@@ -20,11 +20,8 @@ import {
 import { toast } from "react-hot-toast";
 import { AuthError } from "firebase/auth";
 
-interface LoginPageProps {
-  onLoginSuccess?: () => void;
-}
-
-export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
+// Remove the interface since Next.js pages don't accept custom props
+export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -106,11 +103,8 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
           },
         });
 
-        if (onLoginSuccess) {
-          onLoginSuccess();
-        } else {
-          router.push("/");
-        }
+        // Always redirect to home page since this is a Next.js page component
+        router.push("/");
       }
     } catch (error: unknown) {
       let message = "Bir hata oluştu. Lütfen tekrar deneyin.";
@@ -169,11 +163,8 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
           },
         });
 
-        if (onLoginSuccess) {
-          onLoginSuccess();
-        } else {
-          router.push("/");
-        }
+        // Always redirect to home page since this is a Next.js page component
+        router.push("/");
       }
     } catch (error: unknown) {
       let message = "Google ile giriş başarısız. Lütfen tekrar deneyin.";
