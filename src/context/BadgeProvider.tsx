@@ -16,7 +16,7 @@ import {
   orderBy,
   Unsubscribe,
 } from "firebase/firestore";
-import { onAuthStateChanged, User } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "../lib/firebase";
 
 interface BadgeContextType {
@@ -45,7 +45,6 @@ export function BadgeProvider({ children }: BadgeProviderProps) {
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   // Store unsubscribe functions
   const [unsubscribes, setUnsubscribes] = useState<Unsubscribe[]>([]);
@@ -65,12 +64,10 @@ export function BadgeProvider({ children }: BadgeProviderProps) {
         cancelAllSubscriptions();
         setUnreadMessagesCount(0);
         setUnreadNotificationsCount(0);
-        setCurrentUser(null);
         setIsLoading(false);
         setError(null);
       } else {
         // User logged in - setup Firestore listeners
-        setCurrentUser(user);
         setupFirestoreListeners(user.uid);
       }
     });
@@ -110,10 +107,14 @@ export function BadgeProvider({ children }: BadgeProviderProps) {
       // (A) Listen to user document for any additional data
       const userDocUnsubscribe = onSnapshot(
         doc(db, "users", userId),
-        (snapshot) => {
+        (docSnapshot) => {
           console.log("📄 BadgeProvider: User doc updated");
           // You can access other user fields here if needed
-          // Note: We don't update notification count here to avoid conflicts
+          const userData = docSnapshot.data();
+          if (userData) {
+            // Process user document data if needed
+            console.log("User data:", userData);
+          }
         },
         (error) => {
           console.error(
@@ -133,11 +134,11 @@ export function BadgeProvider({ children }: BadgeProviderProps) {
 
       const chatsUnsubscribe = onSnapshot(
         chatsQuery,
-        (snapshot) => {
+        (querySnapshot) => {
           console.log("💬 BadgeProvider: Chats updated, processing...");
           let totalUnread = 0;
 
-          snapshot.docs.forEach((doc) => {
+          querySnapshot.docs.forEach((doc) => {
             const data = doc.data();
             const unreadCounts =
               (data.unreadCounts as Record<string, number>) || {};
@@ -165,8 +166,8 @@ export function BadgeProvider({ children }: BadgeProviderProps) {
 
       const notificationsUnsubscribe = onSnapshot(
         notificationsQuery,
-        (snapshot) => {
-          const count = snapshot.docs.length;
+        (querySnapshot) => {
+          const count = querySnapshot.docs.length;
           console.log("🔔 BadgeProvider: Unread notifications count:", count);
           setUnreadNotificationsCount(count);
         },

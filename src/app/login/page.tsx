@@ -35,7 +35,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [showVerificationMessage, setShowVerificationMessage] = useState(false);
-  const [isDark, setIsDark] = useState(false);
+
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
   // Initialize from URL params
@@ -47,15 +47,6 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
     if (emailParam) setEmail(emailParam);
     if (passwordParam) setPassword(passwordParam);
     setShowVerificationMessage(showVerification);
-
-    // Check for dark mode
-    const darkModeQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    setIsDark(darkModeQuery.matches);
-
-    const handleChange = (e: MediaQueryListEvent) => setIsDark(e.matches);
-    darkModeQuery.addEventListener("change", handleChange);
-
-    return () => darkModeQuery.removeEventListener("change", handleChange);
   }, [searchParams]);
 
   // Email validation

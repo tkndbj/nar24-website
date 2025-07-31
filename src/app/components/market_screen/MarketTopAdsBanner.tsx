@@ -26,13 +26,11 @@ interface AdsBannerProps {
 
 export const AdsBanner: React.FC<AdsBannerProps> = ({
   onBackgroundColorChange,
-  headerHeight = 64,
 }) => {
   const router = useRouter();
   const [banners, setBanners] = useState<BannerItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [screenSize, setScreenSize] = useState({ width: 0, height: 0 });
   const [isClient, setIsClient] = useState(false); // Add client-side check
 
   // Refs for optimizations
@@ -74,19 +72,6 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
     }
   }, [isLargerScreen, isClient]);
 
-  // Handle screen resize
-  useEffect(() => {
-    if (!isClient) return;
-
-    const handleResize = () => {
-      setScreenSize({ width: window.innerWidth, height: window.innerHeight });
-    };
-
-    handleResize(); // Initial call
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, [isClient]);
-
   // Setup Firestore listener
   useEffect(() => {
     console.log("🔥 Setting up Firestore listener for market_top_ads_banners");
@@ -106,7 +91,7 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
         );
         const items: BannerItem[] = [];
 
-        snapshot.docs.forEach((doc, index) => {
+        snapshot.docs.forEach((doc) => {
           const data = doc.data();
           console.log("📄 Document data:", data);
 
