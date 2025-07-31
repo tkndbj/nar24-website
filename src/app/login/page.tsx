@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   signInWithEmailAndPassword,
@@ -20,8 +20,8 @@ import {
 import { toast } from "react-hot-toast";
 import { AuthError } from "firebase/auth";
 
-// Remove the interface since Next.js pages don't accept custom props
-export default function LoginPage() {
+// Create a separate component for the login content that uses useSearchParams
+function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -503,5 +503,23 @@ export default function LoginPage() {
         }
       `}</style>
     </div>
+  );
+}
+
+// Loading component to show while Suspense is loading
+function LoginLoading() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-blue-900/20 dark:to-purple-900/20 flex items-center justify-center">
+      <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+    </div>
+  );
+}
+
+// Main page component that wraps LoginContent in Suspense
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginLoading />}>
+      <LoginContent />
+    </Suspense>
   );
 }
