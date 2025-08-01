@@ -6,6 +6,38 @@ import { getFirestore, Firestore } from "firebase-admin/firestore";
 let app: App | null = null;
 let db: Firestore | null = null;
 
+function formatPrivateKey(key: string): string {
+  // Remove any existing newlines and whitespace
+  let cleanKey = key.replace(/\\n/g, '\n').trim();
+  
+  // If the key doesn't have proper line breaks, add them
+  if (!cleanKey.includes('\n')) {
+    // This handles the case where the key is all on one line
+    cleanKey = cleanKey.replace(/-----BEGIN PRIVATE KEY-----/, '-----BEGIN PRIVATE KEY-----\n');
+    cleanKey = cleanKey.replace(/-----END PRIVATE KEY-----/, '\n-----END PRIVATE KEY-----');
+    
+    // Add line breaks every 64 characters for the key content
+    const beginMarker = '-----BEGIN PRIVATE KEY-----\n';
+    const endMarker = '\n-----END PRIVATE KEY-----';
+    const keyContent = cleanKey.replace(beginMarker, '').replace(endMarker, '');
+    
+    // Split key content into 64-character lines
+    const lines = [];
+    for (let i = 0; i < keyContent.length; i += 64) {
+      lines.push(keyContent.substring(i, i + 64));
+    }
+    
+    cleanKey = beginMarker + lines.join('\n') + endMarker;
+  }
+  
+  // Ensure it ends with a newline
+  if (!cleanKey.endsWith('\n')) {
+    cleanKey += '\n';
+  }
+  
+  return cleanKey;
+}
+
 export function initializeFirebaseAdmin(): App {
   if (app) {
     return app;
@@ -23,59 +55,55 @@ export function initializeFirebaseAdmin(): App {
 
   const projectId = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  let privateKey = process.env.FIREBASE_PRIVATE_KEY;
+  const rawPrivateKey = process.env.FIREBASE_PRIVATE_KEY;
 
-  if (!projectId || !clientEmail || !privateKey) {
+  console.log("🔥 Firebase Admin Initialization Debug:");
+  console.log("Project ID:", projectId ? "✅ Present" : "❌ Missing");
+  console.log("Client Email:", clientEmail ? "✅ Present" : "❌ Missing");
+  console.log("Private Key:", rawPrivateKey ? `✅ Present (${rawPrivateKey.length} chars)` : "❌ Missing");
+
+  if (!projectId || !clientEmail || !rawPrivateKey) {
     const missing = [];
     if (!projectId) missing.push("FIREBASE_PROJECT_ID");
     if (!clientEmail) missing.push("FIREBASE_CLIENT_EMAIL");
-    if (!privateKey) missing.push("FIREBASE_PRIVATE_KEY");
+    if (!rawPrivateKey) missing.push("FIREBASE_PRIVATE_KEY");
 
     throw new Error(`Missing Firebase credentials: ${missing.join(", ")}`);
   }
 
-  // Handle private key formatting - try different approaches
   try {
-    // First, try to handle the key as-is (in case Vercel already formatted it correctly)
-    if (!privateKey.includes('\\n') && !privateKey.includes('\n')) {
-      // If no newlines at all, it might be base64 encoded or malformed
-      throw new Error("Private key appears to be malformed");
-    }
+    // Format the private key properly
+    const privateKey = formatPrivateKey(rawPrivateKey);
     
-    // Replace \\n with actual newlines if needed
-    if (privateKey.includes('\\n')) {
-      privateKey = privateKey.replace(/\\n/g, '\n');
-    }
+    console.log("🔑 Private Key Debug:");
+    console.log("Raw key starts with:", rawPrivateKey.substring(0, 30));
+    console.log("Raw key ends with:", rawPrivateKey.substring(rawPrivateKey.length - 30));
+    console.log("Formatted key starts with:", privateKey.substring(0, 30));
+    console.log("Formatted key ends with:", privateKey.substring(privateKey.length - 30));
+    console.log("Has proper BEGIN marker:", privateKey.includes('-----BEGIN PRIVATE KEY-----'));
+    console.log("Has proper END marker:", privateKey.includes('-----END PRIVATE KEY-----'));
 
-    // Ensure the key starts and ends correctly
-    if (!privateKey.startsWith('-----BEGIN PRIVATE KEY-----')) {
-      throw new Error("Private key missing BEGIN marker");
-    }
-    if (!privateKey.endsWith('-----END PRIVATE KEY-----\n') && !privateKey.endsWith('-----END PRIVATE KEY-----')) {
-      if (!privateKey.endsWith('\n')) {
-        privateKey += '\n';
-      }
-    }
+    const serviceAccount = {
+      projectId,
+      clientEmail,
+      privateKey,
+    };
 
     app = initializeApp({
-      credential: cert({
-        projectId,
-        clientEmail,
-        privateKey,
-      }),
+      credential: cert(serviceAccount),
     });
 
-    console.log("Firebase Admin initialized successfully");
+    console.log("✅ Firebase Admin initialized successfully");
     return app;
   } catch (error) {
-    console.error("Failed to initialize Firebase Admin:", error);
-    console.error("Project ID:", projectId ? "✓ Present" : "✗ Missing");
-    console.error("Client Email:", clientEmail ? "✓ Present" : "✗ Missing");
-    console.error("Private Key:", privateKey ? `✓ Present (${privateKey.length} chars)` : "✗ Missing");
+    console.error("❌ Failed to initialize Firebase Admin:", error);
     
-    if (privateKey) {
-      console.error("Private Key starts with:", privateKey.substring(0, 50));
-      console.error("Private Key ends with:", privateKey.substring(privateKey.length - 50));
+    if (error instanceof Error) {
+      console.error("Error details:", {
+        name: error.name,
+        message: error.message,
+        stack: error.stack?.substring(0, 500)
+      });
     }
     
     throw error;
