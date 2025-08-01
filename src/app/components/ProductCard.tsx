@@ -8,6 +8,7 @@ import {
   ImageIcon,
   ImageOff,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 // Product interface based on your Flutter model
 interface Product {
@@ -250,6 +251,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   isFavorited = false,
   isInCart = false,
 }) => {
+  const router = useRouter();
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [internalSelectedColor, setInternalSelectedColor] = useState<
@@ -278,6 +280,19 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     product.colorImages,
     product.imageUrls,
   ]);
+
+  const handleCardClick = () => {
+    if (onTap) {
+      onTap(); // Call the existing onTap if provided
+    } else {
+      // Add debug logging
+      console.log("Navigating to:", `/productdetail/${product.id}`);
+      console.log("Product ID:", product.id);
+
+      // Navigate to product detail page with product ID
+      router.push(`/productdetail/${product.id}`);
+    }
+  };
 
   useEffect(() => {
     const checkTheme = () => {
@@ -401,7 +416,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   return (
     <div
       className="cursor-pointer"
-      onClick={onTap}
+      onClick={handleCardClick}
       style={{ transform: `scale(${effectiveScaleFactor})` }}
     >
       <div className="flex flex-col">
@@ -667,59 +682,4 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   );
 };
 
-// Demo component to show the card in action
-const ProductCardDemo = () => {
-  const [favorited, setFavorited] = useState(false);
-  const [inCart, setInCart] = useState(false);
-
-  const sampleProduct: Product = {
-    id: "1",
-    productName: "Premium Wireless Headphones",
-    price: 299,
-    originalPrice: 399,
-    discountPercentage: 25,
-    currency: "USD",
-    imageUrls: [
-      "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop",
-      "https://images.unsplash.com/photo-1484704849700-f032a568e944?w=400&h=400&fit=crop",
-      "https://images.unsplash.com/photo-1583394838336-acd977736f90?w=400&h=400&fit=crop",
-    ],
-    colorImages: {
-      black: [
-        "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop",
-      ],
-      white: [
-        "https://images.unsplash.com/photo-1484704849700-f032a568e944?w=400&h=400&fit=crop",
-      ],
-      blue: [
-        "https://images.unsplash.com/photo-1583394838336-acd977736f90?w=400&h=400&fit=crop",
-      ],
-    },
-    description: "High-quality wireless headphones with noise cancellation",
-    brandModel: "AudioTech Pro Max",
-    condition: "New",
-    quantity: 3,
-    averageRating: 4.5,
-    isBoosted: true,
-    deliveryOption: "Fast Delivery",
-    campaignName: "Summer Sale",
-  };
-
-  return (
-    <div className="p-8 bg-gray-50 min-h-screen">
-      <div className="max-w-sm mx-auto">
-        <ProductCard
-          product={sampleProduct}
-          showExtraLabels={true}
-          isFavorited={favorited}
-          isInCart={inCart}
-          onFavoriteToggle={() => setFavorited(!favorited)}
-          onAddToCart={() => setInCart(!inCart)}
-          onTap={() => console.log("Product tapped")}
-        />
-      </div>
-    </div>
-  );
-};
-
-export default ProductCardDemo;
+export default ProductCard;

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { MarketBubbles } from "./components/market_screen/MarketBubbles";
 import { PreferenceProduct } from "./components/market_screen/PreferenceProduct";
+import MarketBanner from "./components/market_screen/MarketBanner";
 
 export default function Home() {
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -68,6 +69,10 @@ export default function Home() {
       {/* Preference Product with background wrapper */}
       <div className={`w-full ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}>
         <PreferenceProduct />
+      </div>
+
+      <div className={`w-full ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}>
+        <MarketBanner />
       </div>
 
       {/* Bottom padding */}

@@ -127,11 +127,6 @@ export const PreferenceProduct: React.FC<PreferenceProductProps> = ({
     router.push("/special-for-you");
   };
 
-  const handleProductTap = (product: Product) => {
-    // Navigate to product detail page
-    router.push(`/products/${product.id}`);
-  };
-
   // Don't render until client-side hydration is complete
   if (!isClient) {
     return (
@@ -255,7 +250,6 @@ export const PreferenceProduct: React.FC<PreferenceProductProps> = ({
                       portraitImageHeight={portraitImageHeight}
                       overrideInternalScaleFactor={overrideInnerScale}
                       showCartIcon={false}
-                      onTap={() => handleProductTap(product)}
                     />
                   </div>
                 ))}
