@@ -168,10 +168,13 @@ export const PreferenceProduct: React.FC<PreferenceProductProps> = ({
   // Don't render until client-side hydration is complete
   if (!isClient) {
     return (
-      <div className="w-full my-2 px-6" style={{ height: `${rowHeight}px` }}>
-        <div className="relative w-full rounded-t-3xl overflow-visible">
+      <div
+        className="w-full my-2 px-0 lg:px-6"
+        style={{ height: `${rowHeight}px` }}
+      >
+        <div className="relative w-full rounded-none lg:rounded-t-3xl overflow-visible">
           <div
-            className="absolute inset-0 rounded-t-3xl"
+            className="absolute inset-0 rounded-none lg:rounded-t-3xl"
             style={{
               height: `${rowHeight * 0.6}px`,
               background: `linear-gradient(to right, #f97316, #ec4899)`,
@@ -181,7 +184,7 @@ export const PreferenceProduct: React.FC<PreferenceProductProps> = ({
           />
 
           <div className="relative py-3">
-            <div className="px-2 mb-2">
+            <div className="px-4 lg:px-2 mb-2">
               <div className="flex justify-between items-center">
                 <div className="h-5 bg-white bg-opacity-30 rounded animate-pulse w-48" />
                 <div className="h-4 bg-white bg-opacity-30 rounded animate-pulse w-16" />
@@ -197,10 +200,13 @@ export const PreferenceProduct: React.FC<PreferenceProductProps> = ({
   // Render loading state
   if (loading) {
     return (
-      <div className="w-full my-2 px-6" style={{ height: `${rowHeight}px` }}>
-        <div className="relative w-full rounded-t-3xl overflow-visible">
+      <div
+        className="w-full my-2 px-0 lg:px-6"
+        style={{ height: `${rowHeight}px` }}
+      >
+        <div className="relative w-full rounded-none lg:rounded-t-3xl overflow-visible">
           <div
-            className="absolute inset-0 rounded-t-3xl"
+            className="absolute inset-0 rounded-none lg:rounded-t-3xl"
             style={{
               height: `${rowHeight * 0.6}px`,
               background: `linear-gradient(to right, #f97316, #ec4899)`,
@@ -210,7 +216,7 @@ export const PreferenceProduct: React.FC<PreferenceProductProps> = ({
           />
 
           <div className="relative py-3">
-            <div className="px-2 mb-2">
+            <div className="px-4 lg:px-2 mb-2">
               <div className="flex justify-between items-center">
                 <div className="h-5 bg-white bg-opacity-30 rounded animate-pulse w-48" />
                 <div className="h-4 bg-white bg-opacity-30 rounded animate-pulse w-16" />
@@ -224,11 +230,11 @@ export const PreferenceProduct: React.FC<PreferenceProductProps> = ({
   }
 
   return (
-    <div className="w-full my-2 px-6">
-      <div className="relative w-full rounded-t-3xl overflow-visible">
+    <div className="w-full my-2 px-0 lg:px-6">
+      <div className="relative w-full rounded-none lg:rounded-t-3xl overflow-visible">
         {/* Background gradient - horizontal orange to pink with vertical fade mask */}
         <div
-          className="absolute inset-0 rounded-t-3xl"
+          className="absolute inset-0 rounded-none lg:rounded-t-3xl"
           style={{
             height: `${rowHeight * 0.6}px`,
             background: `linear-gradient(to right, #f97316, #ec4899)`,
@@ -239,7 +245,7 @@ export const PreferenceProduct: React.FC<PreferenceProductProps> = ({
 
         <div className="relative py-3">
           {/* Title row */}
-          <div className="px-2 mb-2">
+          <div className="px-4 lg:px-2 mb-2">
             <div className="flex justify-between items-center">
               <h2 className="text-lg font-bold text-white">
                 Special Products For You
@@ -257,7 +263,7 @@ export const PreferenceProduct: React.FC<PreferenceProductProps> = ({
           {/* Product list or empty state */}
           {error ? (
             <div
-              className="flex items-center justify-center text-white"
+              className="flex items-center justify-center text-white px-4 lg:px-0"
               style={{ height: `${rowHeight - 60}px` }}
             >
               <p className="text-center">
@@ -275,14 +281,15 @@ export const PreferenceProduct: React.FC<PreferenceProductProps> = ({
             <ShimmerList height={rowHeight - 60} count={5} />
           ) : (
             <div className="relative">
-              {/* Left scroll arrow - positioned outside component */}
+              {/* Left scroll arrow - hidden on mobile, positioned outside component on desktop */}
               {canScrollLeft && (
                 <button
                   onClick={scrollLeft}
-                  className="absolute top-1/2 -translate-y-1/2 z-20 w-12 h-12 bg-white rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105"
+                  className="hidden lg:block absolute top-1/2 -translate-y-1/2 z-20 w-12 h-12 bg-white rounded-full items-center justify-center transition-all duration-200 hover:scale-105"
                   style={{
                     left: "-30px",
                     boxShadow: "0 4px 16px rgba(0, 0, 0, 0.2)",
+                    display: "none",
                   }}
                   aria-label="Scroll left"
                 >
@@ -290,11 +297,11 @@ export const PreferenceProduct: React.FC<PreferenceProductProps> = ({
                 </button>
               )}
 
-              {/* Right scroll arrow - positioned outside component */}
+              {/* Right scroll arrow - hidden on mobile, positioned outside component on desktop */}
               {canScrollRight && (
                 <button
                   onClick={scrollRight}
-                  className="absolute top-1/2 -translate-y-1/2 z-20 w-12 h-12 bg-white rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105"
+                  className="hidden lg:flex absolute top-1/2 -translate-y-1/2 z-20 w-12 h-12 bg-white rounded-full items-center justify-center transition-all duration-200 hover:scale-105"
                   style={{
                     right: "-30px",
                     boxShadow: "0 4px 16px rgba(0, 0, 0, 0.2)",
@@ -321,7 +328,7 @@ export const PreferenceProduct: React.FC<PreferenceProductProps> = ({
                     display: none;
                   }
                 `}</style>
-                <div className="flex gap-1.5 px-2 h-full">
+                <div className="flex gap-1.5 px-4 lg:px-2 h-full">
                   {products.map((product) => (
                     <div
                       key={product.id}

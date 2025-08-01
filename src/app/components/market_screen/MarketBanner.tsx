@@ -23,7 +23,7 @@ interface MarketBannerItem {
 const ShimmerCard = ({ isDarkMode }: { isDarkMode: boolean }) => {
   return (
     <div
-      className={`animate-pulse rounded-lg overflow-hidden ${
+      className={`animate-pulse rounded-none lg:rounded-lg overflow-hidden ${
         isDarkMode ? "bg-gray-800" : "bg-gray-300"
       }`}
     >
@@ -38,7 +38,7 @@ const ShimmerCard = ({ isDarkMode }: { isDarkMode: boolean }) => {
 const ErrorCard = ({ isDarkMode }: { isDarkMode: boolean }) => {
   return (
     <div
-      className={`h-40 w-full rounded-lg flex items-center justify-center ${
+      className={`h-40 w-full rounded-none lg:rounded-lg flex items-center justify-center ${
         isDarkMode ? "bg-gray-800" : "bg-gray-200"
       }`}
     >
@@ -260,9 +260,9 @@ export default function MarketBannerGrid() {
   if (error && banners.length === 0) {
     return (
       <div className={`w-full ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}>
-        <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="max-w-4xl mx-auto px-0 lg:px-4 py-8">
           <div
-            className={`text-center ${
+            className={`text-center px-4 ${
               isDarkMode ? "text-red-400" : "text-red-600"
             }`}
           >
@@ -275,10 +275,10 @@ export default function MarketBannerGrid() {
 
   return (
     <div className={`w-full ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}>
-      <div className="max-w-4xl mx-auto px-4 py-6">
+      <div className="max-w-4xl mx-auto px-0 lg:px-4 py-0 lg:py-6">
         {/* Initial loading state */}
         {isLoading && banners.length === 0 ? (
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 lg:gap-4">
             {Array.from({ length: 6 }, (_, index) => (
               <ShimmerCard key={index} isDarkMode={isDarkMode} />
             ))}
@@ -286,14 +286,14 @@ export default function MarketBannerGrid() {
         ) : (
           <>
             {/* Banner grid */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 lg:gap-4">
               {banners.map((banner) => (
                 <div
                   key={banner.id}
                   className="cursor-pointer transform transition-transform duration-200 hover:scale-105"
                   onClick={() => handleBannerTap(banner)}
                 >
-                  <div className="relative rounded-lg overflow-hidden shadow-md">
+                  <div className="relative rounded-none lg:rounded-lg overflow-hidden shadow-none lg:shadow-md">
                     {/* Loading placeholder */}
                     {loadingImages.has(banner.id) && (
                       <div
@@ -326,11 +326,11 @@ export default function MarketBannerGrid() {
 
             {/* Load more indicator */}
             {hasMore && (
-              <div className="flex justify-center mt-6">
+              <div className="flex justify-center mt-0 lg:mt-6 py-6 lg:py-0">
                 <button
                   onClick={loadMore}
                   disabled={isLoading}
-                  className={`px-6 py-2 rounded-lg transition-colors ${
+                  className={`px-6 py-2 mx-4 lg:mx-0 rounded-lg transition-colors ${
                     isDarkMode
                       ? "bg-blue-600 hover:bg-blue-700 text-white"
                       : "bg-blue-500 hover:bg-blue-600 text-white"
