@@ -97,7 +97,7 @@ export const MarketBubbles: React.FC<MarketBubblesProps> = ({
   };
 
   return (
-    <div className="flex justify-center items-center w-full px-4 gap-2 lg:gap-0 lg:justify-evenly">
+    <div className="flex justify-center items-center w-full px-4 gap-3 lg:gap-0 lg:justify-evenly">
       {bubbles.map((bubble, index) => (
         <div
           key={index}
@@ -109,20 +109,20 @@ export const MarketBubbles: React.FC<MarketBubblesProps> = ({
           {/* Bubble Container */}
           <div className="relative">
             <div
-              className="w-16 h-16 lg:w-20 lg:h-20 rounded-full border-2 flex items-center justify-center relative overflow-hidden transition-all duration-200 hover:shadow-lg"
+              className="w-18 h-18 lg:w-20 lg:h-20 rounded-full border-2 flex items-center justify-center relative overflow-hidden transition-all duration-200 hover:shadow-lg"
               style={{
                 borderColor: bubble.borderColor,
                 backgroundColor: bubble.backgroundColor,
               }}
             >
               {/* Bubble Image */}
-              <div className="relative w-10 h-10 lg:w-12 lg:h-12">
+              <div className="relative w-11 h-11 lg:w-12 lg:h-12">
                 <Image
                   src={bubble.image}
                   alt={bubble.label}
                   fill
                   className="object-contain"
-                  sizes="(max-width: 1024px) 40px, 48px"
+                  sizes="(max-width: 1024px) 44px, 48px"
                 />
               </div>
             </div>
@@ -252,7 +252,7 @@ export const MarketBubblesWithIcons: React.FC<MarketBubblesProps> = ({
   };
 
   return (
-    <div className="flex justify-center items-center w-full px-4 gap-2 lg:gap-0 lg:justify-evenly">
+    <div className="flex justify-center items-center w-full px-4 gap-3 lg:gap-0 lg:justify-evenly">
       {bubbles.map((bubble, index) => (
         <div
           key={index}
@@ -263,7 +263,7 @@ export const MarketBubblesWithIcons: React.FC<MarketBubblesProps> = ({
         >
           <div className="relative">
             <div
-              className="w-16 h-16 lg:w-20 lg:h-20 rounded-full border-2 flex items-center justify-center relative transition-all duration-200 hover:shadow-lg"
+              className="w-18 h-18 lg:w-20 lg:h-20 rounded-full border-2 flex items-center justify-center relative transition-all duration-200 hover:shadow-lg"
               style={{
                 borderColor: bubble.borderColor,
                 backgroundColor: bubble.backgroundColor,

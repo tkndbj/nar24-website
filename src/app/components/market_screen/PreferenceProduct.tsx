@@ -230,7 +230,7 @@ export const PreferenceProduct: React.FC<PreferenceProductProps> = ({
   }
 
   return (
-    <div className="w-full my-2 px-0 lg:px-6">
+    <div className="w-full my-2 -mx-4 lg:mx-0 lg:px-6">
       <div className="relative w-full rounded-none lg:rounded-t-3xl overflow-visible">
         {/* Background gradient - horizontal orange to pink with vertical fade mask */}
         <div
