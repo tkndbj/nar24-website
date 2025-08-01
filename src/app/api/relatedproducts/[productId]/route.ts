@@ -1,8 +1,8 @@
 // src/app/api/relatedproducts/[productId]/route.ts
 
 import { NextRequest, NextResponse } from "next/server";
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getFirestore, DocumentSnapshot } from "firebase-admin/firestore";
+import { getFirestoreAdmin } from "@/lib/firebase-admin";
+import { DocumentSnapshot } from "firebase-admin/firestore";
 
 // Product interface
 interface Product {
@@ -33,36 +33,6 @@ interface Product {
 interface CacheData {
   data: Product[];
   timestamp: number;
-}
-
-// Initialize Firebase Admin SDK
-function initializeFirebase() {
-  if (getApps().length === 0) {
-    try {
-      const projectId = process.env.FIREBASE_PROJECT_ID;
-      const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-      const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(
-        /\\n/g,
-        "\n"
-      );
-
-      if (!projectId || !clientEmail || !privateKey) {
-        throw new Error("Missing Firebase environment variables");
-      }
-
-      initializeApp({
-        credential: cert({
-          projectId,
-          clientEmail,
-          privateKey,
-        }),
-      });
-    } catch (error) {
-      console.error("Failed to initialize Firebase Admin SDK:", error);
-      throw error;
-    }
-  }
-  return getFirestore();
 }
 
 // In-memory cache
@@ -275,7 +245,7 @@ export async function GET(
     }
 
     // Initialize Firebase
-    const db = initializeFirebase();
+    const db = getFirestoreAdmin();
 
     // Normalize productId
     let rawId = productId.trim();
@@ -369,6 +339,22 @@ export async function GET(
     });
   } catch (error) {
     console.error("Error in GET /api/relatedproducts/[productId]:", error);
+
+    // Handle Firebase configuration errors specifically
+    if (
+      error instanceof Error &&
+      error.message.includes("Firebase credentials")
+    ) {
+      return NextResponse.json(
+        {
+          error: "Firebase configuration error",
+          products: [],
+          totalCount: 0,
+        },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json(
       {
         error: "Internal server error",

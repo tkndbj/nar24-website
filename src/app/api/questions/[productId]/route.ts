@@ -1,27 +1,16 @@
 // src/app/api/questions/[productId]/route.ts
 
 import { NextRequest, NextResponse } from "next/server";
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
-
-// Initialize Firebase Admin (do this once)
-if (!getApps().length) {
-  initializeApp({
-    credential: cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-    }),
-  });
-}
-
-const db = getFirestore();
+import { getFirestoreAdmin } from "@/lib/firebase-admin";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ productId: string }> }
 ) {
   try {
+    // Initialize Firestore
+    const db = getFirestoreAdmin();
+
     // Await the params Promise
     const { productId } = await params;
     const { searchParams } = new URL(request.url);
@@ -99,6 +88,18 @@ export async function GET(
     });
   } catch (error) {
     console.error("Error fetching questions:", error);
+
+    // Handle Firebase configuration errors specifically
+    if (
+      error instanceof Error &&
+      error.message.includes("Firebase credentials")
+    ) {
+      return NextResponse.json(
+        { error: "Firebase configuration error" },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
