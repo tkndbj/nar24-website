@@ -3,7 +3,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, Share2, Heart, ShoppingCart, Play, X } from "lucide-react";
 import Image from "next/image";
 import ProductDetailActionsRow from "../../components/product_detail/ProductDetailActionsRow";
@@ -39,15 +39,13 @@ interface Product {
 }
 
 interface ProductDetailPageProps {
-  isDarkMode?: boolean;
+  params: { productId: string };
+  searchParams?: { [key: string]: string | string[] | undefined };
 }
 
-const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
-  isDarkMode: propIsDarkMode,
-}) => {
-  const params = useParams();
+const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   const router = useRouter();
-  const productId = params?.productId as string;
+  const productId = params.productId;
 
   // ✅ FIX: Add state for dark mode detection
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -64,12 +62,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   useEffect(() => {
     if (typeof window !== "undefined") {
       const detectDarkMode = () => {
-        // If prop is explicitly passed, use it
-        if (propIsDarkMode !== undefined) {
-          setIsDarkMode(propIsDarkMode);
-          return;
-        }
-
         // Otherwise auto-detect from document
         const htmlElement = document.documentElement;
         const darkModeMediaQuery = window.matchMedia(
@@ -102,7 +94,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
         mediaQuery.removeEventListener("change", detectDarkMode);
       };
     }
-  }, [propIsDarkMode]);
+  }, []);
 
   useEffect(() => {
     if (!productId) return;
