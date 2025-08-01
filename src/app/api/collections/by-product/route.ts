@@ -1,63 +1,11 @@
 // src/app/api/collections/by-product/route.ts
 
 import { NextRequest, NextResponse } from "next/server";
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
-
-// Initialize Firebase Admin (do this once)
-if (!getApps().length) {
-  // Check if we're in a build environment and skip initialization
-  if (
-    process.env.NODE_ENV === "production" &&
-    !process.env.FIREBASE_PROJECT_ID
-  ) {
-    console.warn(
-      "Firebase credentials not available during build, skipping initialization"
-    );
-  } else {
-    // Validate required environment variables
-    const projectId = process.env.FIREBASE_PROJECT_ID;
-    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-    const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
-
-    if (!projectId || !clientEmail || !privateKey) {
-      console.error("Missing Firebase credentials:", {
-        hasProjectId: !!projectId,
-        hasClientEmail: !!clientEmail,
-        hasPrivateKey: !!privateKey,
-      });
-      throw new Error("Missing required Firebase credentials");
-    }
-
-    initializeApp({
-      credential: cert({
-        projectId,
-        clientEmail,
-        privateKey,
-      }),
-    });
-  }
-}
-
-// Only get Firestore if Firebase is initialized
-const getDb = () => {
-  if (!getApps().length) {
-    throw new Error("Firebase not initialized");
-  }
-  return getFirestore();
-};
+import { getFirestoreAdmin } from "@/lib/firebase-admin";
 
 export async function POST(request: NextRequest) {
   try {
-    // Check if Firebase is available
-    if (!getApps().length) {
-      return NextResponse.json(
-        { error: "Firebase not configured" },
-        { status: 500 }
-      );
-    }
-
-    const db = getDb();
+    const db = getFirestoreAdmin();
     const body = await request.json();
     const { productId, shopId } = body;
 
@@ -152,6 +100,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result);
   } catch (error) {
     console.error("Error fetching product collection:", error);
+
+    if (
+      error instanceof Error &&
+      error.message.includes("Firebase credentials")
+    ) {
+      return NextResponse.json(
+        { error: "Firebase configuration error" },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
