@@ -39,6 +39,7 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
   question,
   sellerImageUrl,
   onReadAll,
+  isDarkMode = false,
 }) => {
   const formatDate = (timestamp: string) => {
     const date = new Date(timestamp);
@@ -51,30 +52,42 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
   const isLongAnswer = question.answerText.length > 150;
 
   return (
-    <div className="min-w-72 w-72 bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+    <div className={`min-w-72 w-72 rounded-lg p-4 border ${
+      isDarkMode 
+        ? "bg-gray-800 border-gray-700" 
+        : "bg-gray-50 border-gray-200"
+    }`}>
       {/* Date */}
       <div className="flex justify-end mb-2">
-        <span className="text-xs text-gray-500 dark:text-gray-400">
+        <span className={`text-xs ${
+          isDarkMode ? "text-gray-400" : "text-gray-500"
+        }`}>
           {formatDate(question.timestamp)}
         </span>
       </div>
 
       {/* Asker name */}
       <div className="mb-2">
-        <span className="text-sm font-bold text-gray-900 dark:text-white">
+        <span className={`text-sm font-bold ${
+          isDarkMode ? "text-white" : "text-gray-900"
+        }`}>
           {displayName}
         </span>
       </div>
 
       {/* Question text */}
       <div className="mb-4">
-        <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-2">
+        <p className={`text-sm line-clamp-2 ${
+          isDarkMode ? "text-gray-300" : "text-gray-700"
+        }`}>
           {question.questionText}
         </p>
       </div>
 
       {/* Answer section */}
-      <div className="bg-white dark:bg-gray-700 rounded-lg p-3 flex-1">
+      <div className={`rounded-lg p-3 flex-1 ${
+        isDarkMode ? "bg-gray-700" : "bg-white"
+      }`}>
         <div className="flex gap-3">
           {/* Seller avatar */}
           <div className="flex-shrink-0">
@@ -87,22 +100,32 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
                 className="rounded-full object-cover"
               />
             ) : (
-              <div className="w-8 h-8 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
-                <User className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                isDarkMode ? "bg-gray-600" : "bg-gray-300"
+              }`}>
+                <User className={`w-4 h-4 ${
+                  isDarkMode ? "text-gray-400" : "text-gray-600"
+                }`} />
               </div>
             )}
           </div>
 
           {/* Answer content */}
           <div className="flex-1 min-w-0">
-            <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-3">
+            <p className={`text-sm line-clamp-3 ${
+              isDarkMode ? "text-gray-300" : "text-gray-700"
+            }`}>
               {question.answerText}
             </p>
 
             {isLongAnswer && (
               <button
                 onClick={onReadAll}
-                className="mt-2 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 underline transition-colors"
+                className={`mt-2 text-xs underline transition-colors ${
+                  isDarkMode
+                    ? "text-gray-400 hover:text-gray-200"
+                    : "text-gray-600 hover:text-gray-800"
+                }`}
               >
                 Read All
               </button>
@@ -114,13 +137,23 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
   );
 };
 
-const LoadingSkeleton: React.FC = () => (
-  <div className="w-full bg-white dark:bg-gray-800 shadow-sm border-b border-gray-100 dark:border-gray-700">
+const LoadingSkeleton: React.FC<{ isDarkMode?: boolean }> = ({ 
+  isDarkMode = false 
+}) => (
+  <div className={`w-full shadow-sm border-b ${
+    isDarkMode 
+      ? "bg-gray-800 border-gray-700" 
+      : "bg-white border-gray-100"
+  }`}>
     <div className="p-4 space-y-4">
       {/* Header skeleton */}
       <div className="flex justify-between items-center">
-        <div className="w-40 h-5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-        <div className="w-24 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+        <div className={`w-40 h-5 rounded animate-pulse ${
+          isDarkMode ? "bg-gray-700" : "bg-gray-200"
+        }`} />
+        <div className={`w-24 h-4 rounded animate-pulse ${
+          isDarkMode ? "bg-gray-700" : "bg-gray-200"
+        }`} />
       </div>
 
       {/* Questions skeleton */}
@@ -128,7 +161,9 @@ const LoadingSkeleton: React.FC = () => (
         {Array.from({ length: 2 }).map((_, i) => (
           <div
             key={i}
-            className="min-w-72 w-72 h-48 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse"
+            className={`min-w-72 w-72 h-48 rounded-lg animate-pulse ${
+              isDarkMode ? "bg-gray-700" : "bg-gray-200"
+            }`}
           />
         ))}
       </div>
@@ -227,7 +262,7 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
   };
 
   if (isLoading || loading) {
-    return <LoadingSkeleton />;
+    return <LoadingSkeleton isDarkMode={isDarkMode} />;
   }
 
   if (totalQuestions === 0) {
@@ -239,16 +274,26 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
     : sellerInfo?.profileImage;
 
   return (
-    <div className="w-full bg-white dark:bg-gray-800 shadow-sm border-b border-gray-100 dark:border-gray-700">
+    <div className={`w-full shadow-sm border-b ${
+      isDarkMode 
+        ? "bg-gray-800 border-gray-700" 
+        : "bg-white border-gray-100"
+    }`}>
       <div className="p-4 space-y-4">
         {/* Header */}
         <div className="flex justify-between items-center">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+          <h3 className={`text-lg font-bold ${
+            isDarkMode ? "text-white" : "text-gray-900"
+          }`}>
             Product Questions
           </h3>
           <button
             onClick={handleViewAllQuestions}
-            className="text-sm font-bold text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 transition-colors"
+            className={`text-sm font-bold transition-colors ${
+              isDarkMode
+                ? "text-orange-400 hover:text-orange-300"
+                : "text-orange-600 hover:text-orange-700"
+            }`}
           >
             View All ({totalQuestions})
           </button>
@@ -260,7 +305,11 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
           {canScrollLeft && (
             <button
               onClick={scrollLeft}
-              className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white dark:bg-gray-700 shadow-lg rounded-full flex items-center justify-center text-gray-600 dark:text-gray-300 hover:text-orange-600 dark:hover:text-orange-400 transition-all opacity-0 group-hover:opacity-100 hover:scale-110"
+              className={`absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 shadow-lg rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-110 ${
+                isDarkMode
+                  ? "bg-gray-700 text-gray-300 hover:text-orange-400"
+                  : "bg-white text-gray-600 hover:text-orange-600"
+              }`}
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
@@ -270,7 +319,11 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
           {canScrollRight && (
             <button
               onClick={scrollRight}
-              className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white dark:bg-gray-700 shadow-lg rounded-full flex items-center justify-center text-gray-600 dark:text-gray-300 hover:text-orange-600 dark:hover:text-orange-400 transition-all opacity-0 group-hover:opacity-100 hover:scale-110"
+              className={`absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 shadow-lg rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-110 ${
+                isDarkMode
+                  ? "bg-gray-700 text-gray-300 hover:text-orange-400"
+                  : "bg-white text-gray-600 hover:text-orange-600"
+              }`}
             >
               <ChevronRight className="w-5 h-5" />
             </button>

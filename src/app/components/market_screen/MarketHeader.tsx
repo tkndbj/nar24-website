@@ -193,7 +193,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
     setIsSearching(false);
 
     if (type === "product") {
-      router.push(`/product/${suggestion.id}`);
+      router.push(`/productdetail/${suggestion.id}`);
     } else {
       router.push(`/category/${suggestion.id}`);
     }

@@ -32,6 +32,7 @@ interface ReviewTileProps {
   review: Review;
   onLike: (reviewId: string) => void;
   currentUserId?: string;
+  isDarkMode?: boolean;
 }
 
 const StarRating: React.FC<{ rating: number; size?: number }> = ({
@@ -65,7 +66,8 @@ const FullScreenImageModal: React.FC<{
   imageUrl: string;
   isOpen: boolean;
   onClose: () => void;
-}> = ({ imageUrl, isOpen, onClose }) => {
+  isDarkMode?: boolean;
+}> = ({ imageUrl, isOpen, onClose, isDarkMode = false }) => {
   if (!isOpen) return null;
 
   return (
@@ -73,7 +75,11 @@ const FullScreenImageModal: React.FC<{
       <div className="relative max-w-full max-h-full">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 z-10 p-2 bg-black bg-opacity-50 rounded-full text-white hover:bg-opacity-70 transition-colors"
+          className={`absolute top-4 right-4 z-10 p-2 rounded-full text-white transition-colors ${
+            isDarkMode 
+              ? "bg-gray-800 bg-opacity-80 hover:bg-opacity-90" 
+              : "bg-black bg-opacity-50 hover:bg-opacity-70"
+          }`}
         >
           <X className="w-6 h-6" />
         </button>
@@ -94,6 +100,7 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
   review,
   onLike,
   currentUserId,
+  isDarkMode = false,
 }) => {
   const [isTranslated, setIsTranslated] = useState(false);
   const [translatedText, setTranslatedText] = useState("");
@@ -147,17 +154,27 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
 
   return (
     <>
-      <div className="min-w-80 w-80 bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+      <div className={`min-w-80 w-80 rounded-lg p-4 border ${
+        isDarkMode 
+          ? "bg-gray-800 border-gray-700" 
+          : "bg-gray-50 border-gray-200"
+      }`}>
         {/* Header with rating, date, and badge */}
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center gap-2">
             <StarRating rating={review.rating} />
-            <span className="text-sm text-gray-500 dark:text-gray-400">
+            <span className={`text-sm ${
+              isDarkMode ? "text-gray-400" : "text-gray-500"
+            }`}>
               {formatDate(review.timestamp)}
             </span>
           </div>
-          <div className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded-full">
-            <span className="text-xs text-gray-600 dark:text-gray-300 font-medium">
+          <div className={`px-2 py-1 rounded-full ${
+            isDarkMode ? "bg-gray-700" : "bg-gray-200"
+          }`}>
+            <span className={`text-xs font-medium ${
+              isDarkMode ? "text-gray-300" : "text-gray-600"
+            }`}>
               Verified Purchase
             </span>
           </div>
@@ -185,7 +202,9 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
         )}
 
         {/* Review text */}
-        <p className="text-sm text-gray-900 dark:text-white mb-3 line-clamp-3">
+        <p className={`text-sm mb-3 line-clamp-3 ${
+          isDarkMode ? "text-white" : "text-gray-900"
+        }`}>
           {isTranslated ? translatedText : review.review}
         </p>
 
@@ -196,7 +215,11 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
             <button
               onClick={handleTranslate}
               disabled={isTranslating}
-              className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+              className={`flex items-center gap-1 text-xs transition-colors ${
+                isDarkMode
+                  ? "text-gray-400 hover:text-gray-200"
+                  : "text-gray-600 hover:text-gray-800"
+              }`}
             >
               <Languages className="w-3 h-3" />
               {isTranslating
@@ -209,7 +232,13 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
             {/* Like button */}
             <button
               onClick={() => onLike(review.id)}
-              className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 hover:text-blue-600 transition-colors"
+              className={`flex items-center gap-1 text-xs transition-colors ${
+                isLiked
+                  ? "text-blue-600"
+                  : isDarkMode
+                  ? "text-gray-400 hover:text-blue-400"
+                  : "text-gray-600 hover:text-blue-600"
+              }`}
             >
               <ThumbsUp
                 className={`w-3 h-3 ${
@@ -222,7 +251,11 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
 
           {/* Read all link */}
           {isLongReview && (
-            <button className="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 underline transition-colors">
+            <button className={`text-xs underline transition-colors ${
+              isDarkMode
+                ? "text-gray-400 hover:text-gray-200"
+                : "text-gray-600 hover:text-gray-800"
+            }`}>
               Read All
             </button>
           )}
@@ -234,18 +267,29 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
         imageUrl={selectedImageUrl || ""}
         isOpen={!!selectedImageUrl}
         onClose={() => setSelectedImageUrl(null)}
+        isDarkMode={isDarkMode}
       />
     </>
   );
 };
 
-const LoadingSkeleton: React.FC = () => (
-  <div className="w-full bg-white dark:bg-gray-800 shadow-sm border-b border-gray-100 dark:border-gray-700">
+const LoadingSkeleton: React.FC<{ isDarkMode?: boolean }> = ({ 
+  isDarkMode = false 
+}) => (
+  <div className={`w-full shadow-sm border-b ${
+    isDarkMode 
+      ? "bg-gray-800 border-gray-700" 
+      : "bg-white border-gray-100"
+  }`}>
     <div className="p-4 space-y-4">
       {/* Header skeleton */}
       <div className="flex justify-between items-center">
-        <div className="w-20 h-5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-        <div className="w-24 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+        <div className={`w-20 h-5 rounded animate-pulse ${
+          isDarkMode ? "bg-gray-700" : "bg-gray-200"
+        }`} />
+        <div className={`w-24 h-4 rounded animate-pulse ${
+          isDarkMode ? "bg-gray-700" : "bg-gray-200"
+        }`} />
       </div>
 
       {/* Reviews skeleton */}
@@ -253,7 +297,9 @@ const LoadingSkeleton: React.FC = () => (
         {Array.from({ length: 2 }).map((_, i) => (
           <div
             key={i}
-            className="min-w-80 w-80 h-40 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse"
+            className={`min-w-80 w-80 h-40 rounded-lg animate-pulse ${
+              isDarkMode ? "bg-gray-700" : "bg-gray-200"
+            }`}
           />
         ))}
       </div>
@@ -264,6 +310,7 @@ const LoadingSkeleton: React.FC = () => (
 const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
   productId,
   isLoading = false,
+  isDarkMode = false,
 }) => {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
@@ -366,7 +413,7 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
   };
 
   if (isLoading || loading) {
-    return <LoadingSkeleton />;
+    return <LoadingSkeleton isDarkMode={isDarkMode} />;
   }
 
   if (totalReviewCount === 0) {
@@ -374,16 +421,26 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
   }
 
   return (
-    <div className="w-full bg-white dark:bg-gray-800 shadow-sm border-b border-gray-100 dark:border-gray-700">
+    <div className={`w-full shadow-sm border-b ${
+      isDarkMode 
+        ? "bg-gray-800 border-gray-700" 
+        : "bg-white border-gray-100"
+    }`}>
       <div className="p-4 space-y-4">
         {/* Header */}
         <div className="flex justify-between items-center">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+          <h3 className={`text-lg font-bold ${
+            isDarkMode ? "text-white" : "text-gray-900"
+          }`}>
             Reviews
           </h3>
           <button
             onClick={handleSeeAllReviews}
-            className="text-sm font-bold text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 transition-colors"
+            className={`text-sm font-bold transition-colors ${
+              isDarkMode
+                ? "text-orange-400 hover:text-orange-300"
+                : "text-orange-600 hover:text-orange-700"
+            }`}
           >
             See All ({totalReviewCount})
           </button>
@@ -395,7 +452,11 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
           {canScrollLeft && (
             <button
               onClick={scrollLeft}
-              className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white dark:bg-gray-700 shadow-lg rounded-full flex items-center justify-center text-gray-600 dark:text-gray-300 hover:text-orange-600 dark:hover:text-orange-400 transition-all opacity-0 group-hover:opacity-100 hover:scale-110"
+              className={`absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 shadow-lg rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-110 ${
+                isDarkMode
+                  ? "bg-gray-700 text-gray-300 hover:text-orange-400"
+                  : "bg-white text-gray-600 hover:text-orange-600"
+              }`}
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
@@ -405,7 +466,11 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
           {canScrollRight && (
             <button
               onClick={scrollRight}
-              className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white dark:bg-gray-700 shadow-lg rounded-full flex items-center justify-center text-gray-600 dark:text-gray-300 hover:text-orange-600 dark:hover:text-orange-400 transition-all opacity-0 group-hover:opacity-100 hover:scale-110"
+              className={`absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 shadow-lg rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-110 ${
+                isDarkMode
+                  ? "bg-gray-700 text-gray-300 hover:text-orange-400"
+                  : "bg-white text-gray-600 hover:text-orange-600"
+              }`}
             >
               <ChevronRight className="w-5 h-5" />
             </button>
@@ -426,6 +491,7 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
                 review={review}
                 onLike={handleLike}
                 currentUserId="current-user" // Get from auth context
+                isDarkMode={isDarkMode}
               />
             ))}
           </div>

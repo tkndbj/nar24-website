@@ -21,16 +21,30 @@ interface ProductDetailSellerInfoProps {
   isDarkMode?: boolean;
 }
 
-const LoadingSkeleton: React.FC = () => (
-  <div className="w-full bg-white dark:bg-gray-800 shadow-sm border-b border-gray-100 dark:border-gray-700">
+const LoadingSkeleton: React.FC<{ isDarkMode?: boolean }> = ({ 
+  isDarkMode = false 
+}) => (
+  <div className={`w-full shadow-sm border-b ${
+    isDarkMode 
+      ? "bg-gray-800 border-gray-700" 
+      : "bg-white border-gray-100"
+  }`}>
     <div className="p-4">
-      <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-3">
+      <div className={`rounded-lg p-3 ${
+        isDarkMode ? "bg-gray-700" : "bg-gray-100"
+      }`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-24 h-4 bg-gray-200 dark:bg-gray-600 rounded animate-pulse" />
-            <div className="w-12 h-6 bg-gray-200 dark:bg-gray-600 rounded animate-pulse" />
+            <div className={`w-24 h-4 rounded animate-pulse ${
+              isDarkMode ? "bg-gray-600" : "bg-gray-200"
+            }`} />
+            <div className={`w-12 h-6 rounded animate-pulse ${
+              isDarkMode ? "bg-gray-600" : "bg-gray-200"
+            }`} />
           </div>
-          <div className="w-4 h-4 bg-gray-200 dark:bg-gray-600 rounded animate-pulse" />
+          <div className={`w-4 h-4 rounded animate-pulse ${
+            isDarkMode ? "bg-gray-600" : "bg-gray-200"
+          }`} />
         </div>
       </div>
     </div>
@@ -42,7 +56,7 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
   sellerName,
   shopId,
   isLoading = false,
-  isDarkMode: _isDarkMode = false, // eslint-disable-line @typescript-eslint/no-unused-vars
+  isDarkMode = false,
 }) => {
   const router = useRouter();
   const [sellerInfo, setSellerInfo] = useState<SellerInfo | null>(null);
@@ -107,7 +121,7 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
   };
 
   if (isLoading || loading) {
-    return <LoadingSkeleton />;
+    return <LoadingSkeleton isDarkMode={isDarkMode} />;
   }
 
   if (error && !sellerInfo) {
@@ -129,21 +143,33 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
   const canNavigate = (isShop && shopId) || sellerId;
 
   return (
-    <div className="w-full bg-white dark:bg-gray-800 shadow-sm border-b border-gray-100 dark:border-gray-700">
+    <div className={`w-full shadow-sm border-b ${
+      isDarkMode 
+        ? "bg-gray-800 border-gray-700" 
+        : "bg-white border-gray-100"
+    }`}>
       <div className="p-4">
-        <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
+        <div className={`rounded-lg p-3 ${
+          isDarkMode ? "bg-gray-700" : "bg-gray-50"
+        }`}>
           <button
             onClick={handleSellerClick}
             disabled={!canNavigate}
-            className={`w-full ${
-              canNavigate ? "hover:bg-gray-100 dark:hover:bg-gray-600" : ""
-            } transition-colors rounded-lg`}
+            className={`w-full transition-colors rounded-lg ${
+              canNavigate 
+                ? isDarkMode 
+                  ? "hover:bg-gray-600" 
+                  : "hover:bg-gray-100"
+                : ""
+            }`}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 {/* Seller name and verification */}
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-gray-900 dark:text-white truncate">
+                  <span className={`text-sm font-bold truncate ${
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  }`}>
                     {displayName || "Unknown Seller"}
                   </span>
 
@@ -165,14 +191,18 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
 
               {/* Arrow icon */}
               {canNavigate && (
-                <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                <ChevronRight className={`w-4 h-4 flex-shrink-0 ${
+                  isDarkMode ? "text-gray-400" : "text-gray-400"
+                }`} />
               )}
             </div>
 
             {/* Additional info row */}
             {(sellerInfo.totalProductsSold > 0 ||
               sellerInfo.totalReviews > 0) && (
-              <div className="flex items-center gap-4 mt-2 text-xs text-gray-600 dark:text-gray-400">
+              <div className={`flex items-center gap-4 mt-2 text-xs ${
+                isDarkMode ? "text-gray-400" : "text-gray-600"
+              }`}>
                 {sellerInfo.totalProductsSold > 0 && (
                   <span>{sellerInfo.totalProductsSold} products sold</span>
                 )}

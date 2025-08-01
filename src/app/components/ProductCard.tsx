@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Heart,
   ShoppingCart,
@@ -7,6 +7,8 @@ import {
   StarHalf,
   ImageIcon,
   ImageOff,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -49,6 +51,46 @@ interface ProductCardProps {
   isInCart?: boolean;
 }
 
+// Enhanced image preloader hook
+const useImagePreloader = (urls: string[]) => {
+  const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!urls.length) return;
+
+    const preloadImages = async () => {
+      const promises = urls.map((url) => {
+        return new Promise<{ url: string; success: boolean }>((resolve) => {
+          const img = new Image();
+          img.onload = () => resolve({ url, success: true });
+          img.onerror = () => resolve({ url, success: false });
+          img.src = url;
+        });
+      });
+
+      const results = await Promise.all(promises);
+      const loaded = new Set<string>();
+      const failed = new Set<string>();
+
+      results.forEach(({ url, success }) => {
+        if (success) {
+          loaded.add(url);
+        } else {
+          failed.add(url);
+        }
+      });
+
+      setLoadedImages(loaded);
+      setFailedImages(failed);
+    };
+
+    preloadImages();
+  }, [urls]);
+
+  return { loadedImages, failedImages };
+};
+
 // Color mapping function
 const getColorFromName = (colorName: string): string => {
   const colorMap: Record<string, string> = {
@@ -86,7 +128,7 @@ const getColorFromName = (colorName: string): string => {
   return colorMap[colorName.toLowerCase()] || "#9E9E9E";
 };
 
-// Fixed rotating text component
+// Optimized rotating text component
 interface RotatingTextProps {
   children: React.ReactNode[];
   duration?: number;
@@ -115,31 +157,23 @@ const RotatingText: React.FC<RotatingTextProps> = ({
     return <div className={className}>{children[0]}</div>;
 
   return (
-    <div
-      className={`relative overflow-hidden ${className}`}
-      style={{ height: "16px" }}
-    >
-      <div
-        className="transition-transform duration-500 ease-in-out"
-        style={{
-          transform: `translateY(-${currentIndex * 16}px)`,
-        }}
-      >
-        {children.map((child, index) => (
-          <div
-            key={index}
-            className="h-4 flex items-center"
-            style={{ lineHeight: "16px" }}
-          >
-            {child}
-          </div>
-        ))}
-      </div>
+    <div className={`relative overflow-hidden ${className}`} style={{ height: "16px" }}>
+      {children.map((child, index) => (
+        <div
+          key={index}
+          className={`absolute w-full h-4 flex items-center transition-all duration-500 ease-in-out ${
+            index === currentIndex ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+          }`}
+          style={{ lineHeight: "16px" }}
+        >
+          {child}
+        </div>
+      ))}
     </div>
   );
 };
 
-// Fixed rotating banner component
+// Optimized rotating banner component
 interface RotatingBannerProps {
   children: React.ReactNode[];
   duration?: number;
@@ -168,18 +202,17 @@ const RotatingBanner: React.FC<RotatingBannerProps> = ({
 
   return (
     <div style={{ height }} className="relative overflow-hidden">
-      <div
-        className="transition-transform duration-500 ease-in-out"
-        style={{
-          transform: `translateY(-${currentIndex * height}px)`,
-        }}
-      >
-        {children.map((child, index) => (
-          <div key={index} style={{ height }}>
-            {child}
-          </div>
-        ))}
-      </div>
+      {children.map((child, index) => (
+        <div
+          key={index}
+          className={`absolute w-full transition-all duration-500 ease-in-out ${
+            index === currentIndex ? "opacity-100 translate-y-0" : "opacity-0 translate-y-full"
+          }`}
+          style={{ height }}
+        >
+          {child}
+        </div>
+      ))}
     </div>
   );
 };
@@ -235,6 +268,34 @@ const ExtraLabel: React.FC<ExtraLabelProps> = ({ text, gradientColors }) => {
   );
 };
 
+// Logo placeholder component
+const LogoPlaceholder: React.FC<{ size?: number }> = ({ size = 120 }) => (
+  <div 
+    className="flex items-center justify-center bg-gray-100 rounded-lg"
+    style={{ width: size, height: size }}
+  >
+    <img 
+      src="/images/narsiyah.png" 
+      alt="Narsiyah Logo" 
+      width={size * 0.8} 
+      height={size * 0.8}
+      className="object-contain"
+      onError={(e) => {
+        // Fallback to generic icon if logo fails to load
+        const target = e.target as HTMLImageElement;
+        target.style.display = 'none';
+        target.parentElement!.innerHTML = `
+          <div class="w-8 h-8 text-gray-400">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+            </svg>
+          </div>
+        `;
+      }}
+    />
+  </div>
+);
+
 export const ProductCard: React.FC<ProductCardProps> = ({
   product,
   scaleFactor = 1.0,
@@ -254,11 +315,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const router = useRouter();
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [internalSelectedColor, setInternalSelectedColor] = useState<
-    string | null
-  >(selectedColor || null);
-  const [imageError, setImageError] = useState(false);
-  const [imageLoading, setImageLoading] = useState(true);
+  const [internalSelectedColor, setInternalSelectedColor] = useState<string | null>(
+    selectedColor || null
+  );
+  const [isHovered, setIsHovered] = useState(false);
 
   // Compute displayed colors (max 4, shuffled)
   const displayedColors = useMemo(() => {
@@ -274,25 +334,19 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       return product.colorImages[colorToUse];
     }
     return product.imageUrls;
-  }, [
-    internalSelectedColor,
-    selectedColor,
-    product.colorImages,
-    product.imageUrls,
-  ]);
+  }, [internalSelectedColor, selectedColor, product.colorImages, product.imageUrls]);
 
-  const handleCardClick = () => {
+  // Preload all images
+  const { loadedImages, failedImages } = useImagePreloader(currentImageUrls);
+
+  const handleCardClick = useCallback(() => {
     if (onTap) {
-      onTap(); // Call the existing onTap if provided
+      onTap();
     } else {
-      // Add debug logging
       console.log("Navigating to:", `/productdetail/${product.id}`);
-      console.log("Product ID:", product.id);
-
-      // Navigate to product detail page with product ID
       router.push(`/productdetail/${product.id}`);
     }
-  };
+  }, [onTap, product.id, router]);
 
   useEffect(() => {
     const checkTheme = () => {
@@ -312,11 +366,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     return () => observer.disconnect();
   }, []);
 
-  // Reset image index when color changes
+  // Reset image index when color changes with faster transition
   useEffect(() => {
     setCurrentImageIndex(0);
-    setImageError(false);
-    setImageLoading(true);
   }, [internalSelectedColor, selectedColor]);
 
   // Update internal selected color when prop changes
@@ -325,8 +377,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   }, [selectedColor]);
 
   const effectiveScaleFactor = scaleFactor;
-  const finalInternalScaleFactor =
-    overrideInternalScaleFactor ?? internalScaleFactor;
+  const finalInternalScaleFactor = overrideInternalScaleFactor ?? internalScaleFactor;
   const textScaleFactor = effectiveScaleFactor * 0.9 * finalInternalScaleFactor;
 
   const hasDiscount = (product.discountPercentage ?? 0) > 0;
@@ -337,24 +388,22 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     ? `${portraitImageHeight * effectiveScaleFactor}px`
     : "35vh";
 
-  // Build rotating children for description area - FIXED (only brand model and stock info)
+  // Build rotating children for description area
   const rotatingChildren = useMemo(() => {
     const children: React.ReactNode[] = [];
     const quantity = product.quantity ?? 1;
 
-    // Always add brand model if available
     if (product.brandModel) {
       children.push(
-        <span className="text-gray-500 text-xs truncate">
+        <span key="brand" className="text-gray-500 text-xs truncate">
           {product.brandModel}
         </span>
       );
     }
 
-    // Add stock info if low quantity
     if (quantity <= 5 && quantity > 0) {
       children.push(
-        <span className="text-emerald-600 text-xs font-bold truncate">
+        <span key="stock" className="text-emerald-600 text-xs font-bold truncate">
           Only {quantity} left
         </span>
       );
@@ -363,13 +412,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     return children;
   }, [product.brandModel, product.quantity]);
 
-  // Build banner children - FIXED
+  // Build banner children
   const bannerChildren = useMemo(() => {
     const children: React.ReactNode[] = [];
 
     if (hasFastDelivery) {
       children.push(
-        <div className="w-full h-full bg-orange-500 flex items-center justify-center text-white text-xs font-medium">
+        <div key="delivery" className="w-full h-full bg-orange-500 flex items-center justify-center text-white text-xs font-medium">
           Fast Delivery
         </div>
       );
@@ -377,7 +426,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
     if (hasDiscountBanner) {
       children.push(
-        <div className="w-full h-full bg-emerald-600 flex items-center justify-center text-white text-xs font-medium">
+        <div key="discount" className="w-full h-full bg-emerald-600 flex items-center justify-center text-white text-xs font-medium">
           {product.discountPercentage}% OFF
         </div>
       );
@@ -386,21 +435,25 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     return children;
   }, [hasFastDelivery, hasDiscountBanner, product.discountPercentage]);
 
-  const handleColorSelect = (color: string) => {
+  const handleColorSelect = useCallback((color: string) => {
     const newColor = internalSelectedColor === color ? null : color;
     setInternalSelectedColor(newColor);
     onColorSelect?.(newColor || "");
-  };
+  }, [internalSelectedColor, onColorSelect]);
 
-  const handleImageLoad = () => {
-    setImageLoading(false);
-    setImageError(false);
-  };
+  const handlePrevImage = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentImageIndex((prev) =>
+      prev === 0 ? currentImageUrls.length - 1 : prev - 1
+    );
+  }, [currentImageUrls.length]);
 
-  const handleImageError = () => {
-    setImageLoading(false);
-    setImageError(true);
-  };
+  const handleNextImage = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentImageIndex((prev) =>
+      prev === currentImageUrls.length - 1 ? 0 : prev + 1
+    );
+  }, [currentImageUrls.length]);
 
   // Determine active dot for pagination (max 3 dots)
   const getActiveDotIndex = () => {
@@ -413,75 +466,68 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     return 1;
   };
 
+  const currentImageUrl = currentImageUrls[currentImageIndex];
+  const isImageLoaded = currentImageUrl && loadedImages.has(currentImageUrl);
+  const isImageFailed = currentImageUrl && failedImages.has(currentImageUrl);
+
   return (
     <div
-      className="cursor-pointer"
+      className="cursor-pointer transition-transform duration-200 hover:scale-105"
       onClick={handleCardClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       style={{ transform: `scale(${effectiveScaleFactor})` }}
     >
       <div className="flex flex-col">
         {/* Image Section */}
-        <div className="relative" style={{ height: imageHeight }}>
-          <div className="w-full h-full rounded-t-xl overflow-hidden bg-gray-200">
+        <div className="relative group" style={{ height: imageHeight }}>
+          <div className="w-full h-full rounded-t-xl overflow-hidden bg-gray-200 relative">
             {currentImageUrls.length > 0 ? (
               <div className="relative w-full h-full">
-                {/* Current Image */}
-                <img
-                  src={currentImageUrls[currentImageIndex]}
-                  alt={product.productName}
-                  className={`w-full h-full object-cover transition-opacity duration-300 ${
-                    imageLoading || imageError ? "opacity-0" : "opacity-100"
-                  }`}
-                  onLoad={handleImageLoad}
-                  onError={handleImageError}
-                />
-
-                {/* Loading/Error States */}
-                {imageLoading && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-gray-200">
-                    <div className="w-24 h-24 bg-gray-100 rounded-lg flex items-center justify-center">
-                      <ImageIcon size={32} className="text-gray-400" />
+                {/* Image with smooth transition */}
+                <div className="relative w-full h-full">
+                  {isImageLoaded ? (
+                    <img
+                      src={currentImageUrl}
+                      alt={product.productName}
+                      className="w-full h-full object-cover transition-opacity duration-300"
+                    />
+                  ) : isImageFailed ? (
+                    <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                      <ImageOff size={32} className="text-gray-400" />
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                      <LogoPlaceholder size={80} />
+                    </div>
+                  )}
+                </div>
 
-                {imageError && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-gray-200">
-                    <ImageOff size={32} className="text-gray-400" />
-                  </div>
-                )}
-
-                {/* Image Navigation */}
+                {/* Navigation buttons - show on hover instantly for multiple images */}
                 {currentImageUrls.length > 1 && (
                   <>
                     <button
-                      className="absolute left-2 top-1/2 transform -translate-y-1/2 w-8 h-8 bg-black bg-opacity-50 rounded-full flex items-center justify-center text-white opacity-0 hover:opacity-100 transition-opacity"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setCurrentImageIndex((prev) =>
-                          prev === 0 ? currentImageUrls.length - 1 : prev - 1
-                        );
-                      }}
+                      className={`absolute left-2 top-1/2 transform -translate-y-1/2 w-8 h-8 bg-black bg-opacity-50 rounded-full flex items-center justify-center text-white transition-opacity duration-150 ${
+                        isHovered ? "opacity-100" : "opacity-0"
+                      }`}
+                      onClick={handlePrevImage}
                     >
-                      ‹
+                      <ChevronLeft size={16} />
                     </button>
                     <button
-                      className="absolute right-2 top-1/2 transform -translate-y-1/2 w-8 h-8 bg-black bg-opacity-50 rounded-full flex items-center justify-center text-white opacity-0 hover:opacity-100 transition-opacity"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setCurrentImageIndex((prev) =>
-                          prev === currentImageUrls.length - 1 ? 0 : prev + 1
-                        );
-                      }}
+                      className={`absolute right-2 top-1/2 transform -translate-y-1/2 w-8 h-8 bg-black bg-opacity-50 rounded-full flex items-center justify-center text-white transition-opacity duration-150 ${
+                        isHovered ? "opacity-100" : "opacity-0"
+                      }`}
+                      onClick={handleNextImage}
                     >
-                      ›
+                      <ChevronRight size={16} />
                     </button>
                   </>
                 )}
               </div>
             ) : (
               <div className="w-full h-full flex items-center justify-center">
-                <ImageOff size={32} className="text-gray-400" />
+                <LogoPlaceholder size={80} />
               </div>
             )}
           </div>
@@ -490,14 +536,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           <div className="absolute top-2 right-2 flex items-center gap-2">
             {showExtraLabels && (
               <>
-                <ExtraLabel
-                  text="Nar24"
-                  gradientColors={["#FF9800", "#E91E63"]}
-                />
-                <ExtraLabel
-                  text="Vitrin"
-                  gradientColors={["#9C27B0", "#E91E63"]}
-                />
+                <ExtraLabel text="Nar24" gradientColors={["#FF9800", "#E91E63"]} />
+                <ExtraLabel text="Vitrin" gradientColors={["#9C27B0", "#E91E63"]} />
               </>
             )}
 
@@ -511,9 +551,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             >
               <Heart
                 size={12}
-                className={
-                  isFavorited ? "fill-red-500 text-red-500" : "text-gray-500"
-                }
+                className={isFavorited ? "fill-red-500 text-red-500" : "text-gray-500"}
               />
             </button>
           </div>
@@ -526,8 +564,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 return (
                   <button
                     key={color}
-                    className={`w-5 h-5 rounded-full border-2 transition-all ${
-                      isSelected ? "border-orange-500" : "border-white"
+                    className={`w-5 h-5 rounded-full border-2 transition-all duration-200 ${
+                      isSelected ? "border-orange-500 scale-110" : "border-white hover:scale-105"
                     }`}
                     style={{ backgroundColor: getColorFromName(color) }}
                     onClick={(e) => {
@@ -535,9 +573,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                       handleColorSelect(color);
                     }}
                   >
-                    {isSelected && (
-                      <Check size={10} className="text-white m-auto" />
-                    )}
+                    {isSelected && <Check size={10} className="text-white m-auto" />}
                   </button>
                 );
               })}
@@ -565,26 +601,23 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           {/* Image Dots */}
           {currentImageUrls.length > 1 && (
             <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2">
-              <div className="px-2 py-1 bg-gray-600 rounded-full flex gap-1">
-                {Array.from(
-                  { length: Math.min(currentImageUrls.length, 3) },
-                  (_, i) => {
-                    const isActive = i === getActiveDotIndex();
-                    return (
-                      <div
-                        key={i}
-                        className={`w-1.5 h-1.5 rounded-full transition-all ${
-                          isActive ? "bg-orange-500" : "bg-white bg-opacity-60"
-                        }`}
-                      />
-                    );
-                  }
-                )}
+              <div className="px-2 py-1 bg-gray-600 bg-opacity-80 rounded-full flex gap-1">
+                {Array.from({ length: Math.min(currentImageUrls.length, 3) }, (_, i) => {
+                  const isActive = i === getActiveDotIndex();
+                  return (
+                    <div
+                      key={i}
+                      className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
+                        isActive ? "bg-orange-500 scale-125" : "bg-white bg-opacity-60"
+                      }`}
+                    />
+                  );
+                })}
               </div>
             </div>
           )}
 
-          {/* Bottom Banner - FIXED */}
+          {/* Bottom Banner */}
           {bannerChildren.length > 0 && (
             <div className="absolute bottom-0 left-0 right-0">
               <RotatingBanner height={20} duration={2000}>
@@ -606,9 +639,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             {product.productName}
           </h3>
 
-          {/* Rotating Description - FIXED */}
+          {/* Rotating Description */}
           {rotatingChildren.length > 0 && (
-            <RotatingText duration={2000}>{rotatingChildren}</RotatingText>
+            <RotatingText duration={1500}>{rotatingChildren}</RotatingText>
           )}
 
           <div className="h-1" />
@@ -616,10 +649,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           {/* Rating Row */}
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-1">
-              <StarRating
-                rating={product.averageRating}
-                size={12 * effectiveScaleFactor}
-              />
+              <StarRating rating={product.averageRating} size={12 * effectiveScaleFactor} />
               <span
                 className="text-gray-500"
                 style={{ fontSize: `${10 * textScaleFactor}px` }}
@@ -662,14 +692,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             {/* Cart Icon */}
             {showCartIcon && (
               <button
-                className="w-6 h-6 flex items-center justify-center transform -translate-y-1"
+                className="w-6 h-6 flex items-center justify-center transform -translate-y-1 transition-transform hover:scale-110"
                 onClick={(e) => {
                   e.stopPropagation();
                   onAddToCart?.(product.id);
                 }}
               >
                 {isInCart ? (
-                  <Check size={16} className="text-gray-800" />
+                  <Check size={16} className="text-green-600" />
                 ) : (
                   <ShoppingCart size={16} className="text-gray-800" />
                 )}

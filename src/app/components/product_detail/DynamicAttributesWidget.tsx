@@ -15,31 +15,54 @@ interface DynamicAttributesWidgetProps {
 interface AttributeCardProps {
   title: string;
   value: string;
+  isDarkMode?: boolean;
 }
 
-const AttributeCard: React.FC<AttributeCardProps> = ({ title, value }) => (
-  <div className="inline-flex flex-col px-3 py-2 bg-gray-50 dark:bg-gray-900 rounded-lg border border-orange-400 dark:border-orange-500">
-    <span className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1 truncate">
+const AttributeCard: React.FC<AttributeCardProps> = ({ 
+  title, 
+  value, 
+  isDarkMode = false 
+}) => (
+  <div className={`inline-flex flex-col px-3 py-2 rounded-lg border ${
+    isDarkMode 
+      ? "bg-gray-900 border-orange-500" 
+      : "bg-gray-50 border-orange-400"
+  }`}>
+    <span className={`text-xs font-semibold mb-1 truncate ${
+      isDarkMode ? "text-gray-400" : "text-gray-600"
+    }`}>
       {title}
     </span>
-    <span className="text-sm font-medium text-gray-900 dark:text-white">
+    <span className={`text-sm font-medium ${
+      isDarkMode ? "text-white" : "text-gray-900"
+    }`}>
       {value}
     </span>
   </div>
 );
 
-const LoadingSkeleton: React.FC = () => (
-  <div className="w-full bg-white dark:bg-gray-800 shadow-sm border-b border-gray-100 dark:border-gray-700">
+const LoadingSkeleton: React.FC<{ isDarkMode?: boolean }> = ({ 
+  isDarkMode = false 
+}) => (
+  <div className={`w-full shadow-sm border-b ${
+    isDarkMode 
+      ? "bg-gray-800 border-gray-700" 
+      : "bg-white border-gray-100"
+  }`}>
     <div className="p-4 space-y-4">
       {/* Header skeleton */}
-      <div className="w-32 h-5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+      <div className={`w-32 h-5 rounded animate-pulse ${
+        isDarkMode ? "bg-gray-700" : "bg-gray-200"
+      }`} />
 
       {/* Attributes grid skeleton */}
       <div className="flex flex-wrap gap-2">
         {Array.from({ length: 6 }).map((_, i) => (
           <div
             key={i}
-            className="w-24 h-14 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse"
+            className={`w-24 h-14 rounded-lg animate-pulse ${
+              isDarkMode ? "bg-gray-700" : "bg-gray-200"
+            }`}
           />
         ))}
       </div>
@@ -94,9 +117,10 @@ const localizeAttribute = (
 const DynamicAttributesWidget: React.FC<DynamicAttributesWidgetProps> = ({
   product,
   isLoading = false,
+  isDarkMode = false,
 }) => {
   if (isLoading || !product) {
-    return <LoadingSkeleton />;
+    return <LoadingSkeleton isDarkMode={isDarkMode} />;
   }
 
   if (!product.attributes || Object.keys(product.attributes).length === 0) {
@@ -129,17 +153,28 @@ const DynamicAttributesWidget: React.FC<DynamicAttributesWidgetProps> = ({
   }
 
   return (
-    <div className="w-full bg-white dark:bg-gray-800 shadow-sm border-b border-gray-100 dark:border-gray-700">
+    <div className={`w-full shadow-sm border-b ${
+      isDarkMode 
+        ? "bg-gray-800 border-gray-700" 
+        : "bg-white border-gray-100"
+    }`}>
       <div className="p-4 space-y-4">
         {/* Header */}
-        <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+        <h3 className={`text-lg font-bold ${
+          isDarkMode ? "text-white" : "text-gray-900"
+        }`}>
           Product Details
         </h3>
 
         {/* Attributes grid */}
         <div className="flex flex-wrap gap-2">
           {formattedAttributes.map((attr, index) => (
-            <AttributeCard key={index} title={attr.title} value={attr.value} />
+            <AttributeCard 
+              key={index} 
+              title={attr.title} 
+              value={attr.value}
+              isDarkMode={isDarkMode}
+            />
           ))}
         </div>
       </div>

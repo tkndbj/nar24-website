@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Share2, Heart, ShoppingCart, Play, X } from "lucide-react";
+import { ArrowLeft, Share2, Heart, ShoppingCart, Play, X, Check, Plus, Minus } from "lucide-react";
 import Image from "next/image";
 import ProductDetailActionsRow from "../../components/product_detail/ProductDetailActionsRow";
 import DynamicAttributesWidget from "../../components/product_detail/DynamicAttributesWidget";
@@ -14,6 +14,8 @@ import ProductDetailReviewsTab from "../../components/product_detail/Reviews";
 import ProductDetailSellerInfo from "../../components/product_detail/SellerInfo";
 import ProductQuestionsWidget from "../../components/product_detail/Questions";
 import ProductDetailRelatedProducts from "../../components/product_detail/RelatedProducts";
+import { useCart } from "@/context/CartProvider"; // ✅ ADDED: Import useCart hook
+import { useUser } from "@/context/UserProvider"; // ✅ ADDED: Import useUser hook
 
 interface Product {
   id: string;
@@ -47,7 +49,14 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   const router = useRouter();
   const [productId, setProductId] = useState<string>("");
 
-  // ✅ FIX: Add state for dark mode detection
+  // ✅ ADDED: Cart and user hooks
+  const { addToCart, isInCart, isOptimisticallyAdding, isOptimisticallyRemoving } = useCart();
+  const { user } = useUser();
+
+  // ✅ ADDED: Animation states
+  const [cartButtonState, setCartButtonState] = useState<'idle' | 'adding' | 'added' | 'removing' | 'removed'>('idle');
+  const [showCartAnimation, setShowCartAnimation] = useState(false);
+
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [product, setProduct] = useState<Product | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -64,11 +73,9 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     });
   }, [params]);
 
-  // ✅ FIX: Auto-detect dark mode properly
   useEffect(() => {
     if (typeof window !== "undefined") {
       const detectDarkMode = () => {
-        // Otherwise auto-detect from document
         const htmlElement = document.documentElement;
         const darkModeMediaQuery = window.matchMedia(
           "(prefers-color-scheme: dark)"
@@ -82,10 +89,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         setIsDarkMode(isDark);
       };
 
-      // Initial detection
       detectDarkMode();
 
-      // Listen for changes
       const observer = new MutationObserver(detectDarkMode);
       observer.observe(document.documentElement, {
         attributes: true,
@@ -103,6 +108,10 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   }, []);
 
   useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [productId]);
+
+  useEffect(() => {
     if (!productId) return;
 
     const fetchProduct = async () => {
@@ -110,7 +119,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         setIsLoading(true);
         setError(null);
 
-        // Replace with your actual API endpoint
         const response = await fetch(`/api/products/${productId}`);
 
         if (!response.ok) {
@@ -120,7 +128,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         const productData = await response.json();
         setProduct(productData);
 
-        // Record detail view
         recordDetailView(productData);
       } catch (err) {
         console.error("Error fetching product:", err);
@@ -135,7 +142,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
   const recordDetailView = async (product: Product) => {
     try {
-      // Record analytics
       await fetch("/api/analytics/detail-view", {
         method: "POST",
         headers: {
@@ -167,9 +173,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           url: window.location.href,
         });
       } else {
-        // Fallback: copy to clipboard
         await navigator.clipboard.writeText(window.location.href);
-        // You could show a toast notification here
       }
     } catch (error) {
       console.error("Error sharing:", error);
@@ -196,32 +200,118 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     }
   };
 
+  // ✅ MODIFIED: Enhanced cart functionality with animations
   const handleAddToCart = async () => {
-    try {
-      const response = await fetch("/api/cart/add", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          productId: product?.id,
-          quantity: 1,
-        }),
-      });
-
-      if (response.ok) {
-        // Show success message or update cart count
-      }
-    } catch (error) {
-      console.error("Error adding to cart:", error);
+    if (!user) {
+      // Redirect to login or show login modal
+      router.push('/login');
+      return;
     }
+
+    if (!product) return;
+
+    try {
+      const wasInCart = isInCart(product.id);
+      
+      // Set loading state
+      setCartButtonState(wasInCart ? 'removing' : 'adding');
+      setShowCartAnimation(true);
+
+      // Call the cart function
+      const result = await addToCart(product.id, 1);
+      
+      // Set success state based on result
+      if (result.includes('Added')) {
+        setCartButtonState('added');
+      } else if (result.includes('Removed')) {
+        setCartButtonState('removed');
+      }
+
+      // Reset state after animation
+      setTimeout(() => {
+        setCartButtonState('idle');
+        setShowCartAnimation(false);
+      }, 2000);
+
+    } catch (error) {
+      console.error("Error with cart operation:", error);
+      setCartButtonState('idle');
+      setShowCartAnimation(false);
+    }
+  };
+
+  const handleBuyNow = async () => {
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
+    if (!product) return;
+
+    try {
+      // Add to cart first if not already in cart
+      if (!isInCart(product.id)) {
+        await addToCart(product.id, 1);
+      }
+      
+      // Redirect to checkout
+      router.push(`/checkout?productId=${product.id}&quantity=1`);
+    } catch (error) {
+      console.error("Error with buy now:", error);
+    }
+  };
+
+  // ✅ ADDED: Get current cart status
+  const getCartButtonContent = () => {
+    const productInCart = product ? isInCart(product.id) : false;
+    const isOptimisticAdd = product ? isOptimisticallyAdding(product.id) : false;
+    const isOptimisticRemove = product ? isOptimisticallyRemoving(product.id) : false;
+
+    if (cartButtonState === 'adding' || isOptimisticAdd) {
+      return {
+        icon: <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />,
+        text: "Ekleniyor...",
+      };
+    }
+
+    if (cartButtonState === 'removing' || isOptimisticRemove) {
+      return {
+        icon: <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />,
+        text: "Çıkarılıyor...",
+      };
+    }
+
+    if (cartButtonState === 'added') {
+      return {
+        icon: <Check className="w-5 h-5" />,
+        text: "Sepete Eklendi!",
+      };
+    }
+
+    if (cartButtonState === 'removed') {
+      return {
+        icon: <Check className="w-5 h-5" />,
+        text: "Sepetten Çıkarıldı!",
+      };
+    }
+
+    if (productInCart) {
+      return {
+        icon: <Minus className="w-5 h-5" />,
+        text: "Sepetten Çıkar",
+      };
+    }
+
+    return {
+      icon: <ShoppingCart className="w-5 h-5" />,
+      text: "Sepete Ekle",
+    };
   };
 
   const LoadingSkeleton = () => (
     <div
       className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
     >
-      {/* Header skeleton */}
       <div
         className={`
         sticky top-0 z-10 border-b 
@@ -251,14 +341,12 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         </div>
       </div>
 
-      {/* Image section skeleton */}
       <div
         className={`w-full h-96 animate-pulse ${
           isDarkMode ? "bg-gray-700" : "bg-gray-200"
         }`}
       />
 
-      {/* Content skeleton */}
       <div className="space-y-4 p-4">
         <div
           className={`h-6 rounded animate-pulse ${
@@ -316,6 +404,9 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     );
   }
 
+  const cartButtonContent = getCartButtonContent();
+  const productInCart = isInCart(product.id);
+
   return (
     <div
       className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
@@ -372,7 +463,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
       </div>
 
       {/* Main content */}
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-6xl mx-auto px-2">
         {/* Image section */}
         <div
           className={`
@@ -415,7 +506,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
             </div>
           )}
 
-          {/* Video play button */}
           {product.videoUrl && (
             <button
               onClick={() => setShowVideoModal(true)}
@@ -425,14 +515,12 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
             </button>
           )}
 
-          {/* Best seller badge */}
           {product.bestSellerRank && product.bestSellerRank <= 10 && (
             <div className="absolute top-4 right-4 px-3 py-1 bg-orange-600 text-white text-sm font-bold rounded-full">
               #{product.bestSellerRank} Best Seller
             </div>
           )}
 
-          {/* Image navigation dots */}
           {product.imageUrls.length > 1 && (
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
               {product.imageUrls.map((_, index) => (
@@ -489,7 +577,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           </div>
         </div>
 
-        {/* Actions row */}
         <ProductDetailActionsRow
           product={product}
           onShare={handleShare}
@@ -505,17 +592,14 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           isDarkMode={isDarkMode}
         />
 
-        {/* Dynamic attributes */}
         <DynamicAttributesWidget product={product} isDarkMode={isDarkMode} />
 
-        {/* Collection products */}
         <ProductCollectionWidget
           productId={product.id}
           shopId={product.shopId}
           isDarkMode={isDarkMode}
         />
 
-        {/* Description */}
         {product.description && (
           <div
             className={`
@@ -546,7 +630,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           </div>
         )}
 
-        {/* Reviews */}
         <ProductDetailReviewsTab
           productId={product.id}
           isDarkMode={isDarkMode}
@@ -565,9 +648,11 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           subcategory={product.subcategory}
           isDarkMode={isDarkMode}
         />
+
+        <div className="h-24" />
       </div>
 
-      {/* Bottom action bar */}
+      {/* ✅ ENHANCED: Bottom action bar with animations */}
       <div
         className={`
         fixed bottom-0 left-0 right-0 border-t p-4 safe-area-pb
@@ -578,40 +663,51 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         }
       `}
       >
-        <div className="max-w-4xl mx-auto flex gap-3">
-          <button
-            onClick={handleToggleFavorite}
-            className={`
-              flex-1 py-3 px-4 rounded-lg border transition-colors
-              ${
-                isFavorite
-                  ? `border-red-500 text-red-500 ${
-                      isDarkMode ? "hover:bg-red-900/20" : "hover:bg-red-50"
-                    }`
-                  : `${
-                      isDarkMode
-                        ? "border-gray-600 text-gray-300 hover:bg-gray-700"
-                        : "border-gray-300 text-gray-700 hover:bg-gray-50"
-                    }`
-              }
-            `}
-          >
-            <Heart
-              className={`w-5 h-5 mx-auto ${isFavorite ? "fill-current" : ""}`}
-            />
-          </button>
-
+        <div className="max-w-6xl mx-auto px-2 flex gap-3">
+          {/* ✅ ENHANCED: Cart Button with animations */}
           <button
             onClick={handleAddToCart}
-            className="flex-[3] py-3 px-6 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
+            disabled={cartButtonState === 'adding' || cartButtonState === 'removing'}
+            className={`
+              flex-1 py-3 px-4 rounded-lg border font-semibold transition-all duration-300 flex items-center justify-center gap-2 relative overflow-hidden
+              ${
+                productInCart && cartButtonState === 'idle'
+                  ? isDarkMode
+                    ? "border-red-500 text-red-400 hover:bg-red-900/20"
+                    : "border-red-500 text-red-600 hover:bg-red-50"
+                  : cartButtonState === 'added' || cartButtonState === 'removed'
+                  ? "border-green-500 text-green-600 bg-green-50"
+                  : isDarkMode
+                  ? "border-orange-500 text-orange-400 hover:bg-orange-900/20"
+                  : "border-orange-500 text-orange-600 hover:bg-orange-50"
+              }
+              ${(cartButtonState === 'adding' || cartButtonState === 'removing') ? 'opacity-75 cursor-not-allowed' : ''}
+              ${showCartAnimation ? 'transform scale-105' : ''}
+            `}
           >
-            <ShoppingCart className="w-5 h-5" />
-            Add to Cart
+            <span className={`transition-all duration-300 ${showCartAnimation ? 'animate-pulse' : ''}`}>
+              {cartButtonContent.icon}
+            </span>
+            <span className="transition-all duration-300">
+              {cartButtonContent.text}
+            </span>
+            
+            {/* ✅ ADDED: Success animation overlay */}
+            {(cartButtonState === 'added' || cartButtonState === 'removed') && (
+              <div className="absolute inset-0 bg-green-500/10 animate-pulse" />
+            )}
+          </button>
+
+          {/* Buy Now Button */}
+          <button
+            onClick={handleBuyNow}
+            className="flex-1 py-3 px-4 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
+          >
+            Şimdi Satın Al
           </button>
         </div>
       </div>
 
-      {/* Full screen image viewer */}
       <FullScreenImageViewer
         imageUrls={product.imageUrls}
         initialIndex={currentImageIndex}
@@ -620,7 +716,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         isDarkMode={isDarkMode}
       />
 
-      {/* Video modal */}
       {showVideoModal && product.videoUrl && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
           <div className="relative w-full max-w-4xl aspect-video bg-black rounded-lg overflow-hidden">
@@ -639,9 +734,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           </div>
         </div>
       )}
-
-      {/* Bottom padding for fixed button */}
-      <div className="h-20" />
     </div>
   );
 };
