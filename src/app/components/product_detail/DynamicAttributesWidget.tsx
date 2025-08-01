@@ -94,7 +94,6 @@ const localizeAttribute = (
 const DynamicAttributesWidget: React.FC<DynamicAttributesWidgetProps> = ({
   product,
   isLoading = false,
-  isDarkMode = false,
 }) => {
   if (isLoading || !product) {
     return <LoadingSkeleton />;

@@ -264,7 +264,6 @@ const LoadingSkeleton: React.FC = () => (
 const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
   productId,
   isLoading = false,
-  isDarkMode = false,
 }) => {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);

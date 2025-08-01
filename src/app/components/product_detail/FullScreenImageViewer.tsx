@@ -17,7 +17,6 @@ const FullScreenImageViewer: React.FC<FullScreenImageViewerProps> = ({
   initialIndex = 0,
   isOpen,
   onClose,
-  isDarkMode = false,
 }) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());

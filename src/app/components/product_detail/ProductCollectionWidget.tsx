@@ -98,7 +98,6 @@ const ProductCollectionWidget: React.FC<ProductCollectionWidgetProps> = ({
   productId,
   shopId,
   isLoading = false,
-  isDarkMode = false,
 }) => {
   const [collectionData, setCollectionData] = useState<CollectionData | null>(
     null
