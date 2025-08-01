@@ -40,7 +40,7 @@ interface Product {
 
 interface ProductDetailPageProps {
   params: Promise<{ productId: string }>;
-  searchParams?: { [key: string]: string | string[] | undefined };
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
 const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
