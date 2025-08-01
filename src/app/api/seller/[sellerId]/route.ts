@@ -19,10 +19,11 @@ const db = getFirestore();
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { sellerId: string } }
+  { params }: { params: Promise<{ sellerId: string }> }
 ) {
   try {
-    const { sellerId } = params;
+    // Await the params Promise
+    const { sellerId } = await params;
     const { searchParams } = new URL(request.url);
     const shopId = searchParams.get("shopId");
 

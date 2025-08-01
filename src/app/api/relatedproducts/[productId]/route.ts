@@ -250,10 +250,10 @@ async function getRelatedProducts(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { productId: string } }
+  { params }: { params: Promise<{ productId: string }> }
 ): Promise<NextResponse> {
   try {
-    const { productId } = params;
+    const { productId } = await params;
 
     // Validate productId
     if (!productId || productId.trim() === "") {
