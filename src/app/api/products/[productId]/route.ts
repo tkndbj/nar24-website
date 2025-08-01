@@ -19,10 +19,11 @@ const db = getFirestore();
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { productId: string } }
+  { params }: { params: Promise<{ productId: string }> }
 ) {
   try {
-    const productId = params.productId;
+    // Await the params Promise
+    const { productId } = await params;
 
     if (!productId || productId.trim() === "") {
       return NextResponse.json(
