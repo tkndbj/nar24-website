@@ -14,7 +14,13 @@ export default function ConditionalHeader() {
     "/verify-email",
   ];
 
-  const shouldHideHeader = hideHeaderRoutes.includes(pathname);
+  const shouldHideHeader =
+    hideHeaderRoutes.includes(pathname) ||
+    hideHeaderRoutes.some((route) => pathname.endsWith(route));
 
-  return !shouldHideHeader ? <MarketHeader /> : null;
+  if (shouldHideHeader) {
+    return null;
+  }
+
+  return <MarketHeader />;
 }

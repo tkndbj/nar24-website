@@ -12,14 +12,16 @@ import {
   ShoppingBag,
   Grid3x3,
   TrendingUp,
+  Globe, // ADD: Import Globe icon for language switcher
 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation"; // ADD: Import usePathname
+import { useLocale } from "next-intl"; // ADD: Import useLocale
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useUser } from "@/context/UserProvider";
 import { useBadgeProvider } from "@/context/BadgeProvider";
-import { useCart } from "@/context/CartProvider"; // ✅ ADD: Import cart context
-import { useFavorites } from "@/context/FavoritesProvider"; // ADD this
+import { useCart } from "@/context/CartProvider";
+import { useFavorites } from "@/context/FavoritesProvider";
 import { FavoritesDrawer } from "../FavoritesDrawer";
 import { NotificationDrawer } from "../NotificationDrawer";
 
@@ -28,7 +30,7 @@ import {
   Suggestion,
   useSearchProvider,
 } from "@/context/SearchProvider";
-import { CartDrawer } from "../CartDrawer"; // ✅ ADD: Import CartDrawer
+import { CartDrawer } from "../CartDrawer";
 
 interface MarketHeaderProps {
   onTakePhoto?: () => void;
@@ -45,18 +47,22 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
   const [isDark, setIsDark] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [isCartOpen, setIsCartOpen] = useState(false); // ✅ ADD: Cart drawer state
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [showLanguageMenu, setShowLanguageMenu] = useState(false); // ADD: Language menu state
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
+  const languageMenuRef = useRef<HTMLDivElement>(null); // ADD: Language menu ref
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
   const { favoriteCount } = useFavorites();
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const router = useRouter();
+  const pathname = usePathname(); // ADD: Get current pathname
+  const locale = useLocale(); // ADD: Get current locale
 
   // Auth and providers
   const { user, isLoading: userLoading } = useUser();
   const { unreadNotificationsCount } = useBadgeProvider();
-  const { cartCount } = useCart(); // ✅ ADD: Get cart count
+  const { cartCount } = useCart();
   const {
     updateTerm,
     search,
@@ -86,7 +92,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
     return () => observer.disconnect();
   }, []);
 
-  // Handle click outside
+  // Handle click outside for search
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -95,6 +101,20 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
       ) {
         setShowSuggestions(false);
         searchInputRef.current?.blur();
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // ADD: Handle click outside for language menu
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        languageMenuRef.current &&
+        !languageMenuRef.current.contains(event.target as Node)
+      ) {
+        setShowLanguageMenu(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -121,12 +141,26 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
     isLoading,
   ]);
 
+  // ADD: Language switching function
+  const switchLanguage = (newLocale: string) => {
+    // Remove the current locale from pathname if it exists
+    let pathWithoutLocale = pathname;
+    if (pathname.startsWith(`/${locale}`)) {
+      pathWithoutLocale = pathname.substring(`/${locale}`.length) || "/";
+    }
+
+    // Add the new locale to the path
+    const newPath = `/${newLocale}${pathWithoutLocale}`;
+    router.push(newPath);
+    setShowLanguageMenu(false);
+  };
+
   const handleFavoritesClick = () => {
     if (!user) {
       router.push("/login");
       return;
     }
-    setIsFavoritesOpen(true); // Open the favorites drawer
+    setIsFavoritesOpen(true);
   };
 
   const handleNotificationClick = () => {
@@ -134,7 +168,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
       router.push("/login");
       return;
     }
-    setIsNotificationOpen(true); // Open the drawer
+    setIsNotificationOpen(true);
   };
 
   const handleSearchStateChange = (searching: boolean) => {
@@ -220,13 +254,12 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
     router.push(path);
   };
 
-  // ✅ ADD: Handle cart click - open drawer instead of navigation
   const handleCartClick = () => {
     if (!user) {
       router.push("/login");
       return;
     }
-    setIsCartOpen(true); // Open the drawer
+    setIsCartOpen(true);
   };
 
   // Don't render if user is still loading
@@ -578,7 +611,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                     {/* Notifications */}
                     <div className="relative">
                       <button
-                        onClick={handleNotificationClick} // ✅ CHANGED: Use new handler
+                        onClick={handleNotificationClick}
                         className={`
               relative p-2.5 rounded-full transition-all duration-200
               ${
@@ -603,10 +636,89 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                       </button>
                     </div>
 
+                    {/* ADD: Language Switcher */}
+                    <div className="relative" ref={languageMenuRef}>
+                      <button
+                        onClick={() => setShowLanguageMenu(!showLanguageMenu)}
+                        className={`
+                          relative p-2.5 rounded-full transition-all duration-200
+                          ${
+                            isDark
+                              ? "hover:bg-gray-700 text-gray-300 hover:text-white"
+                              : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
+                          }
+                          active:scale-95 group
+                        `}
+                        aria-label="Dil Seçimi"
+                      >
+                        <Globe size={20} />
+                      </button>
+
+                      {/* Language Menu */}
+                      {showLanguageMenu && (
+                        <div
+                          className={`
+                            absolute right-0 top-full mt-2 w-32
+                            ${isDark ? "bg-gray-800" : "bg-white"}
+                            border ${
+                              isDark ? "border-gray-700" : "border-gray-200"
+                            }
+                            rounded-lg shadow-xl backdrop-blur-xl z-50
+                            overflow-hidden
+                          `}
+                        >
+                          <button
+                            onClick={() => switchLanguage("tr")}
+                            className={`
+                              w-full flex items-center space-x-3 px-4 py-3 text-left
+                              hover:bg-gray-100 dark:hover:bg-gray-700 
+                              transition-colors duration-150
+                              ${
+                                locale === "tr"
+                                  ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                                  : ""
+                              }
+                            `}
+                          >
+                            <span className="text-lg">🇹🇷</span>
+                            <span
+                              className={`text-sm font-medium ${
+                                isDark ? "text-gray-200" : "text-gray-900"
+                              }`}
+                            >
+                              Türkçe
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => switchLanguage("en")}
+                            className={`
+                              w-full flex items-center space-x-3 px-4 py-3 text-left
+                              hover:bg-gray-100 dark:hover:bg-gray-700 
+                              transition-colors duration-150
+                              ${
+                                locale === "en"
+                                  ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                                  : ""
+                              }
+                            `}
+                          >
+                            <span className="text-lg">🇺🇸</span>
+                            <span
+                              className={`text-sm font-medium ${
+                                isDark ? "text-gray-200" : "text-gray-900"
+                              }`}
+                            >
+                              English
+                            </span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
                     {/* Favorites */}
                     <div className="relative">
                       <button
-                        onClick={handleFavoritesClick} // ✅ CHANGED: Use new handler
+                        onClick={handleFavoritesClick}
                         className={`
       relative p-2.5 rounded-full transition-all duration-200
       ${
@@ -619,7 +731,6 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                         aria-label="Favoriler"
                       >
                         <Heart size={20} />
-                        {/* ✅ ADD: Favorites count badge */}
                         {favoriteCount > 0 && (
                           <div className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-pink-500 rounded-full flex items-center justify-center shadow-lg ring-2 ring-white dark:ring-gray-900">
                             <span className="text-white text-xs font-bold px-1">
@@ -630,10 +741,10 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                       </button>
                     </div>
 
-                    {/* ✅ MODIFIED: Cart - now opens drawer instead of navigation */}
+                    {/* Cart */}
                     <div className="relative">
                       <button
-                        onClick={handleCartClick} // ✅ CHANGED: Use new handler
+                        onClick={handleCartClick}
                         className={`
                           relative p-2.5 rounded-full transition-all duration-200
                           ${
@@ -646,7 +757,6 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                         aria-label="Sepet"
                       >
                         <ShoppingCart size={20} />
-                        {/* ✅ ADD: Cart count badge */}
                         {cartCount > 0 && (
                           <div className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-orange-500 rounded-full flex items-center justify-center shadow-lg ring-2 ring-white dark:ring-gray-900">
                             <span className="text-white text-xs font-bold px-1">
@@ -699,6 +809,85 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                 ) : (
                   /* Login button for non-authenticated users */
                   <div className="flex items-center gap-2">
+                    {/* ADD: Language Switcher for non-authenticated users too */}
+                    <div className="relative" ref={languageMenuRef}>
+                      <button
+                        onClick={() => setShowLanguageMenu(!showLanguageMenu)}
+                        className={`
+                          relative p-2.5 rounded-full transition-all duration-200
+                          ${
+                            isDark
+                              ? "hover:bg-gray-700 text-gray-300 hover:text-white"
+                              : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
+                          }
+                          active:scale-95 group
+                        `}
+                        aria-label="Dil Seçimi"
+                      >
+                        <Globe size={20} />
+                      </button>
+
+                      {/* Language Menu */}
+                      {showLanguageMenu && (
+                        <div
+                          className={`
+                            absolute right-0 top-full mt-2 w-32
+                            ${isDark ? "bg-gray-800" : "bg-white"}
+                            border ${
+                              isDark ? "border-gray-700" : "border-gray-200"
+                            }
+                            rounded-lg shadow-xl backdrop-blur-xl z-50
+                            overflow-hidden
+                          `}
+                        >
+                          <button
+                            onClick={() => switchLanguage("tr")}
+                            className={`
+                              w-full flex items-center space-x-3 px-4 py-3 text-left
+                              hover:bg-gray-100 dark:hover:bg-gray-700 
+                              transition-colors duration-150
+                              ${
+                                locale === "tr"
+                                  ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                                  : ""
+                              }
+                            `}
+                          >
+                            <span className="text-lg">🇹🇷</span>
+                            <span
+                              className={`text-sm font-medium ${
+                                isDark ? "text-gray-200" : "text-gray-900"
+                              }`}
+                            >
+                              Türkçe
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => switchLanguage("en")}
+                            className={`
+                              w-full flex items-center space-x-3 px-4 py-3 text-left
+                              hover:bg-gray-100 dark:hover:bg-gray-700 
+                              transition-colors duration-150
+                              ${
+                                locale === "en"
+                                  ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                                  : ""
+                              }
+                            `}
+                          >
+                            <span className="text-lg">🇺🇸</span>
+                            <span
+                              className={`text-sm font-medium ${
+                                isDark ? "text-gray-200" : "text-gray-900"
+                              }`}
+                            >
+                              English
+                            </span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
                     <button
                       onClick={() => router.push("/login")}
                       className={`
@@ -718,7 +907,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
         </div>
       </header>
 
-      {/* ✅ ADD: Cart Drawer Component */}
+      {/* Cart Drawer Component */}
       <CartDrawer
         isOpen={isCartOpen}
         onClose={() => setIsCartOpen(false)}

@@ -4,16 +4,24 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Share2, ShoppingCart, Play, X, Check, Minus } from "lucide-react";
+import {
+  ArrowLeft,
+  Share2,
+  ShoppingCart,
+  Play,
+  X,
+  Check,
+  Minus,
+} from "lucide-react";
 import Image from "next/image";
-import ProductDetailActionsRow from "../../components/product_detail/ProductDetailActionsRow";
-import DynamicAttributesWidget from "../../components/product_detail/DynamicAttributesWidget";
-import ProductCollectionWidget from "../../components/product_detail/ProductCollectionWidget";
-import FullScreenImageViewer from "../../components/product_detail/FullScreenImageViewer";
-import ProductDetailReviewsTab from "../../components/product_detail/Reviews";
-import ProductDetailSellerInfo from "../../components/product_detail/SellerInfo";
-import ProductQuestionsWidget from "../../components/product_detail/Questions";
-import ProductDetailRelatedProducts from "../../components/product_detail/RelatedProducts";
+import ProductDetailActionsRow from "../../../components/product_detail/ProductDetailActionsRow";
+import DynamicAttributesWidget from "../../../components/product_detail/DynamicAttributesWidget";
+import ProductCollectionWidget from "../../../components/product_detail/ProductCollectionWidget";
+import FullScreenImageViewer from "../../../components/product_detail/FullScreenImageViewer";
+import ProductDetailReviewsTab from "../../../components/product_detail/Reviews";
+import ProductDetailSellerInfo from "../../../components/product_detail/SellerInfo";
+import ProductQuestionsWidget from "../../../components/product_detail/Questions";
+import ProductDetailRelatedProducts from "../../../components/product_detail/RelatedProducts";
 import { useCart } from "@/context/CartProvider"; // ✅ ADDED: Import useCart hook
 import { useUser } from "@/context/UserProvider"; // ✅ ADDED: Import useUser hook
 
@@ -50,11 +58,18 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   const [productId, setProductId] = useState<string>("");
 
   // ✅ ADDED: Cart and user hooks
-  const { addToCart, isInCart, isOptimisticallyAdding, isOptimisticallyRemoving } = useCart();
+  const {
+    addToCart,
+    isInCart,
+    isOptimisticallyAdding,
+    isOptimisticallyRemoving,
+  } = useCart();
   const { user } = useUser();
 
   // ✅ ADDED: Animation states
-  const [cartButtonState, setCartButtonState] = useState<'idle' | 'adding' | 'added' | 'removing' | 'removed'>('idle');
+  const [cartButtonState, setCartButtonState] = useState<
+    "idle" | "adding" | "added" | "removing" | "removed"
+  >("idle");
   const [showCartAnimation, setShowCartAnimation] = useState(false);
 
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -108,7 +123,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   }, []);
 
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }, [productId]);
 
   useEffect(() => {
@@ -204,7 +219,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   const handleAddToCart = async () => {
     if (!user) {
       // Redirect to login or show login modal
-      router.push('/login');
+      router.push("/login");
       return;
     }
 
@@ -212,37 +227,36 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
     try {
       const wasInCart = isInCart(product.id);
-      
+
       // Set loading state
-      setCartButtonState(wasInCart ? 'removing' : 'adding');
+      setCartButtonState(wasInCart ? "removing" : "adding");
       setShowCartAnimation(true);
 
       // Call the cart function
       const result = await addToCart(product.id, 1);
-      
+
       // Set success state based on result
-      if (result.includes('Added')) {
-        setCartButtonState('added');
-      } else if (result.includes('Removed')) {
-        setCartButtonState('removed');
+      if (result.includes("Added")) {
+        setCartButtonState("added");
+      } else if (result.includes("Removed")) {
+        setCartButtonState("removed");
       }
 
       // Reset state after animation
       setTimeout(() => {
-        setCartButtonState('idle');
+        setCartButtonState("idle");
         setShowCartAnimation(false);
       }, 2000);
-
     } catch (error) {
       console.error("Error with cart operation:", error);
-      setCartButtonState('idle');
+      setCartButtonState("idle");
       setShowCartAnimation(false);
     }
   };
 
   const handleBuyNow = async () => {
     if (!user) {
-      router.push('/login');
+      router.push("/login");
       return;
     }
 
@@ -253,7 +267,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
       if (!isInCart(product.id)) {
         await addToCart(product.id, 1);
       }
-      
+
       // Redirect to checkout
       router.push(`/checkout?productId=${product.id}&quantity=1`);
     } catch (error) {
@@ -264,31 +278,39 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   // ✅ ADDED: Get current cart status
   const getCartButtonContent = () => {
     const productInCart = product ? isInCart(product.id) : false;
-    const isOptimisticAdd = product ? isOptimisticallyAdding(product.id) : false;
-    const isOptimisticRemove = product ? isOptimisticallyRemoving(product.id) : false;
+    const isOptimisticAdd = product
+      ? isOptimisticallyAdding(product.id)
+      : false;
+    const isOptimisticRemove = product
+      ? isOptimisticallyRemoving(product.id)
+      : false;
 
-    if (cartButtonState === 'adding' || isOptimisticAdd) {
+    if (cartButtonState === "adding" || isOptimisticAdd) {
       return {
-        icon: <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />,
+        icon: (
+          <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+        ),
         text: "Ekleniyor...",
       };
     }
 
-    if (cartButtonState === 'removing' || isOptimisticRemove) {
+    if (cartButtonState === "removing" || isOptimisticRemove) {
       return {
-        icon: <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />,
+        icon: (
+          <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+        ),
         text: "Çıkarılıyor...",
       };
     }
 
-    if (cartButtonState === 'added') {
+    if (cartButtonState === "added") {
       return {
         icon: <Check className="w-5 h-5" />,
         text: "Sepete Eklendi!",
       };
     }
 
-    if (cartButtonState === 'removed') {
+    if (cartButtonState === "removed") {
       return {
         icon: <Check className="w-5 h-5" />,
         text: "Sepetten Çıkarıldı!",
@@ -667,33 +689,43 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           {/* ✅ ENHANCED: Cart Button with animations */}
           <button
             onClick={handleAddToCart}
-            disabled={cartButtonState === 'adding' || cartButtonState === 'removing'}
+            disabled={
+              cartButtonState === "adding" || cartButtonState === "removing"
+            }
             className={`
               flex-1 py-3 px-4 rounded-lg border font-semibold transition-all duration-300 flex items-center justify-center gap-2 relative overflow-hidden
               ${
-                productInCart && cartButtonState === 'idle'
+                productInCart && cartButtonState === "idle"
                   ? isDarkMode
                     ? "border-red-500 text-red-400 hover:bg-red-900/20"
                     : "border-red-500 text-red-600 hover:bg-red-50"
-                  : cartButtonState === 'added' || cartButtonState === 'removed'
+                  : cartButtonState === "added" || cartButtonState === "removed"
                   ? "border-green-500 text-green-600 bg-green-50"
                   : isDarkMode
                   ? "border-orange-500 text-orange-400 hover:bg-orange-900/20"
                   : "border-orange-500 text-orange-600 hover:bg-orange-50"
               }
-              ${(cartButtonState === 'adding' || cartButtonState === 'removing') ? 'opacity-75 cursor-not-allowed' : ''}
-              ${showCartAnimation ? 'transform scale-105' : ''}
+              ${
+                cartButtonState === "adding" || cartButtonState === "removing"
+                  ? "opacity-75 cursor-not-allowed"
+                  : ""
+              }
+              ${showCartAnimation ? "transform scale-105" : ""}
             `}
           >
-            <span className={`transition-all duration-300 ${showCartAnimation ? 'animate-pulse' : ''}`}>
+            <span
+              className={`transition-all duration-300 ${
+                showCartAnimation ? "animate-pulse" : ""
+              }`}
+            >
               {cartButtonContent.icon}
             </span>
             <span className="transition-all duration-300">
               {cartButtonContent.text}
             </span>
-            
+
             {/* ✅ ADDED: Success animation overlay */}
-            {(cartButtonState === 'added' || cartButtonState === 'removed') && (
+            {(cartButtonState === "added" || cartButtonState === "removed") && (
               <div className="absolute inset-0 bg-green-500/10 animate-pulse" />
             )}
           </button>
