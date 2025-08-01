@@ -39,13 +39,13 @@ interface Product {
 }
 
 interface ProductDetailPageProps {
-  params: { productId: string };
+  params: Promise<{ productId: string }>;
   searchParams?: { [key: string]: string | string[] | undefined };
 }
 
 const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   const router = useRouter();
-  const productId = params.productId;
+  const [productId, setProductId] = useState<string>("");
 
   // ✅ FIX: Add state for dark mode detection
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -57,6 +57,12 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
+
+  useEffect(() => {
+    params.then((resolvedParams) => {
+      setProductId(resolvedParams.productId);
+    });
+  }, [params]);
 
   // ✅ FIX: Auto-detect dark mode properly
   useEffect(() => {
