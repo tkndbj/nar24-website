@@ -5,7 +5,7 @@ import {
   Check,
   Star,
   StarHalf,
-  ImageIcon,
+  
   ImageOff,
   ChevronLeft,
   ChevronRight,
