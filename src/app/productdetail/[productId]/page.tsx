@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Share2, Heart, ShoppingCart, Play, X, Check, Plus, Minus } from "lucide-react";
+import { ArrowLeft, Share2, ShoppingCart, Play, X, Check, Minus } from "lucide-react";
 import Image from "next/image";
 import ProductDetailActionsRow from "../../components/product_detail/ProductDetailActionsRow";
 import DynamicAttributesWidget from "../../components/product_detail/DynamicAttributesWidget";

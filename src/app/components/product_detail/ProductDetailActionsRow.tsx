@@ -1,7 +1,7 @@
 // src/components/productdetail/ProductDetailActionsRow.tsx
 
 import React, { useState, useEffect } from "react";
-import { Heart, Share2, Star, StarHalf, Check, Plus, Minus } from "lucide-react";
+import { Heart, Share2, Star, StarHalf, Check} from "lucide-react";
 import { useFavorites } from "@/context/FavoritesProvider"; // ✅ ADDED: Import useFavorites hook
 import { useUser } from "@/context/UserProvider"; // ✅ ADDED: Import useUser hook
 
@@ -204,7 +204,7 @@ const ProductDetailActionsRow: React.FC<ProductDetailActionsRowProps> = ({
   isLoading = false,
   onShare,
   onToggleFavorite, // ✅ NOTE: This prop is now optional and will be overridden
-  isFavorite, // ✅ NOTE: This prop is now optional and will be overridden
+  
   isDarkMode = false,
 }) => {
   // ✅ ADDED: Favorites and user hooks
