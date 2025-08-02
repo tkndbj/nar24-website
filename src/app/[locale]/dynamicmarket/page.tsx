@@ -468,7 +468,7 @@ export default function DynamicMarketPage() {
           {/* Filter Sidebar */}
           <div
             className={`
-              fixed lg:sticky lg:top-0 lg:h-screen top-0 left-0 h-full w-80 transform transition-transform duration-300 z-40
+              fixed lg:sticky lg:top-16 lg:h-[calc(100vh-4rem)] top-16 left-0 h-[calc(100vh-4rem)] w-64 transform transition-transform duration-300 z-40
               ${
                 showSidebar
                   ? "translate-x-0"
@@ -480,31 +480,31 @@ export default function DynamicMarketPage() {
             `}
           >
             {/* Mobile Close Button */}
-            <div className="lg:hidden p-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="lg:hidden p-3 border-b border-gray-200 dark:border-gray-700">
               <button
                 onClick={() => setShowSidebar(false)}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
+                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
               >
                 <X
-                  size={20}
+                  size={18}
                   className={isDarkMode ? "text-gray-400" : "text-gray-600"}
                 />
               </button>
             </div>
 
             {/* Filter Content */}
-            <div className="p-4">
+            <div className="p-3">
               {/* Clear All Filters Button */}
               {getActiveFiltersCount() > 0 && (
                 <button
                   onClick={clearAllFilters}
-                  className="w-full mb-4 py-2 text-sm text-orange-500 border border-orange-500 rounded hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
+                  className="w-full mb-3 py-1.5 text-xs text-orange-500 border border-orange-500 rounded hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
                 >
                   Clear All Filters ({getActiveFiltersCount()})
                 </button>
               )}
 
-              <div className="space-y-6">
+              <div className="space-y-4">
                 {/* Subcategories Filter */}
                 {availableSubcategories.length > 0 && (
                   <div>
@@ -515,24 +515,24 @@ export default function DynamicMarketPage() {
                           subcategory: !prev.subcategory,
                         }))
                       }
-                      className="w-full flex items-center justify-between text-left py-2"
+                      className="w-full flex items-center justify-between text-left py-1.5"
                     >
                       <span
-                        className={`font-medium text-sm ${
+                        className={`font-medium text-xs ${
                           isDarkMode ? "text-white" : "text-gray-900"
                         }`}
                       >
                         Subcategories
                       </span>
                       {expandedSections.subcategory ? (
-                        <ChevronUp size={16} className="text-gray-400" />
+                        <ChevronUp size={14} className="text-gray-400" />
                       ) : (
-                        <ChevronDown size={16} className="text-gray-400" />
+                        <ChevronDown size={14} className="text-gray-400" />
                       )}
                     </button>
 
                     {expandedSections.subcategory && (
-                      <div className="mt-2 space-y-2 max-h-48 overflow-y-auto">
+                      <div className="mt-1.5 space-y-1.5 max-h-40 overflow-y-auto">
                         {availableSubcategories.map((sub) => {
                           const formattedCategory =
                             category
@@ -550,7 +550,7 @@ export default function DynamicMarketPage() {
                           return (
                             <label
                               key={sub}
-                              className="flex items-center space-x-3 cursor-pointer py-1"
+                              className="flex items-center space-x-2 cursor-pointer py-0.5"
                             >
                               <input
                                 type="checkbox"
@@ -558,10 +558,10 @@ export default function DynamicMarketPage() {
                                 onChange={() =>
                                   toggleFilter("subcategories", sub)
                                 }
-                                className="w-4 h-4 text-orange-500 rounded border-gray-300 focus:ring-orange-500"
+                                className="w-3 h-3 text-orange-500 rounded border-gray-300 focus:ring-orange-500"
                               />
                               <span
-                                className={`text-sm ${
+                                className={`text-xs ${
                                   isDarkMode ? "text-gray-300" : "text-gray-700"
                                 } leading-tight`}
                               >
@@ -584,28 +584,28 @@ export default function DynamicMarketPage() {
                         brand: !prev.brand,
                       }))
                     }
-                    className="w-full flex items-center justify-between text-left py-2"
+                    className="w-full flex items-center justify-between text-left py-1.5"
                   >
                     <span
-                      className={`font-medium text-sm ${
+                      className={`font-medium text-xs ${
                         isDarkMode ? "text-white" : "text-gray-900"
                       }`}
                     >
                       Brands
                     </span>
                     {expandedSections.brand ? (
-                      <ChevronUp size={16} className="text-gray-400" />
+                      <ChevronUp size={14} className="text-gray-400" />
                     ) : (
-                      <ChevronDown size={16} className="text-gray-400" />
+                      <ChevronDown size={14} className="text-gray-400" />
                     )}
                   </button>
 
                   {expandedSections.brand && (
-                    <div className="mt-2 space-y-3">
+                    <div className="mt-1.5 space-y-2">
                       <div className="relative">
                         <Search
-                          size={16}
-                          className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                          size={14}
+                          className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400"
                         />
                         <input
                           type="text"
@@ -613,7 +613,7 @@ export default function DynamicMarketPage() {
                           value={brandSearch}
                           onChange={(e) => setBrandSearch(e.target.value)}
                           className={`
-                              w-full pl-10 pr-4 py-2 text-sm border rounded
+                              w-full pl-8 pr-3 py-1.5 text-xs border rounded
                               ${
                                 isDarkMode
                                   ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
@@ -624,20 +624,20 @@ export default function DynamicMarketPage() {
                         />
                       </div>
 
-                      <div className="max-h-48 overflow-y-auto space-y-2">
+                      <div className="max-h-40 overflow-y-auto space-y-1.5">
                         {filteredBrands.map((brand) => (
                           <label
                             key={brand}
-                            className="flex items-center space-x-3 cursor-pointer py-1"
+                            className="flex items-center space-x-2 cursor-pointer py-0.5"
                           >
                             <input
                               type="checkbox"
                               checked={filters.brands.includes(brand)}
                               onChange={() => toggleFilter("brands", brand)}
-                              className="w-4 h-4 text-orange-500 rounded border-gray-300 focus:ring-orange-500"
+                              className="w-3 h-3 text-orange-500 rounded border-gray-300 focus:ring-orange-500"
                             />
                             <span
-                              className={`text-sm ${
+                              className={`text-xs ${
                                 isDarkMode ? "text-gray-300" : "text-gray-700"
                               } leading-tight`}
                             >
@@ -659,28 +659,28 @@ export default function DynamicMarketPage() {
                         color: !prev.color,
                       }))
                     }
-                    className="w-full flex items-center justify-between text-left py-2"
+                    className="w-full flex items-center justify-between text-left py-1.5"
                   >
                     <span
-                      className={`font-medium text-sm ${
+                      className={`font-medium text-xs ${
                         isDarkMode ? "text-white" : "text-gray-900"
                       }`}
                     >
                       Colors
                     </span>
                     {expandedSections.color ? (
-                      <ChevronUp size={16} className="text-gray-400" />
+                      <ChevronUp size={14} className="text-gray-400" />
                     ) : (
-                      <ChevronDown size={16} className="text-gray-400" />
+                      <ChevronDown size={14} className="text-gray-400" />
                     )}
                   </button>
 
                   {expandedSections.color && (
-                    <div className="mt-2 space-y-2 max-h-48 overflow-y-auto">
+                    <div className="mt-1.5 space-y-1.5 max-h-40 overflow-y-auto">
                       {availableColors.map((colorData) => (
                         <label
                           key={colorData.name}
-                          className="flex items-center space-x-3 cursor-pointer py-1"
+                          className="flex items-center space-x-2 cursor-pointer py-0.5"
                         >
                           <input
                             type="checkbox"
@@ -688,14 +688,14 @@ export default function DynamicMarketPage() {
                             onChange={() =>
                               toggleFilter("colors", colorData.name)
                             }
-                            className="w-4 h-4 text-orange-500 rounded border-gray-300 focus:ring-orange-500"
+                            className="w-3 h-3 text-orange-500 rounded border-gray-300 focus:ring-orange-500"
                           />
                           <div
-                            className="w-4 h-4 rounded border border-gray-300 flex-shrink-0"
+                            className="w-3 h-3 rounded border border-gray-300 flex-shrink-0"
                             style={{ backgroundColor: colorData.color }}
                           />
                           <span
-                            className={`text-sm ${
+                            className={`text-xs ${
                               isDarkMode ? "text-gray-300" : "text-gray-700"
                             } leading-tight`}
                           >
@@ -716,32 +716,32 @@ export default function DynamicMarketPage() {
                         price: !prev.price,
                       }))
                     }
-                    className="w-full flex items-center justify-between text-left py-2"
+                    className="w-full flex items-center justify-between text-left py-1.5"
                   >
                     <span
-                      className={`font-medium text-sm ${
+                      className={`font-medium text-xs ${
                         isDarkMode ? "text-white" : "text-gray-900"
                       }`}
                     >
                       Price Range
                     </span>
                     {expandedSections.price ? (
-                      <ChevronUp size={16} className="text-gray-400" />
+                      <ChevronUp size={14} className="text-gray-400" />
                     ) : (
-                      <ChevronDown size={16} className="text-gray-400" />
+                      <ChevronDown size={14} className="text-gray-400" />
                     )}
                   </button>
 
                   {expandedSections.price && (
-                    <div className="mt-2 space-y-3">
-                      <div className="flex space-x-2">
+                    <div className="mt-1.5 space-y-2">
+                      <div className="flex space-x-1.5">
                         <input
                           type="number"
                           placeholder="Min"
                           value={minPriceInput}
                           onChange={(e) => setMinPriceInput(e.target.value)}
                           className={`
-                            w-20 px-2 py-2 text-sm border rounded
+                            w-16 px-1.5 py-1.5 text-xs border rounded
                             ${
                               isDarkMode
                                 ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
@@ -750,7 +750,7 @@ export default function DynamicMarketPage() {
                             focus:ring-1 focus:ring-orange-500 focus:border-orange-500
                           `}
                         />
-                        <span className="text-sm text-gray-500 self-center">
+                        <span className="text-xs text-gray-500 self-center">
                           -
                         </span>
                         <input
@@ -759,7 +759,7 @@ export default function DynamicMarketPage() {
                           value={maxPriceInput}
                           onChange={(e) => setMaxPriceInput(e.target.value)}
                           className={`
-                            w-20 px-2 py-2 text-sm border rounded
+                            w-16 px-1.5 py-1.5 text-xs border rounded
                             ${
                               isDarkMode
                                 ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
@@ -768,21 +768,21 @@ export default function DynamicMarketPage() {
                             focus:ring-1 focus:ring-orange-500 focus:border-orange-500
                           `}
                         />
-                        <span className="text-sm text-gray-500 self-center">
+                        <span className="text-xs text-gray-500 self-center">
                           TL
                         </span>
                       </div>
 
                       <button
                         onClick={setPriceFilter}
-                        className="w-full py-2 bg-orange-500 text-white text-sm font-medium rounded hover:bg-orange-600 transition-colors"
+                        className="w-full py-1.5 bg-orange-500 text-white text-xs font-medium rounded hover:bg-orange-600 transition-colors"
                       >
                         Apply Price Filter
                       </button>
 
                       {(filters.minPrice !== undefined ||
                         filters.maxPrice !== undefined) && (
-                        <div className="text-sm text-orange-500 font-medium">
+                        <div className="text-xs text-orange-500 font-medium">
                           {filters.minPrice || 0} TL - {filters.maxPrice || "∞"}{" "}
                           TL
                         </div>
@@ -878,7 +878,7 @@ export default function DynamicMarketPage() {
 
               {/* Products grid */}
               {!loading && products.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                <div className="grid grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-4 lg:gap-6">
                   {products.map((product) => (
                     <div key={product.id} className="flex justify-center">
                       <ProductCard

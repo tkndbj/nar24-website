@@ -13,6 +13,7 @@ import {
   Grid3x3,
   TrendingUp,
   Globe, // ADD: Import Globe icon for language switcher
+  LogIn,
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation"; // ADD: Import usePathname
 import { useLocale } from "next-intl"; // ADD: Import useLocale
@@ -156,18 +157,10 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
   };
 
   const handleFavoritesClick = () => {
-    if (!user) {
-      router.push("/login");
-      return;
-    }
     setIsFavoritesOpen(true);
   };
 
   const handleNotificationClick = () => {
-    if (!user) {
-      router.push("/login");
-      return;
-    }
     setIsNotificationOpen(true);
   };
 
@@ -247,18 +240,10 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
   };
 
   const handleNavigation = (path: string) => {
-    if (!user) {
-      router.push("/login");
-      return;
-    }
     router.push(path);
   };
 
   const handleCartClick = () => {
-    if (!user) {
-      router.push("/login");
-      return;
-    }
     setIsCartOpen(true);
   };
 
@@ -327,306 +312,219 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
               {/* Action Icons */}
               {!isSearching && (
                 <div className="flex items-center gap-1">
-                  {/* Show auth-dependent icons only if user is logged in */}
-                  {user ? (
-                    <>
-                      {/* Notifications */}
-                      <div className="relative">
-                        <button
-                          onClick={handleNotificationClick}
-                          className={`
-                            relative p-2 rounded-full transition-all duration-200
-                            ${
-                              isDark
-                                ? "hover:bg-gray-700 text-gray-300 hover:text-white"
-                                : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
-                            }
-                            active:scale-95 group
-                          `}
-                          aria-label="Bildirimler"
-                        >
-                          <Bell size={18} />
-                          {unreadNotificationsCount > 0 && (
-                            <div className="absolute -top-1 -right-1 min-w-[18px] h-4 bg-emerald-500 rounded-full flex items-center justify-center shadow-lg ring-2 ring-white dark:ring-gray-900">
-                              <span className="text-white text-xs font-bold px-1">
-                                {unreadNotificationsCount > 10
-                                  ? "+10"
-                                  : unreadNotificationsCount}
-                              </span>
-                            </div>
-                          )}
-                        </button>
-                      </div>
+                  {/* Notifications */}
+                  <div className="relative">
+                    <button
+                      onClick={handleNotificationClick}
+                      className={`
+          relative p-2 rounded-full transition-all duration-200
+          ${
+            isDark
+              ? "hover:bg-gray-700 text-gray-300 hover:text-white"
+              : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
+          }
+          active:scale-95 group
+        `}
+                      aria-label="Bildirimler"
+                    >
+                      <Bell size={18} />
+                      {user && unreadNotificationsCount > 0 && (
+                        <div className="absolute -top-1 -right-1 min-w-[18px] h-4 bg-emerald-500 rounded-full flex items-center justify-center shadow-lg ring-2 ring-white dark:ring-gray-900">
+                          <span className="text-white text-xs font-bold px-1">
+                            {unreadNotificationsCount > 10
+                              ? "+10"
+                              : unreadNotificationsCount}
+                          </span>
+                        </div>
+                      )}
+                    </button>
+                  </div>
 
-                      {/* Language Switcher */}
-                      <div className="relative" ref={languageMenuRef}>
-                        <button
-                          onClick={() => setShowLanguageMenu(!showLanguageMenu)}
-                          className={`
-                            relative p-2 rounded-full transition-all duration-200
-                            ${
-                              isDark
-                                ? "hover:bg-gray-700 text-gray-300 hover:text-white"
-                                : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
-                            }
-                            active:scale-95 group
-                          `}
-                          aria-label="Dil Seçimi"
-                        >
-                          <Globe size={18} />
-                        </button>
+                  {/* Language Switcher */}
+                  <div className="relative" ref={languageMenuRef}>
+                    <button
+                      onClick={() => setShowLanguageMenu(!showLanguageMenu)}
+                      className={`
+          relative p-2 rounded-full transition-all duration-200
+          ${
+            isDark
+              ? "hover:bg-gray-700 text-gray-300 hover:text-white"
+              : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
+          }
+          active:scale-95 group
+        `}
+                      aria-label="Dil Seçimi"
+                    >
+                      <Globe size={18} />
+                    </button>
 
-                        {/* Language Menu */}
-                        {showLanguageMenu && (
-                          <div
-                            className={`
-                              absolute right-0 top-full mt-2 w-32
-                              ${isDark ? "bg-gray-800" : "bg-white"}
-                              border ${
-                                isDark ? "border-gray-700" : "border-gray-200"
-                              }
-                              rounded-lg shadow-xl backdrop-blur-xl z-50
-                              overflow-hidden
-                            `}
+                    {/* Language Menu */}
+                    {showLanguageMenu && (
+                      <div
+                        className={`
+            absolute right-0 top-full mt-2 w-32
+            ${isDark ? "bg-gray-800" : "bg-white"}
+            border ${isDark ? "border-gray-700" : "border-gray-200"}
+            rounded-lg shadow-xl backdrop-blur-xl z-50
+            overflow-hidden
+          `}
+                      >
+                        <button
+                          onClick={() => switchLanguage("tr")}
+                          className={`
+              w-full flex items-center space-x-3 px-4 py-3 text-left
+              hover:bg-gray-100 dark:hover:bg-gray-700 
+              transition-colors duration-150
+              ${
+                locale === "tr"
+                  ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                  : ""
+              }
+            `}
+                        >
+                          <span className="text-lg">🇹🇷</span>
+                          <span
+                            className={`text-sm font-medium ${
+                              isDark ? "text-gray-200" : "text-gray-900"
+                            }`}
                           >
-                            <button
-                              onClick={() => switchLanguage("tr")}
-                              className={`
-                                w-full flex items-center space-x-3 px-4 py-3 text-left
-                                hover:bg-gray-100 dark:hover:bg-gray-700 
-                                transition-colors duration-150
-                                ${
-                                  locale === "tr"
-                                    ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-                                    : ""
-                                }
-                              `}
-                            >
-                              <span className="text-lg">🇹🇷</span>
-                              <span
-                                className={`text-sm font-medium ${
-                                  isDark ? "text-gray-200" : "text-gray-900"
-                                }`}
-                              >
-                                Türkçe
-                              </span>
-                            </button>
-                            <button
-                              onClick={() => switchLanguage("en")}
-                              className={`
-                                w-full flex items-center space-x-3 px-4 py-3 text-left
-                                hover:bg-gray-100 dark:hover:bg-gray-700 
-                                transition-colors duration-150
-                                ${
-                                  locale === "en"
-                                    ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-                                    : ""
-                                }
-                              `}
-                            >
-                              <span className="text-lg">🇺🇸</span>
-                              <span
-                                className={`text-sm font-medium ${
-                                  isDark ? "text-gray-200" : "text-gray-900"
-                                }`}
-                              >
-                                English
-                              </span>
-                            </button>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Favorites */}
-                      <div className="relative">
-                        <button
-                          onClick={handleFavoritesClick}
-                          className={`
-                            relative p-2 rounded-full transition-all duration-200
-                            ${
-                              isDark
-                                ? "hover:bg-gray-700 text-gray-300 hover:text-white"
-                                : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
-                            }
-                            active:scale-95 group
-                          `}
-                          aria-label="Favoriler"
-                        >
-                          <Heart size={18} />
-                          {favoriteCount > 0 && (
-                            <div className="absolute -top-1 -right-1 min-w-[18px] h-4 bg-pink-500 rounded-full flex items-center justify-center shadow-lg ring-2 ring-white dark:ring-gray-900">
-                              <span className="text-white text-xs font-bold px-1">
-                                {favoriteCount > 99 ? "99+" : favoriteCount}
-                              </span>
-                            </div>
-                          )}
+                            Türkçe
+                          </span>
                         </button>
-                      </div>
-
-                      {/* Cart */}
-                      <div className="relative">
                         <button
-                          onClick={handleCartClick}
+                          onClick={() => switchLanguage("en")}
                           className={`
-                            relative p-2 rounded-full transition-all duration-200
-                            ${
-                              isDark
-                                ? "hover:bg-gray-700 text-gray-300 hover:text-white"
-                                : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
-                            }
-                            active:scale-95 group
-                          `}
-                          aria-label="Sepet"
+              w-full flex items-center space-x-3 px-4 py-3 text-left
+              hover:bg-gray-100 dark:hover:bg-gray-700 
+              transition-colors duration-150
+              ${
+                locale === "en"
+                  ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                  : ""
+              }
+            `}
                         >
-                          <ShoppingCart size={18} />
-                          {cartCount > 0 && (
-                            <div className="absolute -top-1 -right-1 min-w-[18px] h-4 bg-orange-500 rounded-full flex items-center justify-center shadow-lg ring-2 ring-white dark:ring-gray-900">
-                              <span className="text-white text-xs font-bold px-1">
-                                {cartCount > 99 ? "99+" : cartCount}
-                              </span>
-                            </div>
-                          )}
-                        </button>
-                      </div>
-
-                      {/* Profile */}
-                      <div className="relative">
-                        <button
-                          onClick={() => handleNavigation("/profile")}
-                          className={`
-                            relative p-2 rounded-full transition-all duration-200
-                            ${
-                              isDark
-                                ? "hover:bg-gray-700 text-gray-300 hover:text-white"
-                                : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
-                            }
-                            active:scale-95 group
-                          `}
-                          aria-label="Profil"
-                        >
-                          <User size={18} />
-                        </button>
-                      </div>
-
-                      {/* Logout */}
-                      <div className="relative">
-                        <button
-                          onClick={handleLogout}
-                          disabled={isLoggingOut}
-                          className={`
-                            relative p-2 rounded-full transition-all duration-200
-                            hover:bg-red-50 dark:hover:bg-red-900/30 active:scale-95 group
-                            text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300
-                            ${
-                              isLoggingOut
-                                ? "opacity-50 cursor-not-allowed"
-                                : ""
-                            }
-                          `}
-                          aria-label="Çıkış"
-                        >
-                          <LogOut
-                            size={16}
-                            className={isLoggingOut ? "animate-pulse" : ""}
-                          />
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    /* Login button for non-authenticated users */
-                    <div className="flex items-center gap-2">
-                      {/* Language Switcher for non-authenticated users too */}
-                      <div className="relative" ref={languageMenuRef}>
-                        <button
-                          onClick={() => setShowLanguageMenu(!showLanguageMenu)}
-                          className={`
-                            relative p-2 rounded-full transition-all duration-200
-                            ${
-                              isDark
-                                ? "hover:bg-gray-700 text-gray-300 hover:text-white"
-                                : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
-                            }
-                            active:scale-95 group
-                          `}
-                          aria-label="Dil Seçimi"
-                        >
-                          <Globe size={18} />
-                        </button>
-
-                        {/* Language Menu */}
-                        {showLanguageMenu && (
-                          <div
-                            className={`
-                              absolute right-0 top-full mt-2 w-32
-                              ${isDark ? "bg-gray-800" : "bg-white"}
-                              border ${
-                                isDark ? "border-gray-700" : "border-gray-200"
-                              }
-                              rounded-lg shadow-xl backdrop-blur-xl z-50
-                              overflow-hidden
-                            `}
+                          <span className="text-lg">🇺🇸</span>
+                          <span
+                            className={`text-sm font-medium ${
+                              isDark ? "text-gray-200" : "text-gray-900"
+                            }`}
                           >
-                            <button
-                              onClick={() => switchLanguage("tr")}
-                              className={`
-                                w-full flex items-center space-x-3 px-4 py-3 text-left
-                                hover:bg-gray-100 dark:hover:bg-gray-700 
-                                transition-colors duration-150
-                                ${
-                                  locale === "tr"
-                                    ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-                                    : ""
-                                }
-                              `}
-                            >
-                              <span className="text-lg">🇹🇷</span>
-                              <span
-                                className={`text-sm font-medium ${
-                                  isDark ? "text-gray-200" : "text-gray-900"
-                                }`}
-                              >
-                                Türkçe
-                              </span>
-                            </button>
-                            <button
-                              onClick={() => switchLanguage("en")}
-                              className={`
-                                w-full flex items-center space-x-3 px-4 py-3 text-left
-                                hover:bg-gray-100 dark:hover:bg-gray-700 
-                                transition-colors duration-150
-                                ${
-                                  locale === "en"
-                                    ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-                                    : ""
-                                }
-                              `}
-                            >
-                              <span className="text-lg">🇺🇸</span>
-                              <span
-                                className={`text-sm font-medium ${
-                                  isDark ? "text-gray-200" : "text-gray-900"
-                                }`}
-                              >
-                                English
-                              </span>
-                            </button>
-                          </div>
-                        )}
+                            English
+                          </span>
+                        </button>
                       </div>
+                    )}
+                  </div>
 
+                  {/* Favorites */}
+                  <div className="relative">
+                    <button
+                      onClick={handleFavoritesClick}
+                      className={`
+          relative p-2 rounded-full transition-all duration-200
+          ${
+            isDark
+              ? "hover:bg-gray-700 text-gray-300 hover:text-white"
+              : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
+          }
+          active:scale-95 group
+        `}
+                      aria-label="Favoriler"
+                    >
+                      <Heart size={18} />
+                      {user && favoriteCount > 0 && (
+                        <div className="absolute -top-1 -right-1 min-w-[18px] h-4 bg-pink-500 rounded-full flex items-center justify-center shadow-lg ring-2 ring-white dark:ring-gray-900">
+                          <span className="text-white text-xs font-bold px-1">
+                            {favoriteCount > 99 ? "99+" : favoriteCount}
+                          </span>
+                        </div>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Cart */}
+                  <div className="relative">
+                    <button
+                      onClick={handleCartClick}
+                      className={`
+          relative p-2 rounded-full transition-all duration-200
+          ${
+            isDark
+              ? "hover:bg-gray-700 text-gray-300 hover:text-white"
+              : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
+          }
+          active:scale-95 group
+        `}
+                      aria-label="Sepet"
+                    >
+                      <ShoppingCart size={18} />
+                      {user && cartCount > 0 && (
+                        <div className="absolute -top-1 -right-1 min-w-[18px] h-4 bg-orange-500 rounded-full flex items-center justify-center shadow-lg ring-2 ring-white dark:ring-gray-900">
+                          <span className="text-white text-xs font-bold px-1">
+                            {cartCount > 99 ? "99+" : cartCount}
+                          </span>
+                        </div>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Profile */}
+                  <div className="relative">
+                    <button
+                      onClick={() => handleNavigation("/profile")}
+                      className={`
+          relative p-2 rounded-full transition-all duration-200
+          ${
+            isDark
+              ? "hover:bg-gray-700 text-gray-300 hover:text-white"
+              : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
+          }
+          active:scale-95 group
+        `}
+                      aria-label="Profil"
+                    >
+                      <LogIn size={18} />
+                    </button>
+                  </div>
+
+                  {/* Login/Logout */}
+                  <div className="relative">
+                    {user ? (
+                      <button
+                        onClick={handleLogout}
+                        disabled={isLoggingOut}
+                        className={`
+            relative p-2 rounded-full transition-all duration-200
+            hover:bg-red-50 dark:hover:bg-red-900/30 active:scale-95 group
+            text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300
+            ${isLoggingOut ? "opacity-50 cursor-not-allowed" : ""}
+          `}
+                        aria-label="Çıkış"
+                      >
+                        <LogOut
+                          size={16}
+                          className={isLoggingOut ? "animate-pulse" : ""}
+                        />
+                      </button>
+                    ) : (
                       <button
                         onClick={() => router.push("/login")}
                         className={`
-                          px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200
-                          bg-gradient-to-r from-orange-500 to-pink-500 text-white
-                          hover:from-orange-600 hover:to-pink-600 active:scale-95
-                          shadow-md hover:shadow-lg
-                        `}
+            relative p-2 rounded-full transition-all duration-200
+            ${
+              isDark
+                ? "hover:bg-gray-700 text-gray-300 hover:text-white"
+                : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
+            }
+            active:scale-95 group
+          `}
+                        aria-label="Giriş"
                       >
-                        Giriş
+                        <LogIn size={16} />
                       </button>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -1219,302 +1117,219 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
             {/* Action Icons - Desktop */}
             {!isSearching && (
               <div className="absolute right-4 z-10 flex items-center gap-1 lg:gap-2">
-                {/* Show auth-dependent icons only if user is logged in */}
-                {user ? (
-                  <>
-                    {/* Notifications */}
-                    <div className="relative">
-                      <button
-                        onClick={handleNotificationClick}
-                        className={`
-                          relative p-2.5 rounded-full transition-all duration-200
-                          ${
-                            isDark
-                              ? "hover:bg-gray-700 text-gray-300 hover:text-white"
-                              : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
-                          }
-                          active:scale-95 group
-                        `}
-                        aria-label="Bildirimler"
-                      >
-                        <Bell size={20} />
-                        {unreadNotificationsCount > 0 && (
-                          <div className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-emerald-500 rounded-full flex items-center justify-center shadow-lg ring-2 ring-white dark:ring-gray-900">
-                            <span className="text-white text-xs font-bold px-1">
-                              {unreadNotificationsCount > 10
-                                ? "+10"
-                                : unreadNotificationsCount}
-                            </span>
-                          </div>
-                        )}
-                      </button>
-                    </div>
+                {/* Notifications */}
+                <div className="relative">
+                  <button
+                    onClick={handleNotificationClick}
+                    className={`
+          relative p-2.5 rounded-full transition-all duration-200
+          ${
+            isDark
+              ? "hover:bg-gray-700 text-gray-300 hover:text-white"
+              : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
+          }
+          active:scale-95 group
+        `}
+                    aria-label="Bildirimler"
+                  >
+                    <Bell size={20} />
+                    {user && unreadNotificationsCount > 0 && (
+                      <div className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-emerald-500 rounded-full flex items-center justify-center shadow-lg ring-2 ring-white dark:ring-gray-900">
+                        <span className="text-white text-xs font-bold px-1">
+                          {unreadNotificationsCount > 10
+                            ? "+10"
+                            : unreadNotificationsCount}
+                        </span>
+                      </div>
+                    )}
+                  </button>
+                </div>
 
-                    {/* Language Switcher */}
-                    <div className="relative" ref={languageMenuRef}>
-                      <button
-                        onClick={() => setShowLanguageMenu(!showLanguageMenu)}
-                        className={`
-                          relative p-2.5 rounded-full transition-all duration-200
-                          ${
-                            isDark
-                              ? "hover:bg-gray-700 text-gray-300 hover:text-white"
-                              : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
-                          }
-                          active:scale-95 group
-                        `}
-                        aria-label="Dil Seçimi"
-                      >
-                        <Globe size={20} />
-                      </button>
+                {/* Language Switcher */}
+                <div className="relative" ref={languageMenuRef}>
+                  <button
+                    onClick={() => setShowLanguageMenu(!showLanguageMenu)}
+                    className={`
+          relative p-2.5 rounded-full transition-all duration-200
+          ${
+            isDark
+              ? "hover:bg-gray-700 text-gray-300 hover:text-white"
+              : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
+          }
+          active:scale-95 group
+        `}
+                    aria-label="Dil Seçimi"
+                  >
+                    <Globe size={20} />
+                  </button>
 
-                      {/* Language Menu */}
-                      {showLanguageMenu && (
-                        <div
-                          className={`
-                            absolute right-0 top-full mt-2 w-32
-                            ${isDark ? "bg-gray-800" : "bg-white"}
-                            border ${
-                              isDark ? "border-gray-700" : "border-gray-200"
-                            }
-                            rounded-lg shadow-xl backdrop-blur-xl z-50
-                            overflow-hidden
-                          `}
+                  {/* Language Menu */}
+                  {showLanguageMenu && (
+                    <div
+                      className={`
+            absolute right-0 top-full mt-2 w-32
+            ${isDark ? "bg-gray-800" : "bg-white"}
+            border ${isDark ? "border-gray-700" : "border-gray-200"}
+            rounded-lg shadow-xl backdrop-blur-xl z-50
+            overflow-hidden
+          `}
+                    >
+                      <button
+                        onClick={() => switchLanguage("tr")}
+                        className={`
+              w-full flex items-center space-x-3 px-4 py-3 text-left
+              hover:bg-gray-100 dark:hover:bg-gray-700 
+              transition-colors duration-150
+              ${
+                locale === "tr"
+                  ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                  : ""
+              }
+            `}
+                      >
+                        <span className="text-lg">🇹🇷</span>
+                        <span
+                          className={`text-sm font-medium ${
+                            isDark ? "text-gray-200" : "text-gray-900"
+                          }`}
                         >
-                          <button
-                            onClick={() => switchLanguage("tr")}
-                            className={`
-                              w-full flex items-center space-x-3 px-4 py-3 text-left
-                              hover:bg-gray-100 dark:hover:bg-gray-700 
-                              transition-colors duration-150
-                              ${
-                                locale === "tr"
-                                  ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-                                  : ""
-                              }
-                            `}
-                          >
-                            <span className="text-lg">🇹🇷</span>
-                            <span
-                              className={`text-sm font-medium ${
-                                isDark ? "text-gray-200" : "text-gray-900"
-                              }`}
-                            >
-                              Türkçe
-                            </span>
-                          </button>
-                          <button
-                            onClick={() => switchLanguage("en")}
-                            className={`
-                              w-full flex items-center space-x-3 px-4 py-3 text-left
-                              hover:bg-gray-100 dark:hover:bg-gray-700 
-                              transition-colors duration-150
-                              ${
-                                locale === "en"
-                                  ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-                                  : ""
-                              }
-                            `}
-                          >
-                            <span className="text-lg">🇺🇸</span>
-                            <span
-                              className={`text-sm font-medium ${
-                                isDark ? "text-gray-200" : "text-gray-900"
-                              }`}
-                            >
-                              English
-                            </span>
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Favorites */}
-                    <div className="relative">
-                      <button
-                        onClick={handleFavoritesClick}
-                        className={`
-                          relative p-2.5 rounded-full transition-all duration-200
-                          ${
-                            isDark
-                              ? "hover:bg-gray-700 text-gray-300 hover:text-white"
-                              : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
-                          }
-                          active:scale-95 group
-                        `}
-                        aria-label="Favoriler"
-                      >
-                        <Heart size={20} />
-                        {favoriteCount > 0 && (
-                          <div className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-pink-500 rounded-full flex items-center justify-center shadow-lg ring-2 ring-white dark:ring-gray-900">
-                            <span className="text-white text-xs font-bold px-1">
-                              {favoriteCount > 99 ? "99+" : favoriteCount}
-                            </span>
-                          </div>
-                        )}
+                          Türkçe
+                        </span>
                       </button>
-                    </div>
-
-                    {/* Cart */}
-                    <div className="relative">
                       <button
-                        onClick={handleCartClick}
+                        onClick={() => switchLanguage("en")}
                         className={`
-                          relative p-2.5 rounded-full transition-all duration-200
-                          ${
-                            isDark
-                              ? "hover:bg-gray-700 text-gray-300 hover:text-white"
-                              : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
-                          }
-                          active:scale-95 group
-                        `}
-                        aria-label="Sepet"
+              w-full flex items-center space-x-3 px-4 py-3 text-left
+              hover:bg-gray-100 dark:hover:bg-gray-700 
+              transition-colors duration-150
+              ${
+                locale === "en"
+                  ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                  : ""
+              }
+            `}
                       >
-                        <ShoppingCart size={20} />
-                        {cartCount > 0 && (
-                          <div className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-orange-500 rounded-full flex items-center justify-center shadow-lg ring-2 ring-white dark:ring-gray-900">
-                            <span className="text-white text-xs font-bold px-1">
-                              {cartCount > 99 ? "99+" : cartCount}
-                            </span>
-                          </div>
-                        )}
-                      </button>
-                    </div>
-
-                    {/* Profile */}
-                    <div className="relative">
-                      <button
-                        onClick={() => handleNavigation("/profile")}
-                        className={`
-                          relative p-2.5 rounded-full transition-all duration-200
-                          ${
-                            isDark
-                              ? "hover:bg-gray-700 text-gray-300 hover:text-white"
-                              : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
-                          }
-                          active:scale-95 group
-                        `}
-                        aria-label="Profil"
-                      >
-                        <User size={20} />
-                      </button>
-                    </div>
-
-                    {/* Logout */}
-                    <div className="relative">
-                      <button
-                        onClick={handleLogout}
-                        disabled={isLoggingOut}
-                        className={`
-                          relative p-2.5 rounded-full transition-all duration-200
-                          hover:bg-red-50 dark:hover:bg-red-900/30 active:scale-95 group
-                          text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300
-                          ${isLoggingOut ? "opacity-50 cursor-not-allowed" : ""}
-                        `}
-                        aria-label="Çıkış"
-                      >
-                        <LogOut
-                          size={18}
-                          className={isLoggingOut ? "animate-pulse" : ""}
-                        />
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  /* Login button for non-authenticated users */
-                  <div className="flex items-center gap-2">
-                    {/* Language Switcher for non-authenticated users too */}
-                    <div className="relative" ref={languageMenuRef}>
-                      <button
-                        onClick={() => setShowLanguageMenu(!showLanguageMenu)}
-                        className={`
-                          relative p-2.5 rounded-full transition-all duration-200
-                          ${
-                            isDark
-                              ? "hover:bg-gray-700 text-gray-300 hover:text-white"
-                              : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
-                          }
-                          active:scale-95 group
-                        `}
-                        aria-label="Dil Seçimi"
-                      >
-                        <Globe size={20} />
-                      </button>
-
-                      {/* Language Menu */}
-                      {showLanguageMenu && (
-                        <div
-                          className={`
-                            absolute right-0 top-full mt-2 w-32
-                            ${isDark ? "bg-gray-800" : "bg-white"}
-                            border ${
-                              isDark ? "border-gray-700" : "border-gray-200"
-                            }
-                            rounded-lg shadow-xl backdrop-blur-xl z-50
-                            overflow-hidden
-                          `}
+                        <span className="text-lg">🇺🇸</span>
+                        <span
+                          className={`text-sm font-medium ${
+                            isDark ? "text-gray-200" : "text-gray-900"
+                          }`}
                         >
-                          <button
-                            onClick={() => switchLanguage("tr")}
-                            className={`
-                              w-full flex items-center space-x-3 px-4 py-3 text-left
-                              hover:bg-gray-100 dark:hover:bg-gray-700 
-                              transition-colors duration-150
-                              ${
-                                locale === "tr"
-                                  ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-                                  : ""
-                              }
-                            `}
-                          >
-                            <span className="text-lg">🇹🇷</span>
-                            <span
-                              className={`text-sm font-medium ${
-                                isDark ? "text-gray-200" : "text-gray-900"
-                              }`}
-                            >
-                              Türkçe
-                            </span>
-                          </button>
-                          <button
-                            onClick={() => switchLanguage("en")}
-                            className={`
-                              w-full flex items-center space-x-3 px-4 py-3 text-left
-                              hover:bg-gray-100 dark:hover:bg-gray-700 
-                              transition-colors duration-150
-                              ${
-                                locale === "en"
-                                  ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-                                  : ""
-                              }
-                            `}
-                          >
-                            <span className="text-lg">🇺🇸</span>
-                            <span
-                              className={`text-sm font-medium ${
-                                isDark ? "text-gray-200" : "text-gray-900"
-                              }`}
-                            >
-                              English
-                            </span>
-                          </button>
-                        </div>
-                      )}
+                          English
+                        </span>
+                      </button>
                     </div>
+                  )}
+                </div>
 
+                {/* Favorites */}
+                <div className="relative">
+                  <button
+                    onClick={handleFavoritesClick}
+                    className={`
+          relative p-2.5 rounded-full transition-all duration-200
+          ${
+            isDark
+              ? "hover:bg-gray-700 text-gray-300 hover:text-white"
+              : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
+          }
+          active:scale-95 group
+        `}
+                    aria-label="Favoriler"
+                  >
+                    <Heart size={20} />
+                    {user && favoriteCount > 0 && (
+                      <div className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-pink-500 rounded-full flex items-center justify-center shadow-lg ring-2 ring-white dark:ring-gray-900">
+                        <span className="text-white text-xs font-bold px-1">
+                          {favoriteCount > 99 ? "99+" : favoriteCount}
+                        </span>
+                      </div>
+                    )}
+                  </button>
+                </div>
+
+                {/* Cart */}
+                <div className="relative">
+                  <button
+                    onClick={handleCartClick}
+                    className={`
+          relative p-2.5 rounded-full transition-all duration-200
+          ${
+            isDark
+              ? "hover:bg-gray-700 text-gray-300 hover:text-white"
+              : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
+          }
+          active:scale-95 group
+        `}
+                    aria-label="Sepet"
+                  >
+                    <ShoppingCart size={20} />
+                    {user && cartCount > 0 && (
+                      <div className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-orange-500 rounded-full flex items-center justify-center shadow-lg ring-2 ring-white dark:ring-gray-900">
+                        <span className="text-white text-xs font-bold px-1">
+                          {cartCount > 99 ? "99+" : cartCount}
+                        </span>
+                      </div>
+                    )}
+                  </button>
+                </div>
+
+                {/* Profile */}
+                <div className="relative">
+                  <button
+                    onClick={() => handleNavigation("/profile")}
+                    className={`
+          relative p-2.5 rounded-full transition-all duration-200
+          ${
+            isDark
+              ? "hover:bg-gray-700 text-gray-300 hover:text-white"
+              : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
+          }
+          active:scale-95 group
+        `}
+                    aria-label="Profil"
+                  >
+                    <User size={20} />
+                  </button>
+                </div>
+
+                {/* Login/Logout */}
+                <div className="relative">
+                  {user ? (
+                    <button
+                      onClick={handleLogout}
+                      disabled={isLoggingOut}
+                      className={`
+            relative p-2.5 rounded-full transition-all duration-200
+            hover:bg-red-50 dark:hover:bg-red-900/30 active:scale-95 group
+            text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300
+            ${isLoggingOut ? "opacity-50 cursor-not-allowed" : ""}
+          `}
+                      aria-label="Çıkış"
+                    >
+                      <LogOut
+                        size={18}
+                        className={isLoggingOut ? "animate-pulse" : ""}
+                      />
+                    </button>
+                  ) : (
                     <button
                       onClick={() => router.push("/login")}
                       className={`
-                        px-4 py-2 rounded-full text-sm font-medium transition-all duration-200
-                        bg-gradient-to-r from-orange-500 to-pink-500 text-white
-                        hover:from-orange-600 hover:to-pink-600 active:scale-95
-                        shadow-md hover:shadow-lg
-                      `}
+            relative p-2.5 rounded-full transition-all duration-200
+            ${
+              isDark
+                ? "hover:bg-gray-700 text-gray-300 hover:text-white"
+                : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
+            }
+            active:scale-95 group
+          `}
+                      aria-label="Giriş"
                     >
-                      Giriş Yap
+                      <LogIn size={18} />
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             )}
           </div>
