@@ -240,9 +240,9 @@ export default function MyProductsPage() {
     if (timeRemaining === "00:00:00") return null;
 
     return (
-      <div className="inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-full shadow-lg">
-        <Zap size={12} className="mr-1 animate-pulse" />
-        <span className="text-xs font-bold">
+      <div className="inline-flex items-center px-2 sm:px-3 py-1 sm:py-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-full shadow-lg">
+        <Zap size={10} className="sm:size-3 mr-1 animate-pulse" />
+        <span className="text-xs sm:text-xs font-bold">
           {t("boosted")}: {timeRemaining}
         </span>
       </div>
@@ -256,7 +256,7 @@ export default function MyProductsPage() {
 
     return (
       <div
-        className={`group relative rounded-2xl border transition-all duration-300 overflow-hidden hover:shadow-xl hover:scale-[1.02] ${
+        className={`group relative rounded-xl sm:rounded-2xl border transition-all duration-300 overflow-hidden hover:shadow-xl hover:scale-[1.02] ${
           isBoosted
             ? "border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 dark:border-emerald-700"
             : isDarkMode
@@ -272,13 +272,13 @@ export default function MyProductsPage() {
         {/* Main product content */}
         <div className="relative">
           <div
-            className="flex p-6 cursor-pointer"
+            className="flex p-3 sm:p-6 cursor-pointer"
             onClick={() => router.push(`/product/${product.id}`)}
           >
             {/* Product Image */}
-            <div className="relative w-24 h-24 flex-shrink-0 mr-6">
+            <div className="relative w-16 h-16 sm:w-24 sm:h-24 flex-shrink-0 mr-3 sm:mr-6">
               {product.imageUrls.length > 0 ? (
-                <div className="relative w-full h-full rounded-xl overflow-hidden shadow-lg">
+                <div className="relative w-full h-full rounded-lg sm:rounded-xl overflow-hidden shadow-lg">
                   <Image
                     src={product.imageUrls[0]}
                     alt={product.productName}
@@ -291,15 +291,17 @@ export default function MyProductsPage() {
                 </div>
               ) : (
                 <div
-                  className={`w-full h-full rounded-xl flex items-center justify-center border-2 border-dashed transition-colors ${
+                  className={`w-full h-full rounded-lg sm:rounded-xl flex items-center justify-center border-2 border-dashed transition-colors ${
                     isDarkMode
                       ? "bg-gray-700 border-gray-600"
                       : "bg-gray-100 border-gray-300"
                   }`}
                 >
                   <Package
-                    size={28}
-                    className={isDarkMode ? "text-gray-400" : "text-gray-500"}
+                    size={20}
+                    className={`sm:size-7 ${
+                      isDarkMode ? "text-gray-400" : "text-gray-500"
+                    }`}
                   />
                 </div>
               )}
@@ -307,9 +309,9 @@ export default function MyProductsPage() {
 
             {/* Product Info */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-start justify-between mb-2">
+              <div className="flex items-start justify-between mb-1 sm:mb-2">
                 <h3
-                  className={`text-xl font-bold line-clamp-2 ${
+                  className={`text-sm sm:text-xl font-bold line-clamp-2 ${
                     isDarkMode ? "text-white" : "text-gray-900"
                   }`}
                 >
@@ -324,7 +326,7 @@ export default function MyProductsPage() {
 
               {product.brandModel && (
                 <p
-                  className={`text-sm mb-3 font-medium ${
+                  className={`text-xs sm:text-sm mb-2 sm:mb-3 font-medium ${
                     isDarkMode ? "text-gray-300" : "text-gray-600"
                   }`}
                 >
@@ -332,18 +334,21 @@ export default function MyProductsPage() {
                 </p>
               )}
 
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
+                <div className="flex items-center space-x-2 sm:space-x-4">
                   <div className="bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">
-                    <span className="text-2xl font-bold">
+                    <span className="text-lg sm:text-2xl font-bold">
                       {product.price.toFixed(2)} {product.currency}
                     </span>
                   </div>
 
                   {product.averageRating && (
-                    <div className="flex items-center space-x-1 bg-amber-100 dark:bg-amber-900/30 px-2 py-1 rounded-full">
-                      <Star size={14} className="text-amber-500 fill-current" />
-                      <span className="text-sm font-semibold text-amber-700 dark:text-amber-300">
+                    <div className="flex items-center space-x-1 bg-amber-100 dark:bg-amber-900/30 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">
+                      <Star
+                        size={10}
+                        className="sm:size-3.5 text-amber-500 fill-current"
+                      />
+                      <span className="text-xs sm:text-sm font-semibold text-amber-700 dark:text-amber-300">
                         {product.averageRating.toFixed(1)}
                       </span>
                     </div>
@@ -351,21 +356,21 @@ export default function MyProductsPage() {
                 </div>
 
                 {/* Quick Stats */}
-                <div className="flex items-center space-x-3 text-sm">
+                <div className="flex items-center space-x-2 sm:space-x-3 text-xs sm:text-sm">
                   <div className="flex items-center space-x-1 text-blue-600">
-                    <Eye size={14} />
+                    <Eye size={10} className="sm:size-3.5" />
                     <span className="font-semibold">
                       {product.clickCount || 0}
                     </span>
                   </div>
                   <div className="flex items-center space-x-1 text-red-500">
-                    <Heart size={14} />
+                    <Heart size={10} className="sm:size-3.5" />
                     <span className="font-semibold">
                       {product.favoritesCount || 0}
                     </span>
                   </div>
                   <div className="flex items-center space-x-1 text-green-600">
-                    <ShoppingCart size={14} />
+                    <ShoppingCart size={10} className="sm:size-3.5" />
                     <span className="font-semibold">
                       {product.cartCount || 0}
                     </span>
@@ -376,42 +381,42 @@ export default function MyProductsPage() {
           </div>
 
           {/* Action Buttons */}
-          <div className="absolute top-4 right-4 flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="absolute top-2 sm:top-4 right-2 sm:right-4 flex space-x-1 sm:space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 setExpandedProductId(isExpanded ? null : product.id);
               }}
-              className="w-10 h-10 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 text-white flex items-center justify-center hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl"
+              className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 text-white flex items-center justify-center hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl"
             >
-              <Info size={16} />
+              <Info size={12} className="sm:size-4" />
             </button>
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 router.push(`/edit-product/${product.id}`);
               }}
-              className="w-10 h-10 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white flex items-center justify-center hover:from-amber-600 hover:to-orange-600 transition-all shadow-lg hover:shadow-xl"
+              className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white flex items-center justify-center hover:from-amber-600 hover:to-orange-600 transition-all shadow-lg hover:shadow-xl"
             >
-              <Edit size={16} />
+              <Edit size={12} className="sm:size-4" />
             </button>
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 router.push(`/boost?productId=${product.id}`);
               }}
-              className="w-10 h-10 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white flex items-center justify-center hover:from-emerald-600 hover:to-teal-600 transition-all shadow-lg hover:shadow-xl"
+              className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white flex items-center justify-center hover:from-emerald-600 hover:to-teal-600 transition-all shadow-lg hover:shadow-xl"
             >
-              <Zap size={16} />
+              <Zap size={12} className="sm:size-4" />
             </button>
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 handleDeleteProduct(product.id);
               }}
-              className="w-10 h-10 rounded-xl bg-gradient-to-r from-red-500 to-pink-500 text-white flex items-center justify-center hover:from-red-600 hover:to-pink-600 transition-all shadow-lg hover:shadow-xl"
+              className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-gradient-to-r from-red-500 to-pink-500 text-white flex items-center justify-center hover:from-red-600 hover:to-pink-600 transition-all shadow-lg hover:shadow-xl"
             >
-              <Trash2 size={16} />
+              <Trash2 size={12} className="sm:size-4" />
             </button>
           </div>
         </div>
@@ -425,27 +430,27 @@ export default function MyProductsPage() {
                 : "border-gray-200 bg-white/80"
             }`}
           >
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-6">
+            <div className="p-3 sm:p-6">
+              <div className="flex justify-between items-center mb-3 sm:mb-6">
                 <div className="flex items-center space-x-2">
-                  <TrendingUp size={20} className="text-purple-500" />
+                  <TrendingUp size={16} className="sm:size-5 text-purple-500" />
                   <h4
-                    className={`text-lg font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent`}
+                    className={`text-base sm:text-lg font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent`}
                   >
                     {t("productStats") || "Product Statistics"}
                   </h4>
                 </div>
                 <button
                   onClick={() => setExpandedProductId(null)}
-                  className={`p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
+                  className={`p-1.5 sm:p-2 rounded-lg sm:rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
                     isDarkMode ? "text-gray-300" : "text-gray-600"
                   }`}
                 >
-                  <X size={18} />
+                  <X size={14} className="sm:size-4.5" />
                 </button>
               </div>
 
-              <div className="grid grid-cols-3 gap-6">
+              <div className="grid grid-cols-3 gap-3 sm:gap-6">
                 {[
                   {
                     label: t("clicks") || "Clicks",
@@ -474,22 +479,22 @@ export default function MyProductsPage() {
                 ].map((stat, index) => (
                   <div
                     key={index}
-                    className={`relative p-4 rounded-2xl bg-gradient-to-br ${stat.bgColor} border border-white/20 shadow-lg`}
+                    className={`relative p-2 sm:p-4 rounded-xl sm:rounded-2xl bg-gradient-to-br ${stat.bgColor} border border-white/20 shadow-lg`}
                   >
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-between mb-1 sm:mb-2">
                       <div
-                        className={`w-8 h-8 rounded-lg bg-gradient-to-r ${stat.color} flex items-center justify-center`}
+                        className={`w-6 h-6 sm:w-8 sm:h-8 rounded-md sm:rounded-lg bg-gradient-to-r ${stat.color} flex items-center justify-center`}
                       >
-                        <stat.icon size={16} className="text-white" />
+                        <stat.icon size={12} className="sm:size-4 text-white" />
                       </div>
                     </div>
                     <div
-                      className={`text-2xl font-bold bg-gradient-to-r ${stat.color} bg-clip-text text-transparent`}
+                      className={`text-lg sm:text-2xl font-bold bg-gradient-to-r ${stat.color} bg-clip-text text-transparent`}
                     >
                       {stat.value}
                     </div>
                     <div
-                      className={`text-sm font-medium mt-1 ${
+                      className={`text-xs sm:text-sm font-medium mt-1 ${
                         isDarkMode ? "text-gray-300" : "text-gray-600"
                       }`}
                     >
@@ -500,9 +505,9 @@ export default function MyProductsPage() {
               </div>
 
               {/* Creation Date */}
-              <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-                <div className="flex items-center space-x-2 text-sm">
-                  <Clock size={16} className="text-gray-500" />
+              <div className="mt-3 sm:mt-6 pt-3 sm:pt-6 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex items-center space-x-2 text-xs sm:text-sm">
+                  <Clock size={12} className="sm:size-4 text-gray-500" />
                   <span
                     className={isDarkMode ? "text-gray-300" : "text-gray-600"}
                   >
@@ -519,11 +524,11 @@ export default function MyProductsPage() {
 
   // Loading skeleton
   const LoadingSkeleton = () => (
-    <div className="space-y-6 p-4">
+    <div className="space-y-4 sm:space-y-6 p-2 sm:p-4">
       {[...Array(5)].map((_, i) => (
         <div
           key={i}
-          className={`animate-pulse rounded-2xl h-32 bg-gradient-to-r ${
+          className={`animate-pulse rounded-xl sm:rounded-2xl h-24 sm:h-32 bg-gradient-to-r ${
             isDarkMode
               ? "from-gray-800 to-gray-700"
               : "from-gray-200 to-gray-100"
@@ -536,20 +541,20 @@ export default function MyProductsPage() {
   // Not logged in state
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-900 dark:to-gray-800">
-        <div className="text-center bg-white dark:bg-gray-800 rounded-3xl p-8 shadow-2xl border border-gray-200 dark:border-gray-700">
-          <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center">
-            <Package size={40} className="text-white" />
+      <div className="min-h-screen flex items-center justify-center p-2 sm:p-4 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-900 dark:to-gray-800">
+        <div className="text-center bg-white dark:bg-gray-800 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-2xl border border-gray-200 dark:border-gray-700 mx-4 max-w-sm sm:max-w-none">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 sm:mb-6 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl sm:rounded-2xl flex items-center justify-center">
+            <Package size={32} className="sm:size-10 text-white" />
           </div>
-          <h2 className="text-2xl font-bold mb-3 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+          <h2 className="text-lg sm:text-2xl font-bold mb-2 sm:mb-3 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             {t("loginRequired") || "Login Required"}
           </h2>
-          <p className="text-gray-600 dark:text-gray-400 mb-6">
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-4 sm:mb-6">
             {t("loginToViewProducts") || "Please login to view your products"}
           </p>
           <button
             onClick={() => router.push("/login")}
-            className="px-8 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl hover:from-blue-600 hover:to-purple-600 transition-all shadow-lg hover:shadow-xl font-semibold"
+            className="px-6 sm:px-8 py-2.5 sm:py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg sm:rounded-xl hover:from-blue-600 hover:to-purple-600 transition-all shadow-lg hover:shadow-xl font-semibold text-sm sm:text-base"
           >
             {t("login") || "Login"}
           </button>
@@ -576,21 +581,21 @@ export default function MyProductsPage() {
             : "bg-white/80 border-gray-200"
         }`}
       >
-        <div className="px-4 sm:px-6 lg:px-8 py-4">
+        <div className="px-2 sm:px-4 lg:px-8 py-2 sm:py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 sm:space-x-4">
               <button
                 onClick={() => router.back()}
-                className={`p-3 rounded-xl transition-all hover:scale-105 ${
+                className={`p-2 sm:p-3 rounded-lg sm:rounded-xl transition-all hover:scale-105 ${
                   isDarkMode
                     ? "hover:bg-gray-800 text-white"
                     : "hover:bg-gray-100 text-gray-900"
                 }`}
               >
-                <ArrowLeft size={20} />
+                <ArrowLeft size={16} className="sm:size-5" />
               </button>
               <h1
-                className={`text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent`}
+                className={`text-lg sm:text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent`}
               >
                 {t("myProducts") || "My Products"}
               </h1>
@@ -599,21 +604,21 @@ export default function MyProductsPage() {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-6xl mx-auto px-2 sm:px-4 lg:px-8 py-4 sm:py-8">
         {/* Search and Filter Bar */}
-        <div className="mb-8 space-y-6">
+        <div className="mb-4 sm:mb-8 space-y-3 sm:space-y-6">
           {/* Search */}
           <div className="relative">
             <Search
-              size={20}
-              className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"
+              size={16}
+              className="sm:size-5 absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 text-gray-400"
             />
             <input
               type="text"
               placeholder={t("searchProducts") || "Search products..."}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className={`w-full pl-12 pr-4 py-4 rounded-2xl border-2 transition-all focus:scale-[1.02] ${
+              className={`w-full pl-9 sm:pl-12 pr-3 sm:pr-4 py-3 sm:py-4 rounded-xl sm:rounded-2xl border-2 transition-all focus:scale-[1.02] text-sm sm:text-base ${
                 isDarkMode
                   ? "bg-gray-800/50 border-gray-700 text-white placeholder-gray-400 focus:border-blue-500"
                   : "bg-white/70 border-gray-200 text-gray-900 placeholder-gray-500 focus:border-blue-500"
@@ -622,10 +627,10 @@ export default function MyProductsPage() {
           </div>
 
           {/* Date Range Filter */}
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-2 sm:gap-3">
             <button
               onClick={() => setShowDatePicker(!showDatePicker)}
-              className={`flex items-center space-x-2 px-6 py-3 rounded-2xl border-2 transition-all hover:scale-105 ${
+              className={`flex items-center space-x-1.5 sm:space-x-2 px-3 sm:px-6 py-2 sm:py-3 rounded-xl sm:rounded-2xl border-2 transition-all hover:scale-105 text-sm sm:text-base ${
                 selectedDateRange
                   ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-transparent shadow-lg"
                   : isDarkMode
@@ -633,7 +638,7 @@ export default function MyProductsPage() {
                   : "border-gray-300 text-gray-700 hover:bg-white bg-white/70"
               } backdrop-blur-sm`}
             >
-              <Calendar size={18} />
+              <Calendar size={14} className="sm:size-4.5" />
               <span className="font-semibold">
                 {selectedDateRange
                   ? formatDateRange(selectedDateRange)
@@ -644,9 +649,9 @@ export default function MyProductsPage() {
             {selectedDateRange && (
               <button
                 onClick={clearDateRange}
-                className="flex items-center space-x-2 px-4 py-3 text-sm bg-red-100 dark:bg-red-900/30 text-red-600 hover:bg-red-200 dark:hover:bg-red-900/50 rounded-2xl transition-all hover:scale-105 font-semibold"
+                className="flex items-center space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm bg-red-100 dark:bg-red-900/30 text-red-600 hover:bg-red-200 dark:hover:bg-red-900/50 rounded-xl sm:rounded-2xl transition-all hover:scale-105 font-semibold"
               >
-                <X size={16} />
+                <X size={12} className="sm:size-4" />
                 <span>{t("clear") || "Clear"}</span>
               </button>
             )}
@@ -654,7 +659,7 @@ export default function MyProductsPage() {
 
           {/* Quick date range buttons */}
           {showDatePicker && (
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-2 sm:gap-3">
               {[
                 {
                   label: t("last7Days") || "Last 7 Days",
@@ -681,7 +686,7 @@ export default function MyProductsPage() {
                     setSelectedDateRange({ start, end });
                     setShowDatePicker(false);
                   }}
-                  className={`px-4 py-2 text-sm rounded-xl bg-gradient-to-r ${range.color} text-white hover:scale-105 transition-all shadow-lg font-semibold`}
+                  className={`px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm rounded-lg sm:rounded-xl bg-gradient-to-r ${range.color} text-white hover:scale-105 transition-all shadow-lg font-semibold`}
                 >
                   {range.label}
                 </button>
@@ -692,12 +697,12 @@ export default function MyProductsPage() {
 
         {/* Products Grid */}
         {filteredProducts.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="w-32 h-32 mx-auto mb-8 bg-gradient-to-r from-gray-300 to-gray-400 rounded-3xl flex items-center justify-center">
-              <Package size={64} className="text-white" />
+          <div className="text-center py-8 sm:py-16">
+            <div className="w-24 h-24 sm:w-32 sm:h-32 mx-auto mb-4 sm:mb-8 bg-gradient-to-r from-gray-300 to-gray-400 rounded-2xl sm:rounded-3xl flex items-center justify-center">
+              <Package size={48} className="sm:size-16 text-white" />
             </div>
             <h3
-              className={`text-2xl font-bold mb-4 ${
+              className={`text-xl sm:text-2xl font-bold mb-2 sm:mb-4 ${
                 isDarkMode ? "text-white" : "text-gray-900"
               }`}
             >
@@ -706,7 +711,7 @@ export default function MyProductsPage() {
                 : t("noProducts") || "No products yet"}
             </h3>
             <p
-              className={`mb-8 text-lg ${
+              className={`mb-4 sm:mb-8 text-base sm:text-lg px-4 ${
                 isDarkMode ? "text-gray-400" : "text-gray-600"
               }`}
             >
@@ -719,17 +724,15 @@ export default function MyProductsPage() {
             {!searchQuery && !selectedDateRange && (
               <button
                 onClick={() => router.push("/list-product")}
-                className="inline-flex items-center space-x-3 px-8 py-4 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-2xl hover:from-emerald-600 hover:to-teal-600 transition-all shadow-lg hover:shadow-xl hover:scale-105 font-semibold"
+                className="inline-flex items-center space-x-2 sm:space-x-3 px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl sm:rounded-2xl hover:from-emerald-600 hover:to-teal-600 transition-all shadow-lg hover:shadow-xl hover:scale-105 font-semibold text-sm sm:text-lg"
               >
-                <Plus size={24} />
-                <span className="text-lg">
-                  {t("addProduct") || "Add Product"}
-                </span>
+                <Plus size={20} className="sm:size-6" />
+                <span>{t("addProduct") || "Add Product"}</span>
               </button>
             )}
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-3 sm:space-y-6">
             {filteredProducts.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}
@@ -738,14 +741,14 @@ export default function MyProductsPage() {
 
         {/* Add Product Button */}
         {filteredProducts.length > 0 && (
-          <div className="fixed bottom-8 right-8">
+          <div className="fixed bottom-4 sm:bottom-8 right-4 sm:right-8">
             <button
               onClick={() => router.push("/list-product")}
-              className="w-16 h-16 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-2xl shadow-2xl hover:from-emerald-600 hover:to-teal-600 transition-all flex items-center justify-center hover:scale-110 group"
+              className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl sm:rounded-2xl shadow-2xl hover:from-emerald-600 hover:to-teal-600 transition-all flex items-center justify-center hover:scale-110 group"
             >
               <Plus
-                size={28}
-                className="group-hover:rotate-90 transition-transform"
+                size={20}
+                className="sm:size-7 group-hover:rotate-90 transition-transform"
               />
             </button>
           </div>
