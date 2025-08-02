@@ -89,7 +89,7 @@ export const MarketBubbles: React.FC<MarketBubblesProps> = ({
 
   const handleBubbleClick = (index: number) => {
     if (index === 0) {
-      router.push("/shop"); // Navigate to /shop for Mağazalar bubble
+      router.push("/shops"); // Navigate to /shop for Mağazalar bubble
     } else if (index === 1) {
       onNavItemTapped(4); // Use the callback for Vitrin bubble
     }
@@ -245,7 +245,7 @@ export const MarketBubblesWithIcons: React.FC<MarketBubblesProps> = ({
 
   const handleBubbleClick = (index: number) => {
     if (index === 0) {
-      router.push("/shop");
+      router.push("/shops");
     } else if (index === 1) {
       onNavItemTapped(4);
     }

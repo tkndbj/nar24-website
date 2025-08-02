@@ -31,6 +31,16 @@ import {
   Sun,
 } from "lucide-react";
 import Image from "next/image";
+import { SavedPaymentMethodsDrawer } from "@/app/components/profile/SavedPaymentMethodsDrawer";
+import { useTranslations } from "next-intl";
+
+interface ActionButton {
+  icon: React.ElementType;
+  label: string;
+  path?: string;
+  action?: () => void;
+  gradient: string;
+}
 
 export default function ProfilePage() {
   const { user, profileData, updateProfileData, isLoading } = useUser();
@@ -38,6 +48,9 @@ export default function ProfilePage() {
   const [isDarkMode, setIsDarkMode] = useState(false); // ✅ Keep this consistent with header
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isPaymentMethodsDrawerOpen, setIsPaymentMethodsDrawerOpen] =
+    useState(false);
+  const t = useTranslations();
   const router = useRouter();
 
   // ✅ FIX: Use the same theme detection logic as the header
@@ -126,12 +139,20 @@ export default function ProfilePage() {
     }
   };
 
-  const handleNavigation = (path: string) => {
+  const handleNavigation = (path?: string, action?: () => void) => {
+    if (action) {
+      action();
+      return;
+    }
+
     if (!user) {
       router.push("/login");
       return;
     }
-    router.push(path);
+
+    if (path) {
+      router.push(path);
+    }
   };
 
   const toggleTheme = () => {
@@ -187,7 +208,7 @@ export default function ProfilePage() {
     );
   }
 
-  const quickActionButtons = [
+  const quickActionButtons: ActionButton[] = [
     {
       icon: Box,
       label: "Ürünlerim",
@@ -197,7 +218,7 @@ export default function ProfilePage() {
     {
       icon: CreditCard,
       label: "Ödeme Yöntemleri",
-      path: "/payment-methods",
+      action: () => setIsPaymentMethodsDrawerOpen(true),
       gradient: "from-green-500 to-green-600",
     },
     {
@@ -428,7 +449,7 @@ export default function ProfilePage() {
           {quickActionButtons.map((button, index) => (
             <button
               key={index}
-              onClick={() => handleNavigation(button.path)}
+              onClick={() => handleNavigation(button.path, button.action)}
               className={`group p-6 rounded-2xl shadow-md hover:shadow-lg transition-all duration-200 border ${
                 isDarkMode
                   ? "bg-gray-800 border-gray-700"
@@ -669,6 +690,75 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+      {/* SavedPaymentMethodsDrawer */}
+      <SavedPaymentMethodsDrawer
+        isOpen={isPaymentMethodsDrawerOpen}
+        onClose={() => setIsPaymentMethodsDrawerOpen(false)}
+        isDarkMode={isDarkMode}
+        localization={{
+          SavedPaymentMethodsDrawer: {
+            title: t("SavedPaymentMethodsDrawer.title"),
+            ofFourMethods: t("SavedPaymentMethodsDrawer.ofFourMethods"),
+            addNew: t("SavedPaymentMethodsDrawer.addNew"),
+            clearAll: t("SavedPaymentMethodsDrawer.clearAll"),
+            clearing: t("SavedPaymentMethodsDrawer.clearing"),
+            loginRequired: t("SavedPaymentMethodsDrawer.loginRequired"),
+            loginToManagePaymentMethods: t(
+              "SavedPaymentMethodsDrawer.loginToManagePaymentMethods"
+            ),
+            login: t("SavedPaymentMethodsDrawer.login"),
+            loading: t("SavedPaymentMethodsDrawer.loading"),
+            noSavedPaymentMethods: t(
+              "SavedPaymentMethodsDrawer.noSavedPaymentMethods"
+            ),
+            addFirstPaymentMethod: t(
+              "SavedPaymentMethodsDrawer.addFirstPaymentMethod"
+            ),
+            addNewPaymentMethod: t(
+              "SavedPaymentMethodsDrawer.addNewPaymentMethod"
+            ),
+            preferred: t("SavedPaymentMethodsDrawer.preferred"),
+            expires: t("SavedPaymentMethodsDrawer.expires"),
+            editPaymentMethod: t("SavedPaymentMethodsDrawer.editPaymentMethod"),
+            newPaymentMethod: t("SavedPaymentMethodsDrawer.newPaymentMethod"),
+            cardHolderName: t("SavedPaymentMethodsDrawer.cardHolderName"),
+            cardNumber: t("SavedPaymentMethodsDrawer.cardNumber"),
+            expiryDate: t("SavedPaymentMethodsDrawer.expiryDate"),
+            cancel: t("SavedPaymentMethodsDrawer.cancel"),
+            save: t("SavedPaymentMethodsDrawer.save"),
+            invalidCardNumber: t("SavedPaymentMethodsDrawer.invalidCardNumber"),
+            unsupportedCardType: t(
+              "SavedPaymentMethodsDrawer.unsupportedCardType"
+            ),
+            maxPaymentMethodsReached: t(
+              "SavedPaymentMethodsDrawer.maxPaymentMethodsReached"
+            ),
+            paymentMethodAdded: t(
+              "SavedPaymentMethodsDrawer.paymentMethodAdded"
+            ),
+            paymentMethodUpdated: t(
+              "SavedPaymentMethodsDrawer.paymentMethodUpdated"
+            ),
+            paymentMethodDeleted: t(
+              "SavedPaymentMethodsDrawer.paymentMethodDeleted"
+            ),
+            allPaymentMethodsCleared: t(
+              "SavedPaymentMethodsDrawer.allPaymentMethodsCleared"
+            ),
+            preferredPaymentMethodSet: t(
+              "SavedPaymentMethodsDrawer.preferredPaymentMethodSet"
+            ),
+            errorOccurred: t("SavedPaymentMethodsDrawer.errorOccurred"),
+            deleteConfirmation: t(
+              "SavedPaymentMethodsDrawer.deleteConfirmation"
+            ),
+            deleteAllConfirmation: t(
+              "SavedPaymentMethodsDrawer.deleteAllConfirmation"
+            ),
+            fillAllFields: t("SavedPaymentMethodsDrawer.fillAllFields"),
+          },
+        }}
+      />
     </div>
   );
 }

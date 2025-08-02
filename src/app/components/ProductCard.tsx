@@ -5,7 +5,6 @@ import {
   Check,
   Star,
   StarHalf,
-  
   ImageOff,
   ChevronLeft,
   ChevronRight,
@@ -157,12 +156,17 @@ const RotatingText: React.FC<RotatingTextProps> = ({
     return <div className={className}>{children[0]}</div>;
 
   return (
-    <div className={`relative overflow-hidden ${className}`} style={{ height: "16px" }}>
+    <div
+      className={`relative overflow-hidden ${className}`}
+      style={{ height: "16px" }}
+    >
       {children.map((child, index) => (
         <div
           key={index}
           className={`absolute w-full h-4 flex items-center transition-all duration-500 ease-in-out ${
-            index === currentIndex ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+            index === currentIndex
+              ? "opacity-100 translate-y-0"
+              : "opacity-0 translate-y-4"
           }`}
           style={{ lineHeight: "16px" }}
         >
@@ -206,7 +210,9 @@ const RotatingBanner: React.FC<RotatingBannerProps> = ({
         <div
           key={index}
           className={`absolute w-full transition-all duration-500 ease-in-out ${
-            index === currentIndex ? "opacity-100 translate-y-0" : "opacity-0 translate-y-full"
+            index === currentIndex
+              ? "opacity-100 translate-y-0"
+              : "opacity-0 translate-y-full"
           }`}
           style={{ height }}
         >
@@ -270,20 +276,20 @@ const ExtraLabel: React.FC<ExtraLabelProps> = ({ text, gradientColors }) => {
 
 // Logo placeholder component
 const LogoPlaceholder: React.FC<{ size?: number }> = ({ size = 120 }) => (
-  <div 
+  <div
     className="flex items-center justify-center bg-gray-100 rounded-lg"
     style={{ width: size, height: size }}
   >
-    <img 
-      src="/images/narsiyah.png" 
-      alt="Narsiyah Logo" 
-      width={size * 0.8} 
+    <img
+      src="/images/narsiyah.png"
+      alt="Narsiyah Logo"
+      width={size * 0.8}
       height={size * 0.8}
       className="object-contain"
       onError={(e) => {
         // Fallback to generic icon if logo fails to load
         const target = e.target as HTMLImageElement;
-        target.style.display = 'none';
+        target.style.display = "none";
         target.parentElement!.innerHTML = `
           <div class="w-8 h-8 text-gray-400">
             <svg viewBox="0 0 24 24" fill="currentColor">
@@ -315,14 +321,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const router = useRouter();
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [internalSelectedColor, setInternalSelectedColor] = useState<string | null>(
-    selectedColor || null
-  );
+  const [internalSelectedColor, setInternalSelectedColor] = useState<
+    string | null
+  >(selectedColor || null);
   const [isHovered, setIsHovered] = useState(false);
 
   // Compute displayed colors (max 4, shuffled)
   const displayedColors = useMemo(() => {
-    const availableColors = Object.keys(product.colorImages);
+    const availableColors = Object.keys(product.colorImages || {});
     const shuffled = [...availableColors].sort(() => Math.random() - 0.5);
     return shuffled.slice(0, 4);
   }, [product.colorImages]);
@@ -330,11 +336,17 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   // Get current image URLs based on selected color
   const currentImageUrls = useMemo(() => {
     const colorToUse = internalSelectedColor || selectedColor;
-    if (colorToUse && product.colorImages[colorToUse]?.length) {
-      return product.colorImages[colorToUse];
+    const colorImages = product.colorImages || {};
+    if (colorToUse && colorImages[colorToUse]?.length) {
+      return colorImages[colorToUse];
     }
-    return product.imageUrls;
-  }, [internalSelectedColor, selectedColor, product.colorImages, product.imageUrls]);
+    return product.imageUrls || [];
+  }, [
+    internalSelectedColor,
+    selectedColor,
+    product.colorImages,
+    product.imageUrls,
+  ]);
 
   // Preload all images
   const { loadedImages, failedImages } = useImagePreloader(currentImageUrls);
@@ -377,7 +389,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   }, [selectedColor]);
 
   const effectiveScaleFactor = scaleFactor;
-  const finalInternalScaleFactor = overrideInternalScaleFactor ?? internalScaleFactor;
+  const finalInternalScaleFactor =
+    overrideInternalScaleFactor ?? internalScaleFactor;
   const textScaleFactor = effectiveScaleFactor * 0.9 * finalInternalScaleFactor;
 
   const hasDiscount = (product.discountPercentage ?? 0) > 0;
@@ -403,7 +416,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
     if (quantity <= 5 && quantity > 0) {
       children.push(
-        <span key="stock" className="text-emerald-600 text-xs font-bold truncate">
+        <span
+          key="stock"
+          className="text-emerald-600 text-xs font-bold truncate"
+        >
           Only {quantity} left
         </span>
       );
@@ -418,7 +434,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
     if (hasFastDelivery) {
       children.push(
-        <div key="delivery" className="w-full h-full bg-orange-500 flex items-center justify-center text-white text-xs font-medium">
+        <div
+          key="delivery"
+          className="w-full h-full bg-orange-500 flex items-center justify-center text-white text-xs font-medium"
+        >
           Fast Delivery
         </div>
       );
@@ -426,7 +445,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
     if (hasDiscountBanner) {
       children.push(
-        <div key="discount" className="w-full h-full bg-emerald-600 flex items-center justify-center text-white text-xs font-medium">
+        <div
+          key="discount"
+          className="w-full h-full bg-emerald-600 flex items-center justify-center text-white text-xs font-medium"
+        >
           {product.discountPercentage}% OFF
         </div>
       );
@@ -435,25 +457,34 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     return children;
   }, [hasFastDelivery, hasDiscountBanner, product.discountPercentage]);
 
-  const handleColorSelect = useCallback((color: string) => {
-    const newColor = internalSelectedColor === color ? null : color;
-    setInternalSelectedColor(newColor);
-    onColorSelect?.(newColor || "");
-  }, [internalSelectedColor, onColorSelect]);
+  const handleColorSelect = useCallback(
+    (color: string) => {
+      const newColor = internalSelectedColor === color ? null : color;
+      setInternalSelectedColor(newColor);
+      onColorSelect?.(newColor || "");
+    },
+    [internalSelectedColor, onColorSelect]
+  );
 
-  const handlePrevImage = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    setCurrentImageIndex((prev) =>
-      prev === 0 ? currentImageUrls.length - 1 : prev - 1
-    );
-  }, [currentImageUrls.length]);
+  const handlePrevImage = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setCurrentImageIndex((prev) =>
+        prev === 0 ? currentImageUrls.length - 1 : prev - 1
+      );
+    },
+    [currentImageUrls.length]
+  );
 
-  const handleNextImage = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    setCurrentImageIndex((prev) =>
-      prev === currentImageUrls.length - 1 ? 0 : prev + 1
-    );
-  }, [currentImageUrls.length]);
+  const handleNextImage = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setCurrentImageIndex((prev) =>
+        prev === currentImageUrls.length - 1 ? 0 : prev + 1
+      );
+    },
+    [currentImageUrls.length]
+  );
 
   // Determine active dot for pagination (max 3 dots)
   const getActiveDotIndex = () => {
@@ -536,8 +567,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           <div className="absolute top-2 right-2 flex items-center gap-2">
             {showExtraLabels && (
               <>
-                <ExtraLabel text="Nar24" gradientColors={["#FF9800", "#E91E63"]} />
-                <ExtraLabel text="Vitrin" gradientColors={["#9C27B0", "#E91E63"]} />
+                <ExtraLabel
+                  text="Nar24"
+                  gradientColors={["#FF9800", "#E91E63"]}
+                />
+                <ExtraLabel
+                  text="Vitrin"
+                  gradientColors={["#9C27B0", "#E91E63"]}
+                />
               </>
             )}
 
@@ -551,7 +588,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             >
               <Heart
                 size={12}
-                className={isFavorited ? "fill-red-500 text-red-500" : "text-gray-500"}
+                className={
+                  isFavorited ? "fill-red-500 text-red-500" : "text-gray-500"
+                }
               />
             </button>
           </div>
@@ -565,7 +604,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                   <button
                     key={color}
                     className={`w-5 h-5 rounded-full border-2 transition-all duration-200 ${
-                      isSelected ? "border-orange-500 scale-110" : "border-white hover:scale-105"
+                      isSelected
+                        ? "border-orange-500 scale-110"
+                        : "border-white hover:scale-105"
                     }`}
                     style={{ backgroundColor: getColorFromName(color) }}
                     onClick={(e) => {
@@ -573,7 +614,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                       handleColorSelect(color);
                     }}
                   >
-                    {isSelected && <Check size={10} className="text-white m-auto" />}
+                    {isSelected && (
+                      <Check size={10} className="text-white m-auto" />
+                    )}
                   </button>
                 );
               })}
@@ -602,17 +645,22 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           {currentImageUrls.length > 1 && (
             <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2">
               <div className="px-2 py-1 bg-gray-600 bg-opacity-80 rounded-full flex gap-1">
-                {Array.from({ length: Math.min(currentImageUrls.length, 3) }, (_, i) => {
-                  const isActive = i === getActiveDotIndex();
-                  return (
-                    <div
-                      key={i}
-                      className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
-                        isActive ? "bg-orange-500 scale-125" : "bg-white bg-opacity-60"
-                      }`}
-                    />
-                  );
-                })}
+                {Array.from(
+                  { length: Math.min(currentImageUrls.length, 3) },
+                  (_, i) => {
+                    const isActive = i === getActiveDotIndex();
+                    return (
+                      <div
+                        key={i}
+                        className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
+                          isActive
+                            ? "bg-orange-500 scale-125"
+                            : "bg-white bg-opacity-60"
+                        }`}
+                      />
+                    );
+                  }
+                )}
               </div>
             </div>
           )}
@@ -649,7 +697,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           {/* Rating Row */}
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-1">
-              <StarRating rating={product.averageRating} size={12 * effectiveScaleFactor} />
+              <StarRating
+                rating={product.averageRating}
+                size={12 * effectiveScaleFactor}
+              />
               <span
                 className="text-gray-500"
                 style={{ fontSize: `${10 * textScaleFactor}px` }}
