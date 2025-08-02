@@ -184,7 +184,7 @@ export const PreferenceProduct: React.FC<PreferenceProductProps> = ({
           />
 
           <div className="relative py-3">
-            <div className="px-4 lg:px-2 mb-2">
+            <div className="px-0 lg:px-2 mb-2">
               <div className="flex justify-between items-center">
                 <div className="h-5 bg-white bg-opacity-30 rounded animate-pulse w-48" />
                 <div className="h-4 bg-white bg-opacity-30 rounded animate-pulse w-16" />
@@ -216,7 +216,7 @@ export const PreferenceProduct: React.FC<PreferenceProductProps> = ({
           />
 
           <div className="relative py-3">
-            <div className="px-4 lg:px-2 mb-2">
+            <div className="px-0 lg:px-2 mb-2">
               <div className="flex justify-between items-center">
                 <div className="h-5 bg-white bg-opacity-30 rounded animate-pulse w-48" />
                 <div className="h-4 bg-white bg-opacity-30 rounded animate-pulse w-16" />
@@ -245,7 +245,7 @@ export const PreferenceProduct: React.FC<PreferenceProductProps> = ({
 
         <div className="relative py-3">
           {/* Title row */}
-          <div className="px-4 lg:px-2 mb-2">
+          <div className="px-0 lg:px-2 mb-2">
             <div className="flex justify-between items-center">
               <h2 className="text-lg font-bold text-white">
                 Special Products For You
@@ -263,7 +263,7 @@ export const PreferenceProduct: React.FC<PreferenceProductProps> = ({
           {/* Product list or empty state */}
           {error ? (
             <div
-              className="flex items-center justify-center text-white px-4 lg:px-0"
+              className="flex items-center justify-center text-white px-0 lg:px-0"
               style={{ height: `${rowHeight - 60}px` }}
             >
               <p className="text-center">
@@ -328,7 +328,7 @@ export const PreferenceProduct: React.FC<PreferenceProductProps> = ({
                     display: none;
                   }
                 `}</style>
-                <div className="flex gap-1.5 px-4 lg:px-2 h-full pr-0 lg:pr-2">
+                <div className="flex gap-1.5 px-0 lg:px-2 h-full pr-0 lg:pr-2 -ml-2 lg:ml-0">
                   {products.map((product) => (
                     <div
                       key={product.id}
