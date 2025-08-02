@@ -82,7 +82,17 @@ export default function Home() {
           <div
             className={`w-full ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
           >
-            <PreferenceProduct />
+            {/* Mobile: full width */}
+            <div className="block lg:hidden">
+              <PreferenceProduct />
+            </div>
+
+            {/* Desktop and up: centered layout */}
+            <div className="hidden lg:block">
+              <div className="max-w-6xl mx-auto px-4">
+                <PreferenceProduct />
+              </div>
+            </div>
           </div>
 
           {/* Market Banner remains full-width */}
