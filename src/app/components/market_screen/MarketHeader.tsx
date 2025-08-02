@@ -927,7 +927,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
 
             {/* Logo/Brand */}
             {!isSearching && (
-              <div className="absolute left-4 z-10">
+              <div className="absolute left-1/2 transform -translate-x-1/2 -ml-130 z-10">
                 <button
                   onClick={() => router.push("/")}
                   className="text-xl font-bold bg-gradient-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent hover:opacity-80 transition-opacity"

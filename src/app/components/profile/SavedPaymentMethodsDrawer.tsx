@@ -24,6 +24,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useTranslations } from "next-intl";
 
 interface PaymentMethod {
   id: string;
@@ -34,49 +35,11 @@ interface PaymentMethod {
   cardType: string;
 }
 
-interface LocalizationStrings {
-  SavedPaymentMethodsDrawer?: {
-    title?: string;
-    ofFourMethods?: string;
-    addNew?: string;
-    clearing?: string;
-    clearAll?: string;
-    loginRequired?: string;
-    loginToManagePaymentMethods?: string;
-    login?: string;
-    loading?: string;
-    noSavedPaymentMethods?: string;
-    addFirstPaymentMethod?: string;
-    addNewPaymentMethod?: string;
-    preferred?: string;
-    expires?: string;
-    editPaymentMethod?: string;
-    newPaymentMethod?: string;
-    cardHolderName?: string;
-    cardNumber?: string;
-    expiryDate?: string;
-    cancel?: string;
-    save?: string;
-    invalidCardNumber?: string;
-    unsupportedCardType?: string;
-    maxPaymentMethodsReached?: string;
-    paymentMethodAdded?: string;
-    paymentMethodUpdated?: string;
-    paymentMethodDeleted?: string;
-    allPaymentMethodsCleared?: string;
-    preferredPaymentMethodSet?: string;
-    errorOccurred?: string;
-    deleteConfirmation?: string;
-    deleteAllConfirmation?: string;
-    fillAllFields?: string;
-  };
-}
-
 interface SavedPaymentMethodsDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   isDarkMode?: boolean;
-  localization?: LocalizationStrings;
+  localization?: ReturnType<typeof useTranslations>;
 }
 
 export const SavedPaymentMethodsDrawer: React.FC<
@@ -446,7 +409,7 @@ export const SavedPaymentMethodsDrawer: React.FC<
 
   if (!shouldRender) return null;
 
-  const l = localization?.SavedPaymentMethodsDrawer || {}; // Fallback if localization is not provided
+  const l = localization || ((key: string) => key.split(".").pop() || key); // Fallback if localization is not provided
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden">
@@ -499,7 +462,7 @@ export const SavedPaymentMethodsDrawer: React.FC<
                     ${isDarkMode ? "text-white" : "text-gray-900"}
                   `}
                 >
-                  {l.title || "Payment Methods"}
+                  {l("SavedPaymentMethodsDrawer.title") || "Payment Methods"}
                 </h2>
                 {user && paymentMethods.length > 0 && (
                   <p
@@ -508,7 +471,9 @@ export const SavedPaymentMethodsDrawer: React.FC<
                       ${isDarkMode ? "text-gray-400" : "text-gray-500"}
                     `}
                   >
-                    {paymentMethods.length} {l.ofFourMethods || "of 4 methods"}
+                    {paymentMethods.length}{" "}
+                    {l("SavedPaymentMethodsDrawer.ofFourMethods") ||
+                      "of 4 methods"}
                   </p>
                 )}
               </div>
@@ -527,7 +492,7 @@ export const SavedPaymentMethodsDrawer: React.FC<
                         : "hover:bg-gray-100 text-gray-500 hover:text-gray-700"
                     }
                   `}
-                  title={l.addNew || "Add New"}
+                  title={l("SavedPaymentMethodsDrawer.addNew") || "Add New"}
                 >
                   <Plus size={20} />
                 </button>
@@ -572,8 +537,8 @@ export const SavedPaymentMethodsDrawer: React.FC<
                 )}
                 <span>
                   {isClearing
-                    ? l.clearing || "Clearing..."
-                    : l.clearAll || "Clear All"}
+                    ? l("SavedPaymentMethodsDrawer.clearing") || "Clearing..."
+                    : l("SavedPaymentMethodsDrawer.clearAll") || "Clear All"}
                 </span>
               </button>
             </div>
@@ -602,7 +567,8 @@ export const SavedPaymentMethodsDrawer: React.FC<
                   ${isDarkMode ? "text-white" : "text-gray-900"}
                 `}
               >
-                {l.loginRequired || "Login Required"}
+                {l("SavedPaymentMethodsDrawer.loginRequired") ||
+                  "Login Required"}
               </h3>
               <p
                 className={`
@@ -610,7 +576,7 @@ export const SavedPaymentMethodsDrawer: React.FC<
                   ${isDarkMode ? "text-gray-400" : "text-gray-600"}
                 `}
               >
-                {l.loginToManagePaymentMethods ||
+                {l("SavedPaymentMethodsDrawer.loginToManagePaymentMethods") ||
                   "Please login to view and manage your payment methods."}
               </p>
               <button
@@ -624,7 +590,9 @@ export const SavedPaymentMethodsDrawer: React.FC<
                 "
               >
                 <LogIn size={18} />
-                <span className="font-medium">{l.login || "Login"}</span>
+                <span className="font-medium">
+                  {l("SavedPaymentMethodsDrawer.login") || "Login"}
+                </span>
               </button>
             </div>
           ) : /* Loading State */ isLoading ? (
@@ -636,7 +604,8 @@ export const SavedPaymentMethodsDrawer: React.FC<
                   ${isDarkMode ? "text-gray-400" : "text-gray-600"}
                 `}
               >
-                {l.loading || "Loading payment methods..."}
+                {l("SavedPaymentMethodsDrawer.loading") ||
+                  "Loading payment methods..."}
               </p>
             </div>
           ) : /* Empty State */ paymentMethods.length === 0 ? (
@@ -658,7 +627,8 @@ export const SavedPaymentMethodsDrawer: React.FC<
                   ${isDarkMode ? "text-white" : "text-gray-900"}
                 `}
               >
-                {l.noSavedPaymentMethods || "No Saved Payment Methods"}
+                {l("SavedPaymentMethodsDrawer.noSavedPaymentMethods") ||
+                  "No Saved Payment Methods"}
               </h3>
               <p
                 className={`
@@ -666,7 +636,7 @@ export const SavedPaymentMethodsDrawer: React.FC<
                   ${isDarkMode ? "text-gray-400" : "text-gray-600"}
                 `}
               >
-                {l.addFirstPaymentMethod ||
+                {l("SavedPaymentMethodsDrawer.addFirstPaymentMethod") ||
                   "Add your first payment method to get started with secure payments."}
               </p>
               <button
@@ -681,7 +651,8 @@ export const SavedPaymentMethodsDrawer: React.FC<
               >
                 <Plus size={18} />
                 <span className="font-medium">
-                  {l.addNewPaymentMethod || "Add Payment Method"}
+                  {l("SavedPaymentMethodsDrawer.addNewPaymentMethod") ||
+                    "Add Payment Method"}
                 </span>
               </button>
             </div>
@@ -727,7 +698,10 @@ export const SavedPaymentMethodsDrawer: React.FC<
                           <div className="absolute top-3 right-3">
                             <div className="flex items-center space-x-1 px-2 py-1 rounded-full bg-orange-500 text-white text-xs font-medium">
                               <Star size={12} fill="currentColor" />
-                              <span>{l.preferred || "Preferred"}</span>
+                              <span>
+                                {l("SavedPaymentMethodsDrawer.preferred") ||
+                                  "Preferred"}
+                              </span>
                             </div>
                           </div>
                         )}
@@ -782,7 +756,9 @@ export const SavedPaymentMethodsDrawer: React.FC<
                                   }
                                 `}
                               >
-                                {l.expires || "Expires"}: {method.expiryDate}
+                                {l("SavedPaymentMethodsDrawer.expires") ||
+                                  "Expires"}
+                                : {method.expiryDate}
                               </span>
                               <span
                                 className={`
@@ -874,8 +850,10 @@ export const SavedPaymentMethodsDrawer: React.FC<
                 `}
               >
                 {editingMethod
-                  ? l.editPaymentMethod || "Edit Payment Method"
-                  : l.newPaymentMethod || "New Payment Method"}
+                  ? l("SavedPaymentMethodsDrawer.editPaymentMethod") ||
+                    "Edit Payment Method"
+                  : l("SavedPaymentMethodsDrawer.newPaymentMethod") ||
+                    "New Payment Method"}
               </h3>
               <button
                 onClick={() => {
@@ -909,15 +887,22 @@ export const SavedPaymentMethodsDrawer: React.FC<
                     ${isDarkMode ? "text-gray-300" : "text-gray-700"}
                   `}
                 >
-                  {l.cardHolderName || "Cardholder Name"}
+                  {l("SavedPaymentMethodsDrawer.cardHolderName") ||
+                    "Cardholder Name"}
                 </label>
                 <input
                   type="text"
                   value={formData.cardHolderName}
                   onChange={(e) =>
-                    handleInputChange("cardHolderName", e.target.value)
+                    handleInputChange(
+                      "SavedPaymentMethodsDrawer.cardHolderName",
+                      e.target.value
+                    )
                   }
-                  placeholder={l.cardHolderName || "Cardholder Name"}
+                  placeholder={
+                    l("SavedPaymentMethodsDrawer.cardHolderName") ||
+                    "Cardholder Name"
+                  }
                   className={`
                     w-full px-3 py-2 rounded-lg border
                     ${
@@ -938,13 +923,16 @@ export const SavedPaymentMethodsDrawer: React.FC<
                     ${isDarkMode ? "text-gray-300" : "text-gray-700"}
                   `}
                 >
-                  {l.cardNumber || "Card Number"}
+                  {l("SavedPaymentMethodsDrawer.cardNumber") || "Card Number"}
                 </label>
                 <input
                   type="text"
                   value={formData.cardNumber}
                   onChange={(e) =>
-                    handleInputChange("cardNumber", e.target.value)
+                    handleInputChange(
+                      "SavedPaymentMethodsDrawer.cardNumber",
+                      e.target.value
+                    )
                   }
                   placeholder="1234 5678 9012 3456"
                   className={`
@@ -967,13 +955,16 @@ export const SavedPaymentMethodsDrawer: React.FC<
                     ${isDarkMode ? "text-gray-300" : "text-gray-700"}
                   `}
                 >
-                  {l.expiryDate || "Expiry Date"}
+                  {l("SavedPaymentMethodsDrawer.expiryDate") || "Expiry Date"}
                 </label>
                 <input
                   type="text"
                   value={formData.expiryDate}
                   onChange={(e) =>
-                    handleInputChange("expiryDate", e.target.value)
+                    handleInputChange(
+                      "SavedPaymentMethodsDrawer.expiryDate",
+                      e.target.value
+                    )
                   }
                   placeholder="MM/YY"
                   maxLength={5}
@@ -1012,7 +1003,7 @@ export const SavedPaymentMethodsDrawer: React.FC<
                   transition-colors duration-200
                 `}
               >
-                {l.cancel || "Cancel"}
+                {l("SavedPaymentMethodsDrawer.cancel") || "Cancel"}
               </button>
               <button
                 onClick={handleSavePaymentMethod}
@@ -1029,7 +1020,7 @@ export const SavedPaymentMethodsDrawer: React.FC<
                   transition-all duration-200
                 "
               >
-                {l.save || "Save"}
+                {l("SavedPaymentMethodsDrawer.save") || "Save"}
               </button>
             </div>
           </div>

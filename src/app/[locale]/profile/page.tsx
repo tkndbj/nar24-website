@@ -12,8 +12,6 @@ import {
   User,
   Camera,
   Mail,
-  Phone,
-  Calendar,
   MapPin,
   Package,
   CreditCard,
@@ -33,6 +31,8 @@ import {
 import Image from "next/image";
 import { SavedPaymentMethodsDrawer } from "@/app/components/profile/SavedPaymentMethodsDrawer";
 import { useTranslations } from "next-intl";
+import { SellerInfoDrawer } from "@/app/components/profile/SellerInfoDrawer";
+import { SavedAddressesDrawer } from "@/app/components/profile/AddressesDrawer";
 
 interface ActionButton {
   icon: React.ElementType;
@@ -45,15 +45,16 @@ interface ActionButton {
 export default function ProfilePage() {
   const { user, profileData, updateProfileData, isLoading } = useUser();
   const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false); // ✅ Keep this consistent with header
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isPaymentMethodsDrawerOpen, setIsPaymentMethodsDrawerOpen] =
     useState(false);
+  const [isSellerInfoDrawerOpen, setIsSellerInfoDrawerOpen] = useState(false);
+  const [isAddressesDrawerOpen, setIsAddressesDrawerOpen] = useState(false);
   const t = useTranslations();
   const router = useRouter();
 
-  // ✅ FIX: Use the same theme detection logic as the header
   React.useEffect(() => {
     const checkTheme = () => {
       if (typeof document !== "undefined") {
@@ -61,7 +62,6 @@ export default function ProfilePage() {
       }
     };
 
-    // Initialize theme from localStorage or system preference
     if (typeof document !== "undefined") {
       const savedTheme = localStorage.getItem("theme");
       const systemPrefersDark = window.matchMedia(
@@ -90,17 +90,15 @@ export default function ProfilePage() {
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
-    // Validate file type
     const validTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif"];
     if (!validTypes.includes(file.type)) {
-      alert("Lütfen geçerli bir resim dosyası seçin (JPG, PNG veya GIF)");
+      alert(t("ProfilePage.invalidFileType"));
       return;
     }
 
-    // Validate file size (20MB)
     const maxSize = 20 * 1024 * 1024;
     if (file.size > maxSize) {
-      alert("Resim boyutu 20MB'dan küçük olmalıdır");
+      alert(t("ProfilePage.fileSizeError"));
       return;
     }
 
@@ -114,13 +112,12 @@ export default function ProfilePage() {
         profileImage: downloadURL,
       });
 
-      // Update local state
       await updateProfileData({ profileImage: downloadURL });
 
-      alert("Profil resmi başarıyla güncellendi!");
+      alert(t("ProfilePage.imageUploadSuccess"));
     } catch (error) {
       console.error("Error uploading image:", error);
-      alert("Resim yüklenemedi. Lütfen tekrar deneyin.");
+      alert(t("ProfilePage.imageUploadError"));
     } finally {
       setIsUploadingImage(false);
     }
@@ -139,7 +136,11 @@ export default function ProfilePage() {
     }
   };
 
-  const handleNavigation = (path?: string, action?: () => void) => {
+  const handleNavigation = (
+    path?: string,
+    action?: () => void,
+    isExternal?: boolean
+  ) => {
     if (action) {
       action();
       return;
@@ -151,7 +152,11 @@ export default function ProfilePage() {
     }
 
     if (path) {
-      router.push(path);
+      if (isExternal) {
+        window.open(path, "_blank");
+      } else {
+        router.push(path);
+      }
     }
   };
 
@@ -195,13 +200,13 @@ export default function ProfilePage() {
               isDarkMode ? "text-white" : "text-gray-900"
             }`}
           >
-            Profilinizi görüntülemek için giriş yapın
+            {t("ProfilePage.loginToViewProfile")}
           </h1>
           <button
             onClick={() => router.push("/login")}
             className="px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium transition-colors"
           >
-            Giriş Yap
+            {t("ProfilePage.login")}
           </button>
         </div>
       </div>
@@ -211,26 +216,26 @@ export default function ProfilePage() {
   const quickActionButtons: ActionButton[] = [
     {
       icon: Box,
-      label: "Ürünlerim",
-      path: "/my-products",
+      label: t("ProfilePage.myProducts"),
+      path: "/myproducts",
       gradient: "from-blue-500 to-blue-600",
     },
     {
       icon: CreditCard,
-      label: "Ödeme Yöntemleri",
+      label: t("ProfilePage.paymentMethods"),
       action: () => setIsPaymentMethodsDrawerOpen(true),
       gradient: "from-green-500 to-green-600",
     },
     {
       icon: MapPin,
-      label: "Adreslerim",
-      path: "/addresses",
+      label: t("ProfilePage.myAddresses"),
+      action: () => setIsAddressesDrawerOpen(true),
       gradient: "from-purple-500 to-purple-600",
     },
     {
       icon: Info,
-      label: "Satıcı Bilgileri",
-      path: "/seller-info",
+      label: t("ProfilePage.sellerInfo"),
+      action: () => setIsSellerInfoDrawerOpen(true),
       gradient: "from-indigo-500 to-indigo-600",
     },
   ];
@@ -238,40 +243,41 @@ export default function ProfilePage() {
   const mainActionButtons = [
     {
       icon: Package,
-      label: "Siparişlerim",
-      path: "/my-orders",
-      description: "Son alışverişlerinizi takip edin",
+      label: t("ProfilePage.myOrders"),
+      path: "/orders",
+      description: t("ProfilePage.trackRecentPurchases"),
     },
     {
       icon: Upload,
-      label: "Nar24'te Sat",
+      label: t("ProfilePage.sellOnNar24"),
       path: "/sell",
-      description: "Ürünlerinizi satmaya başlayın",
+      description: t("ProfilePage.startSellingProducts"),
     },
     {
       icon: Star,
-      label: "Değerlendirmelerim",
-      path: "/my-reviews",
-      description: "Yazdığınız değerlendirmeler",
+      label: t("ProfilePage.myReviews"),
+      path: "/reviews",
+      description: t("ProfilePage.yourWrittenReviews"),
     },
     {
       icon: Zap,
-      label: "Yükseltmeler",
+      label: t("ProfilePage.boosts"),
       path: "/boosts",
-      description: "İlanlarınızı öne çıkarın",
+      description: t("ProfilePage.promoteYourListings"),
     },
     {
       icon: HelpCircle,
-      label: "Sorularım",
-      path: "/my-questions",
-      description: "Ürün soru ve cevapları",
+      label: t("ProfilePage.myQuestions"),
+      path: "/productquestions",
+      description: t("ProfilePage.productQuestionsAnswers"),
     },
     {
       icon: ShoppingCart,
-      label: "Satıcı Paneli",
-      path: "/seller-panel",
-      description: "Mağazanızı yönetin",
+      label: t("ProfilePage.sellerPanel"),
+      path: "https://nar24panel.com",
+      description: t("ProfilePage.manageYourStore"),
       featured: true,
+      isExternal: true,
     },
   ];
 
@@ -370,7 +376,7 @@ export default function ProfilePage() {
                     isDarkMode ? "text-white" : "text-gray-900"
                   }`}
                 >
-                  {profileData?.displayName || "İsim Yok"}
+                  {profileData?.displayName || t("ProfilePage.noName")}
                 </h1>
                 <div className="flex items-center gap-3 mt-2">
                   <div
@@ -389,34 +395,14 @@ export default function ProfilePage() {
                           : "bg-green-100 text-green-800"
                       }`}
                     >
-                      Onaylanmış
+                      {t("ProfilePage.verified")}
                     </span>
                   )}
                 </div>
               </div>
 
-              {profileData?.bio && (
-                <p
-                  className={`text-lg ${
-                    isDarkMode ? "text-gray-300" : "text-gray-700"
-                  }`}
-                >
-                  {profileData.bio}
-                </p>
-              )}
-
               {/* User Stats */}
               <div className="flex items-center gap-6 pt-4">
-                {profileData?.phone && (
-                  <div
-                    className={`flex items-center gap-2 ${
-                      isDarkMode ? "text-gray-400" : "text-gray-600"
-                    }`}
-                  >
-                    <Phone className="w-4 h-4" />
-                    <span>{profileData.phone}</span>
-                  </div>
-                )}
                 {profileData?.location && (
                   <div
                     className={`flex items-center gap-2 ${
@@ -425,18 +411,6 @@ export default function ProfilePage() {
                   >
                     <MapPin className="w-4 h-4" />
                     <span>{profileData.location}</span>
-                  </div>
-                )}
-                {profileData?.birthDate && (
-                  <div
-                    className={`flex items-center gap-2 ${
-                      isDarkMode ? "text-gray-400" : "text-gray-600"
-                    }`}
-                  >
-                    <Calendar className="w-4 h-4" />
-                    <span>
-                      {new Date(profileData.birthDate).toLocaleDateString()}
-                    </span>
                   </div>
                 )}
               </div>
@@ -450,19 +424,19 @@ export default function ProfilePage() {
             <button
               key={index}
               onClick={() => handleNavigation(button.path, button.action)}
-              className={`group p-6 rounded-2xl shadow-md hover:shadow-lg transition-all duration-200 border ${
+              className={`group p-4 rounded-2xl shadow-md hover:shadow-lg transition-all duration-200 border flex items-center gap-3 ${
                 isDarkMode
                   ? "bg-gray-800 border-gray-700"
                   : "bg-white border-gray-100"
               }`}
             >
               <div
-                className={`w-12 h-12 rounded-xl bg-gradient-to-r ${button.gradient} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}
+                className={`w-10 h-10 rounded-xl bg-gradient-to-r ${button.gradient} flex items-center justify-center group-hover:scale-110 transition-transform flex-shrink-0`}
               >
-                <button.icon className="w-6 h-6 text-white" />
+                <button.icon className="w-5 h-5 text-white" />
               </div>
               <p
-                className={`text-sm font-medium text-center ${
+                className={`text-sm font-medium text-left leading-tight ${
                   isDarkMode ? "text-white" : "text-gray-900"
                 }`}
               >
@@ -553,13 +527,13 @@ export default function ProfilePage() {
               isDarkMode ? "text-white" : "text-gray-900"
             }`}
           >
-            Account Settings
+            {t("ProfilePage.accountSettings")}
           </h2>
 
           <div className="space-y-4">
             {/* Become a Seller */}
             <button
-              onClick={() => handleNavigation("/become-seller")}
+              onClick={() => handleNavigation("/createshop")}
               className={`w-full flex items-center gap-4 p-4 rounded-xl transition-colors text-left ${
                 isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"
               }`}
@@ -573,14 +547,14 @@ export default function ProfilePage() {
                     isDarkMode ? "text-white" : "text-gray-900"
                   }`}
                 >
-                  Become a Seller
+                  {t("ProfilePage.becomeSeller")}
                 </h3>
                 <p
                   className={`text-sm ${
                     isDarkMode ? "text-gray-400" : "text-gray-600"
                   }`}
                 >
-                  Start your own shop on Nar24
+                  {t("ProfilePage.startYourShop")}
                 </p>
               </div>
               <ChevronRight
@@ -600,12 +574,7 @@ export default function ProfilePage() {
             {/* Delete Account */}
             <button
               onClick={() => {
-                if (
-                  confirm(
-                    "Are you sure you want to delete your account? This action cannot be undone."
-                  )
-                ) {
-                  // Handle account deletion
+                if (confirm(t("ProfilePage.deleteAccountConfirmation"))) {
                   console.log("Delete account");
                 }
               }}
@@ -632,14 +601,14 @@ export default function ProfilePage() {
                     isDarkMode ? "text-red-400" : "text-red-600"
                   }`}
                 >
-                  Delete Account
+                  {t("ProfilePage.deleteAccount")}
                 </h3>
                 <p
                   className={`text-sm ${
                     isDarkMode ? "text-red-400" : "text-red-500"
                   }`}
                 >
-                  Permanently delete your account and data
+                  {t("ProfilePage.permanentlyDeleteAccount")}
                 </p>
               </div>
             </button>
@@ -676,14 +645,16 @@ export default function ProfilePage() {
                     isDarkMode ? "text-white" : "text-gray-900"
                   }`}
                 >
-                  {isLoggingOut ? "Logging out..." : "Logout"}
+                  {isLoggingOut
+                    ? t("ProfilePage.loggingOut")
+                    : t("ProfilePage.logout")}
                 </h3>
                 <p
                   className={`text-sm ${
                     isDarkMode ? "text-gray-400" : "text-gray-600"
                   }`}
                 >
-                  Sign out of your account
+                  {t("ProfilePage.signOutAccount")}
                 </p>
               </div>
             </button>
@@ -695,69 +666,19 @@ export default function ProfilePage() {
         isOpen={isPaymentMethodsDrawerOpen}
         onClose={() => setIsPaymentMethodsDrawerOpen(false)}
         isDarkMode={isDarkMode}
-        localization={{
-          SavedPaymentMethodsDrawer: {
-            title: t("SavedPaymentMethodsDrawer.title"),
-            ofFourMethods: t("SavedPaymentMethodsDrawer.ofFourMethods"),
-            addNew: t("SavedPaymentMethodsDrawer.addNew"),
-            clearAll: t("SavedPaymentMethodsDrawer.clearAll"),
-            clearing: t("SavedPaymentMethodsDrawer.clearing"),
-            loginRequired: t("SavedPaymentMethodsDrawer.loginRequired"),
-            loginToManagePaymentMethods: t(
-              "SavedPaymentMethodsDrawer.loginToManagePaymentMethods"
-            ),
-            login: t("SavedPaymentMethodsDrawer.login"),
-            loading: t("SavedPaymentMethodsDrawer.loading"),
-            noSavedPaymentMethods: t(
-              "SavedPaymentMethodsDrawer.noSavedPaymentMethods"
-            ),
-            addFirstPaymentMethod: t(
-              "SavedPaymentMethodsDrawer.addFirstPaymentMethod"
-            ),
-            addNewPaymentMethod: t(
-              "SavedPaymentMethodsDrawer.addNewPaymentMethod"
-            ),
-            preferred: t("SavedPaymentMethodsDrawer.preferred"),
-            expires: t("SavedPaymentMethodsDrawer.expires"),
-            editPaymentMethod: t("SavedPaymentMethodsDrawer.editPaymentMethod"),
-            newPaymentMethod: t("SavedPaymentMethodsDrawer.newPaymentMethod"),
-            cardHolderName: t("SavedPaymentMethodsDrawer.cardHolderName"),
-            cardNumber: t("SavedPaymentMethodsDrawer.cardNumber"),
-            expiryDate: t("SavedPaymentMethodsDrawer.expiryDate"),
-            cancel: t("SavedPaymentMethodsDrawer.cancel"),
-            save: t("SavedPaymentMethodsDrawer.save"),
-            invalidCardNumber: t("SavedPaymentMethodsDrawer.invalidCardNumber"),
-            unsupportedCardType: t(
-              "SavedPaymentMethodsDrawer.unsupportedCardType"
-            ),
-            maxPaymentMethodsReached: t(
-              "SavedPaymentMethodsDrawer.maxPaymentMethodsReached"
-            ),
-            paymentMethodAdded: t(
-              "SavedPaymentMethodsDrawer.paymentMethodAdded"
-            ),
-            paymentMethodUpdated: t(
-              "SavedPaymentMethodsDrawer.paymentMethodUpdated"
-            ),
-            paymentMethodDeleted: t(
-              "SavedPaymentMethodsDrawer.paymentMethodDeleted"
-            ),
-            allPaymentMethodsCleared: t(
-              "SavedPaymentMethodsDrawer.allPaymentMethodsCleared"
-            ),
-            preferredPaymentMethodSet: t(
-              "SavedPaymentMethodsDrawer.preferredPaymentMethodSet"
-            ),
-            errorOccurred: t("SavedPaymentMethodsDrawer.errorOccurred"),
-            deleteConfirmation: t(
-              "SavedPaymentMethodsDrawer.deleteConfirmation"
-            ),
-            deleteAllConfirmation: t(
-              "SavedPaymentMethodsDrawer.deleteAllConfirmation"
-            ),
-            fillAllFields: t("SavedPaymentMethodsDrawer.fillAllFields"),
-          },
-        }}
+        localization={t}
+      />
+      <SellerInfoDrawer
+        isOpen={isSellerInfoDrawerOpen}
+        onClose={() => setIsSellerInfoDrawerOpen(false)}
+        isDarkMode={isDarkMode}
+        localization={t}
+      />
+      <SavedAddressesDrawer
+        isOpen={isAddressesDrawerOpen}
+        onClose={() => setIsAddressesDrawerOpen(false)}
+        isDarkMode={isDarkMode}
+        localization={t}
       />
     </div>
   );
