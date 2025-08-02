@@ -82,9 +82,7 @@ export default function Home() {
           <div
             className={`w-full ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
           >
-            <div className="max-w-6xl mx-auto px-4">
-              <PreferenceProduct />
-            </div>
+            <PreferenceProduct />
           </div>
 
           {/* Market Banner remains full-width */}

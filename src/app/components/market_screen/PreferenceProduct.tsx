@@ -230,7 +230,7 @@ export const PreferenceProduct: React.FC<PreferenceProductProps> = ({
   }
 
   return (
-    <div className="w-screen max-w-none my-2 lg:w-full lg:mx-0 lg:px-6">
+    <div className="w-full my-2 lg:mx-0 lg:px-6">
       <div className="relative w-full rounded-none lg:rounded-t-3xl overflow-visible">
         {/* Background gradient - horizontal orange to pink with vertical fade mask */}
         <div
@@ -328,7 +328,7 @@ export const PreferenceProduct: React.FC<PreferenceProductProps> = ({
                     display: none;
                   }
                 `}</style>
-                <div className="flex gap-1.5 pl-3 pr-2 lg:px-2 h-full">
+                <div className="flex gap-1.5 px-0 lg:px-2 h-full pr-0 lg:pr-2 -ml-2 lg:ml-0">
                   {products.map((product) => (
                     <div
                       key={product.id}
