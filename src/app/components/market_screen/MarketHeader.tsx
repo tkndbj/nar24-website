@@ -166,6 +166,15 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
     setShowLanguageMenu(false);
   };
 
+  const handleMobileLanguageSwitch = (newLocale: string) => {
+    console.log("Mobile handler called for:", newLocale);
+
+    // Add a small delay to ensure the touch event completes
+    setTimeout(() => {
+      switchLanguage(newLocale);
+    }, 100);
+  };
+
   const handleFavoritesClick = () => {
     setIsFavoritesOpen(true);
   };
@@ -380,17 +389,29 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
           `}
                       >
                         <button
-                          onClick={(e) => switchLanguage("tr", e)}
+                          onClick={() => handleMobileLanguageSwitch("tr")}
+                          onTouchStart={(e) => {
+                            e.stopPropagation();
+                            console.log("Touch start TR");
+                          }}
+                          onTouchEnd={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            console.log("Touch end TR - calling handler");
+                            handleMobileLanguageSwitch("tr");
+                          }}
                           className={`
     w-full flex items-center space-x-3 px-4 py-3 text-left
     hover:bg-gray-100 dark:hover:bg-gray-700 
-    transition-colors duration-150
+    active:bg-gray-200 dark:active:bg-gray-600
+    transition-colors duration-150 cursor-pointer
     ${
       locale === "tr"
         ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
         : ""
     }
   `}
+                          style={{ touchAction: "manipulation" }}
                         >
                           <span className="text-lg">🇹🇷</span>
                           <span
@@ -402,17 +423,29 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                           </span>
                         </button>
                         <button
-                          onClick={(e) => switchLanguage("en", e)}
+                          onClick={() => handleMobileLanguageSwitch("en")}
+                          onTouchStart={(e) => {
+                            e.stopPropagation();
+                            console.log("Touch start EN");
+                          }}
+                          onTouchEnd={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            console.log("Touch end EN - calling handler");
+                            handleMobileLanguageSwitch("en");
+                          }}
                           className={`
     w-full flex items-center space-x-3 px-4 py-3 text-left
     hover:bg-gray-100 dark:hover:bg-gray-700 
-    transition-colors duration-150
+    active:bg-gray-200 dark:active:bg-gray-600
+    transition-colors duration-150 cursor-pointer
     ${
       locale === "en"
         ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
         : ""
     }
   `}
+                          style={{ touchAction: "manipulation" }}
                         >
                           <span className="text-lg">🇺🇸</span>
                           <span
