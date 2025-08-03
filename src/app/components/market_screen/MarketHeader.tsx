@@ -143,7 +143,15 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
   ]);
 
   // ADD: Language switching function
-  const switchLanguage = (newLocale: string) => {
+  const switchLanguage = (newLocale: string, event?: React.MouseEvent) => {
+    // Prevent event bubbling and default behavior
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+
+    console.log("Switching language to:", newLocale); // Add this for debugging
+
     // Remove the current locale from pathname if it exists
     let pathWithoutLocale = pathname;
     if (pathname.startsWith(`/${locale}`)) {
@@ -152,6 +160,8 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
 
     // Add the new locale to the path
     const newPath = `/${newLocale}${pathWithoutLocale}`;
+    console.log("New path:", newPath); // Add this for debugging
+
     router.push(newPath);
     setShowLanguageMenu(false);
   };
@@ -370,17 +380,17 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
           `}
                       >
                         <button
-                          onClick={() => switchLanguage("tr")}
+                          onClick={(e) => switchLanguage("tr", e)}
                           className={`
-              w-full flex items-center space-x-3 px-4 py-3 text-left
-              hover:bg-gray-100 dark:hover:bg-gray-700 
-              transition-colors duration-150
-              ${
-                locale === "tr"
-                  ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-                  : ""
-              }
-            `}
+    w-full flex items-center space-x-3 px-4 py-3 text-left
+    hover:bg-gray-100 dark:hover:bg-gray-700 
+    transition-colors duration-150
+    ${
+      locale === "tr"
+        ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+        : ""
+    }
+  `}
                         >
                           <span className="text-lg">🇹🇷</span>
                           <span
@@ -392,17 +402,17 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                           </span>
                         </button>
                         <button
-                          onClick={() => switchLanguage("en")}
+                          onClick={(e) => switchLanguage("en", e)}
                           className={`
-              w-full flex items-center space-x-3 px-4 py-3 text-left
-              hover:bg-gray-100 dark:hover:bg-gray-700 
-              transition-colors duration-150
-              ${
-                locale === "en"
-                  ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-                  : ""
-              }
-            `}
+    w-full flex items-center space-x-3 px-4 py-3 text-left
+    hover:bg-gray-100 dark:hover:bg-gray-700 
+    transition-colors duration-150
+    ${
+      locale === "en"
+        ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+        : ""
+    }
+  `}
                         >
                           <span className="text-lg">🇺🇸</span>
                           <span
