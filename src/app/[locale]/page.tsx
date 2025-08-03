@@ -7,6 +7,7 @@ import { MarketBubbles } from "../components/market_screen/MarketBubbles";
 import { PreferenceProduct } from "../components/market_screen/PreferenceProduct";
 import MarketBanner from "../components/market_screen/MarketBanner";
 import { DynamicHorizontalList } from "../components/market_screen/DynamicHorizontalList";
+import { AdsBanner } from "../components/market_screen/MarketTopAdsBanner";
 
 export default function Home() {
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -51,18 +52,35 @@ export default function Home() {
 
   return (
     <>
-      {/* Add SecondHeader here */}
+      {/* SecondHeader */}
       <SecondHeader />
+
+      {/* AdsBanner - attached to SecondHeader */}
+      <div className={`w-full ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}>
+        {/* Mobile: full width */}
+        <div className="block lg:hidden">
+          <AdsBanner />
+        </div>
+
+        {/* Desktop and up: centered layout with same width as other components */}
+        <div className="hidden lg:block">
+          <div className="mx-auto px-4" style={{ maxWidth: "1120px" }}>
+            <AdsBanner />
+          </div>
+        </div>
+      </div>
 
       <div
         className={`min-h-screen w-full ${
           isDarkMode ? "bg-gray-900" : "bg-gray-50"
         }`}
       >
-        <div className="w-full pt-10">
-          {/* Market Bubbles with centered wrapper */}
+        <div className="w-full">
+          {/* Market Bubbles with centered wrapper and top gap */}
           <div
-            className={`w-full ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
+            className={`w-full pt-6 ${
+              isDarkMode ? "bg-gray-900" : "bg-gray-50"
+            }`}
           >
             <div className="max-w-6xl mx-auto px-4">
               <MarketBubbles

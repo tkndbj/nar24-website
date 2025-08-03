@@ -57,18 +57,17 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
     if (typeof window === "undefined" || !isClient) return 220; // Server-side default
 
     if (!isLargerScreen()) {
-      return 220; // Increased from 180 for mobile
+      return 150; // Increased from 180 for mobile
     }
 
     const { innerWidth, innerHeight } = window;
     const isPortrait = innerHeight > innerWidth;
 
     if (isPortrait) {
-      // Tablet portrait: increased height values
-      return Math.max(500, Math.min(550, innerWidth * 0.6));
+      return Math.max(300, Math.min(350, innerWidth * 0.4));
     } else {
-      // Tablet landscape: increased height values
-      return Math.max(500, Math.min(550, innerHeight * 0.7));
+      // Tablet landscape (reduce from 500-550 range to 300-350 range)
+      return Math.max(300, Math.min(350, innerHeight * 0.5));
     }
   }, [isLargerScreen, isClient]);
 
