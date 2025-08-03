@@ -11,11 +11,13 @@ import {
   ShirtIcon,
   ShoppingBag,
   ChevronRight,
+  ChevronLeft,
   Home,
   Wrench,
   Heart,
   Car,
   BookOpen,
+  X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { AllInOneCategoryData } from "@/constants/productData";
@@ -80,11 +82,25 @@ const categoryIconMap: Record<
   Automotive: Car,
 };
 
+// Mobile drawer states
+type DrawerState = "main" | "subcategory" | "subsubcategory";
+
 export default function SecondHeader({ className = "" }: SecondHeaderProps) {
   const [isDark, setIsDark] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [showCategoriesMenu, setShowCategoriesMenu] = useState(false);
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Mobile drawer states
+  const [showMobileDrawer, setShowMobileDrawer] = useState(false);
+  const [drawerState, setDrawerState] = useState<DrawerState>("main");
+  const [selectedMainCategory, setSelectedMainCategory] =
+    useState<BuyerCategory | null>(null);
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(
+    null
+  );
+
   const categoriesMenuRef = useRef<HTMLDivElement>(null);
   const categoriesButtonRef = useRef<HTMLButtonElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
@@ -92,6 +108,17 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
   const router = useRouter();
   const t = useTranslations();
   const l10n = createAppLocalizations(t);
+
+  // Check if screen is mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768); // md breakpoint
+    };
+
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   // Get buyer categories from AllInOneCategoryData
   const getBuyerCategories = (): BuyerCategory[] => {
@@ -187,8 +214,18 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
     return () => observer.disconnect();
   }, []);
 
-  // Handle click outside to close menu
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const categoryParam = params.get("category");
+      setActiveCategory(categoryParam);
+    }
+  }, [router]);
+
+  // Handle click outside to close menu (desktop only)
+  useEffect(() => {
+    if (isMobile) return; // Don't handle for mobile
+
     const handleClickOutside = (event: MouseEvent) => {
       if (
         categoriesMenuRef.current &&
@@ -251,27 +288,29 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("mousemove", handleMouseLeave);
     };
-  }, [showCategoriesMenu]);
+  }, [showCategoriesMenu, isMobile]);
 
   const handleCategoryClick = (category: CategoryItem) => {
     if (category.id === "categories") {
-      return; // Don't navigate for categories button
+      if (isMobile) {
+        setShowMobileDrawer(true);
+        setDrawerState("main");
+      }
+      return;
     }
 
-    setActiveCategory(category.id);
+    setActiveCategory(category.id); // Keep this active
 
-    // Navigate to dynamic market page with category parameter
     const searchParams = new URLSearchParams({ category: category.id });
     router.push(`/dynamicmarket?${searchParams.toString()}`);
 
-    // Reset active state after a short delay
-    setTimeout(() => {
-      setActiveCategory(null);
-    }, 200);
+    // Remove the setTimeout that resets activeCategory
   };
 
   const handleCategoriesMouseEnter = () => {
-    setShowCategoriesMenu(true);
+    if (!isMobile) {
+      setShowCategoriesMenu(true);
+    }
   };
 
   const handleCategoriesMouseLeave = () => {
@@ -279,33 +318,78 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
   };
 
   const handleMenuMouseEnter = () => {
-    setShowCategoriesMenu(true);
+    if (!isMobile) {
+      setShowCategoriesMenu(true);
+    }
   };
 
   const handleMenuMouseLeave = () => {
-    setShowCategoriesMenu(false);
-    setHoveredCategory(null);
+    if (!isMobile) {
+      setShowCategoriesMenu(false);
+      setHoveredCategory(null);
+    }
   };
 
   const handleBuyerCategoryClick = (buyerCategory: BuyerCategory) => {
-    const path = `/category/${buyerCategory.key
-      .toLowerCase()
-      .replace(/\s+/g, "-")}`;
-    router.push(path);
-    setShowCategoriesMenu(false);
-    setHoveredCategory(null);
+    if (isMobile) {
+      setSelectedMainCategory(buyerCategory);
+      setDrawerState("subcategory");
+    } else {
+      const path = `/category/${buyerCategory.key
+        .toLowerCase()
+        .replace(/\s+/g, "-")}`;
+      router.push(path);
+      setShowCategoriesMenu(false);
+      setHoveredCategory(null);
+    }
   };
 
   const handleSubcategoryClick = (
     buyerCategory: BuyerCategory,
     subcategory: string
   ) => {
-    const categoryPath = buyerCategory.key.toLowerCase().replace(/\s+/g, "-");
-    const subcategoryPath = subcategory.toLowerCase().replace(/\s+/g, "-");
-    const path = `/category/${categoryPath}/${subcategoryPath}`;
-    router.push(path);
-    setShowCategoriesMenu(false);
-    setHoveredCategory(null);
+    if (isMobile) {
+      setSelectedSubcategory(subcategory);
+      setDrawerState("subsubcategory");
+    } else {
+      const categoryPath = buyerCategory.key.toLowerCase().replace(/\s+/g, "-");
+      const subcategoryPath = subcategory.toLowerCase().replace(/\s+/g, "-");
+      const path = `/category/${categoryPath}/${subcategoryPath}`;
+      router.push(path);
+      setShowCategoriesMenu(false);
+      setHoveredCategory(null);
+    }
+  };
+
+  const handleSubSubcategoryClick = (subSubcategory: string) => {
+    if (selectedMainCategory && selectedSubcategory) {
+      const categoryPath = selectedMainCategory.key
+        .toLowerCase()
+        .replace(/\s+/g, "-");
+      const subcategoryPath = selectedSubcategory
+        .toLowerCase()
+        .replace(/\s+/g, "-");
+      const subSubPath = subSubcategory.toLowerCase().replace(/\s+/g, "-");
+      router.push(`/category/${categoryPath}/${subcategoryPath}/${subSubPath}`);
+      closeMobileDrawer();
+    }
+  };
+
+  const closeMobileDrawer = () => {
+    setShowMobileDrawer(false);
+    setDrawerState("main");
+    setSelectedMainCategory(null);
+    setSelectedSubcategory(null);
+  };
+
+  const goBackInDrawer = () => {
+    if (drawerState === "subsubcategory") {
+      setDrawerState("subcategory");
+      setSelectedSubcategory(null);
+    } else if (drawerState === "subcategory") {
+      setDrawerState("main");
+      setSelectedMainCategory(null);
+    }
   };
 
   return (
@@ -342,11 +426,12 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
                     >
                       <button
                         ref={categoriesButtonRef}
+                        onClick={() => handleCategoryClick(category)}
                         className={`
                           flex items-center justify-center gap-2 px-4 py-2 rounded-lg
                           transition-all duration-200 group min-w-max
                           ${
-                            showCategoriesMenu
+                            showCategoriesMenu && !isMobile
                               ? isDark
                                 ? "bg-gray-700 text-white"
                                 : "bg-gray-100 text-gray-900"
@@ -363,7 +448,7 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
                           className={`
                             transition-all duration-200
                             ${
-                              showCategoriesMenu
+                              showCategoriesMenu && !isMobile
                                 ? "text-orange-500"
                                 : "group-hover:text-orange-500"
                             }
@@ -373,7 +458,7 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
                           className={`
                             text-xs font-medium transition-all duration-200
                             ${
-                              showCategoriesMenu
+                              showCategoriesMenu && !isMobile
                                 ? isDark
                                   ? "text-white"
                                   : "text-gray-900"
@@ -445,8 +530,8 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
         </div>
       </div>
 
-      {/* Categories Dropdown Menu */}
-      {showCategoriesMenu && (
+      {/* Desktop Categories Dropdown Menu */}
+      {showCategoriesMenu && !isMobile && (
         <div
           ref={categoriesMenuRef}
           className={`
@@ -698,6 +783,246 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Mobile Drawer */}
+      {showMobileDrawer && isMobile && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 z-[9998]"
+            onClick={closeMobileDrawer}
+          />
+
+          {/* Drawer */}
+          <div
+            className={`
+              fixed top-0 left-0 h-full w-80 max-w-[85vw] z-[9999]
+              ${isDark ? "bg-gray-900" : "bg-white"}
+              shadow-2xl transform transition-transform duration-300 ease-in-out
+              ${showMobileDrawer ? "translate-x-0" : "-translate-x-full"}
+              overflow-y-auto
+            `}
+          >
+            {/* Header */}
+            <div
+              className={`
+                flex items-center justify-between p-4 border-b
+                ${isDark ? "border-gray-700" : "border-gray-200"}
+              `}
+            >
+              <div className="flex items-center space-x-3">
+                {drawerState !== "main" && (
+                  <button
+                    onClick={goBackInDrawer}
+                    className={`
+                      p-2 rounded-lg transition-colors duration-200
+                      ${isDark ? "hover:bg-gray-700" : "hover:bg-gray-100"}
+                    `}
+                  >
+                    <ChevronLeft
+                      size={20}
+                      className={isDark ? "text-gray-300" : "text-gray-600"}
+                    />
+                  </button>
+                )}
+                <h2
+                  className={`
+                    text-lg font-semibold
+                    ${isDark ? "text-gray-200" : "text-gray-800"}
+                  `}
+                >
+                  {drawerState === "main" && "Kategoriler"}
+                  {drawerState === "subcategory" && selectedMainCategory?.name}
+                  {drawerState === "subsubcategory" &&
+                    selectedSubcategory &&
+                    getLocalizedSubcategory(
+                      selectedMainCategory?.key || "",
+                      selectedSubcategory
+                    )}
+                </h2>
+              </div>
+              <button
+                onClick={closeMobileDrawer}
+                className={`
+                  p-2 rounded-lg transition-colors duration-200
+                  ${isDark ? "hover:bg-gray-700" : "hover:bg-gray-100"}
+                `}
+              >
+                <X
+                  size={20}
+                  className={isDark ? "text-gray-300" : "text-gray-600"}
+                />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-4">
+              {drawerState === "main" && (
+                <div className="space-y-2">
+                  {buyerCategories.map((buyerCategory) => {
+                    const CategoryIcon = buyerCategory.icon;
+
+                    return (
+                      <button
+                        key={buyerCategory.key}
+                        onClick={() => handleBuyerCategoryClick(buyerCategory)}
+                        className={`
+                          w-full flex items-center space-x-3 p-3 rounded-lg
+                          transition-all duration-200 text-left
+                          ${
+                            isDark
+                              ? "hover:bg-gray-800 text-gray-300 hover:text-white"
+                              : "hover:bg-gray-50 text-gray-700 hover:text-gray-900"
+                          }
+                        `}
+                      >
+                        <CategoryIcon size={20} className="text-orange-500" />
+                        <span className="text-sm font-medium flex-1">
+                          {buyerCategory.name}
+                        </span>
+                        <ChevronRight
+                          size={16}
+                          className={isDark ? "text-gray-500" : "text-gray-400"}
+                        />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {drawerState === "subcategory" && selectedMainCategory && (
+                <div className="space-y-2">
+                  {/* View All Category Button */}
+                  <button
+                    onClick={() => {
+                      const path = `/category/${selectedMainCategory.key
+                        .toLowerCase()
+                        .replace(/\s+/g, "-")}`;
+                      router.push(path);
+                      closeMobileDrawer();
+                    }}
+                    className={`
+                      w-full flex items-center space-x-3 p-3 rounded-lg mb-4
+                      transition-all duration-200 text-left border
+                      ${
+                        isDark
+                          ? "border-orange-500 bg-orange-500/10 text-orange-400 hover:bg-orange-500/20"
+                          : "border-orange-500 bg-orange-50 text-orange-600 hover:bg-orange-100"
+                      }
+                    `}
+                  >
+                    <selectedMainCategory.icon
+                      size={20}
+                      className="text-orange-500"
+                    />
+                    <span className="text-sm font-medium flex-1">
+                      Tüm {selectedMainCategory.name}
+                    </span>
+                  </button>
+
+                  {selectedMainCategory.subcategories.map((subcategory) => (
+                    <button
+                      key={subcategory}
+                      onClick={() =>
+                        handleSubcategoryClick(
+                          selectedMainCategory,
+                          subcategory
+                        )
+                      }
+                      className={`
+                        w-full flex items-center space-x-3 p-3 rounded-lg
+                        transition-all duration-200 text-left
+                        ${
+                          isDark
+                            ? "hover:bg-gray-800 text-gray-300 hover:text-white"
+                            : "hover:bg-gray-50 text-gray-700 hover:text-gray-900"
+                        }
+                      `}
+                    >
+                      <span className="text-sm font-medium flex-1">
+                        {getLocalizedSubcategory(
+                          selectedMainCategory.key,
+                          subcategory
+                        )}
+                      </span>
+                      <ChevronRight
+                        size={16}
+                        className={isDark ? "text-gray-500" : "text-gray-400"}
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {drawerState === "subsubcategory" &&
+                selectedMainCategory &&
+                selectedSubcategory && (
+                  <div className="space-y-2">
+                    {/* View All Subcategory Button */}
+                    <button
+                      onClick={() => {
+                        const categoryPath = selectedMainCategory.key
+                          .toLowerCase()
+                          .replace(/\s+/g, "-");
+                        const subcategoryPath = selectedSubcategory
+                          .toLowerCase()
+                          .replace(/\s+/g, "-");
+                        const path = `/category/${categoryPath}/${subcategoryPath}`;
+                        router.push(path);
+                        closeMobileDrawer();
+                      }}
+                      className={`
+                      w-full flex items-center space-x-3 p-3 rounded-lg mb-4
+                      transition-all duration-200 text-left border
+                      ${
+                        isDark
+                          ? "border-orange-500 bg-orange-500/10 text-orange-400 hover:bg-orange-500/20"
+                          : "border-orange-500 bg-orange-50 text-orange-600 hover:bg-orange-100"
+                      }
+                    `}
+                    >
+                      <span className="text-sm font-medium flex-1">
+                        Tüm{" "}
+                        {getLocalizedSubcategory(
+                          selectedMainCategory.key,
+                          selectedSubcategory
+                        )}
+                      </span>
+                    </button>
+
+                    {AllInOneCategoryData.kBuyerSubSubcategories[
+                      selectedMainCategory.key
+                    ]?.[selectedSubcategory]?.map((subSubcategory) => (
+                      <button
+                        key={subSubcategory}
+                        onClick={() =>
+                          handleSubSubcategoryClick(subSubcategory)
+                        }
+                        className={`
+                        w-full flex items-center space-x-3 p-3 rounded-lg
+                        transition-all duration-200 text-left
+                        ${
+                          isDark
+                            ? "hover:bg-gray-800 text-gray-300 hover:text-white"
+                            : "hover:bg-gray-50 text-gray-700 hover:text-gray-900"
+                        }
+                      `}
+                      >
+                        <span className="text-sm font-medium flex-1">
+                          {getLocalizedSubSubcategory(
+                            selectedMainCategory.key,
+                            selectedSubcategory,
+                            subSubcategory
+                          )}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+            </div>
+          </div>
+        </>
       )}
     </>
   );

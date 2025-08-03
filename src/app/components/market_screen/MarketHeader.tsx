@@ -484,7 +484,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
         `}
                       aria-label="Profil"
                     >
-                      <LogIn size={18} />
+                      <User size={18} />
                     </button>
                   </div>
 

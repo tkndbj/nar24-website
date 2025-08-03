@@ -258,7 +258,7 @@ export default function DynamicMarketPage() {
         if (subcategory) params.set("subcategory", subcategory);
         if (subsubcategory) params.set("subsubcategory", subsubcategory);
 
-        // Add filter parameters
+        // Add filter parameters (matching API expectations)
         if (filters.subcategories.length > 0) {
           params.set("filterSubcategories", filters.subcategories.join(","));
         }
@@ -275,15 +275,27 @@ export default function DynamicMarketPage() {
           params.set("maxPrice", filters.maxPrice.toString());
         }
 
+        // Add sort option to API call
+        params.set("sort", "date");
+
         console.log("Fetching with params:", params.toString());
 
         const response = await fetch(`/api/dynamicmarket?${params}`);
 
         if (!response.ok) {
+          const errorText = await response.text();
+          console.error("API Error:", errorText);
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
         const data: ProductsResponse = await response.json();
+
+        console.log("API Response:", {
+          productsCount: data.products?.length || 0,
+          hasMore: data.hasMore,
+          page: data.page,
+          total: data.total,
+        });
 
         if (append) {
           setProducts((prev) => [...prev, ...data.products]);
@@ -554,9 +566,11 @@ export default function DynamicMarketPage() {
                             >
                               <input
                                 type="checkbox"
-                                checked={filters.subcategories.includes(sub)}
+                                checked={filters.subcategories.includes(
+                                  localizedName
+                                )}
                                 onChange={() =>
-                                  toggleFilter("subcategories", sub)
+                                  toggleFilter("subcategories", localizedName)
                                 }
                                 className="w-3 h-3 text-orange-500 rounded border-gray-300 focus:ring-orange-500"
                               />

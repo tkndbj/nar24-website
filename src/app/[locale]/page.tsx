@@ -6,6 +6,7 @@ import SecondHeader from "../components/market_screen/SecondHeader";
 import { MarketBubbles } from "../components/market_screen/MarketBubbles";
 import { PreferenceProduct } from "../components/market_screen/PreferenceProduct";
 import MarketBanner from "../components/market_screen/MarketBanner";
+import { DynamicHorizontalList } from "../components/market_screen/DynamicHorizontalList";
 
 export default function Home() {
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -91,6 +92,22 @@ export default function Home() {
             <div className="hidden lg:block">
               <div className="max-w-6xl mx-auto px-4">
                 <PreferenceProduct />
+              </div>
+            </div>
+          </div>
+
+          <div
+            className={`w-full ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
+          >
+            {/* Mobile: full width */}
+            <div className="block lg:hidden">
+              <DynamicHorizontalList />
+            </div>
+
+            {/* Desktop and up: centered layout */}
+            <div className="hidden lg:block">
+              <div className="max-w-6xl mx-auto px-4">
+                <DynamicHorizontalList />
               </div>
             </div>
           </div>
