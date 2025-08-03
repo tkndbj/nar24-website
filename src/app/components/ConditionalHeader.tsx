@@ -9,7 +9,7 @@ export default function ConditionalHeader() {
   // Define pages where header should be hidden
   const hideHeaderRoutes = [
     "/login",
-    "/register",
+    "/registration",
     "/forgot-password",
     "/verify-email",
   ];
