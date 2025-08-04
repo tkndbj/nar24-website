@@ -10,7 +10,7 @@ import {
   getDocs,
   query,
   where,
-  DocumentSnapshot,
+  
   Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
