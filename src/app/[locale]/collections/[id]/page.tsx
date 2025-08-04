@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
@@ -11,6 +11,7 @@ import {
   query,
   where,
   DocumentSnapshot,
+  Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
@@ -43,7 +44,7 @@ interface Product {
   isBoosted: boolean;
   deliveryOption?: string;
   campaignName?: string;
-  createdAt: any;
+  createdAt: Timestamp;
   category?: string;
   subcategory?: string;
   subsubcategory?: string;
@@ -212,7 +213,7 @@ export default function CollectionPage() {
   const [scrollOffset, setScrollOffset] = useState(0);
   const [showFullScreenImage, setShowFullScreenImage] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [lastDocument, setLastDocument] = useState<DocumentSnapshot | null>(null);
+  
 
   // Filter states (same as dynamic market page)
   const [filters, setFilters] = useState<FilterState>({
