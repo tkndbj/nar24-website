@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { ChevronRight } from "lucide-react";
+import { useRouter } from "next/navigation"; // ✅ ADDED: Import useRouter
 import Image from "next/image";
 
 interface Product {
@@ -128,6 +129,7 @@ const ProductCollectionWidget: React.FC<ProductCollectionWidgetProps> = ({
   isLoading = false,
   isDarkMode = false,
 }) => {
+  const router = useRouter(); // ✅ ADDED: Initialize router
   const [collectionData, setCollectionData] = useState<CollectionData | null>(
     null
   );
@@ -208,13 +210,18 @@ const ProductCollectionWidget: React.FC<ProductCollectionWidgetProps> = ({
     fetchProductCollection();
   }, [productId, shopId]);
 
+  // ✅ UPDATED: Navigate to product detail page using Next.js router
   const handleProductClick = (clickedProductId: string) => {
-    window.location.href = `/productdetail/${clickedProductId}`;
+    router.push(`/productdetail/${clickedProductId}`);
   };
 
+  // ✅ UPDATED: Navigate to collection page using Next.js router with state
   const handleViewAll = () => {
     if (collectionData && shopId) {
-      window.location.href = `/collection/${collectionData.id}?shopId=${shopId}`;
+      // Store shopId in sessionStorage to pass it to the collection page
+      sessionStorage.setItem('collectionShopId', shopId);
+      sessionStorage.setItem('collectionName', collectionData.name);
+      router.push(`/collections/${collectionData.id}`);
     }
   };
 

@@ -107,7 +107,7 @@ export async function GET(request: NextRequest) {
     const db = getFirestoreAdmin();
     let allProducts: Product[] = [];
 
-    // Handle Women/Men categories using gender field (fetch both gender and Unisex)
+    // Handle Women/Men categories using gender field
     if (category === "women" || category === "men") {
       const genderValue = category.charAt(0).toUpperCase() + category.slice(1);
       const gendersToFetch = [genderValue, "Unisex"];
@@ -119,7 +119,7 @@ export async function GET(request: NextRequest) {
             .where("gender", "==", gender)
             .where("quantity", ">", 0);
 
-          // Add subcategory filter if provided
+          // Add subcategory filter if provided in URL
           if (subcategory) {
             const subcategoryValue = subcategory
               .split("-")
@@ -132,7 +132,7 @@ export async function GET(request: NextRequest) {
             );
           }
 
-          // Add subsubcategory filter if provided
+          // Add subsubcategory filter if provided in URL
           if (subsubcategory) {
             const subsubcategoryValue = subsubcategory
               .split("-")
@@ -145,36 +145,7 @@ export async function GET(request: NextRequest) {
             );
           }
 
-          // Apply additional filters
-          if (filterSubcategories.length > 0) {
-            // Convert filter subcategories to proper format
-            const formattedSubcategories = filterSubcategories.map((sub) =>
-              sub
-                .split(" ")
-                .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-                .join(" ")
-            );
-            if (formattedSubcategories.length <= 10) {
-              genderQuery = genderQuery.where(
-                "subcategory",
-                "in",
-                formattedSubcategories
-              );
-            }
-          }
-
-          if (brands.length > 0 && brands.length <= 10) {
-            genderQuery = genderQuery.where("brandModel", "in", brands);
-          }
-
-          if (colors.length > 0 && colors.length <= 10) {
-            genderQuery = genderQuery.where(
-              "availableColors",
-              "array-contains-any",
-              colors
-            );
-          }
-
+          // Apply price filters at database level (most efficient)
           if (minPrice !== undefined) {
             genderQuery = genderQuery.where("price", ">=", minPrice);
           }
@@ -183,12 +154,15 @@ export async function GET(request: NextRequest) {
             genderQuery = genderQuery.where("price", "<=", maxPrice);
           }
 
+          // Only apply simple filters at database level to avoid complex compound queries
+          // We'll handle colors, brands, and filterSubcategories client-side for better reliability
+
           // Order by ranking score for better results
           genderQuery = genderQuery
             .orderBy("quantity") // Required for the where clause
             .orderBy("isBoosted", "desc")
             .orderBy("rankingScore", "desc")
-            .limit(50); // Fetch more to account for filtering
+            .limit(200); // Fetch more to account for client-side filtering
 
           const snapshot = await genderQuery.get();
           const products = snapshot.docs.map((doc: QueryDocumentSnapshot) =>
@@ -214,26 +188,6 @@ export async function GET(request: NextRequest) {
         return true;
       });
 
-      // Apply client-side filtering for complex filters
-      allProducts = applyClientSideFilters(allProducts, {
-        filterSubcategories,
-        colors,
-        brands,
-        minPrice,
-        maxPrice,
-      });
-
-      // Sort by boosted first, then ranking score
-      allProducts.sort((a, b) => {
-        // First priority: boosted products
-        if (a.isBoosted && !b.isBoosted) return -1;
-        if (!a.isBoosted && b.isBoosted) return 1;
-
-        // Second priority: ranking score
-        const aScore = a.rankingScore ?? 0;
-        const bScore = b.rankingScore ?? 0;
-        return bScore - aScore;
-      });
     } else {
       // For other categories, filter by category field directly
       try {
@@ -247,7 +201,7 @@ export async function GET(request: NextRequest) {
           .where("category", "==", categoryValue)
           .where("quantity", ">", 0);
 
-        // Add subcategory filter if provided
+        // Add subcategory filter if provided in URL
         if (subcategory) {
           const subcategoryValue = subcategory
             .split("-")
@@ -256,7 +210,7 @@ export async function GET(request: NextRequest) {
           query = query.where("subcategory", "==", subcategoryValue);
         }
 
-        // Add subsubcategory filter if provided
+        // Add subsubcategory filter if provided in URL
         if (subsubcategory) {
           const subsubcategoryValue = subsubcategory
             .split("-")
@@ -265,27 +219,7 @@ export async function GET(request: NextRequest) {
           query = query.where("subsubcategory", "==", subsubcategoryValue);
         }
 
-        // Apply additional filters
-        if (filterSubcategories.length > 0) {
-          const formattedSubcategories = filterSubcategories.map((sub) =>
-            sub
-              .split(" ")
-              .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-              .join(" ")
-          );
-          if (formattedSubcategories.length <= 10) {
-            query = query.where("subcategory", "in", formattedSubcategories);
-          }
-        }
-
-        if (brands.length > 0 && brands.length <= 10) {
-          query = query.where("brandModel", "in", brands);
-        }
-
-        if (colors.length > 0 && colors.length <= 10) {
-          query = query.where("availableColors", "array-contains-any", colors);
-        }
-
+        // Apply price filters at database level
         if (minPrice !== undefined) {
           query = query.where("price", ">=", minPrice);
         }
@@ -299,26 +233,38 @@ export async function GET(request: NextRequest) {
           .orderBy("quantity") // Required for the where clause
           .orderBy("isBoosted", "desc")
           .orderBy("rankingScore", "desc")
-          .limit(100); // Fetch more for filtering
+          .limit(200); // Fetch more for filtering
 
         const snapshot = await query.get();
         allProducts = snapshot.docs.map((doc: QueryDocumentSnapshot) =>
           documentToProduct(doc)
         );
-
-        // Apply client-side filtering for complex filters
-        allProducts = applyClientSideFilters(allProducts, {
-          filterSubcategories,
-          colors,
-          brands,
-          minPrice,
-          maxPrice,
-        });
       } catch (error) {
         console.log(`Error fetching products for category ${category}:`, error);
         allProducts = [];
       }
     }
+
+    // Apply client-side filtering for complex filters
+    allProducts = applyClientSideFilters(allProducts, {
+      filterSubcategories,
+      colors,
+      brands,
+      minPrice,
+      maxPrice,
+    });
+
+    // Sort by boosted first, then ranking score
+    allProducts.sort((a, b) => {
+      // First priority: boosted products
+      if (a.isBoosted && !b.isBoosted) return -1;
+      if (!a.isBoosted && b.isBoosted) return 1;
+
+      // Second priority: ranking score
+      const aScore = a.rankingScore ?? 0;
+      const bScore = b.rankingScore ?? 0;
+      return bScore - aScore;
+    });
 
     // Apply pagination
     const startIndex = page * limit;
@@ -329,11 +275,11 @@ export async function GET(request: NextRequest) {
       products: paginatedProducts,
       hasMore,
       page,
-      total: paginatedProducts.length,
+      total: allProducts.length, // Changed to show total filtered products
     };
 
     console.log(
-      `✅ Total fetched ${allProducts.length} products, returning ${paginatedProducts.length} for page ${page}`
+      `✅ Total filtered ${allProducts.length} products, returning ${paginatedProducts.length} for page ${page}`
     );
 
     return NextResponse.json(response);
@@ -346,7 +292,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Client-side filtering for complex filters that can't be done in Firestore
+// Improved client-side filtering function
 function applyClientSideFilters(
   products: Product[],
   filters: {
@@ -357,54 +303,102 @@ function applyClientSideFilters(
     maxPrice?: number;
   }
 ): Product[] {
-  return products.filter((product) => {
+  console.log("🔧 Applying client-side filters:", filters);
+  console.log("🔧 Before filtering:", products.length, "products");
+
+  const filteredProducts = products.filter((product) => {
     // Filter by subcategories
     if (filters.filterSubcategories.length > 0) {
-      const formattedSubcategories = filters.filterSubcategories.map((sub) =>
-        sub
-          .split(" ")
-          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-          .join(" ")
-      );
-      if (
-        product.subcategory &&
-        !formattedSubcategories.includes(product.subcategory)
-      ) {
+      if (!product.subcategory) {
+        console.log(`❌ Product ${product.id} has no subcategory`);
+        return false;
+      }
+      
+      // Check if product subcategory matches any of the filter subcategories
+      const productSubcategory = product.subcategory.toLowerCase();
+      const matchesSubcategory = filters.filterSubcategories.some(filterSub => {
+        const normalizedFilterSub = filterSub.toLowerCase();
+        return productSubcategory === normalizedFilterSub || 
+               productSubcategory.includes(normalizedFilterSub) ||
+               normalizedFilterSub.includes(productSubcategory);
+      });
+      
+      if (!matchesSubcategory) {
+        console.log(`❌ Product ${product.id} subcategory "${product.subcategory}" doesn't match filters:`, filters.filterSubcategories);
         return false;
       }
     }
 
-    // Filter by colors (if available in product)
+    // Filter by colors - check if product has any of the selected colors
     if (filters.colors.length > 0) {
       if (!product.availableColors || product.availableColors.length === 0) {
+        console.log(`❌ Product ${product.id} has no available colors`);
         return false;
       }
-      const hasMatchingColor = filters.colors.some((color) =>
-        product.availableColors!.includes(color)
-      );
+      
+      const hasMatchingColor = filters.colors.some(filterColor => {
+        const normalizedFilterColor = filterColor.toLowerCase();
+        return product.availableColors!.some(productColor => 
+          productColor.toLowerCase() === normalizedFilterColor ||
+          productColor.toLowerCase().includes(normalizedFilterColor) ||
+          normalizedFilterColor.includes(productColor.toLowerCase())
+        );
+      });
+      
       if (!hasMatchingColor) {
+        console.log(`❌ Product ${product.id} colors ${product.availableColors} don't match filters:`, filters.colors);
         return false;
       }
     }
 
-    // Filter by brands
+    // Filter by brands - exact match on brandModel
     if (filters.brands.length > 0) {
-      if (!product.brandModel || !filters.brands.includes(product.brandModel)) {
+      if (!product.brandModel) {
+        console.log(`❌ Product ${product.id} has no brand`);
+        return false;
+      }
+      
+      const matchesBrand = filters.brands.some(filterBrand => {
+        return product.brandModel!.toLowerCase() === filterBrand.toLowerCase() ||
+               product.brandModel!.toLowerCase().includes(filterBrand.toLowerCase()) ||
+               filterBrand.toLowerCase().includes(product.brandModel!.toLowerCase());
+      });
+      
+      if (!matchesBrand) {
+        console.log(`❌ Product ${product.id} brand "${product.brandModel}" doesn't match filters:`, filters.brands);
         return false;
       }
     }
 
-    // Filter by price range
+    // Filter by price range (double-check since we also filter at DB level)
     if (filters.minPrice !== undefined && product.price < filters.minPrice) {
+      console.log(`❌ Product ${product.id} price ${product.price} below min ${filters.minPrice}`);
       return false;
     }
 
     if (filters.maxPrice !== undefined && product.price > filters.maxPrice) {
+      console.log(`❌ Product ${product.id} price ${product.price} above max ${filters.maxPrice}`);
       return false;
     }
 
     return true;
   });
+
+  console.log("🔧 After filtering:", filteredProducts.length, "products");
+  
+  // Log some examples of what passed the filters
+  if (filteredProducts.length > 0) {
+    console.log("✅ Sample filtered products:", filteredProducts.slice(0, 3).map(p => ({
+      id: p.id,
+      name: p.productName,
+      subcategory: p.subcategory,
+      brand: p.brandModel,
+      colors: p.availableColors,
+      price: p.price
+    })));
+  }
+
+  return filteredProducts;
 }
 
 export async function OPTIONS() {

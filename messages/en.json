@@ -1894,5 +1894,30 @@
     "verificationEmailSentMessage": "We've sent a verification email to your inbox. Please check your email and click the verification link to activate your account.",
     "resendEmail": "Resend Email",
     "resendInSeconds": "Resend in {seconds}s"
+  },
+  "Collection": {
+    "collection": "Collection",
+    "filter": "Filter",
+    "filtersApplied": "filters applied",
+    "clear": "Clear",
+    "featured": "Featured",
+    "goBack": "Go Back",
+    "noProductsFound": "No Products Found",
+    "noProductsInCollection": "This collection doesn't have any products yet.",
+    "tryAdjustingFilters": "Try adjusting your filters to see more products.",
+    "loadingCollection": "Loading Collection...",
+    "collectionNotFound": "Collection not found",
+    "failedToLoadCollection": "Failed to load collection",
+    "failedToLoadProducts": "Failed to load products",
+    "errorLoadingCollection": "Error loading collection",
+    "missingCollectionId": "Missing collection or shop ID",
+    "backToShop": "Back to Shop",
+    "products": "Products",
+    "noResults": "No results found",
+    "loading": "Loading...",
+    "retry": "Retry",
+    "showingResults": "Showing {count} products",
+    "loadMore": "Load More",
+    "endOfResults": "You've reached the end"
   }
 }

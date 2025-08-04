@@ -171,9 +171,9 @@ export default function DynamicMarketPage() {
         .split("-")
         .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
         .join(" ");
-
+  
       let title = formattedCategory;
-
+  
       if (subcategory) {
         const formattedSubcategory = subcategory
           .split("-")
@@ -181,7 +181,7 @@ export default function DynamicMarketPage() {
           .join(" ");
         title = `${formattedCategory} - ${formattedSubcategory}`;
       }
-
+  
       if (subsubcategory) {
         const formattedSubSubcategory = subsubcategory
           .split("-")
@@ -189,47 +189,58 @@ export default function DynamicMarketPage() {
           .join(" ");
         title = `${title} - ${formattedSubSubcategory}`;
       }
-
+  
       setCategoryTitle(title);
-
-      // Set available subcategories based on the selected category
+  
+      // MODIFIED SECTION: Special handling for Women and Men categories
       const categoryKey = formattedCategory;
-      const subcats = AllInOneCategoryData.getSubcategories(categoryKey, true);
+      let subcats: string[] = [];
+  
+      if (categoryKey === "Women" || categoryKey === "Men") {
+        // For Women/Men, show all sub-subcategories from all buyer subcategories
+        const buyerSubcategories = AllInOneCategoryData.getSubcategories(categoryKey, true);
+        const allSubSubcategories: string[] = [];
+        
+        buyerSubcategories.forEach(buyerSub => {
+          const subSubs = AllInOneCategoryData.getSubSubcategories(categoryKey, buyerSub, true);
+          allSubSubcategories.push(...subSubs);
+        });
+        
+        // Remove duplicates and sort
+        subcats = [...new Set(allSubSubcategories)].sort();
+      } else {
+        // For other categories, use the regular subcategories
+        subcats = AllInOneCategoryData.getSubcategories(categoryKey, true);
+      }
+      
       setAvailableSubcategories(subcats);
-
+  
+      // ADDED: Reset all filters when category changes
+      setFilters({
+        subcategories: [],
+        colors: [],
+        brands: [],
+        minPrice: undefined,
+        maxPrice: undefined,
+      });
+      
+      // ADDED: Reset price input fields
+      setMinPriceInput("");
+      setMaxPriceInput("");
+  
       console.log("Available subcategories for", categoryKey, ":", subcats);
+      console.log("🔄 Filters reset for new category:", categoryKey);
     }
   }, [category, subcategory, subsubcategory]);
 
-  // Mock localization function (replace with your actual l10n)
   const getLocalizedSubcategoryName = (
     categoryKey: string,
     subcategoryKey: string
   ): string => {
-    // Create a mock l10n object for localization
-    const mockL10n: Record<string, string> = {
-      // Add common subcategory localizations - you can expand this based on your needs
-      buyerSubcategoryFashion: "Fashion",
-      buyerSubcategoryShoes: "Shoes",
-      buyerSubcategoryAccessories: "Accessories",
-      buyerSubcategoryBags: "Bags",
-      buyerSubcategorySelfCare: "Self Care",
-      // Add more as needed...
-    };
-
-    try {
-      // Use the AllInOneCategoryData localization method
-      return (
-        AllInOneCategoryData.localizeBuyerSubcategoryKey(
-          categoryKey,
-          subcategoryKey,
-          mockL10n
-        ) || subcategoryKey
-      );
-    } catch (error) {
-      console.warn("Failed to localize subcategory:", subcategoryKey, error);
-      return subcategoryKey;
-    }
+    // Since we're just displaying the names as they are in the data structure,
+    // we can simply return the subcategoryKey directly
+    // The AllInOneCategoryData already provides clean, formatted names
+    return subcategoryKey;
   };
 
   // Fetch products function

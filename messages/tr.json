@@ -1893,5 +1893,30 @@
     "verificationEmailSentMessage": "Gelen kutunuza bir doğrulama e-postası gönderdik. Lütfen e-postanızı kontrol edin ve hesabınızı etkinleştirmek için doğrulama bağlantısına tıklayın.",
     "resendEmail": "E-postayı Tekrar Gönder",
     "resendInSeconds": "{seconds}s sonra tekrar gönder"
+  },
+  "Collection": {
+    "collection": "Koleksiyon",
+    "filter": "Filtrele",
+    "filtersApplied": "filtre uygulandı",
+    "clear": "Temizle",
+    "featured": "Öne Çıkan",
+    "goBack": "Geri Dön",
+    "noProductsFound": "Ürün Bulunamadı",
+    "noProductsInCollection": "Bu koleksiyonda henüz ürün bulunmuyor.",
+    "tryAdjustingFilters": "Daha fazla ürün görmek için filtrelerinizi ayarlayın.",
+    "loadingCollection": "Koleksiyon Yükleniyor...",
+    "collectionNotFound": "Koleksiyon bulunamadı",
+    "failedToLoadCollection": "Koleksiyon yüklenemedi",
+    "failedToLoadProducts": "Ürünler yüklenemedi",
+    "errorLoadingCollection": "Koleksiyon yüklenirken hata oluştu",
+    "missingCollectionId": "Koleksiyon veya mağaza ID'si eksik",
+    "backToShop": "Mağazaya Dön",
+    "products": "Ürünler",
+    "noResults": "Sonuç bulunamadı",
+    "loading": "Yükleniyor...",
+    "retry": "Tekrar Dene",
+    "showingResults": "{count} ürün gösteriliyor",
+    "loadMore": "Daha Fazla Yükle",
+    "endOfResults": "Sona ulaştınız"
   }
 }
