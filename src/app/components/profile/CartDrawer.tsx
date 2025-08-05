@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   X,
   ShoppingCart,
@@ -13,21 +13,25 @@ import {
   AlertCircle,
   RefreshCw,
 } from "lucide-react";
-import { ProductCard3 } from "./ProductCard3";
+import { ProductCard3 } from "../ProductCard3";
 import { useCart } from "@/context/CartProvider";
 import { useUser } from "@/context/UserProvider";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { AttributeLocalizationUtils } from "@/constants/AttributeLocalization";
 
 interface CartDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   isDarkMode?: boolean;
+  localization?: ReturnType<typeof useTranslations>;
 }
 
 export const CartDrawer: React.FC<CartDrawerProps> = ({
   isOpen,
   onClose,
   isDarkMode = false,
+  localization,
 }) => {
   const router = useRouter();
   const { user } = useUser();
@@ -43,22 +47,50 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     clearCart,
     initializeCartIfNeeded,
     loadMoreItems,
+    isOptimisticallyRemoving,
   } = useCart();
 
   const [isClearing, setIsClearing] = useState(false);
-  const [removingItems, setRemovingItems] = useState<Set<string>>(new Set());
-
   const [isAnimating, setIsAnimating] = useState(false);
   const [shouldRender, setShouldRender] = useState(false);
 
+  // ✅ FIXED: Proper nested translation function that uses JSON files
+  const t = useCallback((key: string) => {
+    if (!localization) {
+      // Return the key itself if no localization function is provided
+      return key;
+    }
+
+    try {
+      // Try to get the nested CartDrawer translation
+      const translation = localization(`CartDrawer.${key}`);
+      
+      // Check if we got a valid translation (not the same as the key we requested)
+      if (translation && translation !== `CartDrawer.${key}`) {
+        return translation;
+      }
+      
+      // If nested translation doesn't exist, try direct key
+      const directTranslation = localization(key);
+      if (directTranslation && directTranslation !== key) {
+        return directTranslation;
+      }
+      
+      // Return the key as fallback
+      return key;
+    } catch (error) {
+      console.warn(`Translation error for key: ${key}`, error);
+      return key;
+    }
+  }, [localization]);
+
+  // Handle drawer animation
   useEffect(() => {
     if (isOpen) {
       setShouldRender(true);
-      // Small delay to trigger enter animation
       setTimeout(() => setIsAnimating(true), 10);
     } else {
       setIsAnimating(false);
-      // Wait for exit animation to complete before unmounting
       setTimeout(() => setShouldRender(false), 300);
     }
   }, [isOpen]);
@@ -70,32 +102,29 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     }
   }, [isOpen, user, isInitialized, isLoading, initializeCartIfNeeded]);
 
-  // Calculate total price
-  const totalPrice = cartItems.reduce((total, item) => {
-    if (item.product && !item.isOptimistic) {
-      return total + item.product.price * item.quantity;
-    }
-    return total;
-  }, 0);
+  // Calculate total price with memoization
+  const totalPrice = useMemo(() => {
+    return cartItems.reduce((total, item) => {
+      if (item.product && !item.isOptimistic && !isOptimisticallyRemoving(item.productId)) {
+        return total + item.product.price * item.quantity;
+      }
+      return total;
+    }, 0);
+  }, [cartItems, isOptimisticallyRemoving]);
 
-  // Handle item removal with optimistic UI
-  const handleRemoveItem = async (productId: string) => {
-    setRemovingItems((prev) => new Set(prev).add(productId));
+  // Handle item removal
+  const handleRemoveItem = useCallback(async (productId: string) => {
     try {
-      await removeFromCart(productId);
+      console.log('CartDrawer - Removing item:', { productId });
+      const result = await removeFromCart(productId);
+      console.log('CartDrawer - Remove result:', { productId, result });
     } catch (error) {
-      console.error("Failed to remove item:", error);
-    } finally {
-      setRemovingItems((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(productId);
-        return newSet;
-      });
+      console.error("CartDrawer - Failed to remove item:", error);
     }
-  };
+  }, [removeFromCart]);
 
   // Handle quantity update
-  const handleQuantityChange = async (
+  const handleQuantityChange = useCallback(async (
     productId: string,
     newQuantity: number
   ) => {
@@ -103,49 +132,261 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
       await handleRemoveItem(productId);
       return;
     }
+    
     try {
+      console.log('CartDrawer - Updating quantity:', { productId, newQuantity });
       await updateQuantity(productId, newQuantity);
     } catch (error) {
-      console.error("Failed to update quantity:", error);
+      console.error("CartDrawer - Failed to update quantity:", error);
     }
-  };
+  }, [handleRemoveItem, updateQuantity]);
 
   // Handle clear cart
-  const handleClearCart = async () => {
+  const handleClearCart = useCallback(async () => {
     setIsClearing(true);
     try {
+      console.log('CartDrawer - Clearing entire cart');
       await clearCart();
     } catch (error) {
-      console.error("Failed to clear cart:", error);
+      console.error("CartDrawer - Failed to clear cart:", error);
     } finally {
       setIsClearing(false);
     }
-  };
+  }, [clearCart]);
 
-  // Handle navigation to checkout
-  const handleCheckout = () => {
+  // Handle navigation functions
+  const handleCheckout = useCallback(() => {
+    console.log('CartDrawer - Navigating to checkout');
+    
+    // Prepare cart items for payment page - pass ALL fields from cart documents
+    const paymentItems = cartItems
+      .filter(item => !item.isOptimistic && item.product && !isOptimisticallyRemoving(item.productId))
+      .map(item => {
+        // Create a copy of the entire item object
+        const paymentItem = { ...item };
+        
+        // Add essential product info from the product object
+        if (item.product) {
+          paymentItem.price = item.product.price;
+          paymentItem.productName = item.product.productName;
+          paymentItem.currency = item.product.currency;
+        }
+        
+        // Remove only the fields that shouldn't be sent to payment
+        delete (paymentItem as any).product; // Remove the full product object (too large)
+        delete (paymentItem as any).cartData; // Remove internal cart metadata
+        delete (paymentItem as any).isOptimistic; // Remove UI state
+        delete (paymentItem as any).isLoadingProduct; // Remove UI state
+        delete (paymentItem as any).loadError; // Remove UI state
+        delete (paymentItem as any).selectedColorImage; // Remove UI-specific field
+        
+        return paymentItem;
+      });
+  
+    console.log('CartDrawer - Payment items prepared:', paymentItems);
+  
+    // Calculate total for verification
+    const totalPrice = paymentItems.reduce((sum, item) => sum + ((item as any).price * item.quantity), 0);
+    
+    // Save to localStorage as backup
+    localStorage.setItem('cartItems', JSON.stringify(paymentItems));
+    localStorage.setItem('cartTotal', totalPrice.toString());
+    
     onClose();
-    router.push("/checkout");
-  };
+    
+    // Navigate to payment page
+    try {
+      const itemsParam = encodeURIComponent(JSON.stringify(paymentItems));
+      // Check if URL would be too long (most browsers limit to ~2000 chars)
+      if (itemsParam.length < 1500) {
+        router.push(`/productpayment?items=${itemsParam}&total=${totalPrice}`);
+      } else {
+        // For large carts, use localStorage only
+        router.push(`/productpayment?total=${totalPrice}`);
+      }
+    } catch (error) {
+      console.error('Error encoding cart items for URL:', error);
+      // Fallback to localStorage only
+      router.push(`/productpayment?total=${totalPrice}`);
+    }
+  }, [cartItems, isOptimisticallyRemoving, onClose, router]);
 
-  // Handle navigation to cart page
-  const handleViewFullCart = () => {
+  const handleViewFullCart = useCallback(() => {
+    console.log('CartDrawer - Navigating to full cart page');
     onClose();
     router.push("/cart");
-  };
+  }, [onClose, router]);
 
-  // Handle navigation to login
-  const handleGoToLogin = () => {
+  const handleGoToLogin = useCallback(() => {
+    console.log('CartDrawer - Navigating to login');
     onClose();
     router.push("/login");
-  };
+  }, [onClose, router]);
 
   // Backdrop click handler
-  const handleBackdropClick = (e: React.MouseEvent) => {
+  const handleBackdropClick = useCallback((e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
       onClose();
     }
-  };
+  }, [onClose]);
+
+  // Format dynamic attributes for display
+  const formatItemAttributes = useCallback((item: any) => {
+    if (!localization) return '';
+
+    const attributes: Record<string, unknown> = {};
+    const excludedKeys = [
+      'productId', 'cartData', 'product', 'quantity', 'sellerName', 
+      'sellerId', 'isShop', 'isOptimistic', 'isLoadingProduct', 
+      'loadError', 'selectedColor', 'selectedColorImage', 'gender'
+    ];
+
+    // Collect all non-excluded attributes
+    Object.entries(item).forEach(([key, value]) => {
+      if (!excludedKeys.includes(key) && 
+          value !== undefined && 
+          value !== null && 
+          value !== '' && 
+          typeof value !== 'boolean') {
+        attributes[key] = value;
+      }
+    });
+
+    // Handle selected color separately
+    if (typeof item.selectedColor === 'string' && item.selectedColor !== 'default') {
+      attributes['selectedColor'] = item.selectedColor;
+    }
+
+    if (Object.keys(attributes).length === 0) return '';
+
+    // Get localized values only (without titles)
+    const displayValues: string[] = [];
+    Object.entries(attributes).forEach(([key, value]) => {
+      const localizedValue = AttributeLocalizationUtils.getLocalizedAttributeValue(key, value, localization);
+      if (localizedValue.trim() !== '') {
+        displayValues.push(localizedValue);
+      }
+    });
+
+    return displayValues.join(', ');
+  }, [localization]);
+
+  // Memoize cart items rendering
+  const renderCartItems = useMemo(() => {
+    return cartItems.map((item) => {
+      const isRemoving = isOptimisticallyRemoving(item.productId);
+      const attributesDisplay = formatItemAttributes(item);
+      
+      return (
+        <div
+          key={item.productId}
+          className={`
+            transition-all duration-300 transform
+            ${
+              isRemoving || item.isOptimistic
+                ? "opacity-50 scale-95"
+                : "opacity-100 scale-100"
+            }
+          `}
+        >
+          <div
+            className={`
+              rounded-xl border p-3 transition-all duration-200
+              ${
+                isDarkMode
+                  ? "bg-gray-800 border-gray-700 hover:border-gray-600"
+                  : "bg-gray-50 border-gray-200 hover:border-gray-300"
+              }
+              ${item.isOptimistic ? "border-dashed" : ""}
+            `}
+          >
+            <ProductCard3
+              imageUrl={item.product?.imageUrls?.[0] || ""}
+              colorImages={item.product?.colorImages || {}} 
+              selectedColorImage={typeof item.selectedColorImage === 'string' ? item.selectedColorImage : undefined}
+              productName={
+                item.product?.productName || t("loadingProduct")
+              }
+              brandModel={
+                item.product?.brandModel || item.sellerName
+              }
+              price={item.product?.price || 0}
+              currency={item.product?.currency || "TL"}
+              averageRating={item.product?.averageRating || 0}
+              quantity={item.quantity}
+              maxQuantityAllowed={99}
+              onQuantityChanged={
+                item.isOptimistic || isRemoving
+                  ? undefined
+                  : (newQuantity) =>
+                      handleQuantityChange(item.productId, newQuantity)
+              }
+              isDarkMode={isDarkMode}
+              scaleFactor={0.9}
+            />
+
+            {/* Display attributes in one line */}
+            {attributesDisplay && (
+              <div className="mt-2 text-xs text-gray-500">
+                <span className="font-medium">
+                  
+                </span> {attributesDisplay}
+              </div>
+            )}
+
+            {/* Remove Button */}
+            <div className="mt-3 flex justify-end">
+              <button
+                onClick={() => handleRemoveItem(item.productId)}
+                disabled={isRemoving || item.isOptimistic}
+                className={`
+                  flex items-center space-x-2 px-3 py-2 rounded-lg text-sm
+                  transition-colors duration-200
+                  ${
+                    isDarkMode
+                      ? "text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                      : "text-red-500 hover:text-red-600 hover:bg-red-50"
+                  }
+                  ${
+                    isRemoving || item.isOptimistic
+                      ? "opacity-50 cursor-not-allowed"
+                      : ""
+                  }
+                `}
+              >
+                {isRemoving ? (
+                  <RefreshCw size={14} className="animate-spin" />
+                ) : (
+                  <Trash2 size={14} />
+                )}
+                <span>
+                  {isRemoving 
+                    ? t("removing")
+                    : t("remove")
+                  }
+                </span>
+              </button>
+            </div>
+
+            {/* Loading/Error States */}
+            {item.isLoadingProduct === true && (
+              <div className="mt-2 flex items-center space-x-2 text-xs text-gray-500">
+                <div className="animate-spin w-3 h-3 border border-gray-400 border-t-transparent rounded-full"></div>
+                <span>{t("loadingProductInfo")}</span>
+              </div>
+            )}
+
+            {item.loadError === true && (
+              <div className="mt-2 flex items-center space-x-2 text-xs text-red-500">
+                <AlertCircle size={12} />
+                <span>{t("productInfoError")}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    });
+  }, [cartItems, isOptimisticallyRemoving, isDarkMode, handleQuantityChange, handleRemoveItem, formatItemAttributes, t]);
 
   if (!shouldRender) return null;
 
@@ -162,12 +403,11 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
       {/* Drawer */}
       <div
         className={`
-    absolute right-0 top-0 h-full w-full max-w-md transform transition-transform duration-300 ease-out
-    ${isDarkMode ? "bg-gray-900" : "bg-white"}
-    shadow-2xl
-    ${isAnimating ? "translate-x-0" : "translate-x-full"} // Changed this line
-  `}
-        // Remove the inline style={{ transform: ... }}
+          absolute right-0 top-0 h-full w-full max-w-md transform transition-transform duration-300 ease-out
+          ${isDarkMode ? "bg-gray-900" : "bg-white"}
+          shadow-2xl
+          ${isAnimating ? "translate-x-0" : "translate-x-full"}
+        `}
       >
         {/* Header */}
         <div
@@ -201,7 +441,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                     ${isDarkMode ? "text-white" : "text-gray-900"}
                   `}
                 >
-                  Sepetim
+                  {t("title")}
                 </h2>
                 {user && cartCount > 0 && (
                   <p
@@ -210,7 +450,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                       ${isDarkMode ? "text-gray-400" : "text-gray-500"}
                     `}
                   >
-                    {cartCount} ürün
+                    {cartCount} {t("itemsCount")}
                   </p>
                 )}
               </div>
@@ -252,7 +492,12 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 ) : (
                   <Trash2 size={16} />
                 )}
-                <span>{isClearing ? "Temizleniyor..." : "Sepeti Temizle"}</span>
+                <span>
+                  {isClearing 
+                    ? t("clearing")
+                    : t("clearCart")
+                  }
+                </span>
               </button>
             </div>
           )}
@@ -281,7 +526,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                     ${isDarkMode ? "text-white" : "text-gray-900"}
                   `}
                 >
-                  Giriş Yapın
+                  {t("loginRequired")}
                 </h3>
                 <p
                   className={`
@@ -289,8 +534,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                     ${isDarkMode ? "text-gray-400" : "text-gray-600"}
                   `}
                 >
-                  Sepetinizi görüntülemek ve alışverişe devam etmek için lütfen
-                  giriş yapın.
+                  {t("loginToViewCart")}
                 </p>
                 <button
                   onClick={handleGoToLogin}
@@ -303,7 +547,9 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   "
                 >
                   <LogIn size={18} />
-                  <span className="font-medium">Giriş Yap</span>
+                  <span className="font-medium">
+                    {t("login")}
+                  </span>
                 </button>
               </div>
             ) : /* Loading State */ isLoading && !isInitialized ? (
@@ -315,7 +561,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                     ${isDarkMode ? "text-gray-400" : "text-gray-600"}
                   `}
                 >
-                  Sepetiniz yükleniyor...
+                  {t("loading")}
                 </p>
               </div>
             ) : /* Empty Cart State */ cartCount === 0 ? (
@@ -337,7 +583,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                     ${isDarkMode ? "text-white" : "text-gray-900"}
                   `}
                 >
-                  Sepetiniz Boş
+                  {t("emptyCart")}
                 </h3>
                 <p
                   className={`
@@ -345,8 +591,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                     ${isDarkMode ? "text-gray-400" : "text-gray-600"}
                   `}
                 >
-                  Henüz sepetinize ürün eklemediniz. Alışverişe başlamak için
-                  ürünleri keşfedin!
+                  {t("emptyCartDescription")}
                 </p>
                 <button
                   onClick={() => {
@@ -362,117 +607,16 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   "
                 >
                   <Heart size={18} />
-                  <span className="font-medium">Alışverişe Başla</span>
+                  <span className="font-medium">
+                    {t("startShopping")}
+                  </span>
                 </button>
               </div>
             ) : (
               /* Cart Items */
               <div className="px-4 py-4">
                 <div className="space-y-4">
-                  {cartItems.map((item) => {
-                    const isRemoving = removingItems.has(item.productId);
-
-                    return (
-                      <div
-                        key={item.productId}
-                        className={`
-                          transition-all duration-300 transform
-                          ${
-                            isRemoving || item.isOptimistic
-                              ? "opacity-50 scale-95"
-                              : "opacity-100 scale-100"
-                          }
-                        `}
-                      >
-                        <div
-                          className={`
-                            rounded-xl border p-3 transition-all duration-200
-                            ${
-                              isDarkMode
-                                ? "bg-gray-800 border-gray-700 hover:border-gray-600"
-                                : "bg-gray-50 border-gray-200 hover:border-gray-300"
-                            }
-                            ${item.isOptimistic ? "border-dashed" : ""}
-                          `}
-                        >
-                          <ProductCard3
-                            imageUrl={item.product?.imageUrls?.[0] || ""}
-                            colorImages={item.product?.colorImages || {}}
-                            selectedColor={item.selectedColor}
-                            selectedColorImage={item.selectedColorImage}
-                            productName={
-                              item.product?.productName || "Ürün yükleniyor..."
-                            }
-                            brandModel={
-                              item.product?.brandModel || item.sellerName
-                            }
-                            price={item.product?.price || 0}
-                            currency={item.product?.currency || "TL"}
-                            averageRating={item.product?.averageRating || 0}
-                            quantity={item.quantity}
-                            maxQuantityAllowed={99}
-                            onQuantityChanged={
-                              item.isOptimistic || isRemoving
-                                ? undefined
-                                : (newQuantity) =>
-                                    handleQuantityChange(
-                                      item.productId,
-                                      newQuantity
-                                    )
-                            }
-                            isDarkMode={isDarkMode}
-                            scaleFactor={0.9}
-                          />
-
-                          {/* Remove Button */}
-                          <div className="mt-3 flex justify-end">
-                            <button
-                              onClick={() => handleRemoveItem(item.productId)}
-                              disabled={isRemoving || item.isOptimistic}
-                              className={`
-                                flex items-center space-x-2 px-3 py-2 rounded-lg text-sm
-                                transition-colors duration-200
-                                ${
-                                  isDarkMode
-                                    ? "text-red-400 hover:text-red-300 hover:bg-red-900/20"
-                                    : "text-red-500 hover:text-red-600 hover:bg-red-50"
-                                }
-                                ${
-                                  isRemoving || item.isOptimistic
-                                    ? "opacity-50 cursor-not-allowed"
-                                    : ""
-                                }
-                              `}
-                            >
-                              {isRemoving ? (
-                                <RefreshCw size={14} className="animate-spin" />
-                              ) : (
-                                <Trash2 size={14} />
-                              )}
-                              <span>
-                                {isRemoving ? "Kaldırılıyor..." : "Kaldır"}
-                              </span>
-                            </button>
-                          </div>
-
-                          {/* Loading/Error States */}
-                          {item.isLoadingProduct && (
-                            <div className="mt-2 flex items-center space-x-2 text-xs text-gray-500">
-                              <div className="animate-spin w-3 h-3 border border-gray-400 border-t-transparent rounded-full"></div>
-                              <span>Ürün bilgileri yükleniyor...</span>
-                            </div>
-                          )}
-
-                          {item.loadError && (
-                            <div className="mt-2 flex items-center space-x-2 text-xs text-red-500">
-                              <AlertCircle size={12} />
-                              <span>Ürün bilgileri yüklenemedi</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {renderCartItems}
 
                   {/* Load More Button */}
                   {hasMore && (
@@ -495,10 +639,10 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                         {isLoadingMore ? (
                           <div className="flex items-center space-x-2">
                             <RefreshCw size={14} className="animate-spin" />
-                            <span>Yükleniyor...</span>
+                            <span>{t("loadingMore")}</span>
                           </div>
                         ) : (
-                          "Daha Fazla Göster"
+                          t("loadMore")
                         )}
                       </button>
                     </div>
@@ -529,7 +673,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                     ${isDarkMode ? "text-white" : "text-gray-900"}
                   `}
                 >
-                  Toplam:
+                  {t("total")}:
                 </span>
                 <span className="text-lg font-bold text-orange-500">
                   {totalPrice.toFixed(2)} TL
@@ -550,7 +694,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                     active:scale-95
                   `}
                 >
-                  Sepeti Görüntüle
+                  {t("viewCart")}
                 </button>
                 <button
                   onClick={handleCheckout}
@@ -562,7 +706,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                     flex items-center justify-center space-x-2
                   "
                 >
-                  <span>Ödemeye Geç</span>
+                  <span>{t("checkout")}</span>
                   <ArrowRight size={16} />
                 </button>
               </div>

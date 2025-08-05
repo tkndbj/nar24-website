@@ -41,16 +41,25 @@ interface FavoriteBasket {
 }
 
 interface FavoriteAttributes {
-  selectedColor?: string;
-  selectedColorImage?: string;
-  selectedSize?: string;
-  selectedFootwearSize?: string;
-  selectedHeightSize?: string;
-  selectedGender?: string;
-  selectedPantSize?: string;
-  selectedPantSizes?: string;
-  quantity?: number;
-  [key: string]: unknown;
+  [key: string]: unknown; // Allow any attribute dynamically
+}
+
+interface ProductDocumentData {
+  shopId?: string;
+  ownerId?: string;
+  shopName?: string;
+  sellerName?: string;
+  brandModel?: string;
+  ownerName?: string;
+  favoritesCount?: number;
+  metricsUpdatedAt?: Timestamp | FieldValue;
+  productName?: string;
+  price?: number;
+  currency?: string;
+  imageUrls?: string[];
+  colorImages?: Record<string, string[]>;
+  averageRating?: number;
+  attributes?: Record<string, unknown>; // 🚀 NEW: Product attributes
 }
 
 interface FavoritesContextType {
@@ -65,7 +74,7 @@ interface FavoritesContextType {
   // Methods
   addToFavorites: (
     productId: string,
-    attributes?: FavoriteAttributes
+    attributes?: FavoriteAttributes // 🚀 Now supports any dynamic attributes
   ) => Promise<string>;
   removeFromFavorites: (productId: string) => Promise<string>;
   removeGloballyFromFavorites: (productId: string) => Promise<string>;
@@ -395,6 +404,16 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
     }, DEBOUNCE_DELAY);
   }, [showSuccessToast]);
 
+  const isSystemField = (key: string): boolean => {
+    const systemFields = new Set([
+      'addedAt',
+      'updatedAt',
+      'productId',
+      'quantity',
+    ]);
+    return systemFields.has(key);
+  };
+
   // Add to favorites
   const addToFavorites = useCallback(
     async (
@@ -403,7 +422,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
     ): Promise<string> => {
       if (!user) return "Please log in";
       if (!productId) return "Invalid product ID";
-
+  
       const favCollection = selectedBasketId
         ? collection(
             db,
@@ -414,7 +433,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
             "favorites"
           )
         : collection(db, "users", user.uid, "favorites");
-
+  
       try {
         return await runTransaction(db, async (transaction) => {
           // Check if already exists
@@ -424,14 +443,14 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
             limit(1)
           );
           const existing = await getDocs(existingQuery);
-
-          // Get product reference
+  
+          // Get product reference and data
           const productRef = await getProductDocument(productId);
           if (!productRef) return "Product not found";
-
+  
           const productSnap = await transaction.get(productRef);
           if (!productSnap.exists()) return "Product not found";
-
+  
           if (existing.docs.length > 0) {
             // Remove existing favorite
             transaction.delete(existing.docs[0].ref);
@@ -439,14 +458,14 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
               favoritesCount: increment(-1),
               metricsUpdatedAt: serverTimestamp(),
             });
-
+  
             // Update local state immediately
             setAllFavoriteProductIds((prev) => {
               const newSet = new Set(prev);
               newSet.delete(productId);
               return newSet;
             });
-
+  
             if (!selectedBasketId) {
               setFavoriteProductIds((prev) => {
                 const newSet = new Set(prev);
@@ -454,46 +473,58 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
                 return newSet;
               });
             }
-
+  
             // Clear cache
             basketFavoriteCacheRef.current = {};
             basketNameCacheRef.current = {};
-
+  
             showDebouncedRemoveToast();
             return "Removed from favorites";
           } else {
-            // Add new favorite
+            // 🚀 NEW: Get product data and its attributes
+            const productData = productSnap.data() as ProductDocumentData;
+  
+            // Add new favorite with dynamic attributes
             const favoriteData: Record<string, unknown> = {
               productId,
               addedAt: serverTimestamp(),
               quantity: attributes.quantity || 1,
             };
-
-            // Add all attributes that are not undefined
+  
+            // 🚀 NEW: Add product's dynamic attributes from Firestore
+            if (productData.attributes) {
+              Object.entries(productData.attributes).forEach(([key, value]) => {
+                if (!isSystemField(key)) {
+                  favoriteData[key] = value;
+                }
+              });
+            }
+  
+            // 🚀 NEW: Override with any UI-selected attributes
             Object.entries(attributes).forEach(([key, value]) => {
-              if (value !== undefined && value !== null) {
+              if (!isSystemField(key) && value !== undefined && value !== null) {
                 favoriteData[key] = value;
               }
             });
-
+  
             const newFavRef = doc(favCollection);
             transaction.set(newFavRef, favoriteData);
             transaction.update(productRef, {
               favoritesCount: increment(1),
               metricsUpdatedAt: serverTimestamp(),
             });
-
+  
             // Update local state immediately
             setAllFavoriteProductIds((prev) => new Set([...prev, productId]));
-
+  
             if (!selectedBasketId) {
               setFavoriteProductIds((prev) => new Set([...prev, productId]));
             }
-
+  
             // Clear cache
             basketFavoriteCacheRef.current = {};
             basketNameCacheRef.current = {};
-
+  
             showSuccessToast("Added to favorites");
             return "Added to favorites";
           }
@@ -513,6 +544,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
       showDebouncedRemoveToast,
     ]
   );
+  
 
   // Remove from favorites (alias for addToFavorites for toggle behavior)
   const removeFromFavorites = useCallback(
@@ -770,7 +802,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   const transferBatch = useCallback(
     async (productIds: string[], basketId: string) => {
       if (!user) return;
-
+  
       const defaultFavs = collection(db, "users", user.uid, "favorites");
       const basketFavs = collection(
         db,
@@ -780,52 +812,41 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         basketId,
         "favorites"
       );
-
+  
       const batch = writeBatch(db);
-
+  
       try {
         for (const chunk of chunkArray(productIds, FIRESTORE_IN_LIMIT)) {
           const snap = await getDocs(
             query(defaultFavs, where("productId", "in", chunk))
           );
-
+  
           snap.docs.forEach((docSnap) => {
             const data = docSnap.data();
-
+  
             // Delete from default favorites
             batch.delete(docSnap.ref);
-
-            // Prepare transfer data with null checks
+  
+            // 🚀 NEW: Build transfer data with all non-system attributes
             const transferData: Record<string, unknown> = {
               productId: data.productId,
               addedAt: serverTimestamp(),
               quantity: (data.quantity as number) || 1,
             };
-
-            // Add non-null attributes
-            const attributeKeys = [
-              "selectedColor",
-              "selectedColorImage",
-              "selectedSize",
-              "selectedFootwearSize",
-              "selectedHeightSize",
-              "selectedGender",
-              "selectedPantSize",
-              "selectedPantSizes",
-            ];
-
-            attributeKeys.forEach((key) => {
-              if (data[key] != null) {
-                transferData[key] = data[key];
+  
+            // 🚀 NEW: Copy all non-system attributes dynamically
+            Object.entries(data).forEach(([key, value]) => {
+              if (!isSystemField(key) && key !== 'productId' && value != null) {
+                transferData[key] = value;
               }
             });
-
+  
             // Add to basket
             const newBasketRef = doc(basketFavs);
             batch.set(newBasketRef, transferData);
           });
         }
-
+  
         await batch.commit();
       } catch (error) {
         console.error("Error in transferBatch:", error);
@@ -864,7 +885,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   const moveFromBasketBatch = useCallback(
     async (productIds: string[], basketId: string) => {
       if (!user) return;
-
+  
       const basketFavs = collection(
         db,
         "users",
@@ -874,52 +895,41 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         "favorites"
       );
       const defaultFavs = collection(db, "users", user.uid, "favorites");
-
+  
       const batch = writeBatch(db);
-
+  
       try {
         for (const chunk of chunkArray(productIds, FIRESTORE_IN_LIMIT)) {
           const snap = await getDocs(
             query(basketFavs, where("productId", "in", chunk))
           );
-
+  
           snap.docs.forEach((docSnap) => {
             const data = docSnap.data();
-
+  
             // Delete from basket
             batch.delete(docSnap.ref);
-
-            // Prepare transfer data with null checks
+  
+            // 🚀 NEW: Build transfer data with all non-system attributes
             const transferData: Record<string, unknown> = {
               productId: data.productId,
               addedAt: serverTimestamp(),
               quantity: (data.quantity as number) || 1,
             };
-
-            // Add non-null attributes
-            const attributeKeys = [
-              "selectedColor",
-              "selectedColorImage",
-              "selectedSize",
-              "selectedFootwearSize",
-              "selectedHeightSize",
-              "selectedGender",
-              "selectedPantSize",
-              "selectedPantSizes",
-            ];
-
-            attributeKeys.forEach((key) => {
-              if (data[key] != null) {
-                transferData[key] = data[key];
+  
+            // 🚀 NEW: Copy all non-system attributes dynamically
+            Object.entries(data).forEach(([key, value]) => {
+              if (!isSystemField(key) && key !== 'productId' && value != null) {
+                transferData[key] = value;
               }
             });
-
+  
             // Add to default favorites
             const newDefaultRef = doc(defaultFavs);
             batch.set(newDefaultRef, transferData);
           });
         }
-
+  
         await batch.commit();
       } catch (error) {
         console.error("Error in moveFromBasketBatch:", error);

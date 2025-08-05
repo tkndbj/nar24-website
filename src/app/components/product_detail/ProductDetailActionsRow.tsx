@@ -2,25 +2,17 @@
 
 import React, { useState, useEffect } from "react";
 import { Heart, Share2, Star, StarHalf, Check} from "lucide-react";
-import { useFavorites } from "@/context/FavoritesProvider"; // ✅ ADDED: Import useFavorites hook
-import { useUser } from "@/context/UserProvider"; // ✅ ADDED: Import useUser hook
-
-interface Product {
-  id: string;
-  averageRating: number;
-  cartCount: number;
-  favoritesCount: number;
-  purchaseCount: number;
-  brandModel?: string;
-  deliveryOption?: string;
-}
+import { useFavorites } from "@/context/FavoritesProvider";
+import { useUser } from "@/context/UserProvider";
+import ProductOptionSelector from "@/app/components/ProductOptionSelector";
+import { Product } from "@/app/models/Product"; // ✅ FIXED: Import Product from your model
 
 interface ProductDetailActionsRowProps {
   product: Product | null;
   isLoading?: boolean;
   onShare?: () => void;
-  onToggleFavorite?: () => void; // ✅ MODIFIED: This will be overridden by internal logic
-  isFavorite?: boolean; // ✅ MODIFIED: This will be overridden by favorites context
+  onToggleFavorite?: () => void;
+  isFavorite?: boolean;
   isDarkMode?: boolean;
 }
 
@@ -30,6 +22,36 @@ interface RotatingCountTextProps {
   purchaseCount: number;
   isDarkMode?: boolean;
 }
+
+// ✅ FIXED: Helper function to check if product has selectable options
+const hasSelectableOptions = (product: Product | null): boolean => {
+  if (!product) return false;
+
+  // Check for colors
+  const hasColors = Object.keys(product.colorImages || {}).length > 0;
+  if (hasColors) return true;
+
+  // Check for selectable attributes (attributes with multiple options)
+  const selectableAttrs = Object.entries(product.attributes || {}).filter(([key, value]) => {
+    let options: string[] = [];
+
+    if (Array.isArray(value)) {
+      options = value
+        .map(item => item.toString())
+        .filter(item => item.trim() !== '');
+    } else if (typeof value === 'string' && value.trim() !== '') {
+      options = value
+        .split(',')
+        .map(item => item.trim())
+        .filter(item => item !== '');
+    }
+
+    // Only include attributes with multiple options
+    return options.length > 1;
+  });
+
+  return selectableAttrs.length > 0;
+};
 
 const RotatingCountText: React.FC<RotatingCountTextProps> = ({
   cartCount,
@@ -203,55 +225,64 @@ const ProductDetailActionsRow: React.FC<ProductDetailActionsRowProps> = ({
   product,
   isLoading = false,
   onShare,
-  onToggleFavorite, // ✅ NOTE: This prop is now optional and will be overridden
-  
+  onToggleFavorite,
   isDarkMode = false,
 }) => {
-  // ✅ ADDED: Favorites and user hooks
   const { addToFavorites, isFavorite: isProductFavorite } = useFavorites();
   const { user } = useUser();
 
-  // ✅ ADDED: Animation states for favorite button
+  // State for option selector modal
+  const [showOptionSelector, setShowOptionSelector] = useState(false);
+
   const [favoriteButtonState, setFavoriteButtonState] = useState<'idle' | 'adding' | 'added' | 'removing' | 'removed'>('idle');
   const [showFavoriteAnimation, setShowFavoriteAnimation] = useState(false);
 
-  // ✅ ADDED: Get actual favorite status from context
   const actualIsFavorite = product ? isProductFavorite(product.id) : false;
 
-  // ✅ ADDED: Enhanced favorite functionality with animations
+  // Enhanced favorite functionality with option selector logic
   const handleToggleFavorite = async () => {
     if (!user) {
-      // Could redirect to login or show login modal
       console.log("Please log in to add favorites");
       return;
     }
 
     if (!product) return;
 
+    // ✅ FIXED: Only show option selector when ADDING to favorites (not removing)
+    if (!actualIsFavorite && hasSelectableOptions(product)) {
+      // Show option selector modal only when adding to favorites
+      setShowOptionSelector(true);
+      return;
+    }
+
+    // Direct favorite toggle for products without options OR when removing from favorites
+    await performFavoriteToggle();
+  };
+
+  // Separated favorite toggle logic
+  const performFavoriteToggle = async (selectedOptions?: any) => {
+    if (!product) return;
+
     try {
       const wasInFavorites = actualIsFavorite;
       
-      // Set loading state
       setFavoriteButtonState(wasInFavorites ? 'removing' : 'adding');
       setShowFavoriteAnimation(true);
 
-      // Call the favorites function
-      const result = await addToFavorites(product.id);
+      // Pass selected options if available
+      const result = await addToFavorites(product.id, selectedOptions);
       
-      // Set success state based on result
       if (result.includes('Added')) {
         setFavoriteButtonState('added');
       } else if (result.includes('Removed')) {
         setFavoriteButtonState('removed');
       }
 
-      // Reset state after animation
       setTimeout(() => {
         setFavoriteButtonState('idle');
         setShowFavoriteAnimation(false);
       }, 2000);
 
-      // Call the original callback if provided
       if (onToggleFavorite) {
         onToggleFavorite();
       }
@@ -263,7 +294,17 @@ const ProductDetailActionsRow: React.FC<ProductDetailActionsRowProps> = ({
     }
   };
 
-  // ✅ ADDED: Get favorite button content based on state
+  // Handle option selector confirmation
+  const handleOptionSelectorConfirm = async (selectedOptions: any) => {
+    setShowOptionSelector(false);
+    await performFavoriteToggle(selectedOptions);
+  };
+
+  // Handle option selector close
+  const handleOptionSelectorClose = () => {
+    setShowOptionSelector(false);
+  };
+
   const getFavoriteButtonContent = () => {
     if (favoriteButtonState === 'adding') {
       return {
@@ -293,7 +334,6 @@ const ProductDetailActionsRow: React.FC<ProductDetailActionsRowProps> = ({
       };
     }
 
-    // Default state
     return {
       icon: (
         <Heart
@@ -317,88 +357,99 @@ const ProductDetailActionsRow: React.FC<ProductDetailActionsRowProps> = ({
   const favoriteButtonContent = getFavoriteButtonContent();
 
   return (
-    <div className={`w-full p-4 shadow-sm border-b ${
-      isDarkMode 
-        ? "bg-gray-800 border-gray-700" 
-        : "bg-white border-gray-100"
-    }`}>
-      <div className="flex items-start justify-between">
-        {/* Left side: rating and details */}
-        <div className="flex-1 space-y-3">
-          {/* Star rating row */}
-          <div className="flex items-center gap-3">
-            <StarRating rating={product.averageRating} isDarkMode={isDarkMode} />
-            <span className={`text-sm font-bold ${
-              isDarkMode ? "text-white" : "text-gray-900"
-            }`}>
-              {product.averageRating.toFixed(1)}
-            </span>
-            <RotatingCountText
-              cartCount={product.cartCount}
-              favoriteCount={product.favoritesCount}
-              purchaseCount={product.purchaseCount}
-              isDarkMode={isDarkMode}
-            />
+    <>
+      <div className={`w-full p-4 shadow-sm border-b ${
+        isDarkMode 
+          ? "bg-gray-800 border-gray-700" 
+          : "bg-white border-gray-100"
+      }`}>
+        <div className="flex items-start justify-between">
+          {/* Left side: rating and details */}
+          <div className="flex-1 space-y-3">
+            {/* Star rating row */}
+            <div className="flex items-center gap-3">
+              <StarRating rating={product.averageRating} isDarkMode={isDarkMode} />
+              <span className={`text-sm font-bold ${
+                isDarkMode ? "text-white" : "text-gray-900"
+              }`}>
+                {product.averageRating.toFixed(1)}
+              </span>
+              <RotatingCountText
+                cartCount={product.cartCount}
+                favoriteCount={product.favoritesCount}
+                purchaseCount={product.purchaseCount}
+                isDarkMode={isDarkMode}
+              />
+            </div>
+
+            {/* Detail chips */}
+            <div className="flex gap-2 flex-wrap">
+              <DetailChip 
+                title="Brand" 
+                value={product.brandModel || "-"} 
+                isDarkMode={isDarkMode}
+              />
+              <DetailChip
+                title="Delivery"
+                value={product.deliveryOption || "-"}
+                isDarkMode={isDarkMode}
+              />
+            </div>
           </div>
 
-          {/* Detail chips */}
-          <div className="flex gap-2 flex-wrap">
-            <DetailChip 
-              title="Brand" 
-              value={product.brandModel || "-"} 
-              isDarkMode={isDarkMode}
-            />
-            <DetailChip
-              title="Delivery"
-              value={product.deliveryOption || "-"}
-              isDarkMode={isDarkMode}
-            />
-          </div>
-        </div>
-
-        {/* Right side: action buttons */}
-        <div className="flex gap-2 ml-4">
-          <button
-            onClick={onShare}
-            className={`p-2 rounded-full transition-colors ${
-              isDarkMode 
-                ? "hover:bg-gray-700 text-gray-400" 
-                : "hover:bg-gray-100 text-gray-600"
-            }`}
-            aria-label="Share product"
-          >
-            <Share2 className="w-5 h-5" />
-          </button>
-
-          {/* ✅ ENHANCED: Favorite button with animations and proper functionality */}
-          <button
-            onClick={handleToggleFavorite}
-            disabled={favoriteButtonState === 'adding' || favoriteButtonState === 'removing'}
-            className={`
-              p-2 rounded-full transition-all duration-300 relative overflow-hidden
-              ${
+          {/* Right side: action buttons */}
+          <div className="flex gap-2 ml-4">
+            <button
+              onClick={onShare}
+              className={`p-2 rounded-full transition-colors ${
                 isDarkMode 
-                  ? "hover:bg-gray-700" 
-                  : "hover:bg-gray-100"
-              }
-              ${favoriteButtonContent.className}
-              ${(favoriteButtonState === 'adding' || favoriteButtonState === 'removing') ? 'opacity-75 cursor-not-allowed' : ''}
-              ${showFavoriteAnimation ? 'transform scale-105' : ''}
-            `}
-            aria-label={actualIsFavorite ? "Remove from favorites" : "Add to favorites"}
-          >
-            <span className={`transition-all duration-300 ${showFavoriteAnimation ? 'animate-pulse' : ''}`}>
-              {favoriteButtonContent.icon}
-            </span>
-            
-            {/* ✅ ADDED: Success animation overlay */}
-            {(favoriteButtonState === 'added' || favoriteButtonState === 'removed') && (
-              <div className="absolute inset-0 bg-green-500/10 animate-pulse rounded-full" />
-            )}
-          </button>
+                  ? "hover:bg-gray-700 text-gray-400" 
+                  : "hover:bg-gray-100 text-gray-600"
+              }`}
+              aria-label="Share product"
+            >
+              <Share2 className="w-5 h-5" />
+            </button>
+
+            <button
+              onClick={handleToggleFavorite}
+              disabled={favoriteButtonState === 'adding' || favoriteButtonState === 'removing'}
+              className={`
+                p-2 rounded-full transition-all duration-300 relative overflow-hidden
+                ${
+                  isDarkMode 
+                    ? "hover:bg-gray-700" 
+                    : "hover:bg-gray-100"
+                }
+                ${favoriteButtonContent.className}
+                ${(favoriteButtonState === 'adding' || favoriteButtonState === 'removing') ? 'opacity-75 cursor-not-allowed' : ''}
+                ${showFavoriteAnimation ? 'transform scale-105' : ''}
+              `}
+              aria-label={actualIsFavorite ? "Remove from favorites" : "Add to favorites"}
+            >
+              <span className={`transition-all duration-300 ${showFavoriteAnimation ? 'animate-pulse' : ''}`}>
+                {favoriteButtonContent.icon}
+              </span>
+              
+              {(favoriteButtonState === 'added' || favoriteButtonState === 'removed') && (
+                <div className="absolute inset-0 bg-green-500/10 animate-pulse rounded-full" />
+              )}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* ✅ FIXED: Product Option Selector Modal - Pass complete product directly */}
+      {product && (
+        <ProductOptionSelector
+          product={product}
+          isOpen={showOptionSelector}
+          onClose={handleOptionSelectorClose}
+          onConfirm={handleOptionSelectorConfirm}
+          isBuyNow={false}
+        />
+      )}
+    </>
   );
 };
 

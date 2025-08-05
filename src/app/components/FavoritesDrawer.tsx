@@ -22,6 +22,7 @@ import { ProductCard3 } from "./ProductCard3";
 import { useFavorites } from "@/context/FavoritesProvider";
 import { useUser } from "@/context/UserProvider";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import {
   collection,
   getDocs,
@@ -48,13 +49,7 @@ interface FavoriteDetails {
   addedAt?: Timestamp;
   quantity?: number;
   selectedColor?: string;
-  selectedColorImage?: string;
-  selectedSize?: string;
-  selectedFootwearSize?: string;
-  selectedHeightSize?: string;
-  selectedGender?: string;
-  selectedPantSize?: string;
-  selectedPantSizes?: string;
+  selectedColorImage?: string;  
 }
 
 interface FavoriteItem {
@@ -62,13 +57,7 @@ interface FavoriteItem {
   addedAt: Timestamp;
   quantity: number;
   selectedColor?: string;
-  selectedColorImage?: string;
-  selectedSize?: string;
-  selectedFootwearSize?: string;
-  selectedHeightSize?: string;
-  selectedGender?: string;
-  selectedPantSize?: string;
-  selectedPantSizes?: string;
+  selectedColorImage?: string;  
   product?: Product;
   isLoadingProduct?: boolean;
   loadError?: boolean;
@@ -78,12 +67,14 @@ interface FavoritesDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   isDarkMode?: boolean;
+  localization?: ReturnType<typeof useTranslations>;
 }
 
 export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
   isOpen,
   onClose,
   isDarkMode = false,
+  localization,
 }) => {
   const router = useRouter();
   const { user } = useUser();
@@ -102,6 +93,36 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
     showErrorToast,
     showSuccessToast,
   } = useFavorites();
+
+  // ✅ FIXED: Proper nested translation function that uses JSON files
+  const t = useCallback((key: string) => {
+    if (!localization) {
+      // Return the key itself if no localization function is provided
+      return key;
+    }
+
+    try {
+      // Try to get the nested FavoritesDrawer translation
+      const translation = localization(`FavoritesDrawer.${key}`);
+      
+      // Check if we got a valid translation (not the same as the key we requested)
+      if (translation && translation !== `FavoritesDrawer.${key}`) {
+        return translation;
+      }
+      
+      // If nested translation doesn't exist, try direct key
+      const directTranslation = localization(key);
+      if (directTranslation && directTranslation !== key) {
+        return directTranslation;
+      }
+      
+      // Return the key as fallback
+      return key;
+    } catch (error) {
+      console.warn(`Translation error for key: ${key}`, error);
+      return key;
+    }
+  }, [localization]);
 
   // Local state for favorite items with product data
   const [favoriteItems, setFavoriteItems] = useState<FavoriteItem[]>([]);
@@ -200,13 +221,7 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
           addedAt: favDetails.addedAt || Timestamp.now(),
           quantity: favDetails.quantity || 1,
           selectedColor: favDetails.selectedColor,
-          selectedColorImage: favDetails.selectedColorImage,
-          selectedSize: favDetails.selectedSize,
-          selectedFootwearSize: favDetails.selectedFootwearSize,
-          selectedHeightSize: favDetails.selectedHeightSize,
-          selectedGender: favDetails.selectedGender,
-          selectedPantSize: favDetails.selectedPantSize,
-          selectedPantSizes: favDetails.selectedPantSizes,
+          selectedColorImage: favDetails.selectedColorImage,          
           isLoadingProduct: true,
         };
 
@@ -256,11 +271,11 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
       );
     } catch (error) {
       console.error("Error loading favorite items:", error);
-      showErrorToast("Failed to load favorites");
+      showErrorToast(t("failedToLoadFavorites"));
     } finally {
       setIsLoadingItems(false);
     }
-  }, [user, favoriteProductIds, selectedBasketId, showErrorToast]);
+  }, [user, favoriteProductIds, selectedBasketId, showErrorToast, t]);
 
   // Load favorite items with product data when favorites change
   useEffect(() => {
@@ -333,7 +348,7 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
       });
     } catch (error) {
       console.error("Failed to remove item:", error);
-      showErrorToast("Failed to remove from favorites");
+      showErrorToast(t("failedToRemoveFromFavorites"));
     } finally {
       setRemovingItems((prev) => {
         const newSet = new Set(prev);
@@ -355,7 +370,7 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
       setIsAllSelected(false);
     } catch (error) {
       console.error("Failed to clear favorites:", error);
-      showErrorToast("Failed to clear favorites");
+      showErrorToast(t("failedToClearFavorites"));
     } finally {
       setIsClearing(false);
     }
@@ -376,7 +391,7 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
       }
     } catch (error) {
       console.error("Failed to create basket:", error);
-      showErrorToast("Failed to create basket");
+      showErrorToast(t("failedToCreateBasket"));
     } finally {
       setIsCreatingBasket(false);
     }
@@ -388,7 +403,7 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
       await deleteFavoriteBasket(basketId);
     } catch (error) {
       console.error("Failed to delete basket:", error);
-      showErrorToast("Failed to delete basket");
+      showErrorToast(t("failedToDeleteBasket"));
     }
   };
 
@@ -437,7 +452,7 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
       setIsAllSelected(false);
     } catch (error) {
       console.error("Failed to transfer to basket:", error);
-      showErrorToast("Failed to transfer to basket");
+      showErrorToast(t("failedToTransferToBasket"));
     } finally {
       setIsTransferringToBasket(false);
     }
@@ -451,7 +466,7 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
         .map((b) => `${b.name} (${b.id})`)
         .join("\n");
       const selected = window.prompt(
-        `Select basket:\n${basketNames}\n\nEnter basket name:`
+        `${t("selectBasket")}:\n${basketNames}\n\n${t("enterBasketName")}:`
       );
 
       if (!selected) {
@@ -490,24 +505,18 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
           productId: item.productId,
           quantity: item.quantity,
           selectedColor: item.selectedColor,
-          selectedColorImage: item.selectedColorImage,
-          selectedSize: item.selectedSize,
-          selectedFootwearSize: item.selectedFootwearSize,
-          selectedHeightSize: item.selectedHeightSize,
-          selectedGender: item.selectedGender,
-          selectedPantSize: item.selectedPantSize,
-          selectedPantSizes: item.selectedPantSizes,
+          selectedColorImage: item.selectedColorImage,          
         });
       }
 
-      showSuccessToast(`${selectedProductIds.length} ürün sepete eklendi`);
+      showSuccessToast(`${selectedProductIds.length} ${t("itemsAddedToCart")}`);
 
       // Clear selections
       setSelectedProducts({});
       setIsAllSelected(false);
     } catch (error) {
       console.error("Failed to add to cart:", error);
-      showErrorToast("Failed to add to cart");
+      showErrorToast(t("failedToAddToCart"));
     } finally {
       setIsAddingToCart(false);
     }
@@ -530,8 +539,8 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
 
   const currentBasketName = selectedBasketId
     ? favoriteBaskets.find((b) => b.id === selectedBasketId)?.name ||
-      "Unknown Basket"
-    : "Default Favorites";
+      t("unknownBasket")
+    : t("defaultFavorites");
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden">
@@ -584,7 +593,7 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                     ${isDarkMode ? "text-white" : "text-gray-900"}
                   `}
                 >
-                  Favorilerim
+                  {t("title")}
                 </h2>
                 {user && favoriteCount > 0 && (
                   <p
@@ -593,10 +602,10 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                       ${isDarkMode ? "text-gray-400" : "text-gray-500"}
                     `}
                   >
-                    {favoriteCount} ürün
+                    {favoriteCount} {t("itemsCount")}
                     {selectedCount > 0 && (
                       <span className="ml-2 text-orange-500 font-medium">
-                        ({selectedCount} seçili)
+                        ({selectedCount} {t("selected")})
                       </span>
                     )}
                   </p>
@@ -617,7 +626,7 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                         : "hover:bg-gray-100 text-gray-500 hover:text-gray-700"
                     }
                   `}
-                  title={isAllSelected ? "Tümünü Kaldır" : "Tümünü Seç"}
+                  title={isAllSelected ? t("deselectAll") : t("selectAll")}
                 >
                   {isAllSelected ? (
                     <CheckCircle size={20} className="text-orange-500" />
@@ -701,7 +710,7 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                       `}
                     >
                       <Heart size={16} />
-                      <span className="text-sm">Default Favorites</span>
+                      <span className="text-sm">{t("defaultFavorites")}</span>
                     </button>
 
                     {/* Basket List */}
@@ -757,7 +766,7 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                       `}
                     >
                       <FolderPlus size={16} />
-                      <span className="text-sm">Create New Basket</span>
+                      <span className="text-sm">{t("createNewBasket")}</span>
                     </button>
                   </div>
                 )}
@@ -784,7 +793,7 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                     <Trash2 size={16} />
                   )}
                   <span>
-                    {isClearing ? "Temizleniyor..." : "Favorileri Temizle"}
+                    {isClearing ? t("clearing") : t("clearFavorites")}
                   </span>
                 </button>
               )}
@@ -808,13 +817,13 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                   ${isDarkMode ? "text-white" : "text-gray-900"}
                 `}
               >
-                Yeni Sepet Oluştur
+                {t("createNewBasket")}
               </h3>
               <input
                 type="text"
                 value={newBasketName}
                 onChange={(e) => setNewBasketName(e.target.value)}
-                placeholder="Sepet adı girin..."
+                placeholder={t("enterBasketName")}
                 className={`
                   w-full px-3 py-2 rounded-lg border mb-4
                   ${
@@ -846,7 +855,7 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                     transition-colors duration-200
                   `}
                 >
-                  İptal
+                  {t("cancel")}
                 </button>
                 <button
                   onClick={handleCreateBasket}
@@ -859,7 +868,7 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                     transition-all duration-200
                   "
                 >
-                  {isCreatingBasket ? "Oluşturuluyor..." : "Oluştur"}
+                  {isCreatingBasket ? t("creating") : t("create")}
                 </button>
               </div>
             </div>
@@ -888,7 +897,7 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                   ${isDarkMode ? "text-white" : "text-gray-900"}
                 `}
               >
-                Giriş Yapın
+                {t("loginRequired")}
               </h3>
               <p
                 className={`
@@ -896,7 +905,7 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                   ${isDarkMode ? "text-gray-400" : "text-gray-600"}
                 `}
               >
-                Favorilerinizi görüntülemek ve yönetmek için lütfen giriş yapın.
+                {t("loginToViewFavorites")}
               </p>
               <button
                 onClick={handleGoToLogin}
@@ -909,7 +918,9 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                 "
               >
                 <LogIn size={18} />
-                <span className="font-medium">Giriş Yap</span>
+                <span className="font-medium">
+                  {t("login")}
+                </span>
               </button>
             </div>
           ) : /* Loading State */ isLoading || isLoadingItems ? (
@@ -921,7 +932,7 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                   ${isDarkMode ? "text-gray-400" : "text-gray-600"}
                 `}
               >
-                Favorileriniz yükleniyor...
+                {t("loading")}
               </p>
             </div>
           ) : /* Empty Favorites State */ favoriteCount === 0 ? (
@@ -943,7 +954,7 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                   ${isDarkMode ? "text-white" : "text-gray-900"}
                 `}
               >
-                Favorileriniz Boş
+                {t("emptyFavorites")}
               </h3>
               <p
                 className={`
@@ -951,8 +962,7 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                   ${isDarkMode ? "text-gray-400" : "text-gray-600"}
                 `}
               >
-                Henüz favorilerinize ürün eklemediniz. Beğendiğiniz ürünleri
-                favorilere ekleyin!
+                {t("emptyFavoritesDescription")}
               </p>
               <button
                 onClick={() => {
@@ -968,7 +978,9 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                 "
               >
                 <ShoppingBag size={18} />
-                <span className="font-medium">Alışverişe Başla</span>
+                <span className="font-medium">
+                  {t("startShopping")}
+                </span>
               </button>
             </div>
           ) : (
@@ -1075,7 +1087,7 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                                   size={24}
                                 />
                                 <p className="text-sm text-gray-500">
-                                  Ürün yüklenemedi
+                                  {t("productLoadError")}
                                 </p>
                               </div>
                             )}
@@ -1101,7 +1113,7 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                               `}
                             >
                               <ShoppingCart size={14} />
-                              <span>Sepete Ekle</span>
+                              <span>{t("addToCart")}</span>
                             </button>
 
                             <button
@@ -1128,7 +1140,7 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                                 <Trash2 size={14} />
                               )}
                               <span>
-                                {isRemoving ? "Kaldırılıyor..." : "Kaldır"}
+                                {isRemoving ? t("removing") : t("remove")}
                               </span>
                             </button>
                           </div>
@@ -1138,14 +1150,14 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                         {item.isLoadingProduct && (
                           <div className="mt-2 flex items-center space-x-2 text-xs text-gray-500">
                             <div className="animate-spin w-3 h-3 border border-gray-400 border-t-transparent rounded-full"></div>
-                            <span>Ürün bilgileri yükleniyor...</span>
+                            <span>{t("loadingProductInfo")}</span>
                           </div>
                         )}
 
                         {item.loadError && (
                           <div className="mt-2 flex items-center space-x-2 text-xs text-red-500">
                             <AlertCircle size={12} />
-                            <span>Ürün bilgileri yüklenemedi</span>
+                            <span>{t("productInfoError")}</span>
                           </div>
                         )}
                       </div>
@@ -1199,8 +1211,8 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                   )}
                   <span>
                     {isTransferringToBasket
-                      ? "Aktarılıyor..."
-                      : `Baskete Ekle (${selectedCount})`}
+                      ? t("transferring")
+                      : `${t("addToBasket")} (${selectedCount})`}
                   </span>
                 </button>
               ) : (
@@ -1225,7 +1237,7 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                   `}
                 >
                   <ArrowRight size={16} />
-                  <span>Basketten Çıkar ({selectedCount})</span>
+                  <span>{t("removeFromBasket")} ({selectedCount})</span>
                 </button>
               )}
 
@@ -1249,8 +1261,8 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                 )}
                 <span>
                   {isAddingToCart
-                    ? "Ekleniyor..."
-                    : `Sepete Ekle (${selectedCount})`}
+                    ? t("adding")
+                    : `${t("addToCart")} (${selectedCount})`}
                 </span>
               </button>
             </div>

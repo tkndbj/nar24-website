@@ -12,11 +12,11 @@ import {
   ShoppingBag,
   Grid3x3,
   TrendingUp,
-  Globe, // ADD: Import Globe icon for language switcher
+  Globe,
   LogIn,
 } from "lucide-react";
-import { useRouter, usePathname } from "next/navigation"; // ADD: Import usePathname
-import { useLocale } from "next-intl"; // ADD: Import useLocale
+import { useRouter, usePathname } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl"; // ADD: Import useTranslations
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useUser } from "@/context/UserProvider";
@@ -31,7 +31,7 @@ import {
   Suggestion,
   useSearchProvider,
 } from "@/context/SearchProvider";
-import { CartDrawer } from "../CartDrawer";
+import { CartDrawer } from "../profile/CartDrawer";
 
 interface MarketHeaderProps {
   onTakePhoto?: () => void;
@@ -43,22 +43,25 @@ interface MarketHeaderProps {
 }
 
 export default function MarketHeader({ className = "" }: MarketHeaderProps) {
+  // ADD: Initialize translations
+  const t = useTranslations();
+  
   const [isSearching, setIsSearching] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [isDark, setIsDark] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const [showLanguageMenu, setShowLanguageMenu] = useState(false); // ADD: Language menu state
+  const [showLanguageMenu, setShowLanguageMenu] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
-  const languageMenuRef = useRef<HTMLDivElement>(null); // ADD: Language menu ref
+  const languageMenuRef = useRef<HTMLDivElement>(null);
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
   const { favoriteCount } = useFavorites();
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const router = useRouter();
-  const pathname = usePathname(); // ADD: Get current pathname
-  const locale = useLocale(); // ADD: Get current locale
+  const pathname = usePathname();
+  const locale = useLocale();
 
   // Auth and providers
   const { user, isLoading: userLoading } = useUser();
@@ -108,7 +111,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // ADD: Handle click outside for language menu
+  // Handle click outside for language menu
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -142,25 +145,22 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
     isLoading,
   ]);
 
-  // ADD: Language switching function
+  // Language switching function
   const switchLanguage = (newLocale: string, event?: React.MouseEvent) => {
-    // Prevent event bubbling and default behavior
     if (event) {
       event.preventDefault();
       event.stopPropagation();
     }
 
-    console.log("Switching language to:", newLocale); // Add this for debugging
+    console.log("Switching language to:", newLocale);
 
-    // Remove the current locale from pathname if it exists
     let pathWithoutLocale = pathname;
     if (pathname.startsWith(`/${locale}`)) {
       pathWithoutLocale = pathname.substring(`/${locale}`.length) || "/";
     }
 
-    // Add the new locale to the path
     const newPath = `/${newLocale}${pathWithoutLocale}`;
-    console.log("New path:", newPath); // Add this for debugging
+    console.log("New path:", newPath);
 
     router.push(newPath);
     setShowLanguageMenu(false);
@@ -169,7 +169,6 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
   const handleMobileLanguageSwitch = (newLocale: string) => {
     console.log("Mobile handler called for:", newLocale);
 
-    // Add a small delay to ensure the touch event completes
     setTimeout(() => {
       switchLanguage(newLocale);
     }, 100);
@@ -266,7 +265,6 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
     setIsCartOpen(true);
   };
 
-  // Don't render if user is still loading
   if (userLoading) {
     return (
       <header
@@ -312,7 +310,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                     }
                     active:scale-95
                   `}
-                  aria-label="Back"
+                  aria-label={t('header.back')}
                 >
                   <ArrowLeft size={20} />
                 </button>
@@ -344,7 +342,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
           }
           active:scale-95 group
         `}
-                      aria-label="Bildirimler"
+                      aria-label={t('header.notifications')}
                     >
                       <Bell size={18} />
                       {user && unreadNotificationsCount > 0 && (
@@ -372,7 +370,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
           }
           active:scale-95 group
         `}
-                      aria-label="Dil Seçimi"
+                      aria-label={t('header.languageSelection')}
                     >
                       <Globe size={18} />
                     </button>
@@ -419,7 +417,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                               isDark ? "text-gray-200" : "text-gray-900"
                             }`}
                           >
-                            Türkçe
+                            {t('header.turkish')}
                           </span>
                         </button>
                         <button
@@ -453,7 +451,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                               isDark ? "text-gray-200" : "text-gray-900"
                             }`}
                           >
-                            English
+                            {t('header.english')}
                           </span>
                         </button>
                       </div>
@@ -473,7 +471,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
           }
           active:scale-95 group
         `}
-                      aria-label="Favoriler"
+                      aria-label={t('header.favorites')}
                     >
                       <Heart size={18} />
                       {user && favoriteCount > 0 && (
@@ -499,7 +497,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
           }
           active:scale-95 group
         `}
-                      aria-label="Sepet"
+                      aria-label={t('header.cart')}
                     >
                       <ShoppingCart size={18} />
                       {user && cartCount > 0 && (
@@ -525,7 +523,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
           }
           active:scale-95 group
         `}
-                      aria-label="Profil"
+                      aria-label={t('header.profile')}
                     >
                       <User size={18} />
                     </button>
@@ -543,7 +541,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
             text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300
             ${isLoggingOut ? "opacity-50 cursor-not-allowed" : ""}
           `}
-                        aria-label="Çıkış"
+                        aria-label={t('header.logout')}
                       >
                         <LogOut
                           size={16}
@@ -562,7 +560,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
             }
             active:scale-95 group
           `}
-                        aria-label="Giriş"
+                        aria-label={t('header.login')}
                       >
                         <LogIn size={16} />
                       </button>
@@ -603,7 +601,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                       !isSearching && handleSearchStateChange(true)
                     }
                     readOnly={!isSearching}
-                    placeholder="Ürün ara..."
+                    placeholder={t('header.searchPlaceholder')}
                     className={`
                       w-full h-full px-4 pr-12 bg-transparent border-none outline-none
                       ${
@@ -631,7 +629,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                       }
                       active:scale-95
                     `}
-                    aria-label={isSearching ? "Arama yap" : "Aramaya başla"}
+                    aria-label={isSearching ? t('header.search') : t('header.startSearch')}
                   >
                     <Search
                       size={16}
@@ -681,7 +679,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                               onClick={() => updateTerm(searchTerm)}
                               className="text-sm text-blue-500 hover:text-blue-600 mt-1"
                             >
-                              Try again
+                              {t('header.tryAgain')}
                             </button>
                           </div>
                         </div>
@@ -699,7 +697,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                                 isDark ? "text-gray-300" : "text-gray-700"
                               }`}
                             >
-                              Kategoriler
+                              {t('header.categories')}
                             </span>
                             <div className="px-2 py-1 bg-orange-100 dark:bg-orange-900/30 rounded-full">
                               <span className="text-xs font-bold text-orange-600">
@@ -736,7 +734,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                                       isDark ? "text-gray-400" : "text-gray-500"
                                     }`}
                                   >
-                                    Seviye {category.level} kategori
+                                    {t('header.levelCategory', { level: category.level })}
                                   </p>
                                 </div>
                                 <TrendingUp
@@ -762,7 +760,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                               isDark ? "text-gray-300" : "text-gray-700"
                             }`}
                           >
-                            Ürünler
+                            {t('header.products')}
                           </span>
                           <div className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 rounded-full">
                             <span className="text-xs font-bold text-blue-600">
@@ -828,14 +826,14 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                               isDark ? "text-gray-300" : "text-gray-700"
                             } mb-1`}
                           >
-                            Sonuç bulunamadı
+                            {t('header.noResults')}
                           </p>
                           <p
                             className={`text-xs ${
                               isDark ? "text-gray-400" : "text-gray-500"
                             }`}
                           >
-                            Farklı anahtar kelimeler deneyin
+                            {t('header.tryDifferentKeywords')}
                           </p>
                         </div>
                       )}
@@ -845,7 +843,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
             </div>
           </div>
 
-          {/* Desktop Layout (Single Row) - Unchanged */}
+          {/* Desktop Layout (Single Row) */}
           <div className="hidden lg:flex h-16 px-4 items-center w-full relative">
             {/* Back button when searching */}
             {isSearching && (
@@ -860,7 +858,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                   }
                   active:scale-95
                 `}
-                aria-label="Back"
+                aria-label={t('header.back')}
               >
                 <ArrowLeft size={20} />
               </button>
@@ -916,7 +914,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                       !isSearching && handleSearchStateChange(true)
                     }
                     readOnly={!isSearching}
-                    placeholder="Ürün ara..."
+                    placeholder={t('header.searchPlaceholder')}
                     className={`
                       w-full h-full px-4 pr-12 bg-transparent border-none outline-none
                       ${
@@ -944,7 +942,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                       }
                       active:scale-95
                     `}
-                    aria-label={isSearching ? "Arama yap" : "Aramaya başla"}
+                    aria-label={isSearching ? t('header.search') : t('header.startSearch')}
                   >
                     <Search
                       size={16}
@@ -953,7 +951,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                   </button>
                 </div>
 
-                {/* Search Suggestions Dropdown - Desktop */}
+                {/* Search Suggestions Dropdown - Desktop (same content as mobile) */}
                 {showSuggestions && (
                   <div
                     className={`
@@ -964,6 +962,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                       max-h-96 overflow-hidden
                     `}
                   >
+                    {/* Same suggestion content as mobile version */}
                     {/* Loading State */}
                     {isLoading && (
                       <div className="p-4">
@@ -994,7 +993,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                               onClick={() => updateTerm(searchTerm)}
                               className="text-sm text-blue-500 hover:text-blue-600 mt-1"
                             >
-                              Try again
+                              {t('header.tryAgain')}
                             </button>
                           </div>
                         </div>
@@ -1012,7 +1011,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                                 isDark ? "text-gray-300" : "text-gray-700"
                               }`}
                             >
-                              Kategoriler
+                              {t('header.categories')}
                             </span>
                             <div className="px-2 py-1 bg-orange-100 dark:bg-orange-900/30 rounded-full">
                               <span className="text-xs font-bold text-orange-600">
@@ -1049,7 +1048,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                                       isDark ? "text-gray-400" : "text-gray-500"
                                     }`}
                                   >
-                                    Seviye {category.level} kategori
+                                    {t('header.levelCategory', { level: category.level })}
                                   </p>
                                 </div>
                                 <TrendingUp
@@ -1075,7 +1074,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                               isDark ? "text-gray-300" : "text-gray-700"
                             }`}
                           >
-                            Ürünler
+                            {t('header.products')}
                           </span>
                           <div className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 rounded-full">
                             <span className="text-xs font-bold text-blue-600">
@@ -1141,14 +1140,14 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                               isDark ? "text-gray-300" : "text-gray-700"
                             } mb-1`}
                           >
-                            Sonuç bulunamadı
+                            {t('header.noResults')}
                           </p>
                           <p
                             className={`text-xs ${
                               isDark ? "text-gray-400" : "text-gray-500"
                             }`}
                           >
-                            Farklı anahtar kelimeler deneyin
+                            {t('header.tryDifferentKeywords')}
                           </p>
                         </div>
                       )}
@@ -1173,7 +1172,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
           }
           active:scale-95 group
         `}
-                    aria-label="Bildirimler"
+                    aria-label={t('header.notifications')}
                   >
                     <Bell size={20} />
                     {user && unreadNotificationsCount > 0 && (
@@ -1201,7 +1200,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
           }
           active:scale-95 group
         `}
-                    aria-label="Dil Seçimi"
+                    aria-label={t('header.languageSelection')}
                   >
                     <Globe size={20} />
                   </button>
@@ -1236,7 +1235,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                             isDark ? "text-gray-200" : "text-gray-900"
                           }`}
                         >
-                          Türkçe
+                          {t('header.turkish')}
                         </span>
                       </button>
                       <button
@@ -1258,7 +1257,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                             isDark ? "text-gray-200" : "text-gray-900"
                           }`}
                         >
-                          English
+                          {t('header.english')}
                         </span>
                       </button>
                     </div>
@@ -1278,7 +1277,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
           }
           active:scale-95 group
         `}
-                    aria-label="Favoriler"
+                    aria-label={t('header.favorites')}
                   >
                     <Heart size={20} />
                     {user && favoriteCount > 0 && (
@@ -1304,7 +1303,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
           }
           active:scale-95 group
         `}
-                    aria-label="Sepet"
+                    aria-label={t('header.cart')}
                   >
                     <ShoppingCart size={20} />
                     {user && cartCount > 0 && (
@@ -1330,7 +1329,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
           }
           active:scale-95 group
         `}
-                    aria-label="Profil"
+                    aria-label={t('header.profile')}
                   >
                     <User size={20} />
                   </button>
@@ -1348,7 +1347,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
             text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300
             ${isLoggingOut ? "opacity-50 cursor-not-allowed" : ""}
           `}
-                      aria-label="Çıkış"
+                      aria-label={t('header.logout')}
                     >
                       <LogOut
                         size={18}
@@ -1367,7 +1366,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
             }
             active:scale-95 group
           `}
-                      aria-label="Giriş"
+                      aria-label={t('header.login')}
                     >
                       <LogIn size={18} />
                     </button>
@@ -1379,21 +1378,23 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
         </div>
       </header>
 
-      {/* Cart Drawer Component */}
+      {/* FIXED: Pass localization to all drawer components */}
       <CartDrawer
         isOpen={isCartOpen}
         onClose={() => setIsCartOpen(false)}
         isDarkMode={isDark}
+        localization={t}
       />
       <FavoritesDrawer
         isOpen={isFavoritesOpen}
         onClose={() => setIsFavoritesOpen(false)}
         isDarkMode={isDark}
+        localization={t}
       />
       <NotificationDrawer
         isOpen={isNotificationOpen}
         onClose={() => setIsNotificationOpen(false)}
-        isDarkMode={isDark}
+        isDarkMode={isDark}        
       />
     </>
   );

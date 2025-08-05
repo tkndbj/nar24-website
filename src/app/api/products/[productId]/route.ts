@@ -3,6 +3,83 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getFirestoreAdmin } from "@/lib/firebase-admin";
 
+// Helper functions to safely parse data (matching Flutter's approach)
+function safeDouble(value: any, defaultValue: number = 0): number {
+  if (value === null || value === undefined) return defaultValue;
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') return parseFloat(value) || defaultValue;
+  return defaultValue;
+}
+
+function safeInt(value: any, defaultValue: number = 0): number {
+  if (value === null || value === undefined) return defaultValue;
+  if (typeof value === 'number') return Math.floor(value);
+  if (typeof value === 'string') return parseInt(value) || defaultValue;
+  return defaultValue;
+}
+
+function safeString(value: any, defaultValue: string = ''): string {
+  if (value === null || value === undefined) return defaultValue;
+  return String(value);
+}
+
+function safeStringArray(value: any): string[] {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.map(e => String(e));
+  if (typeof value === 'string') return value.trim() === '' ? [] : [value];
+  return [];
+}
+
+function safeColorQuantities(value: any): Record<string, number> {
+  if (!value || typeof value !== 'object') return {};
+  const result: Record<string, number> = {};
+  for (const [key, val] of Object.entries(value)) {
+    result[String(key)] = safeInt(val);
+  }
+  return result;
+}
+
+function safeColorImages(value: any): Record<string, string[]> {
+  if (!value || typeof value !== 'object') return {};
+  const result: Record<string, string[]> = {};
+  for (const [key, val] of Object.entries(value)) {
+    if (Array.isArray(val)) {
+      result[String(key)] = val.map(e => String(e));
+    } else if (typeof val === 'string' && val.trim() !== '') {
+      result[String(key)] = [String(val)];
+    }
+  }
+  return result;
+}
+
+function safeStringNullable(value: any): string | null {
+  if (value === null || value === undefined) return null;
+  const str = String(value).trim();
+  return str === '' ? null : str;
+}
+
+function parseTimestamp(value: any): number | null {
+  if (!value) return null;
+  
+  // Handle Firestore Timestamp objects
+  if (value && typeof value === 'object' && value._seconds) {
+    return value._seconds * 1000;
+  }
+  
+  // Handle regular timestamps
+  if (typeof value === 'number') {
+    return value > 10000000000 ? value : value * 1000; // Convert seconds to milliseconds if needed
+  }
+  
+  // Handle string dates
+  if (typeof value === 'string') {
+    const date = new Date(value);
+    return isNaN(date.getTime()) ? null : date.getTime();
+  }
+  
+  return null;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ productId: string }> }
@@ -85,32 +162,86 @@ export async function GET(
 
     console.log("Product data keys:", Object.keys(data));
 
-    // Transform Firestore document to match your Product interface
+    // Extract dynamic attributes
+    const rawAttr = data.attributes;
+    const attributes: Record<string, any> = rawAttr && typeof rawAttr === 'object' ? rawAttr : {};
+
+    // Transform Firestore document to match your Product interface (matching Flutter's fromDocument)
     const product = {
       id: doc.id,
-      productName: data.productName || "",
-      price: data.price || 0,
-      currency: data.currency || "TL",
-      brandModel: data.brandModel || null,
-      sellerName: data.sellerName || "",
-      shopId: data.shopId || null,
-      userId: data.userId || "",
-      imageUrls: data.imageUrls || [],
-      videoUrl: data.videoUrl || null,
-      averageRating: data.averageRating || 0,
-      cartCount: data.cartCount || 0,
-      favoritesCount: data.favoritesCount || 0,
-      purchaseCount: data.purchaseCount || 0,
-      deliveryOption: data.deliveryOption || null,
-      attributes: data.attributes || {},
-      category: data.category || "",
-      subcategory: data.subcategory || null,
-      description: data.description || null,
-      bestSellerRank: data.bestSellerRank || null,
+      productName: safeString(data.productName || data.title),
+      description: safeString(data.description),
+      price: safeDouble(data.price),
+      currency: safeString(data.currency, 'TL'),
+      condition: safeString(data.condition, 'Brand New'),
+      brandModel: safeString(data.brandModel || data.brand || ''),
+      imageUrls: safeStringArray(data.imageUrls),
+      averageRating: safeDouble(data.averageRating),
+      reviewCount: safeInt(data.reviewCount),
+      gender: safeStringNullable(data.gender),
+      originalPrice: data.originalPrice !== null && data.originalPrice !== undefined ? safeDouble(data.originalPrice) : null,
+      discountPercentage: data.discountPercentage !== null && data.discountPercentage !== undefined ? safeInt(data.discountPercentage) : null,
+      colorQuantities: safeColorQuantities(data.colorQuantities),
+      boostClickCountAtStart: safeInt(data.boostClickCountAtStart),
+      availableColors: safeStringArray(data.availableColors),
+      userId: safeString(data.userId),
+      discountThreshold: data.discountThreshold !== null && data.discountThreshold !== undefined ? safeInt(data.discountThreshold) : null,
+      rankingScore: safeDouble(data.rankingScore),
+      promotionScore: safeDouble(data.promotionScore),
+      campaign: data.campaign?.toString() || null,
+      campaignDiscount: data.campaignDiscount !== null && data.campaignDiscount !== undefined ? safeDouble(data.campaignDiscount) : null,
+      campaignPrice: data.campaignPrice !== null && data.campaignPrice !== undefined ? safeDouble(data.campaignPrice) : null,
+      ownerId: safeString(data.ownerId),
+      shopId: data.shopId?.toString() || null,
+      ilanNo: safeString(data.ilan_no || data.id, 'N/A'),
+      searchIndex: safeStringArray(data.searchIndex),
+      createdAt: parseTimestamp(data.createdAt) || Date.now(),
+      sellerName: safeString(data.sellerName, 'Unknown'),
+      category: safeString(data.category, 'Uncategorized'),
+      subcategory: safeString(data.subcategory),
+      subsubcategory: safeString(data.subsubcategory),
+      quantity: safeInt(data.quantity),
+      bestSellerRank: data.bestSellerRank !== null && data.bestSellerRank !== undefined ? safeInt(data.bestSellerRank) : null,
+      sold: data.sold === true,
+      clickCount: safeInt(data.clickCount),
+      clickCountAtStart: safeInt(data.clickCountAtStart),
+      favoritesCount: safeInt(data.favoritesCount),
+      cartCount: safeInt(data.cartCount),
+      purchaseCount: safeInt(data.purchaseCount),
+      deliveryOption: safeString(data.deliveryOption, 'Self Delivery'),
+      boostedImpressionCount: safeInt(data.boostedImpressionCount),
+      boostImpressionCountAtStart: safeInt(data.boostImpressionCountAtStart),
+      isFeatured: data.isFeatured === true,
+      isTrending: data.isTrending === true,
+      isBoosted: data.isBoosted === true,
+      boostStartTime: parseTimestamp(data.boostStartTime),
+      boostEndTime: parseTimestamp(data.boostEndTime),
+      dailyClickCount: safeInt(data.dailyClickCount),
+      lastClickDate: parseTimestamp(data.lastClickDate),
+      paused: data.paused === true,
+      campaignName: data.campaignName?.toString() || null,
+      colorImages: safeColorImages(data.colorImages),
+      videoUrl: data.videoUrl?.toString() || null,
+      attributes: attributes,
+      // Add reference information for sale preferences loading
+      reference: {
+        id: doc.id,
+        path: `${collection}/${doc.id}`,
+        parent: {
+          id: collection
+        }
+      }
     };
 
-    console.log("Returning product successfully");
-    return NextResponse.json(product);
+    // Remove any null/undefined values
+    const cleanedProduct = Object.fromEntries(
+      Object.entries(product).filter(([_, value]) => value !== null && value !== undefined)
+    );
+
+    console.log("Returning product successfully with colorImages:", !!cleanedProduct.colorImages);
+    console.log("Product has attributes:", Object.keys(cleanedProduct.attributes || {}).length > 0);
+    
+    return NextResponse.json(cleanedProduct);
   } catch (error) {
     console.error("Error fetching product:", error);
     console.error("Error type:", typeof error);

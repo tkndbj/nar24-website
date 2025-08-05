@@ -56,6 +56,14 @@ export interface Product {
   colorImages: Record<string, string[]>;
   videoUrl?: string;
   attributes: Record<string, unknown>;
+  // Add reference property for Firestore document reference
+  reference?: {
+    id: string;
+    path: string;
+    parent: {
+      id: string;
+    };
+  };
 }
 
 export interface ProductCardProps {
@@ -157,6 +165,22 @@ export class ProductUtils {
     return {};
   }
 
+  static safeReference(value: unknown): Product['reference'] {
+    if (value != null && typeof value === "object" && !Array.isArray(value)) {
+      const ref = value as Record<string, unknown>;
+      if (ref.id && ref.path && ref.parent) {
+        return {
+          id: String(ref.id),
+          path: String(ref.path),
+          parent: {
+            id: String((ref.parent as any)?.id || '')
+          }
+        };
+      }
+    }
+    return undefined;
+  }
+
   // Factory method to create Product from API response
   static fromJson(json: ApiData): Product {
     const attributes = ProductUtils.safeAttributes(json.attributes);
@@ -242,6 +266,7 @@ export class ProductUtils {
       colorImages: ProductUtils.safeColorImages(json.colorImages),
       videoUrl: ProductUtils.safeStringNullable(json.videoUrl),
       attributes,
+      reference: ProductUtils.safeReference(json.reference),
     };
   }
 
@@ -301,6 +326,7 @@ export class ProductUtils {
       colorImages: product.colorImages,
       videoUrl: product.videoUrl,
       attributes: product.attributes,
+      reference: product.reference,
     };
 
     // Remove null/undefined values

@@ -1,0 +1,591 @@
+"use client";
+
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X, Plus, Minus, Check, Loader2 } from 'lucide-react';
+import { doc, getDoc } from 'firebase/firestore';
+import { useTranslations } from 'next-intl';
+import { db } from '@/lib/firebase';
+import { useUser } from '@/context/UserProvider';
+import { AttributeLocalizationUtils } from '@/constants/AttributeLocalization';
+import { Product } from '@/app/models/Product';
+
+interface SalePreferences {
+  maxQuantity?: number;
+  discountThreshold?: number;
+  discountPercentage?: number;
+  acceptOffers?: boolean;
+  minOffer?: number;
+  quickSale?: boolean;
+}
+
+interface OptionSelectorResult {
+  selectedColor?: string;
+  selectedColorImage?: string;
+  quantity: number;
+  [key: string]: unknown;
+}
+
+interface ProductOptionSelectorProps {
+  product: Product;
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: (result: OptionSelectorResult) => void;
+  isBuyNow?: boolean;
+}
+
+interface ColorThumbProps {
+  colorKey: string;
+  imageUrl: string;
+  isSelected: boolean;
+  disabled: boolean;
+  onSelect: () => void;
+  label?: string;
+}
+
+interface AttributeChipProps {
+  label: string;
+  isSelected: boolean;
+  onSelect: () => void;
+}
+
+const ColorThumb: React.FC<ColorThumbProps> = ({
+  colorKey,
+  imageUrl,
+  isSelected,
+  disabled,
+  onSelect,
+  label,
+}) => {
+  const t = useTranslations();
+
+  return (
+    <button
+      onClick={disabled ? undefined : onSelect}
+      disabled={disabled}
+      className={`
+        relative flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden border-2 transition-all duration-200 mx-1
+        ${isSelected 
+          ? 'border-orange-500 border-3 shadow-lg' 
+          : 'border-gray-300 dark:border-gray-600'
+        }
+        ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-orange-400'}
+      `}
+    >
+      <img
+        src={imageUrl}
+        alt={label || `Color ${colorKey}`}
+        className="w-full h-full object-cover"
+        onError={(e) => {
+          const target = e.target as HTMLImageElement;
+          target.style.display = 'none';
+          target.nextElementSibling?.classList.remove('hidden');
+        }}
+      />
+      
+      {/* Fallback icon */}
+      <div className="hidden absolute inset-0 bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+        <div className="w-6 h-6 bg-gray-400 rounded" />
+      </div>
+
+      {/* Disabled overlay */}
+      {disabled && (
+        <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center">
+          <span className="text-white text-xs font-bold text-center px-1">
+            {t('noStock') || 'No Stock'}
+          </span>
+        </div>
+      )}
+
+      {/* Selected indicator */}
+      {isSelected && !disabled && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <Check className="w-6 h-6 text-orange-500 bg-white rounded-full p-1" />
+        </div>
+      )}
+    </button>
+  );
+};
+
+const AttributeChip: React.FC<AttributeChipProps> = ({
+  label,
+  isSelected,
+  onSelect,
+}) => {
+  return (
+    <button
+      onClick={onSelect}
+      className={`
+        px-4 py-2 rounded-full border transition-all duration-200 text-sm font-medium mx-1 mb-2
+        ${isSelected
+          ? 'border-orange-500 border-2 text-orange-500 bg-orange-50 dark:bg-orange-950'
+          : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-orange-400'
+        }
+      `}
+    >
+      {label}
+    </button>
+  );
+};
+
+const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
+  product,
+  isOpen,
+  onClose,
+  onConfirm,
+  isBuyNow = false,
+}) => {
+  const { user } = useUser();
+  const t = useTranslations();
+  
+  const [selections, setSelections] = useState<Record<string, string>>({});
+  const [selectedColor, setSelectedColor] = useState<string | null>(null);
+  const [selectedQuantity, setSelectedQuantity] = useState(1);
+  const [salePreferences, setSalePreferences] = useState<SalePreferences | null>(null);
+  const [isLoadingSalePrefs, setIsLoadingSalePrefs] = useState(false);
+
+  // Initialize default selections and load sale preferences
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // Initialize default selections for single-option attributes
+    const newSelections: Record<string, string> = {};
+    Object.entries(product.attributes || {}).forEach(([key, value]) => {
+      let options: string[] = [];
+
+      if (Array.isArray(value)) {
+        options = value
+          .map(item => item.toString())
+          .filter(item => item.trim() !== '');
+      } else if (typeof value === 'string' && value.trim() !== '') {
+        options = value
+          .split(',')
+          .map(item => item.trim())
+          .filter(item => item !== '');
+      }
+
+      // Auto-select single options
+      if (options.length === 1) {
+        newSelections[key] = options[0];
+      }
+    });
+
+    setSelections(newSelections);
+    setSelectedColor(null);
+    setSelectedQuantity(1);
+    setSalePreferences(null);
+
+    // Load sale preferences for shop products
+    loadSalePreferences();
+  }, [isOpen, product]);
+
+  const loadSalePreferences = useCallback(async () => {
+    if (!product.reference) return;
+
+    try {
+      setIsLoadingSalePrefs(true);
+      
+      // Check if this is a shop product
+      const parentCollection = product.reference.parent?.id;
+      if (parentCollection !== 'shop_products') return;
+
+      const salePrefsDoc = await getDoc(
+        doc(db, product.reference.path, 'sale_preferences', 'preferences')
+      );
+
+      if (salePrefsDoc.exists()) {
+        const prefs = salePrefsDoc.data() as SalePreferences;
+        setSalePreferences(prefs);
+
+        // Adjust quantity if needed
+        const maxAllowed = getMaxQuantityAllowed(prefs);
+        if (selectedQuantity > maxAllowed) {
+          setSelectedQuantity(maxAllowed);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading sale preferences:', error);
+    } finally {
+      setIsLoadingSalePrefs(false);
+    }
+  }, [product.reference, selectedQuantity]);
+
+  const getMaxQuantityAllowed = useCallback((prefs?: SalePreferences | null) => {
+    const stockQuantity = getMaxQuantity();
+    const preferences = prefs || salePreferences;
+    
+    if (!preferences?.maxQuantity) return stockQuantity;
+    
+    return Math.min(stockQuantity, preferences.maxQuantity);
+  }, [selectedColor, product.quantity, product.colorQuantities, salePreferences]);
+
+  const getMaxQuantity = useCallback(() => {
+    if (selectedColor && selectedColor !== 'default') {
+      return product.colorQuantities[selectedColor] || 0;
+    }
+    return product.quantity;
+  }, [selectedColor, product.quantity, product.colorQuantities]);
+
+  const getSelectableAttributes = useMemo((): Record<string, string[]> => {
+    const selectableAttrs: Record<string, string[]> = {};
+
+    Object.entries(product.attributes || {}).forEach(([key, value]) => {
+      let options: string[] = [];
+
+      if (Array.isArray(value)) {
+        options = value
+          .map(item => item.toString())
+          .filter(item => item.trim() !== '');
+      } else if (typeof value === 'string' && value.trim() !== '') {
+        options = value
+          .split(',')
+          .map(item => item.trim())
+          .filter(item => item !== '');
+      }
+
+      // Only include attributes with multiple options
+      if (options.length > 1) {
+        selectableAttrs[key] = options;
+      }
+    });
+
+    return selectableAttrs;
+  }, [product.attributes]);
+
+  const hasColors = useMemo(() => {
+    return Object.keys(product.colorImages || {}).length > 0 || 
+           (product.imageUrls && product.imageUrls.length > 0);
+  }, [product.colorImages, product.imageUrls]);
+
+  const isConfirmEnabled = useMemo(() => {
+    if (hasColors && !selectedColor) return false;
+
+    // Check if all selectable attributes have been selected
+    for (const key of Object.keys(getSelectableAttributes)) {
+      if (!selections[key]) return false;
+    }
+
+    return selectedQuantity > 0;
+  }, [hasColors, selectedColor, selections, getSelectableAttributes, selectedQuantity]);
+
+  const handleConfirm = useCallback(() => {
+    if (!isConfirmEnabled) return;
+
+    // 🚀 FIXED: Build comprehensive result object with all selected options
+    const result: OptionSelectorResult = {
+      // ✅ CRITICAL: Ensure quantity is properly included
+      quantity: selectedQuantity,
+      // Add all attribute selections
+      ...selections,
+    };
+
+    // Add color selection if applicable
+    if (hasColors && selectedColor) {
+      result.selectedColor = selectedColor;
+      
+      // Add selected color image URL if color is selected
+      if (selectedColor !== 'default') {
+        const colorImages = product.colorImages[selectedColor];
+        if (colorImages && colorImages.length > 0) {
+          result.selectedColorImage = colorImages[0];
+        }
+      } else if (product.imageUrls && product.imageUrls.length > 0) {
+        result.selectedColorImage = product.imageUrls[0];
+      }
+    }
+
+    // 🚀 DEBUG: Log the result to ensure all data is included
+    console.log('ProductOptionSelector - Confirming with options:', {
+      productId: product.id,
+      selectedQuantity,
+      selectedColor,
+      selections,
+      finalResult: result
+    });
+
+    onConfirm(result);
+  }, [isConfirmEnabled, selectedQuantity, selections, hasColors, selectedColor, product, onConfirm]);
+
+  const handleQuantityChange = useCallback((increment: number) => {
+    const maxAllowed = getMaxQuantityAllowed();
+    const newQuantity = selectedQuantity + increment;
+    
+    if (newQuantity >= 1 && newQuantity <= maxAllowed) {
+      setSelectedQuantity(newQuantity);
+      
+      // 🚀 DEBUG: Log quantity changes
+      console.log('ProductOptionSelector - Quantity changed:', {
+        productId: product.id,
+        oldQuantity: selectedQuantity,
+        newQuantity,
+        maxAllowed
+      });
+    }
+  }, [selectedQuantity, getMaxQuantityAllowed, product.id]);
+
+  // Update selected quantity when color changes (to respect color-specific stock limits)
+  useEffect(() => {
+    const maxAllowed = getMaxQuantityAllowed();
+    if (selectedQuantity > maxAllowed) {
+      const adjustedQuantity = Math.max(1, maxAllowed);
+      setSelectedQuantity(adjustedQuantity);
+      
+      console.log('ProductOptionSelector - Quantity adjusted for color/stock:', {
+        productId: product.id,
+        selectedColor,
+        oldQuantity: selectedQuantity,
+        newQuantity: adjustedQuantity,
+        maxAllowed
+      });
+    }
+  }, [selectedColor, salePreferences, selectedQuantity, getMaxQuantityAllowed, product.id]);
+
+  const renderSalePreferenceInfo = useCallback(() => {
+    if (!salePreferences?.discountThreshold || !salePreferences?.discountPercentage) return null;
+
+    const { discountThreshold, discountPercentage } = salePreferences;
+    const hasDiscount = selectedQuantity >= discountThreshold;
+
+    return (
+      <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+        <div className="text-center">
+          <p className={`text-sm font-medium ${
+            hasDiscount ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'
+          }`}>
+            {hasDiscount 
+              ? `${t('discountApplied') || 'Discount applied'}: ${discountPercentage}%`
+              : t('localeName') === 'tr' 
+                ? `${discountThreshold} tane alırsan %${discountPercentage} indirim kazanırsın!`
+                : t('localeName') === 'ru'
+                ? `Если купишь ${discountThreshold} штук, получишь скидку ${discountPercentage}%!`
+                : `Buy ${discountThreshold} for ${discountPercentage}% discount!`
+            }
+          </p>
+        </div>
+      </div>
+    );
+  }, [salePreferences, selectedQuantity, t]);
+
+  const renderColorSelector = useCallback(() => {
+    if (!hasColors) return null;
+
+    return (
+      <div className="mb-6">
+        <h3 className="text-center text-orange-500 font-bold text-base mb-3">
+          {t('selectColor') || 'Select Color'}
+        </h3>
+        <div className="flex overflow-x-auto pb-2 px-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+          {/* Default option - only show if main imageUrls exist */}
+          {product.imageUrls && product.imageUrls.length > 0 && (
+            <ColorThumb
+              colorKey="default"
+              imageUrl={product.imageUrls[0]}
+              isSelected={selectedColor === 'default'}
+              disabled={product.quantity === 0}
+              onSelect={() => {
+                setSelectedColor('default');
+                console.log('ProductOptionSelector - Color selected:', { productId: product.id, selectedColor: 'default' });
+              }}
+              label="Default"
+            />
+          )}
+          
+          {/* Color options from colorImages */}
+          {Object.entries(product.colorImages || {}).map(([colorKey, images]) => {
+            const qty = product.colorQuantities[colorKey] || 0;
+            return (
+              <ColorThumb
+                key={colorKey}
+                colorKey={colorKey}
+                imageUrl={images[0]}
+                isSelected={selectedColor === colorKey}
+                disabled={qty === 0}
+                onSelect={() => {
+                  setSelectedColor(colorKey);
+                  console.log('ProductOptionSelector - Color selected:', { productId: product.id, selectedColor: colorKey, availableQty: qty });
+                }}
+                label={colorKey}
+              />
+            );
+          })}
+        </div>
+      </div>
+    );
+  }, [hasColors, product, selectedColor, t]);
+
+  const renderAttributeSelector = useCallback((attributeKey: string, options: string[]) => {
+    return (
+      <div key={attributeKey} className="mb-6">
+        <h3 className="text-center text-orange-500 font-bold text-base mb-3">
+          {AttributeLocalizationUtils.getLocalizedAttributeTitle(attributeKey, t)}
+        </h3>
+        <div className="flex flex-wrap justify-center">
+          {options.map((option) => (
+            <AttributeChip
+              key={option}
+              label={AttributeLocalizationUtils.getLocalizedSingleValue(attributeKey, option, t)}
+              isSelected={selections[attributeKey] === option}
+              onSelect={() => {
+                setSelections(prev => ({ ...prev, [attributeKey]: option }));
+                console.log('ProductOptionSelector - Attribute selected:', { 
+                  productId: product.id, 
+                  attributeKey, 
+                  option,
+                  allSelections: { ...selections, [attributeKey]: option }
+                });
+              }}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }, [selections, t, product.id]);
+
+  const renderQuantitySelector = useCallback(() => {
+    const maxAllowed = getMaxQuantityAllowed();
+    
+    return (
+      <div className="mb-6">
+        <h3 className="text-center text-orange-500 font-bold text-base mb-3">
+          {t('quantity') || 'Quantity'}
+        </h3>
+        <div className="flex items-center justify-center gap-4">
+          <button
+            onClick={() => handleQuantityChange(-1)}
+            disabled={selectedQuantity <= 1}
+            className="p-2 rounded-full border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          >
+            <Minus size={20} />
+          </button>
+          
+          <div className="px-4 py-2 border border-orange-500 rounded-lg min-w-[60px] text-center">
+            <span className="text-lg font-semibold">{selectedQuantity}</span>
+          </div>
+          
+          <button
+            onClick={() => handleQuantityChange(1)}
+            disabled={selectedQuantity >= maxAllowed}
+            className="p-2 rounded-full border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          >
+            <Plus size={20} />
+          </button>
+        </div>
+
+        {/* Show current max quantity info */}
+        <div className="text-center mt-2">
+          <span className="text-sm text-gray-500">
+            {t('maxAvailable') || 'Max available'}: {maxAllowed}
+          </span>
+        </div>
+
+        {/* 🚀 DEBUG INFO - Remove this in production */}
+        <div className="text-center mt-1 text-xs text-gray-400">
+          Debug: Selected {selectedQuantity} | Max {maxAllowed} | Stock {getMaxQuantity()}
+        </div>
+
+        {/* Loading indicator for sale preferences */}
+        {isLoadingSalePrefs && (
+          <div className="flex justify-center mt-2">
+            <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
+          </div>
+        )}
+      </div>
+    );
+  }, [selectedQuantity, getMaxQuantityAllowed, getMaxQuantity, handleQuantityChange, isLoadingSalePrefs, t]);
+
+  // Redirect to login if user is not authenticated
+  useEffect(() => {
+    if (isOpen && !user) {
+      onClose();
+    }
+  }, [isOpen, user, onClose]);
+
+  if (!user) {
+    return null;
+  }
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 z-50"
+            style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+          />
+
+          {/* Modal */}
+          <motion.div
+            initial={{ opacity: 0, y: 100 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 100 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            className="fixed inset-x-0 bottom-0 z-50 max-h-[90vh]"
+          >
+            <div className="bg-white dark:bg-gray-900 rounded-t-2xl shadow-2xl max-w-lg mx-auto">
+              {/* Header */}
+              <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white font-['Figtree']">
+                  {t('selectOptions') || 'Select Options'}
+                </h2>
+                <button
+                  onClick={onClose}
+                  className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                >
+                  <X size={20} className="text-gray-500" />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="p-4 max-h-[60vh] overflow-y-auto">
+                {/* Color selector */}
+                {renderColorSelector()}
+
+                {/* Dynamic attribute selectors */}
+                {Object.entries(getSelectableAttributes).map(([key, options]) =>
+                  renderAttributeSelector(key, options)
+                )}
+
+                {/* Quantity selector */}
+                {renderQuantitySelector()}
+
+                {/* Sale preference info */}
+                {renderSalePreferenceInfo()}
+              </div>
+
+              {/* Footer */}
+              <div className="p-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
+                <button
+                  onClick={handleConfirm}
+                  disabled={!isConfirmEnabled}
+                  className={`
+                    w-full py-3 px-4 rounded-lg font-semibold font-['Figtree'] transition-all duration-200
+                    ${isConfirmEnabled
+                      ? 'bg-orange-500 hover:bg-orange-600 text-white'
+                      : 'bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed'
+                    }
+                  `}
+                >
+                  {t('confirm') || 'Confirm'} {selectedQuantity > 1 && `(${selectedQuantity})`}
+                </button>
+                
+                <button
+                  onClick={onClose}
+                  className="w-full py-2 px-4 text-gray-600 dark:text-gray-400 font-['Figtree'] hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+                >
+                  {t('cancel') || 'Cancel'}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+};
+
+export default ProductOptionSelector;
