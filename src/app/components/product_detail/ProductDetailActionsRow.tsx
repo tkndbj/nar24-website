@@ -32,7 +32,7 @@ const hasSelectableOptions = (product: Product | null): boolean => {
   if (hasColors) return true;
 
   // Check for selectable attributes (attributes with multiple options)
-  const selectableAttrs = Object.entries(product.attributes || {}).filter(([key, value]) => {
+  const selectableAttrs = Object.entries(product.attributes || {}).filter(([, value]) => {
     let options: string[] = [];
 
     if (Array.isArray(value)) {
@@ -260,7 +260,7 @@ const ProductDetailActionsRow: React.FC<ProductDetailActionsRowProps> = ({
   };
 
   // Separated favorite toggle logic
-  const performFavoriteToggle = async (selectedOptions?: any) => {
+  const performFavoriteToggle = async (selectedOptions?: { selectedColor?: string; selectedColorImage?: string; quantity: number; [key: string]: unknown }) => {
     if (!product) return;
 
     try {
@@ -295,7 +295,7 @@ const ProductDetailActionsRow: React.FC<ProductDetailActionsRowProps> = ({
   };
 
   // Handle option selector confirmation
-  const handleOptionSelectorConfirm = async (selectedOptions: any) => {
+  const handleOptionSelectorConfirm = async (selectedOptions: { selectedColor?: string; selectedColorImage?: string; quantity: number; [key: string]: unknown }) => {
     setShowOptionSelector(false);
     await performFavoriteToggle(selectedOptions);
   };
@@ -446,7 +446,6 @@ const ProductDetailActionsRow: React.FC<ProductDetailActionsRowProps> = ({
           isOpen={showOptionSelector}
           onClose={handleOptionSelectorClose}
           onConfirm={handleOptionSelectorConfirm}
-          isBuyNow={false}
         />
       )}
     </>

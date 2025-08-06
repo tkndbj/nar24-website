@@ -31,7 +31,7 @@ interface ProductOptionSelectorProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: (result: OptionSelectorResult) => void;
-  isBuyNow?: boolean;
+  
 }
 
 interface ColorThumbProps {
@@ -133,7 +133,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
   isOpen,
   onClose,
   onConfirm,
-  isBuyNow = false,
+  
 }) => {
   const { user } = useUser();
   const t = useTranslations();

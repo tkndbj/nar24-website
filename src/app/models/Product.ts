@@ -173,7 +173,7 @@ export class ProductUtils {
           id: String(ref.id),
           path: String(ref.path),
           parent: {
-            id: String((ref.parent as any)?.id || '')
+            id: String((ref.parent as Record<string, unknown>)?.id || '')
           }
         };
       }

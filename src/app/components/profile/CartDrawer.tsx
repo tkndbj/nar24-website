@@ -173,12 +173,12 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
         }
         
         // Remove only the fields that shouldn't be sent to payment
-        delete (paymentItem as any).product; // Remove the full product object (too large)
-        delete (paymentItem as any).cartData; // Remove internal cart metadata
-        delete (paymentItem as any).isOptimistic; // Remove UI state
-        delete (paymentItem as any).isLoadingProduct; // Remove UI state
-        delete (paymentItem as any).loadError; // Remove UI state
-        delete (paymentItem as any).selectedColorImage; // Remove UI-specific field
+        delete (paymentItem as Record<string, unknown>).product; // Remove the full product object (too large)
+        delete (paymentItem as Record<string, unknown>).cartData; // Remove internal cart metadata
+        delete (paymentItem as Record<string, unknown>).isOptimistic; // Remove UI state
+        delete (paymentItem as Record<string, unknown>).isLoadingProduct; // Remove UI state
+        delete (paymentItem as Record<string, unknown>).loadError; // Remove UI state
+        delete (paymentItem as Record<string, unknown>).selectedColorImage; // Remove UI-specific field
         
         return paymentItem;
       });
@@ -186,7 +186,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     console.log('CartDrawer - Payment items prepared:', paymentItems);
   
     // Calculate total for verification
-    const totalPrice = paymentItems.reduce((sum, item) => sum + ((item as any).price * item.quantity), 0);
+    const totalPrice = paymentItems.reduce((sum, item) => sum + ((item as Record<string, unknown>).price as number * item.quantity), 0);
     
     // Save to localStorage as backup
     localStorage.setItem('cartItems', JSON.stringify(paymentItems));
@@ -231,7 +231,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   }, [onClose]);
 
   // Format dynamic attributes for display
-  const formatItemAttributes = useCallback((item: any) => {
+  const formatItemAttributes = useCallback((item: Record<string, unknown>) => {
     if (!localization) return '';
 
     const attributes: Record<string, unknown> = {};

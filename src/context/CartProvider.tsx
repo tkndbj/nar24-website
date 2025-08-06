@@ -147,7 +147,7 @@ const BATCH_DELAY = 200; // Reduced from 500ms for faster updates
 const OPTIMISTIC_TIMEOUT = 3000; // Reduced from 10s for faster rollback
 const MAX_RETRIES = 2; // Reduced retries
 const RETRY_DELAY = 1000; // Faster retry
-const DEBOUNCE_DELAY = 150; // For quantity updates
+
 
 interface CartProviderProps {
   children: ReactNode;

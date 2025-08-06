@@ -41,7 +41,7 @@ const hasSelectableOptions = (product: Product | null): boolean => {
   if (hasColors) return true;
 
   // Check for selectable attributes (attributes with multiple options)
-  const selectableAttrs = Object.entries(product.attributes || {}).filter(([key, value]) => {
+  const selectableAttrs = Object.entries(product.attributes || {}).filter(([, value]) => {
     let options: string[] = [];
 
     if (Array.isArray(value)) {
@@ -239,7 +239,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   }, [product?.id]);
 
   // Enhanced cart functionality with proper state management
-  const handleAddToCart = useCallback(async (selectedOptions?: any) => {
+  const handleAddToCart = useCallback(async (selectedOptions?: { quantity?: number; [key: string]: any }) => {
     if (!user) {
       router.push("/login");
       return;
@@ -260,7 +260,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   }, [user, product, isInCart, router]);
 
   // Separated cart operation logic - simplified and fixed
-  const performCartOperation = useCallback(async (selectedOptions?: any) => {
+  const performCartOperation = useCallback(async (selectedOptions?: { quantity?: number; [key: string]: any }) => {
     if (!product) return;
 
     try {
@@ -271,7 +271,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
       // Extract quantity from selectedOptions if provided
       let quantityToAdd = 1;
-      let attributesToAdd = selectedOptions;
+      const attributesToAdd = selectedOptions;
 
       if (selectedOptions && typeof selectedOptions.quantity === 'number') {
         quantityToAdd = selectedOptions.quantity;
@@ -313,7 +313,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   }, [product, isInCart, addToCart]);
 
   // Handle cart option selector confirmation
-  const handleCartOptionSelectorConfirm = useCallback(async (selectedOptions: any) => {
+  const handleCartOptionSelectorConfirm = useCallback(async (selectedOptions: { quantity?: number; [key: string]: any }) => {
     setShowCartOptionSelector(false);
     await performCartOperation(selectedOptions);
   }, [performCartOperation]);

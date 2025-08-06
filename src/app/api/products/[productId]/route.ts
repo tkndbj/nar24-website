@@ -4,33 +4,33 @@ import { NextRequest, NextResponse } from "next/server";
 import { getFirestoreAdmin } from "@/lib/firebase-admin";
 
 // Helper functions to safely parse data (matching Flutter's approach)
-function safeDouble(value: any, defaultValue: number = 0): number {
+function safeDouble(value: unknown, defaultValue: number = 0): number {
   if (value === null || value === undefined) return defaultValue;
   if (typeof value === 'number') return value;
   if (typeof value === 'string') return parseFloat(value) || defaultValue;
   return defaultValue;
 }
 
-function safeInt(value: any, defaultValue: number = 0): number {
+function safeInt(value: unknown, defaultValue: number = 0): number {
   if (value === null || value === undefined) return defaultValue;
   if (typeof value === 'number') return Math.floor(value);
   if (typeof value === 'string') return parseInt(value) || defaultValue;
   return defaultValue;
 }
 
-function safeString(value: any, defaultValue: string = ''): string {
+function safeString(value: unknown, defaultValue: string = ''): string {
   if (value === null || value === undefined) return defaultValue;
   return String(value);
 }
 
-function safeStringArray(value: any): string[] {
+function safeStringArray(value: unknown): string[] {
   if (!value) return [];
   if (Array.isArray(value)) return value.map(e => String(e));
   if (typeof value === 'string') return value.trim() === '' ? [] : [value];
   return [];
 }
 
-function safeColorQuantities(value: any): Record<string, number> {
+function safeColorQuantities(value: unknown): Record<string, number> {
   if (!value || typeof value !== 'object') return {};
   const result: Record<string, number> = {};
   for (const [key, val] of Object.entries(value)) {
@@ -39,7 +39,7 @@ function safeColorQuantities(value: any): Record<string, number> {
   return result;
 }
 
-function safeColorImages(value: any): Record<string, string[]> {
+function safeColorImages(value: unknown): Record<string, string[]> {
   if (!value || typeof value !== 'object') return {};
   const result: Record<string, string[]> = {};
   for (const [key, val] of Object.entries(value)) {
@@ -52,18 +52,18 @@ function safeColorImages(value: any): Record<string, string[]> {
   return result;
 }
 
-function safeStringNullable(value: any): string | null {
+function safeStringNullable(value: unknown): string | null {
   if (value === null || value === undefined) return null;
   const str = String(value).trim();
   return str === '' ? null : str;
 }
 
-function parseTimestamp(value: any): number | null {
+function parseTimestamp(value: unknown): number | null {
   if (!value) return null;
   
   // Handle Firestore Timestamp objects
-  if (value && typeof value === 'object' && value._seconds) {
-    return value._seconds * 1000;
+  if (value && typeof value === 'object' && '_seconds' in value && typeof (value as any)._seconds === 'number') {
+    return (value as any)._seconds * 1000;
   }
   
   // Handle regular timestamps
@@ -164,7 +164,7 @@ export async function GET(
 
     // Extract dynamic attributes
     const rawAttr = data.attributes;
-    const attributes: Record<string, any> = rawAttr && typeof rawAttr === 'object' ? rawAttr : {};
+    const attributes: Record<string, unknown> = rawAttr && typeof rawAttr === 'object' ? rawAttr : {};
 
     // Transform Firestore document to match your Product interface (matching Flutter's fromDocument)
     const product = {
@@ -235,7 +235,7 @@ export async function GET(
 
     // Remove any null/undefined values
     const cleanedProduct = Object.fromEntries(
-      Object.entries(product).filter(([_, value]) => value !== null && value !== undefined)
+      Object.entries(product).filter(([, value]) => value !== null && value !== undefined)
     );
 
     console.log("Returning product successfully with colorImages:", !!cleanedProduct.colorImages);
