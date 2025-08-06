@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import DynamicFavicon from "./components/DynamicFavicon";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -11,6 +12,20 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Nar24",
   description: "Kıbrın'ın en büyük market platformu",
+  icons: {
+    icon: [
+      {
+        url: '/favicon-light.png', // Default favicon
+        sizes: '32x32',
+        type: 'image/png',
+      },
+      {
+        url: '/favicon.ico',
+        sizes: 'any',
+      }
+    ],
+    apple: '/apple-touch-icon.png',
+  },
 };
 
 export default function RootLayout({
@@ -21,6 +36,7 @@ export default function RootLayout({
   return (
     <html className={inter.variable}>
       <body className={`${inter.className} antialiased`}>
+        <DynamicFavicon />
         {children}
       </body>
     </html>
