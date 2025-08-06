@@ -239,7 +239,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   }, [product?.id]);
 
   // Enhanced cart functionality with proper state management
-  const handleAddToCart = useCallback(async (selectedOptions?: { quantity?: number; [key: string]: any }) => {
+  const handleAddToCart = useCallback(async (selectedOptions?: { quantity?: number; [key: string]: unknown }) => {
     if (!user) {
       router.push("/login");
       return;
@@ -260,7 +260,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   }, [user, product, isInCart, router]);
 
   // Separated cart operation logic - simplified and fixed
-  const performCartOperation = useCallback(async (selectedOptions?: { quantity?: number; [key: string]: any }) => {
+  const performCartOperation = useCallback(async (selectedOptions?: { quantity?: number; [key: string]: unknown }) => {
     if (!product) return;
 
     try {
@@ -313,7 +313,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   }, [product, isInCart, addToCart]);
 
   // Handle cart option selector confirmation
-  const handleCartOptionSelectorConfirm = useCallback(async (selectedOptions: { quantity?: number; [key: string]: any }) => {
+  const handleCartOptionSelectorConfirm = useCallback(async (selectedOptions: { quantity?: number; [key: string]: unknown }) => {
     setShowCartOptionSelector(false);
     await performCartOperation(selectedOptions);
   }, [performCartOperation]);
@@ -692,8 +692,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           product={product}
           isOpen={showCartOptionSelector}
           onClose={handleCartOptionSelectorClose}
-          onConfirm={handleCartOptionSelectorConfirm}
-          isBuyNow={false}
+          onConfirm={handleCartOptionSelectorConfirm}          
         />
       )}
     </div>

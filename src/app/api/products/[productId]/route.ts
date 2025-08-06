@@ -62,8 +62,8 @@ function parseTimestamp(value: unknown): number | null {
   if (!value) return null;
   
   // Handle Firestore Timestamp objects
-  if (value && typeof value === 'object' && '_seconds' in value && typeof (value as any)._seconds === 'number') {
-    return (value as any)._seconds * 1000;
+  if (value && typeof value === 'object' && '_seconds' in value && typeof (value as { _seconds: unknown })._seconds === 'number') {
+    return (value as { _seconds: number })._seconds * 1000;
   }
   
   // Handle regular timestamps
