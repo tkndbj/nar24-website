@@ -1937,7 +1937,6 @@
     "limitedStock": "Stokta sadece {count} adet kaldı",
     "maxQuantityReached": "Maksimum adet sınırına ulaşıldı",
     "minQuantityRequired": "Minimum 1 adet gerekli"
-    
   },
   "CartDrawer": {
     "title": "Sepetim",
@@ -2003,8 +2002,8 @@
     "failedToTransferToBasket": "Sepete aktarılamadı",
     "failedToAddToCart": "Sepete eklenemedi",
     "itemsAddedToCart": "ürün sepete eklendi",
-    "selectBasket": "Sepet Seç"    
-  } ,
+    "selectBasket": "Sepet Seç"
+  },
   "gender": "Cinsiyet",
   "clothingSize": "Kıyafet Bedeni",
   "clothingFit": "Kesim",
@@ -2012,7 +2011,7 @@
   "selectSize": "Beden",
   "selectAvailableSizes": "Mevcut Bedenler",
   "selectJewelryType": "Mücevher Türü",
-  "selectJewelryMaterial": "Mücevher Malzemesi",  
+  "selectJewelryMaterial": "Mücevher Malzemesi",
   "clothingGenderWomen": "Kadın",
   "clothingGenderMen": "Erkek",
   "clothingGenderUnisex": "Unisex",
@@ -2083,7 +2082,7 @@
   "colorSilver": "Gümüş",
   "selectOptions": "Seçenekleri Belirle",
   "quantity": "Adet",
-  "confirm": "Onayla", 
+  "confirm": "Onayla",
   "cancel": "İptal",
   "maxAvailable": "Maksimum mevcut",
   "selectColor": "Renk Seç",
@@ -2155,5 +2154,27 @@
     "clickToSelectLocation": "Konum seçmek için haritaya tıklayın",
     "cancel": "İptal",
     "confirm": "Onayla"
+  },
+  "DynamicMarket": {
+    "filterAll": "Tümü",
+    "filterDeals": "İndirimli",
+    "filterFeatured": "Öne Çıkan",
+    "filterTrending": "Trend",
+    "filterFiveStar": "5 Yıldız",
+    "filterBestSellers": "En Çok Satanlar",
+    "sortNone": "Varsayılan",
+    "sortAlphabetical": "Alfabetik",
+    "sortDate": "En Yeni",
+    "sortPriceLowToHigh": "Fiyat: Düşükten Yükseğe",
+    "sortPriceHighToLow": "Fiyat: Yüksekten Düşüğe",
+    "sort": "Sırala",
+    "selectSortOption": "Sıralama seçeneğini seçin",
+    "featuredProducts": "Öne Çıkan Ürünler",
+    "allProducts": "Tüm Ürünler",
+    "products": "ürün",
+    "noProductsFound": "Ürün bulunamadı",
+    "tryAdjustingFilters": "Filtrelerinizi veya arama terimlerinizi ayarlamayı deneyin",
+    "loadingMore": "Daha fazla ürün yükleniyor...",
+    "loadMore": "Daha Fazla Yükle"
   }
 }

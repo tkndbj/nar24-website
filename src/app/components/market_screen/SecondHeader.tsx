@@ -1,3 +1,4 @@
+// Fixed SecondHeader.tsx
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -81,6 +82,32 @@ const categoryIconMap: Record<
   "Health & Wellness": Heart,
   Automotive: Car,
 };
+
+// Category mapping from URL-friendly to Firestore values
+const CATEGORY_MAPPING: { [key: string]: string } = {
+  "clothing-fashion": "Clothing & Fashion",
+  footwear: "Footwear",
+  accessories: "Accessories",
+  "bags-luggage": "Bags & Luggage",
+  "beauty-personal-care": "Beauty & Personal Care",
+  "mother-child": "Mother & Child",
+  "home-furniture": "Home & Furniture",
+  electronics: "Electronics",
+  "sports-outdoor": "Sports & Outdoor",
+  "books-stationery-hobby": "Books, Stationery & Hobby",
+  "tools-hardware": "Tools & Hardware",
+  "pet-supplies": "Pet Supplies",
+  automotive: "Automotive",
+  "health-wellness": "Health & Wellness",
+};
+
+// Reverse mapping from Firestore to URL-friendly
+const REVERSE_CATEGORY_MAPPING: { [key: string]: string } = Object.entries(
+  CATEGORY_MAPPING
+).reduce((acc, [key, value]) => {
+  acc[value] = key;
+  return acc;
+}, {} as { [key: string]: string });
 
 // Mobile drawer states
 type DrawerState = "main" | "subcategory" | "subsubcategory";
@@ -363,14 +390,63 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
 
   const handleSubSubcategoryClick = (subSubcategory: string) => {
     if (selectedMainCategory && selectedSubcategory) {
-      const categoryPath = selectedMainCategory.key
-        .toLowerCase()
-        .replace(/\s+/g, "-");
-      const subcategoryPath = selectedSubcategory
-        .toLowerCase()
-        .replace(/\s+/g, "-");
-      const subSubPath = subSubcategory.toLowerCase().replace(/\s+/g, "-");
-      router.push(`/category/${categoryPath}/${subcategoryPath}/${subSubPath}`);
+      const params = new URLSearchParams();
+
+      if (
+        selectedMainCategory.key === "Women" ||
+        selectedMainCategory.key === "Men"
+      ) {
+        // ✅ FIX: Use the same logic as Flutter for Women/Men categories
+        // Map buyer subcategory to actual product category
+        const mapping = AllInOneCategoryData.getBuyerToProductMapping(
+          selectedMainCategory.key,
+          selectedSubcategory,
+          subSubcategory
+        );
+
+        const productCategory = mapping?.category || "Clothing & Fashion";
+
+        // Convert to URL-friendly format for the URL parameter
+        const urlCategory =
+          REVERSE_CATEGORY_MAPPING[productCategory] ||
+          productCategory.toLowerCase().replace(/[&\s]+/g, "-");
+
+        console.log("🔄 Women/Men navigation:", {
+          buyerCategory: selectedMainCategory.key,
+          buyerSubcategory: selectedSubcategory,
+          subSubcategory,
+          mappedProductCategory: productCategory,
+          urlCategory,
+        });
+
+        params.set("category", urlCategory);
+        params.set("subcategory", subSubcategory); // subSubcategory becomes the product subcategory
+        params.set("buyerCategory", selectedMainCategory.key); // For gender filtering
+        params.set("buyerSubcategory", selectedSubcategory); // For reference
+      } else {
+        // ✅ For other categories: Use standard mapping (same as Flutter)
+        const urlCategory =
+          REVERSE_CATEGORY_MAPPING[selectedMainCategory.key] ||
+          selectedMainCategory.key.toLowerCase().replace(/\s+/g, "-");
+
+        params.set("category", urlCategory);
+        params.set("subcategory", selectedSubcategory);
+        params.set("subsubcategory", subSubcategory);
+        params.set("buyerCategory", selectedMainCategory.key);
+        params.set("buyerSubcategory", selectedSubcategory);
+      }
+
+      params.set(
+        "displayName",
+        getLocalizedSubSubcategory(
+          selectedMainCategory.key,
+          selectedSubcategory,
+          subSubcategory
+        )
+      );
+
+      console.log("🔄 Final navigation params:", params.toString());
+      router.push(`/dynamicmarket2?${params.toString()}`);
       closeMobileDrawer();
     }
   };
@@ -699,17 +775,93 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
                                         <button
                                           key={subSubcategory}
                                           onClick={() => {
-                                            const categoryPath = category.key
-                                              .toLowerCase()
-                                              .replace(/\s+/g, "-");
-                                            const subcategoryPath = subcategory
-                                              .toLowerCase()
-                                              .replace(/\s+/g, "-");
-                                            const subSubPath = subSubcategory
-                                              .toLowerCase()
-                                              .replace(/\s+/g, "-");
+                                            const params =
+                                              new URLSearchParams();
+
+                                            if (
+                                              category.key === "Women" ||
+                                              category.key === "Men"
+                                            ) {
+                                              // ✅ FIX: Use the same logic as handleSubSubcategoryClick
+                                              const productCategoryMapping =
+                                                AllInOneCategoryData.getBuyerToProductMapping(
+                                                  category.key,
+                                                  subcategory,
+                                                  subSubcategory
+                                                );
+
+                                              const productCategory =
+                                                productCategoryMapping?.category ||
+                                                "Clothing & Fashion";
+
+                                              // Convert to URL-friendly format
+                                              const urlCategory =
+                                                REVERSE_CATEGORY_MAPPING[
+                                                  productCategory
+                                                ] ||
+                                                productCategory
+                                                  .toLowerCase()
+                                                  .replace(/[&\s]+/g, "-");
+
+                                              params.set(
+                                                "category",
+                                                urlCategory
+                                              );
+                                              params.set(
+                                                "subcategory",
+                                                subSubcategory
+                                              );
+                                              params.set(
+                                                "buyerCategory",
+                                                category.key
+                                              );
+                                              params.set(
+                                                "buyerSubcategory",
+                                                subcategory
+                                              );
+                                            } else {
+                                              // For other categories: Use standard mapping
+                                              const urlCategory =
+                                                REVERSE_CATEGORY_MAPPING[
+                                                  category.key
+                                                ] ||
+                                                category.key
+                                                  .toLowerCase()
+                                                  .replace(/\s+/g, "-");
+
+                                              params.set(
+                                                "category",
+                                                urlCategory
+                                              );
+                                              params.set(
+                                                "subcategory",
+                                                subcategory
+                                              );
+                                              params.set(
+                                                "subsubcategory",
+                                                subSubcategory
+                                              );
+                                              params.set(
+                                                "buyerCategory",
+                                                category.key
+                                              );
+                                              params.set(
+                                                "buyerSubcategory",
+                                                subcategory
+                                              );
+                                            }
+
+                                            params.set(
+                                              "displayName",
+                                              getLocalizedSubSubcategory(
+                                                category.key,
+                                                subcategory,
+                                                subSubcategory
+                                              )
+                                            );
+
                                             router.push(
-                                              `/category/${categoryPath}/${subcategoryPath}/${subSubPath}`
+                                              `/dynamicmarket2?${params.toString()}`
                                             );
                                             setShowCategoriesMenu(false);
                                             setHoveredCategory(null);

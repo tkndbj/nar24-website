@@ -1921,7 +1921,7 @@
     "endOfResults": "You've reached the end"
   },
   "productOptionSelector": {
-    "selectOptions": "Select Options",    
+    "selectOptions": "Select Options",
     "quantity": "Quantity",
     "confirm": "Confirm",
     "cancel": "Cancel",
@@ -1936,8 +1936,7 @@
     "outOfStock": "Out of Stock",
     "limitedStock": "Only {count} left in stock",
     "maxQuantityReached": "Maximum quantity reached",
-    "minQuantityRequired": "Minimum 1 quantity required"    
-  
+    "minQuantityRequired": "Minimum 1 quantity required"
   },
   "CartDrawer": {
     "title": "My Cart",
@@ -2024,8 +2023,8 @@
     "failedToTransferToBasket": "Failed to transfer to basket",
     "failedToAddToCart": "Failed to add to cart",
     "itemsAddedToCart": "items added to cart",
-    "selectBasket": "Select Basket"   
-  } ,
+    "selectBasket": "Select Basket"
+  },
   "gender": "Gender",
   "clothingSize": "Clothing Size",
   "clothingFit": "Clothing Fit",
@@ -2033,7 +2032,7 @@
   "selectSize": "Size",
   "selectAvailableSizes": "Available Sizes",
   "selectJewelryType": "Jewelry Type",
-  "selectJewelryMaterial": "Jewelry Materials",  
+  "selectJewelryMaterial": "Jewelry Materials",
   "clothingGenderWomen": "Women",
   "clothingGenderMen": "Men",
   "clothingGenderUnisex": "Unisex",
@@ -2103,7 +2102,7 @@
   "colorNavy": "Navy",
   "colorSilver": "Silver",
   "selectOptions": "Select Options",
-  "quantity": "Quantity", 
+  "quantity": "Quantity",
   "confirm": "Confirm",
   "cancel": "Cancel",
   "maxAvailable": "Max available",
@@ -2155,5 +2154,27 @@
     "clickToSelectLocation": "Click on the map to select a location",
     "cancel": "Cancel",
     "confirm": "Confirm"
-  } 
+  },
+  "DynamicMarket": {
+    "filterAll": "All",
+    "filterDeals": "Deals",
+    "filterFeatured": "Featured",
+    "filterTrending": "Trending",
+    "filterFiveStar": "5 Star",
+    "filterBestSellers": "Best Sellers",
+    "sortNone": "Default",
+    "sortAlphabetical": "Alphabetical",
+    "sortDate": "Newest",
+    "sortPriceLowToHigh": "Price: Low to High",
+    "sortPriceHighToLow": "Price: High to Low",
+    "sort": "Sort",
+    "selectSortOption": "Select sort option",
+    "featuredProducts": "Featured Products",
+    "allProducts": "All Products",
+    "products": "products",
+    "noProductsFound": "No products found",
+    "tryAdjustingFilters": "Try adjusting your filters or search terms",
+    "loadingMore": "Loading more products...",
+    "loadMore": "Load More"
+  }
 }
