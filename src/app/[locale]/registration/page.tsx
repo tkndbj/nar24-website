@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import React, { useState, useEffect, useRef, Suspense } from "react";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import {
   signInWithPopup,
   GoogleAuthProvider,
@@ -27,7 +27,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import { AuthError } from "firebase/auth";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 
 // Types
 interface FormData {
@@ -46,6 +46,8 @@ interface FormData {
 function RegistrationContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const locale = useLocale();
   const t = useTranslations();
 
   // State management
@@ -54,6 +56,8 @@ function RegistrationContent() {
     useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [isDark, setIsDark] = useState(false);
+  const [showLanguageMenu, setShowLanguageMenu] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     name: "",
     surname: "",
@@ -66,6 +70,40 @@ function RegistrationContent() {
     referralCode: "",
   });
 
+  const languageMenuRef = useRef<HTMLDivElement>(null);
+
+  // Handle theme detection
+  useEffect(() => {
+    const checkTheme = () => {
+      if (typeof document !== "undefined") {
+        setIsDark(document.documentElement.classList.contains("dark"));
+      }
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    if (typeof document !== "undefined") {
+      observer.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["class"],
+      });
+    }
+    return () => observer.disconnect();
+  }, []);
+
+  // Handle click outside for language menu
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        languageMenuRef.current &&
+        !languageMenuRef.current.contains(event.target as Node)
+      ) {
+        setShowLanguageMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   // Initialize from URL params
   useEffect(() => {
     const emailParam = searchParams.get("email");
@@ -73,6 +111,27 @@ function RegistrationContent() {
       setFormData((prev) => ({ ...prev, email: emailParam }));
     }
   }, [searchParams]);
+
+  // Language switching function
+  const switchLanguage = (newLocale: string, event?: React.MouseEvent) => {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+
+    console.log("Switching language to:", newLocale);
+
+    let pathWithoutLocale = pathname;
+    if (pathname.startsWith(`/${locale}`)) {
+      pathWithoutLocale = pathname.substring(`/${locale}`.length) || "/";
+    }
+
+    const newPath = `/${newLocale}${pathWithoutLocale}`;
+    console.log("New path:", newPath);
+
+    router.push(newPath);
+    setShowLanguageMenu(false);
+  };
 
   // Handle input changes
   const handleInputChange = (field: keyof FormData, value: string) => {
@@ -383,12 +442,28 @@ function RegistrationContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-blue-900/20 dark:to-purple-900/20">
+    <div className={`min-h-screen transition-all duration-300 ${
+      isDark 
+        ? "bg-gray-900" 
+        : "bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50"
+    }`}>
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-4 -left-4 w-72 h-72 bg-gradient-to-r from-blue-300 to-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob"></div>
-        <div className="absolute -top-4 -right-4 w-72 h-72 bg-gradient-to-r from-yellow-300 to-pink-300 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob animation-delay-2000"></div>
-        <div className="absolute -bottom-8 left-20 w-72 h-72 bg-gradient-to-r from-pink-300 to-indigo-300 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob animation-delay-4000"></div>
+        <div className={`absolute -top-4 -left-4 w-72 h-72 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob ${
+          isDark 
+            ? "bg-gradient-to-r from-blue-600 to-purple-600" 
+            : "bg-gradient-to-r from-blue-300 to-purple-300"
+        }`}></div>
+        <div className={`absolute -top-4 -right-4 w-72 h-72 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob animation-delay-2000 ${
+          isDark 
+            ? "bg-gradient-to-r from-yellow-600 to-pink-600" 
+            : "bg-gradient-to-r from-yellow-300 to-pink-300"
+        }`}></div>
+        <div className={`absolute -bottom-8 left-20 w-72 h-72 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob animation-delay-4000 ${
+          isDark 
+            ? "bg-gradient-to-r from-pink-600 to-indigo-600" 
+            : "bg-gradient-to-r from-pink-300 to-indigo-300"
+        }`}></div>
       </div>
 
       <div className="relative min-h-screen flex items-center justify-center p-4 py-8">
@@ -397,17 +472,102 @@ function RegistrationContent() {
           <div className="flex items-center justify-between mb-6">
             <button
               onClick={() => router.back()}
-              className="p-3 rounded-full bg-white/20 dark:bg-gray-800/20 backdrop-blur-lg border border-white/20 hover:bg-white/30 dark:hover:bg-gray-700/30 transition-all duration-300 group"
+              className={`p-3 rounded-full backdrop-blur-lg border transition-all duration-300 group ${
+                isDark
+                  ? "bg-gray-800/20 border-gray-700/20 hover:bg-gray-700/30"
+                  : "bg-white/20 border-white/20 hover:bg-white/30"
+              }`}
             >
-              <ArrowLeftIcon className="w-5 h-5 text-gray-600 dark:text-gray-300 group-hover:text-gray-800 dark:group-hover:text-white transition-colors" />
+              <ArrowLeftIcon className={`w-5 h-5 transition-colors ${
+                isDark 
+                  ? "text-gray-300 group-hover:text-white" 
+                  : "text-gray-600 group-hover:text-gray-800"
+              }`} />
             </button>
-            <button className="p-3 rounded-full bg-white/20 dark:bg-gray-800/20 backdrop-blur-lg border border-white/20 hover:bg-white/30 dark:hover:bg-gray-700/30 transition-all duration-300 group">
-              <GlobeAltIcon className="w-5 h-5 text-gray-600 dark:text-gray-300 group-hover:text-gray-800 dark:group-hover:text-white transition-colors" />
-            </button>
+            
+            <div className="relative" ref={languageMenuRef}>
+              <button
+                onClick={() => setShowLanguageMenu(!showLanguageMenu)}
+                className={`p-3 rounded-full backdrop-blur-lg border transition-all duration-300 group ${
+                  isDark
+                    ? "bg-gray-800/20 border-gray-700/20 hover:bg-gray-700/30"
+                    : "bg-white/20 border-white/20 hover:bg-white/30"
+                }`}
+                aria-label={t('header.languageSelection')}
+              >
+                <GlobeAltIcon className={`w-5 h-5 transition-colors ${
+                  isDark 
+                    ? "text-gray-300 group-hover:text-white" 
+                    : "text-gray-600 group-hover:text-gray-800"
+                }`} />
+              </button>
+
+              {/* Language Menu */}
+              {showLanguageMenu && (
+                <div
+                  className={`
+                    absolute right-0 top-full mt-2 w-32
+                    ${isDark ? "bg-gray-800" : "bg-white"}
+                    border ${isDark ? "border-gray-700" : "border-gray-200"}
+                    rounded-lg shadow-xl backdrop-blur-xl z-50
+                    overflow-hidden
+                  `}
+                >
+                  <button
+                    onClick={() => switchLanguage("tr")}
+                    className={`
+                      w-full flex items-center space-x-3 px-4 py-3 text-left
+                      hover:bg-gray-100 dark:hover:bg-gray-700 
+                      transition-colors duration-150
+                      ${
+                        locale === "tr"
+                          ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                          : ""
+                      }
+                    `}
+                  >
+                    <span className="text-lg">🇹🇷</span>
+                    <span
+                      className={`text-sm font-medium ${
+                        isDark ? "text-gray-200" : "text-gray-900"
+                      }`}
+                    >
+                      {t('header.turkish')}
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => switchLanguage("en")}
+                    className={`
+                      w-full flex items-center space-x-3 px-4 py-3 text-left
+                      hover:bg-gray-100 dark:hover:bg-gray-700 
+                      transition-colors duration-150
+                      ${
+                        locale === "en"
+                          ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                          : ""
+                      }
+                    `}
+                  >
+                    <span className="text-lg">🇺🇸</span>
+                    <span
+                      className={`text-sm font-medium ${
+                        isDark ? "text-gray-200" : "text-gray-900"
+                      }`}
+                    >
+                      {t('header.english')}
+                    </span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Main Card */}
-          <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 dark:border-gray-700/20 p-8 relative overflow-hidden">
+          <div className={`backdrop-blur-xl rounded-3xl shadow-2xl border p-8 relative overflow-hidden ${
+            isDark
+              ? "bg-gray-800/80 border-gray-700/20"
+              : "bg-white/80 border-white/20"
+          }`}>
             {/* Card Background Pattern */}
             <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-blue-400/10 to-transparent rounded-full"></div>
             <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-purple-400/10 to-transparent rounded-full"></div>
@@ -418,10 +578,16 @@ function RegistrationContent() {
                 <UserIcon className="w-10 h-10 text-white" />
                 <div className="absolute inset-0 rounded-full bg-gradient-to-r from-green-500 to-emerald-600 animate-ping opacity-20"></div>
               </div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent mb-2">
+              <h1 className={`text-3xl font-bold bg-gradient-to-r bg-clip-text text-transparent mb-2 ${
+                isDark
+                  ? "from-white to-gray-300"
+                  : "from-gray-800 to-gray-600"
+              }`}>
                 {t("RegistrationPage.createAccount")}
               </h1>
-              <p className="text-gray-600 dark:text-gray-400 font-medium">
+              <p className={`font-medium ${
+                isDark ? "text-gray-400" : "text-gray-600"
+              }`}>
                 {t("RegistrationPage.joinUsToday")}
               </p>
             </div>
@@ -432,7 +598,9 @@ function RegistrationContent() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Name Field */}
                 <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  <label className={`block text-sm font-semibold mb-2 ${
+                    isDark ? "text-gray-300" : "text-gray-700"
+                  }`}>
                     {t("RegistrationPage.name")}
                   </label>
                   <div className="relative">
@@ -453,11 +621,21 @@ function RegistrationContent() {
                       }
                       onFocus={() => setFocusedField("name")}
                       onBlur={() => setFocusedField(null)}
-                      className={`w-full pl-12 pr-4 py-4 rounded-2xl border-2 transition-all duration-300 focus:outline-none focus:ring-4 ${
+                      className={`w-full pl-12 pr-4 py-4 rounded-2xl border-2 transition-all duration-300 focus:outline-none focus:ring-4 text-sm font-medium ${
                         focusedField === "name"
-                          ? "border-green-500 bg-green-50/50 dark:bg-green-900/10 ring-green-500/20 shadow-lg"
-                          : "border-gray-200 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-700/50 hover:border-gray-300 dark:hover:border-gray-500"
-                      } dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm font-medium`}
+                          ? `border-green-500 ring-green-500/20 shadow-lg ${
+                              isDark ? "bg-green-900/10" : "bg-green-50/50"
+                            }`
+                          : `${
+                              isDark
+                                ? "border-gray-600 bg-gray-700/50 hover:border-gray-500"
+                                : "border-gray-200 bg-gray-50/50 hover:border-gray-300"
+                            }`
+                      } ${
+                        isDark
+                          ? "text-white placeholder-gray-400"
+                          : "text-gray-900 placeholder-gray-500"
+                      }`}
                       placeholder={t("RegistrationPage.enterName")}
                       required
                     />
@@ -466,7 +644,9 @@ function RegistrationContent() {
 
                 {/* Surname Field */}
                 <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  <label className={`block text-sm font-semibold mb-2 ${
+                    isDark ? "text-gray-300" : "text-gray-700"
+                  }`}>
                     {t("RegistrationPage.surname")}
                   </label>
                   <div className="relative">
@@ -487,11 +667,21 @@ function RegistrationContent() {
                       }
                       onFocus={() => setFocusedField("surname")}
                       onBlur={() => setFocusedField(null)}
-                      className={`w-full pl-12 pr-4 py-4 rounded-2xl border-2 transition-all duration-300 focus:outline-none focus:ring-4 ${
+                      className={`w-full pl-12 pr-4 py-4 rounded-2xl border-2 transition-all duration-300 focus:outline-none focus:ring-4 text-sm font-medium ${
                         focusedField === "surname"
-                          ? "border-green-500 bg-green-50/50 dark:bg-green-900/10 ring-green-500/20 shadow-lg"
-                          : "border-gray-200 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-700/50 hover:border-gray-300 dark:hover:border-gray-500"
-                      } dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm font-medium`}
+                          ? `border-green-500 ring-green-500/20 shadow-lg ${
+                              isDark ? "bg-green-900/10" : "bg-green-50/50"
+                            }`
+                          : `${
+                              isDark
+                                ? "border-gray-600 bg-gray-700/50 hover:border-gray-500"
+                                : "border-gray-200 bg-gray-50/50 hover:border-gray-300"
+                            }`
+                      } ${
+                        isDark
+                          ? "text-white placeholder-gray-400"
+                          : "text-gray-900 placeholder-gray-500"
+                      }`}
                       placeholder={t("RegistrationPage.enterSurname")}
                       required
                     />
@@ -501,7 +691,9 @@ function RegistrationContent() {
 
               {/* Email Field */}
               <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                <label className={`block text-sm font-semibold mb-2 ${
+                  isDark ? "text-gray-300" : "text-gray-700"
+                }`}>
                   {t("RegistrationPage.email")}
                 </label>
                 <div className="relative">
@@ -520,11 +712,21 @@ function RegistrationContent() {
                     onChange={(e) => handleInputChange("email", e.target.value)}
                     onFocus={() => setFocusedField("email")}
                     onBlur={() => setFocusedField(null)}
-                    className={`w-full pl-12 pr-4 py-4 rounded-2xl border-2 transition-all duration-300 focus:outline-none focus:ring-4 ${
+                    className={`w-full pl-12 pr-4 py-4 rounded-2xl border-2 transition-all duration-300 focus:outline-none focus:ring-4 text-sm font-medium ${
                       focusedField === "email"
-                        ? "border-green-500 bg-green-50/50 dark:bg-green-900/10 ring-green-500/20 shadow-lg"
-                        : "border-gray-200 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-700/50 hover:border-gray-300 dark:hover:border-gray-500"
-                    } dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm font-medium`}
+                        ? `border-green-500 ring-green-500/20 shadow-lg ${
+                            isDark ? "bg-green-900/10" : "bg-green-50/50"
+                          }`
+                        : `${
+                            isDark
+                              ? "border-gray-600 bg-gray-700/50 hover:border-gray-500"
+                              : "border-gray-200 bg-gray-50/50 hover:border-gray-300"
+                          }`
+                    } ${
+                      isDark
+                        ? "text-white placeholder-gray-400"
+                        : "text-gray-900 placeholder-gray-500"
+                    }`}
                     placeholder={t("RegistrationPage.enterEmail")}
                     required
                   />
@@ -535,7 +737,9 @@ function RegistrationContent() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Password Field */}
                 <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  <label className={`block text-sm font-semibold mb-2 ${
+                    isDark ? "text-gray-300" : "text-gray-700"
+                  }`}>
                     {t("RegistrationPage.password")}
                   </label>
                   <div className="relative">
@@ -556,11 +760,21 @@ function RegistrationContent() {
                       }
                       onFocus={() => setFocusedField("password")}
                       onBlur={() => setFocusedField(null)}
-                      className={`w-full pl-12 pr-12 py-4 rounded-2xl border-2 transition-all duration-300 focus:outline-none focus:ring-4 ${
+                      className={`w-full pl-12 pr-12 py-4 rounded-2xl border-2 transition-all duration-300 focus:outline-none focus:ring-4 text-sm font-medium ${
                         focusedField === "password"
-                          ? "border-green-500 bg-green-50/50 dark:bg-green-900/10 ring-green-500/20 shadow-lg"
-                          : "border-gray-200 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-700/50 hover:border-gray-300 dark:hover:border-gray-500"
-                      } dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm font-medium`}
+                          ? `border-green-500 ring-green-500/20 shadow-lg ${
+                              isDark ? "bg-green-900/10" : "bg-green-50/50"
+                            }`
+                          : `${
+                              isDark
+                                ? "border-gray-600 bg-gray-700/50 hover:border-gray-500"
+                                : "border-gray-200 bg-gray-50/50 hover:border-gray-300"
+                            }`
+                      } ${
+                        isDark
+                          ? "text-white placeholder-gray-400"
+                          : "text-gray-900 placeholder-gray-500"
+                      }`}
                       placeholder={t("RegistrationPage.enterPassword")}
                       required
                       minLength={6}
@@ -568,7 +782,11 @@ function RegistrationContent() {
                     <button
                       type="button"
                       onClick={() => setIsPasswordVisible(!isPasswordVisible)}
-                      className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                      className={`absolute inset-y-0 right-0 pr-4 flex items-center transition-colors ${
+                        isDark
+                          ? "text-gray-400 hover:text-gray-300"
+                          : "text-gray-400 hover:text-gray-600"
+                      }`}
                     >
                       {isPasswordVisible ? (
                         <EyeSlashIcon className="h-5 w-5" />
@@ -581,7 +799,9 @@ function RegistrationContent() {
 
                 {/* Confirm Password Field */}
                 <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  <label className={`block text-sm font-semibold mb-2 ${
+                    isDark ? "text-gray-300" : "text-gray-700"
+                  }`}>
                     {t("RegistrationPage.confirmPassword")}
                   </label>
                   <div className="relative">
@@ -602,11 +822,21 @@ function RegistrationContent() {
                       }
                       onFocus={() => setFocusedField("confirmPassword")}
                       onBlur={() => setFocusedField(null)}
-                      className={`w-full pl-12 pr-12 py-4 rounded-2xl border-2 transition-all duration-300 focus:outline-none focus:ring-4 ${
+                      className={`w-full pl-12 pr-12 py-4 rounded-2xl border-2 transition-all duration-300 focus:outline-none focus:ring-4 text-sm font-medium ${
                         focusedField === "confirmPassword"
-                          ? "border-green-500 bg-green-50/50 dark:bg-green-900/10 ring-green-500/20 shadow-lg"
-                          : "border-gray-200 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-700/50 hover:border-gray-300 dark:hover:border-gray-500"
-                      } dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm font-medium`}
+                          ? `border-green-500 ring-green-500/20 shadow-lg ${
+                              isDark ? "bg-green-900/10" : "bg-green-50/50"
+                            }`
+                          : `${
+                              isDark
+                                ? "border-gray-600 bg-gray-700/50 hover:border-gray-500"
+                                : "border-gray-200 bg-gray-50/50 hover:border-gray-300"
+                            }`
+                      } ${
+                        isDark
+                          ? "text-white placeholder-gray-400"
+                          : "text-gray-900 placeholder-gray-500"
+                      }`}
                       placeholder={t("RegistrationPage.confirmPassword")}
                       required
                       minLength={6}
@@ -616,7 +846,11 @@ function RegistrationContent() {
                       onClick={() =>
                         setIsConfirmPasswordVisible(!isConfirmPasswordVisible)
                       }
-                      className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                      className={`absolute inset-y-0 right-0 pr-4 flex items-center transition-colors ${
+                        isDark
+                          ? "text-gray-400 hover:text-gray-300"
+                          : "text-gray-400 hover:text-gray-600"
+                      }`}
                     >
                       {isConfirmPasswordVisible ? (
                         <EyeSlashIcon className="h-5 w-5" />
@@ -632,7 +866,9 @@ function RegistrationContent() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Gender Field */}
                 <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  <label className={`block text-sm font-semibold mb-2 ${
+                    isDark ? "text-gray-300" : "text-gray-700"
+                  }`}>
                     {t("RegistrationPage.gender")}
                   </label>
                   <div className="relative">
@@ -652,11 +888,21 @@ function RegistrationContent() {
                       }
                       onFocus={() => setFocusedField("gender")}
                       onBlur={() => setFocusedField(null)}
-                      className={`w-full pl-12 pr-4 py-4 rounded-2xl border-2 transition-all duration-300 focus:outline-none focus:ring-4 ${
+                      className={`w-full pl-12 pr-4 py-4 rounded-2xl border-2 transition-all duration-300 focus:outline-none focus:ring-4 text-sm font-medium ${
                         focusedField === "gender"
-                          ? "border-green-500 bg-green-50/50 dark:bg-green-900/10 ring-green-500/20 shadow-lg"
-                          : "border-gray-200 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-700/50 hover:border-gray-300 dark:hover:border-gray-500"
-                      } dark:text-white text-sm font-medium`}
+                          ? `border-green-500 ring-green-500/20 shadow-lg ${
+                              isDark ? "bg-green-900/10" : "bg-green-50/50"
+                            }`
+                          : `${
+                              isDark
+                                ? "border-gray-600 bg-gray-700/50 hover:border-gray-500"
+                                : "border-gray-200 bg-gray-50/50 hover:border-gray-300"
+                            }`
+                      } ${
+                        isDark
+                          ? "text-white"
+                          : "text-gray-900"
+                      }`}
                       required
                     >
                       <option value="">
@@ -675,7 +921,9 @@ function RegistrationContent() {
 
                 {/* Birth Year Field */}
                 <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  <label className={`block text-sm font-semibold mb-2 ${
+                    isDark ? "text-gray-300" : "text-gray-700"
+                  }`}>
                     {t("RegistrationPage.birthYear")}
                   </label>
                   <div className="relative">
@@ -695,11 +943,21 @@ function RegistrationContent() {
                       }
                       onFocus={() => setFocusedField("birthDate")}
                       onBlur={() => setFocusedField(null)}
-                      className={`w-full pl-12 pr-4 py-4 rounded-2xl border-2 transition-all duration-300 focus:outline-none focus:ring-4 ${
+                      className={`w-full pl-12 pr-4 py-4 rounded-2xl border-2 transition-all duration-300 focus:outline-none focus:ring-4 text-sm font-medium ${
                         focusedField === "birthDate"
-                          ? "border-green-500 bg-green-50/50 dark:bg-green-900/10 ring-green-500/20 shadow-lg"
-                          : "border-gray-200 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-700/50 hover:border-gray-300 dark:hover:border-gray-500"
-                      } dark:text-white text-sm font-medium`}
+                          ? `border-green-500 ring-green-500/20 shadow-lg ${
+                              isDark ? "bg-green-900/10" : "bg-green-50/50"
+                            }`
+                          : `${
+                              isDark
+                                ? "border-gray-600 bg-gray-700/50 hover:border-gray-500"
+                                : "border-gray-200 bg-gray-50/50 hover:border-gray-300"
+                            }`
+                      } ${
+                        isDark
+                          ? "text-white"
+                          : "text-gray-900"
+                      }`}
                       required
                     >
                       <option value="">
@@ -719,7 +977,9 @@ function RegistrationContent() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Language Field */}
                 <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  <label className={`block text-sm font-semibold mb-2 ${
+                    isDark ? "text-gray-300" : "text-gray-700"
+                  }`}>
                     {t("RegistrationPage.language")}
                   </label>
                   <div className="relative">
@@ -739,11 +999,21 @@ function RegistrationContent() {
                       }
                       onFocus={() => setFocusedField("language")}
                       onBlur={() => setFocusedField(null)}
-                      className={`w-full pl-12 pr-4 py-4 rounded-2xl border-2 transition-all duration-300 focus:outline-none focus:ring-4 ${
+                      className={`w-full pl-12 pr-4 py-4 rounded-2xl border-2 transition-all duration-300 focus:outline-none focus:ring-4 text-sm font-medium ${
                         focusedField === "language"
-                          ? "border-green-500 bg-green-50/50 dark:bg-green-900/10 ring-green-500/20 shadow-lg"
-                          : "border-gray-200 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-700/50 hover:border-gray-300 dark:hover:border-gray-500"
-                      } dark:text-white text-sm font-medium`}
+                          ? `border-green-500 ring-green-500/20 shadow-lg ${
+                              isDark ? "bg-green-900/10" : "bg-green-50/50"
+                            }`
+                          : `${
+                              isDark
+                                ? "border-gray-600 bg-gray-700/50 hover:border-gray-500"
+                                : "border-gray-200 bg-gray-50/50 hover:border-gray-300"
+                            }`
+                      } ${
+                        isDark
+                          ? "text-white"
+                          : "text-gray-900"
+                      }`}
                       required
                     >
                       <option value="">
@@ -758,7 +1028,9 @@ function RegistrationContent() {
 
                 {/* Referral Code Field */}
                 <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  <label className={`block text-sm font-semibold mb-2 ${
+                    isDark ? "text-gray-300" : "text-gray-700"
+                  }`}>
                     {t("RegistrationPage.referralCode")}{" "}
                     <span className="text-gray-400">
                       ({t("RegistrationPage.optional")})
@@ -782,11 +1054,21 @@ function RegistrationContent() {
                       }
                       onFocus={() => setFocusedField("referralCode")}
                       onBlur={() => setFocusedField(null)}
-                      className={`w-full pl-12 pr-4 py-4 rounded-2xl border-2 transition-all duration-300 focus:outline-none focus:ring-4 ${
+                      className={`w-full pl-12 pr-4 py-4 rounded-2xl border-2 transition-all duration-300 focus:outline-none focus:ring-4 text-sm font-medium ${
                         focusedField === "referralCode"
-                          ? "border-green-500 bg-green-50/50 dark:bg-green-900/10 ring-green-500/20 shadow-lg"
-                          : "border-gray-200 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-700/50 hover:border-gray-300 dark:hover:border-gray-500"
-                      } dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm font-medium`}
+                          ? `border-green-500 ring-green-500/20 shadow-lg ${
+                              isDark ? "bg-green-900/10" : "bg-green-50/50"
+                            }`
+                          : `${
+                              isDark
+                                ? "border-gray-600 bg-gray-700/50 hover:border-gray-500"
+                                : "border-gray-200 bg-gray-50/50 hover:border-gray-300"
+                            }`
+                      } ${
+                        isDark
+                          ? "text-white placeholder-gray-400"
+                          : "text-gray-900 placeholder-gray-500"
+                      }`}
                       placeholder={t("RegistrationPage.enterReferralCode")}
                     />
                   </div>
@@ -814,10 +1096,16 @@ function RegistrationContent() {
               {/* Divider */}
               <div className="relative my-6">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-200 dark:border-gray-600"></div>
+                  <div className={`w-full border-t ${
+                    isDark ? "border-gray-600" : "border-gray-200"
+                  }`}></div>
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-4 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 font-medium">
+                  <span className={`px-4 font-medium ${
+                    isDark
+                      ? "bg-gray-800 text-gray-400"
+                      : "bg-white text-gray-500"
+                  }`}>
                     {t("RegistrationPage.or")}
                   </span>
                 </div>
@@ -828,7 +1116,11 @@ function RegistrationContent() {
                 type="button"
                 onClick={handleGoogleRegistration}
                 disabled={isLoading}
-                className="w-full bg-white dark:bg-gray-700 border-2 border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 text-gray-700 dark:text-gray-200 font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] shadow-lg hover:shadow-xl disabled:scale-100 flex items-center justify-center space-x-3 group"
+                className={`w-full border-2 font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] shadow-lg hover:shadow-xl disabled:scale-100 flex items-center justify-center space-x-3 group ${
+                  isDark
+                    ? "bg-gray-700 border-gray-600 hover:border-gray-500 text-gray-200"
+                    : "bg-white border-gray-200 hover:border-gray-300 text-gray-700"
+                }`}
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
                   <path
@@ -856,7 +1148,11 @@ function RegistrationContent() {
             <div className="mt-8 space-y-4 text-center">
               <button
                 onClick={() => router.push("/login")}
-                className="block w-full text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 font-semibold text-sm transition-colors duration-200 py-2"
+                className={`block w-full font-semibold text-sm transition-colors duration-200 py-2 ${
+                  isDark
+                    ? "text-green-400 hover:text-green-300"
+                    : "text-green-600 hover:text-green-700"
+                }`}
               >
                 {t("RegistrationPage.alreadyHaveAccount")}{" "}
                 <span className="underline">
@@ -866,7 +1162,11 @@ function RegistrationContent() {
 
               <button
                 onClick={() => router.push("/")}
-                className="block w-full text-gray-500 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 font-medium text-sm transition-colors duration-200 py-2"
+                className={`block w-full font-medium text-sm transition-colors duration-200 py-2 ${
+                  isDark
+                    ? "text-gray-500 hover:text-gray-300"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
               >
                 {t("RegistrationPage.continueAsGuest")}
               </button>
@@ -907,7 +1207,7 @@ function RegistrationContent() {
 // Loading component to show while Suspense is loading
 function RegistrationLoading() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-blue-900/20 dark:to-purple-900/20 flex items-center justify-center">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:bg-gray-900 flex items-center justify-center">
       <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
     </div>
   );
