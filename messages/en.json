@@ -1875,6 +1875,13 @@
     "enterPassword": "Enter your password",
     "emailRequired": "Email address is required",
     "passwordRequired": "Password is required",
+    "verificationCodeSent": "Verification code sent!",
+    "invalidVerificationCode": "Invalid verification code",
+    "verificationCodeExpired": "Verification code has expired",
+    "verificationCodeUsed": "Verification code has already been used",
+    "noVerificationCode": "No verification code found",
+    "emailVerified": "Email verified successfully!",
+    "verificationError": "Verification failed",
     "invalidEmail": "Invalid email address",
     "passwordTooShort": "Password must be at least 6 characters",
     "loginSuccess": "Login successful! Welcome!",
@@ -2216,5 +2223,16 @@
     "emailFallback": "Check your email for the verification code",
     "copied": "Copied to clipboard",
     "openAuthenticatorFailed": "Failed to open authenticator app"
+  },
+  "EmailVerification": {
+    "title": "Verify Your Email",
+    "subtitle": "Enter the 6-digit code sent to your email",
+    "sentTo": "Code sent to:",
+    "verify": "Verify Email",
+    "didntReceive": "Didn't receive the code?",
+    "sending": "Sending...",
+    "resendIn": "Resend in",
+    "resendCode": "Resend Code",
+    "checkSpam": "Check your spam folder if you don't see the email"
   }
 }

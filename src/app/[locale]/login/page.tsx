@@ -6,7 +6,6 @@ import {
   signInWithEmailAndPassword,
   signInWithPopup,
   GoogleAuthProvider,
-  sendEmailVerification,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import {
@@ -21,6 +20,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import { AuthError } from "firebase/auth";
+import { getFunctions, httpsCallable } from "firebase/functions";
 import { useTranslations, useLocale } from "next-intl";
 import TwoFactorService from "@/services/TwoFactorService";
 // 🔥 CRITICAL: Import useUser to properly handle 2FA state
@@ -191,10 +191,21 @@ function LoginContent() {
       const user = userCredential.user;
 
       if (user && !user.emailVerified) {
-        await auth.signOut();
-        setShowVerificationMessage(true);
-        toast.error(t("LoginPage.emailNotVerified"));
-        return;
+        // Check if user is using email/password (not Google)
+        const isEmailPasswordUser = user.providerData.some(
+          (info) => info.providerId === "password"
+        );
+
+        if (isEmailPasswordUser) {
+          await auth.signOut();
+          // NEW: Redirect to email verification page instead of showing message
+          router.push(
+            `/email-verification?email=${encodeURIComponent(
+              email.trim()
+            )}&password=${encodeURIComponent(password)}`
+          );
+          return;
+        }
       }
 
       if (user) {
@@ -213,8 +224,6 @@ function LoginContent() {
           });
           router.push("/");
         }
-        // If 2FA is needed, user will be redirected to 2FA page
-        // The completion will be handled when they return from 2FA
       }
     } catch (error: unknown) {
       let message = t("LoginPage.loginError");
@@ -310,7 +319,7 @@ function LoginContent() {
   };
 
   // Resend verification email
-  const resendVerificationEmail = async () => {
+  const resendVerificationCode = async () => {
     if (!email.trim() || !password) {
       toast.error(t("LoginPage.emailPasswordRequired"));
       return;
@@ -324,6 +333,7 @@ function LoginContent() {
     setIsResending(true);
 
     try {
+      // First, sign in to get the user context
       const userCredential = await signInWithEmailAndPassword(
         auth,
         email.trim(),
@@ -332,28 +342,51 @@ function LoginContent() {
       const user = userCredential.user;
 
       if (user && !user.emailVerified) {
-        await sendEmailVerification(user);
-        toast.success(t("LoginPage.verificationEmailSent"));
+        // Call the resend verification code function
+        const functions = getFunctions(undefined, "europe-west3");
+        const resendEmailVerificationCode = httpsCallable(
+          functions,
+          "resendEmailVerificationCode"
+        );
+
+        await resendEmailVerificationCode();
+
+        toast.success(
+          t("LoginPage.verificationCodeSent") || "Verification code sent!"
+        );
         setResendCooldown(30); // 30 seconds cooldown
       }
 
+      // Sign out after sending code
       await auth.signOut();
     } catch (error: unknown) {
       let message = t("LoginPage.verificationEmailError");
 
-      switch ((error as AuthError).code) {
-        case "auth/user-not-found":
-          message = t("LoginPage.userNotFound");
-          break;
-        case "auth/wrong-password":
-          message = t("LoginPage.wrongPassword");
-          break;
-        case "auth/invalid-email":
-          message = t("LoginPage.invalidEmail");
-          break;
-        case "auth/too-many-requests":
-          message = t("LoginPage.tooManyRequests");
-          break;
+      if (error && typeof error === "object" && "code" in error) {
+        const authError = error as AuthError;
+        switch (authError.code) {
+          case "auth/user-not-found":
+            message = t("LoginPage.userNotFound");
+            break;
+          case "auth/wrong-password":
+            message = t("LoginPage.wrongPassword");
+            break;
+          case "auth/invalid-email":
+            message = t("LoginPage.invalidEmail");
+            break;
+          case "auth/too-many-requests":
+            message = t("LoginPage.tooManyRequests");
+            break;
+          case "functions/resource-exhausted":
+            message = t("LoginPage.tooManyRequests");
+            break;
+          case "functions/failed-precondition":
+            message = "Email already verified";
+            break;
+          default:
+            message =
+              authError.message || t("LoginPage.verificationEmailError");
+        }
       }
 
       toast.error(message);
@@ -628,7 +661,7 @@ function LoginContent() {
                       {t("LoginPage.verificationEmailSentMessage")}
                     </p>
                     <button
-                      onClick={resendVerificationEmail}
+                      onClick={resendVerificationCode}
                       disabled={isResending || resendCooldown > 0}
                       className="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white text-sm font-semibold rounded-xl transition-colors duration-200 disabled:cursor-not-allowed"
                     >

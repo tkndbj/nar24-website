@@ -1871,6 +1871,13 @@
     "forgotPassword": "Şifrenizi mi unuttunuz?",
     "continueAsGuest": "Misafir olarak devam et",
     "enterEmail": "ornek@email.com",
+    "verificationCodeSent": "Doğrulama kodu gönderildi!",
+    "invalidVerificationCode": "Geçersiz doğrulama kodu",
+    "verificationCodeExpired": "Doğrulama kodunun süresi dolmuş",
+    "verificationCodeUsed": "Doğrulama kodu zaten kullanılmış",
+    "noVerificationCode": "Doğrulama kodu bulunamadı",
+    "emailVerified": "E-posta başarıyla doğrulandı!",
+    "verificationError": "Doğrulama başarısız",
     "enterPassword": "Şifrenizi girin",
     "emailRequired": "E-posta adresi gerekli",
     "passwordRequired": "Şifre gerekli",
@@ -2216,5 +2223,16 @@
     "emailFallback": "Doğrulama kodu için e-postanızı kontrol edin",
     "copied": "Panoya kopyalandı",
     "openAuthenticatorFailed": "Kimlik doğrulayıcı uygulaması açılamadı"
+  },
+  "EmailVerification": {
+    "title": "E-postanızı Doğrulayın",
+    "subtitle": "E-posta adresinize gönderilen 6 haneli kodu girin",
+    "sentTo": "Kod gönderildi:",
+    "verify": "E-postayı Doğrula",
+    "didntReceive": "Kodu almadınız mı?",
+    "sending": "Gönderiliyor...",
+    "resendIn": "Tekrar gönder",
+    "resendCode": "Kodu Tekrar Gönder",
+    "checkSpam": "E-postayı görmüyorsanız spam klasörünüzü kontrol edin"
   }
 }

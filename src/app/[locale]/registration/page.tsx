@@ -5,7 +5,6 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import {
   signInWithPopup,
   GoogleAuthProvider,
-  sendEmailVerification,
   signOut,
   User,
 } from "firebase/auth";
@@ -253,7 +252,8 @@ function RegistrationContent() {
 
       const data = result.data as {
         customToken: string;
-        emailSent?: boolean; // Made optional since cloud function might not always return this
+        emailSent?: boolean;
+        verificationCodeSent?: boolean; // NEW: Check if verification code was sent
         uid: string;
       };
 
@@ -266,20 +266,11 @@ function RegistrationContent() {
       const user = userCredential.user;
 
       if (user) {
-        // If cloud function didn't send email or emailSent is undefined, send it as fallback
-        if (!data.emailSent) {
-          try {
-            await sendEmailVerification(user, {
-              url: `${window.location.origin}/login?verified=true`,
-              handleCodeInApp: false,
-            });
-            console.log("Email verification sent from client as fallback");
-          } catch (emailError) {
-            console.error("Fallback email sending failed:", emailError);
-            // Don't throw error - continue with registration
-          }
+        // NEW: Check if verification code was sent by cloud function
+        if (data.verificationCodeSent || data.emailSent) {
+          console.log("Email verification code sent by cloud function");
         } else {
-          console.log("Email verification was sent by cloud function");
+          console.warn("No verification code was sent by cloud function");
         }
 
         // Sign out immediately (user needs to verify email first)
@@ -294,11 +285,9 @@ function RegistrationContent() {
           },
         });
 
-        // Redirect to login page with verification message
+        // NEW: Redirect to email verification page instead of login
         router.push(
-          `/login?email=${encodeURIComponent(
-            formData.email
-          )}&showVerification=true`
+          `/email-verification?email=${encodeURIComponent(formData.email)}`
         );
       }
     } catch (error: unknown) {
@@ -325,23 +314,6 @@ function RegistrationContent() {
           default:
             message =
               authError.message || t("RegistrationPage.registrationError");
-        }
-      } else {
-        // Handle other errors
-        const authError = error as AuthError;
-        switch (authError?.code) {
-          case "auth/email-already-in-use":
-            message = t("RegistrationPage.emailAlreadyInUse");
-            break;
-          case "auth/invalid-email":
-            message = t("RegistrationPage.invalidEmail");
-            break;
-          case "auth/weak-password":
-            message = t("RegistrationPage.weakPassword");
-            break;
-          case "auth/network-request-failed":
-            message = t("RegistrationPage.networkError");
-            break;
         }
       }
 
@@ -442,28 +414,36 @@ function RegistrationContent() {
   };
 
   return (
-    <div className={`min-h-screen transition-all duration-300 ${
-      isDark 
-        ? "bg-gray-900" 
-        : "bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50"
-    }`}>
+    <div
+      className={`min-h-screen transition-all duration-300 ${
+        isDark
+          ? "bg-gray-900"
+          : "bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50"
+      }`}
+    >
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className={`absolute -top-4 -left-4 w-72 h-72 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob ${
-          isDark 
-            ? "bg-gradient-to-r from-blue-600 to-purple-600" 
-            : "bg-gradient-to-r from-blue-300 to-purple-300"
-        }`}></div>
-        <div className={`absolute -top-4 -right-4 w-72 h-72 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob animation-delay-2000 ${
-          isDark 
-            ? "bg-gradient-to-r from-yellow-600 to-pink-600" 
-            : "bg-gradient-to-r from-yellow-300 to-pink-300"
-        }`}></div>
-        <div className={`absolute -bottom-8 left-20 w-72 h-72 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob animation-delay-4000 ${
-          isDark 
-            ? "bg-gradient-to-r from-pink-600 to-indigo-600" 
-            : "bg-gradient-to-r from-pink-300 to-indigo-300"
-        }`}></div>
+        <div
+          className={`absolute -top-4 -left-4 w-72 h-72 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob ${
+            isDark
+              ? "bg-gradient-to-r from-blue-600 to-purple-600"
+              : "bg-gradient-to-r from-blue-300 to-purple-300"
+          }`}
+        ></div>
+        <div
+          className={`absolute -top-4 -right-4 w-72 h-72 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob animation-delay-2000 ${
+            isDark
+              ? "bg-gradient-to-r from-yellow-600 to-pink-600"
+              : "bg-gradient-to-r from-yellow-300 to-pink-300"
+          }`}
+        ></div>
+        <div
+          className={`absolute -bottom-8 left-20 w-72 h-72 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob animation-delay-4000 ${
+            isDark
+              ? "bg-gradient-to-r from-pink-600 to-indigo-600"
+              : "bg-gradient-to-r from-pink-300 to-indigo-300"
+          }`}
+        ></div>
       </div>
 
       <div className="relative min-h-screen flex items-center justify-center p-4 py-8">
@@ -478,13 +458,15 @@ function RegistrationContent() {
                   : "bg-white/20 border-white/20 hover:bg-white/30"
               }`}
             >
-              <ArrowLeftIcon className={`w-5 h-5 transition-colors ${
-                isDark 
-                  ? "text-gray-300 group-hover:text-white" 
-                  : "text-gray-600 group-hover:text-gray-800"
-              }`} />
+              <ArrowLeftIcon
+                className={`w-5 h-5 transition-colors ${
+                  isDark
+                    ? "text-gray-300 group-hover:text-white"
+                    : "text-gray-600 group-hover:text-gray-800"
+                }`}
+              />
             </button>
-            
+
             <div className="relative" ref={languageMenuRef}>
               <button
                 onClick={() => setShowLanguageMenu(!showLanguageMenu)}
@@ -493,13 +475,15 @@ function RegistrationContent() {
                     ? "bg-gray-800/20 border-gray-700/20 hover:bg-gray-700/30"
                     : "bg-white/20 border-white/20 hover:bg-white/30"
                 }`}
-                aria-label={t('header.languageSelection')}
+                aria-label={t("header.languageSelection")}
               >
-                <GlobeAltIcon className={`w-5 h-5 transition-colors ${
-                  isDark 
-                    ? "text-gray-300 group-hover:text-white" 
-                    : "text-gray-600 group-hover:text-gray-800"
-                }`} />
+                <GlobeAltIcon
+                  className={`w-5 h-5 transition-colors ${
+                    isDark
+                      ? "text-gray-300 group-hover:text-white"
+                      : "text-gray-600 group-hover:text-gray-800"
+                  }`}
+                />
               </button>
 
               {/* Language Menu */}
@@ -532,7 +516,7 @@ function RegistrationContent() {
                         isDark ? "text-gray-200" : "text-gray-900"
                       }`}
                     >
-                      {t('header.turkish')}
+                      {t("header.turkish")}
                     </span>
                   </button>
                   <button
@@ -554,7 +538,7 @@ function RegistrationContent() {
                         isDark ? "text-gray-200" : "text-gray-900"
                       }`}
                     >
-                      {t('header.english')}
+                      {t("header.english")}
                     </span>
                   </button>
                 </div>
@@ -563,11 +547,13 @@ function RegistrationContent() {
           </div>
 
           {/* Main Card */}
-          <div className={`backdrop-blur-xl rounded-3xl shadow-2xl border p-8 relative overflow-hidden ${
-            isDark
-              ? "bg-gray-800/80 border-gray-700/20"
-              : "bg-white/80 border-white/20"
-          }`}>
+          <div
+            className={`backdrop-blur-xl rounded-3xl shadow-2xl border p-8 relative overflow-hidden ${
+              isDark
+                ? "bg-gray-800/80 border-gray-700/20"
+                : "bg-white/80 border-white/20"
+            }`}
+          >
             {/* Card Background Pattern */}
             <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-blue-400/10 to-transparent rounded-full"></div>
             <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-purple-400/10 to-transparent rounded-full"></div>
@@ -578,16 +564,20 @@ function RegistrationContent() {
                 <UserIcon className="w-10 h-10 text-white" />
                 <div className="absolute inset-0 rounded-full bg-gradient-to-r from-green-500 to-emerald-600 animate-ping opacity-20"></div>
               </div>
-              <h1 className={`text-3xl font-bold bg-gradient-to-r bg-clip-text text-transparent mb-2 ${
-                isDark
-                  ? "from-white to-gray-300"
-                  : "from-gray-800 to-gray-600"
-              }`}>
+              <h1
+                className={`text-3xl font-bold bg-gradient-to-r bg-clip-text text-transparent mb-2 ${
+                  isDark
+                    ? "from-white to-gray-300"
+                    : "from-gray-800 to-gray-600"
+                }`}
+              >
                 {t("RegistrationPage.createAccount")}
               </h1>
-              <p className={`font-medium ${
-                isDark ? "text-gray-400" : "text-gray-600"
-              }`}>
+              <p
+                className={`font-medium ${
+                  isDark ? "text-gray-400" : "text-gray-600"
+                }`}
+              >
                 {t("RegistrationPage.joinUsToday")}
               </p>
             </div>
@@ -598,9 +588,11 @@ function RegistrationContent() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Name Field */}
                 <div className="space-y-2">
-                  <label className={`block text-sm font-semibold mb-2 ${
-                    isDark ? "text-gray-300" : "text-gray-700"
-                  }`}>
+                  <label
+                    className={`block text-sm font-semibold mb-2 ${
+                      isDark ? "text-gray-300" : "text-gray-700"
+                    }`}
+                  >
                     {t("RegistrationPage.name")}
                   </label>
                   <div className="relative">
@@ -644,9 +636,11 @@ function RegistrationContent() {
 
                 {/* Surname Field */}
                 <div className="space-y-2">
-                  <label className={`block text-sm font-semibold mb-2 ${
-                    isDark ? "text-gray-300" : "text-gray-700"
-                  }`}>
+                  <label
+                    className={`block text-sm font-semibold mb-2 ${
+                      isDark ? "text-gray-300" : "text-gray-700"
+                    }`}
+                  >
                     {t("RegistrationPage.surname")}
                   </label>
                   <div className="relative">
@@ -691,9 +685,11 @@ function RegistrationContent() {
 
               {/* Email Field */}
               <div className="space-y-2">
-                <label className={`block text-sm font-semibold mb-2 ${
-                  isDark ? "text-gray-300" : "text-gray-700"
-                }`}>
+                <label
+                  className={`block text-sm font-semibold mb-2 ${
+                    isDark ? "text-gray-300" : "text-gray-700"
+                  }`}
+                >
                   {t("RegistrationPage.email")}
                 </label>
                 <div className="relative">
@@ -737,9 +733,11 @@ function RegistrationContent() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Password Field */}
                 <div className="space-y-2">
-                  <label className={`block text-sm font-semibold mb-2 ${
-                    isDark ? "text-gray-300" : "text-gray-700"
-                  }`}>
+                  <label
+                    className={`block text-sm font-semibold mb-2 ${
+                      isDark ? "text-gray-300" : "text-gray-700"
+                    }`}
+                  >
                     {t("RegistrationPage.password")}
                   </label>
                   <div className="relative">
@@ -799,9 +797,11 @@ function RegistrationContent() {
 
                 {/* Confirm Password Field */}
                 <div className="space-y-2">
-                  <label className={`block text-sm font-semibold mb-2 ${
-                    isDark ? "text-gray-300" : "text-gray-700"
-                  }`}>
+                  <label
+                    className={`block text-sm font-semibold mb-2 ${
+                      isDark ? "text-gray-300" : "text-gray-700"
+                    }`}
+                  >
                     {t("RegistrationPage.confirmPassword")}
                   </label>
                   <div className="relative">
@@ -866,9 +866,11 @@ function RegistrationContent() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Gender Field */}
                 <div className="space-y-2">
-                  <label className={`block text-sm font-semibold mb-2 ${
-                    isDark ? "text-gray-300" : "text-gray-700"
-                  }`}>
+                  <label
+                    className={`block text-sm font-semibold mb-2 ${
+                      isDark ? "text-gray-300" : "text-gray-700"
+                    }`}
+                  >
                     {t("RegistrationPage.gender")}
                   </label>
                   <div className="relative">
@@ -898,11 +900,7 @@ function RegistrationContent() {
                                 ? "border-gray-600 bg-gray-700/50 hover:border-gray-500"
                                 : "border-gray-200 bg-gray-50/50 hover:border-gray-300"
                             }`
-                      } ${
-                        isDark
-                          ? "text-white"
-                          : "text-gray-900"
-                      }`}
+                      } ${isDark ? "text-white" : "text-gray-900"}`}
                       required
                     >
                       <option value="">
@@ -921,9 +919,11 @@ function RegistrationContent() {
 
                 {/* Birth Year Field */}
                 <div className="space-y-2">
-                  <label className={`block text-sm font-semibold mb-2 ${
-                    isDark ? "text-gray-300" : "text-gray-700"
-                  }`}>
+                  <label
+                    className={`block text-sm font-semibold mb-2 ${
+                      isDark ? "text-gray-300" : "text-gray-700"
+                    }`}
+                  >
                     {t("RegistrationPage.birthYear")}
                   </label>
                   <div className="relative">
@@ -953,11 +953,7 @@ function RegistrationContent() {
                                 ? "border-gray-600 bg-gray-700/50 hover:border-gray-500"
                                 : "border-gray-200 bg-gray-50/50 hover:border-gray-300"
                             }`
-                      } ${
-                        isDark
-                          ? "text-white"
-                          : "text-gray-900"
-                      }`}
+                      } ${isDark ? "text-white" : "text-gray-900"}`}
                       required
                     >
                       <option value="">
@@ -977,9 +973,11 @@ function RegistrationContent() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Language Field */}
                 <div className="space-y-2">
-                  <label className={`block text-sm font-semibold mb-2 ${
-                    isDark ? "text-gray-300" : "text-gray-700"
-                  }`}>
+                  <label
+                    className={`block text-sm font-semibold mb-2 ${
+                      isDark ? "text-gray-300" : "text-gray-700"
+                    }`}
+                  >
                     {t("RegistrationPage.language")}
                   </label>
                   <div className="relative">
@@ -1009,11 +1007,7 @@ function RegistrationContent() {
                                 ? "border-gray-600 bg-gray-700/50 hover:border-gray-500"
                                 : "border-gray-200 bg-gray-50/50 hover:border-gray-300"
                             }`
-                      } ${
-                        isDark
-                          ? "text-white"
-                          : "text-gray-900"
-                      }`}
+                      } ${isDark ? "text-white" : "text-gray-900"}`}
                       required
                     >
                       <option value="">
@@ -1028,9 +1022,11 @@ function RegistrationContent() {
 
                 {/* Referral Code Field */}
                 <div className="space-y-2">
-                  <label className={`block text-sm font-semibold mb-2 ${
-                    isDark ? "text-gray-300" : "text-gray-700"
-                  }`}>
+                  <label
+                    className={`block text-sm font-semibold mb-2 ${
+                      isDark ? "text-gray-300" : "text-gray-700"
+                    }`}
+                  >
                     {t("RegistrationPage.referralCode")}{" "}
                     <span className="text-gray-400">
                       ({t("RegistrationPage.optional")})
@@ -1096,16 +1092,20 @@ function RegistrationContent() {
               {/* Divider */}
               <div className="relative my-6">
                 <div className="absolute inset-0 flex items-center">
-                  <div className={`w-full border-t ${
-                    isDark ? "border-gray-600" : "border-gray-200"
-                  }`}></div>
+                  <div
+                    className={`w-full border-t ${
+                      isDark ? "border-gray-600" : "border-gray-200"
+                    }`}
+                  ></div>
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className={`px-4 font-medium ${
-                    isDark
-                      ? "bg-gray-800 text-gray-400"
-                      : "bg-white text-gray-500"
-                  }`}>
+                  <span
+                    className={`px-4 font-medium ${
+                      isDark
+                        ? "bg-gray-800 text-gray-400"
+                        : "bg-white text-gray-500"
+                    }`}
+                  >
                     {t("RegistrationPage.or")}
                   </span>
                 </div>

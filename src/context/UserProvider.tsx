@@ -118,6 +118,17 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   // Check if user needs 2FA verification
   const check2FARequirement = async (firebaseUser: User): Promise<boolean> => {
     try {
+      // NEW: First check if email is verified for email/password users
+      const isEmailPasswordUser = firebaseUser.providerData.some(
+        (info) => info.providerId === "password"
+      );
+
+      if (isEmailPasswordUser && !firebaseUser.emailVerified) {
+        // Email not verified for email/password user
+        // Don't proceed to 2FA check, user needs to verify email first
+        return false; // This will allow normal auth flow to handle email verification
+      }
+
       const needs2FA = await twoFactorService.is2FAEnabled();
 
       if (needs2FA) {
