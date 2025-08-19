@@ -93,9 +93,11 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     null
   );
 
-  // New 2FA gate state
+  // CRITICAL SECURITY CHANGE: Store Firebase user internally but don't expose it when 2FA is pending
   const [pending2FA, setPending2FA] = useState(false);
-  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
+  const [internalFirebaseUser, setInternalFirebaseUser] = useState<User | null>(
+    null
+  );
 
   const twoFactorService = TwoFactorService.getInstance();
 
@@ -154,7 +156,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     setProfileCompleteState(null);
     setIsLoading(false);
     setPending2FA(false);
-    setFirebaseUser(null);
+    setInternalFirebaseUser(null);
     setUser(null);
   };
 
@@ -202,7 +204,8 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
   // Fetch additional user data from Firestore
   const fetchUserData = async () => {
-    const currentUser = user || firebaseUser;
+    // SECURITY: Only use the exposed user, not the internal Firebase user
+    const currentUser = user;
     if (!currentUser) return;
 
     try {
@@ -257,12 +260,13 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     }
   };
 
-  // **NEW**: Update user data immediately (for login optimization)
+  // **MODIFIED**: Update user data immediately (for login optimization)
   const updateUserDataImmediately = async (
     currentUser: User,
     options?: { profileComplete?: boolean }
   ) => {
-    setFirebaseUser(currentUser);
+    // SECURITY: Always store internally first
+    setInternalFirebaseUser(currentUser);
 
     if (options?.profileComplete !== undefined) {
       setProfileCompleteState(options.profileComplete);
@@ -273,32 +277,37 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
     if (needs2FA) {
       setPending2FA(true);
-      setUser(null); // Don't set user until 2FA is complete
+      setUser(null); // CRITICAL: Don't expose user until 2FA is complete
     } else {
       setUser(currentUser);
       setPending2FA(false);
     }
 
     // Fetch fresh data in background without blocking UI
-    backgroundFetchUserData(currentUser);
+    if (!needs2FA) {
+      backgroundFetchUserData(currentUser);
+    }
   };
 
-  // **NEW**: Set profile completion status immediately
+  // Set profile completion status immediately
   const setProfileComplete = (complete: boolean) => {
     setProfileCompleteState(complete);
   };
 
-  // **NEW**: Complete 2FA verification
+  // **MODIFIED**: Complete 2FA verification
   const complete2FA = () => {
-    if (firebaseUser && pending2FA) {
-      setUser(firebaseUser);
+    if (internalFirebaseUser && pending2FA) {
+      setUser(internalFirebaseUser); // Now expose the user
       setPending2FA(false);
+
+      // Fetch user data now that 2FA is complete
+      backgroundFetchUserData(internalFirebaseUser);
     }
   };
 
-  // **NEW**: Cancel 2FA and sign out
+  // **MODIFIED**: Cancel 2FA and sign out
   const cancel2FA = async () => {
-    if (firebaseUser) {
+    if (internalFirebaseUser) {
       await auth.signOut();
     }
     resetState();
@@ -332,7 +341,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     try {
       await auth.currentUser?.reload();
       const currentUser = auth.currentUser;
-      setFirebaseUser(currentUser);
+      setInternalFirebaseUser(currentUser);
 
       if (currentUser) {
         const needs2FA = await check2FARequirement(currentUser);
@@ -343,9 +352,8 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         } else {
           setUser(currentUser);
           setPending2FA(false);
+          await fetchUserData();
         }
-
-        await fetchUserData();
       }
     } catch (error) {
       console.error("Error refreshing user:", error);
@@ -354,7 +362,8 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
   // Update profile data and refresh completion status
   const updateProfileData = async (updates: Partial<ProfileData>) => {
-    const currentUser = user || firebaseUser;
+    // SECURITY: Only use the exposed user
+    const currentUser = user;
     if (!currentUser) return;
 
     try {
@@ -383,9 +392,10 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     }
   };
 
-  // Get the Firebase ID token, forcing a refresh if necessary
+  // **MODIFIED**: Get the Firebase ID token, forcing a refresh if necessary
   const getIdToken = async (): Promise<string | null> => {
-    const currentUser = user || firebaseUser;
+    // SECURITY: Only use the exposed user
+    const currentUser = user;
     if (!currentUser) {
       console.log("No user logged in to fetch ID token.");
       return null;
@@ -398,14 +408,14 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     return (profileData?.[key] as T) || null;
   };
 
-  // Listen to authentication state changes
+  // **MODIFIED**: Listen to authentication state changes
   useEffect(() => {
     setIsLoading(true);
 
     const unsubscribe = onAuthStateChanged(
       auth,
       async (currentUser) => {
-        setFirebaseUser(currentUser);
+        setInternalFirebaseUser(currentUser);
 
         if (currentUser) {
           // Check if 2FA is required
@@ -413,14 +423,13 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
           if (needs2FA) {
             setPending2FA(true);
-            setUser(null); // Don't expose user until 2FA is complete
+            setUser(null); // CRITICAL: Don't expose user until 2FA is complete
           } else {
             setUser(currentUser);
             setPending2FA(false);
+            // Fetch additional user data
+            fetchUserData();
           }
-
-          // Fetch additional user data
-          fetchUserData();
         } else {
           // If the user is logged out, reset all state
           resetState();
@@ -435,15 +444,16 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     return () => unsubscribe();
   }, []);
 
-  // Update fetchUserData dependency when user changes
+  // **MODIFIED**: Update fetchUserData dependency when user changes
   useEffect(() => {
-    if (user || firebaseUser) {
+    if (user) {
+      // Only fetch when user is exposed (not pending 2FA)
       fetchUserData();
     }
-  }, [user, firebaseUser]);
+  }, [user]);
 
   const contextValue: UserContextType = {
-    user,
+    user, // This will be null when 2FA is pending
     isLoading,
     isAdmin,
     isProfileComplete,
@@ -455,7 +465,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     getProfileField,
     updateUserDataImmediately,
     setProfileComplete,
-    // New 2FA properties
+    // 2FA properties
     isPending2FA: pending2FA,
     complete2FA,
     cancel2FA,

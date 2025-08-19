@@ -324,6 +324,12 @@ class TwoFactorService {
     }
   }
 
+  public reset(): void {
+    this.currentType = null;
+    this.currentMethod = null;
+    this.otpauthUri = null;
+  }
+
   // FALLBACK
   public async useEmailFallback(type?: string): Promise<TwoFactorResult> {
     const user = auth.currentUser;
