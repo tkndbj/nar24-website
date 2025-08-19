@@ -23,6 +23,8 @@ import { toast } from "react-hot-toast";
 import { AuthError } from "firebase/auth";
 import { useTranslations, useLocale } from "next-intl";
 import TwoFactorService from "@/services/TwoFactorService";
+// 🔥 CRITICAL: Import useUser to properly handle 2FA state
+import { useUser } from "@/context/UserProvider";
 
 // Create a separate component for the login content that uses useSearchParams
 function LoginContent() {
@@ -32,6 +34,9 @@ function LoginContent() {
   const locale = useLocale();
   const t = useTranslations();
   const twoFactorService = TwoFactorService.getInstance();
+
+  // 🔥 CRITICAL: Get user context to check 2FA state
+  const { isPending2FA, cancel2FA } = useUser();
 
   // State management
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
@@ -47,6 +52,11 @@ function LoginContent() {
   const [twoFAPending, setTwoFAPending] = useState(false);
 
   const languageMenuRef = useRef<HTMLDivElement>(null);
+
+  // 🔥 CRITICAL: Sync local twoFAPending with global isPending2FA state
+  useEffect(() => {
+    setTwoFAPending(isPending2FA);
+  }, [isPending2FA]);
 
   // Handle theme detection
   useEffect(() => {
@@ -352,6 +362,64 @@ function LoginContent() {
     }
   };
 
+  // 🔥 CRITICAL FIX: Proper continue as guest handler
+  const handleContinueAsGuest = async () => {
+    if (isPending2FA || twoFAPending) {
+      // User is in 2FA state - must properly cancel and sign out
+      try {
+        // Use the cancel2FA method from UserProvider (this signs out and resets state)
+        await cancel2FA();
+
+        // Reset local state
+        setTwoFAPending(false);
+        setEmail("");
+        setPassword("");
+
+        // Clear any TwoFactorService state
+        twoFactorService.reset();
+
+        // Show success message
+        toast.success(
+          t("LoginPage.signedOutSuccessfully") || "Signed out successfully",
+          {
+            icon: "👋",
+            style: {
+              borderRadius: "10px",
+              background: "#6B7280",
+              color: "#fff",
+            },
+          }
+        );
+
+        // Small delay to ensure state is clean, then navigate
+        setTimeout(() => {
+          router.push("/");
+        }, 500);
+
+        return;
+      } catch (error) {
+        console.error("Error during 2FA cancellation:", error);
+
+        // Fallback: force sign out and reset
+        try {
+          await auth.signOut();
+          setTwoFAPending(false);
+          twoFactorService.reset();
+
+          // Nuclear option to ensure clean state
+          window.location.href = "/";
+        } catch (fallbackError) {
+          console.error("Fallback sign out failed:", fallbackError);
+          // Last resort
+          window.location.reload();
+        }
+      }
+    } else {
+      // Normal case - just navigate to home
+      router.push("/");
+    }
+  };
+
   return (
     <div
       className={`min-h-screen transition-all duration-300 ${
@@ -505,7 +573,7 @@ function LoginContent() {
             </div>
 
             {/* 2FA Pending Message */}
-            {twoFAPending && (
+            {(isPending2FA || twoFAPending) && (
               <div
                 className={`mb-6 p-4 rounded-2xl border ${
                   isDark
@@ -521,7 +589,7 @@ function LoginContent() {
                     }`}
                   >
                     {t("LoginPage.twoFactorPending") ||
-                      "Completing two-factor authentication..."}
+                      "Two-factor authentication required. Complete verification or sign out."}
                   </p>
                 </div>
               </div>
@@ -624,7 +692,7 @@ function LoginContent() {
                     }`}
                     placeholder={t("LoginPage.enterEmail")}
                     required
-                    disabled={isLoading || twoFAPending}
+                    disabled={isLoading || isPending2FA || twoFAPending}
                   />
                 </div>
               </div>
@@ -672,7 +740,7 @@ function LoginContent() {
                     placeholder={t("LoginPage.enterPassword")}
                     required
                     minLength={6}
-                    disabled={isLoading || twoFAPending}
+                    disabled={isLoading || isPending2FA || twoFAPending}
                   />
                   <button
                     type="button"
@@ -682,7 +750,7 @@ function LoginContent() {
                         ? "text-gray-400 hover:text-gray-300"
                         : "text-gray-400 hover:text-gray-600"
                     }`}
-                    disabled={isLoading || twoFAPending}
+                    disabled={isLoading || isPending2FA || twoFAPending}
                   >
                     {isPasswordVisible ? (
                       <EyeSlashIcon className="h-5 w-5" />
@@ -703,7 +771,7 @@ function LoginContent() {
                       ? "text-gray-400 hover:text-gray-200"
                       : "text-gray-600 hover:text-gray-800"
                   }`}
-                  disabled={isLoading || twoFAPending}
+                  disabled={isLoading || isPending2FA || twoFAPending}
                 >
                   {t("LoginPage.forgotPassword") || "Forgot Password?"}
                 </button>
@@ -712,10 +780,10 @@ function LoginContent() {
               {/* Login Button */}
               <button
                 type="submit"
-                disabled={isLoading || twoFAPending}
+                disabled={isLoading || isPending2FA || twoFAPending}
                 className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-bold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] disabled:scale-100 shadow-lg hover:shadow-xl disabled:shadow-md flex items-center justify-center group"
               >
-                {isLoading || twoFAPending ? (
+                {isLoading || isPending2FA || twoFAPending ? (
                   <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
                 ) : (
                   <>
@@ -751,7 +819,7 @@ function LoginContent() {
               <button
                 type="button"
                 onClick={handleGoogleSignIn}
-                disabled={isLoading || twoFAPending}
+                disabled={isLoading || isPending2FA || twoFAPending}
                 className={`w-full border-2 font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] disabled:scale-100 shadow-lg hover:shadow-xl flex items-center justify-center space-x-3 group ${
                   isDark
                     ? "bg-gray-700 border-gray-600 hover:border-gray-500 text-gray-200"
@@ -784,49 +852,38 @@ function LoginContent() {
             <div className="mt-8 space-y-4 text-center">
               <button
                 onClick={() => router.push("/registration")}
-                disabled={twoFAPending}
+                disabled={isPending2FA || twoFAPending}
                 className={`block w-full font-semibold text-sm transition-colors duration-200 py-2 ${
                   isDark
                     ? "text-blue-400 hover:text-blue-300"
                     : "text-blue-600 hover:text-blue-700"
-                } ${twoFAPending ? "opacity-50 cursor-not-allowed" : ""}`}
+                } ${
+                  isPending2FA || twoFAPending
+                    ? "opacity-50 cursor-not-allowed"
+                    : ""
+                }`}
               >
                 {t("LoginPage.noAccount")}{" "}
                 <span className="underline">{t("LoginPage.register")}</span>
               </button>
 
+              {/* 🔥 CRITICAL FIX: Proper Continue as Guest button */}
               <button
-                onClick={async () => {
-                  if (twoFAPending) {
-                    // SECURITY FIX: Ensure proper cleanup when canceling 2FA
-                    try {
-                      // Sign out from Firebase
-                      await auth.signOut();
-
-                      // Reset local state
-                      setTwoFAPending(false);
-                      setEmail("");
-                      setPassword("");
-
-                      // Clear any TwoFactorService state
-                      TwoFactorService.getInstance().reset?.(); // If you add a reset method
-
-                      // Force refresh of user context
-                      window.location.reload(); // Nuclear option to ensure clean state
-                      return;
-                    } catch (error) {
-                      console.error("Error during 2FA cancellation:", error);
-                    }
-                  }
-                  router.push("/");
-                }}
+                onClick={handleContinueAsGuest}
                 className={`block w-full font-medium text-sm transition-colors duration-200 py-2 ${
                   isDark
                     ? "text-gray-500 hover:text-gray-300"
                     : "text-gray-500 hover:text-gray-700"
+                } ${
+                  isPending2FA || twoFAPending
+                    ? "text-red-500 hover:text-red-400"
+                    : ""
                 }`}
               >
-                {t("LoginPage.continueAsGuest")}
+                {isPending2FA || twoFAPending
+                  ? t("LoginPage.signOutAndContinueAsGuest") ||
+                    "Sign Out & Continue as Guest"
+                  : t("LoginPage.continueAsGuest")}
               </button>
             </div>
           </div>
