@@ -16,6 +16,8 @@ import {
 } from "@heroicons/react/24/outline";
 import TwoFactorService from "@/services/TwoFactorService";
 import QRCode from "qrcode";
+// 🔥 CRITICAL FIX: Import useUser to access complete2FA
+import { useUser } from "@/context/UserProvider";
 
 interface TwoFactorVerificationPageProps {
   type: "setup" | "login" | "disable";
@@ -25,9 +27,11 @@ export default function TwoFactorVerificationPage({
   type,
 }: TwoFactorVerificationPageProps) {
   const router = useRouter();
-
   const t = useTranslations();
   const twoFactorService = TwoFactorService.getInstance();
+
+  // 🔥 CRITICAL FIX: Get complete2FA method from UserProvider
+  const { complete2FA } = useUser();
 
   // State management
   const [code, setCode] = useState<string[]>(Array(6).fill(""));
@@ -285,10 +289,17 @@ export default function TwoFactorVerificationPage({
           },
         });
 
-        // Navigate back or to appropriate page
+        // 🔥 CRITICAL FIX: Complete 2FA verification for login
         if (type === "login") {
-          router.push("/"); // or wherever successful login should redirect
+          // Notify UserProvider that 2FA is complete
+          complete2FA();
+
+          // Small delay to ensure state is updated
+          setTimeout(() => {
+            router.push("/");
+          }, 100);
         } else {
+          // For setup/disable, just go back
           router.back();
         }
       } else {
