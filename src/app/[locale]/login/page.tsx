@@ -22,6 +22,7 @@ import {
 import { toast } from "react-hot-toast";
 import { AuthError } from "firebase/auth";
 import { useTranslations, useLocale } from "next-intl";
+import TwoFactorService from "@/services/TwoFactorService";
 
 // Create a separate component for the login content that uses useSearchParams
 function LoginContent() {
@@ -30,6 +31,7 @@ function LoginContent() {
   const pathname = usePathname();
   const locale = useLocale();
   const t = useTranslations();
+  const twoFactorService = TwoFactorService.getInstance();
 
   // State management
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
@@ -42,6 +44,7 @@ function LoginContent() {
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [isDark, setIsDark] = useState(false);
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
+  const [twoFAPending, setTwoFAPending] = useState(false);
 
   const languageMenuRef = useRef<HTMLDivElement>(null);
 
@@ -104,16 +107,12 @@ function LoginContent() {
       event.stopPropagation();
     }
 
-    console.log("Switching language to:", newLocale);
-
     let pathWithoutLocale = pathname;
     if (pathname.startsWith(`/${locale}`)) {
       pathWithoutLocale = pathname.substring(`/${locale}`.length) || "/";
     }
 
     const newPath = `/${newLocale}${pathWithoutLocale}`;
-    console.log("New path:", newPath);
-
     router.push(newPath);
     setShowLanguageMenu(false);
   };
@@ -122,6 +121,29 @@ function LoginContent() {
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email.trim());
+  };
+
+  // Check if user needs 2FA after successful login
+  const checkAndHandle2FA = async (): Promise<boolean> => {
+    try {
+      const needs2FA = await twoFactorService.is2FAEnabled();
+
+      if (needs2FA) {
+        setTwoFAPending(true);
+
+        // Navigate to 2FA verification
+        router.push(`/two-factor-verification?type=login`);
+
+        // Return false to indicate 2FA is pending (login not complete)
+        return false;
+      }
+
+      return true; // No 2FA needed, login complete
+    } catch (error) {
+      console.error("Error handling 2FA:", error);
+      setTwoFAPending(false);
+      return true; // If error checking 2FA, proceed with login
+    }
   };
 
   // Handle email/password login
@@ -166,16 +188,23 @@ function LoginContent() {
       }
 
       if (user) {
-        toast.success(t("LoginPage.loginSuccess"), {
-          icon: "🎉",
-          style: {
-            borderRadius: "10px",
-            background: "#10B981",
-            color: "#fff",
-          },
-        });
+        // Check if 2FA verification is needed
+        const loginComplete = await checkAndHandle2FA();
 
-        router.push("/");
+        if (loginComplete) {
+          // No 2FA needed or 2FA check failed - complete login
+          toast.success(t("LoginPage.loginSuccess"), {
+            icon: "🎉",
+            style: {
+              borderRadius: "10px",
+              background: "#10B981",
+              color: "#fff",
+            },
+          });
+          router.push("/");
+        }
+        // If 2FA is needed, user will be redirected to 2FA page
+        // The completion will be handled when they return from 2FA
       }
     } catch (error: unknown) {
       let message = t("LoginPage.loginError");
@@ -227,16 +256,22 @@ function LoginContent() {
       const user = result.user;
 
       if (user) {
-        toast.success(t("LoginPage.googleLoginSuccess"), {
-          icon: "🚀",
-          style: {
-            borderRadius: "10px",
-            background: "#10B981",
-            color: "#fff",
-          },
-        });
+        // Check if 2FA verification is needed
+        const loginComplete = await checkAndHandle2FA();
 
-        router.push("/");
+        if (loginComplete) {
+          // No 2FA needed or 2FA check failed - complete login
+          toast.success(t("LoginPage.googleLoginSuccess"), {
+            icon: "🚀",
+            style: {
+              borderRadius: "10px",
+              background: "#10B981",
+              color: "#fff",
+            },
+          });
+          router.push("/");
+        }
+        // If 2FA is needed, user will be redirected to 2FA page
       }
     } catch (error: unknown) {
       let message = t("LoginPage.googleLoginError");
@@ -318,28 +353,36 @@ function LoginContent() {
   };
 
   return (
-    <div className={`min-h-screen transition-all duration-300 ${
-      isDark 
-        ? "bg-gray-900" 
-        : "bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50"
-    }`}>
+    <div
+      className={`min-h-screen transition-all duration-300 ${
+        isDark
+          ? "bg-gray-900"
+          : "bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50"
+      }`}
+    >
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className={`absolute -top-4 -left-4 w-72 h-72 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob ${
-          isDark 
-            ? "bg-gradient-to-r from-blue-600 to-purple-600" 
-            : "bg-gradient-to-r from-blue-300 to-purple-300"
-        }`}></div>
-        <div className={`absolute -top-4 -right-4 w-72 h-72 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob animation-delay-2000 ${
-          isDark 
-            ? "bg-gradient-to-r from-yellow-600 to-pink-600" 
-            : "bg-gradient-to-r from-yellow-300 to-pink-300"
-        }`}></div>
-        <div className={`absolute -bottom-8 left-20 w-72 h-72 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob animation-delay-4000 ${
-          isDark 
-            ? "bg-gradient-to-r from-pink-600 to-indigo-600" 
-            : "bg-gradient-to-r from-pink-300 to-indigo-300"
-        }`}></div>
+        <div
+          className={`absolute -top-4 -left-4 w-72 h-72 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob ${
+            isDark
+              ? "bg-gradient-to-r from-blue-600 to-purple-600"
+              : "bg-gradient-to-r from-blue-300 to-purple-300"
+          }`}
+        ></div>
+        <div
+          className={`absolute -top-4 -right-4 w-72 h-72 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob animation-delay-2000 ${
+            isDark
+              ? "bg-gradient-to-r from-yellow-600 to-pink-600"
+              : "bg-gradient-to-r from-yellow-300 to-pink-300"
+          }`}
+        ></div>
+        <div
+          className={`absolute -bottom-8 left-20 w-72 h-72 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob animation-delay-4000 ${
+            isDark
+              ? "bg-gradient-to-r from-pink-600 to-indigo-600"
+              : "bg-gradient-to-r from-pink-300 to-indigo-300"
+          }`}
+        ></div>
       </div>
 
       <div className="relative min-h-screen flex items-center justify-center p-4">
@@ -354,13 +397,15 @@ function LoginContent() {
                     ? "bg-gray-800/20 border-gray-700/20 hover:bg-gray-700/30"
                     : "bg-white/20 border-white/20 hover:bg-white/30"
                 }`}
-                aria-label={t('header.languageSelection')}
+                aria-label={t("header.languageSelection")}
               >
-                <GlobeAltIcon className={`w-5 h-5 transition-colors ${
-                  isDark 
-                    ? "text-gray-300 group-hover:text-white" 
-                    : "text-gray-600 group-hover:text-gray-800"
-                }`} />
+                <GlobeAltIcon
+                  className={`w-5 h-5 transition-colors ${
+                    isDark
+                      ? "text-gray-300 group-hover:text-white"
+                      : "text-gray-600 group-hover:text-gray-800"
+                  }`}
+                />
               </button>
 
               {/* Language Menu */}
@@ -393,7 +438,7 @@ function LoginContent() {
                         isDark ? "text-gray-200" : "text-gray-900"
                       }`}
                     >
-                      {t('header.turkish')}
+                      {t("header.turkish")}
                     </span>
                   </button>
                   <button
@@ -415,7 +460,7 @@ function LoginContent() {
                         isDark ? "text-gray-200" : "text-gray-900"
                       }`}
                     >
-                      {t('header.english')}
+                      {t("header.english")}
                     </span>
                   </button>
                 </div>
@@ -424,11 +469,13 @@ function LoginContent() {
           </div>
 
           {/* Main Card */}
-          <div className={`backdrop-blur-xl rounded-3xl shadow-2xl border p-8 relative overflow-hidden ${
-            isDark
-              ? "bg-gray-800/80 border-gray-700/20"
-              : "bg-white/80 border-white/20"
-          }`}>
+          <div
+            className={`backdrop-blur-xl rounded-3xl shadow-2xl border p-8 relative overflow-hidden ${
+              isDark
+                ? "bg-gray-800/80 border-gray-700/20"
+                : "bg-white/80 border-white/20"
+            }`}
+          >
             {/* Card Background Pattern */}
             <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-blue-400/10 to-transparent rounded-full"></div>
             <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-purple-400/10 to-transparent rounded-full"></div>
@@ -439,42 +486,77 @@ function LoginContent() {
                 <UserIcon className="w-10 h-10 text-white" />
                 <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 animate-ping opacity-20"></div>
               </div>
-              <h1 className={`text-3xl font-bold bg-gradient-to-r bg-clip-text text-transparent mb-2 ${
-                isDark
-                  ? "from-white to-gray-300"
-                  : "from-gray-800 to-gray-600"
-              }`}>
+              <h1
+                className={`text-3xl font-bold bg-gradient-to-r bg-clip-text text-transparent mb-2 ${
+                  isDark
+                    ? "from-white to-gray-300"
+                    : "from-gray-800 to-gray-600"
+                }`}
+              >
                 {t("LoginPage.welcome")}
               </h1>
-              <p className={`font-medium ${
-                isDark ? "text-gray-400" : "text-gray-600"
-              }`}>
+              <p
+                className={`font-medium ${
+                  isDark ? "text-gray-400" : "text-gray-600"
+                }`}
+              >
                 {t("LoginPage.signInToContinue")}
               </p>
             </div>
 
+            {/* 2FA Pending Message */}
+            {twoFAPending && (
+              <div
+                className={`mb-6 p-4 rounded-2xl border ${
+                  isDark
+                    ? "bg-gradient-to-r from-orange-900/20 to-pink-900/20 border-orange-700/30"
+                    : "bg-gradient-to-r from-orange-50 to-pink-50 border-orange-200"
+                }`}
+              >
+                <div className="flex items-center justify-center space-x-3">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-orange-500"></div>
+                  <p
+                    className={`text-sm font-medium ${
+                      isDark ? "text-orange-200" : "text-orange-800"
+                    }`}
+                  >
+                    {t("LoginPage.twoFactorPending") ||
+                      "Completing two-factor authentication..."}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Verification Success Message (for new registrations) */}
             {showVerificationMessage && (
-              <div className={`mb-6 p-4 rounded-2xl border ${
-                isDark
-                  ? "bg-gradient-to-r from-green-900/20 to-emerald-900/20 border-green-700/30"
-                  : "bg-gradient-to-r from-green-50 to-emerald-50 border-green-200"
-              }`}>
+              <div
+                className={`mb-6 p-4 rounded-2xl border ${
+                  isDark
+                    ? "bg-gradient-to-r from-green-900/20 to-emerald-900/20 border-green-700/30"
+                    : "bg-gradient-to-r from-green-50 to-emerald-50 border-green-200"
+                }`}
+              >
                 <div className="flex items-start space-x-3">
                   <div className="flex-shrink-0">
-                    <CheckCircleIcon className={`w-6 h-6 mt-0.5 ${
-                      isDark ? "text-green-400" : "text-green-600"
-                    }`} />
+                    <CheckCircleIcon
+                      className={`w-6 h-6 mt-0.5 ${
+                        isDark ? "text-green-400" : "text-green-600"
+                      }`}
+                    />
                   </div>
                   <div className="flex-1">
-                    <h3 className={`text-sm font-semibold mb-2 ${
-                      isDark ? "text-green-200" : "text-green-800"
-                    }`}>
+                    <h3
+                      className={`text-sm font-semibold mb-2 ${
+                        isDark ? "text-green-200" : "text-green-800"
+                      }`}
+                    >
                       {t("LoginPage.accountCreatedSuccessfully")}
                     </h3>
-                    <p className={`text-sm mb-3 ${
-                      isDark ? "text-green-300" : "text-green-700"
-                    }`}>
+                    <p
+                      className={`text-sm mb-3 ${
+                        isDark ? "text-green-300" : "text-green-700"
+                      }`}
+                    >
                       {t("LoginPage.verificationEmailSentMessage")}
                     </p>
                     <button
@@ -502,9 +584,11 @@ function LoginContent() {
             <form onSubmit={handleLoginWithPassword} className="space-y-6">
               {/* Email Field */}
               <div className="space-y-2">
-                <label className={`block text-sm font-semibold mb-2 ${
-                  isDark ? "text-gray-300" : "text-gray-700"
-                }`}>
+                <label
+                  className={`block text-sm font-semibold mb-2 ${
+                    isDark ? "text-gray-300" : "text-gray-700"
+                  }`}
+                >
                   {t("LoginPage.email")}
                 </label>
                 <div className="relative">
@@ -540,15 +624,18 @@ function LoginContent() {
                     }`}
                     placeholder={t("LoginPage.enterEmail")}
                     required
+                    disabled={isLoading || twoFAPending}
                   />
                 </div>
               </div>
 
               {/* Password Field */}
               <div className="space-y-2">
-                <label className={`block text-sm font-semibold mb-2 ${
-                  isDark ? "text-gray-300" : "text-gray-700"
-                }`}>
+                <label
+                  className={`block text-sm font-semibold mb-2 ${
+                    isDark ? "text-gray-300" : "text-gray-700"
+                  }`}
+                >
                   {t("LoginPage.password")}
                 </label>
                 <div className="relative">
@@ -585,6 +672,7 @@ function LoginContent() {
                     placeholder={t("LoginPage.enterPassword")}
                     required
                     minLength={6}
+                    disabled={isLoading || twoFAPending}
                   />
                   <button
                     type="button"
@@ -594,6 +682,7 @@ function LoginContent() {
                         ? "text-gray-400 hover:text-gray-300"
                         : "text-gray-400 hover:text-gray-600"
                     }`}
+                    disabled={isLoading || twoFAPending}
                   >
                     {isPasswordVisible ? (
                       <EyeSlashIcon className="h-5 w-5" />
@@ -604,13 +693,29 @@ function LoginContent() {
                 </div>
               </div>
 
+              {/* Forgot Password Link */}
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => router.push("/forgot-password")}
+                  className={`text-sm font-medium transition-colors duration-200 ${
+                    isDark
+                      ? "text-gray-400 hover:text-gray-200"
+                      : "text-gray-600 hover:text-gray-800"
+                  }`}
+                  disabled={isLoading || twoFAPending}
+                >
+                  {t("LoginPage.forgotPassword") || "Forgot Password?"}
+                </button>
+              </div>
+
               {/* Login Button */}
               <button
                 type="submit"
-                disabled={isLoading}
-                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-bold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] shadow-lg hover:shadow-xl disabled:scale-100 disabled:shadow-md flex items-center justify-center group"
+                disabled={isLoading || twoFAPending}
+                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-bold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] disabled:scale-100 shadow-lg hover:shadow-xl disabled:shadow-md flex items-center justify-center group"
               >
-                {isLoading ? (
+                {isLoading || twoFAPending ? (
                   <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
                 ) : (
                   <>
@@ -623,16 +728,20 @@ function LoginContent() {
               {/* Divider */}
               <div className="relative my-6">
                 <div className="absolute inset-0 flex items-center">
-                  <div className={`w-full border-t ${
-                    isDark ? "border-gray-600" : "border-gray-200"
-                  }`}></div>
+                  <div
+                    className={`w-full border-t ${
+                      isDark ? "border-gray-600" : "border-gray-200"
+                    }`}
+                  ></div>
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className={`px-4 font-medium ${
-                    isDark
-                      ? "bg-gray-800 text-gray-400"
-                      : "bg-white text-gray-500"
-                  }`}>
+                  <span
+                    className={`px-4 font-medium ${
+                      isDark
+                        ? "bg-gray-800 text-gray-400"
+                        : "bg-white text-gray-500"
+                    }`}
+                  >
                     {t("LoginPage.or")}
                   </span>
                 </div>
@@ -642,8 +751,8 @@ function LoginContent() {
               <button
                 type="button"
                 onClick={handleGoogleSignIn}
-                disabled={isLoading}
-                className={`w-full border-2 font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] shadow-lg hover:shadow-xl disabled:scale-100 flex items-center justify-center space-x-3 group ${
+                disabled={isLoading || twoFAPending}
+                className={`w-full border-2 font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] disabled:scale-100 shadow-lg hover:shadow-xl flex items-center justify-center space-x-3 group ${
                   isDark
                     ? "bg-gray-700 border-gray-600 hover:border-gray-500 text-gray-200"
                     : "bg-white border-gray-200 hover:border-gray-300 text-gray-700"
@@ -675,29 +784,26 @@ function LoginContent() {
             <div className="mt-8 space-y-4 text-center">
               <button
                 onClick={() => router.push("/registration")}
+                disabled={twoFAPending}
                 className={`block w-full font-semibold text-sm transition-colors duration-200 py-2 ${
                   isDark
                     ? "text-blue-400 hover:text-blue-300"
                     : "text-blue-600 hover:text-blue-700"
-                }`}
+                } ${twoFAPending ? "opacity-50 cursor-not-allowed" : ""}`}
               >
                 {t("LoginPage.noAccount")}{" "}
                 <span className="underline">{t("LoginPage.register")}</span>
               </button>
 
               <button
-                onClick={() => router.push("/forgot-password")}
-                className={`block w-full font-medium text-sm transition-colors duration-200 py-2 ${
-                  isDark
-                    ? "text-gray-400 hover:text-gray-200"
-                    : "text-gray-600 hover:text-gray-800"
-                }`}
-              >
-                {t("LoginPage.forgotPassword")}
-              </button>
-
-              <button
-                onClick={() => router.push("/")}
+                onClick={async () => {
+                  if (twoFAPending) {
+                    // Ensure user is not authenticated if they choose to proceed as guest
+                    await auth.signOut();
+                    setTwoFAPending(false);
+                  }
+                  router.push("/");
+                }}
                 className={`block w-full font-medium text-sm transition-colors duration-200 py-2 ${
                   isDark
                     ? "text-gray-500 hover:text-gray-300"
