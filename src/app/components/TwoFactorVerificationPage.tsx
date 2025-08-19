@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { toast } from "react-hot-toast";
+import { useUser } from "@/context/UserProvider";
 import {
   ShieldCheckIcon,
   ShieldExclamationIcon,
@@ -25,9 +26,9 @@ export default function TwoFactorVerificationPage({
   type,
 }: TwoFactorVerificationPageProps) {
   const router = useRouter();
-
   const t = useTranslations();
   const twoFactorService = TwoFactorService.getInstance();
+  const { complete2FA, cancel2FA, isPending2FA } = useUser();
 
   // State management
   const [code, setCode] = useState<string[]>(Array(6).fill(""));
@@ -285,10 +286,13 @@ export default function TwoFactorVerificationPage({
           },
         });
 
-        // Navigate back or to appropriate page
+        // Handle different verification types
         if (type === "login") {
-          router.push("/"); // or wherever successful login should redirect
+          // Complete the 2FA login process
+          complete2FA();
+          router.push("/"); // Navigate to home after successful 2FA
         } else {
+          // For setup/disable, just go back
           router.back();
         }
       } else {
@@ -494,7 +498,14 @@ export default function TwoFactorVerificationPage({
         >
           <div className="max-w-md mx-auto px-4 py-4 flex items-center">
             <button
-              onClick={() => router.back()}
+              onClick={async () => {
+                if (type === "login" && isPending2FA) {
+                  // If this is a login 2FA and user cancels, sign them out
+                  await cancel2FA();
+                } else {
+                  router.back();
+                }
+              }}
               className={`p-2 rounded-full transition-colors ${
                 isDark
                   ? "hover:bg-gray-700/50 text-gray-300 hover:text-white"

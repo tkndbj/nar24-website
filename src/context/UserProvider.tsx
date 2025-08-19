@@ -20,8 +20,10 @@ import {
   getDocFromCache,
   getDocFromServer,
   DocumentSnapshot,
+  Timestamp,
 } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase"; // Adjust path as needed
+import { auth, db } from "@/lib/firebase";
+import TwoFactorService from "@/services/TwoFactorService";
 
 interface ProfileData {
   displayName?: string;
@@ -41,6 +43,8 @@ interface ProfileData {
   instagram?: string;
   linkedin?: string;
   whatsapp?: string;
+  twoFactorEnabled?: boolean;
+  lastTwoFactorVerification?: Timestamp;
   [key: string]: unknown;
 }
 
@@ -60,6 +64,10 @@ interface UserContextType {
     options?: { profileComplete?: boolean }
   ) => Promise<void>;
   setProfileComplete: (complete: boolean) => void;
+  // New 2FA related methods
+  isPending2FA: boolean;
+  complete2FA: () => void;
+  cancel2FA: () => Promise<void>;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -85,22 +93,59 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     null
   );
 
+  // New 2FA gate state
+  const [pending2FA, setPending2FA] = useState(false);
+  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
+
+  const twoFactorService = TwoFactorService.getInstance();
+
   // Calculate profile completion status
   const isProfileComplete = React.useMemo(() => {
-    // Use cached value if available, otherwise check profile data
     if (profileComplete !== null) return profileComplete;
-
     if (!profileData) return false;
 
-    // ✅ FIX: Use consistent logic (only birthDate, not birthYear)
     const complete = !!(
       profileData.gender &&
-      profileData.birthDate && // Only check birthDate
+      profileData.birthDate &&
       profileData.languageCode
     );
 
     return complete;
   }, [profileComplete, profileData]);
+
+  // Check if user needs 2FA verification
+  const check2FARequirement = async (firebaseUser: User): Promise<boolean> => {
+    try {
+      const needs2FA = await twoFactorService.is2FAEnabled();
+
+      if (needs2FA) {
+        // Check if user has recently verified 2FA (within last 5 minutes)
+        const userDocRef = doc(db, "users", firebaseUser.uid);
+        const userDoc = await getDocFromServer(userDocRef);
+
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          const lastVerification =
+            userData?.lastTwoFactorVerification?.toDate?.();
+
+          if (lastVerification) {
+            const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+            if (lastVerification > fiveMinutesAgo) {
+              // Recently verified, allow access
+              return false;
+            }
+          }
+        }
+
+        return true; // Needs 2FA verification
+      }
+
+      return false; // No 2FA needed
+    } catch (error) {
+      console.error("Error checking 2FA requirement:", error);
+      return false; // On error, don't block access
+    }
+  };
 
   // Reset all state (used during logout)
   const resetState = () => {
@@ -108,6 +153,9 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     setProfileData(null);
     setProfileCompleteState(null);
     setIsLoading(false);
+    setPending2FA(false);
+    setFirebaseUser(null);
+    setUser(null);
   };
 
   // Update user data from Firestore document
@@ -116,27 +164,18 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     setIsAdmin(data.isAdmin === true);
     setProfileData(data);
 
-    // Update cached profile completion status with consistent logic
-    const complete = !!(
-      data.gender &&
-      data.birthDate && // Only check birthDate (consistent with AuthService)
-      data.languageCode
-    );
+    const complete = !!(data.gender && data.birthDate && data.languageCode);
     setProfileCompleteState(complete);
   };
 
   // Create default user document for new users
   const createDefaultUserDoc = async (currentUser: User) => {
     try {
-      // ❌ DON'T try to create document - this causes permission error
-      // Instead, just set safe local defaults and let AuthService handle document creation
-
       console.log(
         "User document not found, setting safe defaults for",
         currentUser.uid
       );
 
-      // Set safe defaults locally
       const defaultData: ProfileData = {
         displayName:
           currentUser.displayName || currentUser.email?.split("@")[0] || "User",
@@ -148,11 +187,8 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       setProfileData(defaultData);
       setIsAdmin(false);
       setProfileCompleteState(false);
-
-      // The document will be created by AuthService on next login/action
     } catch (error) {
       console.error("Error setting default user data:", error);
-      // Set minimal safe defaults
       setProfileData({
         displayName: "User",
         email: currentUser.email || "",
@@ -166,13 +202,15 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
   // Fetch additional user data from Firestore
   const fetchUserData = async () => {
-    if (!user) return;
+    const currentUser = user || firebaseUser;
+    if (!currentUser) return;
 
     try {
       // Try cache first for faster response
       try {
-        const cacheDoc = await getDocFromCache(doc(db, "users", user.uid));
-
+        const cacheDoc = await getDocFromCache(
+          doc(db, "users", currentUser.uid)
+        );
         if (cacheDoc.exists()) {
           updateUserDataFromDoc(cacheDoc.data());
         }
@@ -181,7 +219,9 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       }
 
       // Always fetch from server for accurate data with timeout
-      const serverDocPromise = getDocFromServer(doc(db, "users", user.uid));
+      const serverDocPromise = getDocFromServer(
+        doc(db, "users", currentUser.uid)
+      );
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error("Timeout")), 10000)
       );
@@ -194,25 +234,24 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       if (serverDoc.exists()) {
         updateUserDataFromDoc(serverDoc.data());
       } else {
-        // Document doesn't exist - set safe defaults without trying to create it
         console.log(
           "User document not found for",
-          user.uid,
+          currentUser.uid,
           ", using safe defaults"
         );
-        await createDefaultUserDoc(user);
+        await createDefaultUserDoc(currentUser);
       }
     } catch (error) {
       console.error("Error fetching user data:", error);
-      // Set safe defaults on error
       setIsAdmin(false);
       setProfileData({
-        displayName: user.displayName || user.email?.split("@")[0] || "User",
-        email: user.email || "",
+        displayName:
+          currentUser.displayName || currentUser.email?.split("@")[0] || "User",
+        email: currentUser.email || "",
         isAdmin: false,
         isNew: true,
       });
-      setProfileCompleteState(false); // Safe default - assume incomplete
+      setProfileCompleteState(false);
     } finally {
       setIsLoading(false);
     }
@@ -223,13 +262,22 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     currentUser: User,
     options?: { profileComplete?: boolean }
   ) => {
-    setUser(currentUser);
+    setFirebaseUser(currentUser);
 
     if (options?.profileComplete !== undefined) {
       setProfileCompleteState(options.profileComplete);
     }
 
-    // Don't set loading to false yet - still fetch fresh data in background
+    // Check if 2FA is required
+    const needs2FA = await check2FARequirement(currentUser);
+
+    if (needs2FA) {
+      setPending2FA(true);
+      setUser(null); // Don't set user until 2FA is complete
+    } else {
+      setUser(currentUser);
+      setPending2FA(false);
+    }
 
     // Fetch fresh data in background without blocking UI
     backgroundFetchUserData(currentUser);
@@ -238,6 +286,22 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   // **NEW**: Set profile completion status immediately
   const setProfileComplete = (complete: boolean) => {
     setProfileCompleteState(complete);
+  };
+
+  // **NEW**: Complete 2FA verification
+  const complete2FA = () => {
+    if (firebaseUser && pending2FA) {
+      setUser(firebaseUser);
+      setPending2FA(false);
+    }
+  };
+
+  // **NEW**: Cancel 2FA and sign out
+  const cancel2FA = async () => {
+    if (firebaseUser) {
+      await auth.signOut();
+    }
+    resetState();
   };
 
   // Background fetch that doesn't affect loading state
@@ -260,7 +324,6 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       }
     } catch (error) {
       console.error("Error in background fetch:", error);
-      // Don't update UI on background fetch errors
     }
   };
 
@@ -269,8 +332,19 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     try {
       await auth.currentUser?.reload();
       const currentUser = auth.currentUser;
-      setUser(currentUser);
+      setFirebaseUser(currentUser);
+
       if (currentUser) {
+        const needs2FA = await check2FARequirement(currentUser);
+
+        if (needs2FA) {
+          setPending2FA(true);
+          setUser(null);
+        } else {
+          setUser(currentUser);
+          setPending2FA(false);
+        }
+
         await fetchUserData();
       }
     } catch (error) {
@@ -280,25 +354,26 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
   // Update profile data and refresh completion status
   const updateProfileData = async (updates: Partial<ProfileData>) => {
-    if (!user) return;
+    const currentUser = user || firebaseUser;
+    if (!currentUser) return;
 
     try {
-      // Update Firestore with timeout
-      const updatePromise = updateDoc(doc(db, "users", user.uid), updates);
+      const updatePromise = updateDoc(
+        doc(db, "users", currentUser.uid),
+        updates
+      );
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error("Timeout")), 10000)
       );
 
       await Promise.race([updatePromise, timeoutPromise]);
 
-      // Update local cache
       const updatedProfileData = { ...(profileData || {}), ...updates };
       setProfileData(updatedProfileData);
 
-      // ✅ FIX: Use consistent logic (only birthDate, not birthYear)
       const complete = !!(
         updatedProfileData.gender &&
-        updatedProfileData.birthDate && // Only check birthDate
+        updatedProfileData.birthDate &&
         updatedProfileData.languageCode
       );
       setProfileCompleteState(complete);
@@ -310,11 +385,12 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
   // Get the Firebase ID token, forcing a refresh if necessary
   const getIdToken = async (): Promise<string | null> => {
-    if (!user) {
+    const currentUser = user || firebaseUser;
+    if (!currentUser) {
       console.log("No user logged in to fetch ID token.");
       return null;
     }
-    return await getFirebaseIdToken(user, true);
+    return await getFirebaseIdToken(currentUser, true);
   };
 
   // Get specific profile field
@@ -328,10 +404,22 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
     const unsubscribe = onAuthStateChanged(
       auth,
-      (currentUser) => {
-        setUser(currentUser);
+      async (currentUser) => {
+        setFirebaseUser(currentUser);
+
         if (currentUser) {
-          // If a user is logged in, fetch additional user data
+          // Check if 2FA is required
+          const needs2FA = await check2FARequirement(currentUser);
+
+          if (needs2FA) {
+            setPending2FA(true);
+            setUser(null); // Don't expose user until 2FA is complete
+          } else {
+            setUser(currentUser);
+            setPending2FA(false);
+          }
+
+          // Fetch additional user data
           fetchUserData();
         } else {
           // If the user is logged out, reset all state
@@ -349,10 +437,10 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
   // Update fetchUserData dependency when user changes
   useEffect(() => {
-    if (user) {
+    if (user || firebaseUser) {
       fetchUserData();
     }
-  }, [user]);
+  }, [user, firebaseUser]);
 
   const contextValue: UserContextType = {
     user,
@@ -367,6 +455,10 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     getProfileField,
     updateUserDataImmediately,
     setProfileComplete,
+    // New 2FA properties
+    isPending2FA: pending2FA,
+    complete2FA,
+    cancel2FA,
   };
 
   return (
