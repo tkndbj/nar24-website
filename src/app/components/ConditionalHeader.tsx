@@ -13,6 +13,7 @@ export default function ConditionalHeader() {
     "/forgot-password",
     "/verify-email",
     "/two-factor-verification",
+    "/email-verification",
   ];
 
   const shouldHideHeader =
