@@ -211,8 +211,16 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
 
   const handleSearchSubmit = async () => {
     if (searchTerm.trim()) {
-      await search(searchTerm.trim());
+      // Clear the search state first
       setShowSuggestions(false);
+      setIsSearching(false);
+      
+      // Navigate to search results page with the query parameter
+      router.push(`/search-results?q=${encodeURIComponent(searchTerm.trim())}`);
+      
+      
+       setSearchTerm("");
+       clearSearchState();
     }
   };
 
@@ -232,11 +240,11 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
       type === "product"
         ? (suggestion as Suggestion).name
         : (suggestion as CategorySuggestion).displayName;
-
+  
     setSearchTerm(displayName || "");
     setShowSuggestions(false);
     setIsSearching(false);
-
+  
     if (type === "product") {
       router.push(`/productdetail/${suggestion.id}`);
     } else {

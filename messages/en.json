@@ -1987,10 +1987,13 @@
     "startSearch": "Start searching",
     "tryAgain": "Try again",
     "categories": "Categories",
-    "levelCategory": "Level {{level}} category",
+    "levelCategory": "Level {level} category",
     "products": "Products",
     "noResults": "No results found",
-    "tryDifferentKeywords": "Try different keywords"
+    "tryDifferentKeywords": "Try different keywords",
+    "viewAllResults": "View all results for",
+    "searchingFor": "Searching for",
+    "loadMore": "Load More"
   },
   "FavoritesDrawer": {
     "title": "My Favorites",
@@ -2234,5 +2237,83 @@
     "resendIn": "Resend in",
     "resendCode": "Resend Code",
     "checkSpam": "Check your spam folder if you don't see the email"
-  }
+  },
+  
+    "searchResults": {
+      
+      "title": "Search Results",
+      "back": "Back",
+      
+      "searchingFor": "Searching for",
+      "resultsFor": "Results for",
+      "productsFound": "{count} products found",
+      "productFound": "{count} product found",
+      
+      "all": "All",
+      "deals": "Deals",
+      "boosted": "Featured",
+      "trending": "Trending", 
+      "fiveStar": "5 Stars",
+      "bestSellers": "Best Sellers",
+      
+      "sortBy": "Sort by",
+      "none": "Relevance",
+      "alphabetical": "A-Z",
+      "date": "Newest",
+      "priceLowToHigh": "Price: Low to High",
+      "priceHighToLow": "Price: High to Low",
+      
+      "searchFailed": "Search Failed",
+      "searchFailedTryAgain": "Search failed. Please try again.",
+      "noInternet": "No internet connection. Please check your network and try again.",
+      "connectionError": "Connection Error",
+      "retry": "Retry",
+      "tryAgain": "Try Again",
+      
+      "noProductsFound": "No Products Found",
+      "noResultsFor": "No results for",
+      "noResultsMessage": "We couldn't find any products matching your search. Try adjusting your search terms or browse our categories.",
+      "tryDifferentKeywords": "Try different keywords or browse categories",
+      
+      "loading": "Loading...",
+      "loadingMore": "Loading more...",
+      "loadMore": "Load More",
+      "refreshing": "Refreshing...",
+      "pullToRefresh": "Pull to refresh",
+      
+      "addToCart": "Add to Cart",
+      "addedToCart": "Added to Cart",
+      "addToFavorites": "Add to Favorites",
+      "removeFromFavorites": "Remove from Favorites",
+      "viewProduct": "View Product",
+      "quickView": "Quick View",
+      
+      "price": "Price",
+      "originalPrice": "Original Price", 
+      "discount": "Discount",
+      "rating": "Rating",
+      "reviews": "Reviews",
+      "inStock": "In Stock",
+      "outOfStock": "Out of Stock",
+      "lowStock": "Only {count} left",
+      "fastDelivery": "Fast Delivery",
+      "freeShipping": "Free Shipping",
+      
+      "showingResults": "Showing {count} results",
+      "filteredBy": "Filtered by: {filter}",
+      "sortedBy": "Sorted by: {sort}",
+      "clearFilters": "Clear Filters",
+      "applyFilters": "Apply Filters",
+      
+      "searchResultsDescription": "Search results for {query}",
+      "filterButton": "Filter products",
+      "sortButton": "Sort products",
+      "productCard": "Product card for {productName}",
+      "priceRange": "Price range: {min} to {max}",
+      
+      "networkError": "Network error occurred",
+      "serverError": "Server error occurred", 
+      "timeoutError": "Request timed out",
+      "unknownError": "An unknown error occurred"
+    }
 }
