@@ -358,7 +358,7 @@ const FilterBar: React.FC<{
         className="flex gap-1 overflow-x-auto scrollbar-hide"
         style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
-        {filterTypes.map((key, index) => {
+        {filterTypes.map((key) => {
           const isSelected = key === currentFilter;
           const label = localizedFilterLabel(key);
 
