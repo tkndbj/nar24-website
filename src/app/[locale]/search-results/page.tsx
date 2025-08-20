@@ -5,7 +5,6 @@ import React, {
   useEffect,
   useCallback,
   useRef,
-  useMemo,
 } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -327,7 +326,7 @@ const EmptyState: React.FC<{ isDarkMode: boolean; query: string }> = ({
 const FilterBar: React.FC<{
   filterTypes: FilterType[];
   currentFilter: FilterType;
-  onFilterChange: (filter: FilterType, index: number) => void;
+  onFilterChange: (filter: FilterType) => void;
   isDarkMode: boolean;
 }> = ({ filterTypes, currentFilter, onFilterChange, isDarkMode }) => {
   const t = useTranslations("searchResults");
@@ -357,14 +356,14 @@ const FilterBar: React.FC<{
         className="flex gap-1 overflow-x-auto scrollbar-hide"
         style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
-        {filterTypes.map((key, index) => {
+        {filterTypes.map((key) => {
           const isSelected = key === currentFilter;
           const label = localizedFilterLabel(key);
 
           return (
             <button
               key={key}
-              onClick={() => onFilterChange(key, index)}
+              onClick={() => onFilterChange(key)}
               className={`
                 flex-shrink-0 px-3 py-1 rounded-full border text-xs font-semibold transition-all duration-200 whitespace-nowrap
                 ${
@@ -475,8 +474,7 @@ const SearchResultsContent: React.FC = () => {
   const router = useRouter();
   const t = useTranslations("searchResults");
   const {
-    filteredProducts,
-    
+    filteredProducts,    
     currentFilter,
     sortOption,
     isEmpty,
@@ -504,7 +502,7 @@ const SearchResultsContent: React.FC = () => {
   const sortOptions: SortOption[] = ["None", "Alphabetical", "Date", "Price Low to High", "Price High to Low"];
   
   const query = searchParams.get("q") || "";
-  const algoliaManager = useMemo(() => AlgoliaServiceManager.getInstance(), []);
+  const algoliaManager = AlgoliaServiceManager.getInstance();
 
   // Refs for scroll management
   const mainScrollRef = useRef<HTMLDivElement>(null);
@@ -632,15 +630,10 @@ const SearchResultsContent: React.FC = () => {
     }, 300);
   }, [hasMore, isLoading, isLoadingMore, fetchResults]);
 
-  // Reset and fetch
-  const resetAndFetch = useCallback(() => {
-    fetchResults(true);
-  }, [fetchResults]);
-
   // Initial fetch only when query changes
   useEffect(() => {
     if (query.trim()) {
-      resetAndFetch();
+      fetchResults(true);
     }
     
     return () => {
@@ -650,10 +643,10 @@ const SearchResultsContent: React.FC = () => {
         clearTimeout(loadMoreDebounceRef.current);
       }
     };
-  }, [query]); // Only depend on query, not resetAndFetch to avoid loops
+  }, [query]);
 
   // Handle filter change
-  const handleFilterChange = useCallback((filter: FilterType, index: number) => {
+  const handleFilterChange = useCallback((filter: FilterType) => {
     if (filter === currentFilter) return;
     setFilter(filter);    
   }, [currentFilter, setFilter]);
@@ -685,7 +678,7 @@ const SearchResultsContent: React.FC = () => {
 
   // Close sort menu on outside click - SIMPLIFIED
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = () => {
       // Close the menu when clicking outside
       setIsSortMenuOpen(false);
     };
@@ -748,7 +741,7 @@ const SearchResultsContent: React.FC = () => {
                 isDarkMode ? "text-gray-400" : "text-gray-600"
               }`}
             >
-              {t("searchingFor") || "Searching for"} "{query}"
+              {t("searchingFor") || "Searching for"} &quot;{query}&quot;
             </p>
           </div>
         )}
@@ -799,7 +792,7 @@ const SearchResultsContent: React.FC = () => {
         </div>
 
         <ErrorState
-          onRetry={resetAndFetch}
+          onRetry={() => fetchResults(true)}
           message={errorMessage}
           isNetworkError={isNetworkError}
           isDarkMode={isDarkMode}
@@ -864,7 +857,7 @@ const SearchResultsContent: React.FC = () => {
               isDarkMode ? "text-gray-400" : "text-gray-600"
             }`}
           >
-            {t("searchingFor") || "Searching for"} "{query}"
+            {t("searchingFor") || "Searching for"} &quot;{query}&quot;
           </p>
         </div>
       )}
@@ -907,8 +900,6 @@ const SearchResultsContent: React.FC = () => {
           </button>
         </div>
       )}
-
-      {/* SINGLE Sort Menu Implementation - REMOVED FROM HERE */}
     </div>
   );
 };

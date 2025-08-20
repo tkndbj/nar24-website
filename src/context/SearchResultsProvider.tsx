@@ -6,6 +6,7 @@ import React, {
   useState,
   useCallback,
   ReactNode,
+  useMemo,
 } from "react";
 
 // Product interface matching your Flutter model
@@ -73,9 +74,6 @@ export function SearchResultsProvider({ children }: SearchResultsProviderProps) 
   // Raw search results from API
   const [rawProducts, setRawProductsState] = useState<Product[]>([]);
   
-  // Filtered and processed products for UI
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
-  
   // Current filter state
   const [currentFilter, setCurrentFilterState] = useState<FilterType>('');
   
@@ -103,39 +101,43 @@ export function SearchResultsProvider({ children }: SearchResultsProviderProps) 
   }, []);
 
   // Apply sorting to the list
-  const applySorting = useCallback((products: Product[], sortOpt: SortOption): void => {
+  const applySorting = useCallback((products: Product[], sortOpt: SortOption): Product[] => {
+    const sorted = [...products];
     switch (sortOpt) {
       case 'Alphabetical':
-        products.sort((a, b) =>
+        sorted.sort((a, b) =>
           a.productName.toLowerCase().localeCompare(b.productName.toLowerCase())
         );
         break;
       case 'Date':
-        products.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         break;
       case 'Price Low to High':
-        products.sort((a, b) => a.price - b.price);
+        sorted.sort((a, b) => a.price - b.price);
         break;
       case 'Price High to Low':
-        products.sort((a, b) => b.price - a.price);
+        sorted.sort((a, b) => b.price - a.price);
         break;
       case 'None':
       default:
         break;
     }
+    return sorted;
   }, []);
 
   // Prioritize boosted products
-  const prioritizeBoosted = useCallback((products: Product[]): void => {
-    products.sort((a, b) => {
+  const prioritizeBoosted = useCallback((products: Product[]): Product[] => {
+    const sorted = [...products];
+    sorted.sort((a, b) => {
       if (a.isBoosted && !b.isBoosted) return -1;
       if (!a.isBoosted && b.isBoosted) return 1;
       return 0;
     });
+    return sorted;
   }, []);
 
-  // Apply current filter and sort to raw products
-  const applyFiltersAndSort = useCallback(() => {
+  // Compute filtered products with memoization
+  const filteredProducts = useMemo(() => {
     // Start with raw products
     let result = [...rawProducts];
 
@@ -143,18 +145,17 @@ export function SearchResultsProvider({ children }: SearchResultsProviderProps) 
     result = applyFilterLogic(result, currentFilter);
 
     // Apply sorting
-    applySorting(result, sortOption);
+    result = applySorting(result, sortOption);
 
     // Prioritize boosted products
-    prioritizeBoosted(result);
+    result = prioritizeBoosted(result);
 
-    // Update filtered products
-    setFilteredProducts(result);
+    return result;
   }, [rawProducts, currentFilter, sortOption, applyFilterLogic, applySorting, prioritizeBoosted]);
 
   // Set the raw products from search API
   const setRawProducts = useCallback((products: Product[]) => {
-    setRawProductsState([...products]);
+    setRawProductsState(products);
   }, []);
 
   // Add more products (for pagination)
@@ -165,29 +166,21 @@ export function SearchResultsProvider({ children }: SearchResultsProviderProps) 
   // Clear all products
   const clearProducts = useCallback(() => {
     setRawProductsState([]);
-    setFilteredProducts([]);
   }, []);
 
   // Apply a quick filter
   const setFilter = useCallback((filter: FilterType | null) => {
     const newFilter: FilterType = filter || '';
-    if (currentFilter === newFilter) return;
     setCurrentFilterState(newFilter);
-  }, [currentFilter]);
+  }, []);
 
   // Set sort option
   const setSortOption = useCallback((sortOpt: SortOption) => {
-    if (sortOption === sortOpt) return;
     setSortOptionState(sortOpt);
-  }, [sortOption]);
-
-  // Apply filters and sort whenever dependencies change
-  React.useEffect(() => {
-    applyFiltersAndSort();
-  }, [applyFiltersAndSort]);
+  }, []);
 
   // Get boosted products from filtered list
-  const boostedProducts = React.useMemo(() => {
+  const boostedProducts = useMemo(() => {
     return filteredProducts.filter((p) => p.isBoosted);
   }, [filteredProducts]);
 
@@ -197,7 +190,7 @@ export function SearchResultsProvider({ children }: SearchResultsProviderProps) 
   // Check if raw products are empty
   const hasNoData = rawProducts.length === 0;
 
-  const value: SearchResultsContextType = {
+  const value: SearchResultsContextType = useMemo(() => ({
     rawProducts,
     filteredProducts,
     boostedProducts,
@@ -210,7 +203,20 @@ export function SearchResultsProvider({ children }: SearchResultsProviderProps) 
     clearProducts,
     setFilter,
     setSortOption,
-  };
+  }), [
+    rawProducts,
+    filteredProducts,
+    boostedProducts,
+    currentFilter,
+    sortOption,
+    isEmpty,
+    hasNoData,
+    setRawProducts,
+    addMoreProducts,
+    clearProducts,
+    setFilter,
+    setSortOption,
+  ]);
 
   return (
     <SearchResultsContext.Provider value={value}>
