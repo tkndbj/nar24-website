@@ -68,8 +68,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
   const { unreadNotificationsCount } = useBadgeProvider();
   const { cartCount } = useCart();
   const {
-    updateTerm,
-    search,
+    updateTerm,    
     isLoading,
     clearSearchState,
     suggestions,

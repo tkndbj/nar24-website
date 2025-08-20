@@ -186,7 +186,6 @@ class AlgoliaServiceManager {
   }
 
   private cleanOldCache(): void {
-    const now = Date.now();
     for (const [key, value] of this.cache.entries()) {
       if (!this.isValidCache(value.timestamp)) {
         this.cache.delete(key);
@@ -217,13 +216,7 @@ const throttle = <T extends (...args: unknown[]) => unknown>(func: T, limit: num
   }) as T;
 };
 
-const debounce = <T extends (...args: unknown[]) => unknown>(func: T, delay: number): T => {
-  let timeoutId: NodeJS.Timeout;
-  return ((...args: Parameters<T>) => {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => func.apply(this, args), delay);
-  }) as T;
-};
+
 
 // Loading shimmer component
 const LoadingShimmer: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => {
@@ -323,7 +316,7 @@ const EmptyState: React.FC<{ isDarkMode: boolean; query: string }> = ({
               isDarkMode ? "text-gray-400" : "text-gray-600"
             }`}
           >
-            We couldn't find any products matching "{query}". Try adjusting your search terms.
+            We couldn&apos;t find any products matching &quot;{query}&quot;. Try adjusting your search terms.
           </p>
         </div>
       </div>
@@ -335,7 +328,7 @@ const EmptyState: React.FC<{ isDarkMode: boolean; query: string }> = ({
 const FilterBar: React.FC<{
   filterTypes: FilterType[];
   currentFilter: FilterType;
-  onFilterChange: (filter: FilterType, index: number) => void;
+  onFilterChange: (filter: FilterType) => void;
   isDarkMode: boolean;
 }> = ({ filterTypes, currentFilter, onFilterChange, isDarkMode }) => {
   const t = useTranslations("searchResults");
@@ -372,7 +365,7 @@ const FilterBar: React.FC<{
           return (
             <button
               key={key}
-              onClick={() => onFilterChange(key, index)}
+              onClick={() => onFilterChange(key)}
               className={`
                 flex-shrink-0 px-3 py-1 rounded-full border text-xs font-semibold transition-all duration-200 whitespace-nowrap
                 ${
@@ -484,7 +477,6 @@ const SearchResultsContent: React.FC = () => {
   const t = useTranslations("searchResults");
   const {
     filteredProducts,
-    boostedProducts,
     currentFilter,
     sortOption,
     isEmpty,
@@ -576,7 +568,7 @@ const SearchResultsContent: React.FC = () => {
         let results: Product[] = [];
         try {
           results = await algoliaManager.searchProducts(query, pageToFetch, 50, "products");
-        } catch (error) {
+        } catch {
           console.log("Products index failed, trying shop_products...");
           results = await algoliaManager.searchProducts(query, pageToFetch, 50, "shop_products");
         }
@@ -658,10 +650,10 @@ const SearchResultsContent: React.FC = () => {
         clearTimeout(loadMoreDebounceRef.current);
       }
     };
-  }, [query]); // Only depend on query, not resetAndFetch to avoid loops
+  }, [query, algoliaManager, resetAndFetch]); // Include all dependencies
 
   // Handle filter change
-  const handleFilterChange = useCallback((filter: FilterType, index: number) => {
+  const handleFilterChange = useCallback((filter: FilterType) => {
     if (filter === currentFilter) return;
     setFilter(filter);    
   }, [currentFilter, setFilter]);
@@ -693,7 +685,7 @@ const SearchResultsContent: React.FC = () => {
 
   // Close sort menu on outside click - SIMPLIFIED
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = () => {
       // Close the menu when clicking outside
       setIsSortMenuOpen(false);
     };
@@ -756,7 +748,7 @@ const SearchResultsContent: React.FC = () => {
                 isDarkMode ? "text-gray-400" : "text-gray-600"
               }`}
             >
-              {t("searchingFor") || "Searching for"} "{query}"
+              {t("searchingFor") || "Searching for"} &quot;{query}&quot;
             </p>
           </div>
         )}
@@ -872,7 +864,7 @@ const SearchResultsContent: React.FC = () => {
               isDarkMode ? "text-gray-400" : "text-gray-600"
             }`}
           >
-            {t("searchingFor") || "Searching for"} "{query}"
+            {t("searchingFor") || "Searching for"} &quot;{query}&quot;
           </p>
         </div>
       )}
