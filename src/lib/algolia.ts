@@ -77,7 +77,7 @@ export interface Suggestion {
     private static instance: AlgoliaServiceManager;
     private readonly applicationId = process.env.NEXT_PUBLIC_ALGOLIA_APP_ID || "3QVVGQH4ME";
     private readonly apiKey = process.env.NEXT_PUBLIC_ALGOLIA_API_KEY || "dcca6685e21c2baed748ccea7a6ddef1";
-    private cache = new Map<string, { data: any; timestamp: number }>();
+    private cache = new Map<string, { data: Product[] | Suggestion[] | CategorySuggestion[]; timestamp: number }>();
     private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
     private abortController: AbortController | null = null;
   
@@ -142,7 +142,7 @@ export interface Suggestion {
       
       if (cached && this.isValidCache(cached.timestamp)) {
         console.log(`🎯 Cache hit for: ${cacheKey}`);
-        return cached.data;
+        return cached.data as Product[];
       }
   
       const url = `https://${this.applicationId}-dsn.algolia.net/1/indexes/${indexName}/query`;
@@ -260,7 +260,7 @@ export interface Suggestion {
       
       if (cached && this.isValidCache(cached.timestamp)) {
         console.log(`🎯 Suggestion cache hit for: ${cacheKey}`);
-        return cached.data;
+        return cached.data as Suggestion[];
       }
   
       const url = `https://${this.applicationId}-dsn.algolia.net/1/indexes/${replicaIndex}/query`;
@@ -326,7 +326,7 @@ export interface Suggestion {
       
       if (cached && this.isValidCache(cached.timestamp)) {
         console.log(`🎯 Category cache hit for: ${cacheKey}`);
-        return cached.data;
+        return cached.data as CategorySuggestion[];
       }
   
       const url = `https://${this.applicationId}-dsn.algolia.net/1/indexes/categories/query`;
