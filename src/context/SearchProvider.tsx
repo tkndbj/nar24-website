@@ -7,24 +7,7 @@ import React, {
   ReactNode,
   useCallback,
 } from "react";
-
-// EXPORTED Types
-export interface Suggestion {
-  id: string;
-  name: string;
-  price: number;
-}
-
-export interface CategorySuggestion {
-  id: string;
-  categoryKey?: string;
-  subcategoryKey?: string;
-  subsubcategoryKey?: string;
-  displayName: string;
-  type: string;
-  level: number;
-  languageCode?: string;
-}
+import AlgoliaServiceManager, { Suggestion, CategorySuggestion } from "@/lib/algolia";
 
 interface SearchContextType {
   term: string;
@@ -52,149 +35,6 @@ export function useSearchProvider() {
 
 interface SearchProviderProps {
   children: ReactNode;
-}
-
-// Algolia Service Manager
-class AlgoliaServiceManager {
-  private static instance: AlgoliaServiceManager;
-  private readonly applicationId = "3QVVGQH4ME";
-  private readonly apiKey = "dcca6685e21c2baed748ccea7a6ddef1";
-
-  static getInstance() {
-    if (!AlgoliaServiceManager.instance) {
-      AlgoliaServiceManager.instance = new AlgoliaServiceManager();
-    }
-    return AlgoliaServiceManager.instance;
-  }
-
-  async searchProducts(
-    query: string,
-    indexName: string = "products",
-    sortOption: string = "alphabetical",
-    page: number = 0,
-    hitsPerPage: number = 5
-  ): Promise<Suggestion[]> {
-    const replicaIndex = this.getReplicaIndexName(indexName, sortOption);
-    const url = `https://${this.applicationId}-dsn.algolia.net/1/indexes/${replicaIndex}/query`;
-
-    const params = new URLSearchParams({
-      query,
-      page: page.toString(),
-      hitsPerPage: hitsPerPage.toString(),
-      attributesToRetrieve: "objectID,productName,price",
-      attributesToHighlight: "",
-    });
-
-    try {
-      console.log(`🔍 Searching ${replicaIndex} with query: "${query}"`);
-
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "X-Algolia-Application-Id": this.applicationId,
-          "X-Algolia-API-Key": this.apiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ params: params.toString() }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Algolia request failed: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log(`✅ ${replicaIndex} returned ${data.hits?.length || 0} hits`);
-
-      const hits = data.hits || [];
-      return hits.map((hit: Record<string, unknown>) => ({
-        id:
-          (hit.objectID as string) ||
-          `unknown-${Math.random().toString(36).substr(2, 9)}`,
-        name: (hit.productName as string) || "Unknown Product",
-        price: (hit.price as number) || 0,
-      }));
-    } catch (error) {
-      console.error(`❌ ${replicaIndex} search error:`, error);
-      return [];
-    }
-  }
-
-  async searchCategories(
-    query: string,
-    hitsPerPage: number = 15,
-    languageCode?: string
-  ): Promise<CategorySuggestion[]> {
-    const url = `https://${this.applicationId}-dsn.algolia.net/1/indexes/categories/query`;
-
-    const params: Record<string, string> = {
-      query,
-      hitsPerPage: hitsPerPage.toString(),
-      attributesToRetrieve:
-        "objectID,categoryKey,subcategoryKey,subsubcategoryKey,displayName,type,level,languageCode",
-      attributesToHighlight: "displayName,searchableText",
-      typoTolerance: "true",
-    };
-
-    if (languageCode) {
-      params.filters = `languageCode:${languageCode}`;
-    }
-
-    try {
-      console.log(`🔍 Searching categories with query: "${query}"`);
-
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "X-Algolia-Application-Id": this.applicationId,
-          "X-Algolia-API-Key": this.apiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          params: new URLSearchParams(params).toString(),
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Category search failed: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log(`✅ Categories returned ${data.hits?.length || 0} hits`);
-
-      const hits = data.hits || [];
-      return hits.map((hit: Record<string, unknown>) => ({
-        id: hit.objectID as string,
-        categoryKey: hit.categoryKey as string | undefined,
-        subcategoryKey: hit.subcategoryKey as string | undefined,
-        subsubcategoryKey: hit.subsubcategoryKey as string | undefined,
-        displayName: (hit.displayName as string) || "Unknown Category",
-        type: (hit.type as string) || "category",
-        level: (hit.level as number) || 1,
-        languageCode: hit.languageCode as string | undefined,
-      }));
-    } catch (error) {
-      console.error("❌ Category search error:", error);
-      return [];
-    }
-  }
-
-  private getReplicaIndexName(indexName: string, sortOption: string): string {
-    if (indexName === "shop_products") {
-      return indexName;
-    }
-    switch (sortOption) {
-      case "date":
-        return `${indexName}_createdAt_desc`;
-      case "alphabetical":
-        return `${indexName}_alphabetical`;
-      case "price_asc":
-        return `${indexName}_price_asc`;
-      case "price_desc":
-        return `${indexName}_price_desc`;
-      default:
-        return indexName;
-    }
-  }
 }
 
 export function SearchProvider({ children }: SearchProviderProps) {
@@ -249,14 +89,14 @@ export function SearchProvider({ children }: SearchProviderProps) {
           Promise<Suggestion[]>,
           Promise<CategorySuggestion[]>
         ] = [
-          algoliaManager.searchProducts(
+          algoliaManager.searchProductSuggestions(
             searchTerm,
             "products",
             "alphabetical",
             0,
             5
           ),
-          algoliaManager.searchProducts(
+          algoliaManager.searchProductSuggestions(
             searchTerm,
             "shop_products",
             "alphabetical",
@@ -406,3 +246,6 @@ export function SearchProvider({ children }: SearchProviderProps) {
     <SearchContext.Provider value={value}>{children}</SearchContext.Provider>
   );
 }
+
+// Re-export types for convenience
+export type { Suggestion, CategorySuggestion };

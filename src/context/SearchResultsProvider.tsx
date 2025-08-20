@@ -8,29 +8,7 @@ import React, {
   ReactNode,
   useMemo,
 } from "react";
-
-// Product interface matching your Flutter model
-export interface Product {
-  id: string;
-  productName: string;
-  price: number;
-  originalPrice?: number;
-  discountPercentage?: number;
-  currency: string;
-  imageUrls: string[];
-  colorImages: Record<string, string[]>;
-  description: string;
-  brandModel?: string;
-  condition: string;
-  quantity?: number;
-  averageRating: number;
-  isBoosted: boolean;
-  deliveryOption?: string;
-  campaignName?: string;
-  dailyClickCount: number;
-  purchaseCount: number;
-  createdAt: string;
-}
+import { Product } from "@/lib/algolia";
 
 // Filter types matching Flutter implementation
 export type FilterType = '' | 'deals' | 'boosted' | 'trending' | 'fiveStar' | 'bestSellers';
@@ -224,3 +202,6 @@ export function SearchResultsProvider({ children }: SearchResultsProviderProps) 
     </SearchResultsContext.Provider>
   );
 }
+
+// Re-export types for convenience
+export type { Product };
