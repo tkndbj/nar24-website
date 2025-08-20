@@ -186,7 +186,7 @@ class AlgoliaServiceManager {
   }
 
   private cleanOldCache(): void {
-    const now = Date.now();
+    
     for (const [key, value] of this.cache.entries()) {
       if (!this.isValidCache(value.timestamp)) {
         this.cache.delete(key);
@@ -214,14 +214,6 @@ const throttle = <T extends (...args: unknown[]) => unknown>(func: T, limit: num
       inThrottle = true;
       setTimeout(() => (inThrottle = false), limit);
     }
-  }) as T;
-};
-
-const debounce = <T extends (...args: unknown[]) => unknown>(func: T, delay: number): T => {
-  let timeoutId: NodeJS.Timeout;
-  return ((...args: Parameters<T>) => {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => func.apply(this, args), delay);
   }) as T;
 };
 
@@ -323,7 +315,7 @@ const EmptyState: React.FC<{ isDarkMode: boolean; query: string }> = ({
               isDarkMode ? "text-gray-400" : "text-gray-600"
             }`}
           >
-            We couldn't find any products matching "{query}". Try adjusting your search terms.
+            We couldn&apos;t find any products matching &quot;{query}&quot;. Try adjusting your search terms.
           </p>
         </div>
       </div>
@@ -484,7 +476,7 @@ const SearchResultsContent: React.FC = () => {
   const t = useTranslations("searchResults");
   const {
     filteredProducts,
-    boostedProducts,
+    
     currentFilter,
     sortOption,
     isEmpty,
@@ -576,7 +568,7 @@ const SearchResultsContent: React.FC = () => {
         let results: Product[] = [];
         try {
           results = await algoliaManager.searchProducts(query, pageToFetch, 50, "products");
-        } catch (error) {
+        } catch {
           console.log("Products index failed, trying shop_products...");
           results = await algoliaManager.searchProducts(query, pageToFetch, 50, "shop_products");
         }
