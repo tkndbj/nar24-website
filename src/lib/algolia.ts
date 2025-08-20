@@ -74,6 +74,21 @@ interface AlgoliaCategoryHit {
   languageCode?: string;
 }
 
+interface AlgoliaSuggestionHit {
+  objectID?: string;
+  productName?: string;
+  price?: string | number;
+}
+
+interface AlgoliaSearchParams {
+  query: string;
+  hitsPerPage: number;
+  attributesToRetrieve: string[];
+  attributesToHighlight: string[];
+  typoTolerance?: boolean;
+  filters?: string;
+}
+
 class AlgoliaServiceManager {
   private static instance: AlgoliaServiceManager;
   private readonly applicationId = process.env.NEXT_PUBLIC_ALGOLIA_APP_ID || "3QVVGQH4ME";
@@ -252,10 +267,10 @@ class AlgoliaServiceManager {
 
       console.log(`✅ ${replicaIndex} returned ${searchResult.hits.length} hits`);
 
-      const suggestions = searchResult.hits.map((hit: Record<string, unknown>) => ({
-        id: (hit.objectID as string) || `unknown-${Math.random().toString(36).substr(2, 9)}`,
-        name: (hit.productName as string) || "Unknown Product",
-        price: (hit.price as number) || 0,
+      const suggestions = searchResult.hits.map((hit: AlgoliaSuggestionHit) => ({
+        id: hit.objectID || `unknown-${Math.random().toString(36).substr(2, 9)}`,
+        name: hit.productName || "Unknown Product",
+        price: hit.price ? (typeof hit.price === 'string' ? parseFloat(hit.price) : hit.price) || 0 : 0,
       }));
 
       // Cache the result
@@ -288,7 +303,7 @@ class AlgoliaServiceManager {
     try {
       console.log(`🔍 Searching categories with query: "${query}"`);
 
-      const searchParams: any = {
+      const searchParams: AlgoliaSearchParams = {
         query,
         hitsPerPage,
         attributesToRetrieve: [
