@@ -2117,7 +2117,11 @@
     "tryDifferentKeywords": "Farklı anahtar kelimeler deneyin",
     "viewAllResults": "Tüm sonuçları görüntüle",
     "searchingFor": "Aranıyor",
-    "loadMore": "Daha Fazla Yükle"
+    "loadMore": "Daha Fazla Yükle",
+    "recentSearches": "Son Aramalar",
+      "deleteSearchHistory": "Arama geçmişini sil",
+      "loadingMore": "Daha fazla yükleniyor...",      
+      "startTypingPrompt": "Öneriler görmek için yazmaya başlayın..."
   },
   "ProductPayment": {
     "payment": "Ödeme",

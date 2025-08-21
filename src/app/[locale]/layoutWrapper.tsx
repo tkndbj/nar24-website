@@ -7,6 +7,7 @@ import { FavoritesProvider } from "@/context/FavoritesProvider";
 import { BadgeProvider } from "@/context/BadgeProvider";
 import { SearchProvider } from "@/context/SearchProvider";
 import ConditionalHeader from "../components/ConditionalHeader";
+import { SearchHistoryProvider } from "@/context/SearchHistoryProvider";
 
 export default function LayoutWrapper({
   children,
@@ -24,8 +25,10 @@ export default function LayoutWrapper({
           <FavoritesProvider>
             <BadgeProvider>
               <SearchProvider>
-                <ConditionalHeader />
-                <main>{children}</main>
+                <SearchHistoryProvider>
+                  <ConditionalHeader />
+                  <main>{children}</main>
+                </SearchHistoryProvider>
               </SearchProvider>
             </BadgeProvider>
           </FavoritesProvider>

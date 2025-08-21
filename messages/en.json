@@ -1993,7 +1993,11 @@
     "tryDifferentKeywords": "Try different keywords",
     "viewAllResults": "View all results for",
     "searchingFor": "Searching for",
-    "loadMore": "Load More"
+    "loadMore": "Load More",
+    "recentSearches": "Recent Searches",
+      "deleteSearchHistory": "Delete search history",
+      "loadingMore": "Loading more...",      
+      "startTypingPrompt": "Start typing to see suggestions..."
   },
   "FavoritesDrawer": {
     "title": "My Favorites",
