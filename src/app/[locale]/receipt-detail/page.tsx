@@ -16,11 +16,8 @@ import {
   Share2,
   Download,
   Copy,
-  CheckCircle,
-  Calendar,
-  CreditCard,
-  MapPin,
-  Phone,
+  CheckCircle,  
+  MapPin,  
   User,
   LogIn,
 } from "lucide-react";
