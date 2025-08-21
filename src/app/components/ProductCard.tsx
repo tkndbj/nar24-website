@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
+import Image from "next/image"; // Add this import
 import {
   Heart,
   ShoppingCart,
@@ -61,7 +62,7 @@ const useImagePreloader = (urls: string[]) => {
     const preloadImages = async () => {
       const promises = urls.map((url) => {
         return new Promise<{ url: string; success: boolean }>((resolve) => {
-          const img = new Image();
+          const img = new window.Image();
           img.onload = () => resolve({ url, success: true });
           img.onerror = () => resolve({ url, success: false });
           img.src = url;
@@ -274,33 +275,43 @@ const ExtraLabel: React.FC<ExtraLabelProps> = ({ text, gradientColors }) => {
   );
 };
 
-// Logo placeholder component
-const LogoPlaceholder: React.FC<{ size?: number }> = ({ size = 120 }) => (
-  <div
-    className="flex items-center justify-center bg-gray-100 rounded-lg"
-    style={{ width: size, height: size }}
-  >
-    <img
-      src="/images/narsiyah.png"
-      alt="Narsiyah Logo"
-      width={size * 0.8}
-      height={size * 0.8}
-      className="object-contain"
-      onError={(e) => {
-        // Fallback to generic icon if logo fails to load
-        const target = e.target as HTMLImageElement;
-        target.style.display = "none";
-        target.parentElement!.innerHTML = `
-          <div class="w-8 h-8 text-gray-400">
-            <svg viewBox="0 0 24 24" fill="currentColor">
-              <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
-            </svg>
-          </div>
-        `;
-      }}
-    />
-  </div>
-);
+// Logo placeholder component - FIXED VERSION
+const LogoPlaceholder: React.FC<{ size?: number }> = ({ size = 120 }) => {
+  const [imageError, setImageError] = useState(false);
+
+  if (imageError) {
+    return (
+      <div
+        className="flex items-center justify-center bg-gray-100 rounded-lg"
+        style={{ width: size, height: size }}
+      >
+        <div className="w-8 h-8 text-gray-400">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" />
+          </svg>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="flex items-center justify-center bg-gray-100 rounded-lg relative"
+      style={{ width: size, height: size }}
+    >
+      <Image
+        src="/images/narsiyah.png"
+        alt="Narsiyah Logo"
+        width={size * 0.8}
+        height={size * 0.8}
+        className="object-contain"
+        onError={() => setImageError(true)}
+        priority={false}
+        sizes={`${size}px`}
+      />
+    </div>
+  );
+};
 
 export const ProductCard: React.FC<ProductCardProps> = ({
   product,
@@ -325,6 +336,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     string | null
   >(selectedColor || null);
   const [isHovered, setIsHovered] = useState(false);
+  const [imageError, setImageError] = useState(false); // Add this state
 
   // Compute displayed colors (max 4, shuffled)
   const displayedColors = useMemo(() => {
@@ -381,6 +393,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   // Reset image index when color changes with faster transition
   useEffect(() => {
     setCurrentImageIndex(0);
+    setImageError(false); // Reset image error when color changes
   }, [internalSelectedColor, selectedColor]);
 
   // Update internal selected color when prop changes
@@ -515,15 +528,19 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           <div className="w-full h-full rounded-t-xl overflow-hidden bg-gray-200 relative">
             {currentImageUrls.length > 0 ? (
               <div className="relative w-full h-full">
-                {/* Image with smooth transition */}
+                {/* Image with smooth transition - FIXED VERSION */}
                 <div className="relative w-full h-full">
-                  {isImageLoaded ? (
-                    <img
+                  {isImageLoaded && !imageError ? (
+                    <Image
                       src={currentImageUrl}
                       alt={product.productName}
-                      className="w-full h-full object-cover transition-opacity duration-300"
+                      fill
+                      className="object-cover transition-opacity duration-300"
+                      onError={() => setImageError(true)}
+                      sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
+                      priority={currentImageIndex === 0} // Prioritize first image
                     />
-                  ) : isImageFailed ? (
+                  ) : isImageFailed || imageError ? (
                     <div className="w-full h-full flex items-center justify-center bg-gray-100">
                       <ImageOff size={32} className="text-gray-400" />
                     </div>
