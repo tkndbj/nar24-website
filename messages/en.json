@@ -1470,7 +1470,16 @@
     "deleteAccountConfirmation": "Are you sure you want to delete your account? This action cannot be undone.",
     "logout": "Logout",
     "loggingOut": "Logging out...",
-    "signOutAccount": "Sign out of your account"
+    "signOutAccount": "Sign out of your account",
+    "notLoggedIn": "Not logged in",    
+    "pickupPoints": "Pickup Points",
+    "myReceipts": "My Receipts", 
+    "becomeASeller": "Become a Seller",
+    "supportAndFaq": "Support & FAQ",
+    "logoutConfirmation": "Are you sure you want to logout?",
+    "loginToAccess": "Login to access your profile",
+    "loginDescription": "Sign in to view your orders, saved items, and account settings",
+    "sellOnVitrin": "Sell on Vitrin"    
   },
   "ProductQuestions": {
     "title": "Product Questions",

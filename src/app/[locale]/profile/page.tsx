@@ -27,6 +27,9 @@ import {
   Box,
   Moon,
   Sun,
+  Settings,
+  Receipt,
+  Bell,
 } from "lucide-react";
 import Image from "next/image";
 import { SavedPaymentMethodsDrawer } from "@/app/components/profile/SavedPaymentMethodsDrawer";
@@ -42,14 +45,25 @@ interface ActionButton {
   gradient: string;
 }
 
+interface MainActionButton {
+  icon: React.ElementType;
+  label: string;
+  path?: string;
+  description: string;
+  featured?: boolean;
+  isExternal?: boolean;
+}
+
 export default function ProfilePage() {
   const { user, profileData, updateProfileData, isLoading } = useUser();
+  
+  // For now, we'll mock userOwnsShop - you can replace this with actual logic
+  const userOwnsShop = profileData?.userOwnsShop || false;
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isPaymentMethodsDrawerOpen, setIsPaymentMethodsDrawerOpen] =
-    useState(false);
+  const [isPaymentMethodsDrawerOpen, setIsPaymentMethodsDrawerOpen] = useState(false);
   const [isSellerInfoDrawerOpen, setIsSellerInfoDrawerOpen] = useState(false);
   const [isAddressesDrawerOpen, setIsAddressesDrawerOpen] = useState(false);
   const t = useTranslations();
@@ -126,6 +140,9 @@ export default function ProfilePage() {
   const handleLogout = async () => {
     if (isLoggingOut) return;
 
+    const confirmLogout = window.confirm(t("ProfilePage.logoutConfirmation"));
+    if (!confirmLogout) return;
+
     try {
       setIsLoggingOut(true);
       await signOut(auth);
@@ -134,6 +151,10 @@ export default function ProfilePage() {
       console.error("Error signing out:", error);
       setIsLoggingOut(false);
     }
+  };
+
+  const handleUnauthenticatedTap = () => {
+    router.push("/login");
   };
 
   const handleNavigation = (
@@ -147,7 +168,7 @@ export default function ProfilePage() {
     }
 
     if (!user) {
-      router.push("/login");
+      handleUnauthenticatedTap();
       return;
     }
 
@@ -187,32 +208,6 @@ export default function ProfilePage() {
     );
   }
 
-  if (!user) {
-    return (
-      <div
-        className={`min-h-screen flex items-center justify-center ${
-          isDarkMode ? "bg-gray-900" : "bg-gray-50"
-        }`}
-      >
-        <div className="text-center">
-          <h1
-            className={`text-2xl font-bold mb-4 ${
-              isDarkMode ? "text-white" : "text-gray-900"
-            }`}
-          >
-            {t("ProfilePage.loginToViewProfile")}
-          </h1>
-          <button
-            onClick={() => router.push("/login")}
-            className="px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium transition-colors"
-          >
-            {t("ProfilePage.login")}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   const quickActionButtons: ActionButton[] = [
     {
       icon: Box,
@@ -240,72 +235,84 @@ export default function ProfilePage() {
     },
   ];
 
-  const mainActionButtons = [
-    {
-      icon: Package,
-      label: t("ProfilePage.myOrders"),
-      path: "/orders",
-      description: t("ProfilePage.trackRecentPurchases"),
-    },
-    {
-      icon: Upload,
-      label: t("ProfilePage.sellOnNar24"),
-      path: "/sell",
-      description: t("ProfilePage.startSellingProducts"),
-    },
-    {
-      icon: Star,
-      label: t("ProfilePage.myReviews"),
-      path: "/reviews",
-      description: t("ProfilePage.yourWrittenReviews"),
-    },
-    {
-      icon: Zap,
-      label: t("ProfilePage.boosts"),
-      path: "/boosts",
-      description: t("ProfilePage.promoteYourListings"),
-    },
-    {
-      icon: HelpCircle,
-      label: t("ProfilePage.myQuestions"),
-      path: "/productquestions",
-      description: t("ProfilePage.productQuestionsAnswers"),
-    },
-    {
-      icon: ShoppingCart,
-      label: t("ProfilePage.sellerPanel"),
-      path: "https://nar24panel.com",
-      description: t("ProfilePage.manageYourStore"),
-      featured: true,
-      isExternal: true,
-    },
-  ];
+  // Main action buttons with conditional layout based on userOwnsShop
+  const getMainActionButtons = (): MainActionButton[] => {
+    const baseButtons: MainActionButton[] = [
+      {
+        icon: Package,
+        label: t("ProfilePage.myOrders"),
+        path: "/my_orders",
+        description: t("ProfilePage.trackRecentPurchases"),
+      },
+      {
+        icon: Upload,
+        label: t("ProfilePage.sellOnVitrin"),
+        path: "/list_product_screen",
+        description: t("ProfilePage.startSellingProducts"),
+      },
+      {
+        icon: Star,
+        label: t("ProfilePage.myReviews"),
+        path: "/my-reviews",
+        description: t("ProfilePage.yourWrittenReviews"),
+      },
+      {
+        icon: Zap,
+        label: t("ProfilePage.boosts"),
+        path: "/boost",
+        description: t("ProfilePage.promoteYourListings"),
+      },
+      {
+        icon: HelpCircle,
+        label: t("ProfilePage.myQuestions"),
+        path: "/user-product-questions",
+        description: t("ProfilePage.productQuestionsAnswers"),
+      },
+    ];
+
+    if (userOwnsShop) {
+      return [
+        {
+          icon: ShoppingCart,
+          label: t("ProfilePage.sellerPanel"),
+          path: "/seller-panel",
+          description: t("ProfilePage.manageYourStore"),
+          featured: true,
+        },
+        ...baseButtons,
+      ];
+    }
+
+    return baseButtons;
+  };
+
+  const mainActionButtons = getMainActionButtons();
 
   return (
     <div
-      className={`min-h-screen py-8 ${
+      className={`min-h-screen py-4 md:py-8 ${
         isDarkMode ? "bg-gray-900" : "bg-gray-50"
       }`}
     >
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
         {/* Header Card */}
         <div
-          className={`rounded-3xl shadow-xl overflow-hidden mb-8 ${
+          className={`rounded-2xl md:rounded-3xl shadow-xl overflow-hidden mb-4 md:mb-8 ${
             isDarkMode ? "bg-gray-800" : "bg-white"
           }`}
         >
           {/* Cover Section */}
-          <div className="h-40 bg-gradient-to-r from-orange-500 via-pink-500 to-purple-500 relative">
+          <div className="h-24 md:h-40 bg-gradient-to-r from-orange-500 via-pink-500 to-purple-500 relative">
             <div className="absolute inset-0 bg-black/10"></div>
           </div>
 
           {/* Profile Section */}
-          <div className="relative px-8 pb-8">
+          <div className="relative px-4 md:px-8 pb-4 md:pb-8">
             {/* Profile Image */}
-            <div className="flex items-end justify-between -mt-20 mb-8">
+            <div className="flex items-end justify-between -mt-12 md:-mt-20 mb-4 md:mb-8">
               <div className="relative">
                 <div
-                  className={`w-40 h-40 rounded-full p-3 shadow-2xl ${
+                  className={`w-24 h-24 md:w-40 md:h-40 rounded-full p-2 md:p-3 shadow-2xl ${
                     isDarkMode ? "bg-gray-800" : "bg-white"
                   }`}
                 >
@@ -314,7 +321,7 @@ export default function ProfilePage() {
                       isDarkMode ? "bg-gray-700" : "bg-gray-200"
                     }`}
                   >
-                    {profileData?.profileImage ? (
+                    {user && profileData?.profileImage ? (
                       <Image
                         src={profileData.profileImage}
                         alt="Profile"
@@ -323,24 +330,26 @@ export default function ProfilePage() {
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <User className="w-16 h-16 text-gray-400" />
+                        <User className="w-8 h-8 md:w-16 md:h-16 text-gray-400" />
                       </div>
                     )}
                   </div>
                 </div>
 
                 {/* Upload Button */}
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploadingImage}
-                  className="absolute bottom-3 right-3 w-12 h-12 bg-orange-500 hover:bg-orange-600 rounded-full flex items-center justify-center shadow-lg transition-colors disabled:opacity-50"
-                >
-                  {isUploadingImage ? (
-                    <div className="animate-spin rounded-full h-6 w-6 border-2 border-white border-t-transparent" />
-                  ) : (
-                    <Camera className="w-6 h-6 text-white" />
-                  )}
-                </button>
+                {user && (
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploadingImage}
+                    className="absolute bottom-1 md:bottom-3 right-1 md:right-3 w-8 h-8 md:w-12 md:h-12 bg-orange-500 hover:bg-orange-600 rounded-full flex items-center justify-center shadow-lg transition-colors disabled:opacity-50"
+                  >
+                    {isUploadingImage ? (
+                      <div className="animate-spin rounded-full h-4 w-4 md:h-6 md:w-6 border-2 border-white border-t-transparent" />
+                    ) : (
+                      <Camera className="w-4 h-4 md:w-6 md:h-6 text-white" />
+                    )}
+                  </button>
+                )}
 
                 <input
                   ref={fileInputRef}
@@ -351,92 +360,127 @@ export default function ProfilePage() {
                 />
               </div>
 
-              {/* Theme Toggle */}
-              <button
-                onClick={toggleTheme}
-                className={`mt-20 p-3 rounded-full transition-colors ${
-                  isDarkMode
-                    ? "bg-gray-700 hover:bg-gray-600"
-                    : "bg-gray-100 hover:bg-gray-200"
-                }`}
-              >
-                {isDarkMode ? (
-                  <Sun className="w-5 h-5 text-yellow-500" />
-                ) : (
-                  <Moon className="w-5 h-5 text-gray-600" />
+              {/* Theme Toggle and Login Button */}
+              <div className="flex items-center gap-2 mt-12 md:mt-20">
+                <button
+                  onClick={toggleTheme}
+                  className={`p-2 md:p-3 rounded-full transition-colors ${
+                    isDarkMode
+                      ? "bg-gray-700 hover:bg-gray-600"
+                      : "bg-gray-100 hover:bg-gray-200"
+                  }`}
+                >
+                  {isDarkMode ? (
+                    <Sun className="w-4 h-4 md:w-5 md:h-5 text-yellow-500" />
+                  ) : (
+                    <Moon className="w-4 h-4 md:w-5 md:h-5 text-gray-600" />
+                  )}
+                </button>
+
+                {user && (
+                  <button
+                    onClick={() => router.push("/notifications")}
+                    className={`p-2 md:p-3 rounded-full transition-colors relative ${
+                      isDarkMode
+                        ? "bg-gray-700 hover:bg-gray-600"
+                        : "bg-gray-100 hover:bg-gray-200"
+                    }`}
+                  >
+                    <Bell className={`w-4 h-4 md:w-5 md:h-5 ${isDarkMode ? "text-white" : "text-gray-600"}`} />
+                    {/* Notification badge can be added here if needed */}
+                  </button>
                 )}
-              </button>
+
+                {!user && (
+                  <button
+                    onClick={() => router.push("/login")}
+                    className="px-4 py-2 md:px-6 md:py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-md font-medium transition-colors text-sm md:text-base"
+                  >
+                    {t("ProfilePage.login")}
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* User Info */}
-            <div className="space-y-4">
+            <div className="space-y-2 md:space-y-4">
               <div>
                 <h1
-                  className={`text-3xl font-bold ${
+                  className={`text-xl md:text-3xl font-bold ${
                     isDarkMode ? "text-white" : "text-gray-900"
                   }`}
                 >
-                  {profileData?.displayName || t("ProfilePage.noName")}
+                  {user
+                    ? profileData?.displayName || t("ProfilePage.noName")
+                    : t("ProfilePage.notLoggedIn")}
                 </h1>
-                <div className="flex items-center gap-3 mt-2">
-                  <div
-                    className={`flex items-center gap-2 ${
-                      isDarkMode ? "text-gray-400" : "text-gray-600"
-                    }`}
-                  >
-                    <Mail className="w-4 h-4" />
-                    <span>{profileData?.email || user.email}</span>
-                  </div>
-                  {profileData?.isVerified && (
-                    <span
-                      className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                        isDarkMode
-                          ? "bg-green-900/30 text-green-400"
-                          : "bg-green-100 text-green-800"
+                {user && (
+                  <div className="flex items-center gap-3 mt-1 md:mt-2">
+                    <div
+                      className={`flex items-center gap-2 ${
+                        isDarkMode ? "text-gray-400" : "text-gray-600"
                       }`}
                     >
-                      {t("ProfilePage.verified")}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* User Stats */}
-              <div className="flex items-center gap-6 pt-4">
-                {profileData?.location && (
-                  <div
-                    className={`flex items-center gap-2 ${
-                      isDarkMode ? "text-gray-400" : "text-gray-600"
-                    }`}
-                  >
-                    <MapPin className="w-4 h-4" />
-                    <span>{profileData.location}</span>
+                      <Mail className="w-3 h-3 md:w-4 md:h-4" />
+                      <span className="text-sm md:text-base">
+                        {profileData?.email || user.email}
+                      </span>
+                    </div>
+                    {profileData?.isVerified && (
+                      <span
+                        className={`inline-flex items-center px-2 py-1 md:px-3 md:py-1 rounded-full text-xs font-medium ${
+                          isDarkMode
+                            ? "bg-green-900/30 text-green-400"
+                            : "bg-green-100 text-green-800"
+                        }`}
+                      >
+                        {t("ProfilePage.verified")}
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
+
+              {/* User Stats */}
+              {user && (
+                <div className="flex items-center gap-6 pt-2 md:pt-4">
+                  {profileData?.location && (
+                    <div
+                      className={`flex items-center gap-2 ${
+                        isDarkMode ? "text-gray-400" : "text-gray-600"
+                      }`}
+                    >
+                      <MapPin className="w-3 h-3 md:w-4 md:h-4" />
+                      <span className="text-sm md:text-base">
+                        {profileData.location}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mb-4 md:mb-8">
           {quickActionButtons.map((button, index) => (
             <button
               key={index}
               onClick={() => handleNavigation(button.path, button.action)}
-              className={`group p-4 rounded-2xl shadow-md hover:shadow-lg transition-all duration-200 border flex items-center gap-3 ${
+              className={`group p-3 md:p-4 rounded-xl md:rounded-2xl shadow-md hover:shadow-lg transition-all duration-200 border flex items-center gap-2 md:gap-3 ${
                 isDarkMode
                   ? "bg-gray-800 border-gray-700"
                   : "bg-white border-gray-100"
               }`}
             >
               <div
-                className={`w-10 h-10 rounded-xl bg-gradient-to-r ${button.gradient} flex items-center justify-center group-hover:scale-110 transition-transform flex-shrink-0`}
+                className={`w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-gradient-to-r ${button.gradient} flex items-center justify-center group-hover:scale-110 transition-transform flex-shrink-0`}
               >
-                <button.icon className="w-5 h-5 text-white" />
+                <button.icon className="w-4 h-4 md:w-5 md:h-5 text-white" />
               </div>
               <p
-                className={`text-sm font-medium text-left leading-tight ${
+                className={`text-xs md:text-sm font-medium text-left leading-tight ${
                   isDarkMode ? "text-white" : "text-gray-900"
                 }`}
               >
@@ -447,12 +491,12 @@ export default function ProfilePage() {
         </div>
 
         {/* Main Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6 mb-4 md:mb-8">
           {mainActionButtons.map((button, index) => (
             <button
               key={index}
-              onClick={() => handleNavigation(button.path)}
-              className={`group p-6 rounded-2xl shadow-md hover:shadow-lg transition-all duration-200 text-left ${
+              onClick={() => handleNavigation(button.path, undefined, button.isExternal)}
+              className={`group p-4 md:p-6 rounded-xl md:rounded-2xl shadow-md hover:shadow-lg transition-all duration-200 text-left ${
                 button.featured
                   ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white"
                   : isDarkMode
@@ -461,23 +505,23 @@ export default function ProfilePage() {
               }`}
             >
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3 md:gap-4">
                   <div
-                    className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                    className={`w-10 h-10 md:w-12 md:h-12 rounded-lg md:rounded-xl flex items-center justify-center ${
                       button.featured
                         ? "bg-white/20"
                         : "bg-gradient-to-r from-orange-500 to-pink-500"
                     }`}
                   >
                     <button.icon
-                      className={`w-6 h-6 ${
+                      className={`w-5 h-5 md:w-6 md:h-6 ${
                         button.featured ? "text-white" : "text-white"
                       }`}
                     />
                   </div>
                   <div>
                     <h3
-                      className={`font-semibold ${
+                      className={`text-sm md:text-base font-semibold ${
                         button.featured
                           ? "text-white"
                           : isDarkMode
@@ -488,7 +532,7 @@ export default function ProfilePage() {
                       {button.label}
                     </h3>
                     <p
-                      className={`text-sm ${
+                      className={`text-xs md:text-sm ${
                         button.featured
                           ? "text-white/80"
                           : isDarkMode
@@ -501,7 +545,7 @@ export default function ProfilePage() {
                   </div>
                 </div>
                 <ChevronRight
-                  className={`w-5 h-5 group-hover:translate-x-1 transition-transform ${
+                  className={`w-4 h-4 md:w-5 md:h-5 group-hover:translate-x-1 transition-transform ${
                     button.featured
                       ? "text-white/80"
                       : isDarkMode
@@ -514,154 +558,246 @@ export default function ProfilePage() {
           ))}
         </div>
 
-        {/* Account Actions */}
-        <div
-          className={`rounded-2xl shadow-md p-6 border ${
-            isDarkMode
-              ? "bg-gray-800 border-gray-700"
-              : "bg-white border-gray-100"
-          }`}
-        >
-          <h2
-            className={`text-xl font-bold mb-6 ${
-              isDarkMode ? "text-white" : "text-gray-900"
+        {/* Additional Actions for Authenticated Users */}
+        {user && (
+          <div
+            className={`rounded-xl md:rounded-2xl shadow-md p-4 md:p-6 border mb-4 md:mb-8 ${
+              isDarkMode
+                ? "bg-gray-800 border-gray-700"
+                : "bg-white border-gray-100"
             }`}
           >
-            {t("ProfilePage.accountSettings")}
-          </h2>
-
-          <div className="space-y-4">
-            {/* Become a Seller */}
-            <button
-              onClick={() => handleNavigation("/createshop")}
-              className={`w-full flex items-center gap-4 p-4 rounded-xl transition-colors text-left ${
-                isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"
-              }`}
-            >
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-r from-green-500 to-emerald-500 flex items-center justify-center">
-                <ShoppingCart className="w-5 h-5 text-white" />
-              </div>
-              <div className="flex-1">
-                <h3
-                  className={`font-medium ${
+            <div className="space-y-3 md:space-y-4">
+              {/* Pickup Points */}
+              <button
+                onClick={() => handleNavigation("/view_pickup_points")}
+                className={`w-full flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-lg md:rounded-xl transition-colors text-left ${
+                  isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"
+                }`}
+              >
+                <MapPin
+                  className={`w-4 h-4 md:w-5 md:h-5 ${
+                    isDarkMode ? "text-gray-400" : "text-gray-600"
+                  }`}
+                />
+                <span
+                  className={`text-sm md:text-base ${
                     isDarkMode ? "text-white" : "text-gray-900"
                   }`}
                 >
-                  {t("ProfilePage.becomeSeller")}
-                </h3>
-                <p
-                  className={`text-sm ${
-                    isDarkMode ? "text-gray-400" : "text-gray-600"
-                  }`}
-                >
-                  {t("ProfilePage.startYourShop")}
-                </p>
-              </div>
-              <ChevronRight
-                className={`w-5 h-5 ${
-                  isDarkMode ? "text-gray-600" : "text-gray-400"
-                }`}
-              />
-            </button>
-
-            {/* Divider */}
-            <div
-              className={`border-t ${
-                isDarkMode ? "border-gray-700" : "border-gray-200"
-              }`}
-            ></div>
-
-            {/* Delete Account */}
-            <button
-              onClick={() => {
-                if (confirm(t("ProfilePage.deleteAccountConfirmation"))) {
-                  console.log("Delete account");
-                }
-              }}
-              className={`w-full flex items-center gap-4 p-4 rounded-xl transition-colors text-left group ${
-                isDarkMode ? "hover:bg-red-900/20" : "hover:bg-red-50"
-              }`}
-            >
-              <div
-                className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
-                  isDarkMode
-                    ? "bg-red-900/30 group-hover:bg-red-900/50"
-                    : "bg-red-100 group-hover:bg-red-200"
-                }`}
-              >
-                <Trash2
-                  className={`w-5 h-5 ${
-                    isDarkMode ? "text-red-400" : "text-red-600"
+                  {t("ProfilePage.pickupPoints")}
+                </span>
+                <ChevronRight
+                  className={`w-4 h-4 md:w-5 md:h-5 ml-auto ${
+                    isDarkMode ? "text-gray-600" : "text-gray-400"
                   }`}
                 />
-              </div>
-              <div className="flex-1">
-                <h3
-                  className={`font-medium ${
-                    isDarkMode ? "text-red-400" : "text-red-600"
-                  }`}
-                >
-                  {t("ProfilePage.deleteAccount")}
-                </h3>
-                <p
-                  className={`text-sm ${
-                    isDarkMode ? "text-red-400" : "text-red-500"
-                  }`}
-                >
-                  {t("ProfilePage.permanentlyDeleteAccount")}
-                </p>
-              </div>
-            </button>
+              </button>
 
-            {/* Divider */}
-            <div
-              className={`border-t ${
-                isDarkMode ? "border-gray-700" : "border-gray-200"
-              }`}
-            ></div>
-
-            {/* Logout */}
-            <button
-              onClick={handleLogout}
-              disabled={isLoggingOut}
-              className={`w-full flex items-center gap-4 p-4 rounded-xl transition-colors text-left disabled:opacity-50 ${
-                isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"
-              }`}
-            >
               <div
-                className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                  isDarkMode ? "bg-gray-700" : "bg-gray-100"
+                className={`border-t ${
+                  isDarkMode ? "border-gray-700" : "border-gray-200"
+                }`}
+              ></div>
+
+              {/* My Receipts */}
+              <button
+                onClick={() => handleNavigation("/receipts")}
+                className={`w-full flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-lg md:rounded-xl transition-colors text-left ${
+                  isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"
+                }`}
+              >
+                <Receipt
+                  className={`w-4 h-4 md:w-5 md:h-5 ${
+                    isDarkMode ? "text-gray-400" : "text-gray-600"
+                  }`}
+                />
+                <span
+                  className={`text-sm md:text-base ${
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  }`}
+                >
+                  {t("ProfilePage.myReceipts")}
+                </span>
+                <ChevronRight
+                  className={`w-4 h-4 md:w-5 md:h-5 ml-auto ${
+                    isDarkMode ? "text-gray-600" : "text-gray-400"
+                  }`}
+                />
+              </button>
+
+              <div
+                className={`border-t ${
+                  isDarkMode ? "border-gray-700" : "border-gray-200"
+                }`}
+              ></div>
+
+              {/* Become a Seller */}
+              <button
+                onClick={() => handleNavigation("/create_shop_screen")}
+                className={`w-full flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-lg md:rounded-xl transition-colors text-left ${
+                  isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"
+                }`}
+              >
+                <ShoppingCart
+                  className={`w-4 h-4 md:w-5 md:h-5 ${
+                    isDarkMode ? "text-gray-400" : "text-gray-600"
+                  }`}
+                />
+                <span
+                  className={`text-sm md:text-base ${
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  }`}
+                >
+                  {t("ProfilePage.becomeASeller")}
+                </span>
+                <ChevronRight
+                  className={`w-4 h-4 md:w-5 md:h-5 ml-auto ${
+                    isDarkMode ? "text-gray-600" : "text-gray-400"
+                  }`}
+                />
+              </button>
+
+              <div
+                className={`border-t ${
+                  isDarkMode ? "border-gray-700" : "border-gray-200"
+                }`}
+              ></div>
+
+              {/* Account Settings */}
+              <button
+                onClick={() => handleNavigation("/account_settings")}
+                className={`w-full flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-lg md:rounded-xl transition-colors text-left ${
+                  isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"
+                }`}
+              >
+                <Settings
+                  className={`w-4 h-4 md:w-5 md:h-5 ${
+                    isDarkMode ? "text-gray-400" : "text-gray-600"
+                  }`}
+                />
+                <span
+                  className={`text-sm md:text-base ${
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  }`}
+                >
+                  {t("ProfilePage.accountSettings")}
+                </span>
+                <ChevronRight
+                  className={`w-4 h-4 md:w-5 md:h-5 ml-auto ${
+                    isDarkMode ? "text-gray-600" : "text-gray-400"
+                  }`}
+                />
+              </button>
+
+              <div
+                className={`border-t ${
+                  isDarkMode ? "border-gray-700" : "border-gray-200"
+                }`}
+              ></div>
+
+              {/* Support and FAQ */}
+              <button
+                onClick={() => handleNavigation("/support_and_faq")}
+                className={`w-full flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-lg md:rounded-xl transition-colors text-left ${
+                  isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"
+                }`}
+              >
+                <Info
+                  className={`w-4 h-4 md:w-5 md:h-5 ${
+                    isDarkMode ? "text-gray-400" : "text-gray-600"
+                  }`}
+                />
+                <span
+                  className={`text-sm md:text-base ${
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  }`}
+                >
+                  {t("ProfilePage.supportAndFaq")}
+                </span>
+                <ChevronRight
+                  className={`w-4 h-4 md:w-5 md:h-5 ml-auto ${
+                    isDarkMode ? "text-gray-600" : "text-gray-400"
+                  }`}
+                />
+              </button>
+
+              <div
+                className={`border-t ${
+                  isDarkMode ? "border-gray-700" : "border-gray-200"
+                }`}
+              ></div>
+
+              {/* Logout */}
+              <button
+                onClick={handleLogout}
+                disabled={isLoggingOut}
+                className={`w-full flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-lg md:rounded-xl transition-colors text-left disabled:opacity-50 ${
+                  isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"
                 }`}
               >
                 <LogOut
-                  className={`w-5 h-5 ${
+                  className={`w-4 h-4 md:w-5 md:h-5 ${
                     isDarkMode ? "text-gray-400" : "text-gray-600"
                   } ${isLoggingOut ? "animate-pulse" : ""}`}
                 />
-              </div>
-              <div className="flex-1">
-                <h3
-                  className={`font-medium ${
+                <span
+                  className={`text-sm md:text-base ${
                     isDarkMode ? "text-white" : "text-gray-900"
                   }`}
                 >
                   {isLoggingOut
                     ? t("ProfilePage.loggingOut")
                     : t("ProfilePage.logout")}
+                </span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Unauthenticated State Message */}
+        {!user && (
+          <div
+            className={`rounded-xl md:rounded-2xl shadow-md p-4 md:p-6 border text-center ${
+              isDarkMode
+                ? "bg-gray-800 border-gray-700"
+                : "bg-white border-gray-100"
+            }`}
+          >
+            <div className="space-y-3 md:space-y-4">
+              <User
+                className={`w-12 h-12 md:w-16 md:h-16 mx-auto ${
+                  isDarkMode ? "text-gray-600" : "text-gray-400"
+                }`}
+              />
+              <div>
+                <h3
+                  className={`text-lg md:text-xl font-semibold mb-2 ${
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  }`}
+                >
+                  {t("ProfilePage.loginToAccess")}
                 </h3>
                 <p
-                  className={`text-sm ${
+                  className={`text-sm md:text-base mb-4 ${
                     isDarkMode ? "text-gray-400" : "text-gray-600"
                   }`}
                 >
-                  {t("ProfilePage.signOutAccount")}
+                  {t("ProfilePage.loginDescription")}
                 </p>
+                <button
+                  onClick={() => router.push("/login")}
+                  className="w-full px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium transition-colors"
+                >
+                  {t("ProfilePage.login")}
+                </button>
               </div>
-            </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
-      {/* SavedPaymentMethodsDrawer */}
+
+      {/* Drawers */}
       <SavedPaymentMethodsDrawer
         isOpen={isPaymentMethodsDrawerOpen}
         onClose={() => setIsPaymentMethodsDrawerOpen(false)}

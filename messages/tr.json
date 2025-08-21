@@ -1469,7 +1469,16 @@
     "deleteAccountConfirmation": "Hesabınızı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
     "logout": "Çıkış Yap",
     "loggingOut": "Çıkış yapılıyor...",
-    "signOutAccount": "Hesabınızdan çıkış yapın"
+    "signOutAccount": "Hesabınızdan çıkış yapın",
+    "notLoggedIn": "Giriş yapılmamış",
+"pickupPoints": "Teslim Noktaları",
+"myReceipts": "Fişlerim",
+"becomeASeller": "Satıcı Ol",
+"supportAndFaq": "Destek ve SSS",
+"logoutConfirmation": "Çıkış yapmak istediğinizden emin misiniz?",
+"loginToAccess": "Profilinize erişmek için giriş yapın",
+"loginDescription": "Siparişlerinizi, kayıtlı öğelerinizi ve hesap ayarlarınızı görüntülemek için oturum açın",
+"sellOnVitrin": "Vitrin'de Sat"
   },
   "ProductQuestions": {
     "title": "Ürün Soruları",
