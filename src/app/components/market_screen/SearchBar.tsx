@@ -10,7 +10,7 @@ import {
   TrendingUp,
   Loader2,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
+
 import {
   CategorySuggestion,
   Suggestion,
@@ -51,8 +51,7 @@ export default function SearchBar({
 }: SearchBarProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const router = useRouter();
+  const scrollContainerRef = useRef<HTMLDivElement>(null);  
 
   // Pagination state for search history
   const [currentPage, setCurrentPage] = useState(0);
