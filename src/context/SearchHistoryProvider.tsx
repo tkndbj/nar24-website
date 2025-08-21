@@ -12,8 +12,7 @@ import {
   getDocs, 
   writeBatch,
   limit,
-  startAfter,
-  DocumentSnapshot,
+  startAfter,  
   QueryDocumentSnapshot,
   Unsubscribe 
 } from 'firebase/firestore';
@@ -65,8 +64,7 @@ const INITIAL_LOAD_LIMIT = 20;
 const PAGINATION_LIMIT = 10;
 
 export const SearchHistoryProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // State variables matching Flutter implementation
-  const [searchEntriesSearches, setSearchEntriesSearches] = useState<SearchEntry[]>([]);
+  // Core state for search entries
   const [searchEntries, setSearchEntries] = useState<SearchEntry[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [hasMoreHistory, setHasMoreHistory] = useState(true);
@@ -76,6 +74,7 @@ export const SearchHistoryProvider: React.FC<{ children: React.ReactNode }> = ({
   const deletingEntries = useRef<Map<string, Promise<void>>>(new Map());
   const optimisticallyDeleted = useRef<Set<string>>(new Set());
   const lastDocument = useRef<QueryDocumentSnapshot | null>(null);
+  const allEntries = useRef<SearchEntry[]>([]);
 
   // Subscription references
   const historyUnsubscribe = useRef<Unsubscribe | null>(null);
@@ -129,6 +128,7 @@ export const SearchHistoryProvider: React.FC<{ children: React.ReactNode }> = ({
   const resetPagination = useCallback(() => {
     lastDocument.current = null;
     setHasMoreHistory(true);
+    allEntries.current = [];
   }, []);
 
   const fetchSearchHistory = useCallback((userId: string) => {
@@ -146,7 +146,7 @@ export const SearchHistoryProvider: React.FC<{ children: React.ReactNode }> = ({
       q,
       (snapshot) => {
         const entries = snapshot.docs.map(searchEntryFromFirestore);
-        setSearchEntriesSearches(entries);
+        allEntries.current = entries;
         setIsLoadingHistory(false);
         
         // Update pagination state
@@ -188,7 +188,7 @@ export const SearchHistoryProvider: React.FC<{ children: React.ReactNode }> = ({
       const newEntries = snapshot.docs.map(searchEntryFromFirestore);
 
       if (newEntries.length > 0) {
-        setSearchEntriesSearches(prev => [...prev, ...newEntries]);
+        allEntries.current = [...allEntries.current, ...newEntries];
         lastDocument.current = snapshot.docs[snapshot.docs.length - 1];
         setHasMoreHistory(snapshot.docs.length === PAGINATION_LIMIT);
       } else {
@@ -219,43 +219,38 @@ export const SearchHistoryProvider: React.FC<{ children: React.ReactNode }> = ({
   const insertLocalEntry = useCallback((entry: SearchEntry) => {
     // Only insert if we have a current user
     if (currentUserId) {
-      setSearchEntriesSearches(prev => [entry, ...prev]);
+      allEntries.current = [entry, ...allEntries.current];
       updateCombinedEntries();
     }
   }, [currentUserId]);
 
   const updateCombinedEntries = useCallback(() => {
-    // This needs to be called after state updates, so we use a callback
-    setSearchEntriesSearches(currentSearches => {
-      // Filter out optimistically deleted entries
-      const filteredEntries = currentSearches.filter(
-        entry => !optimisticallyDeleted.current.has(entry.id)
-      );
+    // Filter out optimistically deleted entries
+    const filteredEntries = allEntries.current.filter(
+      entry => !optimisticallyDeleted.current.has(entry.id)
+    );
 
-      const combinedEntries = [...filteredEntries];
-      const uniqueMap = new Map<string, SearchEntry>();
-
-      combinedEntries.forEach(entry => {
-        if (!uniqueMap.has(entry.searchTerm)) {
-          uniqueMap.set(entry.searchTerm, entry);
-        }
-      });
-
-      const uniqueEntries = Array.from(uniqueMap.values()).sort((a, b) => {
-        const timeA = a.timestamp || new Date(0);
-        const timeB = b.timestamp || new Date(0);
-        return timeB.getTime() - timeA.getTime();
-      });
-
-      setSearchEntries(uniqueEntries);
-      return currentSearches;
+    // Remove duplicates based on search term, keeping the most recent
+    const uniqueMap = new Map<string, SearchEntry>();
+    filteredEntries.forEach(entry => {
+      if (!uniqueMap.has(entry.searchTerm)) {
+        uniqueMap.set(entry.searchTerm, entry);
+      }
     });
+
+    const uniqueEntries = Array.from(uniqueMap.values()).sort((a, b) => {
+      const timeA = a.timestamp || new Date(0);
+      const timeB = b.timestamp || new Date(0);
+      return timeB.getTime() - timeA.getTime();
+    });
+
+    setSearchEntries(uniqueEntries);
   }, []);
 
   const clearHistory = useCallback(() => {
     historyUnsubscribe.current?.();
     historyUnsubscribe.current = null;
-    setSearchEntriesSearches([]);
+    allEntries.current = [];
     setSearchEntries([]);
     setIsLoadingHistory(false);
     deletingEntries.current.clear();
@@ -346,7 +341,7 @@ export const SearchHistoryProvider: React.FC<{ children: React.ReactNode }> = ({
   const deleteAllForUser = useCallback(async (userId: string): Promise<void> => {
     try {
       // Optimistically clear the UI first
-      setSearchEntriesSearches([]);
+      allEntries.current = [];
       setSearchEntries([]);
       optimisticallyDeleted.current.clear();
       resetPagination();

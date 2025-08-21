@@ -44,8 +44,7 @@ export default function SearchBar({
   searchTerm,
   onSearchTermChange,
   onSearchSubmit,
-  onKeyPress,
-  showSuggestions,
+  onKeyPress,  
   onSuggestionClick,
   isMobile = false,
   t,
@@ -87,6 +86,9 @@ export default function SearchBar({
         // Restore body scroll
         document.body.style.overflow = originalStyle;
       };
+    } else {
+      // ADD THIS - Ensure scroll is restored when not searching
+      document.body.style.overflow = '';
     }
   }, [isSearching]);
 
@@ -100,6 +102,9 @@ export default function SearchBar({
         onSearchStateChange(false);
         searchInputRef.current?.blur();
         setCurrentPage(0); // Reset pagination when closing
+        
+        // ADD THIS LINE - Force restore body scroll
+        document.body.style.overflow = '';
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
