@@ -533,28 +533,7 @@ class AlgoliaServiceManager {
       console.error("❌ Category search error:", error);
       return [];
     }
-  }
-
-  /**
-   * Health check - verify service is reachable
-   */
-  async isServiceReachable(): Promise<boolean> {
-    try {
-      const result = await this.client.searchSingleIndex({
-        indexName: 'products',
-        searchParams: {
-          query: '',
-          hitsPerPage: 1,
-          attributesToRetrieve: ['objectID'],
-          attributesToHighlight: [],
-        }
-      });
-      return true;
-    } catch (error) {
-      console.error('Algolia health check failed:', error);
-      return false;
-    }
-  }
+  } 
 
   /**
    * Clear all cached data
