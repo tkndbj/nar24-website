@@ -4,8 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/context/UserProvider";
 import { updateDoc, doc, getDoc } from "firebase/firestore";
-import { deleteUser, reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
-import { auth, db } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
 import { httpsCallable, getFunctions } from "firebase/functions";
 import {
   ArrowLeft,
@@ -142,9 +141,9 @@ export default function AccountSettingsPage() {
       
       // Logout and redirect
       router.push("/login");
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error deleting account:", error);
-      alert(error.message || t("AccountSettings.deleteAccountFailed"));
+      alert(error instanceof Error ? error.message : t("AccountSettings.deleteAccountFailed"));
     } finally {
       setIsDeleting(false);
       setShowDeleteDialog(false);
