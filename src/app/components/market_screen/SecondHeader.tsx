@@ -147,6 +147,22 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
+  // ✅ Fix 3: Handle body scroll when mobile drawer is open/closed
+  useEffect(() => {
+    if (isMobile && showMobileDrawer) {
+      // Disable scrolling when drawer is open
+      document.body.style.overflow = 'hidden';
+    } else {
+      // Re-enable scrolling when drawer is closed
+      document.body.style.overflow = 'unset';
+    }
+
+    // Cleanup function to ensure scrolling is restored
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [showMobileDrawer, isMobile]);
+
   // Get buyer categories from AllInOneCategoryData
   const getBuyerCategories = (): BuyerCategory[] => {
     return AllInOneCategoryData.kBuyerCategories.map((category) => ({
@@ -938,15 +954,18 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
       )}
 
       {/* Mobile Drawer */}
-      {showMobileDrawer && isMobile && (
+      {isMobile && (
         <>
-          {/* Backdrop */}
+          {/* ✅ Fix 2: Backdrop with transparent black background */}
           <div
-            className="fixed inset-0 bg-gray-500 bg-opacity-30 z-[9998]"
+            className={`
+              fixed inset-0 bg-black bg-opacity-30 z-[9998] transition-opacity duration-300 ease-in-out
+              ${showMobileDrawer ? 'opacity-100' : 'opacity-0 pointer-events-none'}
+            `}
             onClick={closeMobileDrawer}
           />
 
-          {/* Drawer */}
+          {/* ✅ Fix 1: Drawer with smooth slide animation */}
           <div
             className={`
               fixed top-0 left-0 h-full w-80 max-w-[85vw] z-[9999]

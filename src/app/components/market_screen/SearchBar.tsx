@@ -31,7 +31,9 @@ interface SearchBarProps {
     suggestion: Suggestion | CategorySuggestion,
     type: "product" | "category"
   ) => void;
+  onHistoryItemClick: (historyTerm: string) => void;
   isMobile?: boolean;
+  isMobileOverlay?: boolean;
   t: (key: string, params?: Record<string, string | number>) => string;
 }
 
@@ -46,7 +48,9 @@ export default function SearchBar({
   onSearchSubmit,
   onKeyPress,  
   onSuggestionClick,
+  onHistoryItemClick,
   isMobile = false,
+  isMobileOverlay = false,
   t,
 }: SearchBarProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -75,10 +79,10 @@ export default function SearchBar({
     isDeletingEntry,
   } = useSearchHistory();
 
-  // Body scroll lock when dropdown is active
+  // Body scroll lock when dropdown is active (only for desktop)
   useEffect(() => {
-    if (isSearching) {
-      // Lock body scroll
+    if (!isMobile && isSearching) {
+      // Lock body scroll for desktop
       const originalStyle = window.getComputedStyle(document.body).overflow;
       document.body.style.overflow = 'hidden';
       
@@ -86,14 +90,16 @@ export default function SearchBar({
         // Restore body scroll
         document.body.style.overflow = originalStyle;
       };
-    } else {
-      // ADD THIS - Ensure scroll is restored when not searching
+    } else if (!isMobile) {
+      // Ensure scroll is restored when not searching on desktop
       document.body.style.overflow = '';
     }
-  }, [isSearching]);
+  }, [isSearching, isMobile]);
 
-  // Handle click outside for search
+  // Handle click outside for search (only for desktop)
   useEffect(() => {
+    if (isMobile || isMobileOverlay) return; // Skip for mobile
+    
     const handleClickOutside = (event: MouseEvent) => {
       if (
         searchContainerRef.current &&
@@ -103,13 +109,13 @@ export default function SearchBar({
         searchInputRef.current?.blur();
         setCurrentPage(0); // Reset pagination when closing
         
-        // ADD THIS LINE - Force restore body scroll
+        // Force restore body scroll
         document.body.style.overflow = '';
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [onSearchStateChange]);
+  }, [onSearchStateChange, isMobile, isMobileOverlay]);
 
   // Focus input when entering search mode
   useEffect(() => {
@@ -129,14 +135,6 @@ export default function SearchBar({
   const containerClasses = isMobile
     ? "relative w-full"
     : "relative w-[500px] max-w-[calc(100vw-12rem)]";
-
-  // Handle search history item click
-  const handleHistoryItemClick = useCallback((historyTerm: string) => {
-    onSearchTermChange(historyTerm);
-    onSearchStateChange(false);
-    // Navigate to search results
-    router.push(`/search-results?q=${encodeURIComponent(historyTerm)}`);
-  }, [onSearchTermChange, onSearchStateChange, router]);
 
   // Handle delete history item
   const handleDeleteHistoryItem = useCallback(async (e: React.MouseEvent, docId: string) => {
@@ -246,8 +244,8 @@ export default function SearchBar({
         </button>
       </div>
 
-      {/* Search Dropdown - Shows when searching */}
-      {isSearching && (
+      {/* Search Dropdown - Shows when searching and NOT in mobile overlay mode */}
+      {isSearching && !isMobileOverlay && (
         <div
           className={`
             absolute top-full left-0 right-0 mt-2 
@@ -350,9 +348,7 @@ export default function SearchBar({
                           </div>
                           <TrendingUp
                             size={14}
-                            className={`${
-                              isDark ? "text-gray-400" : "text-gray-400"
-                            }`}
+                            className="text-gray-400"
                           />
                         </button>
                       ))}
@@ -497,7 +493,7 @@ export default function SearchBar({
                       `}
                     >
                       <button
-                        onClick={() => handleHistoryItemClick(entry.searchTerm)}
+                        onClick={() => onHistoryItemClick(entry.searchTerm)}
                         className="flex-1 flex items-center space-x-3 text-left"
                       >
                         <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
@@ -585,6 +581,348 @@ export default function SearchBar({
               </p>
               <p
                 className={`text-xs ${
+                  isDark ? "text-gray-400" : "text-gray-500"
+                }`}
+              >
+                {t('header.startTypingPrompt')}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Mobile Overlay Content - Shows when in mobile overlay mode */}
+      {isMobileOverlay && (
+        <div className={`
+          pt-4 px-4 pb-8 h-[calc(100vh-4rem)] overflow-y-auto
+          ${isDark ? 'bg-gray-900' : 'bg-white'}
+        `}>
+          {/* Show search results if user has typed something and there are results */}
+          {hasSearchResults ? (
+            <div className="space-y-6">
+              {/* Loading State */}
+              {isLoading && (
+                <div className="p-8">
+                  <div className="flex items-center justify-center space-x-2">
+                    <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce"></div>
+                    <div
+                      className="w-3 h-3 bg-blue-500 rounded-full animate-bounce"
+                      style={{ animationDelay: "0.1s" }}
+                    ></div>
+                    <div
+                      className="w-3 h-3 bg-blue-500 rounded-full animate-bounce"
+                      style={{ animationDelay: "0.2s" }}
+                    ></div>
+                  </div>
+                </div>
+              )}
+
+              {/* Error State */}
+              {errorMessage && (
+                <div className="p-6">
+                  <div className="flex items-center space-x-4 text-red-500">
+                    <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                      {hasNetworkError ? "📡" : "⚠️"}
+                    </div>
+                    <div>
+                      <p className="font-medium text-lg">{errorMessage}</p>
+                      <button
+                        onClick={() => updateTerm(searchTerm)}
+                        className="text-blue-500 hover:text-blue-600 mt-2"
+                      >
+                        {t('header.tryAgain')}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Categories Section */}
+              {categorySuggestions.length > 0 && (
+                <div>
+                  <div className="flex items-center space-x-3 mb-4">
+                    <Grid3x3 size={20} className="text-orange-500" />
+                    <span
+                      className={`text-lg font-semibold ${
+                        isDark ? "text-gray-200" : "text-gray-800"
+                      }`}
+                    >
+                      {t('header.categories')}
+                    </span>
+                    <div className="px-3 py-1 bg-orange-100 dark:bg-orange-900/30 rounded-full">
+                      <span className="text-sm font-bold text-orange-600">
+                        {t('header.aiPowered')}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    {categorySuggestions.map((category) => (
+                      <button
+                        key={category.id}
+                        onClick={() =>
+                          onSuggestionClick(category, "category")
+                        }
+                        className={`
+                          w-full flex items-center space-x-4 p-4 rounded-xl
+                          hover:bg-gray-100 dark:hover:bg-gray-800 
+                          transition-colors duration-150
+                          border ${isDark ? 'border-gray-700' : 'border-gray-200'}
+                        `}
+                      >
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-400 to-pink-500 flex items-center justify-center">
+                          <Grid3x3 size={18} className="text-white" />
+                        </div>
+                        <div className="flex-1 text-left">
+                          <p
+                            className={`font-medium ${
+                              isDark ? "text-gray-200" : "text-gray-900"
+                            }`}
+                          >
+                            {category.displayName}
+                          </p>
+                          <p
+                            className={`text-sm ${
+                              isDark ? "text-gray-400" : "text-gray-500"
+                            }`}
+                          >
+                            {t('header.levelCategory', { level: category.level })}
+                          </p>
+                        </div>
+                        <TrendingUp
+                          size={16}
+                          className="text-gray-400"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Products Section */}
+              {suggestions.length > 0 && (
+                <div>
+                  <div className="flex items-center space-x-3 mb-4">
+                    <ShoppingBag size={20} className="text-blue-500" />
+                    <span
+                      className={`text-lg font-semibold ${
+                        isDark ? "text-gray-200" : "text-gray-800"
+                      }`}
+                    >
+                      {t('header.products')}
+                    </span>
+                    <div className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 rounded-full">
+                      <span className="text-sm font-bold text-blue-600">
+                        {suggestions.length}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    {suggestions.map((suggestion) => (
+                      <button
+                        key={suggestion.id}
+                        onClick={() =>
+                          onSuggestionClick(suggestion, "product")
+                        }
+                        className={`
+                          w-full flex items-center space-x-4 p-4 rounded-xl
+                          hover:bg-gray-100 dark:hover:bg-gray-800 
+                          transition-colors duration-150
+                          border ${isDark ? 'border-gray-700' : 'border-gray-200'}
+                        `}
+                      >
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center">
+                          <ShoppingBag size={18} className="text-white" />
+                        </div>
+                        <div className="flex-1 text-left">
+                          <p
+                            className={`font-medium ${
+                              isDark ? "text-gray-200" : "text-gray-900"
+                            }`}
+                          >
+                            {suggestion.name}
+                          </p>
+                          <p
+                            className={`text-sm ${
+                              isDark ? "text-gray-400" : "text-gray-500"
+                            }`}
+                          >
+                            {t('header.price', { amount: suggestion.price.toFixed(2) })}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* No Results when user has typed something */}
+              {!isLoading &&
+                !errorMessage &&
+                suggestions.length === 0 &&
+                categorySuggestions.length === 0 &&
+                searchTerm.trim() && (
+                  <div className="p-8 text-center">
+                    <div className="w-16 h-16 mx-auto rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center mb-4">
+                      <Search
+                        size={24}
+                        className={`${
+                          isDark ? "text-gray-400" : "text-gray-500"
+                        }`}
+                      />
+                    </div>
+                    <p
+                      className={`text-lg font-medium ${
+                        isDark ? "text-gray-300" : "text-gray-700"
+                      } mb-2`}
+                    >
+                      {t('header.noResults')}
+                    </p>
+                    <p
+                      className={`${
+                        isDark ? "text-gray-400" : "text-gray-500"
+                      }`}
+                    >
+                      {t('header.tryDifferentKeywords')}
+                    </p>
+                  </div>
+                )}
+            </div>
+          ) : showSearchHistory ? (
+            /* Search History Section with Pagination - Mobile Overlay */
+            <div>
+              <div className="flex items-center space-x-3 mb-4">
+                <Clock size={20} className="text-gray-500" />
+                <span
+                  className={`text-lg font-semibold ${
+                    isDark ? "text-gray-200" : "text-gray-800"
+                  }`}
+                >
+                  {t('header.recentSearches')}
+                </span>
+                <div className="px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-full">
+                  <span className="text-sm font-bold text-gray-600 dark:text-gray-300">
+                    {searchEntries.length}
+                  </span>
+                </div>
+              </div>
+              {isLoadingHistory ? (
+                <div className="p-8">
+                  <div className="flex items-center justify-center space-x-2">
+                    <div className="w-3 h-3 bg-gray-500 rounded-full animate-bounce"></div>
+                    <div
+                      className="w-3 h-3 bg-gray-500 rounded-full animate-bounce"
+                      style={{ animationDelay: "0.1s" }}
+                    ></div>
+                    <div
+                      className="w-3 h-3 bg-gray-500 rounded-full animate-bounce"
+                      style={{ animationDelay: "0.2s" }}
+                    ></div>
+                  </div>
+                </div>
+              ) : (
+                <div 
+                  className="space-y-3"
+                  onScroll={handleScroll}
+                >
+                  {paginatedEntries.map((entry) => (
+                    <div
+                      key={entry.id}
+                      className={`
+                        flex items-center space-x-4 p-4 rounded-xl
+                        hover:bg-gray-100 dark:hover:bg-gray-800 
+                        transition-colors duration-150 group
+                        border ${isDark ? 'border-gray-700' : 'border-gray-200'}
+                      `}
+                    >
+                      <button
+                        onClick={() => onHistoryItemClick(entry.searchTerm)}
+                        className="flex-1 flex items-center space-x-4 text-left"
+                      >
+                        <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                          <Clock size={18} className="text-gray-500" />
+                        </div>
+                        <div className="flex-1">
+                          <p
+                            className={`font-medium ${
+                              isDark ? "text-gray-200" : "text-gray-900"
+                            }`}
+                          >
+                            {entry.searchTerm}
+                          </p>
+                        </div>
+                      </button>
+                      <button
+                        onClick={(e) => handleDeleteHistoryItem(e, entry.id)}
+                        disabled={isDeletingEntry(entry.id)}
+                        className={`
+                          p-2 rounded-full opacity-0 group-hover:opacity-100 
+                          transition-all duration-200 hover:bg-red-100 dark:hover:bg-red-900/30
+                          ${isDeletingEntry(entry.id) ? 'opacity-50 cursor-not-allowed' : ''}
+                        `}
+                        aria-label={t('header.deleteSearchHistory')}
+                      >
+                        <X size={16} className="text-gray-400 hover:text-red-500" />
+                      </button>
+                    </div>
+                  ))}
+                  
+                  {/* Loading More Indicator */}
+                  {isLoadingMore && (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 size={20} className="animate-spin text-gray-500" />
+                      <span className={`ml-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                        {t('header.loadingMore')}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {/* Load More Button (fallback if scroll doesn't work) */}
+                  {hasMoreEntries && !isLoadingMore && (
+                    <div className="flex justify-center py-4">
+                      <button
+                        onClick={() => {
+                          setIsLoadingMore(true);
+                          setTimeout(() => {
+                            setCurrentPage(prev => prev + 1);
+                            setIsLoadingMore(false);
+                          }, 300);
+                        }}
+                        className={`
+                          px-6 py-2 rounded-full 
+                          ${isDark 
+                            ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' 
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }
+                          transition-colors duration-200
+                        `}
+                      >
+                        {t('header.loadMore')}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            /* Empty state - when user clicks search bar but hasn't typed anything and no history */
+            <div className="p-8 text-center">
+              <div className="w-16 h-16 mx-auto rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center mb-4">
+                <Search
+                  size={24}
+                  className={`${
+                    isDark ? "text-gray-400" : "text-gray-500"
+                  }`}
+                />
+              </div>
+              <p
+                className={`text-lg font-medium ${
+                  isDark ? "text-gray-300" : "text-gray-700"
+                } mb-2`}
+              >
+                {t('header.searchPlaceholder')}
+              </p>
+              <p
+                className={`${
                   isDark ? "text-gray-400" : "text-gray-500"
                 }`}
               >

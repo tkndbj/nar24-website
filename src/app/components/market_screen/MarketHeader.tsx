@@ -9,6 +9,7 @@ import {
   LogOut,
   Globe,
   LogIn,
+  ArrowLeft,
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
@@ -48,6 +49,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
+  const [isMobileSearchActive, setIsMobileSearchActive] = useState(false);
   const languageMenuRef = useRef<HTMLDivElement>(null);
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
   const { favoriteCount } = useFavorites();
@@ -162,9 +164,11 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
     if (searching) {
       setIsSearching(true);
       setShowSuggestions(true);
+      setIsMobileSearchActive(true);
     } else {
       setIsSearching(false);
       setShowSuggestions(false);
+      setIsMobileSearchActive(false);
       clearSearchAndState();
     }
   };
@@ -186,6 +190,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
       // Clear the search state first
       setShowSuggestions(false);
       setIsSearching(false);
+      setIsMobileSearchActive(false);
       
       // Navigate to search results page with the query parameter
       router.push(`/search-results?q=${encodeURIComponent(searchTerm.trim())}`);
@@ -215,12 +220,25 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
     setSearchTerm(displayName || "");
     setShowSuggestions(false);
     setIsSearching(false);
+    setIsMobileSearchActive(false);
   
     if (type === "product") {
       router.push(`/productdetail/${suggestion.id}`);
     } else {
       router.push(`/category/${suggestion.id}`);
     }
+  };
+
+  const handleHistoryItemClick = (historyTerm: string) => {
+    // Clear search state and navigate
+    setShowSuggestions(false);
+    setIsSearching(false);
+    setIsMobileSearchActive(false);
+    setSearchTerm("");
+    clearSearchState();
+    
+    // Navigate to search results page
+    router.push(`/search-results?q=${encodeURIComponent(historyTerm)}`);
   };
 
   const handleLogout = async () => {
@@ -242,6 +260,11 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
 
   const handleCartClick = () => {
     setIsCartOpen(true);
+  };
+
+  const handleMobileSearchBack = () => {
+    setIsMobileSearchActive(false);
+    handleSearchStateChange(false);
   };
 
   if (userLoading) {
@@ -274,8 +297,56 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
         <div className="safe-area-top">
           {/* Mobile Layout (Two Rows) */}
           <div className="lg:hidden">
-            {/* First Row - Logo and Icons */}
-            <div className="h-16 px-4 flex items-center justify-between">
+            {/* Mobile Search Overlay */}
+            {isMobileSearchActive && (
+              <div className={`
+                fixed inset-0 z-[100] 
+                ${isDark ? 'bg-gray-900' : 'bg-white'}
+                transition-all duration-300 ease-in-out
+              `}>
+                {/* Mobile Search Header */}
+                <div className={`
+                  h-16 px-4 flex items-center space-x-3 border-b
+                  ${isDark ? 'border-gray-700' : 'border-gray-200'}
+                `}>
+                  <button
+                    onClick={handleMobileSearchBack}
+                    className={`
+                      p-2 rounded-full transition-colors
+                      ${isDark 
+                        ? 'hover:bg-gray-700 text-gray-300' 
+                        : 'hover:bg-gray-100 text-gray-600'
+                      }
+                    `}
+                  >
+                    <ArrowLeft size={20} />
+                  </button>
+                  <div className="flex-1">
+                    <SearchBar
+                      isDark={isDark}
+                      isSearching={true}
+                      onSearchStateChange={() => {}} // No-op for mobile overlay
+                      searchTerm={searchTerm}
+                      onSearchTermChange={handleSearchChange}
+                      onSearchSubmit={handleSearchSubmit}
+                      onKeyPress={handleKeyPress}
+                      showSuggestions={showSuggestions}
+                      onSuggestionClick={handleSuggestionClick}
+                      onHistoryItemClick={handleHistoryItemClick}
+                      isMobile={true}
+                      isMobileOverlay={true}
+                      t={t}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* First Row - Logo and Icons (hidden when mobile search is active) */}
+            <div className={`
+              h-16 px-4 flex items-center justify-between transition-all duration-300
+              ${isMobileSearchActive ? 'opacity-0 pointer-events-none' : 'opacity-100'}
+            `}>
               {/* Logo/Brand - Always visible */}
               <button
                 onClick={() => router.push("/")}
@@ -526,19 +597,24 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
               </div>
             </div>
 
-            {/* Second Row - Search Bar */}
-            <div className="px-4 pb-3">
+            {/* Second Row - Search Bar (hidden when mobile search is active) */}
+            <div className={`
+              px-4 pb-3 transition-all duration-300
+              ${isMobileSearchActive ? 'opacity-0 pointer-events-none' : 'opacity-100'}
+            `}>
               <SearchBar
                 isDark={isDark}
-                isSearching={isSearching}
+                isSearching={false}
                 onSearchStateChange={handleSearchStateChange}
-                searchTerm={searchTerm}
-                onSearchTermChange={handleSearchChange}
-                onSearchSubmit={handleSearchSubmit}
-                onKeyPress={handleKeyPress}
-                showSuggestions={showSuggestions}
+                searchTerm=""
+                onSearchTermChange={() => {}}
+                onSearchSubmit={() => {}}
+                onKeyPress={() => {}}
+                showSuggestions={false}
                 onSuggestionClick={handleSuggestionClick}
+                onHistoryItemClick={handleHistoryItemClick}
                 isMobile={true}
+                isMobileOverlay={false}
                 t={t}
               />
             </div>
@@ -568,7 +644,9 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                 onKeyPress={handleKeyPress}
                 showSuggestions={showSuggestions}
                 onSuggestionClick={handleSuggestionClick}
+                onHistoryItemClick={handleHistoryItemClick}
                 isMobile={false}
+                isMobileOverlay={false}
                 t={t}
               />
             </div>
