@@ -956,10 +956,10 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
       {/* Mobile Drawer */}
       {isMobile && (
         <>
-          {/* ✅ Fix 2: Backdrop with transparent black background */}
+          {/* ✅ Fix 2: Backdrop with no background color */}
           <div
             className={`
-              fixed inset-0 bg-black bg-opacity-30 z-[9998] transition-opacity duration-300 ease-in-out
+              fixed inset-0 z-[9998] transition-opacity duration-300 ease-in-out
               ${showMobileDrawer ? 'opacity-100' : 'opacity-0 pointer-events-none'}
             `}
             onClick={closeMobileDrawer}

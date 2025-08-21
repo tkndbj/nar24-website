@@ -117,15 +117,15 @@ export default function SearchBar({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [onSearchStateChange, isMobile, isMobileOverlay]);
 
-  // Focus input when entering search mode
+  // Focus input when entering search mode (only for desktop and mobile overlay)
   useEffect(() => {
-    if (isSearching) {
+    if (isSearching && (isMobileOverlay || !isMobile)) {
       setTimeout(() => {
         searchInputRef.current?.focus();
       }, 100);
       setCurrentPage(0); // Reset pagination when opening
     }
-  }, [isSearching]);
+  }, [isSearching, isMobile, isMobileOverlay]);
 
   // Reset pagination when search entries change
   useEffect(() => {
@@ -179,70 +179,112 @@ export default function SearchBar({
   const paginatedEntries = getPaginatedEntries();
   const hasMoreEntries = paginatedEntries.length < searchEntries.length;
 
-  return (
-    <div className={containerClasses} ref={searchContainerRef}>
-      <div
-        className={`
-          relative h-10 rounded-full
-          ${
-            isDark
-              ? "bg-gray-800 border-gray-600"
-              : "bg-gray-50 border-gray-300"
-          }
-          border-2 
-          ${
-            isSearching
-              ? `shadow-lg ${
-                  isDark ? "border-blue-500" : "border-blue-400"
-                } ring-2 ring-blue-500/20`
-              : "hover:shadow-md hover:border-gray-400"
-          }
-        `}
-      >
-        <input
-          ref={searchInputRef}
-          type="text"
-          value={searchTerm}
-          onChange={(e) => onSearchTermChange(e.target.value)}
-          onKeyPress={onKeyPress}
-          onFocus={() => !isSearching && onSearchStateChange(true)}
-          readOnly={!isSearching}
-          placeholder={t('header.searchPlaceholder')}
+  // If this is a mobile tap target (not overlay), render as read-only
+  if (isMobile && !isMobileOverlay) {
+    return (
+      <div className={containerClasses}>
+        <div
           className={`
-            w-full h-full px-4 pr-12 bg-transparent border-none outline-none
+            relative h-10 rounded-full
             ${
               isDark
-                ? "placeholder:text-gray-400 text-white"
-                : "placeholder:text-gray-500 text-gray-900"
+                ? "bg-gray-800 border-gray-600"
+                : "bg-gray-50 border-gray-300"
             }
-            text-sm font-medium rounded-full
+            border-2 hover:shadow-md hover:border-gray-400
           `}
-        />
+        >
+          <input
+            type="text"
+            value=""
+            readOnly
+            placeholder={t('header.searchPlaceholder')}
+            className={`
+              w-full h-full px-4 pr-12 bg-transparent border-none outline-none
+              ${
+                isDark
+                  ? "placeholder:text-gray-400 text-white"
+                  : "placeholder:text-gray-500 text-gray-900"
+              }
+              text-sm font-medium rounded-full cursor-pointer
+            `}
+          />
 
-        <button
-          onClick={
-            isSearching
-              ? onSearchSubmit
-              : () => onSearchStateChange(true)
-          }
+          <div className="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 rounded-full">
+            <Search size={16} className="text-gray-400" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={containerClasses} ref={searchContainerRef}>
+      {/* Only render input for desktop or mobile overlay */}
+      {(!isMobile || isMobileOverlay) && (
+        <div
           className={`
-            absolute right-2 top-1/2 transform -translate-y-1/2
-            p-2 rounded-full transition-all duration-200
+            relative h-10 rounded-full
+            ${
+              isDark
+                ? "bg-gray-800 border-gray-600"
+                : "bg-gray-50 border-gray-300"
+            }
+            border-2 
             ${
               isSearching
-                ? "text-blue-500 hover:text-blue-600 hover:bg-blue-50/80 dark:hover:bg-blue-900/30"
-                : "text-gray-400 hover:text-blue-500 hover:bg-blue-50/80 dark:hover:bg-blue-900/30"
+                ? `shadow-lg ${
+                    isDark ? "border-blue-500" : "border-blue-400"
+                  } ring-2 ring-blue-500/20`
+                : "hover:shadow-md hover:border-gray-400"
             }
-            active:scale-95
           `}
-          aria-label={isSearching ? t('header.search') : t('header.startSearch')}
         >
-          <Search
-            size={16}
-            className={isLoading ? "animate-pulse" : ""}
+          <input
+            ref={searchInputRef}
+            type="text"
+            value={searchTerm}
+            onChange={(e) => onSearchTermChange(e.target.value)}
+            onKeyPress={onKeyPress}
+            onFocus={() => !isSearching && onSearchStateChange(true)}
+            readOnly={!isSearching}
+            placeholder={t('header.searchPlaceholder')}
+            className={`
+              w-full h-full px-4 pr-12 bg-transparent border-none outline-none
+              ${
+                isDark
+                  ? "placeholder:text-gray-400 text-white"
+                  : "placeholder:text-gray-500 text-gray-900"
+              }
+              text-sm font-medium rounded-full
+            `}
           />
-        </button>
-      </div>
+
+          <button
+            onClick={
+              isSearching
+                ? onSearchSubmit
+                : () => onSearchStateChange(true)
+            }
+            className={`
+              absolute right-2 top-1/2 transform -translate-y-1/2
+              p-2 rounded-full transition-all duration-200
+              ${
+                isSearching
+                  ? "text-blue-500 hover:text-blue-600 hover:bg-blue-50/80 dark:hover:bg-blue-900/30"
+                  : "text-gray-400 hover:text-blue-500 hover:bg-blue-50/80 dark:hover:bg-blue-900/30"
+              }
+              active:scale-95
+            `}
+            aria-label={isSearching ? t('header.search') : t('header.startSearch')}
+          >
+            <Search
+              size={16}
+              className={isLoading ? "animate-pulse" : ""}
+            />
+          </button>
+        </div>
+      )}
 
       {/* Search Dropdown - Shows when searching and NOT in mobile overlay mode */}
       {isSearching && !isMobileOverlay && (
@@ -594,12 +636,12 @@ export default function SearchBar({
       {/* Mobile Overlay Content - Shows when in mobile overlay mode */}
       {isMobileOverlay && (
         <div className={`
-          pt-4 px-4 pb-8 h-[calc(100vh-4rem)] overflow-y-auto
+          h-full overflow-y-auto
           ${isDark ? 'bg-gray-900' : 'bg-white'}
         `}>
           {/* Show search results if user has typed something and there are results */}
           {hasSearchResults ? (
-            <div className="space-y-6">
+            <div className="space-y-6 p-4">
               {/* Loading State */}
               {isLoading && (
                 <div className="p-8">
@@ -789,7 +831,7 @@ export default function SearchBar({
             </div>
           ) : showSearchHistory ? (
             /* Search History Section with Pagination - Mobile Overlay */
-            <div>
+            <div className="p-4">
               <div className="flex items-center space-x-3 mb-4">
                 <Clock size={20} className="text-gray-500" />
                 <span
