@@ -158,6 +158,35 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    // Check if it's mobile (you can adjust the breakpoint as needed)
+    const isMobile = window.innerWidth < 768; // md breakpoint
+    
+    if (isMobile && isOpen) {
+      // Disable scrolling when drawer is open
+      document.body.style.overflow = 'hidden';
+      // Prevent scrolling on iOS Safari
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+    } else if (isMobile) {
+      // Re-enable scrolling when drawer is closed (only for mobile)
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+    }
+  
+    // Cleanup function to ensure scrolling is restored
+    return () => {
+      // Only cleanup if it was mobile when the effect ran
+      const wasMobile = window.innerWidth < 768;
+      if (wasMobile) {
+        document.body.style.overflow = '';
+        document.body.style.position = '';
+        document.body.style.width = '';
+      }
+    };
+  }, [isOpen]);
+
   // Calculate selected count
   const selectedCount = Object.values(selectedProducts).filter(Boolean).length;
 

@@ -131,12 +131,19 @@ export default function SearchBar({
 
   // Handle search history item click
   const handleHistoryItemClick = useCallback((historyTerm: string) => {
+    // Update the search term
     onSearchTermChange(historyTerm);
-    // Use a small delay to ensure the search term is updated before submitting
+    
+    // Close the search dropdown immediately
+    onSearchStateChange(false);
+    
+    // Use a longer timeout to ensure state updates
     setTimeout(() => {
-      onSearchSubmit();
-    }, 0);
-  }, [onSearchTermChange, onSearchSubmit]);
+      // Manually trigger navigation since we have the term
+      const searchUrl = `/search-results?q=${encodeURIComponent(historyTerm)}`;
+      window.location.href = searchUrl;
+    }, 100);
+  }, [onSearchTermChange, onSearchStateChange]);
 
   // Handle delete history item
   const handleDeleteHistoryItem = useCallback(async (e: React.MouseEvent, docId: string) => {
