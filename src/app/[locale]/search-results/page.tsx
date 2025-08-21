@@ -171,11 +171,16 @@ const FilterBar: React.FC<{
   };
 
   return (
-    <div className="flex-1">
+    <div className="flex-1 min-w-0"> {/* Added min-w-0 to allow shrinking */}
       <div
         ref={scrollRef}
-        className="flex gap-1 overflow-x-auto scrollbar-hide"
-        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+        className="flex gap-1 overflow-x-auto scrollbar-hide pb-1" // Added pb-1 for better touch scrolling
+        style={{ 
+          scrollbarWidth: "none", 
+          msOverflowStyle: "none",
+          // Ensure the container doesn't expand beyond its parent
+          maxWidth: "100%"
+        }}
       >
         {filterTypes.map((key) => {
           const isSelected = key === currentFilter;
