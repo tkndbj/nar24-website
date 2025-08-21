@@ -133,10 +133,11 @@ export default function SearchBar({
   // Handle search history item click
   const handleHistoryItemClick = useCallback((historyTerm: string) => {
     onSearchTermChange(historyTerm);
-    onSearchStateChange(false);
-    // Navigate to search results
-    router.push(`/search-results?q=${encodeURIComponent(historyTerm)}`);
-  }, [onSearchTermChange, onSearchStateChange, router]);
+    // Use a small delay to ensure the search term is updated before submitting
+    setTimeout(() => {
+      onSearchSubmit();
+    }, 0);
+  }, [onSearchTermChange, onSearchSubmit]);
 
   // Handle delete history item
   const handleDeleteHistoryItem = useCallback(async (e: React.MouseEvent, docId: string) => {

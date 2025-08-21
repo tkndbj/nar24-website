@@ -150,18 +150,25 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
   // ✅ Fix 3: Handle body scroll when mobile drawer is open/closed
   useEffect(() => {
     if (isMobile && showMobileDrawer) {
-      // Disable scrolling when drawer is open
+      // Disable scrolling when drawer is open (any state)
       document.body.style.overflow = 'hidden';
+      // Prevent scrolling on iOS Safari
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
     } else {
       // Re-enable scrolling when drawer is closed
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
     }
-
+  
     // Cleanup function to ensure scrolling is restored
     return () => {
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
     };
-  }, [showMobileDrawer, isMobile]);
+  }, [showMobileDrawer, isMobile, drawerState]);
 
   // Get buyer categories from AllInOneCategoryData
   const getBuyerCategories = (): BuyerCategory[] => {
