@@ -56,7 +56,7 @@ export default function SearchBar({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const router = useRouter();
+  
 
   // Pagination state for search history
   const [currentPage, setCurrentPage] = useState(0);
