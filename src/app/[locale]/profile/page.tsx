@@ -569,7 +569,7 @@ export default function ProfilePage() {
             <div className="space-y-3 md:space-y-4">
               {/* Pickup Points */}
               <button
-                onClick={() => handleNavigation("/view_pickup_points")}
+                onClick={() => handleNavigation("/pickup-points")}
                 className={`w-full flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-lg md:rounded-xl transition-colors text-left ${
                   isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"
                 }`}
@@ -633,7 +633,7 @@ export default function ProfilePage() {
 
               {/* Become a Seller */}
               <button
-                onClick={() => handleNavigation("/create_shop_screen")}
+                onClick={() => handleNavigation("/createshop")}
                 className={`w-full flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-lg md:rounded-xl transition-colors text-left ${
                   isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"
                 }`}
@@ -665,7 +665,7 @@ export default function ProfilePage() {
 
               {/* Account Settings */}
               <button
-                onClick={() => handleNavigation("/account_settings")}
+                onClick={() => handleNavigation("/account-settings")}
                 className={`w-full flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-lg md:rounded-xl transition-colors text-left ${
                   isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"
                 }`}
@@ -697,7 +697,7 @@ export default function ProfilePage() {
 
               {/* Support and FAQ */}
               <button
-                onClick={() => handleNavigation("/support_and_faq")}
+                onClick={() => handleNavigation("/support-and-faq")}
                 className={`w-full flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-lg md:rounded-xl transition-colors text-left ${
                   isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"
                 }`}
