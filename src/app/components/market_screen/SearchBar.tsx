@@ -10,7 +10,7 @@ import {
   TrendingUp,
   Loader2,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
+
 import {
   CategorySuggestion,
   Suggestion,
