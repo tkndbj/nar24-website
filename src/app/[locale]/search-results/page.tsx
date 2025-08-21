@@ -1,5 +1,6 @@
 "use client";
 
+import AlgoliaServiceManager from "@/lib/algolia";
 import React, {
   useState,
   useEffect,
@@ -25,186 +26,7 @@ import {
   Product,
 } from "@/context/SearchResultsProvider";
 
-// Algolia hit response interface
-interface AlgoliaHit {
-  objectID?: string;
-  productName?: string;
-  price?: string | number;
-  originalPrice?: string | number;
-  discountPercentage?: string | number;
-  currency?: string;
-  imageUrls?: string[];
-  colorImages?: Record<string, unknown>;
-  description?: string;
-  brandModel?: string;
-  condition?: string;
-  quantity?: string | number;
-  averageRating?: string | number;
-  isBoosted?: boolean;
-  deliveryOption?: string;
-  campaignName?: string;
-  dailyClickCount?: string | number;
-  purchaseCount?: string | number;
-  createdAt?: string;
-}
-
-// Enhanced Algolia Service Manager with production optimizations
-class AlgoliaServiceManager {
-  private static instance: AlgoliaServiceManager;
-  private readonly applicationId = "3QVVGQH4ME";
-  private readonly apiKey = "dcca6685e21c2baed748ccea7a6ddef1";
-  private cache = new Map<string, { data: Product[]; timestamp: number }>();
-  private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-  private abortController: AbortController | null = null;
-
-  static getInstance() {
-    if (!AlgoliaServiceManager.instance) {
-      AlgoliaServiceManager.instance = new AlgoliaServiceManager();
-    }
-    return AlgoliaServiceManager.instance;
-  }
-
-  private getCacheKey(query: string, page: number, hitsPerPage: number): string {
-    return `${query}-${page}-${hitsPerPage}`;
-  }
-
-  private isValidCache(timestamp: number): boolean {
-    return Date.now() - timestamp < this.CACHE_DURATION;
-  }
-
-  async searchProducts(
-    query: string,
-    page: number = 0,
-    hitsPerPage: number = 50,
-    indexName: string = "products"
-  ): Promise<Product[]> {
-    // Cancel previous request
-    if (this.abortController) {
-      this.abortController.abort();
-    }
-    this.abortController = new AbortController();
-
-    const cacheKey = this.getCacheKey(query, page, hitsPerPage);
-    const cached = this.cache.get(cacheKey);
-    
-    if (cached && this.isValidCache(cached.timestamp)) {
-      console.log(`🎯 Cache hit for: ${cacheKey}`);
-      return cached.data;
-    }
-
-    const url = `https://${this.applicationId}-dsn.algolia.net/1/indexes/${indexName}/query`;
-
-    const params = new URLSearchParams({
-      query,
-      page: page.toString(),
-      hitsPerPage: hitsPerPage.toString(),
-      attributesToRetrieve: [
-        "objectID",
-        "productName", 
-        "price",
-        "originalPrice",
-        "discountPercentage",
-        "currency",
-        "imageUrls",
-        "colorImages",
-        "description",
-        "brandModel",
-        "condition",
-        "quantity",
-        "averageRating",
-        "isBoosted",
-        "deliveryOption",
-        "campaignName",
-        "dailyClickCount",
-        "purchaseCount",
-        "createdAt"
-      ].join(","),
-      attributesToHighlight: "",
-    });
-
-    try {
-      console.log(`🔍 Searching ${indexName} for: "${query}" (page ${page})`);
-
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "X-Algolia-Application-Id": this.applicationId,
-          "X-Algolia-API-Key": this.apiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ params: params.toString() }),
-        signal: this.abortController.signal,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Algolia request failed: ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      const hits = data.hits || [];
-
-      const products: Product[] = hits.map((hit: AlgoliaHit) => ({
-        id: hit.objectID || `unknown-${Math.random().toString(36).substr(2, 9)}`,
-        productName: hit.productName || "Unknown Product",
-        price: hit.price ? (typeof hit.price === 'string' ? parseFloat(hit.price) : hit.price) || 0 : 0,
-        originalPrice: hit.originalPrice ? (typeof hit.originalPrice === 'string' ? parseFloat(hit.originalPrice) : hit.originalPrice) : undefined,
-        discountPercentage: hit.discountPercentage ? (typeof hit.discountPercentage === 'string' ? parseFloat(hit.discountPercentage) : hit.discountPercentage) || 0 : 0,
-        currency: hit.currency || "TL",
-        imageUrls: Array.isArray(hit.imageUrls) ? hit.imageUrls : [],
-        colorImages: hit.colorImages || {},
-        description: hit.description || "",
-        brandModel: hit.brandModel,
-        condition: hit.condition || "new",
-        quantity: hit.quantity ? (typeof hit.quantity === 'string' ? parseInt(hit.quantity) : hit.quantity) : undefined,
-        averageRating: hit.averageRating ? (typeof hit.averageRating === 'string' ? parseFloat(hit.averageRating) : hit.averageRating) || 0 : 0,
-        isBoosted: Boolean(hit.isBoosted),
-        deliveryOption: hit.deliveryOption,
-        campaignName: hit.campaignName,
-        dailyClickCount: hit.dailyClickCount ? (typeof hit.dailyClickCount === 'string' ? parseInt(hit.dailyClickCount) : hit.dailyClickCount) || 0 : 0,
-        purchaseCount: hit.purchaseCount ? (typeof hit.purchaseCount === 'string' ? parseInt(hit.purchaseCount) : hit.purchaseCount) || 0 : 0,
-        createdAt: hit.createdAt || new Date().toISOString(),
-      }));
-
-      // Cache the result
-      this.cache.set(cacheKey, { data: products, timestamp: Date.now() });
-      
-      // Clean old cache entries
-      this.cleanOldCache();
-
-      console.log(`✅ Found ${products.length} products`);
-      return products;
-
-    } catch (error: unknown) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        console.log('🚫 Search request aborted');
-        throw new Error('Request cancelled');
-      }
-      console.error(`❌ Algolia search error for "${query}":`, error);
-      throw error;
-    }
-  }
-
-  private cleanOldCache(): void {
-    
-    for (const [key, value] of this.cache.entries()) {
-      if (!this.isValidCache(value.timestamp)) {
-        this.cache.delete(key);
-      }
-    }
-  }
-
-  clearCache(): void {
-    this.cache.clear();
-  }
-
-  cancelRequests(): void {
-    if (this.abortController) {
-      this.abortController.abort();
-    }
-  }
-}
-
-// Utility functions
+// Enhanced utility functions
 const throttle = <T extends (...args: unknown[]) => unknown>(func: T, limit: number): T => {
   let inThrottle: boolean;
   return ((...args: Parameters<T>) => {
@@ -236,7 +58,7 @@ const LoadingShimmer: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => {
   );
 };
 
-// Error state component
+// Enhanced Error state component
 const ErrorState: React.FC<{
   onRetry: () => void;
   message: string;
@@ -287,7 +109,7 @@ const ErrorState: React.FC<{
   );
 };
 
-// Empty state component with fallback SVG
+// Enhanced Empty state component
 const EmptyState: React.FC<{ isDarkMode: boolean; query: string }> = ({
   isDarkMode,
   query,
@@ -297,7 +119,6 @@ const EmptyState: React.FC<{ isDarkMode: boolean; query: string }> = ({
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
       <div className="text-center space-y-6 max-w-md">
-        {/* Fallback SVG icon instead of image */}
         <div className={`w-32 h-32 mx-auto ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
           <Search size={128} strokeWidth={1} />
         </div>
@@ -314,7 +135,7 @@ const EmptyState: React.FC<{ isDarkMode: boolean; query: string }> = ({
               isDarkMode ? "text-gray-400" : "text-gray-600"
             }`}
           >
-            We couldn&apos;t find any products matching &quot;{query}&quot;. Try adjusting your search terms.
+            We couldn&apos;t find any products matching &quot;{query}&quot;. Try adjusting your search terms or removing filters.
           </p>
         </div>
       </div>
@@ -322,7 +143,7 @@ const EmptyState: React.FC<{ isDarkMode: boolean; query: string }> = ({
   );
 };
 
-// Filter bar component
+// Enhanced Filter bar component
 const FilterBar: React.FC<{
   filterTypes: FilterType[];
   currentFilter: FilterType;
@@ -384,7 +205,7 @@ const FilterBar: React.FC<{
   );
 };
 
-// Sort menu component - SINGLE IMPLEMENTATION
+// Enhanced Sort menu component
 const SortMenu: React.FC<{
   sortOptions: SortOption[];
   currentSort: SortOption;
@@ -416,13 +237,11 @@ const SortMenu: React.FC<{
 
   return (
     <>
-      {/* Invisible backdrop for click detection - NO BLACK OVERLAY */}
       <div 
         className="fixed inset-0 z-40" 
         onClick={onClose} 
       />
       
-      {/* Menu dropdown positioned relative to button */}
       <div
         className={`
           absolute top-full right-0 mt-2 w-56 z-50 rounded-xl shadow-xl border overflow-hidden
@@ -468,7 +287,7 @@ const SortMenu: React.FC<{
   );
 };
 
-// Main search results content component
+// Main search results content component - Enhanced
 const SearchResultsContent: React.FC = () => {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -486,7 +305,7 @@ const SearchResultsContent: React.FC = () => {
     setSortOption,
   } = useSearchResultsProvider();
 
-  // State
+  // Enhanced State Management
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [hasError, setHasError] = useState(false);
@@ -497,17 +316,18 @@ const SearchResultsContent: React.FC = () => {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
 
-  // Constants
+  // Constants - Match Flutter exactly
   const filterTypes: FilterType[] = ["", "deals", "boosted", "trending", "fiveStar", "bestSellers"];
   const sortOptions: SortOption[] = ["None", "Alphabetical", "Date", "Price Low to High", "Price High to Low"];
   
   const query = searchParams.get("q") || "";
   const algoliaManager = AlgoliaServiceManager.getInstance();
 
-  // Refs for scroll management
+  // Enhanced Refs for better scroll management
   const mainScrollRef = useRef<HTMLDivElement>(null);
   const loadMoreDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const fetchInitialCompleteRef = useRef(false);
+  const lastQueryRef = useRef<string>("");
 
   // Theme detection
   useEffect(() => {
@@ -528,19 +348,29 @@ const SearchResultsContent: React.FC = () => {
     return () => observer.disconnect();
   }, []);
 
-  // Connectivity check
+  // Enhanced connectivity check
   const checkConnectivity = useCallback((): boolean => {
     return navigator.onLine;
   }, []);
 
-  // Fetch search results with enhanced error handling
+  // Enhanced fetch results function that mirrors Flutter's searchOnly method
   const fetchResults = useCallback(
     async (reset: boolean = false) => {
-      if (!query.trim()) return;
-      if (isLoading && !reset) return;
+      if (!query.trim()) {
+        console.log("❌ Empty query, skipping search");
+        return;
+      }
+      
+      if (isLoading && !reset) {
+        console.log("⏳ Already loading, skipping duplicate request");
+        return;
+      }
+
+      console.log(`🔍 Fetching results for "${query}", reset: ${reset}, page: ${reset ? 0 : currentPage}`);
 
       // Connectivity check
       if (!checkConnectivity()) {
+        console.log("❌ No internet connection");
         setIsNetworkError(true);
         setErrorMessage(t("noInternet") || "No internet connection. Please check your network and try again.");
         setHasError(true);
@@ -548,6 +378,7 @@ const SearchResultsContent: React.FC = () => {
       }
 
       if (reset) {
+        console.log("🧹 Resetting search state");
         clearProducts();
         setCurrentPage(0);
         setHasMore(true);
@@ -555,6 +386,7 @@ const SearchResultsContent: React.FC = () => {
         setIsNetworkError(false);
         setIsLoading(true);
         fetchInitialCompleteRef.current = false;
+        lastQueryRef.current = query;
       } else {
         setIsLoadingMore(true);
       }
@@ -562,23 +394,57 @@ const SearchResultsContent: React.FC = () => {
       try {
         const pageToFetch = reset ? 0 : currentPage;
         
-        // Try products index first, then shop_products as fallback
+        // Enhanced search strategy matching Flutter's dual-index approach
+        console.log(`🔍 Starting enhanced search for "${query}" page ${pageToFetch}`);
+        
+        // Search with current filter applied server-side when possible
+        const serverSideFilterType = currentFilter || undefined;
+        
+        // Try products index first with enhanced error handling
         let results: Product[] = [];
         try {
-          results = await algoliaManager.searchProducts(query, pageToFetch, 50, "products");
-        } catch {
-          console.log("Products index failed, trying shop_products...");
-          results = await algoliaManager.searchProducts(query, pageToFetch, 50, "shop_products");
+          console.log(`🔍 Searching products index with filter: ${serverSideFilterType}`);
+          results = await algoliaManager.searchProducts(
+            query, 
+            pageToFetch, 
+            50, 
+            "products",
+            serverSideFilterType,
+            sortOption === 'None' ? 'None' : sortOption
+          );
+          console.log(`✅ Products index returned ${results.length} results`);
+        } catch (productError) {
+          console.warn("❌ Products index failed:", productError);
+          
+          // Fallback to shop_products index
+          try {
+            console.log(`🔍 Fallback: Searching shop_products index`);
+            results = await algoliaManager.searchProducts(
+              query, 
+              pageToFetch, 
+              50, 
+              "shop_products",
+              serverSideFilterType,
+              sortOption === 'None' ? 'None' : sortOption
+            );
+            console.log(`✅ Shop_products index returned ${results.length} results`);
+          } catch (shopError) {
+            console.error("❌ Both indexes failed:", { productError, shopError });
+            throw new Error("All search indexes failed");
+          }
         }
 
         if (reset) {
+          console.log(`📝 Setting ${results.length} raw products (reset)`);
           setRawProducts(results);
           fetchInitialCompleteRef.current = true;
+          
           // Scroll to top on reset
           if (mainScrollRef.current) {
             mainScrollRef.current.scrollTo({ top: 0, behavior: 'auto' });
           }
         } else {
+          console.log(`➕ Adding ${results.length} more products (pagination)`);
           addMoreProducts(results);
           setCurrentPage(pageToFetch + 1);
         }
@@ -591,16 +457,20 @@ const SearchResultsContent: React.FC = () => {
         const boostedIds = results.filter(p => p.isBoosted).map(p => p.id);
         if (boostedIds.length > 0) {
           console.log(`📊 Tracking ${boostedIds.length} boosted product impressions`);
+          // TODO: Implement analytics tracking similar to Flutter's incrementImpressionCount
         }
 
       } catch (error: unknown) {
         if (error instanceof Error && error.message === 'Request cancelled') {
-          return; // Don't show error for cancelled requests
+          console.log("⏹️ Request cancelled, not showing error");
+          return;
         }
         
-        console.error("Search error:", error);
+        console.error("❌ Search error:", error);
         const errorMsg = error instanceof Error ? error.message : "Search failed";
-        const isNetworkIssue = errorMsg.toLowerCase().includes("failed to fetch") || !navigator.onLine;
+        const isNetworkIssue = errorMsg.toLowerCase().includes("failed to fetch") || 
+                              errorMsg.toLowerCase().includes("network") || 
+                              !navigator.onLine;
         
         setErrorMessage(
           isNetworkIssue 
@@ -609,17 +479,37 @@ const SearchResultsContent: React.FC = () => {
         );
         setIsNetworkError(isNetworkIssue);
         setHasError(true);
+        
+        if (reset) {
+          console.log("❌ Initial search failed, showing error state");
+        }
       } finally {
         setIsLoading(false);
         setIsLoadingMore(false);
       }
     },
-    [query, isLoading, currentPage, checkConnectivity, t, algoliaManager, clearProducts, setRawProducts, addMoreProducts]
+    [
+      query, 
+      isLoading, 
+      currentPage, 
+      currentFilter, 
+      sortOption,
+      checkConnectivity, 
+      t, 
+      algoliaManager, 
+      clearProducts, 
+      setRawProducts, 
+      addMoreProducts
+    ]
   );
 
-  // Load more with debouncing
+  // Enhanced load more with debouncing
   const loadMoreIfNeeded = useCallback(() => {
-    if (!hasMore || isLoading || isLoadingMore || !fetchInitialCompleteRef.current) return;
+    if (!hasMore || isLoading || isLoadingMore || !fetchInitialCompleteRef.current) {
+      return;
+    }
+    
+    console.log("📄 Loading more results...");
     
     if (loadMoreDebounceRef.current) {
       clearTimeout(loadMoreDebounceRef.current);
@@ -630,38 +520,60 @@ const SearchResultsContent: React.FC = () => {
     }, 300);
   }, [hasMore, isLoading, isLoadingMore, fetchResults]);
 
-  // Initial fetch only when query changes
+  // Enhanced initial fetch with query change detection
   useEffect(() => {
-    if (query.trim()) {
+    if (query.trim() && query !== lastQueryRef.current) {
+      console.log(`🔄 Query changed from "${lastQueryRef.current}" to "${query}"`);
       fetchResults(true);
     }
     
     return () => {
-      // Cleanup on unmount or query change
-      algoliaManager.cancelRequests();
+      // Enhanced cleanup
       if (loadMoreDebounceRef.current) {
         clearTimeout(loadMoreDebounceRef.current);
       }
     };
-  }, [query]);
+  }, [query, fetchResults]);
 
-  // Handle filter change
+  // Enhanced filter change handler
   const handleFilterChange = useCallback((filter: FilterType) => {
     if (filter === currentFilter) return;
-    setFilter(filter);    
-  }, [currentFilter, setFilter]);
+    
+    console.log(`🎯 Filter changed from "${currentFilter}" to "${filter}"`);
+    setFilter(filter);
+    
+    // Reset pagination when filter changes to get fresh server-side filtered results
+    setCurrentPage(0);
+    setHasMore(true);
+    
+    // Fetch new results with the filter applied server-side when possible
+    if (query.trim()) {
+      fetchResults(true);
+    }
+  }, [currentFilter, setFilter, query, fetchResults]);
 
-  // Handle sort change
+  // Enhanced sort change handler
   const handleSortChange = useCallback((sort: SortOption) => {
+    if (sort === sortOption) return;
+    
+    console.log(`📊 Sort changed from "${sortOption}" to "${sort}"`);
     setSortOption(sort);
-  }, [setSortOption]);
+    
+    // Reset and fetch with new sort option
+    if (query.trim()) {
+      setCurrentPage(0);
+      setHasMore(true);
+      fetchResults(true);
+    }
+  }, [sortOption, setSortOption, query, fetchResults]);
 
   // Handle product navigation
   const handleProductTap = useCallback((product: Product) => {
+    console.log(`👆 Product tapped: ${product.productName} (${product.id})`);
     router.push(`/productdetail/${product.id}`);
   }, [router]);
 
-  // Infinite scroll with throttling
+  // Enhanced infinite scroll with throttling
   useEffect(() => {
     const handleScroll = throttle(() => {
       if (
@@ -676,15 +588,13 @@ const SearchResultsContent: React.FC = () => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, [loadMoreIfNeeded]);
 
-  // Close sort menu on outside click - SIMPLIFIED
+  // Enhanced sort menu click outside handler
   useEffect(() => {
     const handleClickOutside = () => {
-      // Close the menu when clicking outside
       setIsSortMenuOpen(false);
     };
 
     if (isSortMenuOpen) {
-      // Add a small delay to prevent immediate closing
       setTimeout(() => {
         document.addEventListener('click', handleClickOutside);
       }, 10);
@@ -697,9 +607,7 @@ const SearchResultsContent: React.FC = () => {
   if (isLoading && hasNoData) {
     return (
       <div className="space-y-4">
-        {/* Header with back button, filters, and sort */}
         <div className="flex items-center gap-4 px-4 py-3">
-          {/* Back button */}
           <button
             onClick={() => router.back()}
             className={`flex-shrink-0 ${
@@ -709,7 +617,6 @@ const SearchResultsContent: React.FC = () => {
             <ChevronLeft size={20} />
           </button>
 
-          {/* Filter Bar */}
           <FilterBar
             filterTypes={filterTypes}
             currentFilter={currentFilter}
@@ -717,7 +624,6 @@ const SearchResultsContent: React.FC = () => {
             isDarkMode={isDarkMode}
           />
 
-          {/* Sort button */}
           <div className="relative">
             <button
               onClick={(e) => {
@@ -733,7 +639,6 @@ const SearchResultsContent: React.FC = () => {
           </div>
         </div>
 
-        {/* Query display */}
         {query && (
           <div className="px-4">
             <p
@@ -755,9 +660,7 @@ const SearchResultsContent: React.FC = () => {
   if (hasError) {
     return (
       <div className="space-y-4">
-        {/* Header with back button, filters, and sort */}
         <div className="flex items-center gap-4 px-4 py-3">
-          {/* Back button */}
           <button
             onClick={() => router.back()}
             className={`flex-shrink-0 ${
@@ -767,7 +670,6 @@ const SearchResultsContent: React.FC = () => {
             <ChevronLeft size={20} />
           </button>
 
-          {/* Filter Bar */}
           <FilterBar
             filterTypes={filterTypes}
             currentFilter={currentFilter}
@@ -775,7 +677,6 @@ const SearchResultsContent: React.FC = () => {
             isDarkMode={isDarkMode}
           />
 
-          {/* Sort button */}
           <div className="relative">
             <button
               onClick={(e) => {
@@ -803,9 +704,8 @@ const SearchResultsContent: React.FC = () => {
 
   return (
     <div className="space-y-4" ref={mainScrollRef}>
-      {/* Header with back button, filters, and sort */}
+      {/* Enhanced Header */}
       <div className="flex items-center gap-4 px-4 py-3">
-        {/* Back button */}
         <button
           onClick={() => router.back()}
           className={`flex-shrink-0 ${
@@ -815,7 +715,6 @@ const SearchResultsContent: React.FC = () => {
           <ChevronLeft size={20} />
         </button>
 
-        {/* Filter Bar */}
         <FilterBar
           filterTypes={filterTypes}
           currentFilter={currentFilter}
@@ -823,7 +722,6 @@ const SearchResultsContent: React.FC = () => {
           isDarkMode={isDarkMode}
         />
 
-        {/* Sort button */}
         <div className="relative">
           <button
             onClick={(e) => {
@@ -837,7 +735,6 @@ const SearchResultsContent: React.FC = () => {
             <SortAsc size={20} />
           </button>
           
-          {/* Sort Menu positioned relative to this button */}
           <SortMenu
             sortOptions={sortOptions}
             currentSort={sortOption}
@@ -849,7 +746,7 @@ const SearchResultsContent: React.FC = () => {
         </div>
       </div>
 
-      {/* Query display */}
+      {/* Enhanced Query display */}
       {query && (
         <div className="px-4">
           <p
@@ -858,16 +755,21 @@ const SearchResultsContent: React.FC = () => {
             }`}
           >
             {t("searchingFor") || "Searching for"} &quot;{query}&quot;
+            {filteredProducts.length > 0 && (
+              <span className="ml-2 font-medium">
+                ({filteredProducts.length} {filteredProducts.length === 1 ? 'result' : 'results'})
+              </span>
+            )}
           </p>
         </div>
       )}
 
-      {/* Empty state */}
+      {/* Enhanced Empty state */}
       {isEmpty && !isLoading && fetchInitialCompleteRef.current && (
         <EmptyState isDarkMode={isDarkMode} query={query} />
       )}
 
-      {/* Products Grid */}
+      {/* Enhanced Products Grid */}
       {!isEmpty && (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 px-4">
           {filteredProducts.map((product, index) => (
@@ -882,14 +784,19 @@ const SearchResultsContent: React.FC = () => {
         </div>
       )}
 
-      {/* Loading more indicator */}
+      {/* Enhanced Loading more indicator */}
       {isLoadingMore && (
         <div className="flex justify-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500" />
+          <div className="flex items-center gap-2">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-orange-500" />
+            <span className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+              Loading more products...
+            </span>
+          </div>
         </div>
       )}
 
-      {/* Load more button (fallback) */}
+      {/* Enhanced Load more button (fallback) */}
       {!isLoadingMore && hasMore && !isEmpty && fetchInitialCompleteRef.current && (
         <div className="flex justify-center py-8">
           <button
@@ -900,11 +807,20 @@ const SearchResultsContent: React.FC = () => {
           </button>
         </div>
       )}
+
+      {/* End of results indicator */}
+      {!hasMore && !isEmpty && fetchInitialCompleteRef.current && (
+        <div className="flex justify-center py-8">
+          <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+            You&apos;ve reached the end of the results
+          </p>
+        </div>
+      )}
     </div>
   );
 };
 
-// Main page component - SINGLE SearchResultsProvider wrapper
+// Main page component with enhanced provider wrapper
 export default function SearchResultsPage() {
   const [isDarkMode, setIsDarkMode] = useState(false);
 
@@ -934,9 +850,7 @@ export default function SearchResultsPage() {
           isDarkMode ? "bg-gray-900" : "bg-gray-50"
         }`}
       >
-        {/* Content */}
         <div className="pb-8">
-          {/* Container with max width for desktop */}
           <div className="max-w-6xl mx-auto">
             <SearchResultsContent />
           </div>
