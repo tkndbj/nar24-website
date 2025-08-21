@@ -190,7 +190,7 @@ export default function ReceiptsPage() {
 
   // Navigate to receipt detail
   const goToReceiptDetail = (receipt: Receipt) => {
-    router.push(`/receipts/${receipt.id}`);
+    router.push(`/receipts/receipt-detail?id=${receipt.id}`);
   };
 
   // Handle navigation to login

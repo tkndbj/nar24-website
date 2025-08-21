@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useUser } from "@/context/UserProvider";
 import {
   doc,
@@ -16,8 +16,11 @@ import {
   Share2,
   Download,
   Copy,
-  CheckCircle,  
-  MapPin,  
+  CheckCircle,
+  Calendar,
+  CreditCard,
+  MapPin,
+  Phone,
   User,
   LogIn,
 } from "lucide-react";
@@ -65,10 +68,10 @@ export default function ReceiptDetailPage() {
 
   const { user } = useUser();
   const router = useRouter();
-  const params = useParams();
+  const searchParams = useSearchParams();
   const t = useTranslations();
 
-  const receiptId = params.id as string;
+  const receiptId = searchParams.get('id');
 
   useEffect(() => {
     const checkTheme = () => {
