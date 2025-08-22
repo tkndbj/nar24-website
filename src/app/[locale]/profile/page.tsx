@@ -240,7 +240,7 @@ export default function ProfilePage() {
       {
         icon: Package,
         label: t("ProfilePage.myOrders"),
-        path: "/my_orders",
+        path: "/orders",
         description: t("ProfilePage.trackRecentPurchases"),
       },
       {
@@ -252,19 +252,19 @@ export default function ProfilePage() {
       {
         icon: Star,
         label: t("ProfilePage.myReviews"),
-        path: "/my-reviews",
+        path: "/reviews",
         description: t("ProfilePage.yourWrittenReviews"),
       },
       {
         icon: Zap,
         label: t("ProfilePage.boosts"),
-        path: "/boost",
+        path: "/boosts",
         description: t("ProfilePage.promoteYourListings"),
       },
       {
         icon: HelpCircle,
         label: t("ProfilePage.myQuestions"),
-        path: "/user-product-questions",
+        path: "/productquestions",
         description: t("ProfilePage.productQuestionsAnswers"),
       },
     ];
