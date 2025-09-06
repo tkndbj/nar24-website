@@ -179,7 +179,7 @@ const LocationPickerModal: React.FC<{
         const marker = new AdvancedMarkerElement({
           map: map,
           position: markerPosition,
-          title: l("clickToSelectLocation") || "Click to select location",
+          title: l("clickToSelectLocation"),
         });
 
         markerRef.current = marker;
@@ -210,9 +210,7 @@ const LocationPickerModal: React.FC<{
         }
       } catch (error) {
         console.error("Error initializing map:", error);
-        alert(
-          "Failed to load Google Maps. Please check your API key and configuration."
-        );
+        alert(l("mapsLoadError"));
       }
     };
 
@@ -258,14 +256,14 @@ const LocationPickerModal: React.FC<{
                 isDarkMode ? "text-white" : "text-gray-900"
               }`}
             >
-              {l("selectLocation") || "Select Delivery Location"}
+              {l("selectLocation")}
             </h3>
             <p
               className={`text-sm mt-1 ${
                 isDarkMode ? "text-gray-400" : "text-gray-600"
               }`}
             >
-              Click anywhere on the map to pin your exact location
+              {l("clickAnywhereOnMap")}
             </p>
           </div>
           <button
@@ -305,7 +303,7 @@ const LocationPickerModal: React.FC<{
                       isDarkMode ? "text-white" : "text-gray-900"
                     }`}
                   >
-                    Location Selected
+                    {l("locationSelected")}
                   </p>
                   <p
                     className={`text-xs font-mono ${
@@ -332,7 +330,7 @@ const LocationPickerModal: React.FC<{
             }`}
           >
             <Map size={16} />
-            <span>Tap anywhere on the map to set your delivery location</span>
+            <span>{l("tapAnywhereToSetLocation")}</span>
           </p>
           <div className="flex space-x-3">
             <button
@@ -343,14 +341,14 @@ const LocationPickerModal: React.FC<{
                   : "bg-gray-100 text-gray-700 hover:bg-gray-200"
               }`}
             >
-              Cancel
+              {l("cancel")}
             </button>
             <button
               onClick={handleConfirm}
               disabled={!selectedLocation}
               className="px-6 py-2.5 rounded-xl font-medium bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg"
             >
-              Confirm Location
+              {l("confirmLocation")}
             </button>
           </div>
         </div>
@@ -364,29 +362,7 @@ export default function ProductPaymentPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, isLoading: userLoading } = useUser();
-  const localization = useTranslations("ProductPayment");
-
-  // Create translation function similar to CartDrawer
-  const t = useCallback(
-    (key: string) => {
-      try {
-        // Now localization is already scoped to ProductPayment
-        const translation = localization(key);
-
-        // If translation exists and is different from key, return it
-        if (translation && translation !== key) {
-          return translation;
-        }
-
-        // Return the key as fallback
-        return key;
-      } catch (error) {
-        console.warn(`Translation error for key: ${key}`, error);
-        return key;
-      }
-    },
-    [localization]
-  );
+  const t = useTranslations("ProductPayment");
 
   // Get cart items from URL params or localStorage
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -605,41 +581,39 @@ export default function ProductPaymentPage() {
 
     // Address validation
     if (!formData.addressLine1.trim()) {
-      newErrors.addressLine1 = t("fieldRequired") || "This field is required";
+      newErrors.addressLine1 = t("fieldRequired");
     }
     if (!formData.phoneNumber.trim()) {
-      newErrors.phoneNumber = t("fieldRequired") || "This field is required";
+      newErrors.phoneNumber = t("fieldRequired");
     }
     if (!formData.city.trim()) {
-      newErrors.city = t("fieldRequired") || "This field is required";
+      newErrors.city = t("fieldRequired");
     }
     if (!formData.location) {
-      newErrors.location =
-        t("pinLocationRequired") || "Please pin your location on the map";
+      newErrors.location = t("pinLocationRequired");
     }
 
     // Payment validation
     if (!formData.cardNumber.trim()) {
-      newErrors.cardNumber = t("fieldRequired") || "This field is required";
+      newErrors.cardNumber = t("fieldRequired");
     } else if (formData.cardNumber.trim().length < 12) {
-      newErrors.cardNumber = t("invalidCardNumber") || "Invalid card number";
+      newErrors.cardNumber = t("invalidCardNumber");
     }
 
     if (!formData.expiryDate.trim()) {
-      newErrors.expiryDate = t("fieldRequired") || "This field is required";
+      newErrors.expiryDate = t("fieldRequired");
     } else if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(formData.expiryDate.trim())) {
-      newErrors.expiryDate =
-        t("invalidExpiryDate") || "Invalid expiry date (MM/YY)";
+      newErrors.expiryDate = t("invalidExpiryDate");
     }
 
     if (!formData.cvv.trim()) {
-      newErrors.cvv = t("fieldRequired") || "This field is required";
+      newErrors.cvv = t("fieldRequired");
     } else if (formData.cvv.trim().length < 3) {
-      newErrors.cvv = t("invalidCvv") || "Invalid CVV";
+      newErrors.cvv = t("invalidCvv");
     }
 
     if (!formData.cardHolderName.trim()) {
-      newErrors.cardHolderName = t("fieldRequired") || "This field is required";
+      newErrors.cardHolderName = t("fieldRequired");
     }
 
     setErrors(newErrors);
@@ -649,7 +623,7 @@ export default function ProductPaymentPage() {
   // Submit payment
   const handleSubmit = async () => {
     if (!user) {
-      alert(t("pleaseLogin") || "Please login to continue");
+      alert(t("pleaseLogin"));
       return;
     }
 
@@ -690,18 +664,14 @@ export default function ProductPaymentPage() {
       });
 
       // Success
-      alert(t("paymentSuccessful") || "Payment successful!");
+      alert(t("paymentSuccessful"));
 
       // Clear cart and redirect
       localStorage.removeItem("cartItems");
       router.push("/orders");
     } catch (error: unknown) {
       console.error("Payment error:", error);
-      alert(
-        (error as Error).message ||
-          t("paymentFailed") ||
-          "Payment failed. Please try again."
-      );
+      alert((error as Error).message || t("paymentFailed"));
     } finally {
       setIsProcessing(false);
     }
@@ -745,14 +715,14 @@ export default function ProductPaymentPage() {
                 isDarkMode ? "text-white" : "text-gray-900"
               }`}
             >
-              Loading Payment
+              {t("loadingPayment")}
             </h3>
             <p
               className={`text-sm mt-1 ${
                 isDarkMode ? "text-gray-400" : "text-gray-600"
               }`}
             >
-              Preparing your secure checkout experience...
+              {t("preparingCheckout")}
             </p>
           </div>
         </div>
@@ -795,14 +765,14 @@ export default function ProductPaymentPage() {
                     isDarkMode ? "text-white" : "text-gray-900"
                   }`}
                 >
-                  Secure Checkout
+                  {t("secureCheckout")}
                 </h1>
                 <p
                   className={`text-sm ${
                     isDarkMode ? "text-gray-400" : "text-gray-600"
                   }`}
                 >
-                  Complete your order securely
+                  {t("completeOrderSecurely")}
                 </p>
               </div>
             </div>
@@ -813,7 +783,7 @@ export default function ProductPaymentPage() {
                   isDarkMode ? "text-gray-300" : "text-gray-700"
                 }`}
               >
-                SSL Secured
+                {t("sslSecured")}
               </span>
             </div>
           </div>
@@ -850,14 +820,14 @@ export default function ProductPaymentPage() {
                         isDarkMode ? "text-white" : "text-gray-900"
                       }`}
                     >
-                      Delivery Address
+                      {t("deliveryAddress")}
                     </h2>
                     <p
                       className={`text-sm mt-1 ${
                         isDarkMode ? "text-gray-400" : "text-gray-600"
                       }`}
                     >
-                      Where should we deliver your order?
+                      {t("whereToDeliver")}
                     </p>
                   </div>
                 </div>
@@ -886,7 +856,7 @@ export default function ProductPaymentPage() {
                         }`}
                       >
                         <Star size={16} />
-                        <span>Saved Addresses</span>
+                        <span>{t("savedAddresses")}</span>
                       </h3>
                       <div className="space-y-3">
                         {savedAddresses.map((address) => (
@@ -962,7 +932,7 @@ export default function ProductPaymentPage() {
                               isDarkMode ? "text-white" : "text-gray-900"
                             }`}
                           >
-                            Enter new address
+                            {t("enterNewAddress")}
                           </span>
                         </label>
                       </div>
@@ -978,7 +948,7 @@ export default function ProductPaymentPage() {
                             isDarkMode ? "text-gray-300" : "text-gray-700"
                           }`}
                         >
-                          Address Line 1 *
+                          {t("addressLine1")} *
                         </label>
                         <div className="relative group">
                           <Home
@@ -1000,7 +970,7 @@ export default function ProductPaymentPage() {
                                 ? "border-gray-600 bg-gray-700/50 text-white focus:border-blue-500 focus:ring-blue-500/20"
                                 : "border-gray-300 bg-white text-gray-900 focus:border-blue-500 focus:ring-blue-500/20"
                             } focus:outline-none focus:ring-4`}
-                            placeholder="Enter your street address"
+                            placeholder={t("enterStreetAddress")}
                           />
                         </div>
                         {errors.addressLine1 && (
@@ -1017,7 +987,7 @@ export default function ProductPaymentPage() {
                             isDarkMode ? "text-gray-300" : "text-gray-700"
                           }`}
                         >
-                          Address Line 2
+                          {t("addressLine2")}
                         </label>
                         <div className="relative group">
                           <Building
@@ -1037,7 +1007,7 @@ export default function ProductPaymentPage() {
                                 ? "border-gray-600 bg-gray-700/50 text-white focus:border-blue-500 focus:ring-blue-500/20"
                                 : "border-gray-300 bg-white text-gray-900 focus:border-blue-500 focus:ring-blue-500/20"
                             } focus:outline-none focus:ring-4`}
-                            placeholder="Apartment, suite, etc. (optional)"
+                            placeholder={t("apartmentSuiteOptional")}
                           />
                         </div>
                       </div>
@@ -1050,7 +1020,7 @@ export default function ProductPaymentPage() {
                             isDarkMode ? "text-gray-300" : "text-gray-700"
                           }`}
                         >
-                          Phone Number *
+                          {t("phoneNumber")} *
                         </label>
                         <div className="relative group">
                           <Phone
@@ -1072,7 +1042,7 @@ export default function ProductPaymentPage() {
                                 ? "border-gray-600 bg-gray-700/50 text-white focus:border-blue-500 focus:ring-blue-500/20"
                                 : "border-gray-300 bg-white text-gray-900 focus:border-blue-500 focus:ring-blue-500/20"
                             } focus:outline-none focus:ring-4`}
-                            placeholder="Your contact number"
+                            placeholder={t("yourContactNumber")}
                           />
                         </div>
                         {errors.phoneNumber && (
@@ -1089,7 +1059,7 @@ export default function ProductPaymentPage() {
                             isDarkMode ? "text-gray-300" : "text-gray-700"
                           }`}
                         >
-                          City *
+                          {t("city")} *
                         </label>
                         <button
                           type="button"
@@ -1113,7 +1083,7 @@ export default function ProductPaymentPage() {
                                 : "text-gray-500"
                             }
                           >
-                            {formData.city || "Select your city"}
+                            {formData.city || t("selectYourCity")}
                           </span>
                           <ChevronDown
                             size={16}
@@ -1165,15 +1135,13 @@ export default function ProductPaymentPage() {
                           isDarkMode ? "text-gray-300" : "text-gray-700"
                         }`}
                       >
-                        Precise Location *
+                        {t("preciseLocation")} *
                       </label>
                       <button
                         type="button"
                         onClick={() => {
                           if (!mapsLoaded) {
-                            alert(
-                              "Google Maps is still loading. Please try again in a moment."
-                            );
+                            alert(t("mapsStillLoading"));
                             return;
                           }
                           setShowMapModal(true);
@@ -1215,10 +1183,10 @@ export default function ProductPaymentPage() {
                               }`}
                             >
                               {formData.location
-                                ? "Location Pinned"
+                                ? t("locationPinned")
                                 : !mapsLoaded
-                                ? "Loading Maps..."
-                                : "Pin Your Exact Location"}
+                                ? t("loadingMaps")
+                                : t("pinYourExactLocation")}
                             </p>
                             {formData.location ? (
                               <p
@@ -1235,7 +1203,7 @@ export default function ProductPaymentPage() {
                                   isDarkMode ? "text-gray-400" : "text-gray-600"
                                 }`}
                               >
-                                Help us find you precisely for faster delivery
+                                {t("helpFindYouPrecisely")}
                               </p>
                             )}
                           </div>
@@ -1271,7 +1239,7 @@ export default function ProductPaymentPage() {
                             isDarkMode ? "text-gray-300" : "text-gray-700"
                           }`}
                         >
-                          Save this address for future orders
+                          {t("saveAddressForFuture")}
                         </span>
                       </label>
                     )}
@@ -1306,14 +1274,14 @@ export default function ProductPaymentPage() {
                         isDarkMode ? "text-white" : "text-gray-900"
                       }`}
                     >
-                      Payment Method
+                      {t("paymentMethod")}
                     </h2>
                     <p
                       className={`text-sm mt-1 ${
                         isDarkMode ? "text-gray-400" : "text-gray-600"
                       }`}
                     >
-                      Secure payment processing
+                      {t("securePaymentProcessing")}
                     </p>
                   </div>
                 </div>
@@ -1342,7 +1310,7 @@ export default function ProductPaymentPage() {
                         }`}
                       >
                         <Star size={16} />
-                        <span>Saved Payment Methods</span>
+                        <span>{t("savedPaymentMethods")}</span>
                       </h3>
                       <div className="space-y-3">
                         {savedPaymentMethods.map((method) => (
@@ -1381,7 +1349,7 @@ export default function ProductPaymentPage() {
                                   isDarkMode ? "text-gray-400" : "text-gray-600"
                                 }`}
                               >
-                                {method.cardHolderName} • Expires{" "}
+                                {method.cardHolderName} • {t("expires")}{" "}
                                 {method.expiryDate}
                               </p>
                             </div>
@@ -1412,7 +1380,7 @@ export default function ProductPaymentPage() {
                               isDarkMode ? "text-white" : "text-gray-900"
                             }`}
                           >
-                            Enter new payment method
+                            {t("enterNewPaymentMethod")}
                           </span>
                         </label>
                       </div>
@@ -1427,7 +1395,7 @@ export default function ProductPaymentPage() {
                           isDarkMode ? "text-gray-300" : "text-gray-700"
                         }`}
                       >
-                        Card Number *
+                        {t("cardNumber")} *
                       </label>
                       <div className="relative group">
                         <CreditCard
@@ -1453,7 +1421,7 @@ export default function ProductPaymentPage() {
                               ? "border-gray-600 bg-gray-700/50 text-white focus:border-green-500 focus:ring-green-500/20"
                               : "border-gray-300 bg-white text-gray-900 focus:border-green-500 focus:ring-green-500/20"
                           } focus:outline-none focus:ring-4`}
-                          placeholder="1234 5678 9012 3456"
+                          placeholder={t("cardNumberPlaceholder")}
                         />
                       </div>
                       {errors.cardNumber && (
@@ -1471,7 +1439,7 @@ export default function ProductPaymentPage() {
                             isDarkMode ? "text-gray-300" : "text-gray-700"
                           }`}
                         >
-                          Expiry Date *
+                          {t("expiryDate")} *
                         </label>
                         <div className="relative group">
                           <Calendar
@@ -1494,7 +1462,7 @@ export default function ProductPaymentPage() {
                                 ? "border-gray-600 bg-gray-700/50 text-white focus:border-green-500 focus:ring-green-500/20"
                                 : "border-gray-300 bg-white text-gray-900 focus:border-green-500 focus:ring-green-500/20"
                             } focus:outline-none focus:ring-4`}
-                            placeholder="MM/YY"
+                            placeholder={t("expiryDatePlaceholder")}
                           />
                         </div>
                         {errors.expiryDate && (
@@ -1511,7 +1479,7 @@ export default function ProductPaymentPage() {
                             isDarkMode ? "text-gray-300" : "text-gray-700"
                           }`}
                         >
-                          CVV *
+                          {t("cvv")} *
                         </label>
                         <div className="relative group">
                           <Lock
@@ -1534,7 +1502,7 @@ export default function ProductPaymentPage() {
                                 ? "border-gray-600 bg-gray-700/50 text-white focus:border-green-500 focus:ring-green-500/20"
                                 : "border-gray-300 bg-white text-gray-900 focus:border-green-500 focus:ring-green-500/20"
                             } focus:outline-none focus:ring-4`}
-                            placeholder="123"
+                            placeholder={t("cvvPlaceholder")}
                           />
                         </div>
                         {errors.cvv && (
@@ -1552,7 +1520,7 @@ export default function ProductPaymentPage() {
                           isDarkMode ? "text-gray-300" : "text-gray-700"
                         }`}
                       >
-                        Card Holder Name *
+                        {t("cardHolderName")} *
                       </label>
                       <div className="relative group">
                         <User
@@ -1574,7 +1542,7 @@ export default function ProductPaymentPage() {
                               ? "border-gray-600 bg-gray-700/50 text-white focus:border-green-500 focus:ring-green-500/20"
                               : "border-gray-300 bg-white text-gray-900 focus:border-green-500 focus:ring-green-500/20"
                           } focus:outline-none focus:ring-4`}
-                          placeholder="Name as it appears on card"
+                          placeholder={t("nameOnCard")}
                         />
                       </div>
                       {errors.cardHolderName && (
@@ -1604,7 +1572,7 @@ export default function ProductPaymentPage() {
                             isDarkMode ? "text-gray-300" : "text-gray-700"
                           }`}
                         >
-                          Save this payment method for future orders
+                          {t("savePaymentMethodForFuture")}
                         </span>
                       </label>
                     )}
@@ -1632,7 +1600,7 @@ export default function ProductPaymentPage() {
                     isDarkMode ? "text-white" : "text-gray-900"
                   }`}
                 >
-                  Order Summary
+                  {t("orderSummary")}
                 </h3>
               </div>
 
@@ -1666,14 +1634,14 @@ export default function ProductPaymentPage() {
                           isDarkMode ? "text-white" : "text-gray-900"
                         }`}
                       >
-                        {item.productName || "Product"}
+                        {item.productName || t("product")}
                       </p>
                       <p
                         className={`text-sm ${
                           isDarkMode ? "text-gray-400" : "text-gray-600"
                         }`}
                       >
-                        Unit price: {(item.price || 0).toFixed(2)}{" "}
+                        {t("unitPrice")}: {(item.price || 0).toFixed(2)}{" "}
                         {item.currency || "USD"}
                       </p>
                     </div>
@@ -1709,7 +1677,7 @@ export default function ProductPaymentPage() {
                       isDarkMode ? "text-gray-400" : "text-gray-600"
                     }`}
                   >
-                    Subtotal
+                    {t("subtotal")}
                   </span>
                   <span
                     className={`font-medium ${
@@ -1725,9 +1693,11 @@ export default function ProductPaymentPage() {
                       isDarkMode ? "text-gray-400" : "text-gray-600"
                     }`}
                   >
-                    Delivery Fee
+                    {t("deliveryFee")}
                   </span>
-                  <span className={`font-medium text-green-500`}>FREE</span>
+                  <span className={`font-medium text-green-500`}>
+                    {t("free")}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span
@@ -1735,14 +1705,14 @@ export default function ProductPaymentPage() {
                       isDarkMode ? "text-gray-400" : "text-gray-600"
                     }`}
                   >
-                    Tax
+                    {t("tax")}
                   </span>
                   <span
                     className={`font-medium ${
                       isDarkMode ? "text-white" : "text-gray-900"
                     }`}
                   >
-                    Included
+                    {t("included")}
                   </span>
                 </div>
 
@@ -1757,7 +1727,7 @@ export default function ProductPaymentPage() {
                         isDarkMode ? "text-white" : "text-gray-900"
                       }`}
                     >
-                      Total
+                      {t("total")}
                     </span>
                     <div className="text-right">
                       <span className="text-3xl font-bold bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent">
@@ -1783,12 +1753,12 @@ export default function ProductPaymentPage() {
                   {isProcessing ? (
                     <>
                       <Loader2 size={24} className="animate-spin" />
-                      <span>Processing Payment...</span>
+                      <span>{t("processingPayment")}</span>
                     </>
                   ) : (
                     <>
                       <Lock size={24} />
-                      <span>Complete Secure Payment</span>
+                      <span>{t("completeSecurePayment")}</span>
                     </>
                   )}
                 </button>
@@ -1800,7 +1770,7 @@ export default function ProductPaymentPage() {
                   }`}
                 >
                   <Shield size={14} className="text-green-500" />
-                  <span>Protected by 256-bit SSL encryption</span>
+                  <span>{t("protectedBySSL")}</span>
                 </div>
 
                 {/* Trust Indicators */}
@@ -1811,15 +1781,15 @@ export default function ProductPaymentPage() {
                 >
                   <div className="flex items-center justify-center space-x-1 text-xs">
                     <CheckCircle2 size={12} className="text-green-500" />
-                    <span>Secure</span>
+                    <span>{t("secure")}</span>
                   </div>
                   <div className="flex items-center justify-center space-x-1 text-xs">
                     <CheckCircle2 size={12} className="text-green-500" />
-                    <span>Fast</span>
+                    <span>{t("fast")}</span>
                   </div>
                   <div className="flex items-center justify-center space-x-1 text-xs">
                     <CheckCircle2 size={12} className="text-green-500" />
-                    <span>Reliable</span>
+                    <span>{t("reliable")}</span>
                   </div>
                 </div>
               </div>
