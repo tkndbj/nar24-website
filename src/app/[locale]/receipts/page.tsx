@@ -25,7 +25,7 @@ import {
   User,
   LogIn,
 } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 
 interface Receipt {
   id: string;
@@ -47,8 +47,9 @@ export default function ReceiptsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [hasMore, setHasMore] = useState(true);
-  const [lastDocument, setLastDocument] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
-
+  const [lastDocument, setLastDocument] =
+    useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const locale = useLocale();
   const scrollRef = useRef<HTMLDivElement>(null);
   const { user } = useUser();
   const router = useRouter();
@@ -73,69 +74,75 @@ export default function ReceiptsPage() {
   }, []);
 
   // Fetch receipts from Firestore
-  const fetchReceipts = useCallback(async (loadMore = false) => {
-    if (!user || isLoading) return;
+  const fetchReceipts = useCallback(
+    async (loadMore = false) => {
+      if (!user || isLoading) return;
 
-    setIsLoading(true);
+      setIsLoading(true);
 
-    try {
-      const receiptsRef = collection(db, "users", user.uid, "receipts");
-      
-      let q = query(
-        receiptsRef,
-        orderBy("timestamp", "desc"),
-        limit(RECEIPTS_LIMIT)
-      );
+      try {
+        const receiptsRef = collection(db, "users", user.uid, "receipts");
 
-      if (loadMore && lastDocument) {
-        q = query(
+        let q = query(
           receiptsRef,
           orderBy("timestamp", "desc"),
-          startAfter(lastDocument),
           limit(RECEIPTS_LIMIT)
         );
-      }
 
-      const snapshot = await getDocs(q);
-
-      if (snapshot.docs.length > 0) {
-        const newReceipts: Receipt[] = snapshot.docs.map((doc) => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            orderId: data.orderId || "",
-            receiptId: data.receiptId || "",
-            totalPrice: data.totalPrice || 0,
-            currency: data.currency || "TL",
-            timestamp: data.timestamp instanceof Timestamp 
-              ? data.timestamp.toDate() 
-              : new Date(data.timestamp),
-            paymentMethod: data.paymentMethod || "",
-            deliveryOption: data.deliveryOption || "",
-            receiptUrl: data.receiptUrl,
-          };
-        });
-
-        setLastDocument(snapshot.docs[snapshot.docs.length - 1]);
-
-        if (loadMore) {
-          setReceipts(prev => [...prev, ...newReceipts]);
-        } else {
-          setReceipts(newReceipts);
+        if (loadMore && lastDocument) {
+          q = query(
+            receiptsRef,
+            orderBy("timestamp", "desc"),
+            startAfter(lastDocument),
+            limit(RECEIPTS_LIMIT)
+          );
         }
 
-        setHasMore(snapshot.docs.length >= RECEIPTS_LIMIT);
-      } else {
-        setHasMore(false);
+        const snapshot = await getDocs(q);
+
+        if (snapshot.docs.length > 0) {
+          const newReceipts: Receipt[] = snapshot.docs.map((doc) => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              orderId: data.orderId || "",
+              receiptId: data.receiptId || "",
+              totalPrice: data.totalPrice || 0,
+              currency: data.currency || "TL",
+              timestamp:
+                data.timestamp instanceof Timestamp
+                  ? data.timestamp.toDate()
+                  : new Date(data.timestamp),
+              paymentMethod: data.paymentMethod || "",
+              deliveryOption: data.deliveryOption || "",
+              receiptUrl: data.receiptUrl,
+            };
+          });
+
+          setLastDocument(snapshot.docs[snapshot.docs.length - 1]);
+
+          if (loadMore) {
+            setReceipts((prev) => [...prev, ...newReceipts]);
+          } else {
+            setReceipts(newReceipts);
+          }
+
+          setHasMore(snapshot.docs.length >= RECEIPTS_LIMIT);
+        } else {
+          setHasMore(false);
+        }
+      } catch (error) {
+        console.error("Error fetching receipts:", error);
+        showErrorToast(
+          l("Receipts.errorFetchingReceipts") || "Error fetching receipts"
+        );
+      } finally {
+        setIsLoading(false);
+        setIsInitialLoad(false);
       }
-    } catch (error) {
-      console.error("Error fetching receipts:", error);
-      showErrorToast(l("Receipts.errorFetchingReceipts") || "Error fetching receipts");
-    } finally {
-      setIsLoading(false);
-      setIsInitialLoad(false);
-    }
-  }, [user, isLoading, lastDocument]);
+    },
+    [user, isLoading, lastDocument]
+  );
 
   // Initial load
   useEffect(() => {
@@ -177,8 +184,8 @@ export default function ReceiptsPage() {
 
     const scrollElement = scrollRef.current;
     if (scrollElement) {
-      scrollElement.addEventListener('scroll', handleScroll);
-      return () => scrollElement.removeEventListener('scroll', handleScroll);
+      scrollElement.addEventListener("scroll", handleScroll);
+      return () => scrollElement.removeEventListener("scroll", handleScroll);
     }
   }, [hasMore, isLoading, loadMoreReceipts]);
 
@@ -190,7 +197,7 @@ export default function ReceiptsPage() {
 
   // Navigate to receipt detail
   const goToReceiptDetail = (receipt: Receipt) => {
-    router.push(`/receipts/receipt-detail?id=${receipt.id}`);
+    router.push(`/${locale}/receipts/receipt-detail/${receipt.id}`);
   };
 
   // Handle navigation to login
@@ -206,14 +213,22 @@ export default function ReceiptsPage() {
 
     if (daysDifference === 0) {
       const today = l("Receipts.today") || "Today";
-      return `${today}, ${timestamp.getHours().toString().padStart(2, '0')}:${timestamp.getMinutes().toString().padStart(2, '0')}`;
+      return `${today}, ${timestamp
+        .getHours()
+        .toString()
+        .padStart(2, "0")}:${timestamp
+        .getMinutes()
+        .toString()
+        .padStart(2, "0")}`;
     } else if (daysDifference === 1) {
       return l("Receipts.yesterday") || "Yesterday";
     } else if (daysDifference < 7) {
       const daysAgo = l("Receipts.daysAgo") || "days ago";
       return `${daysDifference} ${daysAgo}`;
     } else {
-      return `${timestamp.getDate()}/${timestamp.getMonth() + 1}/${timestamp.getFullYear()}`;
+      return `${timestamp.getDate()}/${
+        timestamp.getMonth() + 1
+      }/${timestamp.getFullYear()}`;
     }
   };
 
@@ -257,10 +272,12 @@ export default function ReceiptsPage() {
     }
   };
 
-  const l = (key: string) => t(key) || key.split('.').pop() || key;
+  const l = (key: string) => t(key) || key.split(".").pop() || key;
 
   return (
-    <div className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}>
+    <div
+      className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
+    >
       {/* Header */}
       <div
         className={`sticky top-0 z-10 ${
@@ -311,10 +328,10 @@ export default function ReceiptsPage() {
       </div>
 
       {/* Content */}
-      <div 
+      <div
         ref={scrollRef}
         className="flex-1 overflow-y-auto"
-        style={{ height: 'calc(100vh - 64px)' }}
+        style={{ height: "calc(100vh - 64px)" }}
       >
         {/* Not Authenticated State */}
         {!user ? (
@@ -444,7 +461,8 @@ export default function ReceiptsPage() {
                             ${isDarkMode ? "text-white" : "text-gray-900"}
                           `}
                         >
-                          {l("Receipts.orders") || "Order"} #{receipt.orderId.substring(0, 8).toUpperCase()}
+                          {l("Receipts.orders") || "Order"} #
+                          {receipt.orderId.substring(0, 8).toUpperCase()}
                         </h3>
                         <span
                           className={`
