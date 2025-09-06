@@ -126,36 +126,7 @@ export function BadgeProvider({ children }: BadgeProviderProps) {
       );
       newUnsubscribes.push(userDocUnsubscribe);
 
-      // (B) Listen to chats collection for unread messages
-      const chatsQuery = query(
-        collection(db, "chats"),
-        where("participants", "array-contains", userId)
-      );
-
-      const chatsUnsubscribe = onSnapshot(
-        chatsQuery,
-        (querySnapshot) => {
-          console.log("💬 BadgeProvider: Chats updated, processing...");
-          let totalUnread = 0;
-
-          querySnapshot.docs.forEach((doc) => {
-            const data = doc.data();
-            const unreadCounts =
-              (data.unreadCounts as Record<string, number>) || {};
-            totalUnread += unreadCounts[userId] || 0;
-          });
-
-          console.log("💬 BadgeProvider: Total unread messages:", totalUnread);
-          setUnreadMessagesCount(totalUnread);
-        },
-        (error) => {
-          console.error("❌ BadgeProvider: Error listening to chats:", error);
-          setError("Failed to sync message count");
-        }
-      );
-      newUnsubscribes.push(chatsUnsubscribe);
-
-      // (C) Listen to notifications subcollection
+      // (B) Listen to notifications subcollection
       // Exclude notifications of type 'message' from badge count
       const notificationsQuery = query(
         collection(db, "users", userId, "notifications"),

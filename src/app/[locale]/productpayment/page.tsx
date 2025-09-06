@@ -126,6 +126,7 @@ const LocationPickerModal: React.FC<{
   const [lastClickTime, setLastClickTime] = useState(0);
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
+
   const markerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(
     null
   );
@@ -364,24 +365,18 @@ export default function ProductPaymentPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, isLoading: userLoading } = useUser();
-  const localization = useTranslations();
+  const localization = useTranslations("ProductPayment");
 
   // Create translation function similar to CartDrawer
   const t = useCallback(
     (key: string) => {
       try {
-        // Try to get the nested ProductPayment translation
-        const translation = localization(`ProductPayment.${key}`);
+        // Now localization is already scoped to ProductPayment
+        const translation = localization(key);
 
-        // Check if we got a valid translation (not the same as the key we requested)
-        if (translation && translation !== `ProductPayment.${key}`) {
+        // If translation exists and is different from key, return it
+        if (translation && translation !== key) {
           return translation;
-        }
-
-        // If nested translation doesn't exist, try direct key
-        const directTranslation = localization(key);
-        if (directTranslation && directTranslation !== key) {
-          return directTranslation;
         }
 
         // Return the key as fallback
@@ -435,7 +430,7 @@ export default function ProductPaymentPage() {
   const [showCityDropdown, setShowCityDropdown] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
   const [mapsLoaded, setMapsLoaded] = useState(false);
-
+  const [cartItemsInitialized, setCartItemsInitialized] = useState(false);
   // Error handling
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -466,8 +461,8 @@ export default function ProductPaymentPage() {
       try {
         const items = JSON.parse(decodeURIComponent(itemsParam));
         setCartItems(items);
+        setCartItemsInitialized(true); // Add this
 
-        // Calculate total price
         const total = items.reduce((sum: number, item: CartItem) => {
           return sum + (item.price || 0) * item.quantity;
         }, 0);
@@ -477,12 +472,12 @@ export default function ProductPaymentPage() {
         router.push("/");
       }
     } else {
-      // Try localStorage as fallback
       const savedCart = localStorage.getItem("cartItems");
       if (savedCart) {
         try {
           const items = JSON.parse(savedCart);
           setCartItems(items);
+          setCartItemsInitialized(true); // Add this
 
           const total = items.reduce((sum: number, item: CartItem) => {
             return sum + (item.price || 0) * item.quantity;
@@ -493,11 +488,11 @@ export default function ProductPaymentPage() {
           router.push("/");
         }
       } else {
+        setCartItemsInitialized(true); // Add this - even if no items
         router.push("/");
       }
     }
   }, [searchParams, router]);
-
   // Load saved payment methods and addresses
   useEffect(() => {
     if (user) {
@@ -728,42 +723,49 @@ export default function ProductPaymentPage() {
     handleInputChange("expiryDate", formattedValue);
   };
 
-  if (userLoading || cartItems.length === 0) {
-    return (
-      <div
-        className={`min-h-screen flex items-center justify-center ${
-          isDarkMode
-            ? "bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900"
-            : "bg-gradient-to-br from-blue-50 via-white to-purple-50"
-        }`}
-      >
-        <div className="flex flex-col items-center space-y-6">
-          <div className="relative">
-            <div className="w-20 h-20 border-4 border-blue-200 rounded-full animate-pulse"></div>
-            <Loader2
-              size={40}
-              className="absolute inset-0 m-auto animate-spin text-blue-500"
-            />
-          </div>
-          <div className="text-center">
-            <h3
-              className={`text-xl font-semibold ${
-                isDarkMode ? "text-white" : "text-gray-900"
-              }`}
-            >
-              Loading Payment
-            </h3>
-            <p
-              className={`text-sm mt-1 ${
-                isDarkMode ? "text-gray-400" : "text-gray-600"
-              }`}
-            >
-              Preparing your secure checkout experience...
-            </p>
+  if (
+    userLoading ||
+    !cartItemsInitialized ||
+    (cartItemsInitialized && cartItems.length === 0)
+  ) {
+    // Show loading only when actually loading
+    if (userLoading || !cartItemsInitialized) {
+      return (
+        <div
+          className={`min-h-screen flex items-center justify-center ${
+            isDarkMode
+              ? "bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900"
+              : "bg-gradient-to-br from-blue-50 via-white to-purple-50"
+          }`}
+        >
+          <div className="flex flex-col items-center space-y-6">
+            <div className="relative">
+              <div className="w-20 h-20 border-4 border-blue-200 rounded-full animate-pulse"></div>
+              <Loader2
+                size={40}
+                className="absolute inset-0 m-auto animate-spin text-blue-500"
+              />
+            </div>
+            <div className="text-center">
+              <h3
+                className={`text-xl font-semibold ${
+                  isDarkMode ? "text-white" : "text-gray-900"
+                }`}
+              ></h3>
+              <p
+                className={`text-sm mt-1 ${
+                  isDarkMode ? "text-gray-400" : "text-gray-600"
+                }`}
+              ></p>
+            </div>
           </div>
         </div>
-      </div>
-    );
+      );
+    }
+    if (cartItemsInitialized && cartItems.length === 0) {
+      router.push("/");
+      return null;
+    }
   }
 
   return (
