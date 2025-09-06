@@ -213,11 +213,14 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     }
   };
 
+  const fetchInProgressRef = React.useRef(false);
+
   // Fetch additional user data from Firestore
   const fetchUserData = async () => {
-    // SECURITY: Only use the exposed user, not the internal Firebase user
     const currentUser = user;
-    if (!currentUser) return;
+    if (!currentUser || fetchInProgressRef.current) return;
+
+    fetchInProgressRef.current = true;
 
     try {
       // Try cache first for faster response
@@ -419,49 +422,46 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     return (profileData?.[key] as T) || null;
   };
 
-  // **MODIFIED**: Listen to authentication state changes
   useEffect(() => {
+    let mounted = true;
     setIsLoading(true);
 
     const unsubscribe = onAuthStateChanged(
       auth,
       async (currentUser) => {
+        if (!mounted) return;
+
         setInternalFirebaseUser(currentUser);
 
         if (currentUser) {
-          // Check if 2FA is required
           const needs2FA = await check2FARequirement(currentUser);
 
           if (needs2FA) {
             setPending2FA(true);
-            setUser(null); // CRITICAL: Don't expose user until 2FA is complete
+            setUser(null);
+            setIsLoading(false); // Set loading to false here
           } else {
             setUser(currentUser);
             setPending2FA(false);
-            // Fetch additional user data
-            fetchUserData();
+            await fetchUserData(); // This will set loading to false
           }
         } else {
-          // If the user is logged out, reset all state
-          resetState();
+          resetState(); // This already sets loading to false
         }
       },
       (error) => {
         console.error("Error in authStateChanges:", error);
-        setIsLoading(false);
+        if (mounted) {
+          setIsLoading(false);
+        }
       }
     );
 
-    return () => unsubscribe();
-  }, []);
-
-  // **MODIFIED**: Update fetchUserData dependency when user changes
-  useEffect(() => {
-    if (user) {
-      // Only fetch when user is exposed (not pending 2FA)
-      fetchUserData();
-    }
-  }, [user]);
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, []); // Empty dependency array - only run once
 
   const contextValue: UserContextType = {
     user, // This will be null when 2FA is pending

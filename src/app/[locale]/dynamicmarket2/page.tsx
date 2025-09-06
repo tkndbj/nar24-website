@@ -6,8 +6,6 @@ import {
   ArrowLeft,
   Filter,
   SortAsc,
-  Moon,
-  Sun,
   X,
   ChevronDown,
   ChevronUp,
@@ -65,7 +63,7 @@ const DynamicMarketPage: React.FC = () => {
   const router = useRouter();
   const t = useTranslations();
 
-  // Theme state
+  // Theme state - detect from system/localStorage
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
 
@@ -77,7 +75,7 @@ const DynamicMarketPage: React.FC = () => {
       selectedSubSubcategory: searchParams.get("subsubcategory") || "",
       displayName:
         searchParams.get("displayName") ||
-        searchParams.get("subsubcategory") ||
+        searchParams.get("subSubcategory") ||
         searchParams.get("subcategory") ||
         searchParams.get("category") ||
         "",
@@ -91,11 +89,11 @@ const DynamicMarketPage: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [boostedProducts, setBoostedProducts] = useState<Product[]>([]);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
-  const [isProductsLoading, setIsProductsLoading] = useState(false); // New loading state for products area only
+  const [isProductsLoading, setIsProductsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [currentPage, setCurrentPage] = useState(0);
-
+  const [showSortDropdown, setShowSortDropdown] = useState(false);
   // Filter and sort states
   const [selectedSortOption, setSelectedSortOption] = useState("None");
   const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
@@ -203,7 +201,7 @@ const DynamicMarketPage: React.FC = () => {
     urlParams.selectedSubSubcategory,
   ]);
 
-  // Theme detection and management
+  // Theme detection from system/localStorage
   useEffect(() => {
     const checkTheme = () => {
       if (typeof document !== "undefined") {
@@ -211,20 +209,10 @@ const DynamicMarketPage: React.FC = () => {
       }
     };
 
-    if (typeof document !== "undefined") {
-      const savedTheme = localStorage.getItem("theme");
-      const systemPrefersDark = window.matchMedia(
-        "(prefers-color-scheme: dark)"
-      ).matches;
-
-      if (savedTheme === "dark" || (!savedTheme && systemPrefersDark)) {
-        document.documentElement.classList.add("dark");
-      } else {
-        document.documentElement.classList.remove("dark");
-      }
-    }
-
+    // Initial theme check
     checkTheme();
+
+    // Watch for theme changes
     const observer = new MutationObserver(checkTheme);
     if (typeof document !== "undefined") {
       observer.observe(document.documentElement, {
@@ -232,30 +220,16 @@ const DynamicMarketPage: React.FC = () => {
         attributeFilter: ["class"],
       });
     }
+
     return () => observer.disconnect();
   }, []);
-
-  const toggleTheme = () => {
-    if (typeof document !== "undefined") {
-      const html = document.documentElement;
-      const isDarkMode = html.classList.contains("dark");
-
-      if (isDarkMode) {
-        html.classList.remove("dark");
-        localStorage.setItem("theme", "light");
-      } else {
-        html.classList.add("dark");
-        localStorage.setItem("theme", "dark");
-      }
-    }
-  };
 
   // Optimized fetch products function
   const fetchProducts = useCallback(
     async (page: number = 0, reset: boolean = false) => {
       try {
         if (reset) {
-          setIsProductsLoading(true); // Only set products loading, not full page loading
+          setIsProductsLoading(true);
           setProducts([]);
           setBoostedProducts([]);
           setCurrentPage(0);
@@ -373,7 +347,7 @@ const DynamicMarketPage: React.FC = () => {
     if (urlParams.category) {
       fetchProducts(0, true);
     }
-  }, [selectedSortOption, selectedFilter, filterString]); // Use filterString instead of individual filter values
+  }, [selectedSortOption, selectedFilter, filterString]);
 
   // Handle back button
   const handleBack = () => {
@@ -434,7 +408,7 @@ const DynamicMarketPage: React.FC = () => {
     const max = maxPriceInput ? parseFloat(maxPriceInput) : undefined;
 
     if (min !== undefined && max !== undefined && min > max) {
-      alert("Minimum price cannot be greater than maximum price");
+      alert(t("DynamicMarket.priceRangeError"));
       return;
     }
 
@@ -443,7 +417,7 @@ const DynamicMarketPage: React.FC = () => {
       minPrice: min,
       maxPrice: max,
     }));
-  }, [minPriceInput, maxPriceInput]);
+  }, [minPriceInput, maxPriceInput, t]);
 
   const handleClearAllFilters = useCallback(() => {
     setFilters({
@@ -457,7 +431,17 @@ const DynamicMarketPage: React.FC = () => {
     setMaxPriceInput("");
   }, []);
 
-  // Other handler functions (unchanged)
+  // Get localized color name
+  const getLocalizedColorName = (colorName: string): string => {
+    const colorKey = `color${colorName.replace(/\s+/g, "")}`;
+    try {
+      return t(`DynamicMarket.${colorKey}`);
+    } catch {
+      return colorName;
+    }
+  };
+
+  // Other handler functions
   const getFilterButtonText = (filter: string) => {
     switch (filter) {
       case "":
@@ -496,21 +480,6 @@ const DynamicMarketPage: React.FC = () => {
 
   const handleProductClick = (product: Product) => {
     router.push(`/productdetail/${product.id}`);
-  };
-
-  const showSortModal = () => {
-    const optionsText = sortOptions
-      .map((opt, i) => `${i + 1}. ${getSortOptionText(opt)}`)
-      .join("\n");
-    const selection = prompt(
-      `${t("DynamicMarket.selectSortOption")}:\n${optionsText}`
-    );
-    if (selection) {
-      const index = parseInt(selection) - 1;
-      if (index >= 0 && index < sortOptions.length) {
-        handleSortSelect(sortOptions[index]);
-      }
-    }
   };
 
   const getActiveFiltersCount = () => {
@@ -627,20 +596,6 @@ const DynamicMarketPage: React.FC = () => {
               </span>
             </div>
           </div>
-          <button
-            onClick={toggleTheme}
-            className={`p-2 rounded-lg transition-colors ${
-              isDarkMode
-                ? "bg-gray-700 hover:bg-gray-600"
-                : "bg-gray-100 hover:bg-gray-200"
-            }`}
-          >
-            {isDarkMode ? (
-              <Sun className="w-5 h-5 text-yellow-500" />
-            ) : (
-              <Moon className="w-5 h-5 text-gray-600" />
-            )}
-          </button>
         </div>
 
         {/* Loading skeleton */}
@@ -731,7 +686,7 @@ const DynamicMarketPage: React.FC = () => {
                   isDarkMode ? "text-white" : "text-gray-900"
                 }`}
               >
-                Filters
+                {t("DynamicMarket.filters")}
               </h2>
               <button
                 onClick={() => setShowSidebar(false)}
@@ -752,7 +707,7 @@ const DynamicMarketPage: React.FC = () => {
                 onClick={handleClearAllFilters}
                 className="w-full mb-3 py-1.5 text-xs text-orange-500 border border-orange-500 rounded hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
               >
-                Clear All Filters ({getActiveFiltersCount()})
+                {t("DynamicMarket.clearAllFilters")} ({getActiveFiltersCount()})
               </button>
             )}
 
@@ -776,7 +731,7 @@ const DynamicMarketPage: React.FC = () => {
                             isDarkMode ? "text-white" : "text-gray-900"
                           }`}
                         >
-                          Categories
+                          {t("DynamicMarket.categories")}
                         </span>
                         {filters.subcategories.length > 0 && (
                           <span className="bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full font-semibold">
@@ -803,7 +758,7 @@ const DynamicMarketPage: React.FC = () => {
                             }}
                             className="w-full text-left py-1 px-2 text-xs text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded transition-colors"
                           >
-                            Clear All Categories
+                            {t("DynamicMarket.clearAllCategories")}
                           </button>
                         )}
 
@@ -869,7 +824,7 @@ const DynamicMarketPage: React.FC = () => {
                             isDarkMode ? "text-white" : "text-gray-900"
                           }`}
                         >
-                          Subcategories
+                          {t("DynamicMarket.subcategories")}
                         </span>
                         {filters.subcategories.length > 0 && (
                           <span className="bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full font-semibold">
@@ -939,7 +894,7 @@ const DynamicMarketPage: React.FC = () => {
                         isDarkMode ? "text-white" : "text-gray-900"
                       }`}
                     >
-                      Brands
+                      {t("DynamicMarket.brands")}
                     </span>
                     {filters.brands.length > 0 && (
                       <span className="bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full font-semibold">
@@ -966,7 +921,7 @@ const DynamicMarketPage: React.FC = () => {
                         }}
                         className="w-full text-left py-1 px-2 text-xs text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded transition-colors"
                       >
-                        Clear All Brands
+                        {t("DynamicMarket.clearAllBrands")}
                       </button>
                     )}
 
@@ -977,7 +932,7 @@ const DynamicMarketPage: React.FC = () => {
                       />
                       <input
                         type="text"
-                        placeholder="Search brands..."
+                        placeholder={t("DynamicMarket.searchBrands")}
                         value={brandSearch}
                         onChange={(e) => setBrandSearch(e.target.value)}
                         className={`
@@ -1035,7 +990,7 @@ const DynamicMarketPage: React.FC = () => {
                         isDarkMode ? "text-white" : "text-gray-900"
                       }`}
                     >
-                      Colors
+                      {t("DynamicMarket.colors")}
                     </span>
                     {filters.colors.length > 0 && (
                       <span className="bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full font-semibold">
@@ -1062,7 +1017,7 @@ const DynamicMarketPage: React.FC = () => {
                         }}
                         className="w-full text-left py-1 px-2 text-xs text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded transition-colors"
                       >
-                        Clear All Colors
+                        {t("DynamicMarket.clearAllColors")}
                       </button>
                     )}
 
@@ -1090,7 +1045,7 @@ const DynamicMarketPage: React.FC = () => {
                                 isDarkMode ? "text-gray-300" : "text-gray-700"
                               } leading-tight`}
                             >
-                              {colorData.name}
+                              {getLocalizedColorName(colorData.name)}
                             </span>
                           </label>
                         ))}
@@ -1117,7 +1072,7 @@ const DynamicMarketPage: React.FC = () => {
                         isDarkMode ? "text-white" : "text-gray-900"
                       }`}
                     >
-                      Price Range
+                      {t("DynamicMarket.priceRange")}
                     </span>
                     {(filters.minPrice !== undefined ||
                       filters.maxPrice !== undefined) && (
@@ -1143,7 +1098,8 @@ const DynamicMarketPage: React.FC = () => {
                         } flex items-center justify-between`}
                       >
                         <span className="text-xs text-orange-600 dark:text-orange-400 font-medium">
-                          {filters.minPrice || 0} - {filters.maxPrice || "∞"} TL
+                          {filters.minPrice || 0} - {filters.maxPrice || "∞"}{" "}
+                          {t("DynamicMarket.currency")}
                         </span>
                         <button
                           onClick={() => {
@@ -1165,7 +1121,7 @@ const DynamicMarketPage: React.FC = () => {
                     <div className="flex space-x-1.5 items-center">
                       <input
                         type="number"
-                        placeholder="Min"
+                        placeholder={t("DynamicMarket.min")}
                         value={minPriceInput}
                         onChange={(e) => setMinPriceInput(e.target.value)}
                         className={`
@@ -1183,7 +1139,7 @@ const DynamicMarketPage: React.FC = () => {
                       </span>
                       <input
                         type="number"
-                        placeholder="Max"
+                        placeholder={t("DynamicMarket.max")}
                         value={maxPriceInput}
                         onChange={(e) => setMaxPriceInput(e.target.value)}
                         className={`
@@ -1197,7 +1153,7 @@ const DynamicMarketPage: React.FC = () => {
                     `}
                       />
                       <span className="text-xs text-gray-500 self-center">
-                        TL
+                        {t("DynamicMarket.currency")}
                       </span>
                     </div>
 
@@ -1205,7 +1161,7 @@ const DynamicMarketPage: React.FC = () => {
                       onClick={handleSetPriceFilter}
                       className="w-full py-1.5 bg-orange-500 text-white text-xs font-medium rounded hover:bg-orange-600 transition-colors"
                     >
-                      Apply Price Filter
+                      {t("DynamicMarket.applyPriceFilter")}
                     </button>
 
                     <div className="pt-2">
@@ -1214,7 +1170,7 @@ const DynamicMarketPage: React.FC = () => {
                           isDarkMode ? "text-gray-400" : "text-gray-600"
                         }`}
                       >
-                        Quick Ranges:
+                        {t("DynamicMarket.quickRanges")}:
                       </p>
                       <div className="grid grid-cols-2 gap-1">
                         {[
@@ -1246,7 +1202,7 @@ const DynamicMarketPage: React.FC = () => {
                                   : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                               }`}
                             >
-                              {range.label} TL
+                              {range.label} {t("DynamicMarket.currency")}
                             </button>
                           );
                         })}
@@ -1270,6 +1226,7 @@ const DynamicMarketPage: React.FC = () => {
         {/* Main Content - This is the only part that reloads when filters change */}
         <div className="flex-1 min-w-0">
           {/* Header - Static, doesn't reload */}
+          {/* Header - Static, doesn't reload */}
           <div
             className={`shadow-md sticky top-0 z-10 backdrop-blur-xl ${
               isDarkMode
@@ -1277,90 +1234,36 @@ const DynamicMarketPage: React.FC = () => {
                 : "bg-white/95 border-gray-200"
             } border-b`}
           >
-            <div className="p-4 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={handleBack}
-                  className={`p-2 rounded-lg transition-colors ${
-                    isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"
-                  }`}
-                >
-                  <ArrowLeft
-                    size={24}
-                    className={isDarkMode ? "text-gray-300" : "text-gray-600"}
-                  />
-                </button>
-                <div className="flex items-center gap-3">
-                  <div className="px-3 py-1 bg-gradient-to-r from-orange-500 to-pink-500 rounded-lg text-white text-sm font-bold shadow-md">
-                    Nar24
-                  </div>
-                  <span
-                    className={`font-semibold text-lg ${
-                      isDarkMode ? "text-white" : "text-gray-900"
-                    }`}
-                  >
-                    {urlParams.displayName}
-                  </span>
-                </div>
+            <div className="p-4 flex items-center gap-3">
+              {/* Back button */}
+              <button
+                onClick={handleBack}
+                className={`p-2 rounded-lg transition-colors flex-shrink-0 ${
+                  isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"
+                }`}
+              >
+                <ArrowLeft
+                  size={24}
+                  className={isDarkMode ? "text-gray-300" : "text-gray-600"}
+                />
+              </button>
+
+              {/* Nar24 Logo */}
+              <div className="px-3 py-1 bg-gradient-to-r from-orange-500 to-pink-500 rounded-lg text-white text-sm font-bold shadow-md flex-shrink-0">
+                Nar24
               </div>
 
-              <div className="flex items-center gap-3">
-                {/* Sort button */}
-                <div className="flex items-center gap-2">
-                  {selectedSortOption !== "None" && (
-                    <span
-                      className={`text-sm font-medium ${
-                        isDarkMode ? "text-gray-300" : "text-gray-600"
-                      }`}
-                    >
-                      {getSortOptionText(selectedSortOption)}
-                    </span>
-                  )}
-                  <button
-                    onClick={showSortModal}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-                      isDarkMode
-                        ? "hover:bg-gray-700 text-gray-300"
-                        : "hover:bg-gray-100 text-gray-600"
-                    }`}
-                  >
-                    <SortAsc size={20} />
-                    <span className="hidden sm:inline text-sm font-medium">
-                      {t("DynamicMarket.sort")}
-                    </span>
-                  </button>
-                </div>
-
-                {/* Theme Toggle */}
-                <button
-                  onClick={toggleTheme}
-                  className={`p-2 rounded-lg transition-colors ${
-                    isDarkMode
-                      ? "bg-gray-700 hover:bg-gray-600"
-                      : "bg-gray-100 hover:bg-gray-200"
-                  }`}
-                >
-                  {isDarkMode ? (
-                    <Sun className="w-5 h-5 text-yellow-500" />
-                  ) : (
-                    <Moon className="w-5 h-5 text-gray-600" />
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Filter buttons */}
-            <div className="px-4 pb-4">
-              <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+              {/* Filter buttons - now in the same row */}
+              <div className="flex gap-2 overflow-x-auto scrollbar-hide flex-1">
                 {filterTypes.map((filter) => (
                   <button
                     key={filter}
                     onClick={() =>
                       handleFilterSelect(filter === "" ? null : filter)
                     }
-                    className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-200 ${
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all duration-200 flex-shrink-0 ${
                       selectedFilter === (filter === "" ? null : filter)
-                        ? "bg-gradient-to-r from-orange-500 to-pink-500 text-white shadow-lg scale-105"
+                        ? "bg-gradient-to-r from-orange-500 to-pink-500 text-white shadow-lg"
                         : isDarkMode
                         ? "bg-gray-700 text-gray-300 hover:bg-gray-600 border border-gray-600"
                         : "bg-white text-gray-700 hover:bg-gray-50 shadow-sm border border-gray-200"
@@ -1369,6 +1272,83 @@ const DynamicMarketPage: React.FC = () => {
                     {getFilterButtonText(filter)}
                   </button>
                 ))}
+              </div>
+
+              {/* Sort button */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowSortDropdown(!showSortDropdown)}
+                  className={`flex items-center gap-1 px-3 py-2 rounded-lg transition-colors flex-shrink-0 ${
+                    isDarkMode
+                      ? "hover:bg-gray-700 text-gray-300"
+                      : "hover:bg-gray-100 text-gray-600"
+                  } ${
+                    showSortDropdown
+                      ? isDarkMode
+                        ? "bg-gray-700"
+                        : "bg-gray-100"
+                      : ""
+                  }`}
+                >
+                  <SortAsc size={18} />
+                  <span className="hidden sm:inline text-xs font-medium">
+                    {selectedSortOption !== "None"
+                      ? getSortOptionText(selectedSortOption)
+                      : t("DynamicMarket.sort")}
+                  </span>
+                  <ChevronDown
+                    size={14}
+                    className={`ml-1 transition-transform ${
+                      showSortDropdown ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+
+                {/* Dropdown Menu */}
+                {showSortDropdown && (
+                  <>
+                    {/* Backdrop to close dropdown when clicking outside */}
+                    <div
+                      className="fixed inset-0 z-10"
+                      onClick={() => setShowSortDropdown(false)}
+                    />
+
+                    {/* Dropdown content */}
+                    <div
+                      className={`absolute right-0 mt-2 w-48 rounded-lg shadow-lg z-20 border ${
+                        isDarkMode
+                          ? "bg-gray-800 border-gray-700"
+                          : "bg-white border-gray-200"
+                      }`}
+                    >
+                      <div className="py-1">
+                        {sortOptions.map((option) => (
+                          <button
+                            key={option}
+                            onClick={() => {
+                              handleSortSelect(option);
+                              setShowSortDropdown(false);
+                            }}
+                            className={`w-full text-left px-4 py-2 text-sm transition-colors flex items-center justify-between ${
+                              selectedSortOption === option
+                                ? isDarkMode
+                                  ? "bg-gray-700 text-orange-400"
+                                  : "bg-orange-50 text-orange-600"
+                                : isDarkMode
+                                ? "text-gray-300 hover:bg-gray-700"
+                                : "text-gray-700 hover:bg-gray-50"
+                            }`}
+                          >
+                            <span>{getSortOptionText(option)}</span>
+                            {selectedSortOption === option && (
+                              <div className="w-2 h-2 rounded-full bg-orange-500" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -1389,7 +1369,7 @@ const DynamicMarketPage: React.FC = () => {
                       isDarkMode ? "text-gray-300" : "text-gray-600"
                     }`}
                   >
-                    Updating products...
+                    {t("DynamicMarket.updatingProducts")}
                   </p>
                 </div>
               </div>
@@ -1419,9 +1399,9 @@ const DynamicMarketPage: React.FC = () => {
                       <ProductCard
                         product={product}
                         onTap={() => handleProductClick(product)}
-                        onFavoriteToggle={() => {}} // Note: expects productId parameter
-                        onAddToCart={() => {}} // Note: expects productId parameter
-                        onColorSelect={() => {}} // Note: expects color parameter
+                        onFavoriteToggle={() => {}}
+                        onAddToCart={() => {}}
+                        onColorSelect={() => {}}
                         showCartIcon={true}
                         isFavorited={false}
                         isInCart={false}
@@ -1462,7 +1442,8 @@ const DynamicMarketPage: React.FC = () => {
                           : "bg-orange-100 text-orange-600"
                       }`}
                     >
-                      {getActiveFiltersCount()} filters applied
+                      {getActiveFiltersCount()}{" "}
+                      {t("DynamicMarket.filtersApplied")}
                     </span>
                   )}
                 </div>
@@ -1477,9 +1458,9 @@ const DynamicMarketPage: React.FC = () => {
                       <ProductCard
                         product={product}
                         onTap={() => handleProductClick(product)}
-                        onFavoriteToggle={() => {}} // Note: expects productId parameter
-                        onAddToCart={() => {}} // Note: expects productId parameter
-                        onColorSelect={() => {}} // Note: expects color parameter
+                        onFavoriteToggle={() => {}}
+                        onAddToCart={() => {}}
+                        onColorSelect={() => {}}
                         showCartIcon={true}
                         isFavorited={false}
                         isInCart={false}
@@ -1518,7 +1499,7 @@ const DynamicMarketPage: React.FC = () => {
                       onClick={handleClearAllFilters}
                       className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
                     >
-                      Clear All Filters
+                      {t("DynamicMarket.clearAllFilters")}
                     </button>
                   )}
                 </div>

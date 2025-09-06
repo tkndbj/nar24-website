@@ -15,6 +15,9 @@ import {
   Phone,
   Home,
   Building,
+  Shield,
+  CheckCircle2,
+  Star,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useUser } from "@/context/UserProvider";
@@ -149,14 +152,19 @@ const LocationPickerModal: React.FC<{
           gestureHandling: "greedy",
           styles: isDarkMode
             ? [
-                { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
+                { elementType: "geometry", stylers: [{ color: "#1a202c" }] },
                 {
                   elementType: "labels.text.stroke",
-                  stylers: [{ color: "#242f3e" }],
+                  stylers: [{ color: "#1a202c" }],
                 },
                 {
                   elementType: "labels.text.fill",
-                  stylers: [{ color: "#746855" }],
+                  stylers: [{ color: "#a0aec0" }],
+                },
+                {
+                  featureType: "water",
+                  elementType: "geometry",
+                  stylers: [{ color: "#2d3748" }],
                 },
               ]
             : [],
@@ -231,100 +239,118 @@ const LocationPickerModal: React.FC<{
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
       <div
-        className={`w-full max-w-4xl h-[80vh] rounded-xl overflow-hidden shadow-2xl flex flex-col ${
-          isDarkMode ? "bg-gray-800" : "bg-white"
+        className={`w-full max-w-5xl h-[85vh] rounded-2xl overflow-hidden shadow-2xl flex flex-col ${
+          isDarkMode
+            ? "bg-gray-900/95 backdrop-blur-xl border border-gray-700/50"
+            : "bg-white/95 backdrop-blur-xl border border-gray-200/50"
         }`}
       >
         <div
-          className={`flex items-center justify-between p-4 border-b ${
-            isDarkMode ? "border-gray-700" : "border-gray-200"
+          className={`flex items-center justify-between p-6 border-b ${
+            isDarkMode ? "border-gray-700/50" : "border-gray-200/50"
           }`}
         >
-          <h3
-            className={`text-lg font-bold ${
-              isDarkMode ? "text-white" : "text-gray-900"
-            }`}
-          >
-            {l("selectLocation") || "Select Location"}
-          </h3>
+          <div>
+            <h3
+              className={`text-xl font-bold ${
+                isDarkMode ? "text-white" : "text-gray-900"
+              }`}
+            >
+              {l("selectLocation") || "Select Delivery Location"}
+            </h3>
+            <p
+              className={`text-sm mt-1 ${
+                isDarkMode ? "text-gray-400" : "text-gray-600"
+              }`}
+            >
+              Click anywhere on the map to pin your exact location
+            </p>
+          </div>
           <button
             onClick={onClose}
-            className={`p-2 rounded-full transition-colors ${
+            className={`p-2 rounded-xl transition-all duration-200 ${
               isDarkMode
-                ? "hover:bg-gray-700 text-gray-400"
-                : "hover:bg-gray-100 text-gray-500"
+                ? "hover:bg-gray-800 text-gray-400 hover:text-white"
+                : "hover:bg-gray-100 text-gray-500 hover:text-gray-700"
             }`}
           >
-            <X size={20} />
+            <X size={24} />
           </button>
         </div>
 
         <div className="flex-1 relative">
           <div
             ref={mapRef}
-            className="w-full h-full"
-            style={{ minHeight: "400px" }}
+            className="w-full h-full rounded-b-2xl"
+            style={{ minHeight: "450px" }}
           />
 
           {selectedLocation && (
             <div
-              className={`absolute bottom-4 left-4 right-4 p-4 rounded-lg shadow-lg border ${
+              className={`absolute bottom-6 left-6 right-6 p-4 rounded-xl shadow-lg border backdrop-blur-sm ${
                 isDarkMode
-                  ? "bg-gray-800 border-gray-700"
-                  : "bg-white border-gray-200"
+                  ? "bg-gray-900/90 border-gray-700/50"
+                  : "bg-white/90 border-gray-200/50"
               }`}
             >
-              <p
-                className={`text-sm font-medium mb-2 ${
-                  isDarkMode ? "text-white" : "text-gray-900"
-                }`}
-              >
-                {l("selectedLocation") || "Selected Location"}:
-              </p>
-              <p
-                className={`text-sm font-mono ${
-                  isDarkMode ? "text-gray-300" : "text-gray-600"
-                }`}
-              >
-                {selectedLocation.latitude.toFixed(6)},{" "}
-                {selectedLocation.longitude.toFixed(6)}
-              </p>
+              <div className="flex items-start space-x-3">
+                <div className="p-2 rounded-lg bg-green-500/20">
+                  <CheckCircle2 size={20} className="text-green-500" />
+                </div>
+                <div>
+                  <p
+                    className={`text-sm font-semibold mb-1 ${
+                      isDarkMode ? "text-white" : "text-gray-900"
+                    }`}
+                  >
+                    Location Selected
+                  </p>
+                  <p
+                    className={`text-xs font-mono ${
+                      isDarkMode ? "text-gray-400" : "text-gray-600"
+                    }`}
+                  >
+                    {selectedLocation.latitude.toFixed(6)},{" "}
+                    {selectedLocation.longitude.toFixed(6)}
+                  </p>
+                </div>
+              </div>
             </div>
           )}
         </div>
 
         <div
-          className={`flex items-center justify-between p-4 border-t ${
-            isDarkMode ? "border-gray-700" : "border-gray-200"
+          className={`flex items-center justify-between p-6 border-t ${
+            isDarkMode ? "border-gray-700/50" : "border-gray-200/50"
           }`}
         >
           <p
-            className={`text-sm ${
+            className={`text-sm flex items-center space-x-2 ${
               isDarkMode ? "text-gray-400" : "text-gray-600"
             }`}
           >
-            {l("clickToSelectLocation") ||
-              "Click on the map to select a location"}
+            <Map size={16} />
+            <span>Tap anywhere on the map to set your delivery location</span>
           </p>
           <div className="flex space-x-3">
             <button
               onClick={onClose}
-              className={`px-4 py-2 rounded-lg transition-colors ${
+              className={`px-6 py-2.5 rounded-xl font-medium transition-all duration-200 ${
                 isDarkMode
-                  ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                  ? "bg-gray-800 text-gray-300 hover:bg-gray-700"
                   : "bg-gray-100 text-gray-700 hover:bg-gray-200"
               }`}
             >
-              {l("cancel") || "Cancel"}
+              Cancel
             </button>
             <button
               onClick={handleConfirm}
               disabled={!selectedLocation}
-              className="px-4 py-2 rounded-lg bg-gradient-to-r from-orange-500 to-pink-500 text-white hover:from-orange-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+              className="px-6 py-2.5 rounded-xl font-medium bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg"
             >
-              {l("confirm") || "Confirm"}
+              Confirm Location
             </button>
           </div>
         </div>
@@ -706,16 +732,35 @@ export default function ProductPaymentPage() {
     return (
       <div
         className={`min-h-screen flex items-center justify-center ${
-          isDarkMode ? "bg-gray-900" : "bg-gray-50"
+          isDarkMode
+            ? "bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900"
+            : "bg-gradient-to-br from-blue-50 via-white to-purple-50"
         }`}
       >
-        <div className="flex flex-col items-center space-y-4">
-          <Loader2 size={48} className="animate-spin text-orange-500" />
-          <p
-            className={`text-lg ${isDarkMode ? "text-white" : "text-gray-900"}`}
-          >
-            {t("loading")}
-          </p>
+        <div className="flex flex-col items-center space-y-6">
+          <div className="relative">
+            <div className="w-20 h-20 border-4 border-blue-200 rounded-full animate-pulse"></div>
+            <Loader2
+              size={40}
+              className="absolute inset-0 m-auto animate-spin text-blue-500"
+            />
+          </div>
+          <div className="text-center">
+            <h3
+              className={`text-xl font-semibold ${
+                isDarkMode ? "text-white" : "text-gray-900"
+              }`}
+            >
+              Loading Payment
+            </h3>
+            <p
+              className={`text-sm mt-1 ${
+                isDarkMode ? "text-gray-400" : "text-gray-600"
+              }`}
+            >
+              Preparing your secure checkout experience...
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -723,117 +768,144 @@ export default function ProductPaymentPage() {
 
   return (
     <div
-      className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
+      className={`min-h-screen ${
+        isDarkMode
+          ? "bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900"
+          : "bg-gradient-to-br from-blue-50 via-white to-purple-50"
+      }`}
     >
       {/* Header */}
       <div
-        className={`sticky top-0 z-10 border-b backdrop-blur-xl bg-opacity-95 ${
+        className={`sticky top-0 z-10 border-b backdrop-blur-xl ${
           isDarkMode
-            ? "bg-gray-900 border-gray-700"
-            : "bg-white border-gray-200"
+            ? "bg-gray-900/80 border-gray-700/50"
+            : "bg-white/80 border-gray-200/50"
         }`}
       >
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={() => router.back()}
-              className={`p-2 rounded-full transition-colors ${
-                isDarkMode
-                  ? "hover:bg-gray-800 text-gray-400 hover:text-white"
-                  : "hover:bg-gray-100 text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              <ArrowLeft size={20} />
-            </button>
-            <h1
-              className={`text-xl font-bold ${
-                isDarkMode ? "text-white" : "text-gray-900"
-              }`}
-            >
-              {t("payment")}
-            </h1>
+        <div className="max-w-6xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => router.back()}
+                className={`p-2.5 rounded-xl transition-all duration-200 ${
+                  isDarkMode
+                    ? "hover:bg-gray-800 text-gray-400 hover:text-white"
+                    : "hover:bg-gray-100 text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                <ArrowLeft size={20} />
+              </button>
+              <div>
+                <h1
+                  className={`text-2xl font-bold ${
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  }`}
+                >
+                  Secure Checkout
+                </h1>
+                <p
+                  className={`text-sm ${
+                    isDarkMode ? "text-gray-400" : "text-gray-600"
+                  }`}
+                >
+                  Complete your order securely
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2 text-sm">
+              <Shield size={16} className="text-green-500" />
+              <span
+                className={`font-medium ${
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                }`}
+              >
+                SSL Secured
+              </span>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="max-w-6xl mx-auto px-6 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           {/* Left Column - Forms */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-3 space-y-8">
             {/* Address Section */}
             <div
-              className={`rounded-xl shadow-sm border ${
+              className={`rounded-2xl shadow-lg border backdrop-blur-sm ${
                 isDarkMode
-                  ? "bg-gray-800 border-gray-700"
-                  : "bg-white border-gray-200"
+                  ? "bg-gray-800/80 border-gray-700/50"
+                  : "bg-white/80 border-gray-200/50"
               }`}
             >
               <button
                 onClick={() => setIsAddressExpanded(!isAddressExpanded)}
-                className="w-full p-6 flex items-center justify-between"
+                className="w-full p-8 flex items-center justify-between group"
               >
-                <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-5">
                   <div
-                    className={`p-3 rounded-full ${
-                      isDarkMode ? "bg-gray-700" : "bg-blue-50"
-                    }`}
+                    className={`p-4 rounded-2xl transition-all duration-200 ${
+                      isDarkMode ? "bg-blue-500/20" : "bg-blue-50"
+                    } group-hover:scale-105`}
                   >
-                    <MapPin size={20} className="text-blue-500" />
+                    <MapPin size={24} className="text-blue-500" />
                   </div>
                   <div className="text-left">
                     <h2
-                      className={`text-lg font-semibold ${
+                      className={`text-xl font-bold ${
                         isDarkMode ? "text-white" : "text-gray-900"
                       }`}
                     >
-                      {t("shippingAddress") || "Shipping Address"}
+                      Delivery Address
                     </h2>
                     <p
-                      className={`text-sm ${
-                        isDarkMode ? "text-gray-400" : "text-gray-500"
+                      className={`text-sm mt-1 ${
+                        isDarkMode ? "text-gray-400" : "text-gray-600"
                       }`}
                     >
-                      {t("whereToDeliverOrder") ||
-                        "Where should we deliver your order?"}
+                      Where should we deliver your order?
                     </p>
                   </div>
                 </div>
                 <ChevronDown
                   size={20}
-                  className={`transform transition-transform ${
+                  className={`transform transition-all duration-200 ${
                     isAddressExpanded ? "rotate-180" : ""
-                  } ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                  } ${
+                    isDarkMode ? "text-gray-400" : "text-gray-500"
+                  } group-hover:text-blue-500`}
                 />
               </button>
 
               {isAddressExpanded && (
                 <div
-                  className={`px-6 pb-6 border-t ${
-                    isDarkMode ? "border-gray-700" : "border-gray-200"
+                  className={`px-8 pb-8 border-t ${
+                    isDarkMode ? "border-gray-700/50" : "border-gray-200/50"
                   }`}
                 >
                   {/* Saved Addresses */}
                   {savedAddresses.length > 0 && (
-                    <div className="mb-6">
+                    <div className="mb-8 mt-6">
                       <h3
-                        className={`text-sm font-medium mb-3 ${
+                        className={`text-sm font-semibold mb-4 flex items-center space-x-2 ${
                           isDarkMode ? "text-gray-300" : "text-gray-700"
                         }`}
                       >
-                        {t("savedAddresses") || "Saved Addresses"}
+                        <Star size={16} />
+                        <span>Saved Addresses</span>
                       </h3>
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         {savedAddresses.map((address) => (
                           <label
                             key={address.id}
-                            className={`flex items-start space-x-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                            className={`flex items-start space-x-4 p-4 rounded-xl border cursor-pointer transition-all duration-200 ${
                               selectedAddressId === address.id
                                 ? isDarkMode
-                                  ? "border-blue-500 bg-blue-900/20"
-                                  : "border-blue-500 bg-blue-50"
+                                  ? "border-blue-500 bg-blue-500/10 shadow-lg"
+                                  : "border-blue-500 bg-blue-50 shadow-lg"
                                 : isDarkMode
-                                ? "border-gray-700 hover:border-gray-600"
-                                : "border-gray-200 hover:border-gray-300"
+                                ? "border-gray-700 hover:border-gray-600 hover:bg-gray-700/50"
+                                : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
                             }`}
                           >
                             <input
@@ -842,19 +914,19 @@ export default function ProductPaymentPage() {
                               value={address.id}
                               checked={selectedAddressId === address.id}
                               onChange={() => handleAddressSelect(address.id)}
-                              className="mt-1 text-blue-500"
+                              className="mt-1.5 text-blue-500"
                             />
                             <div className="flex-1 min-w-0">
                               <p
-                                className={`font-medium ${
+                                className={`font-semibold ${
                                   isDarkMode ? "text-white" : "text-gray-900"
                                 }`}
                               >
                                 {address.addressLine1}
                               </p>
                               <p
-                                className={`text-sm ${
-                                  isDarkMode ? "text-gray-400" : "text-gray-500"
+                                className={`text-sm mt-1 ${
+                                  isDarkMode ? "text-gray-400" : "text-gray-600"
                                 }`}
                               >
                                 {[address.addressLine2, address.city]
@@ -863,7 +935,7 @@ export default function ProductPaymentPage() {
                               </p>
                               <p
                                 className={`text-sm ${
-                                  isDarkMode ? "text-gray-400" : "text-gray-500"
+                                  isDarkMode ? "text-gray-400" : "text-gray-600"
                                 }`}
                               >
                                 {address.phoneNumber}
@@ -873,14 +945,14 @@ export default function ProductPaymentPage() {
                         ))}
 
                         <label
-                          className={`flex items-center space-x-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                          className={`flex items-center space-x-4 p-4 rounded-xl border cursor-pointer transition-all duration-200 ${
                             selectedAddressId === null
                               ? isDarkMode
-                                ? "border-blue-500 bg-blue-900/20"
-                                : "border-blue-500 bg-blue-50"
+                                ? "border-blue-500 bg-blue-500/10 shadow-lg"
+                                : "border-blue-500 bg-blue-50 shadow-lg"
                               : isDarkMode
-                              ? "border-gray-700 hover:border-gray-600"
-                              : "border-gray-200 hover:border-gray-300"
+                              ? "border-gray-700 hover:border-gray-600 hover:bg-gray-700/50"
+                              : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
                           }`}
                         >
                           <input
@@ -892,11 +964,11 @@ export default function ProductPaymentPage() {
                             className="text-blue-500"
                           />
                           <span
-                            className={`font-medium ${
+                            className={`font-semibold ${
                               isDarkMode ? "text-white" : "text-gray-900"
                             }`}
                           >
-                            {t("enterNewAddress") || "Enter new address"}
+                            Enter new address
                           </span>
                         </label>
                       </div>
@@ -904,22 +976,22 @@ export default function ProductPaymentPage() {
                   )}
 
                   {/* Address Form */}
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <label
-                          className={`block text-sm font-medium mb-2 ${
+                          className={`block text-sm font-semibold mb-3 ${
                             isDarkMode ? "text-gray-300" : "text-gray-700"
                           }`}
                         >
-                          {t("addressLine1") || "Address Line 1"} *
+                          Address Line 1 *
                         </label>
-                        <div className="relative">
+                        <div className="relative group">
                           <Home
                             size={18}
-                            className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${
+                            className={`absolute left-4 top-1/2 transform -translate-y-1/2 transition-colors ${
                               isDarkMode ? "text-gray-400" : "text-gray-500"
-                            }`}
+                            } group-focus-within:text-blue-500`}
                           />
                           <input
                             type="text"
@@ -927,39 +999,38 @@ export default function ProductPaymentPage() {
                             onChange={(e) =>
                               handleInputChange("addressLine1", e.target.value)
                             }
-                            className={`w-full pl-10 pr-4 py-3 rounded-lg border transition-colors ${
+                            className={`w-full pl-12 pr-4 py-4 rounded-xl border transition-all duration-200 ${
                               errors.addressLine1
-                                ? "border-red-500 focus:border-red-500"
+                                ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
                                 : isDarkMode
-                                ? "border-gray-600 bg-gray-700 text-white focus:border-blue-500"
-                                : "border-gray-300 bg-white text-gray-900 focus:border-blue-500"
-                            } focus:outline-none focus:ring-1 focus:ring-blue-500`}
-                            placeholder={
-                              t("enterAddressLine1") || "Enter address line 1"
-                            }
+                                ? "border-gray-600 bg-gray-700/50 text-white focus:border-blue-500 focus:ring-blue-500/20"
+                                : "border-gray-300 bg-white text-gray-900 focus:border-blue-500 focus:ring-blue-500/20"
+                            } focus:outline-none focus:ring-4`}
+                            placeholder="Enter your street address"
                           />
                         </div>
                         {errors.addressLine1 && (
-                          <p className="mt-1 text-sm text-red-500">
-                            {errors.addressLine1}
+                          <p className="mt-2 text-sm text-red-500 flex items-center space-x-1">
+                            <X size={14} />
+                            <span>{errors.addressLine1}</span>
                           </p>
                         )}
                       </div>
 
                       <div>
                         <label
-                          className={`block text-sm font-medium mb-2 ${
+                          className={`block text-sm font-semibold mb-3 ${
                             isDarkMode ? "text-gray-300" : "text-gray-700"
                           }`}
                         >
-                          {t("addressLine2") || "Address Line 2"}
+                          Address Line 2
                         </label>
-                        <div className="relative">
+                        <div className="relative group">
                           <Building
                             size={18}
-                            className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${
+                            className={`absolute left-4 top-1/2 transform -translate-y-1/2 transition-colors ${
                               isDarkMode ? "text-gray-400" : "text-gray-500"
-                            }`}
+                            } group-focus-within:text-blue-500`}
                           />
                           <input
                             type="text"
@@ -967,35 +1038,32 @@ export default function ProductPaymentPage() {
                             onChange={(e) =>
                               handleInputChange("addressLine2", e.target.value)
                             }
-                            className={`w-full pl-10 pr-4 py-3 rounded-lg border transition-colors ${
+                            className={`w-full pl-12 pr-4 py-4 rounded-xl border transition-all duration-200 ${
                               isDarkMode
-                                ? "border-gray-600 bg-gray-700 text-white focus:border-blue-500"
-                                : "border-gray-300 bg-white text-gray-900 focus:border-blue-500"
-                            } focus:outline-none focus:ring-1 focus:ring-blue-500`}
-                            placeholder={
-                              t("enterAddressLine2") ||
-                              "Enter address line 2 (optional)"
-                            }
+                                ? "border-gray-600 bg-gray-700/50 text-white focus:border-blue-500 focus:ring-blue-500/20"
+                                : "border-gray-300 bg-white text-gray-900 focus:border-blue-500 focus:ring-blue-500/20"
+                            } focus:outline-none focus:ring-4`}
+                            placeholder="Apartment, suite, etc. (optional)"
                           />
                         </div>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <label
-                          className={`block text-sm font-medium mb-2 ${
+                          className={`block text-sm font-semibold mb-3 ${
                             isDarkMode ? "text-gray-300" : "text-gray-700"
                           }`}
                         >
-                          {t("phoneNumber") || "Phone Number"} *
+                          Phone Number *
                         </label>
-                        <div className="relative">
+                        <div className="relative group">
                           <Phone
                             size={18}
-                            className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${
+                            className={`absolute left-4 top-1/2 transform -translate-y-1/2 transition-colors ${
                               isDarkMode ? "text-gray-400" : "text-gray-500"
-                            }`}
+                            } group-focus-within:text-blue-500`}
                           />
                           <input
                             type="tel"
@@ -1003,43 +1071,42 @@ export default function ProductPaymentPage() {
                             onChange={(e) =>
                               handleInputChange("phoneNumber", e.target.value)
                             }
-                            className={`w-full pl-10 pr-4 py-3 rounded-lg border transition-colors ${
+                            className={`w-full pl-12 pr-4 py-4 rounded-xl border transition-all duration-200 ${
                               errors.phoneNumber
-                                ? "border-red-500 focus:border-red-500"
+                                ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
                                 : isDarkMode
-                                ? "border-gray-600 bg-gray-700 text-white focus:border-blue-500"
-                                : "border-gray-300 bg-white text-gray-900 focus:border-blue-500"
-                            } focus:outline-none focus:ring-1 focus:ring-blue-500`}
-                            placeholder={
-                              t("enterPhoneNumber") || "Enter phone number"
-                            }
+                                ? "border-gray-600 bg-gray-700/50 text-white focus:border-blue-500 focus:ring-blue-500/20"
+                                : "border-gray-300 bg-white text-gray-900 focus:border-blue-500 focus:ring-blue-500/20"
+                            } focus:outline-none focus:ring-4`}
+                            placeholder="Your contact number"
                           />
                         </div>
                         {errors.phoneNumber && (
-                          <p className="mt-1 text-sm text-red-500">
-                            {errors.phoneNumber}
+                          <p className="mt-2 text-sm text-red-500 flex items-center space-x-1">
+                            <X size={14} />
+                            <span>{errors.phoneNumber}</span>
                           </p>
                         )}
                       </div>
 
                       <div className="relative">
                         <label
-                          className={`block text-sm font-medium mb-2 ${
+                          className={`block text-sm font-semibold mb-3 ${
                             isDarkMode ? "text-gray-300" : "text-gray-700"
                           }`}
                         >
-                          {t("city") || "City"} *
+                          City *
                         </label>
                         <button
                           type="button"
                           onClick={() => setShowCityDropdown(!showCityDropdown)}
-                          className={`w-full px-4 py-3 rounded-lg border text-left flex items-center justify-between transition-colors ${
+                          className={`w-full px-4 py-4 rounded-xl border text-left flex items-center justify-between transition-all duration-200 ${
                             errors.city
-                              ? "border-red-500 focus:border-red-500"
+                              ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
                               : isDarkMode
-                              ? "border-gray-600 bg-gray-700 text-white focus:border-blue-500"
-                              : "border-gray-300 bg-white text-gray-900 focus:border-blue-500"
-                          } focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                              ? "border-gray-600 bg-gray-700/50 text-white focus:border-blue-500 focus:ring-blue-500/20"
+                              : "border-gray-300 bg-white text-gray-900 focus:border-blue-500 focus:ring-blue-500/20"
+                          } focus:outline-none focus:ring-4`}
                         >
                           <span
                             className={
@@ -1052,17 +1119,20 @@ export default function ProductPaymentPage() {
                                 : "text-gray-500"
                             }
                           >
-                            {formData.city || t("selectCity") || "Select city"}
+                            {formData.city || "Select your city"}
                           </span>
-                          <ChevronDown size={16} />
+                          <ChevronDown
+                            size={16}
+                            className="transition-transform duration-200"
+                          />
                         </button>
 
                         {showCityDropdown && (
                           <div
-                            className={`absolute top-full left-0 right-0 mt-1 border rounded-lg shadow-lg z-20 max-h-48 overflow-y-auto ${
+                            className={`absolute top-full left-0 right-0 mt-2 border rounded-xl shadow-xl z-20 max-h-48 overflow-y-auto backdrop-blur-sm ${
                               isDarkMode
-                                ? "bg-gray-700 border-gray-600"
-                                : "bg-white border-gray-300"
+                                ? "bg-gray-800/95 border-gray-600"
+                                : "bg-white/95 border-gray-300"
                             }`}
                           >
                             {regionsList.map((city) => (
@@ -1073,9 +1143,9 @@ export default function ProductPaymentPage() {
                                   handleInputChange("city", city);
                                   setShowCityDropdown(false);
                                 }}
-                                className={`w-full px-3 py-2 text-left transition-colors ${
+                                className={`w-full px-4 py-3 text-left transition-colors ${
                                   isDarkMode
-                                    ? "text-white hover:bg-gray-600"
+                                    ? "text-white hover:bg-gray-700"
                                     : "text-gray-900 hover:bg-gray-100"
                                 }`}
                               >
@@ -1086,8 +1156,9 @@ export default function ProductPaymentPage() {
                         )}
 
                         {errors.city && (
-                          <p className="mt-1 text-sm text-red-500">
-                            {errors.city}
+                          <p className="mt-2 text-sm text-red-500 flex items-center space-x-1">
+                            <X size={14} />
+                            <span>{errors.city}</span>
                           </p>
                         )}
                       </div>
@@ -1096,11 +1167,11 @@ export default function ProductPaymentPage() {
                     {/* Location Picker */}
                     <div>
                       <label
-                        className={`block text-sm font-medium mb-2 ${
+                        className={`block text-sm font-semibold mb-3 ${
                           isDarkMode ? "text-gray-300" : "text-gray-700"
                         }`}
                       >
-                        {t("location") || "Location"} *
+                        Precise Location *
                       </label>
                       <button
                         type="button"
@@ -1114,75 +1185,99 @@ export default function ProductPaymentPage() {
                           setShowMapModal(true);
                         }}
                         disabled={!mapsLoaded}
-                        className={`w-full p-4 rounded-lg border text-left flex items-center justify-between transition-colors ${
+                        className={`w-full p-6 rounded-xl border text-left flex items-center justify-between transition-all duration-200 group ${
                           errors.location
                             ? "border-red-500"
                             : isDarkMode
-                            ? "border-gray-600 bg-gray-700 hover:bg-gray-600"
+                            ? "border-gray-600 bg-gray-700/50 hover:bg-gray-600/50"
                             : "border-gray-300 bg-white hover:bg-gray-50"
                         } ${
                           !mapsLoaded ? "opacity-50 cursor-not-allowed" : ""
                         }`}
                       >
-                        <div className="flex items-center space-x-3">
-                          <Map size={20} className="text-blue-500" />
+                        <div className="flex items-center space-x-4">
+                          <div
+                            className={`p-3 rounded-xl transition-all duration-200 ${
+                              formData.location
+                                ? "bg-green-500/20"
+                                : isDarkMode
+                                ? "bg-blue-500/20"
+                                : "bg-blue-50"
+                            } group-hover:scale-105`}
+                          >
+                            {formData.location ? (
+                              <CheckCircle2
+                                size={24}
+                                className="text-green-500"
+                              />
+                            ) : (
+                              <Map size={24} className="text-blue-500" />
+                            )}
+                          </div>
                           <div>
                             <p
-                              className={`font-medium ${
+                              className={`font-semibold ${
                                 isDarkMode ? "text-white" : "text-gray-900"
                               }`}
                             >
                               {formData.location
-                                ? t("locationSelected") || "Location selected"
+                                ? "Location Pinned"
                                 : !mapsLoaded
                                 ? "Loading Maps..."
-                                : t("pinLocationOnMap") ||
-                                  "Pin location on map"}
+                                : "Pin Your Exact Location"}
                             </p>
-                            {formData.location && (
+                            {formData.location ? (
                               <p
-                                className={`text-sm ${
-                                  isDarkMode ? "text-gray-400" : "text-gray-500"
+                                className={`text-sm mt-1 ${
+                                  isDarkMode ? "text-gray-400" : "text-gray-600"
                                 }`}
                               >
                                 {formData.location.latitude.toFixed(4)},{" "}
                                 {formData.location.longitude.toFixed(4)}
+                              </p>
+                            ) : (
+                              <p
+                                className={`text-sm mt-1 ${
+                                  isDarkMode ? "text-gray-400" : "text-gray-600"
+                                }`}
+                              >
+                                Help us find you precisely for faster delivery
                               </p>
                             )}
                           </div>
                         </div>
                         <ChevronDown
                           size={16}
-                          className={
+                          className={`transition-colors ${
                             isDarkMode ? "text-gray-400" : "text-gray-500"
-                          }
+                          } group-hover:text-blue-500`}
                         />
                       </button>
                       {errors.location && (
-                        <p className="mt-1 text-sm text-red-500">
-                          {errors.location}
+                        <p className="mt-2 text-sm text-red-500 flex items-center space-x-1">
+                          <X size={14} />
+                          <span>{errors.location}</span>
                         </p>
                       )}
                     </div>
 
                     {/* Save Address */}
                     {selectedAddressId === null && (
-                      <label className="flex items-center space-x-3">
+                      <label className="flex items-center space-x-3 cursor-pointer">
                         <input
                           type="checkbox"
                           checked={formData.saveAddress}
                           onChange={(e) =>
                             handleInputChange("saveAddress", e.target.checked)
                           }
-                          className="text-blue-500 rounded"
+                          className="w-5 h-5 text-blue-500 rounded focus:ring-blue-500/50"
                         />
                         <span
-                          className={`text-sm ${
+                          className={`text-sm font-medium ${
                             isDarkMode ? "text-gray-300" : "text-gray-700"
                           }`}
                         >
-                          {t("saveAddressForFutureOrders") ||
-                            "Save this address for future orders"}
+                          Save this address for future orders
                         </span>
                       </label>
                     )}
@@ -1193,78 +1288,80 @@ export default function ProductPaymentPage() {
 
             {/* Payment Section */}
             <div
-              className={`rounded-xl shadow-sm border ${
+              className={`rounded-2xl shadow-lg border backdrop-blur-sm ${
                 isDarkMode
-                  ? "bg-gray-800 border-gray-700"
-                  : "bg-white border-gray-200"
+                  ? "bg-gray-800/80 border-gray-700/50"
+                  : "bg-white/80 border-gray-200/50"
               }`}
             >
               <button
                 onClick={() => setIsPaymentExpanded(!isPaymentExpanded)}
-                className="w-full p-6 flex items-center justify-between"
+                className="w-full p-8 flex items-center justify-between group"
               >
-                <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-5">
                   <div
-                    className={`p-3 rounded-full ${
-                      isDarkMode ? "bg-gray-700" : "bg-green-50"
-                    }`}
+                    className={`p-4 rounded-2xl transition-all duration-200 ${
+                      isDarkMode ? "bg-green-500/20" : "bg-green-50"
+                    } group-hover:scale-105`}
                   >
-                    <CreditCard size={20} className="text-green-500" />
+                    <CreditCard size={24} className="text-green-500" />
                   </div>
                   <div className="text-left">
                     <h2
-                      className={`text-lg font-semibold ${
+                      className={`text-xl font-bold ${
                         isDarkMode ? "text-white" : "text-gray-900"
                       }`}
                     >
-                      {t("paymentDetails") || "Payment Details"}
+                      Payment Method
                     </h2>
                     <p
-                      className={`text-sm ${
-                        isDarkMode ? "text-gray-400" : "text-gray-500"
+                      className={`text-sm mt-1 ${
+                        isDarkMode ? "text-gray-400" : "text-gray-600"
                       }`}
                     >
-                      {t("howWouldYouLikeToPay") ||
-                        "How would you like to pay?"}
+                      Secure payment processing
                     </p>
                   </div>
                 </div>
                 <ChevronDown
                   size={20}
-                  className={`transform transition-transform ${
+                  className={`transform transition-all duration-200 ${
                     isPaymentExpanded ? "rotate-180" : ""
-                  } ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                  } ${
+                    isDarkMode ? "text-gray-400" : "text-gray-500"
+                  } group-hover:text-green-500`}
                 />
               </button>
 
               {isPaymentExpanded && (
                 <div
-                  className={`px-6 pb-6 border-t ${
-                    isDarkMode ? "border-gray-700" : "border-gray-200"
+                  className={`px-8 pb-8 border-t ${
+                    isDarkMode ? "border-gray-700/50" : "border-gray-200/50"
                   }`}
                 >
                   {/* Saved Payment Methods */}
                   {savedPaymentMethods.length > 0 && (
-                    <div className="mb-6">
+                    <div className="mb-8 mt-6">
                       <h3
-                        className={`text-sm font-medium mb-3 ${
+                        className={`text-sm font-semibold mb-4 flex items-center space-x-2 ${
                           isDarkMode ? "text-gray-300" : "text-gray-700"
                         }`}
                       >
-                        {t("savedPaymentMethods") || "Saved Payment Methods"}
+                        <Star size={16} />
+                        <span>Saved Payment Methods</span>
                       </h3>
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         {savedPaymentMethods.map((method) => (
                           <label
                             key={method.id}
-                            className={`flex items-center space-x-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                            className={`flex items-center space-x-4 p-4 rounded-xl border cursor-pointer transition-all duration-200 ${
                               selectedPaymentMethodId === method.id
                                 ? isDarkMode
-                                  ? "border-green-500 bg-green-900/20"
-                                  : "border-green-500 bg-green-50"
+                                  ? "border-green-500 bg-green-500/10 shadow-lg"
+                                  : "border-green-500 bg-green-50 shadow-lg"
                                 : isDarkMode
-                                ? "border-gray-700 hover:border-gray-600"
-                                : "border-gray-200 hover:border-gray-300"
+                                ? "border-gray-700 hover:border-gray-600 hover:bg-gray-700/50"
+                                : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
                             }`}
                           >
                             <input
@@ -1279,15 +1376,15 @@ export default function ProductPaymentPage() {
                             />
                             <div className="flex-1">
                               <p
-                                className={`font-medium ${
+                                className={`font-semibold ${
                                   isDarkMode ? "text-white" : "text-gray-900"
                                 }`}
                               >
-                                **** **** **** {method.cardNumber.slice(-4)}
+                                •••• •••• •••• {method.cardNumber.slice(-4)}
                               </p>
                               <p
-                                className={`text-sm ${
-                                  isDarkMode ? "text-gray-400" : "text-gray-500"
+                                className={`text-sm mt-1 ${
+                                  isDarkMode ? "text-gray-400" : "text-gray-600"
                                 }`}
                               >
                                 {method.cardHolderName} • Expires{" "}
@@ -1298,14 +1395,14 @@ export default function ProductPaymentPage() {
                         ))}
 
                         <label
-                          className={`flex items-center space-x-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                          className={`flex items-center space-x-4 p-4 rounded-xl border cursor-pointer transition-all duration-200 ${
                             selectedPaymentMethodId === null
                               ? isDarkMode
-                                ? "border-green-500 bg-green-900/20"
-                                : "border-green-500 bg-green-50"
+                                ? "border-green-500 bg-green-500/10 shadow-lg"
+                                : "border-green-500 bg-green-50 shadow-lg"
                               : isDarkMode
-                              ? "border-gray-700 hover:border-gray-600"
-                              : "border-gray-200 hover:border-gray-300"
+                              ? "border-gray-700 hover:border-gray-600 hover:bg-gray-700/50"
+                              : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
                           }`}
                         >
                           <input
@@ -1317,12 +1414,11 @@ export default function ProductPaymentPage() {
                             className="text-green-500"
                           />
                           <span
-                            className={`font-medium ${
+                            className={`font-semibold ${
                               isDarkMode ? "text-white" : "text-gray-900"
                             }`}
                           >
-                            {t("enterNewPaymentMethod") ||
-                              "Enter new payment method"}
+                            Enter new payment method
                           </span>
                         </label>
                       </div>
@@ -1330,21 +1426,21 @@ export default function ProductPaymentPage() {
                   )}
 
                   {/* Payment Form */}
-                  <div className="space-y-4">
+                  <div className="space-y-6">
                     <div>
                       <label
-                        className={`block text-sm font-medium mb-2 ${
+                        className={`block text-sm font-semibold mb-3 ${
                           isDarkMode ? "text-gray-300" : "text-gray-700"
                         }`}
                       >
-                        {t("cardNumber") || "Card Number"} *
+                        Card Number *
                       </label>
-                      <div className="relative">
+                      <div className="relative group">
                         <CreditCard
                           size={18}
-                          className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${
+                          className={`absolute left-4 top-1/2 transform -translate-y-1/2 transition-colors ${
                             isDarkMode ? "text-gray-400" : "text-gray-500"
-                          }`}
+                          } group-focus-within:text-green-500`}
                         />
                         <input
                           type="text"
@@ -1356,38 +1452,39 @@ export default function ProductPaymentPage() {
                             )
                           }
                           maxLength={19}
-                          className={`w-full pl-10 pr-4 py-3 rounded-lg border transition-colors ${
+                          className={`w-full pl-12 pr-4 py-4 rounded-xl border transition-all duration-200 ${
                             errors.cardNumber
-                              ? "border-red-500 focus:border-red-500"
+                              ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
                               : isDarkMode
-                              ? "border-gray-600 bg-gray-700 text-white focus:border-green-500"
-                              : "border-gray-300 bg-white text-gray-900 focus:border-green-500"
-                          } focus:outline-none focus:ring-1 focus:ring-green-500`}
+                              ? "border-gray-600 bg-gray-700/50 text-white focus:border-green-500 focus:ring-green-500/20"
+                              : "border-gray-300 bg-white text-gray-900 focus:border-green-500 focus:ring-green-500/20"
+                          } focus:outline-none focus:ring-4`}
                           placeholder="1234 5678 9012 3456"
                         />
                       </div>
                       {errors.cardNumber && (
-                        <p className="mt-1 text-sm text-red-500">
-                          {errors.cardNumber}
+                        <p className="mt-2 text-sm text-red-500 flex items-center space-x-1">
+                          <X size={14} />
+                          <span>{errors.cardNumber}</span>
                         </p>
                       )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-6">
                       <div>
                         <label
-                          className={`block text-sm font-medium mb-2 ${
+                          className={`block text-sm font-semibold mb-3 ${
                             isDarkMode ? "text-gray-300" : "text-gray-700"
                           }`}
                         >
-                          {t("expiryDate") || "Expiry Date"} *
+                          Expiry Date *
                         </label>
-                        <div className="relative">
+                        <div className="relative group">
                           <Calendar
                             size={18}
-                            className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${
+                            className={`absolute left-4 top-1/2 transform -translate-y-1/2 transition-colors ${
                               isDarkMode ? "text-gray-400" : "text-gray-500"
-                            }`}
+                            } group-focus-within:text-green-500`}
                           />
                           <input
                             type="text"
@@ -1396,37 +1493,38 @@ export default function ProductPaymentPage() {
                               handleExpiryDateChange(e.target.value)
                             }
                             maxLength={5}
-                            className={`w-full pl-10 pr-4 py-3 rounded-lg border transition-colors ${
+                            className={`w-full pl-12 pr-4 py-4 rounded-xl border transition-all duration-200 ${
                               errors.expiryDate
-                                ? "border-red-500 focus:border-red-500"
+                                ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
                                 : isDarkMode
-                                ? "border-gray-600 bg-gray-700 text-white focus:border-green-500"
-                                : "border-gray-300 bg-white text-gray-900 focus:border-green-500"
-                            } focus:outline-none focus:ring-1 focus:ring-green-500`}
+                                ? "border-gray-600 bg-gray-700/50 text-white focus:border-green-500 focus:ring-green-500/20"
+                                : "border-gray-300 bg-white text-gray-900 focus:border-green-500 focus:ring-green-500/20"
+                            } focus:outline-none focus:ring-4`}
                             placeholder="MM/YY"
                           />
                         </div>
                         {errors.expiryDate && (
-                          <p className="mt-1 text-sm text-red-500">
-                            {errors.expiryDate}
+                          <p className="mt-2 text-sm text-red-500 flex items-center space-x-1">
+                            <X size={14} />
+                            <span>{errors.expiryDate}</span>
                           </p>
                         )}
                       </div>
 
                       <div>
                         <label
-                          className={`block text-sm font-medium mb-2 ${
+                          className={`block text-sm font-semibold mb-3 ${
                             isDarkMode ? "text-gray-300" : "text-gray-700"
                           }`}
                         >
-                          {t("cvv") || "CVV"} *
+                          CVV *
                         </label>
-                        <div className="relative">
+                        <div className="relative group">
                           <Lock
                             size={18}
-                            className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${
+                            className={`absolute left-4 top-1/2 transform -translate-y-1/2 transition-colors ${
                               isDarkMode ? "text-gray-400" : "text-gray-500"
-                            }`}
+                            } group-focus-within:text-green-500`}
                           />
                           <input
                             type="password"
@@ -1435,19 +1533,20 @@ export default function ProductPaymentPage() {
                               handleInputChange("cvv", e.target.value)
                             }
                             maxLength={4}
-                            className={`w-full pl-10 pr-4 py-3 rounded-lg border transition-colors ${
+                            className={`w-full pl-12 pr-4 py-4 rounded-xl border transition-all duration-200 ${
                               errors.cvv
-                                ? "border-red-500 focus:border-red-500"
+                                ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
                                 : isDarkMode
-                                ? "border-gray-600 bg-gray-700 text-white focus:border-green-500"
-                                : "border-gray-300 bg-white text-gray-900 focus:border-green-500"
-                            } focus:outline-none focus:ring-1 focus:ring-green-500`}
+                                ? "border-gray-600 bg-gray-700/50 text-white focus:border-green-500 focus:ring-green-500/20"
+                                : "border-gray-300 bg-white text-gray-900 focus:border-green-500 focus:ring-green-500/20"
+                            } focus:outline-none focus:ring-4`}
                             placeholder="123"
                           />
                         </div>
                         {errors.cvv && (
-                          <p className="mt-1 text-sm text-red-500">
-                            {errors.cvv}
+                          <p className="mt-2 text-sm text-red-500 flex items-center space-x-1">
+                            <X size={14} />
+                            <span>{errors.cvv}</span>
                           </p>
                         )}
                       </div>
@@ -1455,18 +1554,18 @@ export default function ProductPaymentPage() {
 
                     <div>
                       <label
-                        className={`block text-sm font-medium mb-2 ${
+                        className={`block text-sm font-semibold mb-3 ${
                           isDarkMode ? "text-gray-300" : "text-gray-700"
                         }`}
                       >
-                        {t("cardHolderName") || "Card Holder Name"} *
+                        Card Holder Name *
                       </label>
-                      <div className="relative">
+                      <div className="relative group">
                         <User
                           size={18}
-                          className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${
+                          className={`absolute left-4 top-1/2 transform -translate-y-1/2 transition-colors ${
                             isDarkMode ? "text-gray-400" : "text-gray-500"
-                          }`}
+                          } group-focus-within:text-green-500`}
                         />
                         <input
                           type="text"
@@ -1474,28 +1573,27 @@ export default function ProductPaymentPage() {
                           onChange={(e) =>
                             handleInputChange("cardHolderName", e.target.value)
                           }
-                          className={`w-full pl-10 pr-4 py-3 rounded-lg border transition-colors ${
+                          className={`w-full pl-12 pr-4 py-4 rounded-xl border transition-all duration-200 ${
                             errors.cardHolderName
-                              ? "border-red-500 focus:border-red-500"
+                              ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
                               : isDarkMode
-                              ? "border-gray-600 bg-gray-700 text-white focus:border-green-500"
-                              : "border-gray-300 bg-white text-gray-900 focus:border-green-500"
-                          } focus:outline-none focus:ring-1 focus:ring-green-500`}
-                          placeholder={
-                            t("enterCardHolderName") || "Enter card holder name"
-                          }
+                              ? "border-gray-600 bg-gray-700/50 text-white focus:border-green-500 focus:ring-green-500/20"
+                              : "border-gray-300 bg-white text-gray-900 focus:border-green-500 focus:ring-green-500/20"
+                          } focus:outline-none focus:ring-4`}
+                          placeholder="Name as it appears on card"
                         />
                       </div>
                       {errors.cardHolderName && (
-                        <p className="mt-1 text-sm text-red-500">
-                          {errors.cardHolderName}
+                        <p className="mt-2 text-sm text-red-500 flex items-center space-x-1">
+                          <X size={14} />
+                          <span>{errors.cardHolderName}</span>
                         </p>
                       )}
                     </div>
 
                     {/* Save Payment Method */}
                     {selectedPaymentMethodId === null && (
-                      <label className="flex items-center space-x-3">
+                      <label className="flex items-center space-x-3 cursor-pointer">
                         <input
                           type="checkbox"
                           checked={formData.savePaymentDetails}
@@ -1505,15 +1603,14 @@ export default function ProductPaymentPage() {
                               e.target.checked
                             )
                           }
-                          className="text-green-500 rounded"
+                          className="w-5 h-5 text-green-500 rounded focus:ring-green-500/50"
                         />
                         <span
-                          className={`text-sm ${
+                          className={`text-sm font-medium ${
                             isDarkMode ? "text-gray-300" : "text-gray-700"
                           }`}
                         >
-                          {t("savePaymentMethodForFutureOrders") ||
-                            "Save this payment method for future orders"}
+                          Save this payment method for future orders
                         </span>
                       </label>
                     )}
@@ -1524,42 +1621,54 @@ export default function ProductPaymentPage() {
           </div>
 
           {/* Right Column - Order Summary */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-2">
             <div
-              className={`sticky top-24 rounded-xl shadow-sm border p-6 ${
+              className={`sticky top-32 rounded-2xl shadow-lg border backdrop-blur-sm p-8 ${
                 isDarkMode
-                  ? "bg-gray-800 border-gray-700"
-                  : "bg-white border-gray-200"
+                  ? "bg-gray-800/80 border-gray-700/50"
+                  : "bg-white/80 border-gray-200/50"
               }`}
             >
-              <h3
-                className={`text-lg font-semibold mb-4 ${
-                  isDarkMode ? "text-white" : "text-gray-900"
-                }`}
-              >
-                {t("orderSummary") || "Order Summary"}
-              </h3>
+              <div className="flex items-center space-x-3 mb-6">
+                <div className="p-3 rounded-xl bg-gradient-to-r from-blue-500/20 to-purple-500/20">
+                  <CreditCard size={24} className="text-blue-500" />
+                </div>
+                <h3
+                  className={`text-xl font-bold ${
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  }`}
+                >
+                  Order Summary
+                </h3>
+              </div>
 
               {/* Cart Items */}
-              <div className="space-y-3 mb-6">
+              <div className="space-y-4 mb-8">
                 {cartItems.map((item, index) => (
-                  <div key={index} className="flex items-center space-x-3">
+                  <div
+                    key={index}
+                    className={`flex items-center space-x-4 p-4 rounded-xl ${
+                      isDarkMode ? "bg-gray-700/30" : "bg-gray-50"
+                    }`}
+                  >
                     <div
-                      className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-                        isDarkMode ? "bg-gray-700" : "bg-gray-100"
+                      className={`w-16 h-16 rounded-xl flex items-center justify-center ${
+                        isDarkMode
+                          ? "bg-gradient-to-br from-blue-500/20 to-purple-500/20"
+                          : "bg-gradient-to-br from-blue-100 to-purple-100"
                       }`}
                     >
                       <span
-                        className={`text-sm font-medium ${
+                        className={`text-lg font-bold ${
                           isDarkMode ? "text-white" : "text-gray-900"
                         }`}
                       >
-                        {item.quantity}x
+                        {item.quantity}×
                       </span>
                     </div>
                     <div className="flex-1 min-w-0">
                       <p
-                        className={`font-medium text-sm ${
+                        className={`font-semibold ${
                           isDarkMode ? "text-white" : "text-gray-900"
                         }`}
                       >
@@ -1567,71 +1676,158 @@ export default function ProductPaymentPage() {
                       </p>
                       <p
                         className={`text-sm ${
-                          isDarkMode ? "text-gray-400" : "text-gray-500"
+                          isDarkMode ? "text-gray-400" : "text-gray-600"
                         }`}
                       >
-                        {/* {item.selectedColor && `Color: ${item.selectedColor}`}
-                        {item.selectedSize && ` • Size: ${item.selectedSize}`} */}
+                        Unit price: {(item.price || 0).toFixed(2)}{" "}
+                        {item.currency || "USD"}
                       </p>
                     </div>
-                    <span
-                      className={`font-medium ${
-                        isDarkMode ? "text-white" : "text-gray-900"
-                      }`}
-                    >
-                      {((item.price || 0) * item.quantity).toFixed(2)}{" "}
-                      {item.currency || "USD"}
-                    </span>
+                    <div className="text-right">
+                      <span
+                        className={`text-lg font-bold ${
+                          isDarkMode ? "text-white" : "text-gray-900"
+                        }`}
+                      >
+                        {((item.price || 0) * item.quantity).toFixed(2)}
+                      </span>
+                      <p
+                        className={`text-sm ${
+                          isDarkMode ? "text-gray-400" : "text-gray-600"
+                        }`}
+                      >
+                        {item.currency || "USD"}
+                      </p>
+                    </div>
                   </div>
                 ))}
               </div>
 
-              {/* Total */}
+              {/* Pricing Breakdown */}
               <div
-                className={`border-t pt-4 ${
-                  isDarkMode ? "border-gray-700" : "border-gray-200"
+                className={`border-t pt-6 space-y-4 ${
+                  isDarkMode ? "border-gray-700/50" : "border-gray-200/50"
                 }`}
               >
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center justify-between">
                   <span
-                    className={`text-lg font-semibold ${
+                    className={`text-sm ${
+                      isDarkMode ? "text-gray-400" : "text-gray-600"
+                    }`}
+                  >
+                    Subtotal
+                  </span>
+                  <span
+                    className={`font-medium ${
                       isDarkMode ? "text-white" : "text-gray-900"
                     }`}
                   >
-                    {t("total") || "Total"}
-                  </span>
-                  <span className="text-2xl font-bold text-green-500">
                     {totalPrice.toFixed(2)} {cartItems[0]?.currency || "USD"}
                   </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span
+                    className={`text-sm ${
+                      isDarkMode ? "text-gray-400" : "text-gray-600"
+                    }`}
+                  >
+                    Delivery Fee
+                  </span>
+                  <span className={`font-medium text-green-500`}>FREE</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span
+                    className={`text-sm ${
+                      isDarkMode ? "text-gray-400" : "text-gray-600"
+                    }`}
+                  >
+                    Tax
+                  </span>
+                  <span
+                    className={`font-medium ${
+                      isDarkMode ? "text-white" : "text-gray-900"
+                    }`}
+                  >
+                    Included
+                  </span>
+                </div>
+
+                <div
+                  className={`border-t pt-4 ${
+                    isDarkMode ? "border-gray-700/50" : "border-gray-200/50"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-6">
+                    <span
+                      className={`text-xl font-bold ${
+                        isDarkMode ? "text-white" : "text-gray-900"
+                      }`}
+                    >
+                      Total
+                    </span>
+                    <div className="text-right">
+                      <span className="text-3xl font-bold bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent">
+                        {totalPrice.toFixed(2)}
+                      </span>
+                      <p
+                        className={`text-sm ${
+                          isDarkMode ? "text-gray-400" : "text-gray-600"
+                        }`}
+                      >
+                        {cartItems[0]?.currency || "USD"}
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Complete Payment Button */}
                 <button
                   onClick={handleSubmit}
                   disabled={isProcessing}
-                  className="w-full py-4 bg-gradient-to-r from-orange-500 to-pink-500 text-white font-semibold rounded-xl hover:from-orange-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center space-x-2"
+                  className="w-full py-5 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white font-bold text-lg rounded-2xl hover:from-blue-600 hover:via-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center space-x-3 shadow-xl transform hover:scale-[1.02] active:scale-[0.98]"
                 >
                   {isProcessing ? (
                     <>
-                      <Loader2 size={20} className="animate-spin" />
-                      <span>{t("processing") || "Processing..."}</span>
+                      <Loader2 size={24} className="animate-spin" />
+                      <span>Processing Payment...</span>
                     </>
                   ) : (
                     <>
-                      <Lock size={20} />
-                      <span>{t("completePayment") || "Complete Payment"}</span>
+                      <Lock size={24} />
+                      <span>Complete Secure Payment</span>
                     </>
                   )}
                 </button>
 
-                <p
-                  className={`text-xs text-center mt-3 ${
+                {/* Security Notice */}
+                <div
+                  className={`flex items-center justify-center space-x-2 text-xs mt-4 ${
                     isDarkMode ? "text-gray-400" : "text-gray-500"
                   }`}
                 >
-                  {t("securePaymentNotice") ||
-                    "Your payment information is secured with 256-bit SSL encryption"}
-                </p>
+                  <Shield size={14} className="text-green-500" />
+                  <span>Protected by 256-bit SSL encryption</span>
+                </div>
+
+                {/* Trust Indicators */}
+                <div
+                  className={`grid grid-cols-3 gap-2 mt-4 ${
+                    isDarkMode ? "text-gray-400" : "text-gray-600"
+                  }`}
+                >
+                  <div className="flex items-center justify-center space-x-1 text-xs">
+                    <CheckCircle2 size={12} className="text-green-500" />
+                    <span>Secure</span>
+                  </div>
+                  <div className="flex items-center justify-center space-x-1 text-xs">
+                    <CheckCircle2 size={12} className="text-green-500" />
+                    <span>Fast</span>
+                  </div>
+                  <div className="flex items-center justify-center space-x-1 text-xs">
+                    <CheckCircle2 size={12} className="text-green-500" />
+                    <span>Reliable</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

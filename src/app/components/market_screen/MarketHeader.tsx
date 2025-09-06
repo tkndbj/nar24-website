@@ -40,7 +40,7 @@ interface MarketHeaderProps {
 
 export default function MarketHeader({ className = "" }: MarketHeaderProps) {
   const t = useTranslations();
-  
+
   const [isSearching, setIsSearching] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [isDark, setIsDark] = useState(false);
@@ -55,19 +55,32 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const locale = useLocale();
-
+  const [loadingTimeout, setLoadingTimeout] = useState(false);
   // Auth and providers
   const { user, isLoading: userLoading } = useUser();
   const { unreadNotificationsCount } = useBadgeProvider();
   const { cartCount } = useCart();
   const {
-    updateTerm,    
+    updateTerm,
     isLoading,
     clearSearchState,
     suggestions,
     categorySuggestions,
     errorMessage,
   } = useSearchProvider();
+
+  useEffect(() => {
+    if (userLoading) {
+      const timer = setTimeout(() => {
+        console.warn("User loading timeout - forcing display");
+        setLoadingTimeout(true);
+      }, 10000); // 10 second timeout
+
+      return () => clearTimeout(timer);
+    } else {
+      setLoadingTimeout(false);
+    }
+  }, [userLoading]);
 
   // Handle theme detection
   useEffect(() => {
@@ -186,10 +199,10 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
       // Clear the search state first
       setShowSuggestions(false);
       setIsSearching(false);
-      
+
       // Navigate to search results page with the query parameter
       router.push(`/search-results?q=${encodeURIComponent(searchTerm.trim())}`);
-      
+
       setSearchTerm("");
       clearSearchState();
     }
@@ -211,11 +224,11 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
       type === "product"
         ? (suggestion as Suggestion).name
         : (suggestion as CategorySuggestion).displayName;
-  
+
     setSearchTerm(displayName || "");
     setShowSuggestions(false);
     setIsSearching(false);
-  
+
     if (type === "product") {
       router.push(`/productdetail/${suggestion.id}`);
     } else {
@@ -244,7 +257,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
     setIsCartOpen(true);
   };
 
-  if (userLoading) {
+  if (userLoading && !loadingTimeout) {
     return (
       <header
         className={`sticky top-0 z-50 bg-white/95 backdrop-blur-xl border-b border-gray-200/50 ${className}`}
@@ -299,7 +312,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
         }
         active:scale-95 group
       `}
-                    aria-label={t('header.notifications')}
+                    aria-label={t("header.notifications")}
                   >
                     <Bell size={18} />
                     {user && unreadNotificationsCount > 0 && (
@@ -327,7 +340,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
         }
         active:scale-95 group
       `}
-                    aria-label={t('header.languageSelection')}
+                    aria-label={t("header.languageSelection")}
                   >
                     <Globe size={18} />
                   </button>
@@ -374,7 +387,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                             isDark ? "text-gray-200" : "text-gray-900"
                           }`}
                         >
-                          {t('header.turkish')}
+                          {t("header.turkish")}
                         </span>
                       </button>
                       <button
@@ -408,7 +421,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                             isDark ? "text-gray-200" : "text-gray-900"
                           }`}
                         >
-                          {t('header.english')}
+                          {t("header.english")}
                         </span>
                       </button>
                     </div>
@@ -428,7 +441,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
         }
         active:scale-95 group
       `}
-                    aria-label={t('header.favorites')}
+                    aria-label={t("header.favorites")}
                   >
                     <Heart size={18} />
                     {user && favoriteCount > 0 && (
@@ -454,7 +467,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
         }
         active:scale-95 group
       `}
-                    aria-label={t('header.cart')}
+                    aria-label={t("header.cart")}
                   >
                     <ShoppingCart size={18} />
                     {user && cartCount > 0 && (
@@ -480,7 +493,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
         }
         active:scale-95 group
       `}
-                    aria-label={t('header.profile')}
+                    aria-label={t("header.profile")}
                   >
                     <User size={18} />
                   </button>
@@ -498,7 +511,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
           text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300
           ${isLoggingOut ? "opacity-50 cursor-not-allowed" : ""}
         `}
-                      aria-label={t('header.logout')}
+                      aria-label={t("header.logout")}
                     >
                       <LogOut
                         size={16}
@@ -517,7 +530,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
           }
           active:scale-95 group
         `}
-                      aria-label={t('header.login')}
+                      aria-label={t("header.login")}
                     >
                       <LogIn size={16} />
                     </button>
@@ -588,7 +601,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
         }
         active:scale-95 group
       `}
-                  aria-label={t('header.notifications')}
+                  aria-label={t("header.notifications")}
                 >
                   <Bell size={20} />
                   {user && unreadNotificationsCount > 0 && (
@@ -616,7 +629,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
         }
         active:scale-95 group
       `}
-                  aria-label={t('header.languageSelection')}
+                  aria-label={t("header.languageSelection")}
                 >
                   <Globe size={20} />
                 </button>
@@ -651,7 +664,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                           isDark ? "text-gray-200" : "text-gray-900"
                         }`}
                       >
-                        {t('header.turkish')}
+                        {t("header.turkish")}
                       </span>
                     </button>
                     <button
@@ -673,7 +686,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                           isDark ? "text-gray-200" : "text-gray-900"
                         }`}
                       >
-                        {t('header.english')}
+                        {t("header.english")}
                       </span>
                     </button>
                   </div>
@@ -693,7 +706,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
         }
         active:scale-95 group
       `}
-                  aria-label={t('header.favorites')}
+                  aria-label={t("header.favorites")}
                 >
                   <Heart size={20} />
                   {user && favoriteCount > 0 && (
@@ -719,7 +732,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
         }
         active:scale-95 group
       `}
-                  aria-label={t('header.cart')}
+                  aria-label={t("header.cart")}
                 >
                   <ShoppingCart size={20} />
                   {user && cartCount > 0 && (
@@ -745,7 +758,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
         }
         active:scale-95 group
       `}
-                  aria-label={t('header.profile')}
+                  aria-label={t("header.profile")}
                 >
                   <User size={20} />
                 </button>
@@ -763,7 +776,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
           text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300
           ${isLoggingOut ? "opacity-50 cursor-not-allowed" : ""}
         `}
-                    aria-label={t('header.logout')}
+                    aria-label={t("header.logout")}
                   >
                     <LogOut
                       size={18}
@@ -782,7 +795,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
           }
           active:scale-95 group
         `}
-                    aria-label={t('header.login')}
+                    aria-label={t("header.login")}
                   >
                     <LogIn size={18} />
                   </button>
@@ -809,7 +822,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
       <NotificationDrawer
         isOpen={isNotificationOpen}
         onClose={() => setIsNotificationOpen(false)}
-        isDarkMode={isDark}        
+        isDarkMode={isDark}
       />
     </>
   );

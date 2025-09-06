@@ -171,9 +171,9 @@ export default function DynamicMarketPage() {
         .split("-")
         .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
         .join(" ");
-  
+
       let title = formattedCategory;
-  
+
       if (subcategory) {
         const formattedSubcategory = subcategory
           .split("-")
@@ -181,7 +181,7 @@ export default function DynamicMarketPage() {
           .join(" ");
         title = `${formattedCategory} - ${formattedSubcategory}`;
       }
-  
+
       if (subsubcategory) {
         const formattedSubSubcategory = subsubcategory
           .split("-")
@@ -189,32 +189,39 @@ export default function DynamicMarketPage() {
           .join(" ");
         title = `${title} - ${formattedSubSubcategory}`;
       }
-  
+
       setCategoryTitle(title);
-  
+
       // MODIFIED SECTION: Special handling for Women and Men categories
       const categoryKey = formattedCategory;
       let subcats: string[] = [];
-  
+
       if (categoryKey === "Women" || categoryKey === "Men") {
         // For Women/Men, show all sub-subcategories from all buyer subcategories
-        const buyerSubcategories = AllInOneCategoryData.getSubcategories(categoryKey, true);
+        const buyerSubcategories = AllInOneCategoryData.getSubcategories(
+          categoryKey,
+          true
+        );
         const allSubSubcategories: string[] = [];
-        
-        buyerSubcategories.forEach(buyerSub => {
-          const subSubs = AllInOneCategoryData.getSubSubcategories(categoryKey, buyerSub, true);
+
+        buyerSubcategories.forEach((buyerSub) => {
+          const subSubs = AllInOneCategoryData.getSubSubcategories(
+            categoryKey,
+            buyerSub,
+            true
+          );
           allSubSubcategories.push(...subSubs);
         });
-        
+
         // Remove duplicates and sort
         subcats = [...new Set(allSubSubcategories)].sort();
       } else {
         // For other categories, use the regular subcategories
         subcats = AllInOneCategoryData.getSubcategories(categoryKey, true);
       }
-      
+
       setAvailableSubcategories(subcats);
-  
+
       // ADDED: Reset all filters when category changes
       setFilters({
         subcategories: [],
@@ -223,11 +230,11 @@ export default function DynamicMarketPage() {
         minPrice: undefined,
         maxPrice: undefined,
       });
-      
+
       // ADDED: Reset price input fields
       setMinPriceInput("");
       setMaxPriceInput("");
-  
+
       console.log("Available subcategories for", categoryKey, ":", subcats);
       console.log("🔄 Filters reset for new category:", categoryKey);
     }
@@ -828,7 +835,7 @@ export default function DynamicMarketPage() {
           )}
 
           {/* Main Content */}
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 w-full overflow-hidden">
             {/* Header */}
             <div className="w-full pt-6 pb-4">
               <div className="px-4">
@@ -903,9 +910,9 @@ export default function DynamicMarketPage() {
 
               {/* Products grid */}
               {!loading && products.length > 0 && (
-                <div className="grid grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-4 lg:gap-6">
+                <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 lg:gap-6">
                   {products.map((product) => (
-                    <div key={product.id} className="flex justify-center">
+                    <div key={product.id} className="w-full">
                       <ProductCard
                         product={product}
                         onTap={() => handleProductClick(product.id)}

@@ -516,13 +516,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
   return (
     <div
-      className="cursor-pointer transition-transform duration-200 hover:scale-105"
+      className="w-full cursor-pointer transition-transform duration-200 hover:scale-105"
       onClick={handleCardClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       style={{ transform: `scale(${effectiveScaleFactor})` }}
     >
-      <div className="flex flex-col">
+      <div className="flex flex-col w-full">
         {/* Image Section */}
         <div className="relative group" style={{ height: imageHeight }}>
           <div className="w-full h-full rounded-t-xl overflow-hidden bg-gray-200 relative">
