@@ -9,6 +9,7 @@ import { BadgeProvider } from "@/context/BadgeProvider";
 import { SearchProvider } from "@/context/SearchProvider";
 import ConditionalHeader from "../components/ConditionalHeader";
 import { SearchHistoryProvider } from "@/context/SearchHistoryProvider";
+import ClientProviders from "../components/ClientProviders";
 
 export default function LayoutWrapper({
   children,
@@ -27,20 +28,22 @@ export default function LayoutWrapper({
       locale={locale}
       timeZone={timeZone}
     >
-      <UserProvider>
-        <CartProvider>
-          <FavoritesProvider>
-            <BadgeProvider>
-              <SearchProvider>
-                <SearchHistoryProvider>
-                  <ConditionalHeader />
-                  <main>{children}</main>
-                </SearchHistoryProvider>
-              </SearchProvider>
-            </BadgeProvider>
-          </FavoritesProvider>
-        </CartProvider>
-      </UserProvider>
+      <ClientProviders>
+        <UserProvider>
+          <CartProvider>
+            <FavoritesProvider>
+              <BadgeProvider>
+                <SearchProvider>
+                  <SearchHistoryProvider>
+                    <ConditionalHeader />
+                    <main>{children}</main>
+                  </SearchHistoryProvider>
+                </SearchProvider>
+              </BadgeProvider>
+            </FavoritesProvider>
+          </CartProvider>
+        </UserProvider>
+      </ClientProviders>
     </NextIntlClientProvider>
   );
 }

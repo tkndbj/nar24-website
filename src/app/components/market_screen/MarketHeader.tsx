@@ -22,6 +22,7 @@ import { FavoritesDrawer } from "../FavoritesDrawer";
 import { NotificationDrawer } from "../NotificationDrawer";
 import { CartDrawer } from "../profile/CartDrawer";
 import SearchBar from "./SearchBar";
+import StatePersistenceManager from "@/lib/statePersistence";
 
 import {
   CategorySuggestion,
@@ -40,7 +41,7 @@ interface MarketHeaderProps {
 
 export default function MarketHeader({ className = "" }: MarketHeaderProps) {
   const t = useTranslations();
-
+  const statePersistence = StatePersistenceManager.getInstance();
   const [isSearching, setIsSearching] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [isDark, setIsDark] = useState(false);
@@ -81,6 +82,24 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
       setLoadingTimeout(false);
     }
   }, [userLoading]);
+
+  useEffect(() => {
+    const restoredState = statePersistence.restoreState();
+    if (restoredState) {
+      // Restore search state if it existed
+      if (restoredState.search) {
+        setSearchTerm(restoredState.search.term || "");
+        setIsSearching(
+          restoredState.search.suggestions.length > 0 ||
+            restoredState.search.categorySuggestions.length > 0 ||
+            false
+        );
+      }
+
+      // Other states will be restored by their respective providers
+      console.log("State restored after language switch");
+    }
+  }, []);
 
   // Handle theme detection
   useEffect(() => {
@@ -141,7 +160,29 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
       event.stopPropagation();
     }
 
-    console.log("Switching language to:", newLocale);
+    // Save current state before switching
+    statePersistence.saveState({
+      cart:
+        cartCount > 0
+          ? { cartCount: cartCount, cartProductIds: [], cartItems: [] }
+          : undefined,
+      favorites:
+        favoriteCount > 0
+          ? {
+              favoriteProductIds: [],
+              allFavoriteProductIds: [],
+              favoriteCount: favoriteCount,
+              selectedBasketId: null,
+            }
+          : undefined,
+      notifications:
+        unreadNotificationsCount > 0
+          ? { count: unreadNotificationsCount }
+          : undefined,
+      search: searchTerm
+        ? { term: searchTerm, suggestions: [], categorySuggestions: [] }
+        : undefined,
+    });
 
     let pathWithoutLocale = pathname;
     if (pathname.startsWith(`/${locale}`)) {
@@ -149,14 +190,43 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
     }
 
     const newPath = `/${newLocale}${pathWithoutLocale}`;
-    console.log("New path:", newPath);
 
-    router.push(newPath);
+    // Preserve query parameters - THIS IS CRITICAL
+    const currentParams = new URLSearchParams(window.location.search);
+    const queryString = currentParams.toString();
+    const finalPath = queryString ? `${newPath}?${queryString}` : newPath;
+
+    // Use hard navigation for reliability
+    window.location.href = finalPath;
     setShowLanguageMenu(false);
   };
 
   const handleMobileLanguageSwitch = (newLocale: string) => {
     console.log("Mobile handler called for:", newLocale);
+
+    // Save state before switch
+    statePersistence.saveState({
+      cart:
+        cartCount > 0
+          ? { cartCount: cartCount, cartProductIds: [], cartItems: [] }
+          : undefined,
+      favorites:
+        favoriteCount > 0
+          ? {
+              favoriteProductIds: [],
+              allFavoriteProductIds: [],
+              favoriteCount: favoriteCount,
+              selectedBasketId: null,
+            }
+          : undefined,
+      notifications:
+        unreadNotificationsCount > 0
+          ? { count: unreadNotificationsCount }
+          : undefined,
+      search: searchTerm
+        ? { term: searchTerm, suggestions: [], categorySuggestions: [] }
+        : undefined,
+    });
 
     setTimeout(() => {
       switchLanguage(newLocale);
