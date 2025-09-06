@@ -1,3 +1,4 @@
+// layout.tsx
 import { getMessages } from "next-intl/server";
 import { ReactNode } from "react";
 import LayoutWrapper from "./layoutWrapper";
@@ -15,8 +16,15 @@ export default async function LocaleLayout({
   // Now use the locale
   const messages = await getMessages({ locale });
 
+  // You could also make this dynamic based on locale
+  const timeZone = "Europe/Istanbul"; // or "UTC" for universal
+
   return (
-    <LayoutWrapper locale={locale} messages={messages}>
+    <LayoutWrapper
+      locale={locale}
+      messages={messages}
+      timeZone={timeZone} // ADD THIS
+    >
       {children}
     </LayoutWrapper>
   );

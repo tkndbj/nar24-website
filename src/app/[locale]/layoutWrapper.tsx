@@ -1,3 +1,4 @@
+// layoutWrapper.tsx
 "use client";
 
 import { NextIntlClientProvider } from "next-intl";
@@ -13,13 +14,19 @@ export default function LayoutWrapper({
   children,
   locale,
   messages,
+  timeZone = "Europe/Istanbul",
 }: {
   children: React.ReactNode;
   locale: string;
   messages: Record<string, unknown>;
+  timeZone?: string;
 }) {
   return (
-    <NextIntlClientProvider messages={messages} locale={locale}>
+    <NextIntlClientProvider
+      messages={messages}
+      locale={locale}
+      timeZone={timeZone}
+    >
       <UserProvider>
         <CartProvider>
           <FavoritesProvider>

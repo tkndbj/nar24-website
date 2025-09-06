@@ -1,5 +1,4 @@
 // contexts/UserProvider.tsx
-
 "use client";
 
 import React, {
@@ -8,22 +7,18 @@ import React, {
   useEffect,
   useState,
   ReactNode,
+  useRef,
 } from "react";
-import {
-  User,
-  onAuthStateChanged,
-  getIdToken as getFirebaseIdToken,
-} from "firebase/auth";
+import { User, getIdToken as getFirebaseIdToken } from "firebase/auth";
 import {
   doc,
   updateDoc,
-  getDocFromCache,
   getDocFromServer,
-  DocumentSnapshot,
   Timestamp,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import TwoFactorService from "@/services/TwoFactorService";
+import AuthStateManager from "@/context/authStateManager";
 
 interface ProfileData {
   displayName?: string;
@@ -64,7 +59,6 @@ interface UserContextType {
     options?: { profileComplete?: boolean }
   ) => Promise<void>;
   setProfileComplete: (complete: boolean) => void;
-  // New 2FA related methods
   isPending2FA: boolean;
   complete2FA: () => void;
   cancel2FA: () => Promise<void>;
@@ -85,21 +79,39 @@ interface UserProviderProps {
 }
 
 export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  const authManager = useRef(AuthStateManager.getInstance());
+  const [user, setUser] = useState<User | null>(() => {
+    // Initialize with cached data if available
+    const cached = authManager.current.getCachedData();
+    return cached?.user || null;
+  });
+
+  const [isLoading, setIsLoading] = useState(() => {
+    // Only show loading if we don't have cached data
+    const cached = authManager.current.getCachedData();
+    return !cached;
+  });
+
+  const [isAdmin, setIsAdmin] = useState(() => {
+    const cached = authManager.current.getCachedData();
+    return cached?.isAdmin || false;
+  });
+
+  const [profileData, setProfileData] = useState<ProfileData | null>(() => {
+    const cached = authManager.current.getCachedData();
+    return cached?.profileData || null;
+  });
+
   const [profileComplete, setProfileCompleteState] = useState<boolean | null>(
     null
   );
-
-  // CRITICAL SECURITY CHANGE: Store Firebase user internally but don't expose it when 2FA is pending
   const [pending2FA, setPending2FA] = useState(false);
   const [internalFirebaseUser, setInternalFirebaseUser] = useState<User | null>(
     null
   );
 
   const twoFactorService = TwoFactorService.getInstance();
+  const isMountedRef = useRef(true);
 
   // Calculate profile completion status
   const isProfileComplete = React.useMemo(() => {
@@ -118,21 +130,17 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   // Check if user needs 2FA verification
   const check2FARequirement = async (firebaseUser: User): Promise<boolean> => {
     try {
-      // NEW: First check if email is verified for email/password users
       const isEmailPasswordUser = firebaseUser.providerData.some(
         (info) => info.providerId === "password"
       );
 
       if (isEmailPasswordUser && !firebaseUser.emailVerified) {
-        // Email not verified for email/password user
-        // Don't proceed to 2FA check, user needs to verify email first
-        return false; // This will allow normal auth flow to handle email verification
+        return false;
       }
 
       const needs2FA = await twoFactorService.is2FAEnabled();
 
       if (needs2FA) {
-        // Check if user has recently verified 2FA (within last 5 minutes)
         const userDocRef = doc(db, "users", firebaseUser.uid);
         const userDoc = await getDocFromServer(userDocRef);
 
@@ -144,255 +152,113 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
           if (lastVerification) {
             const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
             if (lastVerification > fiveMinutesAgo) {
-              // Recently verified, allow access
               return false;
             }
           }
         }
 
-        return true; // Needs 2FA verification
+        return true;
       }
 
-      return false; // No 2FA needed
+      return false;
     } catch (error) {
       console.error("Error checking 2FA requirement:", error);
-      return false; // On error, don't block access
+      return false;
     }
   };
 
-  // Reset all state (used during logout)
-  const resetState = () => {
-    setIsAdmin(false);
-    setProfileData(null);
-    setProfileCompleteState(null);
-    setIsLoading(false);
-    setPending2FA(false);
-    setInternalFirebaseUser(null);
-    setUser(null);
-  };
+  // Initialize auth state manager
+  useEffect(() => {
+    authManager.current.initialize();
 
-  // Update user data from Firestore document
-  const updateUserDataFromDoc = (docData: Record<string, unknown>) => {
-    const data = docData || {};
-    setIsAdmin(data.isAdmin === true);
-    setProfileData(data);
+    const unsubscribe = authManager.current.subscribe(async (cachedData) => {
+      if (!isMountedRef.current) return;
 
-    const complete = !!(data.gender && data.birthDate && data.languageCode);
-    setProfileCompleteState(complete);
-  };
+      if (cachedData) {
+        const {
+          user: cachedUser,
+          profileData: cachedProfile,
+          isAdmin: cachedIsAdmin,
+        } = cachedData;
 
-  // Create default user document for new users
-  const createDefaultUserDoc = async (currentUser: User) => {
-    try {
-      console.log(
-        "User document not found, setting safe defaults for",
-        currentUser.uid
-      );
+        // Check 2FA requirement
+        const needs2FA = await check2FARequirement(cachedUser as User);
 
-      const defaultData: ProfileData = {
-        displayName:
-          currentUser.displayName || currentUser.email?.split("@")[0] || "User",
-        email: currentUser.email || "",
-        isAdmin: false,
-        isNew: true,
-      };
+        if (needs2FA) {
+          setPending2FA(true);
+          setInternalFirebaseUser(cachedUser);
+          setUser(null);
+        } else {
+          setUser(cachedUser);
+          setInternalFirebaseUser(cachedUser);
+          setPending2FA(false);
+        }
 
-      setProfileData(defaultData);
-      setIsAdmin(false);
-      setProfileCompleteState(false);
-    } catch (error) {
-      console.error("Error setting default user data:", error);
-      setProfileData({
-        displayName: "User",
-        email: currentUser.email || "",
-        isAdmin: false,
-        isNew: true,
-      });
-      setIsAdmin(false);
-      setProfileCompleteState(false);
-    }
-  };
+        setProfileData(cachedProfile);
+        setIsAdmin(cachedIsAdmin);
+        setIsLoading(false);
+      } else {
+        // User logged out
+        setUser(null);
+        setInternalFirebaseUser(null);
+        setProfileData(null);
+        setIsAdmin(false);
+        setPending2FA(false);
+        setIsLoading(false);
+      }
+    });
 
-  const fetchInProgressRef = React.useRef(false);
+    return () => {
+      isMountedRef.current = false;
+      unsubscribe();
+    };
+  }, []);
 
-  // Fetch additional user data from Firestore
+  // Fetch user data
   const fetchUserData = async () => {
     const currentUser = user;
-    if (!currentUser || fetchInProgressRef.current) return;
-
-    fetchInProgressRef.current = true;
+    if (!currentUser) return;
 
     try {
-      // Try cache first for faster response
-      try {
-        const cacheDoc = await getDocFromCache(
-          doc(db, "users", currentUser.uid)
-        );
-        if (cacheDoc.exists()) {
-          updateUserDataFromDoc(cacheDoc.data());
-        }
-      } catch {
-        // Cache might not be available - continue with server fetch
-      }
-
-      // Always fetch from server for accurate data with timeout
-      const serverDocPromise = getDocFromServer(
+      const serverDoc = await getDocFromServer(
         doc(db, "users", currentUser.uid)
       );
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Timeout")), 10000)
-      );
-
-      const serverDoc = (await Promise.race([
-        serverDocPromise,
-        timeoutPromise,
-      ])) as DocumentSnapshot;
 
       if (serverDoc.exists()) {
-        updateUserDataFromDoc(serverDoc.data());
-      } else {
-        console.log(
-          "User document not found for",
-          currentUser.uid,
-          ", using safe defaults"
-        );
-        await createDefaultUserDoc(currentUser);
+        const data = serverDoc.data();
+        setProfileData(data);
+        setIsAdmin(data.isAdmin === true);
+
+        const complete = !!(data.gender && data.birthDate && data.languageCode);
+        setProfileCompleteState(complete);
       }
     } catch (error) {
       console.error("Error fetching user data:", error);
-      setIsAdmin(false);
-      setProfileData({
-        displayName:
-          currentUser.displayName || currentUser.email?.split("@")[0] || "User",
-        email: currentUser.email || "",
-        isAdmin: false,
-        isNew: true,
-      });
-      setProfileCompleteState(false);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // **MODIFIED**: Update user data immediately (for login optimization)
-  const updateUserDataImmediately = async (
-    currentUser: User,
-    options?: { profileComplete?: boolean }
-  ) => {
-    // SECURITY: Always store internally first
-    setInternalFirebaseUser(currentUser);
-
-    if (options?.profileComplete !== undefined) {
-      setProfileCompleteState(options.profileComplete);
-    }
-
-    // Check if 2FA is required
-    const needs2FA = await check2FARequirement(currentUser);
-
-    if (needs2FA) {
-      setPending2FA(true);
-      setUser(null); // CRITICAL: Don't expose user until 2FA is complete
-    } else {
-      setUser(currentUser);
-      setPending2FA(false);
-    }
-
-    // Fetch fresh data in background without blocking UI
-    if (!needs2FA) {
-      backgroundFetchUserData(currentUser);
-    }
-  };
-
-  // Set profile completion status immediately
-  const setProfileComplete = (complete: boolean) => {
-    setProfileCompleteState(complete);
-  };
-
-  // **MODIFIED**: Complete 2FA verification
-  const complete2FA = () => {
-    if (internalFirebaseUser && pending2FA) {
-      setUser(internalFirebaseUser); // Now expose the user
-      setPending2FA(false);
-
-      // Fetch user data now that 2FA is complete
-      backgroundFetchUserData(internalFirebaseUser);
-    }
-  };
-
-  // **MODIFIED**: Cancel 2FA and sign out
-  const cancel2FA = async () => {
-    if (internalFirebaseUser) {
-      await auth.signOut();
-    }
-    resetState();
-  };
-
-  // Background fetch that doesn't affect loading state
-  const backgroundFetchUserData = async (currentUser: User) => {
-    if (!currentUser) return;
-
-    try {
-      const docPromise = getDocFromServer(doc(db, "users", currentUser.uid));
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Timeout")), 10000)
-      );
-
-      const docSnapshot = (await Promise.race([
-        docPromise,
-        timeoutPromise,
-      ])) as DocumentSnapshot;
-
-      if (docSnapshot.exists()) {
-        updateUserDataFromDoc(docSnapshot.data());
-      }
-    } catch (error) {
-      console.error("Error in background fetch:", error);
-    }
-  };
-
-  // Refresh the current user's data and fetch updated state
+  // Refresh user
   const refreshUser = async () => {
-    try {
-      await auth.currentUser?.reload();
-      const currentUser = auth.currentUser;
-      setInternalFirebaseUser(currentUser);
-
-      if (currentUser) {
-        const needs2FA = await check2FARequirement(currentUser);
-
-        if (needs2FA) {
-          setPending2FA(true);
-          setUser(null);
-        } else {
-          setUser(currentUser);
-          setPending2FA(false);
-          await fetchUserData();
-        }
-      }
-    } catch (error) {
-      console.error("Error refreshing user:", error);
-    }
+    authManager.current.invalidateCache();
+    await auth.currentUser?.reload();
+    // The subscription will handle the update
   };
 
-  // Update profile data and refresh completion status
+  // Update profile data
   const updateProfileData = async (updates: Partial<ProfileData>) => {
-    // SECURITY: Only use the exposed user
     const currentUser = user;
     if (!currentUser) return;
 
     try {
-      const updatePromise = updateDoc(
-        doc(db, "users", currentUser.uid),
-        updates
-      );
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Timeout")), 10000)
-      );
-
-      await Promise.race([updatePromise, timeoutPromise]);
+      await updateDoc(doc(db, "users", currentUser.uid), updates);
 
       const updatedProfileData = { ...(profileData || {}), ...updates };
       setProfileData(updatedProfileData);
+
+      // Invalidate cache so next mount gets fresh data
+      authManager.current.invalidateCache();
 
       const complete = !!(
         updatedProfileData.gender &&
@@ -406,9 +272,8 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     }
   };
 
-  // **MODIFIED**: Get the Firebase ID token, forcing a refresh if necessary
+  // Get ID token
   const getIdToken = async (): Promise<string | null> => {
-    // SECURITY: Only use the exposed user
     const currentUser = user;
     if (!currentUser) {
       console.log("No user logged in to fetch ID token.");
@@ -417,54 +282,61 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     return await getFirebaseIdToken(currentUser, true);
   };
 
-  // Get specific profile field
+  // Get profile field
   const getProfileField = <T,>(key: string): T | null => {
     return (profileData?.[key] as T) || null;
   };
 
-  useEffect(() => {
-    let mounted = true;
-    setIsLoading(true);
+  // Update user data immediately
+  const updateUserDataImmediately = async (
+    currentUser: User,
+    options?: { profileComplete?: boolean }
+  ) => {
+    setInternalFirebaseUser(currentUser);
 
-    const unsubscribe = onAuthStateChanged(
-      auth,
-      async (currentUser) => {
-        if (!mounted) return;
+    if (options?.profileComplete !== undefined) {
+      setProfileCompleteState(options.profileComplete);
+    }
 
-        setInternalFirebaseUser(currentUser);
+    const needs2FA = await check2FARequirement(currentUser);
 
-        if (currentUser) {
-          const needs2FA = await check2FARequirement(currentUser);
+    if (needs2FA) {
+      setPending2FA(true);
+      setUser(null);
+    } else {
+      setUser(currentUser);
+      setPending2FA(false);
+    }
+  };
 
-          if (needs2FA) {
-            setPending2FA(true);
-            setUser(null);
-            setIsLoading(false); // Set loading to false here
-          } else {
-            setUser(currentUser);
-            setPending2FA(false);
-            await fetchUserData(); // This will set loading to false
-          }
-        } else {
-          resetState(); // This already sets loading to false
-        }
-      },
-      (error) => {
-        console.error("Error in authStateChanges:", error);
-        if (mounted) {
-          setIsLoading(false);
-        }
-      }
-    );
+  // Set profile complete
+  const setProfileComplete = (complete: boolean) => {
+    setProfileCompleteState(complete);
+  };
 
-    return () => {
-      mounted = false;
-      unsubscribe();
-    };
-  }, []); // Empty dependency array - only run once
+  // Complete 2FA
+  const complete2FA = () => {
+    if (internalFirebaseUser && pending2FA) {
+      setUser(internalFirebaseUser);
+      setPending2FA(false);
+      fetchUserData();
+    }
+  };
+
+  // Cancel 2FA
+  const cancel2FA = async () => {
+    if (internalFirebaseUser) {
+      await auth.signOut();
+    }
+    setUser(null);
+    setInternalFirebaseUser(null);
+    setProfileData(null);
+    setIsAdmin(false);
+    setPending2FA(false);
+  };
 
   const contextValue: UserContextType = {
-    user, // This will be null when 2FA is pending
+    user,
     isLoading,
     isAdmin,
     isProfileComplete,
@@ -476,7 +348,6 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     getProfileField,
     updateUserDataImmediately,
     setProfileComplete,
-    // 2FA properties
     isPending2FA: pending2FA,
     complete2FA,
     cancel2FA,
