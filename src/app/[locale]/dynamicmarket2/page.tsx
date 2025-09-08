@@ -600,7 +600,7 @@ const DynamicMarketPage: React.FC = () => {
 
         {/* Loading skeleton */}
         <div className="p-4">
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={i}
@@ -1388,7 +1388,7 @@ const DynamicMarketPage: React.FC = () => {
                     {t("DynamicMarket.featuredProducts")}
                   </h3>
                 </div>
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {boostedProducts.map((product) => (
                     <div
                       key={`boosted-${product.id}`}
@@ -1447,7 +1447,7 @@ const DynamicMarketPage: React.FC = () => {
                     </span>
                   )}
                 </div>
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {products.map((product) => (
                     <div
                       key={product.id}

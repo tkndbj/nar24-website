@@ -910,7 +910,7 @@ export default function DynamicMarketPage() {
 
               {/* Products grid */}
               {!loading && products.length > 0 && (
-                <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 lg:gap-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6">
                   {products.map((product) => (
                     <div key={product.id} className="w-full">
                       <ProductCard
@@ -924,6 +924,7 @@ export default function DynamicMarketPage() {
                         showCartIcon={true}
                         isFavorited={false}
                         isInCart={false}
+                        portraitImageHeight={320}
                       />
                     </div>
                   ))}

@@ -412,7 +412,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
   const imageHeight = portraitImageHeight
     ? `${portraitImageHeight * effectiveScaleFactor}px`
-    : "35vh";
+    : undefined;
 
   // Build rotating children for description area
   const rotatingChildren = useMemo(() => {
@@ -524,7 +524,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     >
       <div className="flex flex-col w-full">
         {/* Image Section */}
-        <div className="relative group" style={{ height: imageHeight }}>
+        <div
+          className="relative group h-[35vh] lg:h-[45vh]"
+          style={imageHeight ? { height: imageHeight } : {}}
+        >
           <div className="w-full h-full rounded-t-xl overflow-hidden bg-gray-200 relative">
             {currentImageUrls.length > 0 ? (
               <div className="relative w-full h-full">
