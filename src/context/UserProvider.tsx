@@ -20,6 +20,7 @@ import { auth, db } from "@/lib/firebase";
 import TwoFactorService from "@/services/TwoFactorService";
 import AuthStateManager from "@/context/authStateManager";
 import StatePersistenceManager from "@/lib/statePersistence";
+import { useLocale } from "next-intl";
 
 interface ProfileData {
   displayName?: string;
@@ -82,7 +83,7 @@ interface UserProviderProps {
 export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const authManager = useRef(AuthStateManager.getInstance());
   const statePersistence = useRef(StatePersistenceManager.getInstance());
-
+  const locale = useLocale();
   const [user, setUser] = useState<User | null>(() => {
     // Initialize with cached data if available
     const cached = authManager.current.getCachedData();
@@ -184,15 +185,16 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
   // Initialize auth state manager
   useEffect(() => {
-    // Skip on server side
     if (typeof window === "undefined") return;
 
-    // If this is a language switch, skip re-initialization
-    const isLanguageSwitch = statePersistence.current.isLanguageSwitch();
+    // Clean up any expired flags first
+    statePersistence.current.cleanupExpiredFlags();
+
+    // Check if this is a real language switch
+    const isLanguageSwitch = statePersistence.current.isLanguageSwitch(locale);
 
     // If this is a language switch, use existing auth state
     if (isLanguageSwitch) {
-      // Use existing auth state
       const cached = authManager.current.getCachedData();
       if (cached) {
         setUser(cached.user);
@@ -203,7 +205,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       }
     }
 
-    // Normal initialization (not a language switch)
+    // Normal initialization
     authManager.current.initialize();
 
     const unsubscribe = authManager.current.subscribe(async (cachedData) => {

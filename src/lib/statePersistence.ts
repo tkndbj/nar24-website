@@ -31,12 +31,15 @@ interface PersistedState {
     [key: string]: unknown;
   };
   timestamp: number;
+  locale?: string; // Add locale to track actual language switches
 }
 
 class StatePersistenceManager {
   private static instance: StatePersistenceManager;
   private readonly STORAGE_KEY = "app_state_persist";
+  private readonly LANGUAGE_SWITCH_KEY = "language_switch_in_progress";
   private readonly STATE_TTL = 30000; // 30 seconds TTL for state
+  private readonly LANGUAGE_SWITCH_TTL = 5000; // 5 seconds for language switch detection
 
   private constructor() {}
 
@@ -48,39 +51,50 @@ class StatePersistenceManager {
   }
 
   // Save state before language switch
-  saveState(state: Partial<PersistedState>): void {
-    // Check if we're in the browser
+  saveState(state: Partial<PersistedState>, currentLocale?: string): void {
     if (typeof window === "undefined") return;
 
     try {
       const persistedState: PersistedState = {
         ...state,
         timestamp: Date.now(),
+        locale: currentLocale,
       };
 
-      // Compress the state to save space
       const compressed = compress(JSON.stringify(persistedState));
       sessionStorage.setItem(this.STORAGE_KEY, compressed);
 
-      // Also set a flag indicating a language switch is happening
-      sessionStorage.setItem("language_switch_in_progress", "true");
+      // Set language switch flag with timestamp
+      const switchData = {
+        timestamp: Date.now(),
+        locale: currentLocale,
+      };
+      sessionStorage.setItem(
+        this.LANGUAGE_SWITCH_KEY,
+        JSON.stringify(switchData)
+      );
     } catch (error) {
       console.error("Failed to persist state:", error);
     }
   }
 
   // Restore state after language switch
-  restoreState(): PersistedState | null {
-    // Check if we're in the browser
+  restoreState(currentLocale?: string): PersistedState | null {
     if (typeof window === "undefined") return null;
 
     try {
       const compressed = sessionStorage.getItem(this.STORAGE_KEY);
-      const isLanguageSwitch = sessionStorage.getItem(
-        "language_switch_in_progress"
-      );
+      const switchDataStr = sessionStorage.getItem(this.LANGUAGE_SWITCH_KEY);
 
-      if (!compressed || !isLanguageSwitch) {
+      if (!compressed || !switchDataStr) {
+        return null;
+      }
+
+      const switchData = JSON.parse(switchDataStr);
+
+      // Check if the language switch flag is expired
+      if (Date.now() - switchData.timestamp > this.LANGUAGE_SWITCH_TTL) {
+        this.clearState();
         return null;
       }
 
@@ -95,11 +109,14 @@ class StatePersistenceManager {
         return null;
       }
 
-      // Clear the flag and state after successful restore
-      sessionStorage.removeItem("language_switch_in_progress");
-      sessionStorage.removeItem(this.STORAGE_KEY);
+      // Only restore if we're actually switching locales
+      if (currentLocale && state.locale && currentLocale !== state.locale) {
+        // Clear the flag and state after successful restore
+        this.clearState();
+        return state;
+      }
 
-      return state;
+      return null;
     } catch (error) {
       console.error("Failed to restore state:", error);
       this.clearState();
@@ -108,19 +125,52 @@ class StatePersistenceManager {
   }
 
   clearState(): void {
-    // Check if we're in the browser
     if (typeof window === "undefined") return;
 
     sessionStorage.removeItem(this.STORAGE_KEY);
-    sessionStorage.removeItem("language_switch_in_progress");
+    sessionStorage.removeItem(this.LANGUAGE_SWITCH_KEY);
   }
 
   // Check if we're in the middle of a language switch
-  isLanguageSwitch(): boolean {
-    // Check if we're in the browser
+  isLanguageSwitch(currentLocale?: string): boolean {
     if (typeof window === "undefined") return false;
 
-    return sessionStorage.getItem("language_switch_in_progress") === "true";
+    try {
+      const switchDataStr = sessionStorage.getItem(this.LANGUAGE_SWITCH_KEY);
+      if (!switchDataStr) return false;
+
+      const switchData = JSON.parse(switchDataStr);
+
+      // Check if the flag is recent and for a different locale
+      const isRecent =
+        Date.now() - switchData.timestamp < this.LANGUAGE_SWITCH_TTL;
+      const isDifferentLocale =
+        currentLocale &&
+        switchData.locale &&
+        currentLocale !== switchData.locale;
+
+      return isRecent && isDifferentLocale;
+    } catch {
+      return false;
+    }
+  }
+
+  // Clean up expired language switch flags (call this on app initialization)
+  cleanupExpiredFlags(): void {
+    if (typeof window === "undefined") return;
+
+    try {
+      const switchDataStr = sessionStorage.getItem(this.LANGUAGE_SWITCH_KEY);
+      if (switchDataStr) {
+        const switchData = JSON.parse(switchDataStr);
+        if (Date.now() - switchData.timestamp > this.LANGUAGE_SWITCH_TTL) {
+          this.clearState();
+        }
+      }
+    } catch {
+      // If parsing fails, clear the state
+      this.clearState();
+    }
   }
 }
 

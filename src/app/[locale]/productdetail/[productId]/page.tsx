@@ -41,23 +41,25 @@ const hasSelectableOptions = (product: Product | null): boolean => {
   if (hasColors) return true;
 
   // Check for selectable attributes (attributes with multiple options)
-  const selectableAttrs = Object.entries(product.attributes || {}).filter(([, value]) => {
-    let options: string[] = [];
+  const selectableAttrs = Object.entries(product.attributes || {}).filter(
+    ([, value]) => {
+      let options: string[] = [];
 
-    if (Array.isArray(value)) {
-      options = value
-        .map(item => item.toString())
-        .filter(item => item.trim() !== '');
-    } else if (typeof value === 'string' && value.trim() !== '') {
-      options = value
-        .split(',')
-        .map(item => item.trim())
-        .filter(item => item !== '');
+      if (Array.isArray(value)) {
+        options = value
+          .map((item) => item.toString())
+          .filter((item) => item.trim() !== "");
+      } else if (typeof value === "string" && value.trim() !== "") {
+        options = value
+          .split(",")
+          .map((item) => item.trim())
+          .filter((item) => item !== "");
+      }
+
+      // Only include attributes with multiple options
+      return options.length > 1;
     }
-
-    // Only include attributes with multiple options
-    return options.length > 1;
-  });
+  );
 
   return selectableAttrs.length > 0;
 };
@@ -107,7 +109,9 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
     const detectDarkMode = () => {
       const htmlElement = document.documentElement;
-      const darkModeMediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+      const darkModeMediaQuery = window.matchMedia(
+        "(prefers-color-scheme: dark)"
+      );
 
       const isDark =
         htmlElement.classList.contains("dark") ||
@@ -197,7 +201,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
   // Image error handling
   const handleImageError = useCallback((index: number) => {
-    setImageErrors(prev => new Set(prev).add(index));
+    setImageErrors((prev) => new Set(prev).add(index));
   }, []);
 
   // Share functionality
@@ -231,7 +235,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
       });
 
       if (response.ok) {
-        setIsFavorite(prev => !prev);
+        setIsFavorite((prev) => !prev);
       }
     } catch (error) {
       console.error("Error toggling favorite:", error);
@@ -239,84 +243,96 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   }, [product?.id]);
 
   // Enhanced cart functionality with proper state management
-  const handleAddToCart = useCallback(async (selectedOptions?: { quantity?: number; [key: string]: unknown }) => {
-    if (!user) {
-      router.push("/login");
-      return;
-    }
+  const handleAddToCart = useCallback(
+    async (selectedOptions?: { quantity?: number; [key: string]: unknown }) => {
+      if (!user) {
+        router.push("/login");
+        return;
+      }
 
-    if (!product) return;
+      if (!product) return;
 
-    const productInCart = isInCart(product.id);
+      const productInCart = isInCart(product.id);
 
-    // Only show option selector when ADDING to cart (not removing)
-    if (!productInCart && hasSelectableOptions(product) && !selectedOptions) {
-      setShowCartOptionSelector(true);
-      return;
-    }
+      // Only show option selector when ADDING to cart (not removing)
+      if (!productInCart && hasSelectableOptions(product) && !selectedOptions) {
+        setShowCartOptionSelector(true);
+        return;
+      }
 
-    // Perform cart operation
-    await performCartOperation(selectedOptions);
-  }, [user, product, isInCart, router]);
+      // Perform cart operation
+      await performCartOperation(selectedOptions);
+    },
+    [user, product, isInCart, router]
+  );
 
   // Separated cart operation logic - simplified and fixed
-  const performCartOperation = useCallback(async (selectedOptions?: { quantity?: number; [key: string]: unknown }) => {
-    if (!product) return;
+  const performCartOperation = useCallback(
+    async (selectedOptions?: { quantity?: number; [key: string]: unknown }) => {
+      if (!product) return;
 
-    try {
-      const wasInCart = isInCart(product.id);
+      try {
+        const wasInCart = isInCart(product.id);
 
-      // Set loading state immediately
-      setCartButtonState(wasInCart ? "removing" : "adding");
+        // Set loading state immediately
+        setCartButtonState(wasInCart ? "removing" : "adding");
 
-      // Extract quantity from selectedOptions if provided
-      let quantityToAdd = 1;
-      const attributesToAdd = selectedOptions;
+        // Extract quantity from selectedOptions if provided
+        let quantityToAdd = 1;
+        const attributesToAdd = selectedOptions;
 
-      if (selectedOptions && typeof selectedOptions.quantity === 'number') {
-        quantityToAdd = selectedOptions.quantity;
-        
-        console.log('ProductDetailPage - Extracted quantity from options:', {
-          productId: product.id,
-          selectedOptions,
+        if (selectedOptions && typeof selectedOptions.quantity === "number") {
+          quantityToAdd = selectedOptions.quantity;
+
+          console.log("ProductDetailPage - Extracted quantity from options:", {
+            productId: product.id,
+            selectedOptions,
+            quantityToAdd,
+            wasInCart,
+          });
+        }
+
+        // Call the cart function with the correct quantity
+        const result = await addToCart(
+          product.id,
           quantityToAdd,
-          wasInCart
+          attributesToAdd
+        );
+
+        console.log("ProductDetailPage - Cart operation result:", {
+          productId: product.id,
+          quantityToAdd,
+          attributesToAdd,
+          result,
         });
-      }
 
-      // Call the cart function with the correct quantity
-      const result = await addToCart(product.id, quantityToAdd, attributesToAdd);
-      
-      console.log('ProductDetailPage - Cart operation result:', {
-        productId: product.id,
-        quantityToAdd,
-        attributesToAdd,
-        result
-      });
-
-      // Set success state based on result
-      if (result.includes("Added")) {
-        setCartButtonState("added");
-        setTimeout(() => setCartButtonState("idle"), 1500);
-      } else if (result.includes("Removed")) {
-        setCartButtonState("removed");
-        setTimeout(() => setCartButtonState("idle"), 1500);
-      } else {
-        // If no clear success message, reset to idle
+        // Set success state based on result
+        if (result.includes("Added")) {
+          setCartButtonState("added");
+          setTimeout(() => setCartButtonState("idle"), 1500);
+        } else if (result.includes("Removed")) {
+          setCartButtonState("removed");
+          setTimeout(() => setCartButtonState("idle"), 1500);
+        } else {
+          // If no clear success message, reset to idle
+          setCartButtonState("idle");
+        }
+      } catch (error) {
+        console.error("Error with cart operation:", error);
         setCartButtonState("idle");
       }
-
-    } catch (error) {
-      console.error("Error with cart operation:", error);
-      setCartButtonState("idle");
-    }
-  }, [product, isInCart, addToCart]);
+    },
+    [product, isInCart, addToCart]
+  );
 
   // Handle cart option selector confirmation
-  const handleCartOptionSelectorConfirm = useCallback(async (selectedOptions: { quantity?: number; [key: string]: unknown }) => {
-    setShowCartOptionSelector(false);
-    await performCartOperation(selectedOptions);
-  }, [performCartOperation]);
+  const handleCartOptionSelectorConfirm = useCallback(
+    async (selectedOptions: { quantity?: number; [key: string]: unknown }) => {
+      setShowCartOptionSelector(false);
+      await performCartOperation(selectedOptions);
+    },
+    [performCartOperation]
+  );
 
   // Handle cart option selector close
   const handleCartOptionSelectorClose = useCallback(() => {
@@ -347,7 +363,11 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
   // Get current cart button content - simplified and fixed
   const cartButtonContent = useMemo(() => {
-    if (!product) return { icon: <ShoppingCart className="w-5 h-5" />, text: "Sepete Ekle" };
+    if (!product)
+      return {
+        icon: <ShoppingCart className="w-5 h-5" />,
+        text: "Sepete Ekle",
+      };
 
     const productInCart = isInCart(product.id);
     const isOptimisticAdd = isOptimisticallyAdding(product.id);
@@ -355,14 +375,18 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
     if (cartButtonState === "adding" || isOptimisticAdd) {
       return {
-        icon: <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />,
+        icon: (
+          <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+        ),
         text: "Ekleniyor...",
       };
     }
 
     if (cartButtonState === "removing" || isOptimisticRemove) {
       return {
-        icon: <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />,
+        icon: (
+          <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+        ),
         text: "Çıkarılıyor...",
       };
     }
@@ -392,7 +416,13 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
       icon: <ShoppingCart className="w-5 h-5" />,
       text: "Sepete Ekle",
     };
-  }, [product, isInCart, isOptimisticallyAdding, isOptimisticallyRemoving, cartButtonState]);
+  }, [
+    product,
+    isInCart,
+    isOptimisticallyAdding,
+    isOptimisticallyRemoving,
+    cartButtonState,
+  ]);
 
   // 🚀 SIMPLIFIED: Single effect to handle state resets
   useEffect(() => {
@@ -403,37 +433,80 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     const isOptimisticRemove = isOptimisticallyRemoving(product.id);
 
     // Only reset if we're in a loading state but no optimistic operations are happening
-    if ((cartButtonState === "adding" || cartButtonState === "removing") && 
-        !isOptimisticAdd && !isOptimisticRemove) {
-      console.log('ProductDetailPage - Resetting button state:', {
+    if (
+      (cartButtonState === "adding" || cartButtonState === "removing") &&
+      !isOptimisticAdd &&
+      !isOptimisticRemove
+    ) {
+      console.log("ProductDetailPage - Resetting button state:", {
         productId: product.id,
         cartButtonState,
         productInCart,
         isOptimisticAdd,
-        isOptimisticRemove
+        isOptimisticRemove,
       });
       setCartButtonState("idle");
     }
-  }, [product?.id, isInCart, isOptimisticallyAdding, isOptimisticallyRemoving, cartButtonState]);
+  }, [
+    product?.id,
+    isInCart,
+    isOptimisticallyAdding,
+    isOptimisticallyRemoving,
+    cartButtonState,
+  ]);
 
   // Loading skeleton component
-  const LoadingSkeleton = useMemo(() => (
-    <div className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}>
-      <div className={`sticky top-0 z-10 border-b ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}>
-        <div className="flex items-center justify-between p-4">
-          <div className={`w-6 h-6 rounded animate-pulse ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`} />
-          <div className={`w-24 h-6 rounded animate-pulse ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`} />
-          <div className={`w-6 h-6 rounded animate-pulse ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`} />
+  const LoadingSkeleton = useMemo(
+    () => (
+      <div
+        className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
+      >
+        <div
+          className={`sticky top-0 z-10 border-b ${
+            isDarkMode
+              ? "bg-gray-800 border-gray-700"
+              : "bg-white border-gray-200"
+          }`}
+        >
+          <div className="flex items-center justify-between p-4">
+            <div
+              className={`w-6 h-6 rounded animate-pulse ${
+                isDarkMode ? "bg-gray-700" : "bg-gray-200"
+              }`}
+            />
+            <div
+              className={`w-6 h-6 rounded animate-pulse ${
+                isDarkMode ? "bg-gray-700" : "bg-gray-200"
+              }`}
+            />
+          </div>
+        </div>
+        <div
+          className={`w-full h-96 animate-pulse ${
+            isDarkMode ? "bg-gray-700" : "bg-gray-200"
+          }`}
+        />
+        <div className="space-y-4 p-4">
+          <div
+            className={`h-6 rounded animate-pulse ${
+              isDarkMode ? "bg-gray-700" : "bg-gray-200"
+            }`}
+          />
+          <div
+            className={`h-16 rounded animate-pulse ${
+              isDarkMode ? "bg-gray-700" : "bg-gray-200"
+            }`}
+          />
+          <div
+            className={`h-20 rounded animate-pulse ${
+              isDarkMode ? "bg-gray-700" : "bg-gray-200"
+            }`}
+          />
         </div>
       </div>
-      <div className={`w-full h-96 animate-pulse ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`} />
-      <div className="space-y-4 p-4">
-        <div className={`h-6 rounded animate-pulse ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`} />
-        <div className={`h-16 rounded animate-pulse ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`} />
-        <div className={`h-20 rounded animate-pulse ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`} />
-      </div>
-    </div>
-  ), [isDarkMode]);
+    ),
+    [isDarkMode]
+  );
 
   if (isLoading) {
     return LoadingSkeleton;
@@ -441,12 +514,22 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
   if (error || !product) {
     return (
-      <div className={`min-h-screen flex items-center justify-center ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}>
+      <div
+        className={`min-h-screen flex items-center justify-center ${
+          isDarkMode ? "bg-gray-900" : "bg-gray-50"
+        }`}
+      >
         <div className="text-center">
-          <h1 className={`text-2xl font-bold mb-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+          <h1
+            className={`text-2xl font-bold mb-2 ${
+              isDarkMode ? "text-white" : "text-gray-900"
+            }`}
+          >
             Product Not Found
           </h1>
-          <p className={`mb-4 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+          <p
+            className={`mb-4 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}
+          >
             {error || "The product you're looking for doesn't exist."}
           </p>
           <button
@@ -461,39 +544,59 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   }
 
   const productInCart = isInCart(product.id);
-  const isProcessing = cartButtonState === "adding" || cartButtonState === "removing" ||
-                     isOptimisticallyAdding(product.id) || isOptimisticallyRemoving(product.id);
+  const isProcessing =
+    cartButtonState === "adding" ||
+    cartButtonState === "removing" ||
+    isOptimisticallyAdding(product.id) ||
+    isOptimisticallyRemoving(product.id);
 
   return (
-    <div className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}>
-      {/* Header */}
-      <div className={`sticky top-0 z-10 border-b shadow-sm ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}>
+    <div
+      className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
+    >
+      {/* Header - Simplified without title */}
+      <div
+        className={`sticky top-0 z-10 border-b shadow-sm ${
+          isDarkMode
+            ? "bg-gray-800 border-gray-700"
+            : "bg-white border-gray-200"
+        }`}
+      >
         <div className="flex items-center justify-between p-4">
           <button
             onClick={() => router.back()}
-            className={`p-2 rounded-lg transition-colors ${isDarkMode ? "hover:bg-gray-700 text-gray-300" : "hover:bg-gray-100 text-gray-700"}`}
+            className={`p-2 rounded-lg transition-colors ${
+              isDarkMode
+                ? "hover:bg-gray-700 text-gray-300"
+                : "hover:bg-gray-100 text-gray-700"
+            }`}
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
 
-          <h1 className={`text-lg font-semibold truncate mx-4 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-            Product Details
-          </h1>
-
           <button
             onClick={handleShare}
-            className={`p-2 rounded-lg transition-colors ${isDarkMode ? "hover:bg-gray-700 text-gray-300" : "hover:bg-gray-100 text-gray-700"}`}
+            className={`p-2 rounded-lg transition-colors ${
+              isDarkMode
+                ? "hover:bg-gray-700 text-gray-300"
+                : "hover:bg-gray-100 text-gray-700"
+            }`}
           >
             <Share2 className="w-5 h-5" />
           </button>
         </div>
       </div>
 
-      {/* Main content */}
-      <div className="max-w-6xl mx-auto px-2">
+      {/* Main content - Full width on mobile, constrained on desktop */}
+      <div className="max-w-6xl mx-auto lg:px-2">
         {/* Image section */}
-        <div className={`relative w-full h-96 lg:h-[500px] ${isDarkMode ? "bg-gray-800" : "bg-white"}`}>
-          {product.imageUrls.length > 0 && !imageErrors.has(currentImageIndex) ? (
+        <div
+          className={`relative w-full h-96 lg:h-[500px] ${
+            isDarkMode ? "bg-gray-800" : "bg-white"
+          }`}
+        >
+          {product.imageUrls.length > 0 &&
+          !imageErrors.has(currentImageIndex) ? (
             <Image
               src={product.imageUrls[currentImageIndex]}
               alt={product.productName}
@@ -504,9 +607,21 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               priority
             />
           ) : (
-            <div className={`w-full h-full flex items-center justify-center ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`}>
-              <div className={`text-center ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-                <div className={`w-16 h-16 mx-auto mb-2 rounded-lg ${isDarkMode ? "bg-gray-600" : "bg-gray-300"}`} />
+            <div
+              className={`w-full h-full flex items-center justify-center ${
+                isDarkMode ? "bg-gray-700" : "bg-gray-200"
+              }`}
+            >
+              <div
+                className={`text-center ${
+                  isDarkMode ? "text-gray-400" : "text-gray-500"
+                }`}
+              >
+                <div
+                  className={`w-16 h-16 mx-auto mb-2 rounded-lg ${
+                    isDarkMode ? "bg-gray-600" : "bg-gray-300"
+                  }`}
+                />
                 <p>No image available</p>
               </div>
             </div>
@@ -544,17 +659,35 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           )}
         </div>
 
-        {/* Product header */}
-        <div className={`p-4 border-b ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-100"}`}>
+        {/* Product header - Smaller font on mobile */}
+        <div
+          className={`p-4 border-b ${
+            isDarkMode
+              ? "bg-gray-800 border-gray-700"
+              : "bg-white border-gray-100"
+          }`}
+        >
           <div className="flex items-start gap-2 mb-2">
-            <span className={`text-lg font-bold ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>
+            <span
+              className={`text-base lg:text-lg font-bold ${
+                isDarkMode ? "text-blue-400" : "text-blue-600"
+              }`}
+            >
               {product.brandModel}
             </span>
-            <span className={`text-lg font-bold ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+            <span
+              className={`text-base lg:text-lg font-bold ${
+                isDarkMode ? "text-gray-400" : "text-gray-500"
+              }`}
+            >
               {product.productName}
             </span>
           </div>
-          <div className={`text-2xl font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+          <div
+            className={`text-xl lg:text-2xl font-bold ${
+              isDarkMode ? "text-white" : "text-gray-900"
+            }`}
+          >
             {product.price} {product.currency}
           </div>
         </div>
@@ -583,17 +716,34 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         />
 
         {product.description && (
-          <div className={`p-4 border-b ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-100"}`}>
-            <h3 className={`text-lg font-bold mb-3 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+          <div
+            className={`p-4 border-b ${
+              isDarkMode
+                ? "bg-gray-800 border-gray-700"
+                : "bg-white border-gray-100"
+            }`}
+          >
+            <h3
+              className={`text-lg font-bold mb-3 ${
+                isDarkMode ? "text-white" : "text-gray-900"
+              }`}
+            >
               Description
             </h3>
-            <p className={`leading-relaxed ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+            <p
+              className={`leading-relaxed ${
+                isDarkMode ? "text-gray-300" : "text-gray-700"
+              }`}
+            >
               {product.description}
             </p>
           </div>
         )}
 
-        <ProductDetailReviewsTab productId={product.id} isDarkMode={isDarkMode} />
+        <ProductDetailReviewsTab
+          productId={product.id}
+          isDarkMode={isDarkMode}
+        />
 
         <ProductQuestionsWidget
           productId={product.id}
@@ -613,8 +763,14 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
       </div>
 
       {/* Bottom action bar */}
-      <div className={`fixed bottom-0 left-0 right-0 border-t p-4 safe-area-pb ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}>
-        <div className="max-w-6xl mx-auto px-2 flex gap-3">
+      <div
+        className={`fixed bottom-0 left-0 right-0 border-t p-4 safe-area-pb ${
+          isDarkMode
+            ? "bg-gray-800 border-gray-700"
+            : "bg-white border-gray-200"
+        }`}
+      >
+        <div className="max-w-6xl mx-auto lg:px-2 flex gap-3">
           {/* Cart Button */}
           <button
             onClick={() => handleAddToCart()}
@@ -633,10 +789,20 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                   : "border-orange-500 text-orange-600 hover:bg-orange-50"
               }
               ${isProcessing ? "opacity-75 cursor-not-allowed" : ""}
-              ${cartButtonState === "added" || cartButtonState === "removed" ? "transform scale-105" : ""}
+              ${
+                cartButtonState === "added" || cartButtonState === "removed"
+                  ? "transform scale-105"
+                  : ""
+              }
             `}
           >
-            <span className={`transition-all duration-300 ${cartButtonState === "added" || cartButtonState === "removed" ? "animate-pulse" : ""}`}>
+            <span
+              className={`transition-all duration-300 ${
+                cartButtonState === "added" || cartButtonState === "removed"
+                  ? "animate-pulse"
+                  : ""
+              }`}
+            >
               {cartButtonContent.icon}
             </span>
             <span className="transition-all duration-300">
@@ -692,7 +858,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           product={product}
           isOpen={showCartOptionSelector}
           onClose={handleCartOptionSelectorClose}
-          onConfirm={handleCartOptionSelectorConfirm}          
+          onConfirm={handleCartOptionSelectorConfirm}
         />
       )}
     </div>

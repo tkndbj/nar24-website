@@ -3,6 +3,7 @@ import { User, onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { doc, getDocFromServer } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import StatePersistenceManager from "@/lib/statePersistence";
 
 interface CachedUserData {
   user: User | null;
@@ -78,9 +79,13 @@ class AuthStateManager {
     }
   }
 
-  setLanguageSwitching(switching: boolean) {
-    this.isLanguageSwitching = switching;
-    if (switching) {
+  setLanguageSwitching(switching: boolean, currentLocale?: string) {
+    // Only set language switching if we have evidence of an actual locale change
+    const statePersistence = StatePersistenceManager.getInstance();
+    this.isLanguageSwitching =
+      switching && statePersistence.isLanguageSwitch(currentLocale);
+
+    if (this.isLanguageSwitching) {
       // Extend cache duration during language switch
       if (this.cachedData) {
         this.cachedData.timestamp = Date.now();
