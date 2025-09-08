@@ -46,7 +46,9 @@ const LoadingShimmer: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => {
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4">
       {Array.from({ length: 12 }, (_, i) => (
         <div key={i} className="space-y-3">
-          <div className={`aspect-[3/4] rounded-lg ${shimmerClass}`} />
+          <div
+            className={`aspect-[3/4] lg:aspect-[3/5] rounded-lg ${shimmerClass}`}
+          />
           <div className={`h-4 w-3/4 rounded ${shimmerClass}`} />
           <div className={`h-3 w-1/2 rounded ${shimmerClass}`} />
           <div className={`h-4 w-2/3 rounded ${shimmerClass}`} />
