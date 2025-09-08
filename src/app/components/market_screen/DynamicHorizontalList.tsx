@@ -14,6 +14,7 @@ import {
   getDocs,
   limit as firestoreLimit,
 } from "firebase/firestore";
+import { useTranslations } from "next-intl";
 import { db } from "@/lib/firebase"; // Adjust import path as needed
 
 // Product interface (should match the one from ProductCard)
@@ -83,7 +84,7 @@ const DynamicList: React.FC<{
   const [canScrollRight, setCanScrollRight] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
-
+  const t = useTranslations("MarketScreen");
   // Parse colors with fallback
   const parseColor = (colorString?: string): string => {
     if (!colorString) return "#FF6B35";
@@ -272,7 +273,7 @@ const DynamicList: React.FC<{
                   onClick={handleViewAll}
                   className="flex items-center text-sm font-bold text-white underline decoration-white hover:opacity-80 transition-opacity"
                 >
-                  View All
+                  {t("viewAll")}
                   <ChevronRight size={16} className="ml-1" />
                 </button>
               )}
@@ -349,7 +350,7 @@ const DynamicList: React.FC<{
                     display: none;
                   }
                 `}</style>
-                <div className="flex gap-1.5 px-0 lg:px-2 h-full pr-0 lg:pr-2 -ml-2 lg:ml-0">
+                <div className="flex gap-0 px-0 lg:px-2 h-full pr-0 lg:pr-2 -ml-2 lg:ml-0">
                   {products.map((product) => (
                     <div
                       key={product.id}

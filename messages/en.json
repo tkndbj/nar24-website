@@ -2204,6 +2204,12 @@
     "paymentSuccessful": "Payment successful!",
     "paymentFailed": "Payment failed. Please try again."
   },
+  "MarketScreen": {
+    "specialProductsForYou": "Special Products For You",
+    "viewAll": "View All",
+    "failedToLoadRecommendations": "Failed to load recommendations",
+    "tryAgain": "Try Again"
+  },
   "DynamicMarket": {
     "filterAll": "All",
     "filterDeals": "Deals",

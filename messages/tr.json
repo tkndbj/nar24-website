@@ -2204,6 +2204,12 @@
     "paymentSuccessful": "Ödeme başarılı!",
     "paymentFailed": "Ödeme başarısız. Lütfen tekrar deneyin."
   },
+  "MarketScreen": {
+    "specialProductsForYou": "Senin İçin Özel Ürünler",
+    "viewAll": "Tümünü Görüntüle",
+    "failedToLoadRecommendations": "Öneriler yüklenemedi",
+    "tryAgain": "Tekrar Dene"
+  },
   "DynamicMarket": {
     "filterAll": "Tümü",
     "filterDeals": "İndirimli",

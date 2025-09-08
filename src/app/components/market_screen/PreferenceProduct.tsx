@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { ProductCard } from "../ProductCard";
 import { ChevronRight, ChevronLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 // Product interface (should match the one from ProductCard)
 interface Product {
@@ -64,7 +65,7 @@ export const PreferenceProduct: React.FC<PreferenceProductProps> = ({
   const [canScrollRight, setCanScrollRight] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
-
+  const t = useTranslations("MarketScreen");
   // Fixed dimensions to prevent hydration mismatch
   const portraitImageHeight = 380; // Increased from 240
   const infoAreaHeight = 80;
@@ -248,13 +249,13 @@ export const PreferenceProduct: React.FC<PreferenceProductProps> = ({
           <div className="px-0 lg:px-2 mb-2">
             <div className="flex justify-between items-center">
               <h2 className="text-lg font-bold text-white">
-                Special Products For You
+                {t("specialProductsForYou")}
               </h2>
               <button
                 onClick={handleViewAll}
                 className="flex items-center text-sm font-bold text-white underline decoration-white hover:opacity-80 transition-opacity"
               >
-                View All
+                {t("viewAll")}
                 <ChevronRight size={16} className="ml-1" />
               </button>
             </div>
@@ -267,13 +268,13 @@ export const PreferenceProduct: React.FC<PreferenceProductProps> = ({
               style={{ height: `${rowHeight - 60}px` }}
             >
               <p className="text-center">
-                Failed to load recommendations
+                {t("failedToLoadRecommendations")}
                 <br />
                 <button
                   onClick={fetchRecommendations}
                   className="mt-2 px-4 py-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 transition-all"
                 >
-                  Try Again
+                  {t("tryAgain")}
                 </button>
               </p>
             </div>
@@ -328,7 +329,7 @@ export const PreferenceProduct: React.FC<PreferenceProductProps> = ({
                     display: none;
                   }
                 `}</style>
-                <div className="flex gap-1.5 px-0 lg:px-2 h-full pr-0 lg:pr-2 -ml-2 lg:ml-0">
+                <div className="flex gap-0 px-0 lg:px-2 h-full pr-0 lg:pr-2 -ml-2 lg:ml-0">
                   {products.map((product) => (
                     <div
                       key={product.id}
