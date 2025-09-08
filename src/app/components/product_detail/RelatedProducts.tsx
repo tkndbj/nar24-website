@@ -33,8 +33,13 @@ const LoadingSkeleton: React.FC<{
   listViewHeight: number;
   cardWidth: number;
   isDarkMode?: boolean;
-}> = ({ listViewHeight, cardWidth, isDarkMode = false }) => (
-  <div className="flex gap-4 overflow-hidden">
+  isMobile?: boolean;
+}> = ({ listViewHeight, cardWidth, isDarkMode = false, isMobile = false }) => (
+  <div
+    className={`flex ${isMobile ? "gap-2" : "gap-4"} overflow-hidden ${
+      isMobile ? "-ml-2" : ""
+    }`}
+  >
     {Array.from({ length: 6 }).map((_, i) => (
       <div
         key={i}
@@ -48,21 +53,29 @@ const LoadingSkeleton: React.FC<{
       >
         <div className="p-3 space-y-3 h-full flex flex-col">
           {/* Image placeholder */}
-          <div className={`flex-1 rounded-lg ${
-            isDarkMode ? "bg-gray-600" : "bg-gray-300"
-          }`} />
+          <div
+            className={`flex-1 rounded-lg ${
+              isDarkMode ? "bg-gray-600" : "bg-gray-300"
+            }`}
+          />
 
           {/* Text placeholders */}
           <div className="space-y-2">
-            <div className={`h-3 rounded w-full ${
-              isDarkMode ? "bg-gray-600" : "bg-gray-300"
-            }`} />
-            <div className={`h-3 rounded w-3/4 ${
-              isDarkMode ? "bg-gray-600" : "bg-gray-300"
-            }`} />
-            <div className={`h-4 rounded w-1/2 ${
-              isDarkMode ? "bg-gray-600" : "bg-gray-300"
-            }`} />
+            <div
+              className={`h-3 rounded w-full ${
+                isDarkMode ? "bg-gray-600" : "bg-gray-300"
+              }`}
+            />
+            <div
+              className={`h-3 rounded w-3/4 ${
+                isDarkMode ? "bg-gray-600" : "bg-gray-300"
+              }`}
+            />
+            <div
+              className={`h-4 rounded w-1/2 ${
+                isDarkMode ? "bg-gray-600" : "bg-gray-300"
+              }`}
+            />
           </div>
         </div>
       </div>
@@ -84,17 +97,35 @@ const ProductDetailRelatedProducts: React.FC<
   const [error, setError] = useState<string | null>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Calculate responsive dimensions - matches Flutter logic
+  // Detect mobile device
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768); // Using 768px as mobile breakpoint
+    };
+
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  // Calculate responsive dimensions - matches Flutter logic with mobile adjustments
   const getResponsiveDimensions = () => {
     if (typeof window === "undefined") {
-      return { listViewHeight: 420, cardWidth: 240, scaleFactor: 0.85 };
+      return {
+        listViewHeight: 420,
+        cardWidth: 240,
+        scaleFactor: 0.85,
+        gap: 16,
+      };
     }
 
     const screenWidth = window.innerWidth;
     const screenHeight = window.innerHeight;
     const isLandscape = screenWidth > screenHeight;
+    const mobile = screenWidth < 768;
 
     // Scale factors matching Flutter implementation
     const cardScaleFactor = 0.85;
@@ -123,18 +154,22 @@ const ProductDetailRelatedProducts: React.FC<
     // Clamp to reasonable bounds - ensure enough height for scaled cards
     const listViewHeight = Math.max(400, Math.min(500, estimatedCardHeight));
 
-    // Card width calculation - significantly wider to make gaps appear smaller
-    const cardWidth = 240; // Increased from 200 to 240 for much wider cards
+    // Card width calculation - narrower on mobile, wider on desktop
+    const cardWidth = mobile ? 180 : 240; // Narrower cards on mobile (180px instead of 240px)
+
+    // Gap calculation - smaller on mobile
+    const gap = mobile ? 8 : 16; // 8px gap on mobile, 16px on desktop
 
     return {
       listViewHeight,
       cardWidth,
       scaleFactor: cardScaleFactor,
       internalScaleFactor,
+      gap,
     };
   };
 
-  const { listViewHeight, cardWidth, scaleFactor, internalScaleFactor } =
+  const { listViewHeight, cardWidth, scaleFactor, internalScaleFactor, gap } =
     getResponsiveDimensions();
 
   // Scroll position checking
@@ -149,22 +184,22 @@ const ProductDetailRelatedProducts: React.FC<
 
   const scrollLeft = () => {
     if (scrollContainerRef.current) {
-      // Fixed scroll amount - one card width + smaller gap
-      const scrollAmount = cardWidth + 16; // 16px gap (reduced from 24px)
-      scrollContainerRef.current.scrollBy({ 
+      // Fixed scroll amount - one card width + gap
+      const scrollAmount = cardWidth + gap;
+      scrollContainerRef.current.scrollBy({
         left: -scrollAmount,
-        behavior: "smooth" 
+        behavior: "smooth",
       });
     }
   };
 
   const scrollRight = () => {
     if (scrollContainerRef.current) {
-      // Fixed scroll amount - one card width + smaller gap
-      const scrollAmount = cardWidth + 16; // 16px gap (reduced from 24px)
-      scrollContainerRef.current.scrollBy({ 
+      // Fixed scroll amount - one card width + gap
+      const scrollAmount = cardWidth + gap;
+      scrollContainerRef.current.scrollBy({
         left: scrollAmount,
-        behavior: "smooth" 
+        behavior: "smooth",
       });
     }
   };
@@ -250,23 +285,25 @@ const ProductDetailRelatedProducts: React.FC<
 
   // Always render the container - matches Flutter behavior
   return (
-    <div className={`w-full shadow-sm border-b ${
-      isDarkMode 
-        ? "bg-gray-800 border-gray-700" 
-        : "bg-white border-gray-100"
-    }`}>
-      <div className="p-4">
-  {/* Header - always show */}
-  <h3 className={`text-lg font-semibold mb-1 ${  // <- Add mb-1, mb-2, mb-3, etc. here
-    isDarkMode ? "text-white" : "text-gray-900"
-  }`}>
-    Related Products
-  </h3>
+    <div
+      className={`w-full shadow-sm border-b ${
+        isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-100"
+      }`}
+    >
+      <div className={`${isMobile ? "px-4 py-4" : "p-4"}`}>
+        {/* Header - always show */}
+        <h3
+          className={`text-lg font-semibold mb-1 ${
+            isDarkMode ? "text-white" : "text-gray-900"
+          }`}
+        >
+          Related Products
+        </h3>
 
         {/* Products horizontal scroll with navigation - FIXED HEIGHT */}
         <div className="relative group">
-          {/* Left scroll button */}
-          {canScrollLeft && (
+          {/* Left scroll button - hide on mobile for cleaner look */}
+          {!isMobile && canScrollLeft && (
             <button
               onClick={scrollLeft}
               className={`absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 shadow-lg rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-110 ${
@@ -279,8 +316,8 @@ const ProductDetailRelatedProducts: React.FC<
             </button>
           )}
 
-          {/* Right scroll button */}
-          {canScrollRight && (
+          {/* Right scroll button - hide on mobile for cleaner look */}
+          {!isMobile && canScrollRight && (
             <button
               onClick={scrollRight}
               className={`absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 shadow-lg rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-110 ${
@@ -294,12 +331,12 @@ const ProductDetailRelatedProducts: React.FC<
           )}
 
           {/* Products container with FIXED HEIGHT - no vertical scrolling */}
-          <div 
-            className="overflow-hidden"
-            style={{ 
+          <div
+            className={`overflow-hidden ${isMobile ? "-mx-2" : ""}`}
+            style={{
               height: `${listViewHeight}px`, // Fixed height based on calculated dimensions
               minHeight: `${listViewHeight}px`, // Ensure minimum height
-              maxHeight: `${listViewHeight}px` // Prevent expansion
+              maxHeight: `${listViewHeight}px`, // Prevent expansion
             }}
           >
             {isLoading || loading ? (
@@ -308,16 +345,20 @@ const ProductDetailRelatedProducts: React.FC<
                 listViewHeight={listViewHeight}
                 cardWidth={cardWidth}
                 isDarkMode={isDarkMode}
+                isMobile={isMobile}
               />
             ) : relatedProducts.length > 0 ? (
               // Show actual products with proper spacing and consistent gaps
-              <div 
+              <div
                 ref={scrollContainerRef}
-                className="flex gap-1 overflow-x-auto h-full scroll-smooth"
+                className={`flex overflow-x-auto h-full scroll-smooth ${
+                  isMobile ? "gap-2" : "gap-4"
+                }`}
                 style={{
                   scrollbarWidth: "none",
                   msOverflowStyle: "none",
                   paddingBottom: "0", // Remove bottom padding to prevent vertical scroll
+                  paddingLeft: isMobile ? "8px" : "0", // Small left padding on mobile to bring first card closer
                 }}
               >
                 {/* Hide scrollbar for webkit browsers */}
@@ -326,13 +367,13 @@ const ProductDetailRelatedProducts: React.FC<
                     display: none;
                   }
                 `}</style>
-                
+
                 {relatedProducts.map((product, index) => (
                   <div
                     key={`${product.id}-${index}`}
                     className="flex-shrink-0"
-                    style={{ 
-                      width: `${cardWidth}px`, // Increased width (200px instead of 180px)
+                    style={{
+                      width: `${cardWidth}px`, // Dynamic width based on device
                       minWidth: `${cardWidth}px`, // Prevent shrinking
                       height: "fit-content", // Let the card determine its own height
                     }}
@@ -343,7 +384,6 @@ const ProductDetailRelatedProducts: React.FC<
                       internalScaleFactor={internalScaleFactor}
                       showCartIcon={true}
                       showExtraLabels={false}
-                      
                       onFavoriteToggle={(productId) => {
                         console.log("Toggle favorite for:", productId);
                         // Implement favorite toggle logic
@@ -359,15 +399,17 @@ const ProductDetailRelatedProducts: React.FC<
             ) : error ? (
               // Show error state but keep container
               <div className="flex items-center justify-center h-full">
-                <div className={`text-center ${
-                  isDarkMode ? "text-gray-400" : "text-gray-500"
-                }`}>
+                <div
+                  className={`text-center ${
+                    isDarkMode ? "text-gray-400" : "text-gray-500"
+                  }`}
+                >
                   <p className="text-sm">{error}</p>
                   <button
                     onClick={() => window.location.reload()}
                     className={`mt-2 text-sm underline transition-colors ${
-                      isDarkMode 
-                        ? "text-blue-400 hover:text-blue-300" 
+                      isDarkMode
+                        ? "text-blue-400 hover:text-blue-300"
                         : "text-blue-500 hover:text-blue-600"
                     }`}
                   >
@@ -381,6 +423,7 @@ const ProductDetailRelatedProducts: React.FC<
                 listViewHeight={listViewHeight}
                 cardWidth={cardWidth}
                 isDarkMode={isDarkMode}
+                isMobile={isMobile}
               />
             )}
           </div>
