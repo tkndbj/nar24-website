@@ -1,12 +1,7 @@
 "use client";
 
 import AlgoliaServiceManager from "@/lib/algolia";
-import React, {
-  useState,
-  useEffect,
-  useCallback,
-  useRef,
-} from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
@@ -27,7 +22,10 @@ import {
 } from "@/context/SearchResultsProvider";
 
 // Enhanced utility functions
-const throttle = <T extends (...args: unknown[]) => unknown>(func: T, limit: number): T => {
+const throttle = <T extends (...args: unknown[]) => unknown>(
+  func: T,
+  limit: number
+): T => {
   let inThrottle: boolean;
   return ((...args: Parameters<T>) => {
     if (!inThrottle) {
@@ -45,7 +43,7 @@ const LoadingShimmer: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => {
     : "bg-gray-300 animate-pulse";
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4">
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4">
       {Array.from({ length: 12 }, (_, i) => (
         <div key={i} className="space-y-3">
           <div className={`aspect-[3/4] rounded-lg ${shimmerClass}`} />
@@ -73,12 +71,16 @@ const ErrorState: React.FC<{
         {isNetworkError ? (
           <WifiOff
             size={80}
-            className={`mx-auto ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+            className={`mx-auto ${
+              isDarkMode ? "text-gray-400" : "text-gray-500"
+            }`}
           />
         ) : (
           <AlertCircle
             size={80}
-            className={`mx-auto ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+            className={`mx-auto ${
+              isDarkMode ? "text-gray-400" : "text-gray-500"
+            }`}
           />
         )}
         <div className="space-y-3">
@@ -87,7 +89,9 @@ const ErrorState: React.FC<{
               isDarkMode ? "text-white" : "text-gray-900"
             }`}
           >
-            {isNetworkError ? (t("noInternet") || "Connection Error") : (t("searchFailedTryAgain") || "Search Failed")}
+            {isNetworkError
+              ? t("noInternet") || "Connection Error"
+              : t("searchFailedTryAgain") || "Search Failed"}
           </h3>
           <p
             className={`text-sm leading-relaxed ${
@@ -119,7 +123,11 @@ const EmptyState: React.FC<{ isDarkMode: boolean; query: string }> = ({
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
       <div className="text-center space-y-6 max-w-md">
-        <div className={`w-32 h-32 mx-auto ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+        <div
+          className={`w-32 h-32 mx-auto ${
+            isDarkMode ? "text-gray-400" : "text-gray-500"
+          }`}
+        >
           <Search size={128} strokeWidth={1} />
         </div>
         <div className="space-y-3">
@@ -135,7 +143,8 @@ const EmptyState: React.FC<{ isDarkMode: boolean; query: string }> = ({
               isDarkMode ? "text-gray-400" : "text-gray-600"
             }`}
           >
-            We couldn&apos;t find any products matching &quot;{query}&quot;. Try adjusting your search terms or removing filters.
+            We couldn&apos;t find any products matching &quot;{query}&quot;. Try
+            adjusting your search terms or removing filters.
           </p>
         </div>
       </div>
@@ -171,15 +180,17 @@ const FilterBar: React.FC<{
   };
 
   return (
-    <div className="flex-1 min-w-0"> {/* Added min-w-0 to allow shrinking */}
+    <div className="flex-1 min-w-0">
+      {" "}
+      {/* Added min-w-0 to allow shrinking */}
       <div
         ref={scrollRef}
         className="flex gap-1 overflow-x-auto scrollbar-hide pb-1" // Added pb-1 for better touch scrolling
-        style={{ 
-          scrollbarWidth: "none", 
+        style={{
+          scrollbarWidth: "none",
           msOverflowStyle: "none",
           // Ensure the container doesn't expand beyond its parent
-          maxWidth: "100%"
+          maxWidth: "100%",
         }}
       >
         {filterTypes.map((key) => {
@@ -218,7 +229,14 @@ const SortMenu: React.FC<{
   isOpen: boolean;
   onClose: () => void;
   isDarkMode: boolean;
-}> = ({ sortOptions, currentSort, onSortChange, isOpen, onClose, isDarkMode }) => {
+}> = ({
+  sortOptions,
+  currentSort,
+  onSortChange,
+  isOpen,
+  onClose,
+  isDarkMode,
+}) => {
   const t = useTranslations("searchResults");
 
   const localizedSortLabel = (opt: SortOption): string => {
@@ -242,11 +260,8 @@ const SortMenu: React.FC<{
 
   return (
     <>
-      <div 
-        className="fixed inset-0 z-40" 
-        onClick={onClose} 
-      />
-      
+      <div className="fixed inset-0 z-40" onClick={onClose} />
+
       <div
         className={`
           absolute top-full right-0 mt-2 w-56 z-50 rounded-xl shadow-xl border overflow-hidden
@@ -298,7 +313,7 @@ const SearchResultsContent: React.FC = () => {
   const router = useRouter();
   const t = useTranslations("searchResults");
   const {
-    filteredProducts,    
+    filteredProducts,
     currentFilter,
     sortOption,
     isEmpty,
@@ -322,9 +337,22 @@ const SearchResultsContent: React.FC = () => {
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
 
   // Constants - Match Flutter exactly
-  const filterTypes: FilterType[] = ["", "deals", "boosted", "trending", "fiveStar", "bestSellers"];
-  const sortOptions: SortOption[] = ["None", "Alphabetical", "Date", "Price Low to High", "Price High to Low"];
-  
+  const filterTypes: FilterType[] = [
+    "",
+    "deals",
+    "boosted",
+    "trending",
+    "fiveStar",
+    "bestSellers",
+  ];
+  const sortOptions: SortOption[] = [
+    "None",
+    "Alphabetical",
+    "Date",
+    "Price Low to High",
+    "Price High to Low",
+  ];
+
   const query = searchParams.get("q") || "";
   const algoliaManager = AlgoliaServiceManager.getInstance();
 
@@ -365,19 +393,26 @@ const SearchResultsContent: React.FC = () => {
         console.log("❌ Empty query, skipping search");
         return;
       }
-      
+
       if (isLoading && !reset) {
         console.log("⏳ Already loading, skipping duplicate request");
         return;
       }
 
-      console.log(`🔍 Fetching results for "${query}", reset: ${reset}, page: ${reset ? 0 : currentPage}`);
+      console.log(
+        `🔍 Fetching results for "${query}", reset: ${reset}, page: ${
+          reset ? 0 : currentPage
+        }`
+      );
 
       // Connectivity check
       if (!checkConnectivity()) {
         console.log("❌ No internet connection");
         setIsNetworkError(true);
-        setErrorMessage(t("noInternet") || "No internet connection. Please check your network and try again.");
+        setErrorMessage(
+          t("noInternet") ||
+            "No internet connection. Please check your network and try again."
+        );
         setHasError(true);
         return;
       }
@@ -398,43 +433,52 @@ const SearchResultsContent: React.FC = () => {
 
       try {
         const pageToFetch = reset ? 0 : currentPage;
-        
+
         // Enhanced search strategy matching Flutter's dual-index approach
-        console.log(`🔍 Starting enhanced search for "${query}" page ${pageToFetch}`);
-        
+        console.log(
+          `🔍 Starting enhanced search for "${query}" page ${pageToFetch}`
+        );
+
         // Search with current filter applied server-side when possible
         const serverSideFilterType = currentFilter || undefined;
-        
+
         // Try products index first with enhanced error handling
         let results: Product[] = [];
         try {
-          console.log(`🔍 Searching products index with filter: ${serverSideFilterType}`);
+          console.log(
+            `🔍 Searching products index with filter: ${serverSideFilterType}`
+          );
           results = await algoliaManager.searchProducts(
-            query, 
-            pageToFetch, 
-            50, 
+            query,
+            pageToFetch,
+            50,
             "products",
             serverSideFilterType,
-            sortOption === 'None' ? 'None' : sortOption
+            sortOption === "None" ? "None" : sortOption
           );
           console.log(`✅ Products index returned ${results.length} results`);
         } catch (productError) {
           console.warn("❌ Products index failed:", productError);
-          
+
           // Fallback to shop_products index
           try {
             console.log(`🔍 Fallback: Searching shop_products index`);
             results = await algoliaManager.searchProducts(
-              query, 
-              pageToFetch, 
-              50, 
+              query,
+              pageToFetch,
+              50,
               "shop_products",
               serverSideFilterType,
-              sortOption === 'None' ? 'None' : sortOption
+              sortOption === "None" ? "None" : sortOption
             );
-            console.log(`✅ Shop_products index returned ${results.length} results`);
+            console.log(
+              `✅ Shop_products index returned ${results.length} results`
+            );
           } catch (shopError) {
-            console.error("❌ Both indexes failed:", { productError, shopError });
+            console.error("❌ Both indexes failed:", {
+              productError,
+              shopError,
+            });
             throw new Error("All search indexes failed");
           }
         }
@@ -443,10 +487,10 @@ const SearchResultsContent: React.FC = () => {
           console.log(`📝 Setting ${results.length} raw products (reset)`);
           setRawProducts(results);
           fetchInitialCompleteRef.current = true;
-          
+
           // Scroll to top on reset
           if (mainScrollRef.current) {
-            mainScrollRef.current.scrollTo({ top: 0, behavior: 'auto' });
+            mainScrollRef.current.scrollTo({ top: 0, behavior: "auto" });
           }
         } else {
           console.log(`➕ Adding ${results.length} more products (pagination)`);
@@ -459,32 +503,36 @@ const SearchResultsContent: React.FC = () => {
         setIsNetworkError(false);
 
         // Track boosted impressions (analytics placeholder)
-        const boostedIds = results.filter(p => p.isBoosted).map(p => p.id);
+        const boostedIds = results.filter((p) => p.isBoosted).map((p) => p.id);
         if (boostedIds.length > 0) {
-          console.log(`📊 Tracking ${boostedIds.length} boosted product impressions`);
+          console.log(
+            `📊 Tracking ${boostedIds.length} boosted product impressions`
+          );
           // TODO: Implement analytics tracking similar to Flutter's incrementImpressionCount
         }
-
       } catch (error: unknown) {
-        if (error instanceof Error && error.message === 'Request cancelled') {
+        if (error instanceof Error && error.message === "Request cancelled") {
           console.log("⏹️ Request cancelled, not showing error");
           return;
         }
-        
+
         console.error("❌ Search error:", error);
-        const errorMsg = error instanceof Error ? error.message : "Search failed";
-        const isNetworkIssue = errorMsg.toLowerCase().includes("failed to fetch") || 
-                              errorMsg.toLowerCase().includes("network") || 
-                              !navigator.onLine;
-        
+        const errorMsg =
+          error instanceof Error ? error.message : "Search failed";
+        const isNetworkIssue =
+          errorMsg.toLowerCase().includes("failed to fetch") ||
+          errorMsg.toLowerCase().includes("network") ||
+          !navigator.onLine;
+
         setErrorMessage(
-          isNetworkIssue 
-            ? (t("noInternet") || "Connection failed. Please check your internet and try again.")
-            : (t("searchFailedTryAgain") || "Search failed. Please try again.")
+          isNetworkIssue
+            ? t("noInternet") ||
+                "Connection failed. Please check your internet and try again."
+            : t("searchFailedTryAgain") || "Search failed. Please try again."
         );
         setIsNetworkError(isNetworkIssue);
         setHasError(true);
-        
+
         if (reset) {
           console.log("❌ Initial search failed, showing error state");
         }
@@ -494,28 +542,33 @@ const SearchResultsContent: React.FC = () => {
       }
     },
     [
-      query, 
-      isLoading, 
-      currentPage, 
-      currentFilter, 
+      query,
+      isLoading,
+      currentPage,
+      currentFilter,
       sortOption,
-      checkConnectivity, 
-      t, 
-      algoliaManager, 
-      clearProducts, 
-      setRawProducts, 
-      addMoreProducts
+      checkConnectivity,
+      t,
+      algoliaManager,
+      clearProducts,
+      setRawProducts,
+      addMoreProducts,
     ]
   );
 
   // Enhanced load more with debouncing
   const loadMoreIfNeeded = useCallback(() => {
-    if (!hasMore || isLoading || isLoadingMore || !fetchInitialCompleteRef.current) {
+    if (
+      !hasMore ||
+      isLoading ||
+      isLoadingMore ||
+      !fetchInitialCompleteRef.current
+    ) {
       return;
     }
-    
+
     console.log("📄 Loading more results...");
-    
+
     if (loadMoreDebounceRef.current) {
       clearTimeout(loadMoreDebounceRef.current);
     }
@@ -528,10 +581,12 @@ const SearchResultsContent: React.FC = () => {
   // Enhanced initial fetch with query change detection
   useEffect(() => {
     if (query.trim() && query !== lastQueryRef.current) {
-      console.log(`🔄 Query changed from "${lastQueryRef.current}" to "${query}"`);
+      console.log(
+        `🔄 Query changed from "${lastQueryRef.current}" to "${query}"`
+      );
       fetchResults(true);
     }
-    
+
     return () => {
       // Enhanced cleanup
       if (loadMoreDebounceRef.current) {
@@ -541,42 +596,51 @@ const SearchResultsContent: React.FC = () => {
   }, [query, fetchResults]);
 
   // Enhanced filter change handler
-  const handleFilterChange = useCallback((filter: FilterType) => {
-    if (filter === currentFilter) return;
-    
-    console.log(`🎯 Filter changed from "${currentFilter}" to "${filter}"`);
-    setFilter(filter);
-    
-    // Reset pagination when filter changes to get fresh server-side filtered results
-    setCurrentPage(0);
-    setHasMore(true);
-    
-    // Fetch new results with the filter applied server-side when possible
-    if (query.trim()) {
-      fetchResults(true);
-    }
-  }, [currentFilter, setFilter, query, fetchResults]);
+  const handleFilterChange = useCallback(
+    (filter: FilterType) => {
+      if (filter === currentFilter) return;
 
-  // Enhanced sort change handler
-  const handleSortChange = useCallback((sort: SortOption) => {
-    if (sort === sortOption) return;
-    
-    console.log(`📊 Sort changed from "${sortOption}" to "${sort}"`);
-    setSortOption(sort);
-    
-    // Reset and fetch with new sort option
-    if (query.trim()) {
+      console.log(`🎯 Filter changed from "${currentFilter}" to "${filter}"`);
+      setFilter(filter);
+
+      // Reset pagination when filter changes to get fresh server-side filtered results
       setCurrentPage(0);
       setHasMore(true);
-      fetchResults(true);
-    }
-  }, [sortOption, setSortOption, query, fetchResults]);
+
+      // Fetch new results with the filter applied server-side when possible
+      if (query.trim()) {
+        fetchResults(true);
+      }
+    },
+    [currentFilter, setFilter, query, fetchResults]
+  );
+
+  // Enhanced sort change handler
+  const handleSortChange = useCallback(
+    (sort: SortOption) => {
+      if (sort === sortOption) return;
+
+      console.log(`📊 Sort changed from "${sortOption}" to "${sort}"`);
+      setSortOption(sort);
+
+      // Reset and fetch with new sort option
+      if (query.trim()) {
+        setCurrentPage(0);
+        setHasMore(true);
+        fetchResults(true);
+      }
+    },
+    [sortOption, setSortOption, query, fetchResults]
+  );
 
   // Handle product navigation
-  const handleProductTap = useCallback((product: Product) => {
-    console.log(`👆 Product tapped: ${product.productName} (${product.id})`);
-    router.push(`/productdetail/${product.id}`);
-  }, [router]);
+  const handleProductTap = useCallback(
+    (product: Product) => {
+      console.log(`👆 Product tapped: ${product.productName} (${product.id})`);
+      router.push(`/productdetail/${product.id}`);
+    },
+    [router]
+  );
 
   // Enhanced infinite scroll with throttling
   useEffect(() => {
@@ -601,10 +665,10 @@ const SearchResultsContent: React.FC = () => {
 
     if (isSortMenuOpen) {
       setTimeout(() => {
-        document.addEventListener('click', handleClickOutside);
+        document.addEventListener("click", handleClickOutside);
       }, 10);
-      
-      return () => document.removeEventListener('click', handleClickOutside);
+
+      return () => document.removeEventListener("click", handleClickOutside);
     }
   }, [isSortMenuOpen]);
 
@@ -739,7 +803,7 @@ const SearchResultsContent: React.FC = () => {
           >
             <SortAsc size={20} />
           </button>
-          
+
           <SortMenu
             sortOptions={sortOptions}
             currentSort={sortOption}
@@ -762,7 +826,8 @@ const SearchResultsContent: React.FC = () => {
             {t("searchingFor") || "Searching for"} &quot;{query}&quot;
             {filteredProducts.length > 0 && (
               <span className="ml-2 font-medium">
-                ({filteredProducts.length} {filteredProducts.length === 1 ? 'result' : 'results'})
+                ({filteredProducts.length}{" "}
+                {filteredProducts.length === 1 ? "result" : "results"})
               </span>
             )}
           </p>
@@ -776,7 +841,7 @@ const SearchResultsContent: React.FC = () => {
 
       {/* Enhanced Products Grid */}
       {!isEmpty && (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 px-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-4">
           {filteredProducts.map((product, index) => (
             <ProductCard
               key={`${product.id}-${index}`}
@@ -794,7 +859,11 @@ const SearchResultsContent: React.FC = () => {
         <div className="flex justify-center py-8">
           <div className="flex items-center gap-2">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-orange-500" />
-            <span className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+            <span
+              className={`text-sm ${
+                isDarkMode ? "text-gray-400" : "text-gray-600"
+              }`}
+            >
               Loading more products...
             </span>
           </div>
@@ -802,21 +871,28 @@ const SearchResultsContent: React.FC = () => {
       )}
 
       {/* Enhanced Load more button (fallback) */}
-      {!isLoadingMore && hasMore && !isEmpty && fetchInitialCompleteRef.current && (
-        <div className="flex justify-center py-8">
-          <button
-            onClick={() => loadMoreIfNeeded()}
-            className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
-          >
-            {t("loadMore") || "Load More"}
-          </button>
-        </div>
-      )}
+      {!isLoadingMore &&
+        hasMore &&
+        !isEmpty &&
+        fetchInitialCompleteRef.current && (
+          <div className="flex justify-center py-8">
+            <button
+              onClick={() => loadMoreIfNeeded()}
+              className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+            >
+              {t("loadMore") || "Load More"}
+            </button>
+          </div>
+        )}
 
       {/* End of results indicator */}
       {!hasMore && !isEmpty && fetchInitialCompleteRef.current && (
         <div className="flex justify-center py-8">
-          <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+          <p
+            className={`text-sm ${
+              isDarkMode ? "text-gray-400" : "text-gray-600"
+            }`}
+          >
             You&apos;ve reached the end of the results
           </p>
         </div>
@@ -851,9 +927,7 @@ export default function SearchResultsPage() {
   return (
     <SearchResultsProvider>
       <div
-        className={`min-h-screen ${
-          isDarkMode ? "bg-gray-900" : "bg-gray-50"
-        }`}
+        className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
       >
         <div className="pb-8">
           <div className="max-w-6xl mx-auto">
