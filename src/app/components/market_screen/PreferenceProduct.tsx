@@ -31,7 +31,7 @@ interface PreferenceProductProps {
 }
 
 // Shimmer loading component
-const ShimmerCard: React.FC<{ width?: number }> = ({ width = 170 }) => (
+const ShimmerCard: React.FC<{ width?: number }> = ({ width = 205 }) => (
   <div
     className="animate-pulse bg-gray-300 rounded-lg"
     style={{ width: `${width}px` }}
@@ -66,7 +66,7 @@ export const PreferenceProduct: React.FC<PreferenceProductProps> = ({
   const router = useRouter();
 
   // Fixed dimensions to prevent hydration mismatch
-  const portraitImageHeight = 240;
+  const portraitImageHeight = 380; // Increased from 240
   const infoAreaHeight = 80;
   const rowHeight = portraitImageHeight + infoAreaHeight + 40;
 
@@ -333,7 +333,7 @@ export const PreferenceProduct: React.FC<PreferenceProductProps> = ({
                     <div
                       key={product.id}
                       className="flex-shrink-0"
-                      style={{ width: "170px" }}
+                      style={{ width: "205px" }}
                     >
                       <ProductCard
                         product={product}

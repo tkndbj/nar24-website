@@ -50,7 +50,7 @@ interface DynamicListData {
 }
 
 // Shimmer loading component
-const ShimmerCard: React.FC<{ width?: number }> = ({ width = 170 }) => (
+const ShimmerCard: React.FC<{ width?: number }> = ({ width = 205 }) => (
   <div
     className="animate-pulse bg-gray-300 dark:bg-gray-600 rounded-lg"
     style={{ width: `${width}px` }}
@@ -354,7 +354,7 @@ const DynamicList: React.FC<{
                     <div
                       key={product.id}
                       className="flex-shrink-0"
-                      style={{ width: "170px" }}
+                      style={{ width: "205px" }}
                     >
                       <ProductCard
                         product={product}
@@ -383,7 +383,7 @@ export const DynamicHorizontalList: React.FC = () => {
   const [isClient, setIsClient] = useState(false);
 
   // Fixed dimensions
-  const portraitImageHeight = 240;
+  const portraitImageHeight = 380;
   const infoAreaHeight = 80;
   const rowHeight = portraitImageHeight + infoAreaHeight + 40;
 
