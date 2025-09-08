@@ -246,20 +246,20 @@ const LocationPickerModal: React.FC<{
         }`}
       >
         <div
-          className={`flex items-center justify-between p-6 border-b ${
+          className={`flex items-center justify-between p-4 sm:p-6 border-b ${
             isDarkMode ? "border-gray-700/50" : "border-gray-200/50"
           }`}
         >
           <div>
             <h3
-              className={`text-xl font-bold ${
+              className={`text-lg sm:text-xl font-bold ${
                 isDarkMode ? "text-white" : "text-gray-900"
               }`}
             >
               {l("selectLocation")}
             </h3>
             <p
-              className={`text-sm mt-1 ${
+              className={`text-xs sm:text-sm mt-1 ${
                 isDarkMode ? "text-gray-400" : "text-gray-600"
               }`}
             >
@@ -274,7 +274,7 @@ const LocationPickerModal: React.FC<{
                 : "hover:bg-gray-100 text-gray-500 hover:text-gray-700"
             }`}
           >
-            <X size={24} />
+            <X size={20} className="sm:size-6" />
           </button>
         </div>
 
@@ -287,19 +287,22 @@ const LocationPickerModal: React.FC<{
 
           {selectedLocation && (
             <div
-              className={`absolute bottom-6 left-6 right-6 p-4 rounded-xl shadow-lg border backdrop-blur-sm ${
+              className={`absolute bottom-4 sm:bottom-6 left-4 sm:left-6 right-4 sm:right-6 p-3 sm:p-4 rounded-xl shadow-lg border backdrop-blur-sm ${
                 isDarkMode
                   ? "bg-gray-900/90 border-gray-700/50"
                   : "bg-white/90 border-gray-200/50"
               }`}
             >
-              <div className="flex items-start space-x-3">
-                <div className="p-2 rounded-lg bg-green-500/20">
-                  <CheckCircle2 size={20} className="text-green-500" />
+              <div className="flex items-start space-x-2 sm:space-x-3">
+                <div className="p-1.5 sm:p-2 rounded-lg bg-green-500/20">
+                  <CheckCircle2
+                    size={16}
+                    className="sm:size-5 text-green-500"
+                  />
                 </div>
                 <div>
                   <p
-                    className={`text-sm font-semibold mb-1 ${
+                    className={`text-xs sm:text-sm font-semibold mb-1 ${
                       isDarkMode ? "text-white" : "text-gray-900"
                     }`}
                   >
@@ -320,22 +323,22 @@ const LocationPickerModal: React.FC<{
         </div>
 
         <div
-          className={`flex items-center justify-between p-6 border-t ${
+          className={`flex items-center justify-between p-4 sm:p-6 border-t ${
             isDarkMode ? "border-gray-700/50" : "border-gray-200/50"
           }`}
         >
           <p
-            className={`text-sm flex items-center space-x-2 ${
+            className={`text-xs sm:text-sm flex items-center space-x-2 ${
               isDarkMode ? "text-gray-400" : "text-gray-600"
             }`}
           >
-            <Map size={16} />
+            <Map size={14} className="sm:size-4" />
             <span>{l("tapAnywhereToSetLocation")}</span>
           </p>
-          <div className="flex space-x-3">
+          <div className="flex space-x-2 sm:space-x-3">
             <button
               onClick={onClose}
-              className={`px-6 py-2.5 rounded-xl font-medium transition-all duration-200 ${
+              className={`px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl font-medium transition-all duration-200 text-sm sm:text-base ${
                 isDarkMode
                   ? "bg-gray-800 text-gray-300 hover:bg-gray-700"
                   : "bg-gray-100 text-gray-700 hover:bg-gray-200"
@@ -346,7 +349,7 @@ const LocationPickerModal: React.FC<{
             <button
               onClick={handleConfirm}
               disabled={!selectedLocation}
-              className="px-6 py-2.5 rounded-xl font-medium bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg"
+              className="px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl font-medium bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg text-sm sm:text-base"
             >
               {l("confirmLocation")}
             </button>
@@ -701,24 +704,24 @@ export default function ProductPaymentPage() {
             : "bg-gradient-to-br from-blue-50 via-white to-purple-50"
         }`}
       >
-        <div className="flex flex-col items-center space-y-6">
+        <div className="flex flex-col items-center space-y-4 sm:space-y-6">
           <div className="relative">
-            <div className="w-20 h-20 border-4 border-blue-200 rounded-full animate-pulse"></div>
+            <div className="w-16 h-16 sm:w-20 sm:h-20 border-4 border-blue-200 rounded-full animate-pulse"></div>
             <Loader2
-              size={40}
-              className="absolute inset-0 m-auto animate-spin text-blue-500"
+              size={32}
+              className="sm:size-10 absolute inset-0 m-auto animate-spin text-blue-500"
             />
           </div>
           <div className="text-center">
             <h3
-              className={`text-xl font-semibold ${
+              className={`text-lg sm:text-xl font-semibold ${
                 isDarkMode ? "text-white" : "text-gray-900"
               }`}
             >
               {t("loadingPayment")}
             </h3>
             <p
-              className={`text-sm mt-1 ${
+              className={`text-xs sm:text-sm mt-1 ${
                 isDarkMode ? "text-gray-400" : "text-gray-600"
               }`}
             >
@@ -746,29 +749,29 @@ export default function ProductPaymentPage() {
             : "bg-white/80 border-gray-200/50"
         }`}
       >
-        <div className="max-w-6xl mx-auto px-6 py-4">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3 sm:space-x-4">
               <button
                 onClick={() => router.back()}
-                className={`p-2.5 rounded-xl transition-all duration-200 ${
+                className={`p-2 sm:p-2.5 rounded-xl transition-all duration-200 ${
                   isDarkMode
                     ? "hover:bg-gray-800 text-gray-400 hover:text-white"
                     : "hover:bg-gray-100 text-gray-500 hover:text-gray-700"
                 }`}
               >
-                <ArrowLeft size={20} />
+                <ArrowLeft size={18} className="sm:size-5" />
               </button>
               <div>
                 <h1
-                  className={`text-2xl font-bold ${
+                  className={`text-lg sm:text-2xl font-bold ${
                     isDarkMode ? "text-white" : "text-gray-900"
                   }`}
                 >
                   {t("secureCheckout")}
                 </h1>
                 <p
-                  className={`text-sm ${
+                  className={`text-xs sm:text-sm ${
                     isDarkMode ? "text-gray-400" : "text-gray-600"
                   }`}
                 >
@@ -776,8 +779,8 @@ export default function ProductPaymentPage() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center space-x-2 text-sm">
-              <Shield size={16} className="text-green-500" />
+            <div className="flex items-center space-x-1.5 sm:space-x-2 text-xs sm:text-sm">
+              <Shield size={14} className="sm:size-4 text-green-500" />
               <span
                 className={`font-medium ${
                   isDarkMode ? "text-gray-300" : "text-gray-700"
@@ -790,10 +793,10 @@ export default function ProductPaymentPage() {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 sm:gap-8">
           {/* Left Column - Forms */}
-          <div className="lg:col-span-3 space-y-8">
+          <div className="lg:col-span-3 space-y-6 sm:space-y-8">
             {/* Address Section */}
             <div
               className={`rounded-2xl shadow-lg border backdrop-blur-sm ${
@@ -804,26 +807,26 @@ export default function ProductPaymentPage() {
             >
               <button
                 onClick={() => setIsAddressExpanded(!isAddressExpanded)}
-                className="w-full p-8 flex items-center justify-between group"
+                className="w-full p-6 sm:p-8 flex items-center justify-between group"
               >
-                <div className="flex items-center space-x-5">
+                <div className="flex items-center space-x-3 sm:space-x-5">
                   <div
-                    className={`p-4 rounded-2xl transition-all duration-200 ${
+                    className={`p-3 sm:p-4 rounded-2xl transition-all duration-200 ${
                       isDarkMode ? "bg-blue-500/20" : "bg-blue-50"
                     } group-hover:scale-105`}
                   >
-                    <MapPin size={24} className="text-blue-500" />
+                    <MapPin size={20} className="sm:size-6 text-blue-500" />
                   </div>
                   <div className="text-left">
                     <h2
-                      className={`text-xl font-bold ${
+                      className={`text-lg sm:text-xl font-bold ${
                         isDarkMode ? "text-white" : "text-gray-900"
                       }`}
                     >
                       {t("deliveryAddress")}
                     </h2>
                     <p
-                      className={`text-sm mt-1 ${
+                      className={`text-xs sm:text-sm mt-1 ${
                         isDarkMode ? "text-gray-400" : "text-gray-600"
                       }`}
                     >
@@ -832,8 +835,8 @@ export default function ProductPaymentPage() {
                   </div>
                 </div>
                 <ChevronDown
-                  size={20}
-                  className={`transform transition-all duration-200 ${
+                  size={18}
+                  className={`sm:size-5 transform transition-all duration-200 ${
                     isAddressExpanded ? "rotate-180" : ""
                   } ${
                     isDarkMode ? "text-gray-400" : "text-gray-500"
@@ -843,26 +846,26 @@ export default function ProductPaymentPage() {
 
               {isAddressExpanded && (
                 <div
-                  className={`px-8 pb-8 border-t ${
+                  className={`px-6 sm:px-8 pb-6 sm:pb-8 border-t ${
                     isDarkMode ? "border-gray-700/50" : "border-gray-200/50"
                   }`}
                 >
                   {/* Saved Addresses */}
                   {savedAddresses.length > 0 && (
-                    <div className="mb-8 mt-6">
+                    <div className="mb-6 sm:mb-8 mt-4 sm:mt-6">
                       <h3
-                        className={`text-sm font-semibold mb-4 flex items-center space-x-2 ${
+                        className={`text-xs sm:text-sm font-semibold mb-3 sm:mb-4 flex items-center space-x-2 ${
                           isDarkMode ? "text-gray-300" : "text-gray-700"
                         }`}
                       >
-                        <Star size={16} />
+                        <Star size={14} className="sm:size-4" />
                         <span>{t("savedAddresses")}</span>
                       </h3>
-                      <div className="space-y-3">
+                      <div className="space-y-2 sm:space-y-3">
                         {savedAddresses.map((address) => (
                           <label
                             key={address.id}
-                            className={`flex items-start space-x-4 p-4 rounded-xl border cursor-pointer transition-all duration-200 ${
+                            className={`flex items-start space-x-3 sm:space-x-4 p-3 sm:p-4 rounded-xl border cursor-pointer transition-all duration-200 ${
                               selectedAddressId === address.id
                                 ? isDarkMode
                                   ? "border-blue-500 bg-blue-500/10 shadow-lg"
@@ -878,18 +881,18 @@ export default function ProductPaymentPage() {
                               value={address.id}
                               checked={selectedAddressId === address.id}
                               onChange={() => handleAddressSelect(address.id)}
-                              className="mt-1.5 text-blue-500"
+                              className="mt-1 sm:mt-1.5 text-blue-500"
                             />
                             <div className="flex-1 min-w-0">
                               <p
-                                className={`font-semibold ${
+                                className={`text-sm sm:text-base font-semibold ${
                                   isDarkMode ? "text-white" : "text-gray-900"
                                 }`}
                               >
                                 {address.addressLine1}
                               </p>
                               <p
-                                className={`text-sm mt-1 ${
+                                className={`text-xs sm:text-sm mt-1 ${
                                   isDarkMode ? "text-gray-400" : "text-gray-600"
                                 }`}
                               >
@@ -898,7 +901,7 @@ export default function ProductPaymentPage() {
                                   .join(", ")}
                               </p>
                               <p
-                                className={`text-sm ${
+                                className={`text-xs sm:text-sm ${
                                   isDarkMode ? "text-gray-400" : "text-gray-600"
                                 }`}
                               >
@@ -909,7 +912,7 @@ export default function ProductPaymentPage() {
                         ))}
 
                         <label
-                          className={`flex items-center space-x-4 p-4 rounded-xl border cursor-pointer transition-all duration-200 ${
+                          className={`flex items-center space-x-3 sm:space-x-4 p-3 sm:p-4 rounded-xl border cursor-pointer transition-all duration-200 ${
                             selectedAddressId === null
                               ? isDarkMode
                                 ? "border-blue-500 bg-blue-500/10 shadow-lg"
@@ -928,7 +931,7 @@ export default function ProductPaymentPage() {
                             className="text-blue-500"
                           />
                           <span
-                            className={`font-semibold ${
+                            className={`text-sm sm:text-base font-semibold ${
                               isDarkMode ? "text-white" : "text-gray-900"
                             }`}
                           >
@@ -940,11 +943,11 @@ export default function ProductPaymentPage() {
                   )}
 
                   {/* Address Form */}
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4 sm:space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                       <div>
                         <label
-                          className={`block text-sm font-semibold mb-3 ${
+                          className={`block text-xs sm:text-sm font-semibold mb-2 sm:mb-3 ${
                             isDarkMode ? "text-gray-300" : "text-gray-700"
                           }`}
                         >
@@ -952,8 +955,8 @@ export default function ProductPaymentPage() {
                         </label>
                         <div className="relative group">
                           <Home
-                            size={18}
-                            className={`absolute left-4 top-1/2 transform -translate-y-1/2 transition-colors ${
+                            size={16}
+                            className={`sm:size-[18px] absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 transition-colors ${
                               isDarkMode ? "text-gray-400" : "text-gray-500"
                             } group-focus-within:text-blue-500`}
                           />
@@ -963,7 +966,7 @@ export default function ProductPaymentPage() {
                             onChange={(e) =>
                               handleInputChange("addressLine1", e.target.value)
                             }
-                            className={`w-full pl-12 pr-4 py-4 rounded-xl border transition-all duration-200 ${
+                            className={`w-full pl-10 sm:pl-12 pr-3 sm:pr-4 py-3 sm:py-4 rounded-xl border transition-all duration-200 text-sm sm:text-base ${
                               errors.addressLine1
                                 ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
                                 : isDarkMode
@@ -974,8 +977,8 @@ export default function ProductPaymentPage() {
                           />
                         </div>
                         {errors.addressLine1 && (
-                          <p className="mt-2 text-sm text-red-500 flex items-center space-x-1">
-                            <X size={14} />
+                          <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm text-red-500 flex items-center space-x-1">
+                            <X size={12} className="sm:size-[14px]" />
                             <span>{errors.addressLine1}</span>
                           </p>
                         )}
@@ -983,7 +986,7 @@ export default function ProductPaymentPage() {
 
                       <div>
                         <label
-                          className={`block text-sm font-semibold mb-3 ${
+                          className={`block text-xs sm:text-sm font-semibold mb-2 sm:mb-3 ${
                             isDarkMode ? "text-gray-300" : "text-gray-700"
                           }`}
                         >
@@ -991,8 +994,8 @@ export default function ProductPaymentPage() {
                         </label>
                         <div className="relative group">
                           <Building
-                            size={18}
-                            className={`absolute left-4 top-1/2 transform -translate-y-1/2 transition-colors ${
+                            size={16}
+                            className={`sm:size-[18px] absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 transition-colors ${
                               isDarkMode ? "text-gray-400" : "text-gray-500"
                             } group-focus-within:text-blue-500`}
                           />
@@ -1002,7 +1005,7 @@ export default function ProductPaymentPage() {
                             onChange={(e) =>
                               handleInputChange("addressLine2", e.target.value)
                             }
-                            className={`w-full pl-12 pr-4 py-4 rounded-xl border transition-all duration-200 ${
+                            className={`w-full pl-10 sm:pl-12 pr-3 sm:pr-4 py-3 sm:py-4 rounded-xl border transition-all duration-200 text-sm sm:text-base ${
                               isDarkMode
                                 ? "border-gray-600 bg-gray-700/50 text-white focus:border-blue-500 focus:ring-blue-500/20"
                                 : "border-gray-300 bg-white text-gray-900 focus:border-blue-500 focus:ring-blue-500/20"
@@ -1013,10 +1016,10 @@ export default function ProductPaymentPage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                       <div>
                         <label
-                          className={`block text-sm font-semibold mb-3 ${
+                          className={`block text-xs sm:text-sm font-semibold mb-2 sm:mb-3 ${
                             isDarkMode ? "text-gray-300" : "text-gray-700"
                           }`}
                         >
@@ -1024,8 +1027,8 @@ export default function ProductPaymentPage() {
                         </label>
                         <div className="relative group">
                           <Phone
-                            size={18}
-                            className={`absolute left-4 top-1/2 transform -translate-y-1/2 transition-colors ${
+                            size={16}
+                            className={`sm:size-[18px] absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 transition-colors ${
                               isDarkMode ? "text-gray-400" : "text-gray-500"
                             } group-focus-within:text-blue-500`}
                           />
@@ -1035,7 +1038,7 @@ export default function ProductPaymentPage() {
                             onChange={(e) =>
                               handleInputChange("phoneNumber", e.target.value)
                             }
-                            className={`w-full pl-12 pr-4 py-4 rounded-xl border transition-all duration-200 ${
+                            className={`w-full pl-10 sm:pl-12 pr-3 sm:pr-4 py-3 sm:py-4 rounded-xl border transition-all duration-200 text-sm sm:text-base ${
                               errors.phoneNumber
                                 ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
                                 : isDarkMode
@@ -1046,8 +1049,8 @@ export default function ProductPaymentPage() {
                           />
                         </div>
                         {errors.phoneNumber && (
-                          <p className="mt-2 text-sm text-red-500 flex items-center space-x-1">
-                            <X size={14} />
+                          <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm text-red-500 flex items-center space-x-1">
+                            <X size={12} className="sm:size-[14px]" />
                             <span>{errors.phoneNumber}</span>
                           </p>
                         )}
@@ -1055,7 +1058,7 @@ export default function ProductPaymentPage() {
 
                       <div className="relative">
                         <label
-                          className={`block text-sm font-semibold mb-3 ${
+                          className={`block text-xs sm:text-sm font-semibold mb-2 sm:mb-3 ${
                             isDarkMode ? "text-gray-300" : "text-gray-700"
                           }`}
                         >
@@ -1064,7 +1067,7 @@ export default function ProductPaymentPage() {
                         <button
                           type="button"
                           onClick={() => setShowCityDropdown(!showCityDropdown)}
-                          className={`w-full px-4 py-4 rounded-xl border text-left flex items-center justify-between transition-all duration-200 ${
+                          className={`w-full px-3 sm:px-4 py-3 sm:py-4 rounded-xl border text-left flex items-center justify-between transition-all duration-200 text-sm sm:text-base ${
                             errors.city
                               ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
                               : isDarkMode
@@ -1086,8 +1089,8 @@ export default function ProductPaymentPage() {
                             {formData.city || t("selectYourCity")}
                           </span>
                           <ChevronDown
-                            size={16}
-                            className="transition-transform duration-200"
+                            size={14}
+                            className="sm:size-4 transition-transform duration-200"
                           />
                         </button>
 
@@ -1107,7 +1110,7 @@ export default function ProductPaymentPage() {
                                   handleInputChange("city", city);
                                   setShowCityDropdown(false);
                                 }}
-                                className={`w-full px-4 py-3 text-left transition-colors ${
+                                className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 text-left transition-colors text-sm sm:text-base ${
                                   isDarkMode
                                     ? "text-white hover:bg-gray-700"
                                     : "text-gray-900 hover:bg-gray-100"
@@ -1120,8 +1123,8 @@ export default function ProductPaymentPage() {
                         )}
 
                         {errors.city && (
-                          <p className="mt-2 text-sm text-red-500 flex items-center space-x-1">
-                            <X size={14} />
+                          <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm text-red-500 flex items-center space-x-1">
+                            <X size={12} className="sm:size-[14px]" />
                             <span>{errors.city}</span>
                           </p>
                         )}
@@ -1131,7 +1134,7 @@ export default function ProductPaymentPage() {
                     {/* Location Picker */}
                     <div>
                       <label
-                        className={`block text-sm font-semibold mb-3 ${
+                        className={`block text-xs sm:text-sm font-semibold mb-2 sm:mb-3 ${
                           isDarkMode ? "text-gray-300" : "text-gray-700"
                         }`}
                       >
@@ -1147,7 +1150,7 @@ export default function ProductPaymentPage() {
                           setShowMapModal(true);
                         }}
                         disabled={!mapsLoaded}
-                        className={`w-full p-6 rounded-xl border text-left flex items-center justify-between transition-all duration-200 group ${
+                        className={`w-full p-4 sm:p-6 rounded-xl border text-left flex items-center justify-between transition-all duration-200 group ${
                           errors.location
                             ? "border-red-500"
                             : isDarkMode
@@ -1157,9 +1160,9 @@ export default function ProductPaymentPage() {
                           !mapsLoaded ? "opacity-50 cursor-not-allowed" : ""
                         }`}
                       >
-                        <div className="flex items-center space-x-4">
+                        <div className="flex items-center space-x-3 sm:space-x-4">
                           <div
-                            className={`p-3 rounded-xl transition-all duration-200 ${
+                            className={`p-2.5 sm:p-3 rounded-xl transition-all duration-200 ${
                               formData.location
                                 ? "bg-green-500/20"
                                 : isDarkMode
@@ -1169,16 +1172,19 @@ export default function ProductPaymentPage() {
                           >
                             {formData.location ? (
                               <CheckCircle2
-                                size={24}
-                                className="text-green-500"
+                                size={20}
+                                className="sm:size-6 text-green-500"
                               />
                             ) : (
-                              <Map size={24} className="text-blue-500" />
+                              <Map
+                                size={20}
+                                className="sm:size-6 text-blue-500"
+                              />
                             )}
                           </div>
                           <div>
                             <p
-                              className={`font-semibold ${
+                              className={`text-sm sm:text-base font-semibold ${
                                 isDarkMode ? "text-white" : "text-gray-900"
                               }`}
                             >
@@ -1190,7 +1196,7 @@ export default function ProductPaymentPage() {
                             </p>
                             {formData.location ? (
                               <p
-                                className={`text-sm mt-1 ${
+                                className={`text-xs sm:text-sm mt-1 ${
                                   isDarkMode ? "text-gray-400" : "text-gray-600"
                                 }`}
                               >
@@ -1199,7 +1205,7 @@ export default function ProductPaymentPage() {
                               </p>
                             ) : (
                               <p
-                                className={`text-sm mt-1 ${
+                                className={`text-xs sm:text-sm mt-1 ${
                                   isDarkMode ? "text-gray-400" : "text-gray-600"
                                 }`}
                               >
@@ -1209,15 +1215,15 @@ export default function ProductPaymentPage() {
                           </div>
                         </div>
                         <ChevronDown
-                          size={16}
-                          className={`transition-colors ${
+                          size={14}
+                          className={`sm:size-4 transition-colors ${
                             isDarkMode ? "text-gray-400" : "text-gray-500"
                           } group-hover:text-blue-500`}
                         />
                       </button>
                       {errors.location && (
-                        <p className="mt-2 text-sm text-red-500 flex items-center space-x-1">
-                          <X size={14} />
+                        <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm text-red-500 flex items-center space-x-1">
+                          <X size={12} className="sm:size-[14px]" />
                           <span>{errors.location}</span>
                         </p>
                       )}
@@ -1225,17 +1231,17 @@ export default function ProductPaymentPage() {
 
                     {/* Save Address */}
                     {selectedAddressId === null && (
-                      <label className="flex items-center space-x-3 cursor-pointer">
+                      <label className="flex items-center space-x-2.5 sm:space-x-3 cursor-pointer">
                         <input
                           type="checkbox"
                           checked={formData.saveAddress}
                           onChange={(e) =>
                             handleInputChange("saveAddress", e.target.checked)
                           }
-                          className="w-5 h-5 text-blue-500 rounded focus:ring-blue-500/50"
+                          className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500 rounded focus:ring-blue-500/50"
                         />
                         <span
-                          className={`text-sm font-medium ${
+                          className={`text-xs sm:text-sm font-medium ${
                             isDarkMode ? "text-gray-300" : "text-gray-700"
                           }`}
                         >
@@ -1258,26 +1264,29 @@ export default function ProductPaymentPage() {
             >
               <button
                 onClick={() => setIsPaymentExpanded(!isPaymentExpanded)}
-                className="w-full p-8 flex items-center justify-between group"
+                className="w-full p-6 sm:p-8 flex items-center justify-between group"
               >
-                <div className="flex items-center space-x-5">
+                <div className="flex items-center space-x-3 sm:space-x-5">
                   <div
-                    className={`p-4 rounded-2xl transition-all duration-200 ${
+                    className={`p-3 sm:p-4 rounded-2xl transition-all duration-200 ${
                       isDarkMode ? "bg-green-500/20" : "bg-green-50"
                     } group-hover:scale-105`}
                   >
-                    <CreditCard size={24} className="text-green-500" />
+                    <CreditCard
+                      size={20}
+                      className="sm:size-6 text-green-500"
+                    />
                   </div>
                   <div className="text-left">
                     <h2
-                      className={`text-xl font-bold ${
+                      className={`text-lg sm:text-xl font-bold ${
                         isDarkMode ? "text-white" : "text-gray-900"
                       }`}
                     >
                       {t("paymentMethod")}
                     </h2>
                     <p
-                      className={`text-sm mt-1 ${
+                      className={`text-xs sm:text-sm mt-1 ${
                         isDarkMode ? "text-gray-400" : "text-gray-600"
                       }`}
                     >
@@ -1286,8 +1295,8 @@ export default function ProductPaymentPage() {
                   </div>
                 </div>
                 <ChevronDown
-                  size={20}
-                  className={`transform transition-all duration-200 ${
+                  size={18}
+                  className={`sm:size-5 transform transition-all duration-200 ${
                     isPaymentExpanded ? "rotate-180" : ""
                   } ${
                     isDarkMode ? "text-gray-400" : "text-gray-500"
@@ -1297,26 +1306,26 @@ export default function ProductPaymentPage() {
 
               {isPaymentExpanded && (
                 <div
-                  className={`px-8 pb-8 border-t ${
+                  className={`px-6 sm:px-8 pb-6 sm:pb-8 border-t ${
                     isDarkMode ? "border-gray-700/50" : "border-gray-200/50"
                   }`}
                 >
                   {/* Saved Payment Methods */}
                   {savedPaymentMethods.length > 0 && (
-                    <div className="mb-8 mt-6">
+                    <div className="mb-6 sm:mb-8 mt-4 sm:mt-6">
                       <h3
-                        className={`text-sm font-semibold mb-4 flex items-center space-x-2 ${
+                        className={`text-xs sm:text-sm font-semibold mb-3 sm:mb-4 flex items-center space-x-2 ${
                           isDarkMode ? "text-gray-300" : "text-gray-700"
                         }`}
                       >
-                        <Star size={16} />
+                        <Star size={14} className="sm:size-4" />
                         <span>{t("savedPaymentMethods")}</span>
                       </h3>
-                      <div className="space-y-3">
+                      <div className="space-y-2 sm:space-y-3">
                         {savedPaymentMethods.map((method) => (
                           <label
                             key={method.id}
-                            className={`flex items-center space-x-4 p-4 rounded-xl border cursor-pointer transition-all duration-200 ${
+                            className={`flex items-center space-x-3 sm:space-x-4 p-3 sm:p-4 rounded-xl border cursor-pointer transition-all duration-200 ${
                               selectedPaymentMethodId === method.id
                                 ? isDarkMode
                                   ? "border-green-500 bg-green-500/10 shadow-lg"
@@ -1338,14 +1347,14 @@ export default function ProductPaymentPage() {
                             />
                             <div className="flex-1">
                               <p
-                                className={`font-semibold ${
+                                className={`text-sm sm:text-base font-semibold ${
                                   isDarkMode ? "text-white" : "text-gray-900"
                                 }`}
                               >
                                 •••• •••• •••• {method.cardNumber.slice(-4)}
                               </p>
                               <p
-                                className={`text-sm mt-1 ${
+                                className={`text-xs sm:text-sm mt-1 ${
                                   isDarkMode ? "text-gray-400" : "text-gray-600"
                                 }`}
                               >
@@ -1357,7 +1366,7 @@ export default function ProductPaymentPage() {
                         ))}
 
                         <label
-                          className={`flex items-center space-x-4 p-4 rounded-xl border cursor-pointer transition-all duration-200 ${
+                          className={`flex items-center space-x-3 sm:space-x-4 p-3 sm:p-4 rounded-xl border cursor-pointer transition-all duration-200 ${
                             selectedPaymentMethodId === null
                               ? isDarkMode
                                 ? "border-green-500 bg-green-500/10 shadow-lg"
@@ -1376,7 +1385,7 @@ export default function ProductPaymentPage() {
                             className="text-green-500"
                           />
                           <span
-                            className={`font-semibold ${
+                            className={`text-sm sm:text-base font-semibold ${
                               isDarkMode ? "text-white" : "text-gray-900"
                             }`}
                           >
@@ -1388,10 +1397,10 @@ export default function ProductPaymentPage() {
                   )}
 
                   {/* Payment Form */}
-                  <div className="space-y-6">
+                  <div className="space-y-4 sm:space-y-6">
                     <div>
                       <label
-                        className={`block text-sm font-semibold mb-3 ${
+                        className={`block text-xs sm:text-sm font-semibold mb-2 sm:mb-3 ${
                           isDarkMode ? "text-gray-300" : "text-gray-700"
                         }`}
                       >
@@ -1399,8 +1408,8 @@ export default function ProductPaymentPage() {
                       </label>
                       <div className="relative group">
                         <CreditCard
-                          size={18}
-                          className={`absolute left-4 top-1/2 transform -translate-y-1/2 transition-colors ${
+                          size={16}
+                          className={`sm:size-[18px] absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 transition-colors ${
                             isDarkMode ? "text-gray-400" : "text-gray-500"
                           } group-focus-within:text-green-500`}
                         />
@@ -1414,7 +1423,7 @@ export default function ProductPaymentPage() {
                             )
                           }
                           maxLength={19}
-                          className={`w-full pl-12 pr-4 py-4 rounded-xl border transition-all duration-200 ${
+                          className={`w-full pl-10 sm:pl-12 pr-3 sm:pr-4 py-3 sm:py-4 rounded-xl border transition-all duration-200 text-sm sm:text-base ${
                             errors.cardNumber
                               ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
                               : isDarkMode
@@ -1425,17 +1434,17 @@ export default function ProductPaymentPage() {
                         />
                       </div>
                       {errors.cardNumber && (
-                        <p className="mt-2 text-sm text-red-500 flex items-center space-x-1">
-                          <X size={14} />
+                        <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm text-red-500 flex items-center space-x-1">
+                          <X size={12} className="sm:size-[14px]" />
                           <span>{errors.cardNumber}</span>
                         </p>
                       )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-2 gap-4 sm:gap-6">
                       <div>
                         <label
-                          className={`block text-sm font-semibold mb-3 ${
+                          className={`block text-xs sm:text-sm font-semibold mb-2 sm:mb-3 ${
                             isDarkMode ? "text-gray-300" : "text-gray-700"
                           }`}
                         >
@@ -1443,8 +1452,8 @@ export default function ProductPaymentPage() {
                         </label>
                         <div className="relative group">
                           <Calendar
-                            size={18}
-                            className={`absolute left-4 top-1/2 transform -translate-y-1/2 transition-colors ${
+                            size={16}
+                            className={`sm:size-[18px] absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 transition-colors ${
                               isDarkMode ? "text-gray-400" : "text-gray-500"
                             } group-focus-within:text-green-500`}
                           />
@@ -1455,7 +1464,7 @@ export default function ProductPaymentPage() {
                               handleExpiryDateChange(e.target.value)
                             }
                             maxLength={5}
-                            className={`w-full pl-12 pr-4 py-4 rounded-xl border transition-all duration-200 ${
+                            className={`w-full pl-10 sm:pl-12 pr-3 sm:pr-4 py-3 sm:py-4 rounded-xl border transition-all duration-200 text-sm sm:text-base ${
                               errors.expiryDate
                                 ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
                                 : isDarkMode
@@ -1466,8 +1475,8 @@ export default function ProductPaymentPage() {
                           />
                         </div>
                         {errors.expiryDate && (
-                          <p className="mt-2 text-sm text-red-500 flex items-center space-x-1">
-                            <X size={14} />
+                          <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm text-red-500 flex items-center space-x-1">
+                            <X size={12} className="sm:size-[14px]" />
                             <span>{errors.expiryDate}</span>
                           </p>
                         )}
@@ -1475,7 +1484,7 @@ export default function ProductPaymentPage() {
 
                       <div>
                         <label
-                          className={`block text-sm font-semibold mb-3 ${
+                          className={`block text-xs sm:text-sm font-semibold mb-2 sm:mb-3 ${
                             isDarkMode ? "text-gray-300" : "text-gray-700"
                           }`}
                         >
@@ -1483,8 +1492,8 @@ export default function ProductPaymentPage() {
                         </label>
                         <div className="relative group">
                           <Lock
-                            size={18}
-                            className={`absolute left-4 top-1/2 transform -translate-y-1/2 transition-colors ${
+                            size={16}
+                            className={`sm:size-[18px] absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 transition-colors ${
                               isDarkMode ? "text-gray-400" : "text-gray-500"
                             } group-focus-within:text-green-500`}
                           />
@@ -1495,7 +1504,7 @@ export default function ProductPaymentPage() {
                               handleInputChange("cvv", e.target.value)
                             }
                             maxLength={4}
-                            className={`w-full pl-12 pr-4 py-4 rounded-xl border transition-all duration-200 ${
+                            className={`w-full pl-10 sm:pl-12 pr-3 sm:pr-4 py-3 sm:py-4 rounded-xl border transition-all duration-200 text-sm sm:text-base ${
                               errors.cvv
                                 ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
                                 : isDarkMode
@@ -1506,8 +1515,8 @@ export default function ProductPaymentPage() {
                           />
                         </div>
                         {errors.cvv && (
-                          <p className="mt-2 text-sm text-red-500 flex items-center space-x-1">
-                            <X size={14} />
+                          <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm text-red-500 flex items-center space-x-1">
+                            <X size={12} className="sm:size-[14px]" />
                             <span>{errors.cvv}</span>
                           </p>
                         )}
@@ -1516,7 +1525,7 @@ export default function ProductPaymentPage() {
 
                     <div>
                       <label
-                        className={`block text-sm font-semibold mb-3 ${
+                        className={`block text-xs sm:text-sm font-semibold mb-2 sm:mb-3 ${
                           isDarkMode ? "text-gray-300" : "text-gray-700"
                         }`}
                       >
@@ -1524,8 +1533,8 @@ export default function ProductPaymentPage() {
                       </label>
                       <div className="relative group">
                         <User
-                          size={18}
-                          className={`absolute left-4 top-1/2 transform -translate-y-1/2 transition-colors ${
+                          size={16}
+                          className={`sm:size-[18px] absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 transition-colors ${
                             isDarkMode ? "text-gray-400" : "text-gray-500"
                           } group-focus-within:text-green-500`}
                         />
@@ -1535,7 +1544,7 @@ export default function ProductPaymentPage() {
                           onChange={(e) =>
                             handleInputChange("cardHolderName", e.target.value)
                           }
-                          className={`w-full pl-12 pr-4 py-4 rounded-xl border transition-all duration-200 ${
+                          className={`w-full pl-10 sm:pl-12 pr-3 sm:pr-4 py-3 sm:py-4 rounded-xl border transition-all duration-200 text-sm sm:text-base ${
                             errors.cardHolderName
                               ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
                               : isDarkMode
@@ -1546,8 +1555,8 @@ export default function ProductPaymentPage() {
                         />
                       </div>
                       {errors.cardHolderName && (
-                        <p className="mt-2 text-sm text-red-500 flex items-center space-x-1">
-                          <X size={14} />
+                        <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm text-red-500 flex items-center space-x-1">
+                          <X size={12} className="sm:size-[14px]" />
                           <span>{errors.cardHolderName}</span>
                         </p>
                       )}
@@ -1555,7 +1564,7 @@ export default function ProductPaymentPage() {
 
                     {/* Save Payment Method */}
                     {selectedPaymentMethodId === null && (
-                      <label className="flex items-center space-x-3 cursor-pointer">
+                      <label className="flex items-center space-x-2.5 sm:space-x-3 cursor-pointer">
                         <input
                           type="checkbox"
                           checked={formData.savePaymentDetails}
@@ -1565,10 +1574,10 @@ export default function ProductPaymentPage() {
                               e.target.checked
                             )
                           }
-                          className="w-5 h-5 text-green-500 rounded focus:ring-green-500/50"
+                          className="w-4 h-4 sm:w-5 sm:h-5 text-green-500 rounded focus:ring-green-500/50"
                         />
                         <span
-                          className={`text-sm font-medium ${
+                          className={`text-xs sm:text-sm font-medium ${
                             isDarkMode ? "text-gray-300" : "text-gray-700"
                           }`}
                         >
@@ -1585,18 +1594,18 @@ export default function ProductPaymentPage() {
           {/* Right Column - Order Summary */}
           <div className="lg:col-span-2">
             <div
-              className={`sticky top-32 rounded-2xl shadow-lg border backdrop-blur-sm p-8 ${
+              className={`sticky top-32 rounded-2xl shadow-lg border backdrop-blur-sm p-6 sm:p-8 ${
                 isDarkMode
                   ? "bg-gray-800/80 border-gray-700/50"
                   : "bg-white/80 border-gray-200/50"
               }`}
             >
-              <div className="flex items-center space-x-3 mb-6">
-                <div className="p-3 rounded-xl bg-gradient-to-r from-blue-500/20 to-purple-500/20">
-                  <CreditCard size={24} className="text-blue-500" />
+              <div className="flex items-center space-x-2.5 sm:space-x-3 mb-5 sm:mb-6">
+                <div className="p-2.5 sm:p-3 rounded-xl bg-gradient-to-r from-blue-500/20 to-purple-500/20">
+                  <CreditCard size={20} className="sm:size-6 text-blue-500" />
                 </div>
                 <h3
-                  className={`text-xl font-bold ${
+                  className={`text-lg sm:text-xl font-bold ${
                     isDarkMode ? "text-white" : "text-gray-900"
                   }`}
                 >
@@ -1605,23 +1614,23 @@ export default function ProductPaymentPage() {
               </div>
 
               {/* Cart Items */}
-              <div className="space-y-4 mb-8">
+              <div className="space-y-3 sm:space-y-4 mb-6 sm:mb-8">
                 {cartItems.map((item, index) => (
                   <div
                     key={index}
-                    className={`flex items-center space-x-4 p-4 rounded-xl ${
+                    className={`flex items-center space-x-3 sm:space-x-4 p-3 sm:p-4 rounded-xl ${
                       isDarkMode ? "bg-gray-700/30" : "bg-gray-50"
                     }`}
                   >
                     <div
-                      className={`w-16 h-16 rounded-xl flex items-center justify-center ${
+                      className={`w-12 h-12 sm:w-16 sm:h-16 rounded-xl flex items-center justify-center ${
                         isDarkMode
                           ? "bg-gradient-to-br from-blue-500/20 to-purple-500/20"
                           : "bg-gradient-to-br from-blue-100 to-purple-100"
                       }`}
                     >
                       <span
-                        className={`text-lg font-bold ${
+                        className={`text-sm sm:text-lg font-bold ${
                           isDarkMode ? "text-white" : "text-gray-900"
                         }`}
                       >
@@ -1630,14 +1639,14 @@ export default function ProductPaymentPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p
-                        className={`font-semibold ${
+                        className={`text-sm sm:text-base font-semibold ${
                           isDarkMode ? "text-white" : "text-gray-900"
                         }`}
                       >
                         {item.productName || t("product")}
                       </p>
                       <p
-                        className={`text-sm ${
+                        className={`text-xs sm:text-sm ${
                           isDarkMode ? "text-gray-400" : "text-gray-600"
                         }`}
                       >
@@ -1647,14 +1656,14 @@ export default function ProductPaymentPage() {
                     </div>
                     <div className="text-right">
                       <span
-                        className={`text-lg font-bold ${
+                        className={`text-base sm:text-lg font-bold ${
                           isDarkMode ? "text-white" : "text-gray-900"
                         }`}
                       >
                         {((item.price || 0) * item.quantity).toFixed(2)}
                       </span>
                       <p
-                        className={`text-sm ${
+                        className={`text-xs sm:text-sm ${
                           isDarkMode ? "text-gray-400" : "text-gray-600"
                         }`}
                       >
@@ -1667,20 +1676,20 @@ export default function ProductPaymentPage() {
 
               {/* Pricing Breakdown */}
               <div
-                className={`border-t pt-6 space-y-4 ${
+                className={`border-t pt-5 sm:pt-6 space-y-3 sm:space-y-4 ${
                   isDarkMode ? "border-gray-700/50" : "border-gray-200/50"
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <span
-                    className={`text-sm ${
+                    className={`text-xs sm:text-sm ${
                       isDarkMode ? "text-gray-400" : "text-gray-600"
                     }`}
                   >
                     {t("subtotal")}
                   </span>
                   <span
-                    className={`font-medium ${
+                    className={`text-sm sm:text-base font-medium ${
                       isDarkMode ? "text-white" : "text-gray-900"
                     }`}
                   >
@@ -1689,26 +1698,28 @@ export default function ProductPaymentPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span
-                    className={`text-sm ${
+                    className={`text-xs sm:text-sm ${
                       isDarkMode ? "text-gray-400" : "text-gray-600"
                     }`}
                   >
                     {t("deliveryFee")}
                   </span>
-                  <span className={`font-medium text-green-500`}>
+                  <span
+                    className={`text-sm sm:text-base font-medium text-green-500`}
+                  >
                     {t("free")}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span
-                    className={`text-sm ${
+                    className={`text-xs sm:text-sm ${
                       isDarkMode ? "text-gray-400" : "text-gray-600"
                     }`}
                   >
                     {t("tax")}
                   </span>
                   <span
-                    className={`font-medium ${
+                    className={`text-sm sm:text-base font-medium ${
                       isDarkMode ? "text-white" : "text-gray-900"
                     }`}
                   >
@@ -1717,24 +1728,24 @@ export default function ProductPaymentPage() {
                 </div>
 
                 <div
-                  className={`border-t pt-4 ${
+                  className={`border-t pt-3 sm:pt-4 ${
                     isDarkMode ? "border-gray-700/50" : "border-gray-200/50"
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center justify-between mb-5 sm:mb-6">
                     <span
-                      className={`text-xl font-bold ${
+                      className={`text-lg sm:text-xl font-bold ${
                         isDarkMode ? "text-white" : "text-gray-900"
                       }`}
                     >
                       {t("total")}
                     </span>
                     <div className="text-right">
-                      <span className="text-3xl font-bold bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent">
+                      <span className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent">
                         {totalPrice.toFixed(2)}
                       </span>
                       <p
-                        className={`text-sm ${
+                        className={`text-xs sm:text-sm ${
                           isDarkMode ? "text-gray-400" : "text-gray-600"
                         }`}
                       >
@@ -1748,16 +1759,16 @@ export default function ProductPaymentPage() {
                 <button
                   onClick={handleSubmit}
                   disabled={isProcessing}
-                  className="w-full py-5 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white font-bold text-lg rounded-2xl hover:from-blue-600 hover:via-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center space-x-3 shadow-xl transform hover:scale-[1.02] active:scale-[0.98]"
+                  className="w-full py-4 sm:py-5 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white font-bold text-base sm:text-lg rounded-2xl hover:from-blue-600 hover:via-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center space-x-2.5 sm:space-x-3 shadow-xl transform hover:scale-[1.02] active:scale-[0.98]"
                 >
                   {isProcessing ? (
                     <>
-                      <Loader2 size={24} className="animate-spin" />
+                      <Loader2 size={20} className="sm:size-6 animate-spin" />
                       <span>{t("processingPayment")}</span>
                     </>
                   ) : (
                     <>
-                      <Lock size={24} />
+                      <Lock size={20} className="sm:size-6" />
                       <span>{t("completeSecurePayment")}</span>
                     </>
                   )}
@@ -1765,30 +1776,39 @@ export default function ProductPaymentPage() {
 
                 {/* Security Notice */}
                 <div
-                  className={`flex items-center justify-center space-x-2 text-xs mt-4 ${
+                  className={`flex items-center justify-center space-x-1.5 sm:space-x-2 text-xs mt-3 sm:mt-4 ${
                     isDarkMode ? "text-gray-400" : "text-gray-500"
                   }`}
                 >
-                  <Shield size={14} className="text-green-500" />
+                  <Shield size={12} className="sm:size-[14px] text-green-500" />
                   <span>{t("protectedBySSL")}</span>
                 </div>
 
                 {/* Trust Indicators */}
                 <div
-                  className={`grid grid-cols-3 gap-2 mt-4 ${
+                  className={`grid grid-cols-3 gap-1.5 sm:gap-2 mt-3 sm:mt-4 ${
                     isDarkMode ? "text-gray-400" : "text-gray-600"
                   }`}
                 >
                   <div className="flex items-center justify-center space-x-1 text-xs">
-                    <CheckCircle2 size={12} className="text-green-500" />
+                    <CheckCircle2
+                      size={10}
+                      className="sm:size-3 text-green-500"
+                    />
                     <span>{t("secure")}</span>
                   </div>
                   <div className="flex items-center justify-center space-x-1 text-xs">
-                    <CheckCircle2 size={12} className="text-green-500" />
+                    <CheckCircle2
+                      size={10}
+                      className="sm:size-3 text-green-500"
+                    />
                     <span>{t("fast")}</span>
                   </div>
                   <div className="flex items-center justify-center space-x-1 text-xs">
-                    <CheckCircle2 size={12} className="text-green-500" />
+                    <CheckCircle2
+                      size={10}
+                      className="sm:size-3 text-green-500"
+                    />
                     <span>{t("reliable")}</span>
                   </div>
                 </div>

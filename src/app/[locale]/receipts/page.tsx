@@ -300,7 +300,7 @@ export default function ReceiptsPage() {
                 />
               </button>
               <h1
-                className={`text-lg font-semibold ${
+                className={`text-sm sm:text-lg font-semibold ${
                   isDarkMode ? "text-white" : "text-gray-900"
                 }`}
               >
@@ -349,7 +349,7 @@ export default function ReceiptsPage() {
             </div>
             <h3
               className={`
-                text-xl font-bold mb-3 text-center
+                text-lg sm:text-xl font-bold mb-3 text-center
                 ${isDarkMode ? "text-white" : "text-gray-900"}
               `}
             >
@@ -357,7 +357,7 @@ export default function ReceiptsPage() {
             </h3>
             <p
               className={`
-                text-center mb-8 leading-relaxed
+                text-sm sm:text-base text-center mb-8 leading-relaxed
                 ${isDarkMode ? "text-gray-400" : "text-gray-600"}
               `}
             >
@@ -375,7 +375,7 @@ export default function ReceiptsPage() {
               "
             >
               <LogIn size={18} />
-              <span className="font-medium">
+              <span className="font-medium text-sm sm:text-base">
                 {l("Receipts.login") || "Login"}
               </span>
             </button>
@@ -385,7 +385,7 @@ export default function ReceiptsPage() {
             <div className="animate-spin w-8 h-8 border-3 border-orange-500 border-t-transparent rounded-full mb-4"></div>
             <p
               className={`
-                text-center
+                text-sm sm:text-base text-center
                 ${isDarkMode ? "text-gray-400" : "text-gray-600"}
               `}
             >
@@ -407,7 +407,7 @@ export default function ReceiptsPage() {
             </div>
             <h3
               className={`
-                text-xl font-bold mb-3 text-center
+                text-lg sm:text-xl font-bold mb-3 text-center
                 ${isDarkMode ? "text-white" : "text-gray-900"}
               `}
             >
@@ -415,7 +415,7 @@ export default function ReceiptsPage() {
             </h3>
             <p
               className={`
-                text-center mb-8 leading-relaxed
+                text-sm sm:text-base text-center mb-8 leading-relaxed
                 ${isDarkMode ? "text-gray-400" : "text-gray-600"}
               `}
             >
@@ -457,7 +457,7 @@ export default function ReceiptsPage() {
                       <div className="flex items-center justify-between mb-2">
                         <h3
                           className={`
-                            font-semibold truncate
+                            text-sm sm:text-base font-semibold truncate
                             ${isDarkMode ? "text-white" : "text-gray-900"}
                           `}
                         >
@@ -479,7 +479,7 @@ export default function ReceiptsPage() {
                         </span>
                       </div>
 
-                      <div className="flex items-center space-x-4 text-sm">
+                      <div className="flex items-center space-x-4 text-xs sm:text-sm">
                         <div className="flex items-center space-x-1">
                           <Calendar
                             className={`
@@ -517,7 +517,7 @@ export default function ReceiptsPage() {
                     {/* Price and Arrow */}
                     <div className="flex items-center space-x-3">
                       <div className="text-right">
-                        <p className="text-lg font-bold text-green-600">
+                        <p className="text-base sm:text-lg font-bold text-green-600">
                           {receipt.totalPrice.toFixed(0)} {receipt.currency}
                         </p>
                       </div>
@@ -544,7 +544,7 @@ export default function ReceiptsPage() {
                 <div className="text-center py-6">
                   <p
                     className={`
-                      text-sm
+                      text-xs sm:text-sm
                       ${isDarkMode ? "text-gray-400" : "text-gray-600"}
                     `}
                   >
