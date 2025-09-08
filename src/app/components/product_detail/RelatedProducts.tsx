@@ -158,7 +158,7 @@ const ProductDetailRelatedProducts: React.FC<
     const cardWidth = mobile ? 180 : 240; // Narrower cards on mobile (180px instead of 240px)
 
     // Gap calculation - smaller on mobile
-    const gap = mobile ? 8 : 16; // 8px gap on mobile, 16px on desktop
+    const gap = mobile ? 4 : 8; // 8px gap on mobile, 16px on desktop
 
     return {
       listViewHeight,
@@ -352,7 +352,7 @@ const ProductDetailRelatedProducts: React.FC<
               <div
                 ref={scrollContainerRef}
                 className={`flex overflow-x-auto h-full scroll-smooth ${
-                  isMobile ? "gap-2" : "gap-4"
+                  isMobile ? "gap-0" : "gap-0"
                 }`}
                 style={{
                   scrollbarWidth: "none",
