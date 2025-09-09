@@ -17,9 +17,7 @@ interface BubbleData {
   showComingSoon: boolean;
 }
 
-export const MarketBubbles: React.FC<MarketBubblesProps> = ({
-  onNavItemTapped,
-}) => {
+export const MarketBubbles: React.FC<MarketBubblesProps> = ({}) => {
   const router = useRouter();
   const [isDarkMode, setIsDarkMode] = useState(false);
 
@@ -91,9 +89,8 @@ export const MarketBubbles: React.FC<MarketBubblesProps> = ({
     if (index === 0) {
       router.push("/shops"); // Navigate to /shop for Mağazalar bubble
     } else if (index === 1) {
-      onNavItemTapped(4); // Use the callback for Vitrin bubble
+      router.push("/dynamicteras"); // Navigate to /shop for Mağazalar bubble
     }
-    // Other bubbles with coming soon don't have actions yet
   };
 
   return (
