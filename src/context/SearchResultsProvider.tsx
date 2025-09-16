@@ -8,7 +8,7 @@ import React, {
   ReactNode,
   useMemo,
 } from "react";
-import { Product } from "@/lib/algolia";
+import { Product } from "@/app/models/Product";
 
 // Filter types matching Flutter implementation
 export type FilterType = '' | 'deals' | 'boosted' | 'trending' | 'fiveStar' | 'bestSellers';
@@ -102,7 +102,7 @@ export function SearchResultsProvider({ children }: SearchResultsProviderProps) 
         );
         break;
       case 'Date':
-        sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        sorted.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
         break;
       case 'Price Low to High':
         sorted.sort((a, b) => a.price - b.price);

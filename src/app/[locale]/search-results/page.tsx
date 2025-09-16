@@ -17,9 +17,11 @@ import {
   SearchResultsProvider,
   useSearchResultsProvider,
   FilterType,
-  SortOption,
-  Product,
+  SortOption,  
 } from "@/context/SearchResultsProvider";
+
+import { Product, ProductUtils } from "@/app/models/Product";
+
 
 // Enhanced utility functions
 const throttle = <T extends (...args: unknown[]) => unknown>(
@@ -450,7 +452,7 @@ const SearchResultsContent: React.FC = () => {
           console.log(
             `🔍 Searching products index with filter: ${serverSideFilterType}`
           );
-          results = await algoliaManager.searchProducts(
+          const algoliaResults = await algoliaManager.searchProducts(
             query,
             pageToFetch,
             50,
@@ -458,6 +460,7 @@ const SearchResultsContent: React.FC = () => {
             serverSideFilterType,
             sortOption === "None" ? "None" : sortOption
           );
+          results = algoliaResults.map(algoliaProduct => ProductUtils.fromAlgolia(algoliaProduct as any));
           console.log(`✅ Products index returned ${results.length} results`);
         } catch (productError) {
           console.warn("❌ Products index failed:", productError);
@@ -465,7 +468,7 @@ const SearchResultsContent: React.FC = () => {
           // Fallback to shop_products index
           try {
             console.log(`🔍 Fallback: Searching shop_products index`);
-            results = await algoliaManager.searchProducts(
+            const algoliaResults = await algoliaManager.searchProducts(
               query,
               pageToFetch,
               50,
@@ -473,6 +476,7 @@ const SearchResultsContent: React.FC = () => {
               serverSideFilterType,
               sortOption === "None" ? "None" : sortOption
             );
+            results = algoliaResults.map(algoliaProduct => ProductUtils.fromAlgolia(algoliaProduct as any));
             console.log(
               `✅ Shop_products index returned ${results.length} results`
             );
