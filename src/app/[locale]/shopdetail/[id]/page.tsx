@@ -584,15 +584,9 @@ export default function ShopDetailPage() {
               </div>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-  <style jsx>{`
-    .grid > div {
-      max-height: 300px; /* Limit card height */
-    }
-  `}</style>
   {products.map((product) => (
-    <div className="max-h-72"> {/* Add height constraint wrapper */}
+    <div key={product.id} className="max-h-80 overflow-hidden">
       <ProductCard
-        key={product.id}
         product={product}
         scaleFactor={0.9}
         showCartIcon={true}
