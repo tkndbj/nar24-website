@@ -92,9 +92,7 @@ interface CartItem {
   [key: string]: unknown;
 }
 
-interface RelatedProduct extends Product {
-  // Additional fields for related products if needed
-}
+type RelatedProduct = Product;
 
 interface CartTotals {
   subtotal: number;
@@ -475,20 +473,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     }
   }, [selectedProducts, removeMultipleFromCart]);
 
-  // Handle refresh - matching Flutter implementation
-  const handleRefresh = useCallback(async () => {
-    if (isRefreshing) return;
 
-    setIsRefreshing(true);
-    try {
-      await refresh();
-      loadRelatedProductsUniversal();
-    } catch (error) {
-      console.error("Refresh error:", error);
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [isRefreshing, refresh, loadRelatedProductsUniversal]);
 
   // Handle checkout - matching Flutter implementation
   const handleCheckout = useCallback(async () => {
