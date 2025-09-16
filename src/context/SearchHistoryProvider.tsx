@@ -287,7 +287,7 @@ export const SearchHistoryProvider: React.FC<{ children: React.ReactNode }> = ({
 
     try {
       // Step 2: Save to Firestore
-      const docRef = await addDoc(collection(db, 'searches'), {
+      await addDoc(collection(db, 'searches'), {
         userId: userId,
         searchTerm: searchTerm.trim(),
         timestamp: serverTimestamp(),
