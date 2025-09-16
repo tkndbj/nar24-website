@@ -31,7 +31,7 @@ interface ProductOptionSelectorProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: (result: OptionSelectorResult) => void;
-  
+  isDarkMode?: boolean;
 }
 
 interface ColorThumbProps {
@@ -41,12 +41,14 @@ interface ColorThumbProps {
   disabled: boolean;
   onSelect: () => void;
   label?: string;
+  isDarkMode?: boolean;
 }
 
 interface AttributeChipProps {
   label: string;
   isSelected: boolean;
   onSelect: () => void;
+  isDarkMode?: boolean;
 }
 
 const ColorThumb: React.FC<ColorThumbProps> = ({
@@ -56,6 +58,7 @@ const ColorThumb: React.FC<ColorThumbProps> = ({
   disabled,
   onSelect,
   label,
+  isDarkMode = false,
 }) => {
   const t = useTranslations();
 
@@ -67,9 +70,11 @@ const ColorThumb: React.FC<ColorThumbProps> = ({
         relative flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden border-2 transition-all duration-200 mx-1
         ${isSelected 
           ? 'border-orange-500 border-3 shadow-lg' 
-          : 'border-gray-300 dark:border-gray-600'
+          : isDarkMode 
+            ? 'border-gray-600 hover:border-orange-400' 
+            : 'border-gray-300 hover:border-orange-400'
         }
-        ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-orange-400'}
+        ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
       `}
     >
       <img
@@ -84,7 +89,9 @@ const ColorThumb: React.FC<ColorThumbProps> = ({
       />
       
       {/* Fallback icon */}
-      <div className="hidden absolute inset-0 bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+      <div className={`hidden absolute inset-0 flex items-center justify-center ${
+        isDarkMode ? 'bg-gray-700' : 'bg-gray-200'
+      }`}>
         <div className="w-6 h-6 bg-gray-400 rounded" />
       </div>
 
@@ -111,6 +118,7 @@ const AttributeChip: React.FC<AttributeChipProps> = ({
   label,
   isSelected,
   onSelect,
+  isDarkMode = false,
 }) => {
   return (
     <button
@@ -119,7 +127,9 @@ const AttributeChip: React.FC<AttributeChipProps> = ({
         px-4 py-2 rounded-full border transition-all duration-200 text-sm font-medium mx-1 mb-2
         ${isSelected
           ? 'border-orange-500 border-2 text-orange-500 bg-orange-50 dark:bg-orange-950'
-          : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-orange-400'
+          : isDarkMode
+            ? 'border-gray-600 text-gray-300 hover:border-orange-400'
+            : 'border-gray-300 text-gray-700 hover:border-orange-400'
         }
       `}
     >
@@ -133,7 +143,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
   isOpen,
   onClose,
   onConfirm,
-  
+  isDarkMode = false,
 }) => {
   const { user } = useUser();
   const t = useTranslations();
@@ -271,9 +281,9 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
   const handleConfirm = useCallback(() => {
     if (!isConfirmEnabled) return;
 
-    // 🚀 FIXED: Build comprehensive result object with all selected options
+    // Build comprehensive result object with all selected options
     const result: OptionSelectorResult = {
-      // ✅ CRITICAL: Ensure quantity is properly included
+      // Ensure quantity is properly included
       quantity: selectedQuantity,
       // Add all attribute selections
       ...selections,
@@ -294,7 +304,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
       }
     }
 
-    // 🚀 DEBUG: Log the result to ensure all data is included
+    // Debug log
     console.log('ProductOptionSelector - Confirming with options:', {
       productId: product.id,
       selectedQuantity,
@@ -313,7 +323,6 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
     if (newQuantity >= 1 && newQuantity <= maxAllowed) {
       setSelectedQuantity(newQuantity);
       
-      // 🚀 DEBUG: Log quantity changes
       console.log('ProductOptionSelector - Quantity changed:', {
         productId: product.id,
         oldQuantity: selectedQuantity,
@@ -347,10 +356,16 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
     const hasDiscount = selectedQuantity >= discountThreshold;
 
     return (
-      <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+      <div className={`mt-4 p-3 rounded-lg border ${
+        isDarkMode 
+          ? 'bg-blue-900/20 border-blue-800' 
+          : 'bg-blue-50 border-blue-200'
+      }`}>
         <div className="text-center">
           <p className={`text-sm font-medium ${
-            hasDiscount ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'
+            hasDiscount 
+              ? 'text-green-600 dark:text-green-400' 
+              : 'text-orange-600 dark:text-orange-400'
           }`}>
             {hasDiscount 
               ? `${t('discountApplied') || 'Discount applied'}: ${discountPercentage}%`
@@ -364,7 +379,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
         </div>
       </div>
     );
-  }, [salePreferences, selectedQuantity, t]);
+  }, [salePreferences, selectedQuantity, t, isDarkMode]);
 
   const renderColorSelector = useCallback(() => {
     if (!hasColors) return null;
@@ -382,6 +397,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
               imageUrl={product.imageUrls[0]}
               isSelected={selectedColor === 'default'}
               disabled={product.quantity === 0}
+              isDarkMode={isDarkMode}
               onSelect={() => {
                 setSelectedColor('default');
                 console.log('ProductOptionSelector - Color selected:', { productId: product.id, selectedColor: 'default' });
@@ -400,6 +416,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
                 imageUrl={images[0]}
                 isSelected={selectedColor === colorKey}
                 disabled={qty === 0}
+                isDarkMode={isDarkMode}
                 onSelect={() => {
                   setSelectedColor(colorKey);
                   console.log('ProductOptionSelector - Color selected:', { productId: product.id, selectedColor: colorKey, availableQty: qty });
@@ -411,7 +428,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
         </div>
       </div>
     );
-  }, [hasColors, product, selectedColor, t]);
+  }, [hasColors, product, selectedColor, t, isDarkMode]);
 
   const renderAttributeSelector = useCallback((attributeKey: string, options: string[]) => {
     return (
@@ -425,6 +442,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
               key={option}
               label={AttributeLocalizationUtils.getLocalizedSingleValue(attributeKey, option, t)}
               isSelected={selections[attributeKey] === option}
+              isDarkMode={isDarkMode}
               onSelect={() => {
                 setSelections(prev => ({ ...prev, [attributeKey]: option }));
                 console.log('ProductOptionSelector - Attribute selected:', { 
@@ -439,7 +457,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
         </div>
       </div>
     );
-  }, [selections, t, product.id]);
+  }, [selections, t, product.id, isDarkMode]);
 
   const renderQuantitySelector = useCallback(() => {
     const maxAllowed = getMaxQuantityAllowed();
@@ -453,7 +471,11 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
           <button
             onClick={() => handleQuantityChange(-1)}
             disabled={selectedQuantity <= 1}
-            className="p-2 rounded-full border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            className={`p-2 rounded-full border transition-colors ${
+              isDarkMode
+                ? 'border-gray-600 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed'
+                : 'border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed'
+            }`}
           >
             <Minus size={20} />
           </button>
@@ -465,23 +487,15 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
           <button
             onClick={() => handleQuantityChange(1)}
             disabled={selectedQuantity >= maxAllowed}
-            className="p-2 rounded-full border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            className={`p-2 rounded-full border transition-colors ${
+              isDarkMode
+                ? 'border-gray-600 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed'
+                : 'border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed'
+            }`}
           >
             <Plus size={20} />
           </button>
-        </div>
-
-        {/* Show current max quantity info */}
-        <div className="text-center mt-2">
-          <span className="text-sm text-gray-500">
-            {t('maxAvailable') || 'Max available'}: {maxAllowed}
-          </span>
-        </div>
-
-        {/* 🚀 DEBUG INFO - Remove this in production */}
-        <div className="text-center mt-1 text-xs text-gray-400">
-          Debug: Selected {selectedQuantity} | Max {maxAllowed} | Stock {getMaxQuantity()}
-        </div>
+        </div>        
 
         {/* Loading indicator for sale preferences */}
         {isLoadingSalePrefs && (
@@ -491,7 +505,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
         )}
       </div>
     );
-  }, [selectedQuantity, getMaxQuantityAllowed, getMaxQuantity, handleQuantityChange, isLoadingSalePrefs, t]);
+  }, [selectedQuantity, getMaxQuantityAllowed, handleQuantityChange, isLoadingSalePrefs, t, isDarkMode]);
 
   // Redirect to login if user is not authenticated
   useEffect(() => {
@@ -526,17 +540,27 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             className="fixed inset-x-0 bottom-0 z-50 max-h-[90vh]"
           >
-            <div className="bg-white dark:bg-gray-900 rounded-t-2xl shadow-2xl max-w-lg mx-auto">
+            <div className={`rounded-t-2xl shadow-2xl max-w-lg mx-auto ${
+              isDarkMode ? 'bg-gray-900' : 'bg-white'
+            }`}>
               {/* Header */}
-              <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white font-['Figtree']">
+              <div className={`flex items-center justify-between p-4 border-b ${
+                isDarkMode ? 'border-gray-700' : 'border-gray-200'
+              }`}>
+                <h2 className={`text-lg font-semibold ${
+                  isDarkMode ? 'text-white' : 'text-gray-900'
+                }`}>
                   {t('selectOptions') || 'Select Options'}
                 </h2>
                 <button
                   onClick={onClose}
-                  className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                  className={`p-1 rounded-full transition-colors ${
+                    isDarkMode 
+                      ? 'hover:bg-gray-800 text-gray-500' 
+                      : 'hover:bg-gray-100 text-gray-500'
+                  }`}
                 >
-                  <X size={20} className="text-gray-500" />
+                  <X size={20} />
                 </button>
               </div>
 
@@ -558,15 +582,19 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
               </div>
 
               {/* Footer */}
-              <div className="p-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
+              <div className={`p-4 border-t space-y-2 ${
+                isDarkMode ? 'border-gray-700' : 'border-gray-200'
+              }`}>
                 <button
                   onClick={handleConfirm}
                   disabled={!isConfirmEnabled}
                   className={`
-                    w-full py-3 px-4 rounded-lg font-semibold font-['Figtree'] transition-all duration-200
+                    w-full py-3 px-4 rounded-lg font-semibold transition-all duration-200
                     ${isConfirmEnabled
                       ? 'bg-orange-500 hover:bg-orange-600 text-white'
-                      : 'bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed'
+                      : isDarkMode
+                        ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                     }
                   `}
                 >
@@ -575,7 +603,11 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
                 
                 <button
                   onClick={onClose}
-                  className="w-full py-2 px-4 text-gray-600 dark:text-gray-400 font-['Figtree'] hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+                  className={`w-full py-2 px-4 transition-colors ${
+                    isDarkMode 
+                      ? 'text-gray-400 hover:text-gray-200' 
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
                 >
                   {t('cancel') || 'Cancel'}
                 </button>
