@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { ProductCard3 } from "../ProductCard3";
 import { CompactBundleWidget } from "../CompactBundle";
-import { useCart } from "@/context/CartProvider";
+import { useCart, CartTotals } from "@/context/CartProvider";
 import { useUser } from "@/context/UserProvider";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -50,6 +50,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     initializeCartIfNeeded,
     loadMoreItems,
     isOptimisticallyRemoving,
+    calculateCartTotals,
   } = useCart();
 
   const [isClearing, setIsClearing] = useState(false);
@@ -133,15 +134,30 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     }
   }, [isOpen, user, isInitialized, isLoading, initializeCartIfNeeded]);
 
-  // Calculate total price with memoization
-  const totalPrice = useMemo(() => {
-    return cartItems.reduce((total, item) => {
-      if (item.product && !item.isOptimistic && !isOptimisticallyRemoving(item.productId)) {
-        return total + item.product.price * item.quantity;
+  const [calculatedTotals, setCalculatedTotals] = useState<CartTotals>({
+    subtotal: 0,
+    total: 0,
+    currency: "TL",
+    items: []
+  });
+
+  useEffect(() => {
+    const calculateTotals = async () => {
+      if (cartItems.length > 0) {
+        const totals = await calculateCartTotals();
+        setCalculatedTotals(totals);
+      } else {
+        setCalculatedTotals({
+          subtotal: 0,
+          total: 0,
+          currency: "TL",
+          items: []
+        });
       }
-      return total;
-    }, 0);
-  }, [cartItems, isOptimisticallyRemoving]);
+    };
+  
+    calculateTotals();
+  }, [cartItems, calculateCartTotals]);
 
   // Handle item removal
   const handleRemoveItem = useCallback(async (productId: string) => {
@@ -188,6 +204,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   // Handle navigation functions
   const handleCheckout = useCallback(() => {
     console.log('CartDrawer - Navigating to checkout');
+
+    const totalPrice = calculatedTotals.total;
     
     // Prepare cart items for payment page - pass ALL fields from cart documents
     const paymentItems = cartItems
@@ -215,9 +233,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
       });
   
     console.log('CartDrawer - Payment items prepared:', paymentItems);
-  
-    // Calculate total for verification
-    const totalPrice = paymentItems.reduce((sum, item) => sum + ((item as Record<string, unknown>).price as number * item.quantity), 0);
+      
     
     // Save to localStorage as backup
     localStorage.setItem('cartItems', JSON.stringify(paymentItems));
@@ -228,19 +244,16 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     // Navigate to payment page
     try {
       const itemsParam = encodeURIComponent(JSON.stringify(paymentItems));
-      // Check if URL would be too long (most browsers limit to ~2000 chars)
       if (itemsParam.length < 1500) {
         router.push(`/productpayment?items=${itemsParam}&total=${totalPrice}`);
       } else {
-        // For large carts, use localStorage only
         router.push(`/productpayment?total=${totalPrice}`);
       }
     } catch (error) {
       console.error('Error encoding cart items for URL:', error);
-      // Fallback to localStorage only
       router.push(`/productpayment?total=${totalPrice}`);
     }
-  }, [cartItems, isOptimisticallyRemoving, onClose, router]);
+  }, [cartItems, calculatedTotals, isOptimisticallyRemoving, onClose, router]);
 
   const handleViewFullCart = useCallback(() => {
     console.log('CartDrawer - Navigating to full cart page');
@@ -740,7 +753,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   {t("total")}:
                 </span>
                 <span className="text-lg font-bold text-orange-500">
-                  {totalPrice.toFixed(2)} TL
+                {calculatedTotals.total.toFixed(2)} TL
                 </span>
               </div>
 

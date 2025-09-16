@@ -137,14 +137,14 @@ interface ProductDocumentData {
   paused?: boolean;
 }
 
-interface CartTotals {
+export interface CartTotals {
   subtotal: number;
   total: number;
   currency: string;
   items: CartItemTotal[];
 }
 
-interface CartItemTotal {
+export interface CartItemTotal {
   productId: string;
   quantity: number;
   unitPrice: number;
