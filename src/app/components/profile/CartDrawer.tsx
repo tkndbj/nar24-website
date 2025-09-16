@@ -28,6 +28,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import type { Firestore } from "firebase/firestore";
 import { CompactBundleWidget } from "../CompactBundle";
@@ -60,6 +61,8 @@ interface Product {
   quantity: number;
   colorQuantities: Record<string, number>;
   brandModel?: string;
+  category?: string;
+  subcategory?: string;
   [key: string]: unknown;
 }
 
@@ -85,11 +88,12 @@ interface CartItem {
   loadError?: boolean;
   salePreferences?: SalePreferences | null;
   selectedColorImage?: string;
+  selectedColor?: string;
   [key: string]: unknown;
 }
 
 interface RelatedProduct extends Product {
-  isRelated?: boolean; // Mark as related product to satisfy no-empty-object-type
+  // Additional fields for related products if needed
 }
 
 interface CartTotals {
@@ -173,13 +177,11 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   
   // Refs for performance
   const lastProcessedProductIds = useRef<Set<string>>(new Set());
-  const relatedProductsTimer = useRef<NodeJS.Timeout>(null);
+  const relatedProductsTimer = useRef<NodeJS.Timeout | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Constants matching Flutter
-  
   const RELATED_PRODUCTS_DELAY = 800;
-  
 
   // Translation function - matching Flutter localization
   const t = useCallback((key: string) => {
@@ -305,41 +307,6 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     }
   }, [cartItems, updateSelectedProducts]);
 
-  // Load related products with debouncing - matching Flutter implementation
-  const loadRelatedProductsUniversal = useCallback(() => {
-    if (relatedProductsTimer.current) {
-      clearTimeout(relatedProductsTimer.current);
-    }
-
-    relatedProductsTimer.current = setTimeout(() => {
-      performRelatedProductsLoad();
-    }, RELATED_PRODUCTS_DELAY);
-  }, []);
-
-  // Perform related products load - matching Flutter logic
-  const performRelatedProductsLoad = useCallback(async () => {
-    if (isRelatedLoading) return;
-
-    setIsRelatedLoading(true);
-
-    try {
-      let products: RelatedProduct[];
-
-      if (user && cartItems.length > 0) {
-        products = await fetchRelatedProductsFromCart(cartItems);
-      } else {
-        products = await fetchTrendingShopProducts();
-      }
-
-      setRelatedProducts(products);
-    } catch (error) {
-      console.error("Error loading related products:", error);
-      setRelatedProducts([]);
-    } finally {
-      setIsRelatedLoading(false);
-    }
-  }, [isRelatedLoading, user, cartItems]);
-
   // Fetch trending shop products - simplified version matching Flutter
   const fetchTrendingShopProducts = useCallback(async (): Promise<RelatedProduct[]> => {
     try {
@@ -379,6 +346,41 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     },
     [fetchTrendingShopProducts]
   );
+
+  // Perform related products load - matching Flutter logic
+  const performRelatedProductsLoad = useCallback(async () => {
+    if (isRelatedLoading) return;
+
+    setIsRelatedLoading(true);
+
+    try {
+      let products: RelatedProduct[];
+
+      if (user && cartItems.length > 0) {
+        products = await fetchRelatedProductsFromCart(cartItems);
+      } else {
+        products = await fetchTrendingShopProducts();
+      }
+
+      setRelatedProducts(products);
+    } catch (error) {
+      console.error("Error loading related products:", error);
+      setRelatedProducts([]);
+    } finally {
+      setIsRelatedLoading(false);
+    }
+  }, [isRelatedLoading, user, cartItems, fetchRelatedProductsFromCart, fetchTrendingShopProducts]);
+
+  // Load related products with debouncing - matching Flutter implementation
+  const loadRelatedProductsUniversal = useCallback(() => {
+    if (relatedProductsTimer.current) {
+      clearTimeout(relatedProductsTimer.current);
+    }
+
+    relatedProductsTimer.current = setTimeout(() => {
+      performRelatedProductsLoad();
+    }, RELATED_PRODUCTS_DELAY);
+  }, [performRelatedProductsLoad]);
 
   // Load related products on mount
   useEffect(() => {
@@ -473,6 +475,20 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     }
   }, [selectedProducts, removeMultipleFromCart]);
 
+  // Handle refresh - matching Flutter implementation
+  const handleRefresh = useCallback(async () => {
+    if (isRefreshing) return;
+
+    setIsRefreshing(true);
+    try {
+      await refresh();
+      loadRelatedProductsUniversal();
+    } catch (error) {
+      console.error("Refresh error:", error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [isRefreshing, refresh, loadRelatedProductsUniversal]);
 
   // Handle checkout - matching Flutter implementation
   const handleCheckout = useCallback(async () => {
@@ -507,7 +523,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
           
           // Remove fields that shouldn't be sent to payment
           const {
-            product, 
+            product,
             cartData,
             isOptimistic,
             isLoadingProduct,
@@ -893,9 +909,11 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
               <div className="flex flex-col h-full">
                 <div className="flex-2 flex flex-col items-center justify-center px-6 py-12">
                   <div className="w-32 h-32 bg-gray-100 rounded-full mb-6 flex items-center justify-center">
-                    <img 
+                    <Image 
                       src="/empty-cart.png" 
                       alt="Empty cart"
+                      width={128}
+                      height={128}
                       className="w-32 h-32"
                       onError={(e) => {
                         e.currentTarget.style.display = 'none';
@@ -1120,9 +1138,11 @@ const CartItemCard: React.FC<CartItemCardProps> = ({
             {/* Product image */}
             <div className="w-20 h-20 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0">
               {product.imageUrls.length > 0 ? (
-                <img
+                <Image
                   src={item.selectedColorImage || product.imageUrls[0]}
                   alt={product.productName}
+                  width={80}
+                  height={80}
                   className="w-full h-full object-cover"
                   loading="lazy"
                   onError={(e) => {
@@ -1248,6 +1268,8 @@ const CartItemCard: React.FC<CartItemCardProps> = ({
             <SalePreferenceLabel
               salePreferences={item.salePreferences}
               currentQuantity={item.quantity}
+              isDarkMode={isDarkMode}
+              t={t}
             />
           )}
 
@@ -1315,11 +1337,15 @@ const CartItemCard: React.FC<CartItemCardProps> = ({
 interface SalePreferenceLabelProps {
   salePreferences: SalePreferences;
   currentQuantity: number;
+  isDarkMode: boolean;
+  t: (key: string) => string;
 }
 
 const SalePreferenceLabel: React.FC<SalePreferenceLabelProps> = ({
   salePreferences,
   currentQuantity,
+  isDarkMode,
+  t,
 }) => {
   const { discountThreshold, discountPercentage } = salePreferences;
   
@@ -1390,7 +1416,7 @@ const RelatedProductsSection: React.FC<RelatedProductsSectionProps> = ({
           </h3>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          {[...Array(4)].map((__, i) => (
+          {[...Array(4)].map((_, i) => (
             <div key={i} className="animate-pulse">
               <div className="w-full h-40 bg-gray-200 rounded-lg mb-2" />
               <div className="h-4 bg-gray-200 rounded mb-1" />
@@ -1478,9 +1504,11 @@ const RelatedProductCard: React.FC<RelatedProductCardProps> = ({
       {/* Product Image */}
       <div className="w-full h-32 bg-gray-200 overflow-hidden">
         {product.imageUrls.length > 0 ? (
-          <img
+          <Image
             src={product.imageUrls[0]}
             alt={product.productName}
+            width={200}
+            height={128}
             className="w-full h-full object-cover"
             loading="lazy"
             onError={(e) => {
