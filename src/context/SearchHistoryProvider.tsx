@@ -14,7 +14,9 @@ import {
   limit,
   startAfter,  
   QueryDocumentSnapshot,
-  Unsubscribe 
+  Unsubscribe,
+  addDoc,
+  serverTimestamp
 } from 'firebase/firestore';
 import { User, onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
@@ -48,6 +50,8 @@ interface SearchHistoryContextType {
   deleteAllForCurrentUser: () => Promise<void>;
   loadMoreHistory: () => Promise<void>;
   clearHistory: () => void;
+  // NEW: Save search term functionality
+  saveSearchTerm: (searchTerm: string) => Promise<void>;
 }
 
 const SearchHistoryContext = createContext<SearchHistoryContextType | undefined>(undefined);
@@ -262,6 +266,48 @@ export const SearchHistoryProvider: React.FC<{ children: React.ReactNode }> = ({
     return deletingEntries.current.has(docId);
   }, []);
 
+  // NEW: Save search term functionality (matches Flutter implementation)
+  const saveSearchTerm = useCallback(async (searchTerm: string): Promise<void> => {
+    const currentUser = auth.currentUser;
+    if (!currentUser || !searchTerm.trim()) return;
+
+    const userId = currentUser.uid;
+    const now = new Date();
+    const placeholderId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    // Step 1: Insert local entry immediately for instant UI feedback
+    const localEntry: SearchEntry = {
+      id: placeholderId,
+      searchTerm: searchTerm.trim(),
+      timestamp: now,
+      userId: userId,
+    };
+
+    insertLocalEntry(localEntry);
+
+    try {
+      // Step 2: Save to Firestore
+      const docRef = await addDoc(collection(db, 'searches'), {
+        userId: userId,
+        searchTerm: searchTerm.trim(),
+        timestamp: serverTimestamp(),
+      });
+
+      console.log('Successfully saved search term:', searchTerm);
+      
+      // The real-time listener will automatically update with the server version
+      // and remove the placeholder
+    } catch (error) {
+      console.error('Error saving search term:', error);
+      
+      // Step 3: Rollback - remove the placeholder entry on error
+      await deleteEntry(placeholderId);
+      
+      // Re-throw to let calling code handle the error
+      throw error;
+    }
+  }, [insertLocalEntry]);
+
   const deleteEntry = useCallback(async (docId: string): Promise<void> => {
     // If already deleting, wait for that operation to complete
     if (deletingEntries.current.has(docId)) {
@@ -290,12 +336,18 @@ export const SearchHistoryProvider: React.FC<{ children: React.ReactNode }> = ({
       updateCombinedEntries(); // This will filter out the deleted item
 
       // Step 2: Delete from Firestore with timeout
-      await Promise.race([
-        deleteFromFirestore(docId),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new TimeoutException('Delete operation timed out', 10000)), 10000)
-        )
-      ]);
+      // Handle both real docs and local placeholder entries
+      if (!docId.startsWith('temp_')) {
+        await Promise.race([
+          deleteFromFirestore(docId),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new TimeoutException('Delete operation timed out', 10000)), 10000)
+          )
+        ]);
+      } else {
+        // For placeholder entries, just remove from local state
+        allEntries.current = allEntries.current.filter(entry => entry.id !== docId);
+      }
 
       console.log('Successfully deleted search entry:', docId);
     } catch (error) {
@@ -385,6 +437,7 @@ export const SearchHistoryProvider: React.FC<{ children: React.ReactNode }> = ({
     deleteAllForCurrentUser,
     loadMoreHistory,
     clearHistory,
+    saveSearchTerm, // NEW
   };
 
   return (

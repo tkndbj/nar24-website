@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
+// Removed useRouter import - will handle navigation differently
 import {
   Search,
   Clock,
@@ -24,8 +25,8 @@ interface SearchBarProps {
   onSearchStateChange: (searching: boolean) => void;
   searchTerm: string;
   onSearchTermChange: (term: string) => void;
-  onSearchSubmit: () => void;
-  onKeyPress: (e: React.KeyboardEvent) => void;
+  onSearchSubmit?: () => void; // Made optional since we'll handle it internally
+  onKeyPress?: (e: React.KeyboardEvent) => void; // Made optional
   showSuggestions: boolean;
   onSuggestionClick: (
     suggestion: Suggestion | CategorySuggestion,
@@ -42,20 +43,20 @@ export default function SearchBar({
   isSearching,
   onSearchStateChange,
   searchTerm,
-  onSearchTermChange,
-  onSearchSubmit,
-  onKeyPress,  
+  onSearchTermChange,  
+  onKeyPress,
   onSuggestionClick,
   isMobile = false,
   t,
 }: SearchBarProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);  
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Pagination state for search history
   const [currentPage, setCurrentPage] = useState(0);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const {
     isLoading,
@@ -72,6 +73,7 @@ export default function SearchBar({
     isLoadingHistory,
     deleteEntry,
     isDeletingEntry,
+    saveSearchTerm,
   } = useSearchHistory();
 
   // Body scroll lock when dropdown is active
@@ -86,7 +88,7 @@ export default function SearchBar({
         document.body.style.overflow = originalStyle;
       };
     } else {
-      // ADD THIS - Ensure scroll is restored when not searching
+      // Ensure scroll is restored when not searching
       document.body.style.overflow = '';
     }
   }, [isSearching]);
@@ -102,7 +104,7 @@ export default function SearchBar({
         searchInputRef.current?.blur();
         setCurrentPage(0); // Reset pagination when closing
         
-        // ADD THIS LINE - Force restore body scroll
+        // Force restore body scroll
         document.body.style.overflow = '';
       }
     };
@@ -125,25 +127,96 @@ export default function SearchBar({
     setCurrentPage(0);
   }, [searchEntries]);
 
-  const containerClasses = isMobile
-    ? "relative w-full"
-    : "relative w-[500px] max-w-[calc(100vw-12rem)]";
+  // Enhanced search submission with history saving
+  const handleSearchSubmit = useCallback(async (term?: string) => {
+    const searchQuery = (term || searchTerm).trim();
+    
+    if (!searchQuery) {
+      console.log('Empty search query, skipping submission');
+      return;
+    }
 
-  // Handle search history item click
-  const handleHistoryItemClick = useCallback((historyTerm: string) => {
-    // Update the search term
-    onSearchTermChange(historyTerm);
-    
-    // Close the search dropdown immediately
-    onSearchStateChange(false);
-    
-    // Use a longer timeout to ensure state updates
-    setTimeout(() => {
-      // Manually trigger navigation since we have the term
-      const searchUrl = `/search-results?q=${encodeURIComponent(historyTerm)}`;
+    if (isSubmitting) {
+      console.log('Already submitting search, skipping duplicate submission');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      console.log('Submitting search for:', searchQuery);
+      
+      // Save search term to history (non-blocking)
+      saveSearchTerm(searchQuery).catch(error => {
+        console.error('Failed to save search term to history:', error);
+        // Don't block navigation on history save failure
+      });
+
+      // Close search dropdown
+      onSearchStateChange(false);
+      
+      // Clear search input if this was from history click
+      if (term && term !== searchTerm) {
+        onSearchTermChange(term);
+      }
+
+      // Navigate to search results using window.location for better compatibility
+      const searchUrl = `/search-results?q=${encodeURIComponent(searchQuery)}`;
+      console.log('Navigating to:', searchUrl);
+      
+      // Use window.location.href for navigation
       window.location.href = searchUrl;
-    }, 100);
-  }, [onSearchTermChange, onSearchStateChange]);
+      
+    } catch (error) {
+      console.error('Error during search submission:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [searchTerm, isSubmitting, saveSearchTerm, onSearchStateChange, onSearchTermChange]);
+
+  // Enhanced key press handler
+  const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSearchSubmit();
+    }
+    
+    // Call original key press handler if provided
+    if (onKeyPress) {
+      onKeyPress(e);
+    }
+  }, [handleSearchSubmit, onKeyPress]);
+
+  // Enhanced search button handler
+  const handleSearchButtonClick = useCallback(() => {
+    if (isSearching) {
+      handleSearchSubmit();
+    } else {
+      onSearchStateChange(true);
+    }
+  }, [isSearching, handleSearchSubmit, onSearchStateChange]);
+
+  // Handle search history item click with proper navigation
+  const handleHistoryItemClick = useCallback(async (historyTerm: string) => {
+    console.log('History item clicked:', historyTerm);
+    
+    // Prevent duplicate submissions
+    if (isSubmitting) {
+      console.log('Already submitting, ignoring history click');
+      return;
+    }
+
+    try {
+      // Update search term first
+      onSearchTermChange(historyTerm);
+      
+      // Submit search with the history term
+      await handleSearchSubmit(historyTerm);
+      
+    } catch (error) {
+      console.error('Error handling history item click:', error);
+    }
+  }, [isSubmitting, onSearchTermChange, handleSearchSubmit]);
 
   // Handle delete history item
   const handleDeleteHistoryItem = useCallback(async (e: React.MouseEvent, docId: string) => {
@@ -152,6 +225,7 @@ export default function SearchBar({
       await deleteEntry(docId);
     } catch (error) {
       console.error('Failed to delete search history item:', error);
+      // Could show a toast notification here
     }
   }, [deleteEntry]);
 
@@ -181,6 +255,10 @@ export default function SearchBar({
     const endIndex = (currentPage + 1) * ITEMS_PER_PAGE;
     return searchEntries.slice(0, endIndex);
   }, [searchEntries, currentPage]);
+
+  const containerClasses = isMobile
+    ? "relative w-full"
+    : "relative w-[500px] max-w-[calc(100vw-12rem)]";
 
   // Determine what to show in dropdown
   const hasSearchResults = searchTerm.trim() && (suggestions.length > 0 || categorySuggestions.length > 0 || isLoading || errorMessage);
@@ -213,9 +291,10 @@ export default function SearchBar({
           type="text"
           value={searchTerm}
           onChange={(e) => onSearchTermChange(e.target.value)}
-          onKeyPress={onKeyPress}
+          onKeyPress={handleKeyPress}
           onFocus={() => !isSearching && onSearchStateChange(true)}
           readOnly={!isSearching}
+          disabled={isSubmitting}
           placeholder={t('header.searchPlaceholder')}
           className={`
             w-full h-full px-4 pr-12 bg-transparent border-none outline-none
@@ -225,15 +304,13 @@ export default function SearchBar({
                 : "placeholder:text-gray-500 text-gray-900"
             }
             text-sm font-medium rounded-full
+            ${isSubmitting ? 'cursor-not-allowed opacity-75' : ''}
           `}
         />
 
         <button
-          onClick={
-            isSearching
-              ? onSearchSubmit
-              : () => onSearchStateChange(true)
-          }
+          onClick={handleSearchButtonClick}
+          disabled={isSubmitting}
           className={`
             absolute right-2 top-1/2 transform -translate-y-1/2
             p-2 rounded-full transition-all duration-200
@@ -243,13 +320,18 @@ export default function SearchBar({
                 : "text-gray-400 hover:text-blue-500 hover:bg-blue-50/80 dark:hover:bg-blue-900/30"
             }
             active:scale-95
+            ${isSubmitting ? 'cursor-not-allowed opacity-75' : ''}
           `}
           aria-label={isSearching ? t('header.search') : t('header.startSearch')}
         >
-          <Search
-            size={16}
-            className={isLoading ? "animate-pulse" : ""}
-          />
+          {isSubmitting ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : (
+            <Search
+              size={16}
+              className={isLoading ? "animate-pulse" : ""}
+            />
+          )}
         </button>
       </div>
 
@@ -505,7 +587,10 @@ export default function SearchBar({
                     >
                       <button
                         onClick={() => handleHistoryItemClick(entry.searchTerm)}
-                        className="flex-1 flex items-center space-x-3 text-left"
+                        disabled={isSubmitting}
+                        className={`flex-1 flex items-center space-x-3 text-left ${
+                          isSubmitting ? 'cursor-not-allowed opacity-75' : ''
+                        }`}
                       >
                         <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
                           <Clock size={14} className="text-gray-500" />
@@ -530,7 +615,11 @@ export default function SearchBar({
                         `}
                         aria-label={t('header.deleteSearchHistory')}
                       >
-                        <X size={14} className="text-gray-400 hover:text-red-500" />
+                        {isDeletingEntry(entry.id) ? (
+                          <Loader2 size={14} className="animate-spin text-gray-400" />
+                        ) : (
+                          <X size={14} className="text-gray-400 hover:text-red-500" />
+                        )}
                       </button>
                     </div>
                   ))}
