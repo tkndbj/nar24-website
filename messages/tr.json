@@ -1980,7 +1980,8 @@
     "loadingMore": "Yükleniyor...",
     "total": "Toplam",
     "viewCart": "Sepeti Görüntüle",
-    "checkout": "Ödemeye Geç"
+    "checkout": "Ödemeye Geç",
+    "save": "Kaydet"
   },
   "FavoritesDrawer": {
     "title": "Favorilerim",

@@ -561,7 +561,7 @@ export default function ShopDetailPage() {
         return (
           <div>
             {isLoadingProducts ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 {Array.from({ length: 8 }).map((_, i) => (
                   <div key={i} className="animate-pulse">
                     <div className="bg-gray-300 h-48 rounded-t-lg" />
@@ -583,7 +583,7 @@ export default function ShopDetailPage() {
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 {products.map((product) => (
                   <ProductCard
                     key={product.id}

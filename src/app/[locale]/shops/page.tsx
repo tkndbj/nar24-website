@@ -368,11 +368,7 @@ export default function ShopsPage() {
                 {t("title")}
               </h1>
               
-              <p className={`text-xl max-w-2xl mx-auto ${
-                isDarkMode ? "text-gray-300" : "text-gray-600"
-              }`}>
-                Discover amazing local businesses and connect with your community
-              </p>
+              
             </div>
 
             {/* Create Shop Button */}

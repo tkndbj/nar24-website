@@ -198,43 +198,50 @@ export default function SearchBar({
 
   // Handle search history item click with proper navigation
   const handleHistoryItemClick = useCallback(async (historyTerm: string) => {
-    console.log('History item clicked:', historyTerm);
+    console.log('🔍 History item clicked:', historyTerm);
+    console.log('🔍 Current isSubmitting state:', isSubmitting);
     
     // Prevent duplicate submissions
     if (isSubmitting) {
-      console.log('Already submitting, ignoring history click');
+      console.log('🔍 Already submitting, ignoring history click');
       return;
     }
   
     setIsSubmitting(true);
+    console.log('🔍 Set isSubmitting to true');
   
     try {
-      console.log('Processing history click for:', historyTerm);
+      console.log('🔍 Processing history click for:', historyTerm);
       
-      // Save search term to history (non-blocking) - don't save duplicates
-      // saveSearchTerm(historyTerm).catch(error => {
-      //   console.error('Failed to save search term to history:', error);
-      // });
-  
       // Close search dropdown
+      console.log('🔍 Closing search dropdown');
       onSearchStateChange(false);
       
       // Update search term
+      console.log('🔍 Updating search term to:', historyTerm);
       onSearchTermChange(historyTerm);
   
       // Navigate to search results immediately
       const searchUrl = `/search-results?q=${encodeURIComponent(historyTerm)}`;
-      console.log('Navigating to:', searchUrl);
+      console.log('🔍 About to navigate to:', searchUrl);
+      console.log('🔍 Current window.location.href:', window.location.href);
       
-      // Use window.location.href for navigation
+      // Try different navigation methods
+      console.log('🔍 Attempting navigation...');
+      
+      // Method 1: Direct assignment
       window.location.href = searchUrl;
       
+      // If that doesn't work, try these alternatives:
+      // window.location.assign(searchUrl);
+      // window.open(searchUrl, '_self');
+      
     } catch (error) {
-      console.error('Error handling history item click:', error);
-    } finally {
-      // Note: this might not execute due to page navigation
+      console.error('🔍 Error handling history item click:', error);
       setIsSubmitting(false);
     }
+    
+    // Note: setIsSubmitting(false) in finally might not execute due to page navigation
   }, [isSubmitting, onSearchStateChange, onSearchTermChange]);
 
   // Handle delete history item

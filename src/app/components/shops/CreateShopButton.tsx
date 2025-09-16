@@ -82,19 +82,8 @@ export default function CreateShopButton() {
             ))}
           </button>
         </div>
-      </Link>
+      </Link>      
       
-      {/* Success Message Animation */}
-      <div className={`absolute -bottom-8 left-1/2 transform -translate-x-1/2 px-3 py-1 bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200 text-sm rounded-lg shadow-lg transition-all duration-300 ${
-        isHovered ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
-      }`}>
-        <div className="flex items-center gap-2">
-          <SparklesIcon className="w-4 h-4" />
-          <span className="font-medium">Start your journey!</span>
-        </div>
-        {/* Arrow */}
-        <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-green-100 dark:bg-green-900/50 rotate-45" />
-      </div>
     </div>
   );
 }
