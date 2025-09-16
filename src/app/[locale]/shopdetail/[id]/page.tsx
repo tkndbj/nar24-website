@@ -584,17 +584,23 @@ export default function ShopDetailPage() {
               </div>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {products.map((product) => (
-                  <ProductCard
-                  key={product.id}
-                  product={product}
-                  scaleFactor={0.8} // Make cards smaller overall
-                  portraitImageHeight={150} // Override the image height specifically
-                  showCartIcon={true}
-                  onTap={() => router.push(`/productdetail/${product.id}`)}
-                />
-                ))}
-              </div>
+  <style jsx>{`
+    .grid > div {
+      max-height: 300px; /* Limit card height */
+    }
+  `}</style>
+  {products.map((product) => (
+    <div className="max-h-72"> {/* Add height constraint wrapper */}
+      <ProductCard
+        key={product.id}
+        product={product}
+        scaleFactor={0.9}
+        showCartIcon={true}
+        onTap={() => router.push(`/productdetail/${product.id}`)}
+      />
+    </div>
+  ))}
+</div>
             )}
           </div>
         );
