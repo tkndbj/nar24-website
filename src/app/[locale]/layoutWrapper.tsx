@@ -2,7 +2,7 @@
 "use client";
 
 import { NextIntlClientProvider } from "next-intl";
-import { UserProvider } from "../../context/UserProvider";
+import { UserProvider, useUser } from "../../context/UserProvider";
 import { CartProvider } from "../../context/CartProvider";
 import { FavoritesProvider } from "@/context/FavoritesProvider";
 import { BadgeProvider } from "@/context/BadgeProvider";
@@ -10,6 +10,18 @@ import { SearchProvider } from "@/context/SearchProvider";
 import ConditionalHeader from "../components/ConditionalHeader";
 import { SearchHistoryProvider } from "@/context/SearchHistoryProvider";
 import ClientProviders from "../components/ClientProviders";
+import { db } from "@/lib/firebase"; // Adjust this import path as needed
+
+// Inner component that has access to user context
+function CartProviderWrapper({ children }: { children: React.ReactNode }) {
+  const { user } = useUser();
+  
+  return (
+    <CartProvider user={user} db={db}>
+      {children}
+    </CartProvider>
+  );
+}
 
 export default function LayoutWrapper({
   children,
@@ -30,7 +42,7 @@ export default function LayoutWrapper({
     >
       <ClientProviders>
         <UserProvider>
-          <CartProvider>
+          <CartProviderWrapper>
             <FavoritesProvider>
               <BadgeProvider>
                 <SearchProvider>
@@ -41,7 +53,7 @@ export default function LayoutWrapper({
                 </SearchProvider>
               </BadgeProvider>
             </FavoritesProvider>
-          </CartProvider>
+          </CartProviderWrapper>
         </UserProvider>
       </ClientProviders>
     </NextIntlClientProvider>
