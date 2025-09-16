@@ -2,6 +2,7 @@
 
 export interface Product {
   id: string;
+  sourceCollection?: string;
   productName: string;
   description: string;
   price: number;
@@ -17,6 +18,8 @@ export interface Product {
   boostClickCountAtStart: number;
   availableColors: string[];
   gender?: string;
+  bundleIds: string[];
+  bundlePrice?: number;
   userId: string;
   discountThreshold?: number;
   rankingScore: number;
@@ -185,8 +188,21 @@ export class ProductUtils {
   static fromJson(json: ApiData): Product {
     const attributes = ProductUtils.safeAttributes(json.attributes);
 
+    // Determine sourceCollection from reference path if available
+    let sourceCollection: string | undefined;
+    if (json.reference && typeof json.reference === 'object') {
+      const ref = json.reference as Record<string, unknown>;
+      const path = String(ref.path || '');
+      if (path.startsWith('products/')) {
+        sourceCollection = 'products';
+      } else if (path.startsWith('shop_products/')) {
+        sourceCollection = 'shop_products';
+      }
+    }
+
     return {
       id: ProductUtils.safeString(json.id),
+      sourceCollection,
       productName: ProductUtils.safeString(json.productName ?? json.title),
       description: ProductUtils.safeString(json.description),
       price: ProductUtils.safeDouble(json.price),
@@ -199,6 +215,10 @@ export class ProductUtils {
       averageRating: ProductUtils.safeDouble(json.averageRating),
       reviewCount: ProductUtils.safeInt(json.reviewCount),
       gender: ProductUtils.safeStringNullable(json.gender),
+      bundleIds: ProductUtils.safeStringArray(json.bundleIds),
+      bundlePrice: json.bundlePrice != null
+        ? ProductUtils.safeDouble(json.bundlePrice)
+        : undefined,
       originalPrice:
         json.originalPrice != null
           ? ProductUtils.safeDouble(json.originalPrice)
@@ -288,6 +308,8 @@ export class ProductUtils {
       discountThreshold: product.discountThreshold,
       boostClickCountAtStart: product.boostClickCountAtStart,
       userId: product.userId,
+      bundleIds: product.bundleIds,
+      bundlePrice: product.bundlePrice,
       ownerId: product.ownerId,
       shopId: product.shopId,
       ilan_no: product.ilanNo,
@@ -342,10 +364,48 @@ export class ProductUtils {
   // Factory method for Algolia data
   static fromAlgolia(json: ApiData): Product {
     // Algolia uses objectID instead of id
+    // Extract and normalize the ID
+    let normalizedId = String(json.objectID ?? json.id ?? '');
+
+    // Remove common Algolia prefixes
+    if (normalizedId.startsWith('products_')) {
+      normalizedId = normalizedId.substring('products_'.length);
+    } else if (normalizedId.startsWith('shop_products_')) {
+      normalizedId = normalizedId.substring('shop_products_'.length);
+    }
+
     const modifiedJson: ApiData = {
       ...json,
-      id: json.objectID ?? json.id,
+      id: normalizedId,
     };
     return ProductUtils.fromJson(modifiedJson);
+  }
+
+  // Create Product with copyWith functionality
+  static copyWith(
+    product: Product,
+    updates: Partial<Product> & {
+      setOriginalPriceNull?: boolean;
+      setDiscountPercentageNull?: boolean;
+    }
+  ): Product {
+    const {
+      setOriginalPriceNull = false,
+      setDiscountPercentageNull = false,
+      ...otherUpdates
+    } = updates;
+
+    return {
+      ...product,
+      ...otherUpdates,
+      // Handle originalPrice with explicit null control
+      originalPrice: setOriginalPriceNull
+        ? undefined
+        : (otherUpdates.originalPrice ?? product.originalPrice),
+      // Handle discountPercentage with explicit null control  
+      discountPercentage: setDiscountPercentageNull
+        ? undefined
+        : (otherUpdates.discountPercentage ?? product.discountPercentage),
+    };
   }
 }

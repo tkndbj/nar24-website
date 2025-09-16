@@ -20,7 +20,8 @@ import { useUser } from "@/context/UserProvider";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { AttributeLocalizationUtils } from "@/constants/AttributeLocalization";
-import { db } from "@/lib/firebase"; // Adjust import path as needed
+import { db } from "@/lib/firebase";
+import { ProductUtils, Product } from '@/app/models/Product';
 
 interface CartDrawerProps {
   isOpen: boolean;

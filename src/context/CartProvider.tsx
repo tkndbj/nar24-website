@@ -34,6 +34,7 @@ import {
   Firestore,
 } from "firebase/firestore";
 import { User } from "firebase/auth";
+import { ProductUtils, Product } from '@/app/models/Product';
 
 // Types
 interface CartUser {
@@ -94,26 +95,6 @@ interface SellerInfo {
   sellerId: string;
   sellerName: string;
   isShop: boolean;
-}
-
-interface Product {
-  id: string;
-  productName: string;
-  price: number;
-  currency: string;
-  imageUrls: string[];
-  colorImages?: Record<string, string[]>;
-  averageRating?: number;
-  quantity: number;
-  colorQuantities: Record<string, number>;
-  bundleIds?: string[];
-  bundlePrice?: number;
-  sold: boolean;
-  paused: boolean;
-  category: string;
-  subcategory: string;
-  brandModel?: string;
-  [key: string]: unknown;
 }
 
 interface ProductDocumentData {
@@ -441,39 +422,37 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   const fetchProductDetailsBatch = useCallback(
     async (productIds: string[]): Promise<Record<string, Product | null>> => {
       const result: Record<string, Product | null> = {};
-
+  
       try {
         for (let i = 0; i < productIds.length; i += 10) {
           const chunk = productIds.slice(i, i + 10);
-
+  
           const snapshot = await getDocs(
             query(
               collection(db, "shop_products"),
               where(documentId(), "in", chunk)
             )
           );
-
+  
           snapshot.docs.forEach((doc) => {
             if (!result[doc.id]) {
               try {
-                const data = doc.data() as ProductDocumentData;
-                const product: Product = {
+                // CRITICAL: Use your existing ProductUtils.fromJson with proper doc data
+                const docData = doc.data();
+                const productJson = {
+                  ...docData,
                   id: doc.id,
-                  productName: data.productName || "",
-                  price: data.price || 0,
-                  currency: data.currency || "TL",
-                  imageUrls: data.imageUrls || [],
-                  colorImages: data.colorImages || {},
-                  averageRating: data.averageRating || 0,
-                  quantity: data.quantity || 0,
-                  colorQuantities: data.colorQuantities || {},
-                  sold: false, // Assuming default
-                  paused: false, // Assuming default
-                  category: "", // Add as needed
-                  subcategory: "", // Add as needed
-                  brandModel: data.brandModel,
+                  // Add reference info for sourceCollection detection
+                  reference: {
+                    id: doc.id,
+                    path: doc.ref.path,
+                    parent: {
+                      id: doc.ref.parent.id
+                    }
+                  }
                 };
-                result[doc.id] = product;
+                
+                result[doc.id] = ProductUtils.fromJson(productJson);
               } catch (error) {
                 console.error(`Error parsing product ${doc.id}:`, error);
                 result[doc.id] = null;
@@ -484,7 +463,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       } catch (error) {
         console.error("Error fetching product details:", error);
       }
-
+  
       return result;
     },
     [db]
@@ -1157,17 +1136,16 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       const quantity = cartItem.quantity || 1;
       const salePreferences = cartItem.salePreferences;
   
-      // Get base unit price - FIXED to match Flutter logic
+      // Get base unit price - EXACT Flutter logic
       let unitPrice: number;
+      // Flutter: cartData['isBundle'] == true ? (cartData['unitPrice'] as num?)?.toDouble() ?? product.price : product.price;
       if (cartData.isBundle === true) {
-        // For bundle items, use the stored unitPrice from cart data
         unitPrice = typeof cartData.unitPrice === 'number' ? cartData.unitPrice : product.price;
       } else {
-        // For regular items, use product price
         unitPrice = product.price;
       }
   
-      // Apply sale preference discount if applicable - FIXED logic
+      // Apply sale preference discount if applicable - EXACT Flutter logic
       if (salePreferences) {
         const discountThreshold = salePreferences.discountThreshold;
         const discountPercentage = salePreferences.discountPercentage;
@@ -1196,200 +1174,204 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     },
     []
   );
-
   
   // Fixed calculateCartTotals function for React CartProvider
-const calculateCartTotals = useCallback(
-  async (selectedProductIds?: string[]): Promise<CartTotals> => {
-    if (!user) {
-      return { subtotal: 0, total: 0, currency: "TL", items: [] };
-    }
-
-    try {
-      const currentCartItems = cartItems;
-      if (currentCartItems.length === 0) {
+  const calculateCartTotals = useCallback(
+    async (selectedProductIds?: string[]): Promise<CartTotals> => {
+      if (!user) {
         return { subtotal: 0, total: 0, currency: "TL", items: [] };
       }
-
-      let itemsToCalculate: CartItem[];
-
-      if (selectedProductIds && selectedProductIds.length > 0) {
-        itemsToCalculate = currentCartItems.filter(item =>
-          selectedProductIds.includes(item.product?.id || "")
-        );
-      } else {
-        itemsToCalculate = currentCartItems;
-      }
-
-      if (itemsToCalculate.length === 0) {
-        return { subtotal: 0, total: 0, currency: "TL", items: [] };
-      }
-
-      console.log(`💰 Calculating totals for ${itemsToCalculate.length} items (with bundle optimization)`);
-
-      // Filter out out-of-stock items first
-      const inStockItems: CartItem[] = [];
-      for (const item of itemsToCalculate) {
-        const product = item.product;
-        if (!product) continue;
-
-        const cartData = item.cartData;
-        const selectedColor = cartData.selectedColor as string;
-
-        let availableStock: number;
-        if (selectedColor && 
-            selectedColor !== "" && 
-            selectedColor !== "default" && 
-            product.colorQuantities[selectedColor] !== undefined) {
-          availableStock = product.colorQuantities[selectedColor] || 0;
-        } else {
-          availableStock = product.quantity;
+  
+      try {
+        const currentCartItems = cartItems;
+        if (currentCartItems.length === 0) {
+          return { subtotal: 0, total: 0, currency: "TL", items: [] };
         }
-
-        if (availableStock > 0) {
-          inStockItems.push(item);
+  
+        let itemsToCalculate: CartItem[];
+  
+        if (selectedProductIds && selectedProductIds.length > 0) {
+          itemsToCalculate = currentCartItems.filter(item =>
+            selectedProductIds.includes(item.product?.id || "")
+          );
         } else {
-          console.log(`⏭️ Skipping out-of-stock product: ${product.productName}`);
+          itemsToCalculate = currentCartItems;
         }
-      }
-
-      if (inStockItems.length === 0) {
-        return { subtotal: 0, total: 0, currency: "TL", items: [] };
-      }
-
-      // Group items by bundleId for bundle detection - FIXED
-      const bundleGroups: Record<string, CartItem[]> = {};
-      const individualItems: CartItem[] = [];
-
-      for (const item of inStockItems) {
-        const product = item.product;
-        if (!product) continue;
-
-        const bundleIds = product.bundleIds;
-        // FIXED: Match Flutter logic exactly
-        if (bundleIds && bundleIds.length > 0 && product.bundlePrice != null) {
-          const bundleId = bundleIds[0];
-          if (!bundleGroups[bundleId]) {
-            bundleGroups[bundleId] = [];
+  
+        if (itemsToCalculate.length === 0) {
+          return { subtotal: 0, total: 0, currency: "TL", items: [] };
+        }
+  
+        console.log(`💰 Calculating totals for ${itemsToCalculate.length} items (with bundle optimization)`);
+  
+        // Filter out out-of-stock items first - EXACT Flutter logic
+        const inStockItems: CartItem[] = [];
+        for (const item of itemsToCalculate) {
+          const product = item.product;
+          if (!product) continue;
+  
+          const cartData = item.cartData;
+          const selectedColor = cartData.selectedColor as string;
+  
+          let availableStock: number;
+          // EXACT Flutter condition: selectedColor != null && selectedColor.isNotEmpty && selectedColor != 'default' && product.colorQuantities.containsKey(selectedColor)
+          if (selectedColor != null && 
+              selectedColor !== "" && 
+              selectedColor !== "default" && 
+              product.colorQuantities && 
+              Object.prototype.hasOwnProperty.call(product.colorQuantities, selectedColor)) {
+            availableStock = product.colorQuantities[selectedColor] || 0;
+          } else {
+            availableStock = product.quantity;
           }
-          bundleGroups[bundleId].push(item);
-        } else {
-          individualItems.push(item);
+  
+          if (availableStock > 0) {
+            inStockItems.push(item);
+          } else {
+            console.log(`⏭️ Skipping out-of-stock product: ${product.productName}`);
+          }
         }
-      }
-
-      let subtotal = 0;
-      const items: CartItemTotal[] = [];
-      let currency = "TL";
-      const processedBundles = new Set<string>();
-
-      // Process bundle groups - FIXED to match Flutter exactly
-      for (const [bundleId, bundleItems] of Object.entries(bundleGroups)) {
-        if (bundleItems.length >= 2 && !processedBundles.has(bundleId)) {
-          // Calculate minimum quantity across all bundle products
-          const minQuantity = Math.min(...bundleItems.map(item => item.quantity));
-          
-          if (minQuantity > 0) {
-            const firstProduct = bundleItems[0].product!;
-            const bundlePrice = firstProduct.bundlePrice || 0;
+  
+        if (inStockItems.length === 0) {
+          return { subtotal: 0, total: 0, currency: "TL", items: [] };
+        }
+  
+        // Group items by bundleId for bundle detection - EXACT Flutter logic
+        const bundleGroups: Record<string, CartItem[]> = {};
+        const individualItems: CartItem[] = [];
+  
+        for (const item of inStockItems) {
+          const product = item.product;
+          if (!product) continue;
+  
+          // CRITICAL: This is the exact Flutter condition
+          // bundleIds != null && bundleIds.isNotEmpty && product.bundlePrice != null
+          if (product.bundleIds != null && 
+              Array.isArray(product.bundleIds) && 
+              product.bundleIds.length > 0 && 
+              product.bundlePrice != null) {
+            const bundleId = product.bundleIds[0]; // Flutter: bundleIds.first
+            if (!bundleGroups[bundleId]) {
+              bundleGroups[bundleId] = [];
+            }
+            bundleGroups[bundleId].push(item);
+          } else {
+            individualItems.push(item);
+          }
+        }
+  
+        let subtotal = 0;
+        const items: CartItemTotal[] = [];
+        let currency = "TL";
+        const processedBundles = new Set<string>();
+  
+        // Process bundle groups - EXACT Flutter logic
+        for (const [bundleId, bundleItems] of Object.entries(bundleGroups)) {
+          if (bundleItems.length >= 2 && !processedBundles.has(bundleId)) {
+            // Calculate minimum quantity across all bundle products
+            const minQuantity = Math.min(...bundleItems.map(item => item.quantity));
             
-            if (bundlePrice > 0) {
-              processedBundles.add(bundleId);
+            if (minQuantity > 0) {
+              const firstProduct = bundleItems[0].product!;
+              const bundlePrice = firstProduct.bundlePrice || 0;
               
-              // Process each bundle item with hybrid pricing - FIXED
-              for (const item of bundleItems) {
-                const product = item.product!;
-                const totalQuantity = item.quantity;
+              if (bundlePrice > 0) {
+                processedBundles.add(bundleId);
                 
-                // Bundle portion (no sale preferences applied)
-                const bundlePortion = minQuantity;
-                const bundleItemCost = (bundlePrice / bundleItems.length) * bundlePortion;
-                
-                // Extra portion (check sale preferences based on TOTAL quantity)
-                const extraQuantity = totalQuantity - bundlePortion;
-                let extraCost = 0;
-                
-                if (extraQuantity > 0) {
-                  let extraUnitPrice = product.price;
+                // Process each bundle item with hybrid pricing - EXACT Flutter logic
+                for (const item of bundleItems) {
+                  const product = item.product!;
+                  const totalQuantity = item.quantity;
                   
-                  // Apply sale preferences based on TOTAL quantity, not just extra
-                  const salePreferences = item.salePreferences;
-                  if (salePreferences) {
-                    const discountThreshold = salePreferences.discountThreshold;
-                    const discountPercentage = salePreferences.discountPercentage;
+                  // Bundle portion (no sale preferences applied)
+                  const bundlePortion = minQuantity;
+                  const bundleItemCost = (bundlePrice / bundleItems.length) * bundlePortion;
+                  
+                  // Extra portion (check sale preferences based on TOTAL quantity)
+                  const extraQuantity = totalQuantity - bundlePortion;
+                  let extraCost = 0;
+                  
+                  if (extraQuantity > 0) {
+                    let extraUnitPrice = product.price;
                     
-                    // Check if TOTAL quantity meets threshold (matching Flutter logic)
-                    if (discountThreshold != null && 
-                        discountPercentage != null && 
-                        totalQuantity >= discountThreshold) {
-                      extraUnitPrice = extraUnitPrice * (1 - (discountPercentage / 100));
-                      console.log(`🎯 Applied sale preference to extra quantity: ${discountPercentage}% for ${product.id} (total qty: ${totalQuantity})`);
+                    // Apply sale preferences based on TOTAL quantity, not just extra
+                    const salePreferences = item.salePreferences;
+                    if (salePreferences) {
+                      const discountThreshold = salePreferences.discountThreshold;
+                      const discountPercentage = salePreferences.discountPercentage;
+                      
+                      // Check if TOTAL quantity meets threshold (exact Flutter logic)
+                      if (discountThreshold != null && 
+                          discountPercentage != null && 
+                          totalQuantity >= discountThreshold) {
+                        extraUnitPrice = extraUnitPrice * (1 - (discountPercentage / 100));
+                        console.log(`🎯 Applied sale preference to extra quantity: ${discountPercentage}% for ${product.id} (total qty: ${totalQuantity})`);
+                      }
                     }
+                    
+                    extraCost = extraUnitPrice * extraQuantity;
                   }
                   
-                  extraCost = extraUnitPrice * extraQuantity;
+                  const totalItemCost = bundleItemCost + extraCost;
+                  subtotal += totalItemCost;
+                  
+                  items.push({
+                    productId: product.id,
+                    quantity: totalQuantity,
+                    unitPrice: totalItemCost / totalQuantity,
+                    total: totalItemCost,
+                    isBundleItem: bundlePortion > 0,
+                  });
                 }
                 
-                const totalItemCost = bundleItemCost + extraCost;
-                subtotal += totalItemCost;
+                if (items.length === 1) {
+                  currency = firstProduct.currency.length > 0 ? firstProduct.currency : "TL";
+                }
                 
-                items.push({
-                  productId: product.id,
-                  quantity: totalQuantity,
-                  unitPrice: totalItemCost / totalQuantity,
-                  total: totalItemCost,
-                  isBundleItem: bundlePortion > 0,
-                });
+                console.log(`🎁 Applied hybrid bundle pricing for ${bundleId}: ${bundlePrice} + extras`);
+                continue;
               }
-              
-              if (items.length === 1) {
-                currency = firstProduct.currency || "TL";
-              }
-              
-              console.log(`🎁 Applied hybrid bundle pricing for ${bundleId}: ${bundlePrice} + extras`);
-              continue;
+            }
+          }
+          
+          // Bundle not valid or no stock - calculate individually with sale preferences
+          for (const item of bundleItems) {
+            const itemTotal = calculateIndividualItemTotal(item);
+            subtotal += itemTotal.total;
+            items.push(itemTotal.item);
+            
+            if (items.length === 1) {
+              currency = itemTotal.currency;
             }
           }
         }
-        
-        // Bundle not valid or no stock - calculate individually with sale preferences
-        for (const item of bundleItems) {
+  
+        // Process individual (non-bundle) items
+        for (const item of individualItems) {
           const itemTotal = calculateIndividualItemTotal(item);
           subtotal += itemTotal.total;
           items.push(itemTotal.item);
-          
+  
           if (items.length === 1) {
             currency = itemTotal.currency;
           }
         }
+  
+        console.log(`💰 Total calculation complete: ${subtotal} ${currency} for ${items.length} items`);
+  
+        return {
+          subtotal,
+          total: subtotal,
+          currency,
+          items,
+        };
+      } catch (error) {
+        console.error("❌ Error calculating cart totals:", error);
+        return { subtotal: 0, total: 0, currency: "TL", items: [] };
       }
-
-      // Process individual (non-bundle) items
-      for (const item of individualItems) {
-        const itemTotal = calculateIndividualItemTotal(item);
-        subtotal += itemTotal.total;
-        items.push(itemTotal.item);
-
-        if (items.length === 1) {
-          currency = itemTotal.currency;
-        }
-      }
-
-      console.log(`💰 Total calculation complete: ${subtotal} ${currency} for ${items.length} items`);
-
-      return {
-        subtotal,
-        total: subtotal,
-        currency,
-        items,
-      };
-    } catch (error) {
-      console.error("❌ Error calculating cart totals:", error);
-      return { subtotal: 0, total: 0, currency: "TL", items: [] };
-    }
-  },
-  [user, cartItems, calculateIndividualItemTotal]
-);
+    },
+    [user, cartItems, calculateIndividualItemTotal]
+  );
 
 
   // Load cart page implementation
