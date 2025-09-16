@@ -585,14 +585,18 @@ export default function ShopDetailPage() {
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
   {products.map((product) => (
-    <div key={product.id} className="max-h-80 overflow-hidden">
-      <ProductCard
-        product={product}
-        scaleFactor={0.9}
-        showCartIcon={true}
-        onTap={() => router.push(`/productdetail/${product.id}`)}
-      />
-    </div>
+    <ProductCard
+      key={product.id}
+      product={product}
+      onTap={() => router.push(`/productdetail/${product.id}`)}
+      onFavoriteToggle={() => {}}
+      onAddToCart={() => {}}
+      onColorSelect={() => {}}
+      showCartIcon={true}
+      isFavorited={false}
+      isInCart={false}
+      portraitImageHeight={320}
+    />
   ))}
 </div>
             )}
