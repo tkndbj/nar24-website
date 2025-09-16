@@ -17,25 +17,8 @@ import {
 import { useTranslations } from "next-intl";
 import { db } from "@/lib/firebase"; // Adjust import path as needed
 
-// Product interface (should match the one from ProductCard)
-interface Product {
-  id: string;
-  productName: string;
-  price: number;
-  originalPrice?: number;
-  discountPercentage?: number;
-  currency: string;
-  imageUrls: string[];
-  colorImages: Record<string, string[]>;
-  description: string;
-  brandModel?: string;
-  condition: string;
-  quantity?: number;
-  averageRating: number;
-  isBoosted: boolean;
-  deliveryOption?: string;
-  campaignName?: string;
-}
+import { Product } from "@/app/models/Product";
+
 
 interface DynamicListData {
   id: string;

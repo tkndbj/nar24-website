@@ -2,24 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import ProductCard from "../../components/ProductCard"; // Adjust path to your ProductCard
 
-interface Product {
-  id: string;
-  productName: string;
-  price: number;
-  originalPrice?: number;
-  discountPercentage?: number;
-  currency: string;
-  imageUrls: string[];
-  colorImages: Record<string, string[]>;
-  description: string;
-  brandModel?: string;
-  condition: string;
-  quantity?: number;
-  averageRating: number;
-  isBoosted: boolean;
-  deliveryOption?: string;
-  campaignName?: string;
-}
+import { Product } from "@/app/models/Product";
 
 interface ProductDetailRelatedProductsProps {
   productId?: string;

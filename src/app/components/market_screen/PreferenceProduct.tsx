@@ -6,25 +6,7 @@ import { ChevronRight, ChevronLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 
-// Product interface (should match the one from ProductCard)
-interface Product {
-  id: string;
-  productName: string;
-  price: number;
-  originalPrice?: number;
-  discountPercentage?: number;
-  currency: string;
-  imageUrls: string[];
-  colorImages: Record<string, string[]>;
-  description: string;
-  brandModel?: string;
-  condition: string;
-  quantity?: number;
-  averageRating: number;
-  isBoosted: boolean;
-  deliveryOption?: string;
-  campaignName?: string;
-}
+import { Product } from "@/app/models/Product";
 
 interface PreferenceProductProps {
   userId?: string | null;
