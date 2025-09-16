@@ -9,9 +9,7 @@ import {
   getDoc,
   getDocs,
   query,
-  where,
-  
-  Timestamp,
+  where,  
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
@@ -26,30 +24,7 @@ import Image from "next/image";
 import { ProductCard } from "@/app/components/ProductCard";
 import { globalBrands } from "@/constants/brands";
 
-// Interfaces
-interface Product {
-  id: string;
-  productName: string;
-  price: number;
-  originalPrice?: number;
-  discountPercentage?: number;
-  currency: string;
-  imageUrls: string[];
-  colorImages: Record<string, string[]>;
-  description: string;
-  brandModel?: string;
-  condition: string;
-  quantity?: number;
-  averageRating: number;
-  isBoosted: boolean;
-  deliveryOption?: string;
-  campaignName?: string;
-  createdAt: Timestamp;
-  category?: string;
-  subcategory?: string;
-  subsubcategory?: string;
-  availableColors?: string[];
-}
+import { Product } from "@/app/models/Product";
 
 interface CollectionData {
   name: string;
@@ -416,7 +391,7 @@ export default function CollectionPage() {
       // Sort by creation date (newest first)
       loadedProducts.sort((a, b) => {
         if (a.createdAt && b.createdAt) {
-          return b.createdAt.toMillis() - a.createdAt.toMillis();
+          return b.createdAt.getTime() - a.createdAt.getTime();
         }
         return 0;
       });
