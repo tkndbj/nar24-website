@@ -242,30 +242,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     }
   }, [product?.id]);
 
-  // Enhanced cart functionality with proper state management
-  const handleAddToCart = useCallback(
-    async (selectedOptions?: { quantity?: number; [key: string]: unknown }) => {
-      if (!user) {
-        router.push("/login");
-        return;
-      }
-
-      if (!product) return;
-
-      const productInCart = isInCart(product.id);
-
-      // Only show option selector when ADDING to cart (not removing)
-      if (!productInCart && hasSelectableOptions(product) && !selectedOptions) {
-        setShowCartOptionSelector(true);
-        return;
-      }
-
-      // Perform cart operation
-      await performCartOperation(selectedOptions);
-    },
-    [user, product, isInCart, router]
-  );
-
   // Separated cart operation logic - simplified and fixed
   const performCartOperation = useCallback(
     async (selectedOptions?: { quantity?: number; [key: string]: unknown }) => {
@@ -324,6 +300,36 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     },
     [product, isInCart, addToCart]
   );
+
+  // Enhanced cart functionality with proper state management
+  const handleAddToCart = useCallback(
+    async (selectedOptions?: { quantity?: number; [key: string]: unknown }) => {
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+  
+      if (!product) return;
+  
+      const productInCart = isInCart(product.id);
+  
+      // If product is in cart, remove it directly (no options needed for removal)
+      if (productInCart) {
+        await performCartOperation(selectedOptions);
+        return;
+      }
+  
+      // Only show option selector when ADDING to cart (not removing)
+      if (!productInCart && hasSelectableOptions(product) && !selectedOptions) {
+        setShowCartOptionSelector(true);
+        return;
+      }
+  
+      // Perform cart operation
+      await performCartOperation(selectedOptions);
+    },
+    [user, product, isInCart, router, performCartOperation, setShowCartOptionSelector]
+  );  
 
   // Handle cart option selector confirmation
   const handleCartOptionSelectorConfirm = useCallback(

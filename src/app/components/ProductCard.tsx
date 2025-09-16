@@ -446,30 +446,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     setInternalSelectedColor(selectedColor || null);
   }, [selectedColor]);
 
-  // Enhanced cart functionality
-  const handleAddToCart = useCallback(
-    async (selectedOptions?: { quantity?: number; [key: string]: unknown }) => {
-      if (!user) {
-        router.push("/login");
-        return;
-      }
-
-      const productInCart = actualIsInCart;
-
-      // Only show option selector when ADDING to cart (not removing)
-      if (!productInCart && hasSelectableOptions(product) && !selectedOptions) {
-        setShowCartOptionSelector(true);
-        return;
-      }
-
-      // Perform cart operation
-      await performCartOperation(selectedOptions);
-    },
-    [user, product, actualIsInCart, router]
-  );
-
-  // Separated cart operation logic
-  const performCartOperation = useCallback(
+   // Separated cart operation logic
+   const performCartOperation = useCallback(
     async (selectedOptions?: { quantity?: number; [key: string]: unknown }) => {
       try {
         const wasInCart = actualIsInCart;
@@ -514,6 +492,34 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     },
     [product, actualIsInCart, addToCart, onAddToCart]
   );
+
+  // Enhanced cart functionality
+  const handleAddToCart = useCallback(
+    async (selectedOptions?: { quantity?: number; [key: string]: unknown }) => {
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+  
+      const productInCart = actualIsInCart;
+  
+      // If product is in cart, remove it directly (no options needed for removal)
+      if (productInCart) {
+        await performCartOperation(selectedOptions);
+        return;
+      }
+  
+      // Only show option selector when ADDING to cart (not removing)
+      if (!productInCart && hasSelectableOptions(product) && !selectedOptions) {
+        setShowCartOptionSelector(true);
+        return;
+      }
+  
+      // Perform cart operation
+      await performCartOperation(selectedOptions);
+    },
+    [user, product, actualIsInCart, router, performCartOperation, setShowCartOptionSelector]
+  ); 
 
   // Enhanced favorite functionality
   const handleToggleFavorite = useCallback(async () => {
