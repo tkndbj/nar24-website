@@ -22,6 +22,74 @@ import {
 
 import { Product, ProductUtils } from "@/app/models/Product";
 
+// Import the Algolia Product type and create a converter function
+import { Product as AlgoliaProduct } from "@/lib/algolia";
+
+// Converter function from Algolia Product to Model Product
+const convertAlgoliaProduct = (algoliaProduct: AlgoliaProduct): Product => {
+  return {
+    id: algoliaProduct.id,
+    sourceCollection: algoliaProduct.collection,
+    productName: algoliaProduct.productName,
+    description: algoliaProduct.description,
+    price: algoliaProduct.price,
+    currency: algoliaProduct.currency,
+    condition: algoliaProduct.condition,
+    brandModel: algoliaProduct.brandModel,
+    imageUrls: algoliaProduct.imageUrls,
+    averageRating: algoliaProduct.averageRating,
+    reviewCount: algoliaProduct.reviewCount || 0,
+    originalPrice: algoliaProduct.originalPrice,
+    discountPercentage: algoliaProduct.discountPercentage,
+    colorQuantities: {},
+    boostClickCountAtStart: 0,
+    availableColors: [],
+    gender: undefined,
+    bundleIds: [],
+    bundlePrice: undefined,
+    userId: algoliaProduct.userId || '',
+    discountThreshold: undefined,
+    rankingScore: algoliaProduct.rankingScore || 0,
+    promotionScore: 0,
+    campaign: undefined,
+    campaignDiscount: undefined,
+    campaignPrice: undefined,
+    ownerId: algoliaProduct.userId || '',
+    shopId: algoliaProduct.shopId,
+    ilanNo: algoliaProduct.id,
+    searchIndex: [],
+    createdAt: algoliaProduct.createdAt ? new Date(algoliaProduct.createdAt) : new Date(),
+    sellerName: algoliaProduct.sellerName || 'Unknown',
+    category: algoliaProduct.category || 'Uncategorized',
+    subcategory: algoliaProduct.subcategory || '',
+    subsubcategory: algoliaProduct.subsubcategory || '',
+    quantity: algoliaProduct.quantity || 0,
+    bestSellerRank: undefined,
+    sold: false,
+    clickCount: algoliaProduct.clickCount || 0,
+    clickCountAtStart: 0,
+    favoritesCount: 0,
+    cartCount: 0,
+    purchaseCount: algoliaProduct.purchaseCount,
+    deliveryOption: algoliaProduct.deliveryOption || 'Self Delivery',
+    boostedImpressionCount: 0,
+    boostImpressionCountAtStart: 0,
+    isFeatured: false,
+    isTrending: false,
+    isBoosted: algoliaProduct.isBoosted,
+    boostStartTime: undefined,
+    boostEndTime: undefined,
+    dailyClickCount: algoliaProduct.dailyClickCount,
+    lastClickDate: undefined,
+    paused: false,
+    campaignName: algoliaProduct.campaignName,
+    colorImages: algoliaProduct.colorImages,
+    videoUrl: undefined,
+    attributes: {},
+    reference: undefined,
+  };
+};
+
 
 // Enhanced utility functions
 const throttle = <T extends (...args: unknown[]) => unknown>(
@@ -460,7 +528,7 @@ const SearchResultsContent: React.FC = () => {
             serverSideFilterType,
             sortOption === "None" ? "None" : sortOption
           );
-          results = algoliaResults.map(algoliaProduct => ProductUtils.fromAlgolia(algoliaProduct as any));
+          results = algoliaResults.map(convertAlgoliaProduct);
           console.log(`✅ Products index returned ${results.length} results`);
         } catch (productError) {
           console.warn("❌ Products index failed:", productError);
@@ -476,7 +544,7 @@ const SearchResultsContent: React.FC = () => {
               serverSideFilterType,
               sortOption === "None" ? "None" : sortOption
             );
-            results = algoliaResults.map(algoliaProduct => ProductUtils.fromAlgolia(algoliaProduct as any));
+            results = algoliaResults.map(convertAlgoliaProduct);
             console.log(
               `✅ Shop_products index returned ${results.length} results`
             );
