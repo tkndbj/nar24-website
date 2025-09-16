@@ -145,6 +145,28 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
   onConfirm,
   isDarkMode = false,
 }) => {
+  // Auto-detect dark mode if not provided as prop
+  const [detectedDarkMode, setDetectedDarkMode] = React.useState(false);
+
+  React.useEffect(() => {
+    if (typeof document !== "undefined") {
+      const checkTheme = () => {
+        setDetectedDarkMode(document.documentElement.classList.contains("dark"));
+      };
+      
+      checkTheme();
+      const observer = new MutationObserver(checkTheme);
+      observer.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["class"],
+      });
+      
+      return () => observer.disconnect();
+    }
+  }, []);
+
+  // Use provided isDarkMode prop or auto-detected value
+  const actualDarkMode = isDarkMode || detectedDarkMode;
   const { user } = useUser();
   const t = useTranslations();
   
@@ -357,7 +379,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
 
     return (
       <div className={`mt-4 p-3 rounded-lg border ${
-        isDarkMode 
+        actualDarkMode 
           ? 'bg-blue-900/20 border-blue-800' 
           : 'bg-blue-50 border-blue-200'
       }`}>
@@ -379,7 +401,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
         </div>
       </div>
     );
-  }, [salePreferences, selectedQuantity, t, isDarkMode]);
+  }, [salePreferences, selectedQuantity, t, actualDarkMode]);
 
   const renderColorSelector = useCallback(() => {
     if (!hasColors) return null;
@@ -397,7 +419,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
               imageUrl={product.imageUrls[0]}
               isSelected={selectedColor === 'default'}
               disabled={product.quantity === 0}
-              isDarkMode={isDarkMode}
+              isDarkMode={actualDarkMode}
               onSelect={() => {
                 setSelectedColor('default');
                 console.log('ProductOptionSelector - Color selected:', { productId: product.id, selectedColor: 'default' });
@@ -416,7 +438,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
                 imageUrl={images[0]}
                 isSelected={selectedColor === colorKey}
                 disabled={qty === 0}
-                isDarkMode={isDarkMode}
+                isDarkMode={actualDarkMode}
                 onSelect={() => {
                   setSelectedColor(colorKey);
                   console.log('ProductOptionSelector - Color selected:', { productId: product.id, selectedColor: colorKey, availableQty: qty });
@@ -428,7 +450,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
         </div>
       </div>
     );
-  }, [hasColors, product, selectedColor, t, isDarkMode]);
+  }, [hasColors, product, selectedColor, t, actualDarkMode]);
 
   const renderAttributeSelector = useCallback((attributeKey: string, options: string[]) => {
     return (
@@ -442,7 +464,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
               key={option}
               label={AttributeLocalizationUtils.getLocalizedSingleValue(attributeKey, option, t)}
               isSelected={selections[attributeKey] === option}
-              isDarkMode={isDarkMode}
+              isDarkMode={actualDarkMode}
               onSelect={() => {
                 setSelections(prev => ({ ...prev, [attributeKey]: option }));
                 console.log('ProductOptionSelector - Attribute selected:', { 
@@ -457,7 +479,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
         </div>
       </div>
     );
-  }, [selections, t, product.id, isDarkMode]);
+  }, [selections, t, product.id, actualDarkMode]);
 
   const renderQuantitySelector = useCallback(() => {
     const maxAllowed = getMaxQuantityAllowed();
@@ -472,7 +494,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
             onClick={() => handleQuantityChange(-1)}
             disabled={selectedQuantity <= 1}
             className={`p-2 rounded-full border transition-colors ${
-              isDarkMode
+              actualDarkMode
                 ? 'border-gray-600 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed'
                 : 'border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed'
             }`}
@@ -488,7 +510,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
             onClick={() => handleQuantityChange(1)}
             disabled={selectedQuantity >= maxAllowed}
             className={`p-2 rounded-full border transition-colors ${
-              isDarkMode
+              actualDarkMode
                 ? 'border-gray-600 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed'
                 : 'border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed'
             }`}
@@ -505,7 +527,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
         )}
       </div>
     );
-  }, [selectedQuantity, getMaxQuantityAllowed, handleQuantityChange, isLoadingSalePrefs, t, isDarkMode]);
+  }, [selectedQuantity, getMaxQuantityAllowed, handleQuantityChange, isLoadingSalePrefs, t, actualDarkMode]);
 
   // Redirect to login if user is not authenticated
   useEffect(() => {
