@@ -506,18 +506,9 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
             paymentItem.currency = item.product.currency;
           }
           
-          // Remove fields that shouldn't be sent to payment
-          const {
-            product,
-            cartData,
-            isOptimistic,
-            isLoadingProduct,
-            loadError,
-            selectedColorImage,
-            ...cleanPaymentItem
-          } = paymentItem;
+           paymentItem;
           
-          return cleanPaymentItem;
+          
         });
 
       console.log('CartDrawer - Payment items prepared:', selectedItems);
