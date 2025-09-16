@@ -776,172 +776,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     []
   );
 
-  // Main cart operations - matching Flutter implementation
-  const addToCart = useCallback(
-    async (
-      productId: string,
-      quantity: number = 1,
-      attributes?: CartAttributes
-    ): Promise<string> => {
-      const operationId = `${productId}_${Date.now()}`;
-      
-      if (!user) return "Please log in";
-      if (!productId.trim()) return "Invalid product ID";
-      if (quantity < 1) return "Quantity must be at least 1";
-      if (operationIdsRef.current.has(productId)) return "Operation in progress";
-      
-      operationIdsRef.current.set(productId, operationId);
-
-      try {
-        const isCurrentlyInCart = cartProductIds.has(productId);
-        
-        // Get product document reference
-        const prodRef = await getProductDocument([productId]);
-        if (!prodRef[productId]) {
-          return "Product not found";
-        }
-
-        // Fetch product data and seller info
-        const prodSnapshot = await getDoc(prodRef[productId]!);
-        if (!prodSnapshot.exists()) {
-          return "Product not found";
-        }
-        const productData = prodSnapshot.data() as ProductDocumentData;
-
-        // Check sale preferences for maxQuantity limit
-        const salePrefsResult = await fetchSalePreferencesBatch([productId]);
-        const salePrefs = salePrefsResult[productId];
-        
-        if (salePrefs?.maxQuantity) {
-          if (isCurrentlyInCart) {
-            const currentCartItem = cartItemsCacheRef.current[productId];
-            const currentQuantity = currentCartItem?.quantity || 0;
-            const totalQuantity = currentQuantity + quantity;
-            
-            if (totalQuantity > salePrefs.maxQuantity) {
-              return `Cannot add more. Maximum allowed: ${salePrefs.maxQuantity}`;
-            }
-            return await updateQuantity(productId, totalQuantity);
-          } else {
-            if (quantity > salePrefs.maxQuantity) {
-              return `Cannot add ${quantity}. Maximum allowed: ${salePrefs.maxQuantity}`;
-            }
-          }
-        }
-
-        // Apply optimistic update immediately
-        await applyOptimisticUpdate(productId, !isCurrentlyInCart, quantity, attributes);
-
-        // Fetch bundle info and seller details
-        const bundleData = await fetchActiveBundleForProduct(productId);
-        const sellerInfo = await fetchSellerInfo(prodRef[productId]!, productData);
-
-        // Run transaction
-        const result = await runTransaction(db, async (transaction) => {
-          const cartRef = doc(db, "users", user.uid, "cart", productId);
-
-          const prodSnap = await transaction.get(prodRef[productId]!);
-          if (!prodSnap.exists()) return "Product not found";
-          const txProductData = prodSnap.data() as ProductDocumentData;
-
-          const cartSnap = await transaction.get(cartRef);
-
-          if (cartSnap.exists()) {
-            // Remove from cart (toggle behavior)
-            transaction.delete(cartRef);
-
-            transaction.update(prodRef[productId]!, {
-              cartCount: increment(-1),
-              metricsUpdatedAt: serverTimestamp(),
-            });
-
-            return "Removed from cart";
-          } else {
-            // Add to cart
-            const unitPrice = bundleData?.bundlePrice ?? txProductData.price ?? 0;
-
-            const cartData: Record<string, unknown> = {
-              addedAt: serverTimestamp(),
-              updatedAt: serverTimestamp(),
-              quantity,
-              unitPrice,
-              currency: txProductData.currency || "TL",
-              sellerId: sellerInfo.sellerId,
-              sellerName: sellerInfo.sellerName,
-              isShop: sellerInfo.isShop,
-            };
-
-            // Add bundle flag if applicable
-            if (bundleData) {
-              cartData.isBundle = true;
-              if (bundleData.bundleId) {
-                cartData.bundleId = bundleData.bundleId;
-              }
-            }
-
-            // Copy product attributes
-            if (txProductData.attributes) {
-              Object.entries(txProductData.attributes).forEach(([k, v]) => {
-                cartData[k] = v;
-              });
-            }
-
-            // Add UI-selected attributes
-            if (attributes) {
-              Object.entries(attributes).forEach(([k, v]) => {
-                cartData[k] = v;
-              });
-            }
-
-            transaction.set(cartRef, cartData);
-
-            transaction.update(prodRef[productId]!, {
-              cartCount: increment(1),
-              metricsUpdatedAt: serverTimestamp(),
-            });
-
-            return "Added to cart";
-          }
-        });
-
-        // Clear optimistic state on success
-        clearOptimisticState(productId);
-
-        return result;
-      } catch (error) {
-        console.error("Cart operation error:", error);
-        rollbackOptimisticUpdate(productId, !cartProductIds.has(productId));
-        return `Failed to update cart: ${error}`;
-      } finally {
-        setTimeout(() => {
-          if (operationIdsRef.current.get(productId) === operationId) {
-            operationIdsRef.current.delete(productId);
-          }
-        }, 5000);
-      }
-    },
-    [
-      user,
-      cartProductIds,
-      getProductDocument,
-      fetchSalePreferencesBatch,
-      applyOptimisticUpdate,
-      fetchActiveBundleForProduct,
-      fetchSellerInfo,
-      db,
-      clearOptimisticState,
-      rollbackOptimisticUpdate,
-    ]
-  );
-
-  // Other methods implementation...
-  const removeFromCart = useCallback(
-    async (productId: string): Promise<string> => {
-      return addToCart(productId); // Toggle behavior
-    },
-    [addToCart]
-  );
-
   const updateQuantity = useCallback(
     async (productId: string, newQuantity: number): Promise<string> => {
       if (!user) return "Please log in";
@@ -982,6 +816,249 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     },
     [user, db, fetchSalePreferencesBatch, isInitialized, cartItems]
   );
+
+  // Main cart operations - matching Flutter implementation
+  const addToCart = useCallback(
+    async (
+      productId: string,
+      quantity: number = 1,
+      attributes?: CartAttributes
+    ): Promise<string> => {
+      const operationId = `${productId}_${Date.now()}`;
+      
+      if (!user) return "Please log in";
+      if (!productId.trim()) return "Invalid product ID";
+      if (quantity < 1) return "Quantity must be at least 1";
+      if (operationIdsRef.current.has(productId)) return "Operation in progress";
+      
+      operationIdsRef.current.set(productId, operationId);
+  
+      try {
+        const isCurrentlyInCart = cartProductIds.has(productId);
+        
+        // Get product document reference
+        const prodRef = await getProductDocument([productId]);
+        if (!prodRef[productId]) {
+          return "Product not found";
+        }
+  
+        // Fetch product data and seller info
+        const prodSnapshot = await getDoc(prodRef[productId]!);
+        if (!prodSnapshot.exists()) {
+          return "Product not found";
+        }
+        const productData = prodSnapshot.data() as ProductDocumentData;
+  
+        // Check sale preferences for maxQuantity limit
+        const salePrefsResult = await fetchSalePreferencesBatch([productId]);
+        const salePrefs = salePrefsResult[productId];
+        
+        if (salePrefs?.maxQuantity) {
+          if (isCurrentlyInCart) {
+            const currentCartItem = cartItemsCacheRef.current[productId];
+            const currentQuantity = currentCartItem?.quantity || 0;
+            const totalQuantity = currentQuantity + quantity;
+            
+            if (totalQuantity > salePrefs.maxQuantity) {
+              return `Cannot add more. Maximum allowed: ${salePrefs.maxQuantity}`;
+            }
+            return await updateQuantity(productId, totalQuantity);
+          } else {
+            if (quantity > salePrefs.maxQuantity) {
+              return `Cannot add ${quantity}. Maximum allowed: ${salePrefs.maxQuantity}`;
+            }
+          }
+        }
+  
+        // Apply optimistic update immediately
+        await applyOptimisticUpdate(productId, true, quantity, attributes);
+  
+        // Fetch bundle info and seller details
+        const bundleData = await fetchActiveBundleForProduct(productId);
+        const sellerInfo = await fetchSellerInfo(prodRef[productId]!, productData);
+  
+        // Run transaction - ONLY ADD, NO TOGGLE
+        const result = await runTransaction(db, async (transaction) => {
+          const cartRef = doc(db, "users", user.uid, "cart", productId);
+          const prodSnap = await transaction.get(prodRef[productId]!);
+          
+          if (!prodSnap.exists()) return "Product not found";
+          const txProductData = prodSnap.data() as ProductDocumentData;
+  
+          const cartSnap = await transaction.get(cartRef);
+  
+          if (cartSnap.exists()) {
+            // Update existing item quantity instead of toggling
+            const existingData = cartSnap.data();
+            const newQuantity = (existingData?.quantity || 0) + quantity;
+            
+            // Check max quantity again in transaction
+            if (salePrefs?.maxQuantity && newQuantity > salePrefs.maxQuantity) {
+              return `Cannot add more. Maximum allowed: ${salePrefs.maxQuantity}`;
+            }
+            
+            transaction.update(cartRef, {
+              quantity: newQuantity,
+              updatedAt: serverTimestamp(),
+            });
+            
+            return "Updated cart quantity";
+          } else {
+            // Add new item to cart
+            const unitPrice = bundleData?.bundlePrice ?? txProductData.price ?? 0;
+  
+            const cartData: Record<string, unknown> = {
+              addedAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+              quantity,
+              unitPrice,
+              currency: txProductData.currency || "TL",
+              sellerId: sellerInfo.sellerId,
+              sellerName: sellerInfo.sellerName,
+              isShop: sellerInfo.isShop,
+            };
+  
+            // Add bundle flag if applicable
+            if (bundleData) {
+              cartData.isBundle = true;
+              if (bundleData.bundleId) {
+                cartData.bundleId = bundleData.bundleId;
+              }
+            }
+  
+            // Copy product attributes
+            if (txProductData.attributes) {
+              Object.entries(txProductData.attributes).forEach(([k, v]) => {
+                cartData[k] = v;
+              });
+            }
+  
+            // Add UI-selected attributes
+            if (attributes) {
+              Object.entries(attributes).forEach(([k, v]) => {
+                cartData[k] = v;
+              });
+            }
+  
+            transaction.set(cartRef, cartData);
+  
+            transaction.update(prodRef[productId]!, {
+              cartCount: increment(1),
+              metricsUpdatedAt: serverTimestamp(),
+            });
+  
+            return "Added to cart";
+          }
+        });
+  
+        // Clear optimistic state on success
+        clearOptimisticState(productId);
+  
+        return result;
+      } catch (error) {
+        console.error("Cart operation error:", error);
+        rollbackOptimisticUpdate(productId, true);
+        return `Failed to update cart: ${error}`;
+      } finally {
+        setTimeout(() => {
+          if (operationIdsRef.current.get(productId) === operationId) {
+            operationIdsRef.current.delete(productId);
+          }
+        }, 5000);
+      }
+    },
+    [
+      user,
+      cartProductIds,
+      getProductDocument,
+      fetchSalePreferencesBatch,
+      applyOptimisticUpdate,
+      fetchActiveBundleForProduct,
+      fetchSellerInfo,
+      updateQuantity,
+      db,
+      clearOptimisticState,
+      rollbackOptimisticUpdate,
+    ]
+  );
+
+  // Replace your current removeFromCart function with this dedicated removal logic
+const removeFromCart = useCallback(
+  async (productId: string): Promise<string> => {
+    const operationId = `remove_${productId}_${Date.now()}`;
+    
+    if (!user) return "Please log in";
+    if (!productId.trim()) return "Invalid product ID";
+    if (operationIdsRef.current.has(productId)) return "Operation in progress";
+    
+    operationIdsRef.current.set(productId, operationId);
+
+    try {
+      const isCurrentlyInCart = cartProductIds.has(productId);
+      
+      if (!isCurrentlyInCart) {
+        return "Item not in cart";
+      }
+
+      // Get product document reference for metrics update
+      const prodRef = await getProductDocument([productId]);
+      if (!prodRef[productId]) {
+        return "Product not found";
+      }
+
+      // Apply optimistic removal immediately
+      await applyOptimisticUpdate(productId, false, 0);
+
+      // Run transaction to remove from cart
+      const result = await runTransaction(db, async (transaction) => {
+        const cartRef = doc(db, "users", user.uid, "cart", productId);
+        const cartSnap = await transaction.get(cartRef);
+
+        if (!cartSnap.exists()) {
+          return "Item not in cart";
+        }
+
+        // Delete from cart
+        transaction.delete(cartRef);
+
+        // Update product metrics
+        if (prodRef[productId]) {
+          transaction.update(prodRef[productId]!, {
+            cartCount: increment(-1),
+            metricsUpdatedAt: serverTimestamp(),
+          });
+        }
+
+        return "Removed from cart";
+      });
+
+      // Clear optimistic state on success
+      clearOptimisticState(productId);
+
+      return result;
+    } catch (error) {
+      console.error("Remove from cart error:", error);
+      // Rollback optimistic removal
+      rollbackOptimisticUpdate(productId, false);
+      return `Failed to remove from cart: ${error}`;
+    } finally {
+      setTimeout(() => {
+        if (operationIdsRef.current.get(productId) === operationId) {
+          operationIdsRef.current.delete(productId);
+        }
+      }, 5000);
+    }
+  },
+  [
+    user,
+    cartProductIds,
+    getProductDocument,
+    applyOptimisticUpdate,
+    db,
+    clearOptimisticState,
+    rollbackOptimisticUpdate,
+  ]
+);  
 
   const incrementQuantity = useCallback(
     async (productId: string): Promise<string> => {
