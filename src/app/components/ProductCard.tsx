@@ -345,9 +345,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   onTap,
   onColorSelect,
   onFavoriteToggle,
-  onAddToCart,
-  isFavorited = false,
-  isInCart = false,
+  onAddToCart,  
 }) => {
   const router = useRouter();
   
