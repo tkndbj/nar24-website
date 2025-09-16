@@ -205,18 +205,37 @@ export default function SearchBar({
       console.log('Already submitting, ignoring history click');
       return;
     }
-
+  
+    setIsSubmitting(true);
+  
     try {
-      // Update search term first
-      onSearchTermChange(historyTerm);
+      console.log('Processing history click for:', historyTerm);
       
-      // Submit search with the history term
-      await handleSearchSubmit(historyTerm);
+      // Save search term to history (non-blocking) - don't save duplicates
+      // saveSearchTerm(historyTerm).catch(error => {
+      //   console.error('Failed to save search term to history:', error);
+      // });
+  
+      // Close search dropdown
+      onSearchStateChange(false);
+      
+      // Update search term
+      onSearchTermChange(historyTerm);
+  
+      // Navigate to search results immediately
+      const searchUrl = `/search-results?q=${encodeURIComponent(historyTerm)}`;
+      console.log('Navigating to:', searchUrl);
+      
+      // Use window.location.href for navigation
+      window.location.href = searchUrl;
       
     } catch (error) {
       console.error('Error handling history item click:', error);
+    } finally {
+      // Note: this might not execute due to page navigation
+      setIsSubmitting(false);
     }
-  }, [isSubmitting, onSearchTermChange, handleSearchSubmit]);
+  }, [isSubmitting, onSearchStateChange, onSearchTermChange]);
 
   // Handle delete history item
   const handleDeleteHistoryItem = useCallback(async (e: React.MouseEvent, docId: string) => {
