@@ -20,7 +20,7 @@ import {
   SortOption,  
 } from "@/context/SearchResultsProvider";
 
-import { Product, ProductUtils } from "@/app/models/Product";
+import { Product } from "@/app/models/Product";
 
 // Import the Algolia Product type and create a converter function
 import { Product as AlgoliaProduct } from "@/lib/algolia";
