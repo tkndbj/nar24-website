@@ -586,12 +586,13 @@ export default function ShopDetailPage() {
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 {products.map((product) => (
                   <ProductCard
-                    key={product.id}
-                    product={product}
-                    scaleFactor={0.9}
-                    showCartIcon={true}
-                    onTap={() => router.push(`/productdetail/${product.id}`)}
-                  />
+                  key={product.id}
+                  product={product}
+                  scaleFactor={0.8} // Make cards smaller overall
+                  portraitImageHeight={150} // Override the image height specifically
+                  showCartIcon={true}
+                  onTap={() => router.push(`/productdetail/${product.id}`)}
+                />
                 ))}
               </div>
             )}
