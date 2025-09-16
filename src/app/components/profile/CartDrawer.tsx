@@ -507,12 +507,12 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
           
           // Remove fields that shouldn't be sent to payment
           const {
-            product: _,
-            cartData: __,
-            isOptimistic: ___,
-            isLoadingProduct: ____,
-            loadError: _____,
-            selectedColorImage: ______,
+            product, 
+            cartData,
+            isOptimistic,
+            isLoadingProduct,
+            loadError,
+            selectedColorImage,
             ...cleanPaymentItem
           } = paymentItem;
           
