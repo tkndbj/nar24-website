@@ -89,7 +89,7 @@ interface CartItem {
 }
 
 interface RelatedProduct extends Product {
-  // Additional fields for related products if needed
+  isRelated?: boolean; // Mark as related product to satisfy no-empty-object-type
 }
 
 interface CartTotals {
@@ -177,9 +177,9 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Constants matching Flutter
-  const REFRESH_COOLDOWN = 30000; // 30 seconds
+  
   const RELATED_PRODUCTS_DELAY = 800;
-  const MAX_RELATED_PRODUCTS = 20;
+  
 
   // Translation function - matching Flutter localization
   const t = useCallback((key: string) => {
@@ -449,7 +449,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   // Delete selected products - matching Flutter implementation
   const deleteSelectedProducts = useCallback(async () => {
     const selectedIds = Object.entries(selectedProducts)
-      .filter(([_, selected]) => selected)
+      .filter(([, selected]) => selected)
       .map(([id]) => id);
 
     if (selectedIds.length === 0) return;
@@ -473,27 +473,13 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     }
   }, [selectedProducts, removeMultipleFromCart]);
 
-  // Handle refresh - matching Flutter implementation
-  const handleRefresh = useCallback(async () => {
-    if (isRefreshing) return;
-
-    setIsRefreshing(true);
-    try {
-      await refresh();
-      loadRelatedProductsUniversal();
-    } catch (error) {
-      console.error("Refresh error:", error);
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [isRefreshing, refresh, loadRelatedProductsUniversal]);
 
   // Handle checkout - matching Flutter implementation
   const handleCheckout = useCallback(async () => {
     console.log('CartDrawer - Navigating to checkout');
     
     const selectedProductIds = Object.entries(selectedProducts)
-      .filter(([_, selected]) => selected)
+      .filter(([, selected]) => selected)
       .map(([id]) => id);
 
     if (selectedProductIds.length === 0) {
@@ -521,12 +507,12 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
           
           // Remove fields that shouldn't be sent to payment
           const {
-            product: _product,
-            cartData: _cartData,
-            isOptimistic: _isOptimistic,
-            isLoadingProduct: _isLoadingProduct,
-            loadError: _loadError,
-            selectedColorImage: _selectedColorImage,
+            product: _,
+            cartData: __,
+            isOptimistic: ___,
+            isLoadingProduct: ____,
+            loadError: _____,
+            selectedColorImage: ______,
             ...cleanPaymentItem
           } = paymentItem;
           
@@ -1262,8 +1248,6 @@ const CartItemCard: React.FC<CartItemCardProps> = ({
             <SalePreferenceLabel
               salePreferences={item.salePreferences}
               currentQuantity={item.quantity}
-              isDarkMode={isDarkMode}
-              t={t}
             />
           )}
 
@@ -1331,15 +1315,11 @@ const CartItemCard: React.FC<CartItemCardProps> = ({
 interface SalePreferenceLabelProps {
   salePreferences: SalePreferences;
   currentQuantity: number;
-  isDarkMode: boolean;
-  t: (key: string) => string;
 }
 
 const SalePreferenceLabel: React.FC<SalePreferenceLabelProps> = ({
   salePreferences,
   currentQuantity,
-  isDarkMode,
-  t,
 }) => {
   const { discountThreshold, discountPercentage } = salePreferences;
   
@@ -1410,7 +1390,7 @@ const RelatedProductsSection: React.FC<RelatedProductsSectionProps> = ({
           </h3>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          {[...Array(4)].map((_, i) => (
+          {[...Array(4)].map((__, i) => (
             <div key={i} className="animate-pulse">
               <div className="w-full h-40 bg-gray-200 rounded-lg mb-2" />
               <div className="h-4 bg-gray-200 rounded mb-1" />

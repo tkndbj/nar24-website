@@ -137,15 +137,6 @@ interface ProductDocumentData {
   paused?: boolean;
 }
 
-interface OptimisticOperation {
-  productId: string;
-  type: "add" | "remove";
-  timestamp: number;
-  timeout: NodeJS.Timeout;
-  quantity?: number;
-  attributes?: CartAttributes;
-}
-
 interface CartTotals {
   subtotal: number;
   total: number;
