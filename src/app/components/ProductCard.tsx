@@ -355,6 +355,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     isInCart: isProductInCart,
     isOptimisticallyAdding,
     isOptimisticallyRemoving,
+    removeFromCart,
   } = useCart();
   const { addToFavorites, isFavorite: isProductFavorite } = useFavorites();
   const { user } = useUser();
@@ -450,37 +451,32 @@ export const ProductCard: React.FC<ProductCardProps> = ({
    const performCartOperation = useCallback(
     async (selectedOptions?: { quantity?: number; [key: string]: unknown }) => {
       try {
-        const wasInCart = actualIsInCart;
-
         // Set loading state immediately
-        setCartButtonState(wasInCart ? "removing" : "adding");
-
+        setCartButtonState("adding");
+  
         // Extract quantity from selectedOptions if provided
         let quantityToAdd = 1;
         const attributesToAdd = selectedOptions;
-
+  
         if (selectedOptions && typeof selectedOptions.quantity === "number") {
           quantityToAdd = selectedOptions.quantity;
         }
-
+  
         // Call the cart function with the correct quantity
         const result = await addToCart(
           product.id,
           quantityToAdd,
           attributesToAdd
         );
-
+  
         // Set success state based on result
-        if (result.includes("Added")) {
+        if (result.includes("Added") || result.includes("Updated")) {
           setCartButtonState("added");
-          setTimeout(() => setCartButtonState("idle"), 1500);
-        } else if (result.includes("Removed")) {
-          setCartButtonState("removed");
           setTimeout(() => setCartButtonState("idle"), 1500);
         } else {
           setCartButtonState("idle");
         }
-
+  
         // Call prop callback if provided
         if (onAddToCart) {
           onAddToCart(product.id);
@@ -490,10 +486,36 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         setCartButtonState("idle");
       }
     },
-    [product, actualIsInCart, addToCart, onAddToCart]
+    [product, addToCart, onAddToCart]
   );
 
-  // Enhanced cart functionality
+   // Add this new function to handle removal:
+   const performCartRemoval = useCallback(
+    async () => {
+      try {
+        setCartButtonState("removing");
+        
+        const result = await removeFromCart(product.id);
+        
+        if (result.includes("Removed")) {
+          setCartButtonState("removed");
+          setTimeout(() => setCartButtonState("idle"), 1500);
+        } else {
+          setCartButtonState("idle");
+        }
+  
+        // Call prop callback if provided
+        if (onAddToCart) {
+          onAddToCart(product.id);
+        }
+      } catch (error) {
+        console.error("Error removing from cart:", error);
+        setCartButtonState("idle");
+      }
+    },
+    [product.id, removeFromCart, onAddToCart]
+  );
+
   const handleAddToCart = useCallback(
     async (selectedOptions?: { quantity?: number; [key: string]: unknown }) => {
       if (!user) {
@@ -503,9 +525,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   
       const productInCart = actualIsInCart;
   
-      // If product is in cart, remove it directly (no options needed for removal)
+      // If product is in cart, remove it directly
       if (productInCart) {
-        await performCartOperation(selectedOptions);
+        await performCartRemoval();
         return;
       }
   
@@ -515,11 +537,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         return;
       }
   
-      // Perform cart operation
+      // Perform cart addition
       await performCartOperation(selectedOptions);
     },
-    [user, product, actualIsInCart, router, performCartOperation, setShowCartOptionSelector]
-  ); 
+    [user, product, actualIsInCart, router, performCartRemoval, performCartOperation, setShowCartOptionSelector]
+  );
+ 
 
   // Enhanced favorite functionality
   const handleToggleFavorite = useCallback(async () => {

@@ -74,6 +74,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     isInCart,
     isOptimisticallyAdding,
     isOptimisticallyRemoving,
+    removeFromCart,
   } = useCart();
   const { user } = useUser();
 
@@ -242,63 +243,74 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     }
   }, [product?.id]);
 
-  // Separated cart operation logic - simplified and fixed
-  const performCartOperation = useCallback(
+  const performCartAddition = useCallback(
     async (selectedOptions?: { quantity?: number; [key: string]: unknown }) => {
       if (!product) return;
-
+  
       try {
-        const wasInCart = isInCart(product.id);
-
-        // Set loading state immediately
-        setCartButtonState(wasInCart ? "removing" : "adding");
-
-        // Extract quantity from selectedOptions if provided
+        setCartButtonState("adding");
+  
         let quantityToAdd = 1;
         const attributesToAdd = selectedOptions;
-
+  
         if (selectedOptions && typeof selectedOptions.quantity === "number") {
           quantityToAdd = selectedOptions.quantity;
-
-          console.log("ProductDetailPage - Extracted quantity from options:", {
-            productId: product.id,
-            selectedOptions,
-            quantityToAdd,
-            wasInCart,
-          });
         }
-
-        // Call the cart function with the correct quantity
+  
         const result = await addToCart(
           product.id,
           quantityToAdd,
           attributesToAdd
         );
-
-        console.log("ProductDetailPage - Cart operation result:", {
+  
+        console.log("ProductDetailPage - Add to cart result:", {
           productId: product.id,
           quantityToAdd,
           attributesToAdd,
           result,
         });
-
-        // Set success state based on result
-        if (result.includes("Added")) {
+  
+        if (result.includes("Added") || result.includes("Updated")) {
           setCartButtonState("added");
           setTimeout(() => setCartButtonState("idle"), 1500);
-        } else if (result.includes("Removed")) {
-          setCartButtonState("removed");
-          setTimeout(() => setCartButtonState("idle"), 1500);
         } else {
-          // If no clear success message, reset to idle
           setCartButtonState("idle");
         }
       } catch (error) {
-        console.error("Error with cart operation:", error);
+        console.error("Error adding to cart:", error);
         setCartButtonState("idle");
       }
     },
-    [product, isInCart, addToCart]
+    [product, addToCart]
+  );
+  
+  // Handle cart removal
+  const performCartRemoval = useCallback(
+    async () => {
+      if (!product) return;
+  
+      try {
+        setCartButtonState("removing");
+  
+        const result = await removeFromCart(product.id);
+  
+        console.log("ProductDetailPage - Remove from cart result:", {
+          productId: product.id,
+          result,
+        });
+  
+        if (result.includes("Removed")) {
+          setCartButtonState("removed");
+          setTimeout(() => setCartButtonState("idle"), 1500);
+        } else {
+          setCartButtonState("idle");
+        }
+      } catch (error) {
+        console.error("Error removing from cart:", error);
+        setCartButtonState("idle");
+      }
+    },
+    [product, removeFromCart]
   );
 
   // Enhanced cart functionality with proper state management
@@ -313,31 +325,31 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   
       const productInCart = isInCart(product.id);
   
-      // If product is in cart, remove it directly (no options needed for removal)
+      // If product is in cart, remove it
       if (productInCart) {
-        await performCartOperation(selectedOptions);
+        await performCartRemoval();
         return;
       }
   
-      // Only show option selector when ADDING to cart (not removing)
+      // Show option selector if product has selectable options and no options provided
       if (!productInCart && hasSelectableOptions(product) && !selectedOptions) {
         setShowCartOptionSelector(true);
         return;
       }
   
-      // Perform cart operation
-      await performCartOperation(selectedOptions);
+      // Add to cart
+      await performCartAddition(selectedOptions);
     },
-    [user, product, isInCart, router, performCartOperation, setShowCartOptionSelector]
-  );  
+    [user, product, isInCart, router, performCartRemoval, performCartAddition, setShowCartOptionSelector]
+  );
 
   // Handle cart option selector confirmation
   const handleCartOptionSelectorConfirm = useCallback(
     async (selectedOptions: { quantity?: number; [key: string]: unknown }) => {
       setShowCartOptionSelector(false);
-      await performCartOperation(selectedOptions);
+      await performCartAddition(selectedOptions); // Only for additions
     },
-    [performCartOperation]
+    [performCartAddition]
   );
 
   // Handle cart option selector close
