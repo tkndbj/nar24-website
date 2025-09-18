@@ -22,25 +22,56 @@ interface ProductInfo {
   currency: string;
 }
 
-// ✅ FIXED: Proper Next.js App Router page props interface
+// ✅ FIXED: Updated for Next.js 15+ async params
 interface PageProps {
-  params: {
+  params: Promise<{
     locale: string;
-  };
-  searchParams: {
+  }>;
+  searchParams: Promise<{
     productId?: string;
     sellerId?: string;
     isShop?: string;
-  };
+  }>;
 }
 
-// ✅ FIXED: Main page component with correct Next.js structure
-const AskToSellerPage: React.FC<PageProps> = ({ searchParams }) => {
+// ✅ FIXED: Main page component with async params handling
+const AskToSellerPage: React.FC<PageProps> = ({ params, searchParams }) => {
   const router = useRouter();
   const { user } = useUser();
 
-  // ✅ Get translations using the locale from params
+  // Get translations
   const localization = useTranslations();
+
+  // State for resolved params
+  const [resolvedParams, setResolvedParams] = useState<{
+    locale: string;
+    productId: string;
+    sellerId: string;
+    isShop: boolean;
+  } | null>(null);
+
+  // ✅ FIXED: Resolve async params on component mount
+  useEffect(() => {
+    const resolveParams = async () => {
+      try {
+        const [resolvedParamsData, resolvedSearchParams] = await Promise.all([
+          params,
+          searchParams
+        ]);
+
+        setResolvedParams({
+          locale: resolvedParamsData.locale,
+          productId: resolvedSearchParams.productId || "",
+          sellerId: resolvedSearchParams.sellerId || "",
+          isShop: resolvedSearchParams.isShop === "true"
+        });
+      } catch (error) {
+        console.error("Error resolving params:", error);
+      }
+    };
+
+    resolveParams();
+  }, [params, searchParams]);
 
   // ✅ FIXED: Proper nested translation function that uses JSON files
   const t = useCallback((key: string) => {
@@ -67,21 +98,6 @@ const AskToSellerPage: React.FC<PageProps> = ({ searchParams }) => {
     }
   }, [localization]);
 
-  // ✅ FIXED: Get URL parameters from searchParams prop instead of useSearchParams hook
-  const productId = searchParams?.productId || "";
-  const sellerId = searchParams?.sellerId || "";
-  const isShop = searchParams?.isShop === "true";
-
-  // Debug log to see what parameters we're getting
-  useEffect(() => {
-    console.log("AskToSeller URL Parameters:", {
-      productId,
-      sellerId,
-      isShop,
-      allParams: searchParams
-    });
-  }, [productId, sellerId, isShop, searchParams]);
-
   // Form state
   const [questionText, setQuestionText] = useState("");
   const [allowNameVisible, setAllowNameVisible] = useState(false);
@@ -96,6 +112,18 @@ const AskToSellerPage: React.FC<PageProps> = ({ searchParams }) => {
 
   // Dark mode detection
   const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // Debug log to see what parameters we're getting
+  useEffect(() => {
+    if (resolvedParams) {
+      console.log("AskToSeller URL Parameters:", {
+        productId: resolvedParams.productId,
+        sellerId: resolvedParams.sellerId,
+        isShop: resolvedParams.isShop,
+        locale: resolvedParams.locale
+      });
+    }
+  }, [resolvedParams]);
 
   useEffect(() => {
     const detectDarkMode = () => {
@@ -129,6 +157,13 @@ const AskToSellerPage: React.FC<PageProps> = ({ searchParams }) => {
 
   // Fetch seller and product information
   useEffect(() => {
+    if (!resolvedParams) {
+      // Still waiting for params to resolve
+      return;
+    }
+
+    const { productId, sellerId, isShop } = resolvedParams;
+
     if (!productId || !sellerId) {
       setError(t("missingRequiredParameters"));
       setIsLoading(false);
@@ -184,7 +219,7 @@ const AskToSellerPage: React.FC<PageProps> = ({ searchParams }) => {
     };
 
     fetchData();
-  }, [productId, sellerId, isShop, t]);
+  }, [resolvedParams, t]);
 
   const handleSubmit = useCallback(async () => {
     if (!user) {
@@ -201,6 +236,12 @@ const AskToSellerPage: React.FC<PageProps> = ({ searchParams }) => {
       alert(t("pleaseEnterQuestion"));
       return;
     }
+
+    if (!resolvedParams) {
+      return;
+    }
+
+    const { productId, sellerId, isShop } = resolvedParams;
 
     setIsSubmitting(true);
 
@@ -230,7 +271,27 @@ const AskToSellerPage: React.FC<PageProps> = ({ searchParams }) => {
     } finally {
       setIsSubmitting(false);
     }
-  }, [user, router, acceptTerms, questionText, productId, sellerId, isShop, allowNameVisible, t]);
+  }, [user, router, acceptTerms, questionText, resolvedParams, allowNameVisible, t]);
+
+  // Show loading while resolving params
+  if (!resolvedParams) {
+    return (
+      <div className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}>
+        <div className={`border-b ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}>
+          <div className="max-w-4xl mx-auto px-4 py-4 flex items-center">
+            <div className={`w-6 h-6 rounded animate-pulse ${isDarkMode ? "bg-gray-700" : "bg-gray-300"}`} />
+          </div>
+        </div>
+        <div className="max-w-4xl mx-auto p-4">
+          <div className="space-y-6">
+            <div className={`h-16 rounded-lg animate-pulse ${isDarkMode ? "bg-gray-800" : "bg-gray-200"}`} />
+            <div className={`h-32 rounded-lg animate-pulse ${isDarkMode ? "bg-gray-800" : "bg-gray-200"}`} />
+            <div className={`h-40 rounded-lg animate-pulse ${isDarkMode ? "bg-gray-800" : "bg-gray-200"}`} />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
