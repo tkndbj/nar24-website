@@ -64,7 +64,7 @@ export async function GET(
     }
 
     // Determine which collection has the product
-    const [productDoc, shopProductDoc] = await Promise.all([
+    const [, shopProductDoc] = await Promise.all([
       db.collection("products").doc(rawId).get(),
       db.collection("shop_products").doc(rawId).get(),
     ]);
