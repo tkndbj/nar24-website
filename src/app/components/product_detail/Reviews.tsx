@@ -292,7 +292,7 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
 const LoadingSkeleton: React.FC<{ isDarkMode?: boolean }> = ({ 
   isDarkMode = false 
 }) => (
-  <div className={`rounded-2xl sm:rounded-none p-4 sm:p-6 border shadow-sm -mx-4 sm:mx-0 ${
+  <div className={`rounded-none sm:rounded-none p-4 sm:p-6 border shadow-sm -mx-4 sm:mx-0 ${
     isDarkMode 
       ? "bg-gray-800 border-gray-700" 
       : "bg-white border-gray-200"
@@ -470,7 +470,7 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
   }
 
   return (
-    <div className={`rounded-2xl sm:rounded-none p-4 sm:p-6 border shadow-sm -mx-4 sm:mx-0 ${
+    <div className={`rounded-none sm:rounded-none p-4 sm:p-6 border shadow-sm -mx-4 sm:mx-0 ${
       isDarkMode 
         ? "bg-gray-800 border-gray-700" 
         : "bg-white border-gray-200"

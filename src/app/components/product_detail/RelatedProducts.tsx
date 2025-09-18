@@ -244,7 +244,7 @@ const ProductDetailRelatedProducts: React.FC<ProductDetailRelatedProductsProps> 
   }, [productId, category, subcategory, t]);
 
   return (
-    <div className={`rounded-none sm:rounded-2xl p-4 sm:p-6 border-0 sm:border sm:shadow-sm ${
+    <div className={`rounded-none sm:rounded-2xl px-0 py-4 sm:p-6 border-0 sm:border sm:shadow-sm ${
       isDarkMode 
         ? "bg-gray-800 sm:border-gray-700" 
         : "bg-white sm:border-gray-200"
