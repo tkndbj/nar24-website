@@ -1,7 +1,7 @@
 // src/components/productdetail/ProductDetailActionsRow.tsx
 
 import React, { useState, useEffect } from "react";
-import { Heart, Share2, Star, StarHalf, Check, Shield, Truck, Award} from "lucide-react";
+import { Heart, Star, StarHalf, Shield, Truck, Award} from "lucide-react";
 import { useFavorites } from "@/context/FavoritesProvider";
 import { useUser } from "@/context/UserProvider";
 import ProductOptionSelector from "@/app/components/ProductOptionSelector";
@@ -230,7 +230,7 @@ const LoadingSkeleton: React.FC<{ isDarkMode?: boolean }> = ({
 const ProductDetailActionsRow: React.FC<ProductDetailActionsRowProps> = ({
   product,
   isLoading = false,
-  onShare,
+  
   onToggleFavorite,
   isDarkMode = false,
 }) => {
@@ -238,26 +238,12 @@ const ProductDetailActionsRow: React.FC<ProductDetailActionsRowProps> = ({
   const { user } = useUser();
 
   const [showOptionSelector, setShowOptionSelector] = useState(false);
-  const [favoriteButtonState, setFavoriteButtonState] = useState<'idle' | 'adding' | 'added' | 'removing' | 'removed'>('idle');
-  const [showFavoriteAnimation, setShowFavoriteAnimation] = useState(false);
+  const [, setFavoriteButtonState] = useState<'idle' | 'adding' | 'added' | 'removing' | 'removed'>('idle');
+  const [, setShowFavoriteAnimation] = useState(false);
 
   const actualIsFavorite = product ? isProductFavorite(product.id) : false;
 
-  const handleToggleFavorite = async () => {
-    if (!user) {
-      console.log("Please log in to add favorites");
-      return;
-    }
-
-    if (!product) return;
-
-    if (!actualIsFavorite && hasSelectableOptions(product)) {
-      setShowOptionSelector(true);
-      return;
-    }
-
-    await performFavoriteToggle();
-  };
+  
 
   const performFavoriteToggle = async (selectedOptions?: { selectedColor?: string; selectedColorImage?: string; quantity: number; [key: string]: unknown }) => {
     if (!product) return;

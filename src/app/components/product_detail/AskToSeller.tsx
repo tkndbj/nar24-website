@@ -17,7 +17,7 @@ const AskSellerBubble: React.FC<AskSellerBubbleProps> = ({
   alignment = "bottomRight",
   size = 64,
   color = "#3b82f6", // blue-500
-  isDarkMode = false,
+  
 }) => {
   const getAlignmentClasses = () => {
     switch (alignment) {

@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const products: Product[] = [];
+    
 
     // Fetch all products in parallel
     const productPromises = productIds.map(async (productId: string) => {
