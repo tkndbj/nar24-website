@@ -454,7 +454,8 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
   }, [productId]);
 
   const handleSeeAllReviews = useCallback(() => {
-    window.location.href = `/reviews/${productId}`;
+    // Using Next.js router would be better, but if not available:
+    window.location.href = `/all-reviews?productId=${productId}`;
   }, [productId]);
 
   if (isLoading || loading) {

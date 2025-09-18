@@ -854,7 +854,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
             <DynamicAttributesWidget 
               product={product} 
               isDarkMode={isDarkMode}
-              localization={localization}
+              localization={localization}              
             />
           </div>
         </div>

@@ -1,8 +1,9 @@
 // src/components/productdetail/DynamicAttributesWidget.tsx
 
-import React, { useCallback } from "react";
-import { Package, Ruler, Palette, Wrench } from "lucide-react";
+import React, { useMemo } from "react";
+import { Package, Ruler, Palette, Wrench, Box, Shield, Globe, Tag } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { AttributeLocalizationUtils } from "@/constants/AttributeLocalization";
 
 interface Product {
   attributes: Record<string, unknown>;
@@ -28,14 +29,14 @@ const AttributeCard: React.FC<AttributeCardProps> = ({
   icon,
   isDarkMode = false 
 }) => (
-  <div className={`group relative overflow-hidden rounded-xl p-4 border transition-all duration-200 hover:shadow-lg hover:scale-[1.02] ${
+  <div className={`group relative overflow-hidden rounded-lg p-3 border transition-all duration-200 hover:shadow-md hover:scale-[1.01] ${
     isDarkMode 
       ? "bg-gradient-to-br from-gray-800 to-gray-850 border-gray-700 hover:border-orange-500" 
       : "bg-gradient-to-br from-white to-gray-50 border-gray-200 hover:border-orange-300"
   }`}>
-    <div className="flex items-start gap-3">
+    <div className="flex items-start gap-2">
       {icon && (
-        <div className={`mt-1 p-2 rounded-lg transition-colors ${
+        <div className={`mt-0.5 p-1.5 rounded transition-colors ${
           isDarkMode 
             ? "bg-orange-900/20 text-orange-400 group-hover:bg-orange-900/30" 
             : "bg-orange-100 text-orange-600 group-hover:bg-orange-200"
@@ -45,12 +46,12 @@ const AttributeCard: React.FC<AttributeCardProps> = ({
       )}
       
       <div className="flex-1 min-w-0">
-        <h4 className={`text-sm font-semibold mb-1 ${
-          isDarkMode ? "text-gray-300" : "text-gray-700"
+        <h4 className={`text-xs font-medium mb-0.5 ${
+          isDarkMode ? "text-gray-400" : "text-gray-600"
         }`}>
           {title}
         </h4>
-        <p className={`text-base font-medium break-words ${
+        <p className={`text-sm font-medium break-words leading-tight ${
           isDarkMode ? "text-white" : "text-gray-900"
         }`}>
           {value}
@@ -68,16 +69,16 @@ const AttributeCard: React.FC<AttributeCardProps> = ({
 const LoadingSkeleton: React.FC<{ isDarkMode?: boolean }> = ({ 
   isDarkMode = false 
 }) => (
-  <div className="space-y-4">
-    <div className={`w-40 h-6 rounded animate-pulse ${
+  <div className="space-y-3">
+    <div className={`w-32 h-5 rounded animate-pulse ${
       isDarkMode ? "bg-gray-700" : "bg-gray-200"
     }`} />
 
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
       {Array.from({ length: 6 }).map((_, i) => (
         <div
           key={i}
-          className={`h-20 rounded-xl animate-pulse ${
+          className={`h-16 rounded-lg animate-pulse ${
             isDarkMode ? "bg-gray-700" : "bg-gray-200"
           }`}
         />
@@ -90,86 +91,114 @@ const DynamicAttributesWidget: React.FC<DynamicAttributesWidgetProps> = ({
   product,
   isLoading = false,
   isDarkMode = false,
-  localization,
 }) => {
-  // ✅ FIXED: Proper nested translation function that uses JSON files
-  const t = useCallback((key: string) => {
-    if (!localization) {
-      return key;
+  const t = useTranslations();
+
+  // Get icon for attribute key
+  const getAttributeIcon = (key: string): React.ReactNode => {
+    const iconSize = "w-3.5 h-3.5";
+    const lowerKey = key.toLowerCase();
+    
+    // Map attribute keys to icons
+    if (lowerKey.includes('color') || lowerKey.includes('colour')) {
+      return <Palette className={iconSize} />;
+    }
+    if (lowerKey.includes('size') || lowerKey.includes('dimension') || lowerKey.includes('footwear') || lowerKey.includes('pant')) {
+      return <Ruler className={iconSize} />;
+    }
+    if (lowerKey.includes('material') || lowerKey.includes('type') || lowerKey.includes('clothing')) {
+      return <Package className={iconSize} />;
+    }
+    if (lowerKey.includes('brand') || lowerKey.includes('console')) {
+      return <Tag className={iconSize} />;
+    }
+    if (lowerKey.includes('model') || lowerKey.includes('component') || lowerKey.includes('variant')) {
+      return <Wrench className={iconSize} />;
+    }
+    if (lowerKey.includes('weight')) {
+      return <Box className={iconSize} />;
+    }
+    if (lowerKey.includes('warranty')) {
+      return <Shield className={iconSize} />;
+    }
+    if (lowerKey.includes('origin') || lowerKey.includes('location')) {
+      return <Globe className={iconSize} />;
+    }
+    if (lowerKey.includes('jewelry') || lowerKey.includes('jewellery')) {
+      return <Palette className={iconSize} />;
+    }
+    if (lowerKey.includes('kitchen') || lowerKey.includes('appliance') || lowerKey.includes('white')) {
+      return <Box className={iconSize} />;
+    }
+    
+    // Default icon
+    return <Package className={iconSize} />;
+  };
+
+  // Process and localize attributes
+  const formattedAttributes = useMemo(() => {
+    if (!product?.attributes || Object.keys(product.attributes).length === 0) {
+      return [];
     }
 
-    try {
-      // Try to get the nested DynamicAttributesWidget translation
-      const translation = localization(`DynamicAttributesWidget.${key}`);
-      
-      // Check if we got a valid translation (not the same as the key we requested)
-      if (translation && translation !== `DynamicAttributesWidget.${key}`) {
-        return translation;
+    const attributes: Array<{ title: string; value: string; icon: React.ReactNode }> = [];
+
+    Object.entries(product.attributes).forEach(([key, value]) => {
+      // Skip empty values
+      if (value === null || value === undefined || value === "") {
+        return;
       }
-      
-      // If nested translation doesn't exist, try direct key
-      const directTranslation = localization(key);
-      if (directTranslation && directTranslation !== key) {
-        return directTranslation;
+
+      try {
+        // Get localized title using AttributeLocalizationUtils
+        const localizedTitle = AttributeLocalizationUtils.getLocalizedAttributeTitle(key, t);
+        
+        // Get localized value using AttributeLocalizationUtils
+        const localizedValue = AttributeLocalizationUtils.getLocalizedAttributeValue(key, value, t);
+        
+        // Only add if we have a meaningful value
+        if (localizedValue && localizedValue.trim()) {
+          attributes.push({
+            title: localizedTitle,
+            value: localizedValue,
+            icon: getAttributeIcon(key)
+          });
+        }
+      } catch (error) {
+        console.error("Error localizing attribute", key, error);
+        // Fallback: use raw values with basic formatting
+        const fallbackTitle = key
+          .replace(/([A-Z])/g, ' $1')
+          .trim()
+          .split(' ')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+          .join(' ');
+        
+        let fallbackValue = "";
+        if (typeof value === "boolean") {
+          fallbackValue = value ? (t("yes") || "Yes") : (t("no") || "No");
+        } else if (Array.isArray(value)) {
+          fallbackValue = value.join(", ");
+        } else {
+          fallbackValue = value.toString();
+        }
+        
+        if (fallbackValue.trim()) {
+          attributes.push({
+            title: fallbackTitle,
+            value: fallbackValue,
+            icon: getAttributeIcon(key)
+          });
+        }
       }
-      
-      // Return the key as fallback
-      return key;
-    } catch (error) {
-      console.warn(`Translation error for key: ${key}`, error);
-      return key;
-    }
-  }, [localization]);
+    });
 
-  // Enhanced localization function with icons
-  const localizeAttribute = useCallback((
-    key: string,
-    value: unknown
-  ): { title: string; localizedValue: string; icon: React.ReactNode } => {
-    const titleMappings: Record<string, { titleKey: string; icon: React.ReactNode }> = {
-      color: { titleKey: "color", icon: <Palette className="w-4 h-4" /> },
-      size: { titleKey: "size", icon: <Ruler className="w-4 h-4" /> },
-      material: { titleKey: "material", icon: <Package className="w-4 h-4" /> },
-      brand: { titleKey: "brand", icon: <Package className="w-4 h-4" /> },
-      model: { titleKey: "model", icon: <Wrench className="w-4 h-4" /> },
-      weight: { titleKey: "weight", icon: <Package className="w-4 h-4" /> },
-      dimensions: { titleKey: "dimensions", icon: <Ruler className="w-4 h-4" /> },
-      warranty: { titleKey: "warranty", icon: <Package className="w-4 h-4" /> },
-      origin: { titleKey: "origin", icon: <Package className="w-4 h-4" /> },
-      category: { titleKey: "category", icon: <Package className="w-4 h-4" /> },
-      subcategory: { titleKey: "subcategory", icon: <Package className="w-4 h-4" /> },
-      condition: { titleKey: "condition", icon: <Package className="w-4 h-4" /> },
-      style: { titleKey: "style", icon: <Palette className="w-4 h-4" /> },
-      type: { titleKey: "type", icon: <Package className="w-4 h-4" /> },
-    };
-
-    const mapping = titleMappings[key.toLowerCase()];
-    const title = mapping ? t(mapping.titleKey) : key.charAt(0).toUpperCase() + key.slice(1);
-    const icon = mapping ? mapping.icon : <Package className="w-4 h-4" />;
-
-    let localizedValue = "";
-    if (value === null || value === undefined) {
-      localizedValue = "";
-    } else if (typeof value === "boolean") {
-      localizedValue = value ? t("yes") : t("no");
-    } else if (typeof value === "number") {
-      localizedValue = value.toString();
-    } else if (Array.isArray(value)) {
-      localizedValue = value.join(", ");
-    } else {
-      localizedValue = value.toString();
-    }
-
-    return { 
-      title, 
-      localizedValue, 
-      icon 
-    };
-  }, [t]);
+    return attributes;
+  }, [product, t]);
 
   if (isLoading || !product) {
     return (
-      <div className={`rounded-2xl p-6 border ${
+      <div className={`rounded-xl p-5 border ${
         isDarkMode 
           ? "bg-gray-800 border-gray-700" 
           : "bg-white border-gray-200"
@@ -179,63 +208,38 @@ const DynamicAttributesWidget: React.FC<DynamicAttributesWidgetProps> = ({
     );
   }
 
-  if (!product.attributes || Object.keys(product.attributes).length === 0) {
-    return null;
-  }
-
-  // Filter and format attributes
-  const formattedAttributes: Array<{ title: string; value: string; icon: React.ReactNode }> = [];
-
-  Object.entries(product.attributes).forEach(([key, value]) => {
-    if (value !== null && value !== undefined && value !== "") {
-      try {
-        const { title, localizedValue, icon } = localizeAttribute(key, value);
-        if (localizedValue.trim()) {
-          formattedAttributes.push({ title, value: localizedValue, icon });
-        }
-      } catch (error) {
-        console.error("Error localizing attribute", key, error);
-        formattedAttributes.push({
-          title: key,
-          value: value.toString(),
-          icon: <Package className="w-4 h-4" />
-        });
-      }
-    }
-  });
-
   if (formattedAttributes.length === 0) {
     return null;
   }
 
   return (
-    <div className={`rounded-2xl p-6 border shadow-sm ${
+    <div className={`rounded-xl p-5 border shadow-sm ${
       isDarkMode 
         ? "bg-gray-800 border-gray-700" 
         : "bg-white border-gray-200"
     }`}>
-      <div className="space-y-6">
+      <div className="space-y-4">
         {/* Header */}
-        <div className="flex items-center gap-3">
-          <div className={`p-2 rounded-xl ${
+        <div className="flex items-center gap-2">
+          <div className={`p-1.5 rounded-lg ${
             isDarkMode 
               ? "bg-orange-900/20 text-orange-400" 
               : "bg-orange-100 text-orange-600"
           }`}>
-            <Package className="w-5 h-5" />
+            <Package className="w-4 h-4" />
           </div>
-          <h3 className={`text-xl font-bold ${
+          <h3 className={`text-lg font-bold ${
             isDarkMode ? "text-white" : "text-gray-900"
           }`}>
-            {t("title")}
+            {t("DynamicAttributesWidget.title") || t("productDetails") || "Product Details"}
           </h3>
         </div>
 
-        {/* Attributes grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* Attributes grid - more compact spacing */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {formattedAttributes.map((attr, index) => (
             <AttributeCard 
-              key={index} 
+              key={`${attr.title}-${index}`} 
               title={attr.title} 
               value={attr.value}
               icon={attr.icon}

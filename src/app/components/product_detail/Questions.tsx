@@ -312,7 +312,8 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
   }, [productId, sellerId, isShop]);
 
   const handleViewAllQuestions = useCallback(() => {
-    window.location.href = `/questions/${productId}?sellerId=${sellerId}&isShop=${isShop}`;
+    // Using Next.js router would be better, but if not available:
+    window.location.href = `/all-questions?productId=${productId}&sellerId=${sellerId}&isShop=${isShop}`;
   }, [productId, sellerId, isShop]);
 
   const handleReadAll = useCallback(() => {
