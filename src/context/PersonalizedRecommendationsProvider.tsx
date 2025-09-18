@@ -18,16 +18,14 @@ import {
   limit, 
   getDocs,
   doc,
-  getDoc,
-  
-  Timestamp,
-  
-  DocumentData,
-  QueryDocumentSnapshot
+  getDoc,  
+  Timestamp,  
+  DocumentData 
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Product, ProductUtils } from "@/app/models/Product";
 import { useUser } from "@/context/UserProvider";
+import { QueryDocumentSnapshot } from "firebase/firestore/lite";
 
 // ============= TYPES & INTERFACES =============
 interface UserPreferences {
@@ -63,7 +61,6 @@ interface PersonalizedRecommendationsContextType extends RecommendationsState {
 const CACHE_VALIDITY = 6 * 60 * 60 * 1000; // 6 hours
 const REFRESH_INTERVAL = 60 * 60 * 1000; // 1 hour
 const DEBOUNCE_DELAY = 2000; // 2 seconds
-const MAX_CACHE_SIZE = 100;
 const MAX_RECENTLY_SHOWN = 50;
 const MIN_FETCH_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
@@ -373,7 +370,13 @@ export const PersonalizedRecommendationsProvider: React.FC<{ children: React.Rea
       const cat = product.category || 'Unknown';
       const subcat = `${cat}_${product.subcategory || 'Unknown'}`;
 
+      // Check if product was recently shown
       if (wasRecentlyShown(product.id)) continue;
+      
+      // Check if we've already shown this product in current session
+      if (recentlyShownIds.has(product.id)) continue;
+      
+      // Limit per category/subcategory
       if ((categoryCount[cat] || 0) >= 5) continue;
       if ((subcategoryCount[subcat] || 0) >= 3) continue;
 
@@ -382,7 +385,7 @@ export const PersonalizedRecommendationsProvider: React.FC<{ children: React.Rea
       subcategoryCount[subcat] = (subcategoryCount[subcat] || 0) + 1;
     }
 
-    // Fill remaining slots
+    // Fill remaining slots if needed
     if (diversified.length < fetchLimit) {
       for (const product of products) {
         if (!diversified.find(p => p.id === product.id)) {
@@ -394,6 +397,22 @@ export const PersonalizedRecommendationsProvider: React.FC<{ children: React.Rea
 
     return diversified;
   };
+
+  // Helper function to clean up old shown products
+  const cleanupRecentlyShown = useCallback(() => {
+    if (recentlyShownIds.size > MAX_RECENTLY_SHOWN) {
+      // Sort by last shown time and keep only the most recent
+      const sortedEntries = Array.from(productLastShown.entries())
+        .sort(([, a], [, b]) => b.getTime() - a.getTime())
+        .slice(0, MAX_RECENTLY_SHOWN);
+      
+      const newRecentlyShown = new Set(sortedEntries.map(([id]) => id));
+      const newProductLastShown = new Map(sortedEntries);
+      
+      setRecentlyShownIds(newRecentlyShown);
+      setProductLastShown(newProductLastShown);
+    }
+  }, [recentlyShownIds.size, productLastShown]);
 
   // ============= MAIN FETCH METHOD =============
   const performFetch = async (fetchLimit: number): Promise<Product[]> => {
@@ -420,7 +439,7 @@ export const PersonalizedRecommendationsProvider: React.FC<{ children: React.Rea
             fetchExploration(Math.ceil(fetchLimit * 0.15))
           ]);
 
-          // Merge and score
+          // Merge and score using category preferences
           const scoredProducts = new Map<string, ScoredProduct>();
           const weights = [0.4, 0.25, 0.2, 0.15];
 
@@ -430,7 +449,21 @@ export const PersonalizedRecommendationsProvider: React.FC<{ children: React.Rea
                 scoredProducts.set(product.id, { product, score: 0 });
               }
               const scored = scoredProducts.get(product.id)!;
-              scored.score += weights[i];
+              
+              // Base score from strategy weight
+              let productScore = weights[i];
+              
+              // Bonus score based on category preference
+              if (product.category && categoryScores[product.category]) {
+                productScore += categoryScores[product.category] * 0.1;
+              }
+              
+              // Bonus score based on subcategory preference
+              if (product.subcategory && subcategoryScores[product.subcategory]) {
+                productScore += subcategoryScores[product.subcategory] * 0.05;
+              }
+              
+              scored.score += productScore;
             }
           }
 
@@ -448,6 +481,9 @@ export const PersonalizedRecommendationsProvider: React.FC<{ children: React.Rea
           setRecentlyShownIds(prev => new Set([...prev, product.id]));
           setProductLastShown(prev => new Map(prev).set(product.id, now));
         }
+        
+        // Cleanup old entries if needed
+        cleanupRecentlyShown();
       }
 
       // Update state
