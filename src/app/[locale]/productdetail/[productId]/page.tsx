@@ -607,7 +607,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
   return (
     <div
-      className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
+      className={`min-h-screen overflow-x-hidden ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
     >
       {/* Header - More compact on mobile */}
       <div
@@ -662,7 +662,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         <div className="grid lg:grid-cols-2 gap-4 sm:gap-8 lg:gap-12">
           {/* Left Column - Images */}
           <div className="space-y-3 sm:space-y-4">
-            {/* Main Image - More compact on mobile */}
+            {/* Main Image - More compact on mobile with proper containment */}
             <div
               className={`relative w-full aspect-square rounded-lg sm:rounded-2xl overflow-hidden ${
                 isDarkMode ? "bg-gray-800" : "bg-white"
@@ -675,6 +675,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                   alt={product.productName}
                   fill
                   className="object-contain cursor-pointer hover:scale-105 transition-transform duration-300"
+                  style={{ maxWidth: '100%', height: 'auto' }}
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                   onClick={() => setShowFullScreenViewer(true)}
                   onError={() => handleImageError(currentImageIndex)}
                   priority
@@ -718,31 +720,33 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               )}
             </div>
 
-            {/* Thumbnail Images - Smaller on mobile */}
+            {/* Thumbnail Images - Smaller on mobile with scroll container */}
             {product.imageUrls.length > 1 && (
-              <div className="flex gap-2 sm:gap-3 overflow-x-auto pb-2">
-                {product.imageUrls.map((url, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setCurrentImageIndex(index)}
-                    className={`flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden border-2 transition-all ${
-                      index === currentImageIndex
-                        ? "border-orange-500 shadow-lg scale-105"
-                        : isDarkMode
-                        ? "border-gray-600 hover:border-gray-500"
-                        : "border-gray-200 hover:border-gray-300"
-                    }`}
-                  >
-                    <Image
-                      src={url}
-                      alt={`${t("productImage")} ${index + 1}`}
-                      width={80}
-                      height={80}
-                      className="w-full h-full object-cover"
-                      onError={() => handleImageError(index)}
-                    />
-                  </button>
-                ))}
+              <div className="relative overflow-hidden">
+                <div className="flex gap-2 sm:gap-3 overflow-x-auto pb-2 scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
+                  {product.imageUrls.map((url, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setCurrentImageIndex(index)}
+                      className={`flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden border-2 transition-all ${
+                        index === currentImageIndex
+                          ? "border-orange-500 shadow-lg scale-105"
+                          : isDarkMode
+                          ? "border-gray-600 hover:border-gray-500"
+                          : "border-gray-200 hover:border-gray-300"
+                      }`}
+                    >
+                      <Image
+                        src={url}
+                        alt={`${t("productImage")} ${index + 1}`}
+                        width={80}
+                        height={80}
+                        className="w-full h-full object-cover"
+                        onError={() => handleImageError(index)}
+                      />
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>
