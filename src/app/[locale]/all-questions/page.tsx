@@ -11,7 +11,7 @@ import {
   ShoppingCart,
   Calendar,
   User,
-  ChevronDown,
+  
   Loader2,
 } from "lucide-react";
 import Image from "next/image";
@@ -44,7 +44,7 @@ interface AllQuestionsPageProps {
   params: Promise<{ locale: string }>;
 }
 
-const AllQuestionsPage: React.FC<AllQuestionsPageProps> = ({ params }) => {
+const AllQuestionsPage: React.FC<AllQuestionsPageProps> = ({ }) => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const localization = useTranslations();

@@ -11,14 +11,13 @@ import {
   StarHalf,
   ThumbsUp,
   Languages,
-  Calendar,
-  ShoppingBag,
+  
   Camera,
   X,
   ChevronLeft,
   ChevronRight,
   Loader2,
-  TrendingUp,
+  
   Award,
 } from "lucide-react";
 import Image from "next/image";
@@ -53,7 +52,7 @@ interface AllReviewsPageProps {
   params: Promise<{ locale: string }>;
 }
 
-const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ params }) => {
+const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const localization = useTranslations();
@@ -74,7 +73,7 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ params }) => {
   const [filterRating, setFilterRating] = useState<number | null>(null);
   const [translatedReviews, setTranslatedReviews] = useState<Record<string, string>>({});
   const [translatingIds, setTranslatingIds] = useState<Set<string>>(new Set());
-  const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
+  
   const [imageGallery, setImageGallery] = useState<{ urls: string[], index: number } | null>(null);
 
   const observerRef = useRef<IntersectionObserver | null>(null);
