@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
+import { useRouter } from "next/navigation"
 
 interface Review {
   id: string;
@@ -116,7 +117,7 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
   const [translatedText, setTranslatedText] = useState("");
   const [isTranslating, setIsTranslating] = useState(false);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
-
+  
   const isLiked = currentUserId ? review.likes.includes(currentUserId) : false;
   const likeCount = review.likes.length;
   const isLongReview = review.review.length > 150;
@@ -337,6 +338,7 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   // ✅ FIXED: Proper nested translation function that uses JSON files
   const t = useCallback((key: string) => {
@@ -454,9 +456,8 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
   }, [productId]);
 
   const handleSeeAllReviews = useCallback(() => {
-    // Using Next.js router would be better, but if not available:
-    window.location.href = `/all-reviews?productId=${productId}`;
-  }, [productId]);
+    router.push(`/all-reviews?productId=${productId}`);
+  }, [productId, router]);
 
   if (isLoading || loading) {
     return <LoadingSkeleton isDarkMode={isDarkMode} />;

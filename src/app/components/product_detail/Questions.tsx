@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { ChevronLeft, ChevronRight, User, HelpCircle, MessageCircle } from "lucide-react";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
+import { useRouter } from "next/navigation";
 
 interface Question {
   id: string;
@@ -218,7 +219,7 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-
+  const router = useRouter();
   // ✅ FIXED: Proper nested translation function that uses JSON files
   const t = useCallback((key: string) => {
     if (!localization) {
@@ -312,9 +313,8 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
   }, [productId, sellerId, isShop]);
 
   const handleViewAllQuestions = useCallback(() => {
-    // Using Next.js router would be better, but if not available:
-    window.location.href = `/all-questions?productId=${productId}&sellerId=${sellerId}&isShop=${isShop}`;
-  }, [productId, sellerId, isShop]);
+    router.push(`/all-questions?productId=${productId}&sellerId=${sellerId}&isShop=${isShop}`);
+  }, [productId, sellerId, isShop, router]);
 
   const handleReadAll = useCallback(() => {
     handleViewAllQuestions();
