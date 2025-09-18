@@ -417,7 +417,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   const cartButtonContent = useMemo(() => {
     if (!product)
       return {
-        icon: <ShoppingCart className="w-5 h-5" />,
+        icon: <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5" />,
         text: t("addToCart"),
       };
 
@@ -428,7 +428,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     if (cartButtonState === "adding" || isOptimisticAdd) {
       return {
         icon: (
-          <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+          <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
         ),
         text: t("adding"),
       };
@@ -437,7 +437,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     if (cartButtonState === "removing" || isOptimisticRemove) {
       return {
         icon: (
-          <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+          <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
         ),
         text: t("removing"),
       };
@@ -445,27 +445,27 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
     if (cartButtonState === "added") {
       return {
-        icon: <Check className="w-5 h-5" />,
+        icon: <Check className="w-4 h-4 sm:w-5 sm:h-5" />,
         text: t("addedToCart"),
       };
     }
 
     if (cartButtonState === "removed") {
       return {
-        icon: <Check className="w-5 h-5" />,
+        icon: <Check className="w-4 h-4 sm:w-5 sm:h-5" />,
         text: t("removedFromCart"),
       };
     }
 
     if (productInCart) {
       return {
-        icon: <Minus className="w-5 h-5" />,
+        icon: <Minus className="w-4 h-4 sm:w-5 sm:h-5" />,
         text: t("removeFromCart"),
       };
     }
 
     return {
-      icon: <ShoppingCart className="w-5 h-5" />,
+      icon: <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5" />,
       text: t("addToCart"),
     };
   }, [
@@ -521,7 +521,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               : "bg-white border-gray-200"
           }`}
         >
-          <div className="flex items-center justify-between p-4">
+          <div className="flex items-center justify-between p-3 sm:p-4">
             <div
               className={`w-6 h-6 rounded animate-pulse ${
                 isDarkMode ? "bg-gray-700" : "bg-gray-200"
@@ -534,13 +534,13 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
             />
           </div>
         </div>
-        <div className="grid lg:grid-cols-2 gap-8 max-w-6xl mx-auto p-4">
+        <div className="grid lg:grid-cols-2 gap-4 sm:gap-8 max-w-6xl mx-auto p-3 sm:p-4">
           <div
-            className={`w-full h-96 lg:h-[500px] animate-pulse ${
+            className={`w-full h-64 sm:h-96 lg:h-[500px] animate-pulse ${
               isDarkMode ? "bg-gray-700" : "bg-gray-200"
             }`}
           />
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             <div
               className={`h-6 rounded animate-pulse ${
                 isDarkMode ? "bg-gray-700" : "bg-gray-200"
@@ -574,22 +574,22 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           isDarkMode ? "bg-gray-900" : "bg-gray-50"
         }`}
       >
-        <div className="text-center">
+        <div className="text-center px-4">
           <h1
-            className={`text-2xl font-bold mb-2 ${
+            className={`text-xl sm:text-2xl font-bold mb-2 ${
               isDarkMode ? "text-white" : "text-gray-900"
             }`}
           >
             {t("productNotFound")}
           </h1>
           <p
-            className={`mb-4 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}
+            className={`mb-4 text-sm sm:text-base ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}
           >
             {error || t("productNotFoundDescription")}
           </p>
           <button
             onClick={() => router.back()}
-            className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+            className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm sm:text-base"
           >
             {t("goBack")}
           </button>
@@ -609,7 +609,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     <div
       className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
     >
-      {/* Header - Clean and minimal */}
+      {/* Header - More compact on mobile */}
       <div
         className={`sticky top-0 z-10 backdrop-blur-md border-b ${
           isDarkMode
@@ -617,11 +617,11 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
             : "bg-white/95 border-gray-200"
         }`}
       >
-        <div className="max-w-6xl mx-auto px-4 py-3">
+        <div className="w-full px-3 py-2 sm:max-w-6xl sm:mx-auto sm:px-4 sm:py-3">
           <div className="flex items-center justify-between">
             <button
               onClick={() => router.back()}
-              className={`p-2 rounded-lg transition-colors ${
+              className={`p-1.5 sm:p-2 rounded-lg transition-colors ${
                 isDarkMode
                   ? "hover:bg-gray-800 text-gray-300"
                   : "hover:bg-gray-100 text-gray-700"
@@ -630,10 +630,10 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               <ArrowLeft className="w-5 h-5" />
             </button>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               <button
                 onClick={handleToggleFavorite}
-                className={`p-2 rounded-lg transition-colors ${
+                className={`p-1.5 sm:p-2 rounded-lg transition-colors ${
                   isDarkMode
                     ? "hover:bg-gray-800 text-gray-300"
                     : "hover:bg-gray-100 text-gray-700"
@@ -644,7 +644,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               
               <button
                 onClick={handleShare}
-                className={`p-2 rounded-lg transition-colors ${
+                className={`p-1.5 sm:p-2 rounded-lg transition-colors ${
                   isDarkMode
                     ? "hover:bg-gray-800 text-gray-300"
                     : "hover:bg-gray-100 text-gray-700"
@@ -657,14 +657,14 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         </div>
       </div>
 
-      {/* Main Content - Modern two-column layout */}
-      <div className="max-w-6xl mx-auto p-4 lg:p-6">
-        <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
+      {/* Main Content - Full width on mobile */}
+      <div className="w-full sm:max-w-6xl sm:mx-auto p-3 sm:p-4 lg:p-6">
+        <div className="grid lg:grid-cols-2 gap-4 sm:gap-8 lg:gap-12">
           {/* Left Column - Images */}
-          <div className="space-y-4">
-            {/* Main Image */}
+          <div className="space-y-3 sm:space-y-4">
+            {/* Main Image - More compact on mobile */}
             <div
-              className={`relative w-full aspect-square rounded-2xl overflow-hidden ${
+              className={`relative w-full aspect-square rounded-lg sm:rounded-2xl overflow-hidden ${
                 isDarkMode ? "bg-gray-800" : "bg-white"
               } shadow-sm border ${isDarkMode ? "border-gray-700" : "border-gray-200"}`}
             >
@@ -691,41 +691,41 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                     }`}
                   >
                     <div
-                      className={`w-16 h-16 mx-auto mb-2 rounded-lg ${
+                      className={`w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-2 rounded-lg ${
                         isDarkMode ? "bg-gray-600" : "bg-gray-300"
                       }`}
                     />
-                    <p>{t("noImageAvailable")}</p>
+                    <p className="text-sm sm:text-base">{t("noImageAvailable")}</p>
                   </div>
                 </div>
               )}
 
-              {/* Video Play Button */}
+              {/* Video Play Button - Smaller on mobile */}
               {product.videoUrl && (
                 <button
                   onClick={() => setShowVideoModal(true)}
-                  className="absolute bottom-4 right-4 p-3 bg-black/60 backdrop-blur-sm rounded-full text-white hover:bg-black/80 transition-all hover:scale-110"
+                  className="absolute bottom-3 right-3 sm:bottom-4 sm:right-4 p-2 sm:p-3 bg-black/60 backdrop-blur-sm rounded-full text-white hover:bg-black/80 transition-all hover:scale-110"
                 >
-                  <Play className="w-6 h-6 fill-current" />
+                  <Play className="w-5 h-5 sm:w-6 sm:h-6 fill-current" />
                 </button>
               )}
 
-              {/* Best Seller Badge */}
+              {/* Best Seller Badge - Smaller on mobile */}
               {product.bestSellerRank && product.bestSellerRank <= 10 && (
-                <div className="absolute top-4 left-4 px-3 py-1 bg-gradient-to-r from-orange-500 to-orange-600 text-white text-sm font-bold rounded-full shadow-lg">
+                <div className="absolute top-3 left-3 sm:top-4 sm:left-4 px-2 py-0.5 sm:px-3 sm:py-1 bg-gradient-to-r from-orange-500 to-orange-600 text-white text-xs sm:text-sm font-bold rounded-full shadow-lg">
                   #{product.bestSellerRank} {t("bestSeller")}
                 </div>
               )}
             </div>
 
-            {/* Thumbnail Images */}
+            {/* Thumbnail Images - Smaller on mobile */}
             {product.imageUrls.length > 1 && (
-              <div className="flex gap-3 overflow-x-auto pb-2">
+              <div className="flex gap-2 sm:gap-3 overflow-x-auto pb-2">
                 {product.imageUrls.map((url, index) => (
                   <button
                     key={index}
                     onClick={() => setCurrentImageIndex(index)}
-                    className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${
+                    className={`flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden border-2 transition-all ${
                       index === currentImageIndex
                         ? "border-orange-500 shadow-lg scale-105"
                         : isDarkMode
@@ -747,13 +747,13 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
             )}
           </div>
 
-          {/* Right Column - Product Info */}
-          <div className="space-y-6">
-            {/* Product Title & Brand */}
-            <div className="space-y-3">
-              <div className="flex items-start gap-3">
+          {/* Right Column - Product Info - More compact on mobile */}
+          <div className="space-y-4 sm:space-y-6">
+            {/* Product Title & Brand - Smaller text on mobile */}
+            <div className="space-y-2 sm:space-y-3">
+              <div className="flex items-start gap-2 sm:gap-3">
                 <span
-                  className={`text-sm font-semibold px-3 py-1 rounded-full ${
+                  className={`text-xs sm:text-sm font-semibold px-2 py-0.5 sm:px-3 sm:py-1 rounded-full ${
                     isDarkMode 
                       ? "bg-blue-900/30 text-blue-400 border border-blue-700" 
                       : "bg-blue-50 text-blue-700 border border-blue-200"
@@ -764,7 +764,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               </div>
               
               <h1
-                className={`text-2xl lg:text-3xl font-bold leading-tight ${
+                className={`text-xl sm:text-2xl lg:text-3xl font-bold leading-tight ${
                   isDarkMode ? "text-white" : "text-gray-900"
                 }`}
               >
@@ -772,7 +772,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               </h1>
               
               <div
-                className={`text-3xl lg:text-4xl font-bold text-orange-600`}
+                className={`text-2xl sm:text-3xl lg:text-4xl font-bold text-orange-600`}
               >
                 {product.price} {product.currency}
               </div>
@@ -788,13 +788,13 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               localization={localization}
             />
 
-            {/* Action Buttons */}
-            <div className="flex gap-3 pt-4">
+            {/* Action Buttons - More compact on mobile */}
+            <div className="flex gap-2 sm:gap-3 pt-2 sm:pt-4">
               <button
                 onClick={() => handleAddToCart()}
                 disabled={isProcessing}
                 className={`
-                  flex-1 py-4 px-6 rounded-xl font-semibold text-lg transition-all duration-300 flex items-center justify-center gap-3 relative overflow-hidden
+                  flex-1 py-3 px-3 sm:py-4 sm:px-6 rounded-lg sm:rounded-xl font-semibold text-sm sm:text-lg transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 relative overflow-hidden
                   ${
                     productInCart && cartButtonState === "idle"
                       ? isDarkMode
@@ -829,13 +829,13 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
                 {/* Success animation overlay */}
                 {(cartButtonState === "added" || cartButtonState === "removed") && (
-                  <div className="absolute inset-0 bg-green-500/10 animate-pulse rounded-xl" />
+                  <div className="absolute inset-0 bg-green-500/10 animate-pulse rounded-lg sm:rounded-xl" />
                 )}
               </button>
 
               <button
                 onClick={handleBuyNow}
-                className="flex-1 py-4 px-6 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white rounded-xl font-semibold text-lg transition-all duration-300 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                className="flex-1 py-3 px-3 sm:py-4 sm:px-6 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white rounded-lg sm:rounded-xl font-semibold text-sm sm:text-lg transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
               >
                 {t("buyNow")}
               </button>
@@ -859,26 +859,26 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           </div>
         </div>
 
-        {/* Bottom Sections */}
-        <div className="mt-12 space-y-8">
-          {/* Description */}
+        {/* Bottom Sections - Full width on mobile */}
+        <div className="mt-8 sm:mt-12 space-y-6 sm:space-y-8">
+          {/* Description - More compact padding on mobile */}
           {product.description && (
             <div
-              className={`rounded-2xl p-6 ${
+              className={`rounded-lg sm:rounded-2xl p-4 sm:p-6 ${
                 isDarkMode
                   ? "bg-gray-800 border border-gray-700"
                   : "bg-white border border-gray-200"
               } shadow-sm`}
             >
               <h3
-                className={`text-xl font-bold mb-4 ${
+                className={`text-lg sm:text-xl font-bold mb-3 sm:mb-4 ${
                   isDarkMode ? "text-white" : "text-gray-900"
                 }`}
               >
                 {t("productDescription")}
               </h3>
               <p
-                className={`leading-relaxed text-base ${
+                className={`leading-relaxed text-sm sm:text-base ${
                   isDarkMode ? "text-gray-300" : "text-gray-700"
                 }`}
               >
@@ -924,7 +924,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           />
         </div>
 
-        <div className="h-24" />
+        <div className="h-20 sm:h-24" />
       </div>
 
       {/* Modals */}
@@ -937,13 +937,13 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
       />
 
       {showVideoModal && product.videoUrl && (
-        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
-          <div className="relative w-full max-w-4xl aspect-video bg-black rounded-2xl overflow-hidden">
+        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-3 sm:p-4">
+          <div className="relative w-full max-w-4xl aspect-video bg-black rounded-lg sm:rounded-2xl overflow-hidden">
             <button
               onClick={() => setShowVideoModal(false)}
-              className="absolute top-4 right-4 z-10 p-3 bg-black/50 rounded-full text-white hover:bg-black/70 transition-colors"
+              className="absolute top-3 right-3 sm:top-4 sm:right-4 z-10 p-2 sm:p-3 bg-black/50 rounded-full text-white hover:bg-black/70 transition-colors"
             >
-              <X className="w-6 h-6" />
+              <X className="w-5 h-5 sm:w-6 sm:h-6" />
             </button>
             <video
               src={product.videoUrl}
