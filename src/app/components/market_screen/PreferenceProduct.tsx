@@ -7,7 +7,7 @@ import { ChevronRight, ChevronLeft, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { usePersonalizedRecommendations } from "@/context/PersonalizedRecommendationsProvider";
-
+import { Product } from "@/app/models/Product";
 
 // Shimmer loading component
 const ShimmerCard: React.FC<{ width?: number }> = ({ width = 205 }) => (
@@ -26,22 +26,14 @@ const ShimmerList: React.FC<{ height: number; count?: number }> = ({
   height,
   count = 5,
 }) => (
-  <>
-    <style jsx>{`
-      @keyframes shimmer {
-        0% { background-position: 200% 0; }
-        100% { background-position: -200% 0; }
-      }
-    `}</style>
-    <div
-      className="flex gap-6 px-2"
-      style={{ height: `${height}px` }}
-    >
-      {Array.from({ length: count }, (_, index) => (
-        <ShimmerCard key={index} />
-      ))}
-    </div>
-  </>
+  <div
+    className="flex gap-6 px-2"
+    style={{ height: `${height}px` }}
+  >
+    {Array.from({ length: count }, (_, index) => (
+      <ShimmerCard key={index} />
+    ))}
+  </div>
 );
 
 export const PreferenceProduct: React.FC = () => {
@@ -317,27 +309,22 @@ export const PreferenceProduct: React.FC = () => {
               {/* Scrollable container */}
               <div
                 ref={scrollContainerRef}
-                className="overflow-x-auto overflow-y-hidden scrollbar-hide"
+                className="overflow-x-auto overflow-y-hidden"
                 style={{
                   height: `${rowHeight - 60}px`,
                   scrollbarWidth: "none",
                   msOverflowStyle: "none",
-                }}
+                } as React.CSSProperties}
                 onScroll={checkScrollPosition}
               >
-                <style jsx>{`
-                  .scrollbar-hide::-webkit-scrollbar {
-                    display: none;
-                  }
-                `}</style>
-                
                 <div className="flex gap-0 px-0 lg:px-2 h-full -ml-2 lg:ml-0">
                   {recommendations.map((product, index) => (
                     <div
                       key={`${product.id}-${index}`}
-                      className="flex-shrink-0 animate-fadeIn"
+                      className="flex-shrink-0"
                       style={{ 
                         width: "205px",
+                        animation: `fadeIn 0.3s ease-out forwards`,
                         animationDelay: `${index * 50}ms`,
                       }}
                     >
@@ -358,7 +345,7 @@ export const PreferenceProduct: React.FC = () => {
         </div>
       </div>
 
-      <style jsx>{`
+      <style jsx global>{`
         @keyframes fadeIn {
           from {
             opacity: 0;
@@ -370,8 +357,20 @@ export const PreferenceProduct: React.FC = () => {
           }
         }
         
-        .animate-fadeIn {
-          animation: fadeIn 0.3s ease-out forwards;
+        @keyframes shimmer {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+        
+        /* Hide scrollbar for Chrome, Safari and Opera */
+        .overflow-x-auto::-webkit-scrollbar {
+          display: none;
+        }
+        
+        /* Hide scrollbar for IE, Edge and Firefox */
+        .overflow-x-auto {
+          -ms-overflow-style: none;  /* IE and Edge */
+          scrollbar-width: none;  /* Firefox */
         }
       `}</style>
     </div>
