@@ -11,6 +11,7 @@ import ConditionalHeader from "../components/ConditionalHeader";
 import { SearchHistoryProvider } from "@/context/SearchHistoryProvider";
 import ClientProviders from "../components/ClientProviders";
 import { db } from "@/lib/firebase"; // Adjust this import path as needed
+import { PersonalizedRecommendationsProvider } from "@/context/PersonalizedRecommendationsProvider";
 
 // Inner component that has access to user context
 function CartProviderWrapper({ children }: { children: React.ReactNode }) {
@@ -47,8 +48,10 @@ export default function LayoutWrapper({
               <BadgeProvider>
                 <SearchProvider>
                   <SearchHistoryProvider>
+                  <PersonalizedRecommendationsProvider>
                     <ConditionalHeader />
                     <main>{children}</main>
+                    </PersonalizedRecommendationsProvider>
                   </SearchHistoryProvider>
                 </SearchProvider>
               </BadgeProvider>
