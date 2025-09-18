@@ -2,10 +2,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getFirestoreAdmin } from "@/lib/firebase-admin";
 
+interface RouteParams {
+  params: {
+    shopId: string;
+  };
+}
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: { shopId: string } }
-) {
+  { params }: RouteParams
+): Promise<NextResponse> {
   try {
     const { shopId } = params;
 
