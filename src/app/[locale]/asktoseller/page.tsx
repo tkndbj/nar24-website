@@ -35,7 +35,7 @@ interface PageProps {
 }
 
 // ✅ FIXED: Main page component with correct Next.js structure
-const AskToSellerPage: React.FC<PageProps> = ({ params, searchParams }) => {
+const AskToSellerPage: React.FC<PageProps> = ({ searchParams }) => {
   const router = useRouter();
   const { user } = useUser();
 
