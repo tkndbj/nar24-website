@@ -82,28 +82,37 @@ const AllQuestionsPage: React.FC<AllQuestionsPageProps> = ({ }) => {
 
   // Dark mode detection
   useEffect(() => {
+    if (typeof window === "undefined") return;
+  
     const detectDarkMode = () => {
-      const isDark = 
-        document.documentElement.classList.contains("dark") ||
-        document.documentElement.getAttribute("data-theme") === "dark" ||
-        window.matchMedia("(prefers-color-scheme: dark)").matches;
+      const htmlElement = document.documentElement;
+      const darkModeMediaQuery = window.matchMedia(
+        "(prefers-color-scheme: dark)"
+      );
+  
+      const isDark =
+        htmlElement.classList.contains("dark") ||
+        htmlElement.getAttribute("data-theme") === "dark" ||
+        darkModeMediaQuery.matches;
+  
       setIsDarkMode(isDark);
     };
-
+  
     detectDarkMode();
-
+  
     const observer = new MutationObserver(detectDarkMode);
     observer.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ["class", "data-theme"],
     });
-
+  
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    mediaQuery.addEventListener("change", detectDarkMode);
-
+    const handleChange = () => detectDarkMode();
+    mediaQuery.addEventListener("change", handleChange);
+  
     return () => {
       observer.disconnect();
-      mediaQuery.removeEventListener("change", detectDarkMode);
+      mediaQuery.removeEventListener("change", handleChange);
     };
   }, []);
 
