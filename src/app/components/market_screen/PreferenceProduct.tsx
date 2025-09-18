@@ -7,7 +7,7 @@ import { ChevronRight, ChevronLeft, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { usePersonalizedRecommendations } from "@/context/PersonalizedRecommendationsProvider";
-import { Product } from "@/app/models/Product";
+
 
 // Shimmer loading component
 const ShimmerCard: React.FC<{ width?: number }> = ({ width = 205 }) => (
@@ -50,7 +50,7 @@ export const PreferenceProduct: React.FC = () => {
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isVisible, setIsVisible] = useState(true);
+  const [isVisible] = useState(true);
   const [hasInitialized, setHasInitialized] = useState(false);
   
   const scrollContainerRef = useRef<HTMLDivElement>(null);
