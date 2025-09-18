@@ -106,3 +106,104 @@ export async function GET(
     );
   }
 }
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ productId: string }> }
+) {
+  try {
+    const db = getFirestoreAdmin();
+    const body = await request.json();
+    const { productId } = await params;
+    
+    const { 
+      sellerId, 
+      isShop, 
+      questionText, 
+      askerNameVisible 
+    } = body;
+
+    // Validate required fields
+    if (!productId || !sellerId || !questionText || typeof isShop !== "boolean") {
+      return NextResponse.json(
+        { error: "Missing required fields" },
+        { status: 400 }
+      );
+    }
+
+    if (questionText.trim().length === 0 || questionText.length > 150) {
+      return NextResponse.json(
+        { error: "Invalid question text" },
+        { status: 400 }
+      );
+    }
+
+    // For now, using mock user data - you'll integrate with your auth system later
+    const mockUserId = "current-user-id";
+    const mockUserName = "Test User";
+
+    // Normalize productId (same logic as your GET method)
+    let rawId = productId.trim();
+    const p1 = "products_";
+    const p2 = "shop_products_";
+    if (rawId.startsWith(p1)) {
+      rawId = rawId.substring(p1.length);
+    } else if (rawId.startsWith(p2)) {
+      rawId = rawId.substring(p2.length);
+    }
+
+    // Determine collection
+    const productCollection = isShop ? "shop_products" : "products";
+
+    // Get product data
+    const productDoc = await db.collection(productCollection).doc(rawId).get();
+    if (!productDoc.exists) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
+    const productData = productDoc.data()!;
+
+    // Get seller data
+    const sellerCollection = isShop ? "shops" : "users";
+    const sellerDoc = await db.collection(sellerCollection).doc(sellerId).get();
+    if (!sellerDoc.exists) {
+      return NextResponse.json({ error: "Seller not found" }, { status: 404 });
+    }
+    const sellerData = sellerDoc.data()!;
+
+    // Create question document
+    const questionRef = db
+      .collection(productCollection)
+      .doc(rawId)
+      .collection("product_questions")
+      .doc();
+
+    const questionPayload = {
+      questionId: questionRef.id,
+      productId: rawId,
+      askerId: mockUserId,
+      askerName: mockUserName,
+      askerNameVisible: askerNameVisible === true,
+      questionText: questionText.trim(),
+      timestamp: new Date(),
+      answered: false,
+      productName: productData.productName || "",
+      productImage: (productData.imageUrls && productData.imageUrls[0]) || "",
+      productPrice: productData.price || 0,
+      productRating: productData.averageRating || 0,
+      sellerId,
+      sellerName: isShop ? (sellerData.name || "") : (sellerData.displayName || ""),
+      sellerImage: isShop ? (sellerData.profileImageUrl || "") : (sellerData.profileImage || ""),
+    };
+
+    // Save question
+    await questionRef.set(questionPayload);
+
+    return NextResponse.json({
+      success: true,
+      questionId: questionRef.id,
+    });
+
+  } catch (error) {
+    console.error("Error submitting question:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}

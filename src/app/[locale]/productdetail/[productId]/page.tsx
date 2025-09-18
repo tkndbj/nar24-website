@@ -12,6 +12,7 @@ import {
   X,
   Check,
   Minus,
+  Heart,
 } from "lucide-react";
 import Image from "next/image";
 import ProductDetailActionsRow from "../../../components/product_detail/ProductDetailActionsRow";
@@ -22,7 +23,9 @@ import ProductDetailReviewsTab from "../../../components/product_detail/Reviews"
 import ProductDetailSellerInfo from "../../../components/product_detail/SellerInfo";
 import ProductQuestionsWidget from "../../../components/product_detail/Questions";
 import ProductDetailRelatedProducts from "../../../components/product_detail/RelatedProducts";
+import BundleComponent from '@/app/components/product_detail/BundleComponent';
 import ProductOptionSelector from "@/app/components/ProductOptionSelector";
+import AskToSellerBubble from '@/app/components/product_detail/AskToSeller';
 import { useCart } from "@/context/CartProvider";
 import { useUser } from "@/context/UserProvider";
 import { Product, ProductUtils } from "@/app/models/Product";
@@ -499,27 +502,29 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
             />
           </div>
         </div>
-        <div
-          className={`w-full h-96 animate-pulse ${
-            isDarkMode ? "bg-gray-700" : "bg-gray-200"
-          }`}
-        />
-        <div className="space-y-4 p-4">
+        <div className="grid lg:grid-cols-2 gap-8 max-w-6xl mx-auto p-4">
           <div
-            className={`h-6 rounded animate-pulse ${
+            className={`w-full h-96 lg:h-[500px] animate-pulse ${
               isDarkMode ? "bg-gray-700" : "bg-gray-200"
             }`}
           />
-          <div
-            className={`h-16 rounded animate-pulse ${
-              isDarkMode ? "bg-gray-700" : "bg-gray-200"
-            }`}
-          />
-          <div
-            className={`h-20 rounded animate-pulse ${
-              isDarkMode ? "bg-gray-700" : "bg-gray-200"
-            }`}
-          />
+          <div className="space-y-4">
+            <div
+              className={`h-6 rounded animate-pulse ${
+                isDarkMode ? "bg-gray-700" : "bg-gray-200"
+              }`}
+            />
+            <div
+              className={`h-16 rounded animate-pulse ${
+                isDarkMode ? "bg-gray-700" : "bg-gray-200"
+              }`}
+            />
+            <div
+              className={`h-20 rounded animate-pulse ${
+                isDarkMode ? "bg-gray-700" : "bg-gray-200"
+              }`}
+            />
+          </div>
         </div>
       </div>
     ),
@@ -572,277 +577,315 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     <div
       className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
     >
-      {/* Header - Simplified without title */}
+      {/* Header - Clean and minimal */}
       <div
-        className={`sticky top-0 z-10 border-b shadow-sm ${
+        className={`sticky top-0 z-10 backdrop-blur-md border-b ${
           isDarkMode
-            ? "bg-gray-800 border-gray-700"
-            : "bg-white border-gray-200"
+            ? "bg-gray-900/95 border-gray-700"
+            : "bg-white/95 border-gray-200"
         }`}
       >
-        <div className="flex items-center justify-between p-4">
-          <button
-            onClick={() => router.back()}
-            className={`p-2 rounded-lg transition-colors ${
-              isDarkMode
-                ? "hover:bg-gray-700 text-gray-300"
-                : "hover:bg-gray-100 text-gray-700"
-            }`}
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
+        <div className="max-w-6xl mx-auto px-4 py-3">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => router.back()}
+              className={`p-2 rounded-lg transition-colors ${
+                isDarkMode
+                  ? "hover:bg-gray-800 text-gray-300"
+                  : "hover:bg-gray-100 text-gray-700"
+              }`}
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
 
-          <button
-            onClick={handleShare}
-            className={`p-2 rounded-lg transition-colors ${
-              isDarkMode
-                ? "hover:bg-gray-700 text-gray-300"
-                : "hover:bg-gray-100 text-gray-700"
-            }`}
-          >
-            <Share2 className="w-5 h-5" />
-          </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleToggleFavorite}
+                className={`p-2 rounded-lg transition-colors ${
+                  isDarkMode
+                    ? "hover:bg-gray-800 text-gray-300"
+                    : "hover:bg-gray-100 text-gray-700"
+                }`}
+              >
+                <Heart className={`w-5 h-5 ${isFavorite ? "fill-red-500 text-red-500" : ""}`} />
+              </button>
+              
+              <button
+                onClick={handleShare}
+                className={`p-2 rounded-lg transition-colors ${
+                  isDarkMode
+                    ? "hover:bg-gray-800 text-gray-300"
+                    : "hover:bg-gray-100 text-gray-700"
+                }`}
+              >
+                <Share2 className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Main content - Full width on mobile, constrained on desktop */}
-      <div className="max-w-6xl mx-auto lg:px-2">
-        {/* Image section */}
-        <div
-          className={`relative w-full h-96 lg:h-[500px] ${
-            isDarkMode ? "bg-gray-800" : "bg-white"
-          }`}
-        >
-          {product.imageUrls.length > 0 &&
-          !imageErrors.has(currentImageIndex) ? (
-            <Image
-              src={product.imageUrls[currentImageIndex]}
-              alt={product.productName}
-              fill
-              className="object-contain cursor-pointer"
-              onClick={() => setShowFullScreenViewer(true)}
-              onError={() => handleImageError(currentImageIndex)}
-              priority
-            />
-          ) : (
+      {/* Main Content - Modern two-column layout */}
+      <div className="max-w-6xl mx-auto p-4 lg:p-6">
+        <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
+          {/* Left Column - Images */}
+          <div className="space-y-4">
+            {/* Main Image */}
             <div
-              className={`w-full h-full flex items-center justify-center ${
-                isDarkMode ? "bg-gray-700" : "bg-gray-200"
-              }`}
+              className={`relative w-full aspect-square rounded-2xl overflow-hidden ${
+                isDarkMode ? "bg-gray-800" : "bg-white"
+              } shadow-sm border ${isDarkMode ? "border-gray-700" : "border-gray-200"}`}
             >
-              <div
-                className={`text-center ${
-                  isDarkMode ? "text-gray-400" : "text-gray-500"
+              {product.imageUrls.length > 0 &&
+              !imageErrors.has(currentImageIndex) ? (
+                <Image
+                  src={product.imageUrls[currentImageIndex]}
+                  alt={product.productName}
+                  fill
+                  className="object-contain cursor-pointer hover:scale-105 transition-transform duration-300"
+                  onClick={() => setShowFullScreenViewer(true)}
+                  onError={() => handleImageError(currentImageIndex)}
+                  priority
+                />
+              ) : (
+                <div
+                  className={`w-full h-full flex items-center justify-center ${
+                    isDarkMode ? "bg-gray-700" : "bg-gray-100"
+                  }`}
+                >
+                  <div
+                    className={`text-center ${
+                      isDarkMode ? "text-gray-400" : "text-gray-500"
+                    }`}
+                  >
+                    <div
+                      className={`w-16 h-16 mx-auto mb-2 rounded-lg ${
+                        isDarkMode ? "bg-gray-600" : "bg-gray-300"
+                      }`}
+                    />
+                    <p>No image available</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Video Play Button */}
+              {product.videoUrl && (
+                <button
+                  onClick={() => setShowVideoModal(true)}
+                  className="absolute bottom-4 right-4 p-3 bg-black/60 backdrop-blur-sm rounded-full text-white hover:bg-black/80 transition-all hover:scale-110"
+                >
+                  <Play className="w-6 h-6 fill-current" />
+                </button>
+              )}
+
+              {/* Best Seller Badge */}
+              {product.bestSellerRank && product.bestSellerRank <= 10 && (
+                <div className="absolute top-4 left-4 px-3 py-1 bg-gradient-to-r from-orange-500 to-orange-600 text-white text-sm font-bold rounded-full shadow-lg">
+                  #{product.bestSellerRank} Best Seller
+                </div>
+              )}
+            </div>
+
+            {/* Thumbnail Images */}
+            {product.imageUrls.length > 1 && (
+              <div className="flex gap-3 overflow-x-auto pb-2">
+                {product.imageUrls.map((url, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setCurrentImageIndex(index)}
+                    className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${
+                      index === currentImageIndex
+                        ? "border-orange-500 shadow-lg scale-105"
+                        : isDarkMode
+                        ? "border-gray-600 hover:border-gray-500"
+                        : "border-gray-200 hover:border-gray-300"
+                    }`}
+                  >
+                    <Image
+                      src={url}
+                      alt={`Product image ${index + 1}`}
+                      width={80}
+                      height={80}
+                      className="w-full h-full object-cover"
+                      onError={() => handleImageError(index)}
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Right Column - Product Info */}
+          <div className="space-y-6">
+            {/* Product Title & Brand */}
+            <div className="space-y-3">
+              <div className="flex items-start gap-3">
+                <span
+                  className={`text-sm font-semibold px-3 py-1 rounded-full ${
+                    isDarkMode 
+                      ? "bg-blue-900/30 text-blue-400 border border-blue-700" 
+                      : "bg-blue-50 text-blue-700 border border-blue-200"
+                  }`}
+                >
+                  {product.brandModel}
+                </span>
+              </div>
+              
+              <h1
+                className={`text-2xl lg:text-3xl font-bold leading-tight ${
+                  isDarkMode ? "text-white" : "text-gray-900"
                 }`}
               >
-                <div
-                  className={`w-16 h-16 mx-auto mb-2 rounded-lg ${
-                    isDarkMode ? "bg-gray-600" : "bg-gray-300"
-                  }`}
-                />
-                <p>No image available</p>
+                {product.productName}
+              </h1>
+              
+              <div
+                className={`text-3xl lg:text-4xl font-bold text-orange-600`}
+              >
+                {product.price} {product.currency}
               </div>
             </div>
-          )}
 
-          {product.videoUrl && (
-            <button
-              onClick={() => setShowVideoModal(true)}
-              className="absolute bottom-4 right-4 p-3 bg-black/50 backdrop-blur-sm rounded-full text-white hover:bg-black/70 transition-colors"
-            >
-              <Play className="w-6 h-6 fill-current" />
-            </button>
-          )}
+            {/* Actions Row */}
+            <ProductDetailActionsRow
+              product={product}
+              onShare={handleShare}
+              onToggleFavorite={handleToggleFavorite}
+              isFavorite={isFavorite}
+              isDarkMode={isDarkMode}
+            />
 
-          {product.bestSellerRank && product.bestSellerRank <= 10 && (
-            <div className="absolute top-4 right-4 px-3 py-1 bg-orange-600 text-white text-sm font-bold rounded-full">
-              #{product.bestSellerRank} Best Seller
-            </div>
-          )}
-
-          {product.imageUrls.length > 1 && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-              {product.imageUrls.map((_, index) => (
-                <button
-                  key={index}
-                  onClick={() => setCurrentImageIndex(index)}
-                  className={`w-2 h-2 rounded-full transition-colors ${
-                    index === currentImageIndex
-                      ? "bg-orange-600"
-                      : "bg-white/50 hover:bg-white/70"
+            {/* Action Buttons */}
+            <div className="flex gap-3 pt-4">
+              <button
+                onClick={() => handleAddToCart()}
+                disabled={isProcessing}
+                className={`
+                  flex-1 py-4 px-6 rounded-xl font-semibold text-lg transition-all duration-300 flex items-center justify-center gap-3 relative overflow-hidden
+                  ${
+                    productInCart && cartButtonState === "idle"
+                      ? isDarkMode
+                        ? "border-2 border-red-500 text-red-400 hover:bg-red-900/20"
+                        : "border-2 border-red-500 text-red-600 hover:bg-red-50"
+                      : cartButtonState === "added" || cartButtonState === "removed"
+                      ? "border-2 border-green-500 text-green-600 bg-green-50"
+                      : isDarkMode
+                      ? "border-2 border-orange-500 text-orange-400 hover:bg-orange-900/20"
+                      : "border-2 border-orange-500 text-orange-600 hover:bg-orange-50"
+                  }
+                  ${isProcessing ? "opacity-75 cursor-not-allowed" : ""}
+                  ${
+                    cartButtonState === "added" || cartButtonState === "removed"
+                      ? "transform scale-105"
+                      : ""
+                  }
+                `}
+              >
+                <span
+                  className={`transition-all duration-300 ${
+                    cartButtonState === "added" || cartButtonState === "removed"
+                      ? "animate-pulse"
+                      : ""
                   }`}
-                />
-              ))}
+                >
+                  {cartButtonContent.icon}
+                </span>
+                <span className="transition-all duration-300">
+                  {cartButtonContent.text}
+                </span>
+
+                {/* Success animation overlay */}
+                {(cartButtonState === "added" || cartButtonState === "removed") && (
+                  <div className="absolute inset-0 bg-green-500/10 animate-pulse rounded-xl" />
+                )}
+              </button>
+
+              <button
+                onClick={handleBuyNow}
+                className="flex-1 py-4 px-6 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white rounded-xl font-semibold text-lg transition-all duration-300 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+              >
+                Şimdi Satın Al
+              </button>
+            </div>
+
+            {/* Seller Info */}
+            <ProductDetailSellerInfo
+              sellerId={product.userId}
+              sellerName={product.sellerName}
+              shopId={product.shopId}
+              isDarkMode={isDarkMode}
+            />
+
+            {/* Product Attributes */}
+            <DynamicAttributesWidget product={product} isDarkMode={isDarkMode} />
+          </div>
+        </div>
+
+        {/* Bottom Sections */}
+        <div className="mt-12 space-y-8">
+          {/* Description */}
+          {product.description && (
+            <div
+              className={`rounded-2xl p-6 ${
+                isDarkMode
+                  ? "bg-gray-800 border border-gray-700"
+                  : "bg-white border border-gray-200"
+              } shadow-sm`}
+            >
+              <h3
+                className={`text-xl font-bold mb-4 ${
+                  isDarkMode ? "text-white" : "text-gray-900"
+                }`}
+              >
+                Product Description
+              </h3>
+              <p
+  className={`leading-relaxed text-base ${
+    isDarkMode ? "text-gray-300" : "text-gray-700"
+  }`}
+>
+  {product.description}
+</p>
+
             </div>
           )}
+
+          <ProductCollectionWidget
+            productId={product.id}
+            shopId={product.shopId}
+            isDarkMode={isDarkMode}
+          />
+
+          <BundleComponent
+            productId={product.id}
+            shopId={product.shopId}
+            isDarkMode={isDarkMode}
+          />
+
+          <ProductDetailReviewsTab
+            productId={product.id}
+            isDarkMode={isDarkMode}
+          />
+
+          <ProductQuestionsWidget
+            productId={product.id}
+            sellerId={product.shopId || product.userId}
+            isShop={!!product.shopId}
+            isDarkMode={isDarkMode}
+          />
+
+          <ProductDetailRelatedProducts
+            productId={product.id}
+            category={product.category}
+            subcategory={product.subcategory}
+            isDarkMode={isDarkMode}
+          />
         </div>
-
-        {/* Product header - Smaller font on mobile */}
-        <div
-          className={`p-4 border-b ${
-            isDarkMode
-              ? "bg-gray-800 border-gray-700"
-              : "bg-white border-gray-100"
-          }`}
-        >
-          <div className="flex items-start gap-2 mb-2">
-            <span
-              className={`text-base lg:text-lg font-bold ${
-                isDarkMode ? "text-blue-400" : "text-blue-600"
-              }`}
-            >
-              {product.brandModel}
-            </span>
-            <span
-              className={`text-base lg:text-lg font-bold ${
-                isDarkMode ? "text-gray-400" : "text-gray-500"
-              }`}
-            >
-              {product.productName}
-            </span>
-          </div>
-          <div
-            className={`text-xl lg:text-2xl font-bold ${
-              isDarkMode ? "text-white" : "text-gray-900"
-            }`}
-          >
-            {product.price} {product.currency}
-          </div>
-        </div>
-
-        <ProductDetailActionsRow
-          product={product}
-          onShare={handleShare}
-          onToggleFavorite={handleToggleFavorite}
-          isFavorite={isFavorite}
-          isDarkMode={isDarkMode}
-        />
-
-        <ProductDetailSellerInfo
-          sellerId={product.userId}
-          sellerName={product.sellerName}
-          shopId={product.shopId}
-          isDarkMode={isDarkMode}
-        />
-
-        <DynamicAttributesWidget product={product} isDarkMode={isDarkMode} />
-
-        <ProductCollectionWidget
-          productId={product.id}
-          shopId={product.shopId}
-          isDarkMode={isDarkMode}
-        />
-
-        {product.description && (
-          <div
-            className={`p-4 border-b ${
-              isDarkMode
-                ? "bg-gray-800 border-gray-700"
-                : "bg-white border-gray-100"
-            }`}
-          >
-            <h3
-              className={`text-lg font-bold mb-3 ${
-                isDarkMode ? "text-white" : "text-gray-900"
-              }`}
-            >
-              Description
-            </h3>
-            <p
-              className={`leading-relaxed ${
-                isDarkMode ? "text-gray-300" : "text-gray-700"
-              }`}
-            >
-              {product.description}
-            </p>
-          </div>
-        )}
-
-        <ProductDetailReviewsTab
-          productId={product.id}
-          isDarkMode={isDarkMode}
-        />
-
-        <ProductQuestionsWidget
-          productId={product.id}
-          sellerId={product.shopId || product.userId}
-          isShop={!!product.shopId}
-          isDarkMode={isDarkMode}
-        />
-
-        <ProductDetailRelatedProducts
-          productId={product.id}
-          category={product.category}
-          subcategory={product.subcategory}
-          isDarkMode={isDarkMode}
-        />
 
         <div className="h-24" />
       </div>
 
-      {/* Bottom action bar */}
-      <div
-        className={`fixed bottom-0 left-0 right-0 border-t p-4 safe-area-pb ${
-          isDarkMode
-            ? "bg-gray-800 border-gray-700"
-            : "bg-white border-gray-200"
-        }`}
-      >
-        <div className="max-w-6xl mx-auto lg:px-2 flex gap-3">
-          {/* Cart Button */}
-          <button
-            onClick={() => handleAddToCart()}
-            disabled={isProcessing}
-            className={`
-              flex-1 py-3 px-4 rounded-lg border font-semibold transition-all duration-300 flex items-center justify-center gap-2 relative overflow-hidden
-              ${
-                productInCart && cartButtonState === "idle"
-                  ? isDarkMode
-                    ? "border-red-500 text-red-400 hover:bg-red-900/20"
-                    : "border-red-500 text-red-600 hover:bg-red-50"
-                  : cartButtonState === "added" || cartButtonState === "removed"
-                  ? "border-green-500 text-green-600 bg-green-50"
-                  : isDarkMode
-                  ? "border-orange-500 text-orange-400 hover:bg-orange-900/20"
-                  : "border-orange-500 text-orange-600 hover:bg-orange-50"
-              }
-              ${isProcessing ? "opacity-75 cursor-not-allowed" : ""}
-              ${
-                cartButtonState === "added" || cartButtonState === "removed"
-                  ? "transform scale-105"
-                  : ""
-              }
-            `}
-          >
-            <span
-              className={`transition-all duration-300 ${
-                cartButtonState === "added" || cartButtonState === "removed"
-                  ? "animate-pulse"
-                  : ""
-              }`}
-            >
-              {cartButtonContent.icon}
-            </span>
-            <span className="transition-all duration-300">
-              {cartButtonContent.text}
-            </span>
-
-            {/* Success animation overlay */}
-            {(cartButtonState === "added" || cartButtonState === "removed") && (
-              <div className="absolute inset-0 bg-green-500/10 animate-pulse" />
-            )}
-          </button>
-
-          {/* Buy Now Button */}
-          <button
-            onClick={handleBuyNow}
-            className="flex-1 py-3 px-4 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
-          >
-            Şimdi Satın Al
-          </button>
-        </div>
-      </div>
-
+      {/* Modals */}
       <FullScreenImageViewer
         imageUrls={product.imageUrls}
         initialIndex={currentImageIndex}
@@ -852,11 +895,11 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
       />
 
       {showVideoModal && product.videoUrl && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-          <div className="relative w-full max-w-4xl aspect-video bg-black rounded-lg overflow-hidden">
+        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
+          <div className="relative w-full max-w-4xl aspect-video bg-black rounded-2xl overflow-hidden">
             <button
               onClick={() => setShowVideoModal(false)}
-              className="absolute top-4 right-4 z-10 p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-colors"
+              className="absolute top-4 right-4 z-10 p-3 bg-black/50 rounded-full text-white hover:bg-black/70 transition-colors"
             >
               <X className="w-6 h-6" />
             </button>
@@ -870,7 +913,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         </div>
       )}
 
-      {/* Cart Option Selector Modal */}
       {product && (
         <ProductOptionSelector
           product={product}
@@ -879,6 +921,17 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           onConfirm={handleCartOptionSelectorConfirm}
         />
       )}
+
+<AskToSellerBubble
+  onTap={() => {
+    // Determine seller ID and whether it's a shop
+    const sellerId = product.shopId || product.userId;
+    const isShop = !!product.shopId;
+    
+    router.push(`/asktoseller?productId=${product.id}&sellerId=${sellerId}&isShop=${isShop}`);
+  }}
+  isDarkMode={isDarkMode}
+/>
     </div>
   );
 };

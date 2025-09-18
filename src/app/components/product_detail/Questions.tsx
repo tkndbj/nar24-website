@@ -1,7 +1,7 @@
 // src/components/productdetail/ProductQuestionsWidget.tsx
 
 import React, { useState, useEffect, useRef } from "react";
-import { ChevronLeft, ChevronRight, User } from "lucide-react";
+import { ChevronLeft, ChevronRight, User, HelpCircle, MessageCircle } from "lucide-react";
 import Image from "next/image";
 
 interface Question {
@@ -43,22 +43,35 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
 }) => {
   const formatDate = (timestamp: string) => {
     const date = new Date(timestamp);
-    return date.toLocaleDateString("en-GB"); // DD/MM/YYYY format
+    return date.toLocaleDateString("en-GB");
   };
 
   const displayName = question.askerNameVisible
     ? question.askerName
     : "Anonymous";
-  const isLongAnswer = question.answerText.length > 150;
+  const isLongAnswer = question.answerText.length > 120;
 
   return (
-    <div className={`min-w-72 w-72 rounded-lg p-4 border ${
+    <div className={`group min-w-80 w-80 rounded-2xl p-5 border transition-all duration-300 hover:shadow-lg hover:scale-[1.02] ${
       isDarkMode 
-        ? "bg-gray-800 border-gray-700" 
-        : "bg-gray-50 border-gray-200"
+        ? "bg-gradient-to-br from-gray-800 to-gray-850 border-gray-700 hover:border-orange-500" 
+        : "bg-gradient-to-br from-white to-gray-50 border-gray-200 hover:border-orange-300"
     }`}>
-      {/* Date */}
-      <div className="flex justify-end mb-2">
+      {/* Header with date and asker */}
+      <div className="flex justify-between items-start mb-4">
+        <div className="flex items-center gap-2">
+          <div className={`p-1.5 rounded-lg ${
+            isDarkMode ? "bg-blue-900/20 text-blue-400" : "bg-blue-50 text-blue-600"
+          }`}>
+            <User className="w-3 h-3" />
+          </div>
+          <span className={`text-sm font-semibold ${
+            isDarkMode ? "text-white" : "text-gray-900"
+          }`}>
+            {displayName}
+          </span>
+        </div>
+        
         <span className={`text-xs ${
           isDarkMode ? "text-gray-400" : "text-gray-500"
         }`}>
@@ -66,27 +79,23 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
         </span>
       </div>
 
-      {/* Asker name */}
-      <div className="mb-2">
-        <span className={`text-sm font-bold ${
-          isDarkMode ? "text-white" : "text-gray-900"
-        }`}>
-          {displayName}
-        </span>
-      </div>
-
-      {/* Question text */}
+      {/* Question section */}
       <div className="mb-4">
-        <p className={`text-sm line-clamp-2 ${
-          isDarkMode ? "text-gray-300" : "text-gray-700"
-        }`}>
-          {question.questionText}
-        </p>
+        <div className="flex items-start gap-2 mb-2">
+          <HelpCircle className={`w-4 h-4 mt-0.5 flex-shrink-0 ${
+            isDarkMode ? "text-orange-400" : "text-orange-600"
+          }`} />
+          <p className={`text-sm font-medium leading-relaxed ${
+            isDarkMode ? "text-gray-300" : "text-gray-700"
+          }`}>
+            {question.questionText}
+          </p>
+        </div>
       </div>
 
       {/* Answer section */}
-      <div className={`rounded-lg p-3 flex-1 ${
-        isDarkMode ? "bg-gray-700" : "bg-white"
+      <div className={`rounded-xl p-4 border ${
+        isDarkMode ? "bg-gray-700/50 border-gray-600" : "bg-gray-50 border-gray-100"
       }`}>
         <div className="flex gap-3">
           {/* Seller avatar */}
@@ -101,18 +110,32 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
               />
             ) : (
               <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                isDarkMode ? "bg-gray-600" : "bg-gray-300"
+                isDarkMode ? "bg-orange-900/20 text-orange-400" : "bg-orange-100 text-orange-600"
               }`}>
-                <User className={`w-4 h-4 ${
-                  isDarkMode ? "text-gray-400" : "text-gray-600"
-                }`} />
+                <User className="w-4 h-4" />
               </div>
             )}
           </div>
 
           {/* Answer content */}
           <div className="flex-1 min-w-0">
-            <p className={`text-sm line-clamp-3 ${
+            <div className="flex items-center gap-2 mb-2">
+              <span className={`text-xs font-semibold ${
+                isDarkMode ? "text-orange-400" : "text-orange-600"
+              }`}>
+                Seller Reply
+              </span>
+              <div className={`w-1 h-1 rounded-full ${
+                isDarkMode ? "bg-gray-600" : "bg-gray-300"
+              }`} />
+              <span className={`text-xs ${
+                isDarkMode ? "text-gray-400" : "text-gray-500"
+              }`}>
+                Official Response
+              </span>
+            </div>
+            
+            <p className={`text-sm leading-relaxed ${isLongAnswer ? 'line-clamp-3' : ''} ${
               isDarkMode ? "text-gray-300" : "text-gray-700"
             }`}>
               {question.answerText}
@@ -121,13 +144,13 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
             {isLongAnswer && (
               <button
                 onClick={onReadAll}
-                className={`mt-2 text-xs underline transition-colors ${
+                className={`mt-2 text-xs font-semibold underline transition-colors ${
                   isDarkMode
-                    ? "text-gray-400 hover:text-gray-200"
-                    : "text-gray-600 hover:text-gray-800"
+                    ? "text-orange-400 hover:text-orange-300"
+                    : "text-orange-600 hover:text-orange-700"
                 }`}
               >
-                Read All
+                Read Full Answer
               </button>
             )}
           </div>
@@ -140,18 +163,23 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
 const LoadingSkeleton: React.FC<{ isDarkMode?: boolean }> = ({ 
   isDarkMode = false 
 }) => (
-  <div className={`w-full shadow-sm border-b ${
+  <div className={`rounded-2xl p-6 border shadow-sm ${
     isDarkMode 
       ? "bg-gray-800 border-gray-700" 
-      : "bg-white border-gray-100"
+      : "bg-white border-gray-200"
   }`}>
-    <div className="p-4 space-y-4">
+    <div className="space-y-6">
       {/* Header skeleton */}
       <div className="flex justify-between items-center">
-        <div className={`w-40 h-5 rounded animate-pulse ${
-          isDarkMode ? "bg-gray-700" : "bg-gray-200"
-        }`} />
-        <div className={`w-24 h-4 rounded animate-pulse ${
+        <div className="flex items-center gap-3">
+          <div className={`w-10 h-10 rounded-xl animate-pulse ${
+            isDarkMode ? "bg-gray-700" : "bg-gray-200"
+          }`} />
+          <div className={`w-40 h-6 rounded animate-pulse ${
+            isDarkMode ? "bg-gray-700" : "bg-gray-200"
+          }`} />
+        </div>
+        <div className={`w-24 h-8 rounded-xl animate-pulse ${
           isDarkMode ? "bg-gray-700" : "bg-gray-200"
         }`} />
       </div>
@@ -161,7 +189,7 @@ const LoadingSkeleton: React.FC<{ isDarkMode?: boolean }> = ({
         {Array.from({ length: 2 }).map((_, i) => (
           <div
             key={i}
-            className={`min-w-72 w-72 h-48 rounded-lg animate-pulse ${
+            className={`min-w-80 w-80 h-56 rounded-2xl animate-pulse ${
               isDarkMode ? "bg-gray-700" : "bg-gray-200"
             }`}
           />
@@ -188,8 +216,7 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
 
   const checkScrollPosition = () => {
     if (scrollContainerRef.current) {
-      const { scrollLeft, scrollWidth, clientWidth } =
-        scrollContainerRef.current;
+      const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
       setCanScrollLeft(scrollLeft > 0);
       setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1);
     }
@@ -197,13 +224,13 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
 
   const scrollLeft = () => {
     if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollBy({ left: -300, behavior: "smooth" });
+      scrollContainerRef.current.scrollBy({ left: -350, behavior: "smooth" });
     }
   };
 
   const scrollRight = () => {
     if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollBy({ left: 300, behavior: "smooth" });
+      scrollContainerRef.current.scrollBy({ left: 350, behavior: "smooth" });
     }
   };
 
@@ -223,12 +250,9 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
       try {
         setLoading(true);
 
-        // Fetch questions and seller info in parallel
         const [questionsResponse, sellerResponse] = await Promise.all([
           fetch(`/api/questions/${productId}?isShop=${isShop}&limit=5`),
-          fetch(
-            `/api/seller/${sellerId}${isShop ? `?shopId=${sellerId}` : ""}`
-          ),
+          fetch(`/api/seller/${sellerId}${isShop ? `?shopId=${sellerId}` : ""}`),
         ]);
 
         if (questionsResponse.ok) {
@@ -274,28 +298,46 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
     : sellerInfo?.profileImage;
 
   return (
-    <div className={`w-full shadow-sm border-b ${
+    <div className={`rounded-2xl p-6 border shadow-sm ${
       isDarkMode 
         ? "bg-gray-800 border-gray-700" 
-        : "bg-white border-gray-100"
+        : "bg-white border-gray-200"
     }`}>
-      <div className="p-4 space-y-4">
+      <div className="space-y-6">
         {/* Header */}
         <div className="flex justify-between items-center">
-          <h3 className={`text-lg font-bold ${
-            isDarkMode ? "text-white" : "text-gray-900"
-          }`}>
-            Product Questions
-          </h3>
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-xl ${
+              isDarkMode 
+                ? "bg-orange-900/20 text-orange-400" 
+                : "bg-orange-100 text-orange-600"
+            }`}>
+              <MessageCircle className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className={`text-xl font-bold ${
+                isDarkMode ? "text-white" : "text-gray-900"
+              }`}>
+                Product Q&A
+              </h3>
+              <p className={`text-sm ${
+                isDarkMode ? "text-gray-400" : "text-gray-600"
+              }`}>
+                {totalQuestions} answered questions
+              </p>
+            </div>
+          </div>
+          
           <button
             onClick={handleViewAllQuestions}
-            className={`text-sm font-bold transition-colors ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm transition-all duration-200 hover:scale-105 ${
               isDarkMode
-                ? "text-orange-400 hover:text-orange-300"
-                : "text-orange-600 hover:text-orange-700"
+                ? "bg-orange-900/20 text-orange-400 hover:bg-orange-900/30 border border-orange-700"
+                : "bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200"
             }`}
           >
             View All ({totalQuestions})
+            <ChevronRight className="w-4 h-4" />
           </button>
         </div>
 
@@ -305,10 +347,10 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
           {canScrollLeft && (
             <button
               onClick={scrollLeft}
-              className={`absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 shadow-lg rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-110 ${
+              className={`absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 shadow-xl rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-110 ${
                 isDarkMode
-                  ? "bg-gray-700 text-gray-300 hover:text-orange-400"
-                  : "bg-white text-gray-600 hover:text-orange-600"
+                  ? "bg-gray-700 text-gray-300 hover:text-orange-400 border border-gray-600"
+                  : "bg-white text-gray-600 hover:text-orange-600 border border-gray-200"
               }`}
             >
               <ChevronLeft className="w-5 h-5" />
@@ -319,10 +361,10 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
           {canScrollRight && (
             <button
               onClick={scrollRight}
-              className={`absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 shadow-lg rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-110 ${
+              className={`absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 shadow-xl rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-110 ${
                 isDarkMode
-                  ? "bg-gray-700 text-gray-300 hover:text-orange-400"
-                  : "bg-white text-gray-600 hover:text-orange-600"
+                  ? "bg-gray-700 text-gray-300 hover:text-orange-400 border border-gray-600"
+                  : "bg-white text-gray-600 hover:text-orange-600 border border-gray-200"
               }`}
             >
               <ChevronRight className="w-5 h-5" />
@@ -332,7 +374,7 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
           {/* Scrollable container */}
           <div
             ref={scrollContainerRef}
-            className="flex gap-4 overflow-x-auto scrollbar-hide pb-2 scroll-smooth"
+            className="flex gap-4 overflow-x-auto scrollbar-hide pb-2 scroll-smooth [&::-webkit-scrollbar]:hidden"
             style={{
               scrollbarWidth: "none",
               msOverflowStyle: "none",

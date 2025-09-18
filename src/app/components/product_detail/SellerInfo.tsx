@@ -1,7 +1,7 @@
 // src/components/productdetail/ProductDetailSellerInfo.tsx
 
 import React, { useState, useEffect } from "react";
-import { ChevronRight, Verified } from "lucide-react";
+import { ChevronRight, Verified, Store, User, Star, Package, MessageCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 interface SellerInfo {
@@ -24,29 +24,26 @@ interface ProductDetailSellerInfoProps {
 const LoadingSkeleton: React.FC<{ isDarkMode?: boolean }> = ({ 
   isDarkMode = false 
 }) => (
-  <div className={`w-full shadow-sm border-b ${
+  <div className={`rounded-2xl p-6 border animate-pulse ${
     isDarkMode 
       ? "bg-gray-800 border-gray-700" 
-      : "bg-white border-gray-100"
+      : "bg-white border-gray-200"
   }`}>
-    <div className="p-4">
-      <div className={`rounded-lg p-3 ${
-        isDarkMode ? "bg-gray-700" : "bg-gray-100"
-      }`}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className={`w-24 h-4 rounded animate-pulse ${
-              isDarkMode ? "bg-gray-600" : "bg-gray-200"
-            }`} />
-            <div className={`w-12 h-6 rounded animate-pulse ${
-              isDarkMode ? "bg-gray-600" : "bg-gray-200"
-            }`} />
-          </div>
-          <div className={`w-4 h-4 rounded animate-pulse ${
-            isDarkMode ? "bg-gray-600" : "bg-gray-200"
-          }`} />
-        </div>
+    <div className="flex items-center gap-4">
+      <div className={`w-12 h-12 rounded-full ${
+        isDarkMode ? "bg-gray-700" : "bg-gray-200"
+      }`} />
+      <div className="flex-1 space-y-2">
+        <div className={`w-32 h-4 rounded ${
+          isDarkMode ? "bg-gray-700" : "bg-gray-200"
+        }`} />
+        <div className={`w-24 h-3 rounded ${
+          isDarkMode ? "bg-gray-700" : "bg-gray-200"
+        }`} />
       </div>
+      <div className={`w-6 h-6 rounded ${
+        isDarkMode ? "bg-gray-700" : "bg-gray-200"
+      }`} />
     </div>
   </div>
 );
@@ -76,7 +73,6 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
         setLoading(true);
         setError(null);
 
-        // Fetch seller information
         const response = await fetch(
           `/api/seller/${sellerId}${shopId ? `?shopId=${shopId}` : ""}`
         );
@@ -93,7 +89,6 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
           err instanceof Error ? err.message : "Failed to load seller info"
         );
 
-        // Fallback to basic info
         setSellerInfo({
           sellerName: sellerName || "Unknown Seller",
           sellerAverageRating: 0,
@@ -112,10 +107,8 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
 
   const handleSellerClick = () => {
     if (isShop && shopId) {
-      // Navigate to shop detail page
       router.push(`/shop/${shopId}`);
     } else if (sellerId) {
-      // Navigate to seller reviews page
       router.push(`/seller/${sellerId}/reviews`);
     }
   };
@@ -125,7 +118,7 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
   }
 
   if (error && !sellerInfo) {
-    return null; // Hide component if there's an error and no fallback data
+    return null;
   }
 
   if (!sellerInfo || !sellerId) {
@@ -143,77 +136,123 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
   const canNavigate = (isShop && shopId) || sellerId;
 
   return (
-    <div className={`w-full shadow-sm border-b ${
+    <div className={`rounded-2xl p-6 border shadow-sm transition-all duration-200 hover:shadow-md ${
       isDarkMode 
         ? "bg-gray-800 border-gray-700" 
-        : "bg-white border-gray-100"
+        : "bg-white border-gray-200"
     }`}>
-      <div className="p-4">
-        <div className={`rounded-lg p-3 ${
-          isDarkMode ? "bg-gray-700" : "bg-gray-50"
-        }`}>
-          <button
-            onClick={handleSellerClick}
-            disabled={!canNavigate}
-            className={`w-full transition-colors rounded-lg ${
-              canNavigate 
-                ? isDarkMode 
-                  ? "hover:bg-gray-600" 
-                  : "hover:bg-gray-100"
-                : ""
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                {/* Seller name and verification */}
-                <div className="flex items-center gap-2">
-                  <span className={`text-sm font-bold truncate ${
-                    isDarkMode ? "text-white" : "text-gray-900"
-                  }`}>
-                    {displayName || "Unknown Seller"}
-                  </span>
-
-                  {sellerInfo.sellerIsVerified && (
-                    <div className="flex-shrink-0">
-                      <Verified
-                        className="w-4 h-4 text-blue-500"
-                        fill="currentColor"
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* Rating badge */}
-                <div className="flex-shrink-0 px-2 py-1 bg-green-500 rounded text-white text-xs font-bold">
-                  {displayRating.toFixed(1)}
-                </div>
-              </div>
-
-              {/* Arrow icon */}
-              {canNavigate && (
-                <ChevronRight className={`w-4 h-4 flex-shrink-0 ${
-                  isDarkMode ? "text-gray-400" : "text-gray-400"
-                }`} />
-              )}
-            </div>
-
-            {/* Additional info row */}
-            {(sellerInfo.totalProductsSold > 0 ||
-              sellerInfo.totalReviews > 0) && (
-              <div className={`flex items-center gap-4 mt-2 text-xs ${
-                isDarkMode ? "text-gray-400" : "text-gray-600"
-              }`}>
-                {sellerInfo.totalProductsSold > 0 && (
-                  <span>{sellerInfo.totalProductsSold} products sold</span>
-                )}
-                {sellerInfo.totalReviews > 0 && (
-                  <span>{sellerInfo.totalReviews} reviews</span>
-                )}
+      <button
+        onClick={handleSellerClick}
+        disabled={!canNavigate}
+        className={`w-full group ${
+          canNavigate 
+            ? "cursor-pointer"
+            : "cursor-default"
+        }`}
+      >
+        <div className="flex items-center gap-4">
+          {/* Seller Avatar/Icon */}
+          <div className={`relative p-3 rounded-full transition-all duration-200 ${
+            isDarkMode 
+              ? "bg-gradient-to-br from-orange-900/20 to-orange-800/20 text-orange-400" 
+              : "bg-gradient-to-br from-orange-100 to-orange-200 text-orange-600"
+          } ${canNavigate ? "group-hover:scale-105" : ""}`}>
+            {isShop ? (
+              <Store className="w-6 h-6" />
+            ) : (
+              <User className="w-6 h-6" />
+            )}
+            
+            {sellerInfo.sellerIsVerified && (
+              <div className="absolute -top-1 -right-1 bg-blue-500 rounded-full p-1">
+                <Verified className="w-3 h-3 text-white" fill="currentColor" />
               </div>
             )}
-          </button>
+          </div>
+
+          {/* Seller Info */}
+          <div className="flex-1 text-left">
+            <div className="flex items-center gap-2 mb-1">
+              <h4 className={`font-bold text-lg truncate ${
+                isDarkMode ? "text-white" : "text-gray-900"
+              }`}>
+                {displayName || "Unknown Seller"}
+              </h4>
+              
+              <span className={`text-sm ${
+                isDarkMode ? "text-gray-400" : "text-gray-600"
+              }`}>
+                {isShop ? "Official Store" : "Individual Seller"}
+              </span>
+            </div>
+
+            {/* Rating and Stats */}
+            <div className="flex items-center gap-4 text-sm">
+              <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1">
+                  <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                  <span className={`font-semibold ${
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  }`}>
+                    {displayRating.toFixed(1)}
+                  </span>
+                </div>
+                
+                {sellerInfo.totalReviews > 0 && (
+                  <span className={`${
+                    isDarkMode ? "text-gray-400" : "text-gray-500"
+                  }`}>
+                    ({sellerInfo.totalReviews})
+                  </span>
+                )}
+              </div>
+
+              {sellerInfo.totalProductsSold > 0 && (
+                <div className="flex items-center gap-1">
+                  <Package className="w-3 h-3" />
+                  <span className={`${
+                    isDarkMode ? "text-gray-400" : "text-gray-500"
+                  }`}>
+                    {sellerInfo.totalProductsSold} sold
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Arrow Icon */}
+          {canNavigate && (
+            <div className={`transition-all duration-200 ${
+              isDarkMode 
+                ? "text-gray-400 group-hover:text-orange-400" 
+                : "text-gray-400 group-hover:text-orange-600"
+            } group-hover:translate-x-1`}>
+              <ChevronRight className="w-5 h-5" />
+            </div>
+          )}
         </div>
-      </div>
+
+        {/* Trust Indicators */}
+        <div className="mt-4 flex items-center gap-3">
+          <div className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${
+            isDarkMode 
+              ? "bg-green-900/20 text-green-400 border border-green-800" 
+              : "bg-green-50 text-green-700 border border-green-200"
+          }`}>
+            <Verified className="w-3 h-3" />
+            Verified {isShop ? "Store" : "Seller"}
+          </div>
+          
+          <div className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${
+            isDarkMode 
+              ? "bg-blue-900/20 text-blue-400 border border-blue-800" 
+              : "bg-blue-50 text-blue-700 border border-blue-200"
+          }`}>
+            <MessageCircle className="w-3 h-3" />
+            Fast Response
+          </div>
+        </div>
+      </button>
     </div>
   );
 };

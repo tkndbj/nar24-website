@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import ProductCard from "../../components/ProductCard"; // Adjust path to your ProductCard
+// src/components/productdetail/ProductDetailRelatedProducts.tsx
 
+import React, { useState, useEffect, useRef } from "react";
+import { ChevronLeft, ChevronRight, Shuffle } from "lucide-react";
+import ProductCard from "../../components/ProductCard";
 import { Product } from "@/app/models/Product";
 
 interface ProductDetailRelatedProductsProps {
@@ -13,31 +14,22 @@ interface ProductDetailRelatedProductsProps {
 }
 
 const LoadingSkeleton: React.FC<{
-  listViewHeight: number;
-  cardWidth: number;
+  cardCount: number;
   isDarkMode?: boolean;
-  isMobile?: boolean;
-}> = ({ listViewHeight, cardWidth, isDarkMode = false, isMobile = false }) => (
-  <div
-    className={`flex ${isMobile ? "gap-2" : "gap-4"} overflow-hidden ${
-      isMobile ? "-ml-2" : ""
-    }`}
-  >
-    {Array.from({ length: 6 }).map((_, i) => (
+}> = ({ cardCount, isDarkMode = false }) => (
+  <div className="flex gap-4 overflow-hidden">
+    {Array.from({ length: cardCount }).map((_, i) => (
       <div
         key={i}
-        className={`flex-shrink-0 rounded-xl animate-pulse ${
+        className={`flex-shrink-0 w-60 rounded-2xl animate-pulse ${
           isDarkMode ? "bg-gray-700" : "bg-gray-200"
         }`}
-        style={{
-          width: `${cardWidth}px`,
-          height: `${listViewHeight - 40}px`, // Account for container padding
-        }}
+        style={{ height: "300px" }}
       >
-        <div className="p-3 space-y-3 h-full flex flex-col">
+        <div className="p-4 space-y-3 h-full flex flex-col">
           {/* Image placeholder */}
           <div
-            className={`flex-1 rounded-lg ${
+            className={`flex-1 rounded-xl ${
               isDarkMode ? "bg-gray-600" : "bg-gray-300"
             }`}
           />
@@ -66,9 +58,7 @@ const LoadingSkeleton: React.FC<{
   </div>
 );
 
-const ProductDetailRelatedProducts: React.FC<
-  ProductDetailRelatedProductsProps
-> = ({
+const ProductDetailRelatedProducts: React.FC<ProductDetailRelatedProductsProps> = ({
   productId,
   category,
   subcategory,
@@ -86,7 +76,7 @@ const ProductDetailRelatedProducts: React.FC<
   // Detect mobile device
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768); // Using 768px as mobile breakpoint
+      setIsMobile(window.innerWidth < 768);
     };
 
     checkMobile();
@@ -94,72 +84,34 @@ const ProductDetailRelatedProducts: React.FC<
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Calculate responsive dimensions - matches Flutter logic with mobile adjustments
+  // Calculate responsive dimensions
   const getResponsiveDimensions = () => {
     if (typeof window === "undefined") {
       return {
-        listViewHeight: 420,
+        listViewHeight: 400,
         cardWidth: 240,
-        scaleFactor: 0.85,
+        cardCount: 6,
         gap: 16,
       };
     }
 
     const screenWidth = window.innerWidth;
-    const screenHeight = window.innerHeight;
-    const isLandscape = screenWidth > screenHeight;
     const mobile = screenWidth < 768;
-
-    // Scale factors matching Flutter implementation
-    const cardScaleFactor = 0.85;
-    const internalScaleFactor = 1.1;
-
-    // Calculate dynamic factor (same logic as Flutter)
-    let dynamicFactor = screenWidth / 375;
-    dynamicFactor = Math.max(0.8, Math.min(1.2, dynamicFactor));
-
-    if (isLandscape && dynamicFactor > 1.0) {
-      dynamicFactor = 1.0;
-    }
-
-    const effectiveScaleFactor = dynamicFactor * cardScaleFactor;
-
-    // Calculate image height (matches Flutter calculation)
-    const baseImageHeight = screenHeight * 0.35;
-    const actualImageHeight = baseImageHeight * effectiveScaleFactor;
-
-    // Calculate text section height
-    const textSectionHeight = 90 * effectiveScaleFactor * internalScaleFactor;
-
-    // Total card height with padding - more generous calculation
-    const estimatedCardHeight = actualImageHeight + textSectionHeight + 40;
-
-    // Clamp to reasonable bounds - ensure enough height for scaled cards
-    const listViewHeight = Math.max(400, Math.min(500, estimatedCardHeight));
-
-    // Card width calculation - narrower on mobile, wider on desktop
-    const cardWidth = mobile ? 180 : 240; // Narrower cards on mobile (180px instead of 240px)
-
-    // Gap calculation - smaller on mobile
-    const gap = mobile ? 4 : 8; // 8px gap on mobile, 16px on desktop
-
+    
     return {
-      listViewHeight,
-      cardWidth,
-      scaleFactor: cardScaleFactor,
-      internalScaleFactor,
-      gap,
+      listViewHeight: mobile ? 350 : 400,
+      cardWidth: mobile ? 200 : 240,
+      cardCount: mobile ? 3 : 6,
+      gap: mobile ? 12 : 16,
     };
   };
 
-  const { listViewHeight, cardWidth, scaleFactor, internalScaleFactor, gap } =
-    getResponsiveDimensions();
+  const { listViewHeight, cardWidth, cardCount, gap } = getResponsiveDimensions();
 
   // Scroll position checking
   const checkScrollPosition = () => {
     if (scrollContainerRef.current) {
-      const { scrollLeft, scrollWidth, clientWidth } =
-        scrollContainerRef.current;
+      const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
       setCanScrollLeft(scrollLeft > 0);
       setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1);
     }
@@ -167,7 +119,6 @@ const ProductDetailRelatedProducts: React.FC<
 
   const scrollLeft = () => {
     if (scrollContainerRef.current) {
-      // Fixed scroll amount - one card width + gap
       const scrollAmount = cardWidth + gap;
       scrollContainerRef.current.scrollBy({
         left: -scrollAmount,
@@ -178,7 +129,6 @@ const ProductDetailRelatedProducts: React.FC<
 
   const scrollRight = () => {
     if (scrollContainerRef.current) {
-      // Fixed scroll amount - one card width + gap
       const scrollAmount = cardWidth + gap;
       scrollContainerRef.current.scrollBy({
         left: scrollAmount,
@@ -209,9 +159,8 @@ const ProductDetailRelatedProducts: React.FC<
         setLoading(true);
         setError(null);
 
-        // Add timeout to prevent hanging requests
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
 
         const response = await fetch(`/api/relatedproducts/${productId}`, {
           method: "GET",
@@ -224,7 +173,6 @@ const ProductDetailRelatedProducts: React.FC<
         clearTimeout(timeoutId);
 
         if (!response.ok) {
-          // Log the response for debugging
           const errorText = await response.text();
           console.error("API Error Response:", errorText);
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -232,18 +180,16 @@ const ProductDetailRelatedProducts: React.FC<
 
         const data = await response.json();
 
-        // Handle the case where API returns error but with 200 status
         if (data.error) {
           console.warn("API returned error:", data.error);
           setRelatedProducts(data.products || []);
-          setError(null); // Don't show error if we got some products
+          setError(null);
         } else {
           setRelatedProducts(data.products || []);
         }
       } catch (err) {
         console.error("Error fetching related products:", err);
 
-        // Set specific error messages based on error type
         if (err instanceof Error) {
           if (err.name === "AbortError") {
             setError("Request timeout - please try again");
@@ -256,7 +202,6 @@ const ProductDetailRelatedProducts: React.FC<
           setError("Failed to load related products");
         }
 
-        // Always ensure we have an empty array on error
         setRelatedProducts([]);
       } finally {
         setLoading(false);
@@ -266,33 +211,57 @@ const ProductDetailRelatedProducts: React.FC<
     fetchRelatedProducts();
   }, [productId, category, subcategory]);
 
-  // Always render the container - matches Flutter behavior
   return (
-    <div
-      className={`w-full shadow-sm border-b ${
-        isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-100"
-      }`}
-    >
-      <div className={`${isMobile ? "px-4 py-4" : "p-4"}`}>
-        {/* Header - always show */}
-        <h3
-          className={`text-lg font-semibold mb-1 ${
-            isDarkMode ? "text-white" : "text-gray-900"
-          }`}
-        >
-          Related Products
-        </h3>
+    <div className={`rounded-2xl p-6 border shadow-sm ${
+      isDarkMode 
+        ? "bg-gray-800 border-gray-700" 
+        : "bg-white border-gray-200"
+    }`}>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-xl ${
+              isDarkMode 
+                ? "bg-orange-900/20 text-orange-400" 
+                : "bg-orange-100 text-orange-600"
+            }`}>
+              <Shuffle className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className={`text-xl font-bold ${
+                isDarkMode ? "text-white" : "text-gray-900"
+              }`}>
+                You Might Also Like
+              </h3>
+              <p className={`text-sm ${
+                isDarkMode ? "text-gray-400" : "text-gray-600"
+              }`}>
+                Similar products customers viewed
+              </p>
+            </div>
+          </div>
+          
+          {relatedProducts.length > 4 && (
+            <div className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${
+              isDarkMode ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gray-600"
+            }`}>
+              <Shuffle className="w-3 h-3" />
+              {relatedProducts.length} items
+            </div>
+          )}
+        </div>
 
-        {/* Products horizontal scroll with navigation - FIXED HEIGHT */}
+        {/* Products container with fixed height */}
         <div className="relative group">
           {/* Left scroll button - hide on mobile for cleaner look */}
           {!isMobile && canScrollLeft && (
             <button
               onClick={scrollLeft}
-              className={`absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 shadow-lg rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-110 ${
+              className={`absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 shadow-xl rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-110 ${
                 isDarkMode
-                  ? "bg-gray-700 text-gray-300 hover:text-orange-400"
-                  : "bg-white text-gray-600 hover:text-orange-600"
+                  ? "bg-gray-700 text-gray-300 hover:text-orange-400 border border-gray-600"
+                  : "bg-white text-gray-600 hover:text-orange-600 border border-gray-200"
               }`}
             >
               <ChevronLeft className="w-5 h-5" />
@@ -303,110 +272,94 @@ const ProductDetailRelatedProducts: React.FC<
           {!isMobile && canScrollRight && (
             <button
               onClick={scrollRight}
-              className={`absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 shadow-lg rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-110 ${
+              className={`absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 shadow-xl rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-110 ${
                 isDarkMode
-                  ? "bg-gray-700 text-gray-300 hover:text-orange-400"
-                  : "bg-white text-gray-600 hover:text-orange-600"
+                  ? "bg-gray-700 text-gray-300 hover:text-orange-400 border border-gray-600"
+                  : "bg-white text-gray-600 hover:text-orange-600 border border-gray-200"
               }`}
             >
               <ChevronRight className="w-5 h-5" />
             </button>
           )}
 
-          {/* Products container with FIXED HEIGHT - no vertical scrolling */}
+          {/* Products container */}
           <div
-            className={`overflow-hidden ${isMobile ? "-mx-2" : ""}`}
+            className="overflow-hidden"
             style={{
-              height: `${listViewHeight}px`, // Fixed height based on calculated dimensions
-              minHeight: `${listViewHeight}px`, // Ensure minimum height
-              maxHeight: `${listViewHeight}px`, // Prevent expansion
+              height: `${listViewHeight}px`,
+              minHeight: `${listViewHeight}px`,
+              maxHeight: `${listViewHeight}px`,
             }}
           >
             {isLoading || loading ? (
-              // Show loading skeleton
               <LoadingSkeleton
-                listViewHeight={listViewHeight}
-                cardWidth={cardWidth}
+                cardCount={cardCount}
                 isDarkMode={isDarkMode}
-                isMobile={isMobile}
               />
             ) : relatedProducts.length > 0 ? (
-              // Show actual products with proper spacing and consistent gaps
               <div
                 ref={scrollContainerRef}
-                className={`flex overflow-x-auto h-full scroll-smooth ${
-                  isMobile ? "gap-0" : "gap-0"
-                }`}
+                className="flex gap-4 overflow-x-auto h-full scroll-smooth [&::-webkit-scrollbar]:hidden"
                 style={{
                   scrollbarWidth: "none",
                   msOverflowStyle: "none",
-                  paddingBottom: "0", // Remove bottom padding to prevent vertical scroll
-                  paddingLeft: isMobile ? "8px" : "0", // Small left padding on mobile to bring first card closer
+                  paddingBottom: "0",
+                  paddingLeft: isMobile ? "4px" : "0",
                 }}
               >
-                {/* Hide scrollbar for webkit browsers */}
-                <style jsx>{`
-                  div::-webkit-scrollbar {
-                    display: none;
-                  }
-                `}</style>
-
                 {relatedProducts.map((product, index) => (
                   <div
                     key={`${product.id}-${index}`}
                     className="flex-shrink-0"
                     style={{
-                      width: `${cardWidth}px`, // Dynamic width based on device
-                      minWidth: `${cardWidth}px`, // Prevent shrinking
-                      height: "fit-content", // Let the card determine its own height
+                      width: `${cardWidth}px`,
+                      minWidth: `${cardWidth}px`,
                     }}
                   >
                     <ProductCard
                       product={product}
-                      scaleFactor={scaleFactor}
-                      internalScaleFactor={internalScaleFactor}
+                      scaleFactor={0.85}
+                      internalScaleFactor={1.1}
                       showCartIcon={true}
                       showExtraLabels={false}
                       onFavoriteToggle={(productId) => {
                         console.log("Toggle favorite for:", productId);
-                        // Implement favorite toggle logic
                       }}
                       onAddToCart={(productId) => {
                         console.log("Add to cart:", productId);
-                        // Implement add to cart logic
                       }}
                     />
                   </div>
                 ))}
               </div>
             ) : error ? (
-              // Show error state but keep container
               <div className="flex items-center justify-center h-full">
-                <div
-                  className={`text-center ${
-                    isDarkMode ? "text-gray-400" : "text-gray-500"
-                  }`}
-                >
-                  <p className="text-sm">{error}</p>
+                <div className={`text-center space-y-3 ${
+                  isDarkMode ? "text-gray-400" : "text-gray-500"
+                }`}>
+                  <Shuffle className={`w-12 h-12 mx-auto ${
+                    isDarkMode ? "text-gray-600" : "text-gray-400"
+                  }`} />
+                  <div>
+                    <p className="font-medium">No related products found</p>
+                    <p className="text-sm">{error}</p>
+                  </div>
                   <button
                     onClick={() => window.location.reload()}
-                    className={`mt-2 text-sm underline transition-colors ${
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                       isDarkMode
-                        ? "text-blue-400 hover:text-blue-300"
-                        : "text-blue-500 hover:text-blue-600"
+                        ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                     }`}
                   >
-                    Try again
+                    Try Again
                   </button>
                 </div>
               </div>
             ) : (
-              // Show shimmer when no products (matches Flutter behavior)
               <LoadingSkeleton
-                listViewHeight={listViewHeight}
-                cardWidth={cardWidth}
+                cardCount={cardCount}
                 isDarkMode={isDarkMode}
-                isMobile={isMobile}
               />
             )}
           </div>
