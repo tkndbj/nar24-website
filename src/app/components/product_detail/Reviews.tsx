@@ -69,7 +69,7 @@ const FullScreenImageModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
   isDarkMode?: boolean;
-}> = ({ imageUrl, isOpen, onClose, isDarkMode = false }) => {
+}> = ({ imageUrl, isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return (

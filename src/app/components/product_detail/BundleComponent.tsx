@@ -216,7 +216,7 @@ const BundleComponent: React.FC<BundleComponentProps> = ({
 
         {/* Bundle Products List */}
         <div className="grid gap-4 sm:grid-cols-1 lg:grid-cols-2">
-          {bundles.map((bundleData, index) => (
+          {bundles.map((bundleData) => (
             <BundleProductCard
               key={`${bundleData.bundleId}-${bundleData.product.id}`}
               bundleData={bundleData}

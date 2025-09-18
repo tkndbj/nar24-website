@@ -23,31 +23,6 @@ interface RotatingCountTextProps {
   isDarkMode?: boolean;
 }
 
-const hasSelectableOptions = (product: Product | null): boolean => {
-  if (!product) return false;
-
-  const hasColors = Object.keys(product.colorImages || {}).length > 0;
-  if (hasColors) return true;
-
-  const selectableAttrs = Object.entries(product.attributes || {}).filter(([, value]) => {
-    let options: string[] = [];
-
-    if (Array.isArray(value)) {
-      options = value
-        .map(item => item.toString())
-        .filter(item => item.trim() !== '');
-    } else if (typeof value === 'string' && value.trim() !== '') {
-      options = value
-        .split(',')
-        .map(item => item.trim())
-        .filter(item => item !== '');
-    }
-
-    return options.length > 1;
-  });
-
-  return selectableAttrs.length > 0;
-};
 
 const RotatingCountText: React.FC<RotatingCountTextProps> = ({
   cartCount,
@@ -235,7 +210,7 @@ const ProductDetailActionsRow: React.FC<ProductDetailActionsRowProps> = ({
   isDarkMode = false,
 }) => {
   const { addToFavorites, isFavorite: isProductFavorite } = useFavorites();
-  const { user } = useUser();
+  
 
   const [showOptionSelector, setShowOptionSelector] = useState(false);
   const [, setFavoriteButtonState] = useState<'idle' | 'adding' | 'added' | 'removing' | 'removed'>('idle');
