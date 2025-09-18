@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Heart, Star, StarHalf, Shield, Truck, Award} from "lucide-react";
 import { useFavorites } from "@/context/FavoritesProvider";
-import { useUser } from "@/context/UserProvider";
+
 import ProductOptionSelector from "@/app/components/ProductOptionSelector";
 import { Product } from "@/app/models/Product";
 
