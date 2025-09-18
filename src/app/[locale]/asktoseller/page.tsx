@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, Star, Store, User, ShoppingBag } from "lucide-react";
 import { useUser } from "@/context/UserProvider";
 import { useTranslations } from "next-intl";
@@ -22,21 +22,28 @@ interface ProductInfo {
   currency: string;
 }
 
-interface AskToSellerPageProps {
-  localization?: ReturnType<typeof useTranslations>;
+// ✅ FIXED: Proper Next.js App Router page props interface
+interface PageProps {
+  params: {
+    locale: string;
+  };
+  searchParams: {
+    productId?: string;
+    sellerId?: string;
+    isShop?: string;
+  };
 }
 
-const AskToSellerPage: React.FC<AskToSellerPageProps> = ({ localization }) => {
+// ✅ FIXED: Main page component with correct Next.js structure
+const AskToSellerPage: React.FC<PageProps> = ({ params, searchParams }) => {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { user } = useUser();
+
+  // ✅ Get translations using the locale from params
+  const localization = useTranslations();
 
   // ✅ FIXED: Proper nested translation function that uses JSON files
   const t = useCallback((key: string) => {
-    if (!localization) {
-      return key;
-    }
-
     try {
       // Try to get the nested AskToSellerPage translation
       const translation = localization(`AskToSellerPage.${key}`);
@@ -60,10 +67,10 @@ const AskToSellerPage: React.FC<AskToSellerPageProps> = ({ localization }) => {
     }
   }, [localization]);
 
-  // URL parameters
-  const productId = searchParams?.get("productId") || "";
-  const sellerId = searchParams?.get("sellerId") || "";
-  const isShop = searchParams?.get("isShop") === "true";
+  // ✅ FIXED: Get URL parameters from searchParams prop instead of useSearchParams hook
+  const productId = searchParams?.productId || "";
+  const sellerId = searchParams?.sellerId || "";
+  const isShop = searchParams?.isShop === "true";
 
   // Debug log to see what parameters we're getting
   useEffect(() => {
@@ -71,7 +78,7 @@ const AskToSellerPage: React.FC<AskToSellerPageProps> = ({ localization }) => {
       productId,
       sellerId,
       isShop,
-      allParams: Object.fromEntries(searchParams?.entries() || [])
+      allParams: searchParams
     });
   }, [productId, sellerId, isShop, searchParams]);
 
