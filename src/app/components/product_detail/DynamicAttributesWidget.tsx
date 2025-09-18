@@ -29,14 +29,14 @@ const AttributeCard: React.FC<AttributeCardProps> = ({
   icon,
   isDarkMode = false 
 }) => (
-  <div className={`group relative overflow-hidden rounded-lg p-3 border transition-all duration-200 hover:shadow-md hover:scale-[1.01] ${
+  <div className={`group relative overflow-hidden rounded-lg sm:rounded-lg p-2 sm:p-3 border transition-all duration-200 hover:shadow-md hover:scale-[1.01] ${
     isDarkMode 
       ? "bg-gradient-to-br from-gray-800 to-gray-850 border-gray-700 hover:border-orange-500" 
       : "bg-gradient-to-br from-white to-gray-50 border-gray-200 hover:border-orange-300"
   }`}>
-    <div className="flex items-start gap-2">
+    <div className="flex items-start gap-1.5 sm:gap-2">
       {icon && (
-        <div className={`mt-0.5 p-1.5 rounded transition-colors ${
+        <div className={`mt-0.5 p-1 sm:p-1.5 rounded transition-colors ${
           isDarkMode 
             ? "bg-orange-900/20 text-orange-400 group-hover:bg-orange-900/30" 
             : "bg-orange-100 text-orange-600 group-hover:bg-orange-200"
@@ -46,12 +46,12 @@ const AttributeCard: React.FC<AttributeCardProps> = ({
       )}
       
       <div className="flex-1 min-w-0">
-        <h4 className={`text-xs font-medium mb-0.5 ${
+        <h4 className={`text-xs sm:text-xs font-medium mb-0.5 ${
           isDarkMode ? "text-gray-400" : "text-gray-600"
         }`}>
           {title}
         </h4>
-        <p className={`text-sm font-medium break-words leading-tight ${
+        <p className={`text-xs sm:text-sm font-medium break-words leading-tight ${
           isDarkMode ? "text-white" : "text-gray-900"
         }`}>
           {value}
@@ -70,15 +70,15 @@ const LoadingSkeleton: React.FC<{ isDarkMode?: boolean }> = ({
   isDarkMode = false 
 }) => (
   <div className="space-y-3">
-    <div className={`w-32 h-5 rounded animate-pulse ${
+    <div className={`w-24 sm:w-32 h-4 sm:h-5 rounded animate-pulse ${
       isDarkMode ? "bg-gray-700" : "bg-gray-200"
     }`} />
 
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
       {Array.from({ length: 6 }).map((_, i) => (
         <div
           key={i}
-          className={`h-16 rounded-lg animate-pulse ${
+          className={`h-14 sm:h-16 rounded-lg animate-pulse ${
             isDarkMode ? "bg-gray-700" : "bg-gray-200"
           }`}
         />
@@ -96,7 +96,7 @@ const DynamicAttributesWidget: React.FC<DynamicAttributesWidgetProps> = ({
 
   // Get icon for attribute key
   const getAttributeIcon = (key: string): React.ReactNode => {
-    const iconSize = "w-3.5 h-3.5";
+    const iconSize = "w-3 h-3 sm:w-3.5 sm:h-3.5";
     const lowerKey = key.toLowerCase();
     
     // Map attribute keys to icons
@@ -198,10 +198,10 @@ const DynamicAttributesWidget: React.FC<DynamicAttributesWidgetProps> = ({
 
   if (isLoading || !product) {
     return (
-      <div className={`rounded-xl p-5 border ${
+      <div className={`rounded-none sm:rounded-xl p-3 sm:p-5 border-0 sm:border ${
         isDarkMode 
-          ? "bg-gray-800 border-gray-700" 
-          : "bg-white border-gray-200"
+          ? "bg-gray-800 sm:border-gray-700" 
+          : "bg-white sm:border-gray-200"
       }`}>
         <LoadingSkeleton isDarkMode={isDarkMode} />
       </div>
@@ -213,30 +213,30 @@ const DynamicAttributesWidget: React.FC<DynamicAttributesWidgetProps> = ({
   }
 
   return (
-    <div className={`rounded-xl p-5 border shadow-sm ${
+    <div className={`rounded-none sm:rounded-xl p-3 sm:p-5 border-0 sm:border sm:shadow-sm ${
       isDarkMode 
-        ? "bg-gray-800 border-gray-700" 
-        : "bg-white border-gray-200"
+        ? "bg-gray-800 sm:border-gray-700" 
+        : "bg-white sm:border-gray-200"
     }`}>
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         {/* Header */}
         <div className="flex items-center gap-2">
-          <div className={`p-1.5 rounded-lg ${
+          <div className={`p-1 sm:p-1.5 rounded-lg ${
             isDarkMode 
               ? "bg-orange-900/20 text-orange-400" 
               : "bg-orange-100 text-orange-600"
           }`}>
-            <Package className="w-4 h-4" />
+            <Package className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </div>
-          <h3 className={`text-lg font-bold ${
+          <h3 className={`text-base sm:text-lg font-bold ${
             isDarkMode ? "text-white" : "text-gray-900"
           }`}>
             {t("DynamicAttributesWidget.title") || t("productDetails") || "Product Details"}
           </h3>
         </div>
 
-        {/* Attributes grid - more compact spacing */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {/* Attributes grid - more compact spacing on mobile */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
           {formattedAttributes.map((attr, index) => (
             <AttributeCard 
               key={`${attr.title}-${index}`} 

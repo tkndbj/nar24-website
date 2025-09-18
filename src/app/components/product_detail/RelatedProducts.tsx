@@ -19,37 +19,37 @@ const LoadingSkeleton: React.FC<{
   cardCount: number;
   isDarkMode?: boolean;
 }> = ({ cardCount, isDarkMode = false }) => (
-  <div className="flex gap-4 overflow-hidden">
+  <div className="flex gap-3 sm:gap-4 overflow-hidden">
     {Array.from({ length: cardCount }).map((_, i) => (
       <div
         key={i}
-        className={`flex-shrink-0 w-60 rounded-2xl animate-pulse ${
+        className={`flex-shrink-0 w-48 sm:w-60 rounded-xl sm:rounded-2xl animate-pulse ${
           isDarkMode ? "bg-gray-700" : "bg-gray-200"
         }`}
-        style={{ height: "300px" }}
+        style={{ height: "280px" }}
       >
-        <div className="p-4 space-y-3 h-full flex flex-col">
+        <div className="p-3 sm:p-4 space-y-2 sm:space-y-3 h-full flex flex-col">
           {/* Image placeholder */}
           <div
-            className={`flex-1 rounded-xl ${
+            className={`flex-1 rounded-lg sm:rounded-xl ${
               isDarkMode ? "bg-gray-600" : "bg-gray-300"
             }`}
           />
 
           {/* Text placeholders */}
-          <div className="space-y-2">
+          <div className="space-y-1.5 sm:space-y-2">
             <div
-              className={`h-3 rounded w-full ${
+              className={`h-2.5 sm:h-3 rounded w-full ${
                 isDarkMode ? "bg-gray-600" : "bg-gray-300"
               }`}
             />
             <div
-              className={`h-3 rounded w-3/4 ${
+              className={`h-2.5 sm:h-3 rounded w-3/4 ${
                 isDarkMode ? "bg-gray-600" : "bg-gray-300"
               }`}
             />
             <div
-              className={`h-4 rounded w-1/2 ${
+              className={`h-3 sm:h-4 rounded w-1/2 ${
                 isDarkMode ? "bg-gray-600" : "bg-gray-300"
               }`}
             />
@@ -131,8 +131,8 @@ const ProductDetailRelatedProducts: React.FC<ProductDetailRelatedProductsProps> 
     const mobile = screenWidth < 768;
     
     return {
-      listViewHeight: mobile ? 350 : 400,
-      cardWidth: mobile ? 200 : 240,
+      listViewHeight: mobile ? 320 : 400,
+      cardWidth: mobile ? 180 : 240,
       cardCount: mobile ? 3 : 6,
       gap: mobile ? 12 : 16,
     };
@@ -244,29 +244,29 @@ const ProductDetailRelatedProducts: React.FC<ProductDetailRelatedProductsProps> 
   }, [productId, category, subcategory, t]);
 
   return (
-    <div className={`rounded-2xl p-6 border shadow-sm ${
+    <div className={`rounded-none sm:rounded-2xl p-4 sm:p-6 border-0 sm:border sm:shadow-sm ${
       isDarkMode 
-        ? "bg-gray-800 border-gray-700" 
-        : "bg-white border-gray-200"
+        ? "bg-gray-800 sm:border-gray-700" 
+        : "bg-white sm:border-gray-200"
     }`}>
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         {/* Header */}
         <div className="flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-xl ${
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className={`p-1.5 sm:p-2 rounded-lg sm:rounded-xl ${
               isDarkMode 
                 ? "bg-orange-900/20 text-orange-400" 
                 : "bg-orange-100 text-orange-600"
             }`}>
-              <Shuffle className="w-5 h-5" />
+              <Shuffle className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
-              <h3 className={`text-xl font-bold ${
+              <h3 className={`text-lg sm:text-xl font-bold ${
                 isDarkMode ? "text-white" : "text-gray-900"
               }`}>
                 {t("title")}
               </h3>
-              <p className={`text-sm ${
+              <p className={`text-xs sm:text-sm ${
                 isDarkMode ? "text-gray-400" : "text-gray-600"
               }`}>
                 {t("subtitle")}
@@ -275,7 +275,7 @@ const ProductDetailRelatedProducts: React.FC<ProductDetailRelatedProductsProps> 
           </div>
           
           {relatedProducts.length > 4 && (
-            <div className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${
+            <div className={`flex items-center gap-1 px-2 sm:px-3 py-1 rounded-full text-xs font-medium ${
               isDarkMode ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gray-600"
             }`}>
               <Shuffle className="w-3 h-3" />
@@ -331,7 +331,7 @@ const ProductDetailRelatedProducts: React.FC<ProductDetailRelatedProductsProps> 
             ) : relatedProducts.length > 0 ? (
               <div
                 ref={scrollContainerRef}
-                className="flex gap-4 overflow-x-auto h-full scroll-smooth [&::-webkit-scrollbar]:hidden"
+                className="flex gap-3 sm:gap-4 overflow-x-auto h-full scroll-smooth [&::-webkit-scrollbar]:hidden"
                 style={{
                   scrollbarWidth: "none",
                   msOverflowStyle: "none",
@@ -350,7 +350,7 @@ const ProductDetailRelatedProducts: React.FC<ProductDetailRelatedProductsProps> 
                   >
                     <ProductCard
                       product={product}
-                      scaleFactor={0.85}
+                      scaleFactor={isMobile ? 0.75 : 0.85}
                       internalScaleFactor={1.1}
                       showCartIcon={true}
                       showExtraLabels={false}
@@ -366,19 +366,19 @@ const ProductDetailRelatedProducts: React.FC<ProductDetailRelatedProductsProps> 
               </div>
             ) : error ? (
               <div className="flex items-center justify-center h-full">
-                <div className={`text-center space-y-3 ${
+                <div className={`text-center space-y-2 sm:space-y-3 ${
                   isDarkMode ? "text-gray-400" : "text-gray-500"
                 }`}>
-                  <Shuffle className={`w-12 h-12 mx-auto ${
+                  <Shuffle className={`w-10 h-10 sm:w-12 sm:h-12 mx-auto ${
                     isDarkMode ? "text-gray-600" : "text-gray-400"
                   }`} />
                   <div>
-                    <p className="font-medium">{t("noRelatedProductsFound")}</p>
-                    <p className="text-sm">{error}</p>
+                    <p className="font-medium text-sm sm:text-base">{t("noRelatedProductsFound")}</p>
+                    <p className="text-xs sm:text-sm">{error}</p>
                   </div>
                   <button
                     onClick={() => window.location.reload()}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors ${
                       isDarkMode
                         ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
                         : "bg-gray-100 text-gray-700 hover:bg-gray-200"

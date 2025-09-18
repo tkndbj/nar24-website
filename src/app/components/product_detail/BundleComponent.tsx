@@ -62,15 +62,15 @@ const BundleProductCard: React.FC<BundleProductCardProps> = ({
   return (
     <div
       onClick={onClick}
-      className={`group relative overflow-hidden rounded-2xl border cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-xl ${
+      className={`group relative overflow-hidden rounded-2xl sm:rounded-none border cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-xl ${
         isDarkMode
           ? 'bg-gradient-to-br from-gray-700 to-gray-800 border-gray-600 hover:border-orange-500'
           : 'bg-gradient-to-br from-white to-gray-50 border-gray-200 hover:border-orange-300'
       }`}
     >
-      <div className="flex p-4">
+      <div className="flex p-3 sm:p-4">
         {/* Product Image */}
-        <div className="relative w-24 h-24 flex-shrink-0">
+        <div className="relative w-20 h-20 sm:w-24 sm:h-24 flex-shrink-0">
           <div className="w-full h-full rounded-xl overflow-hidden bg-gray-100">
             {product.imageUrls.length > 0 && !imageError ? (
               <Image
@@ -84,7 +84,7 @@ const BundleProductCard: React.FC<BundleProductCardProps> = ({
               <div className={`w-full h-full flex items-center justify-center ${
                 isDarkMode ? 'bg-gray-600' : 'bg-gray-200'
               }`}>
-                <Package className={`w-8 h-8 ${
+                <Package className={`w-6 h-6 sm:w-8 sm:h-8 ${
                   isDarkMode ? 'text-gray-500' : 'text-gray-400'
                 }`} />
               </div>
@@ -92,7 +92,7 @@ const BundleProductCard: React.FC<BundleProductCardProps> = ({
           </div>
 
           {/* Discount Badge */}
-          <div className="absolute -top-2 -right-2 px-2 py-1 bg-gradient-to-r from-green-600 to-green-700 rounded-lg shadow-lg">
+          <div className="absolute -top-2 -right-2 px-1.5 py-0.5 sm:px-2 sm:py-1 bg-gradient-to-r from-green-600 to-green-700 rounded-lg shadow-lg">
             <span className="text-xs font-bold text-white">
               -{discountPercentage.toFixed(0)}%
             </span>
@@ -100,11 +100,11 @@ const BundleProductCard: React.FC<BundleProductCardProps> = ({
         </div>
 
         {/* Product Details */}
-        <div className="flex-1 ml-4 flex flex-col justify-center">
+        <div className="flex-1 ml-3 sm:ml-4 flex flex-col justify-center">
           {/* Product Type Badge */}
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
             {isMainProduct && (
-              <div className={`px-2 py-0.5 rounded-md text-xs font-semibold ${
+              <div className={`px-1.5 py-0.5 sm:px-2 rounded-md text-xs font-semibold ${
                 isDarkMode 
                   ? "bg-orange-900/20 text-orange-400" 
                   : "bg-orange-100 text-orange-600"
@@ -112,7 +112,7 @@ const BundleProductCard: React.FC<BundleProductCardProps> = ({
                 {t("main")}
               </div>
             )}
-            <div className={`px-2 py-0.5 rounded-md text-xs font-medium ${
+            <div className={`px-1.5 py-0.5 sm:px-2 rounded-md text-xs font-medium ${
               isDarkMode 
                 ? "bg-blue-900/20 text-blue-400" 
                 : "bg-blue-100 text-blue-600"
@@ -122,26 +122,26 @@ const BundleProductCard: React.FC<BundleProductCardProps> = ({
           </div>
 
           {/* Product Name */}
-          <h4 className={`text-sm font-semibold mb-2 line-clamp-2 leading-tight group-hover:text-orange-500 transition-colors ${
+          <h4 className={`text-sm sm:text-sm font-semibold mb-1.5 sm:mb-2 line-clamp-2 leading-tight group-hover:text-orange-500 transition-colors ${
             isDarkMode ? 'text-white' : 'text-gray-900'
           }`}>
             {product.productName}
           </h4>
 
           {/* Pricing */}
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="text-lg font-bold text-orange-500">
+          <div className="space-y-0.5 sm:space-y-1">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <span className="text-base sm:text-lg font-bold text-orange-500">
                 {bundlePrice.toFixed(2)} {currency}
               </span>
-              <span className={`text-sm line-through ${
+              <span className={`text-xs sm:text-sm line-through ${
                 isDarkMode ? 'text-gray-400' : 'text-gray-500'
               }`}>
                 {originalPrice.toFixed(2)}
               </span>
             </div>
 
-            <div className="text-sm font-semibold text-green-600">
+            <div className="text-xs sm:text-sm font-semibold text-green-600">
               {t("youSave")} {savings.toFixed(2)} {currency}
             </div>
           </div>
@@ -311,7 +311,7 @@ const BundleComponent: React.FC<BundleComponentProps> = ({
 
   if (isLoading) {
     return (
-      <div className={`rounded-2xl p-6 border shadow-sm ${
+      <div className={`rounded-2xl sm:rounded-none p-4 sm:p-6 border shadow-sm -mx-4 sm:mx-0 ${
         isDarkMode 
           ? "bg-gray-800 border-gray-700" 
           : "bg-white border-gray-200"
@@ -328,31 +328,31 @@ const BundleComponent: React.FC<BundleComponentProps> = ({
   }
 
   return (
-    <div className={`rounded-2xl p-6 border shadow-sm ${
+    <div className={`rounded-2xl sm:rounded-2xl p-4 sm:p-6 border shadow-sm -mx-4 sm:mx-0 ${
       isDarkMode 
         ? "bg-gray-800 border-gray-700" 
         : "bg-white border-gray-200"
     }`}>
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         {/* Header */}
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg">
-            <Sparkles className="w-5 h-5 text-white" />
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="p-1.5 sm:p-2 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg">
+            <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
           </div>
           <div className="flex-1">
-            <h3 className={`text-xl font-bold ${
+            <h3 className={`text-lg sm:text-xl font-bold ${
               isDarkMode ? 'text-white' : 'text-gray-900'
             }`}>
               {t("title")}
             </h3>
-            <p className={`text-sm ${
+            <p className={`text-xs sm:text-sm ${
               isDarkMode ? 'text-gray-400' : 'text-gray-600'
             }`}>
               {t("subtitle")}
             </p>
           </div>
           
-          <div className={`flex items-center gap-1 px-3 py-1 rounded-full ${
+          <div className={`flex items-center gap-1 px-2 py-1 sm:px-3 rounded-full ${
             isDarkMode ? "bg-green-900/20 text-green-400 border border-green-800" : "bg-green-50 text-green-700 border border-green-200"
           }`}>
             <ShoppingBag className="w-3 h-3" />
@@ -361,7 +361,7 @@ const BundleComponent: React.FC<BundleComponentProps> = ({
         </div>
 
         {/* Bundle Products List */}
-        <div className="grid gap-4 sm:grid-cols-1 lg:grid-cols-2">
+        <div className="grid gap-3 sm:gap-4 sm:grid-cols-1 lg:grid-cols-2">
           {bundles.map((bundleData) => (
             <BundleProductCard
               key={`${bundleData.bundleId}-${bundleData.product.id}`}

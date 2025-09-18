@@ -164,23 +164,23 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
 
   return (
     <>
-      <div className={`group min-w-80 w-80 rounded-2xl p-5 border transition-all duration-300 hover:shadow-lg hover:scale-[1.02] ${
+      <div className={`group min-w-72 w-72 sm:min-w-80 sm:w-80 rounded-2xl sm:rounded-none p-4 sm:p-5 border transition-all duration-300 hover:shadow-lg hover:scale-[1.02] ${
         isDarkMode 
           ? "bg-gradient-to-br from-gray-800 to-gray-850 border-gray-700 hover:border-orange-500" 
           : "bg-gradient-to-br from-white to-gray-50 border-gray-200 hover:border-orange-300"
       }`}>
         {/* Header with rating, date, and verified badge */}
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <StarRating rating={review.rating} />
-            <span className={`text-sm font-medium ${
+        <div className="flex items-start justify-between mb-3 sm:mb-4">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <StarRating rating={review.rating} size={14} />
+            <span className={`text-xs sm:text-sm font-medium ${
               isDarkMode ? "text-gray-400" : "text-gray-500"
             }`}>
               {formatDate(review.timestamp)}
             </span>
           </div>
           
-          <div className={`flex items-center gap-1 px-3 py-1 rounded-full ${
+          <div className={`flex items-center gap-1 px-2 py-0.5 sm:px-3 sm:py-1 rounded-full ${
             isDarkMode ? "bg-green-900/20 text-green-400 border border-green-800" : "bg-green-50 text-green-700 border border-green-200"
           }`}>
             <Shield className="w-3 h-3" />
@@ -190,24 +190,24 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
 
         {/* Review images */}
         {review.imageUrls.length > 0 && (
-          <div className="flex gap-2 mb-4 overflow-x-auto">
+          <div className="flex gap-1.5 sm:gap-2 mb-3 sm:mb-4 overflow-x-auto">
             {review.imageUrls.slice(0, 4).map((imageUrl, index) => (
               <div
                 key={index}
-                className="flex-shrink-0 w-16 h-16 rounded-xl overflow-hidden cursor-pointer hover:opacity-80 transition-all duration-200 hover:scale-105"
+                className="flex-shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden cursor-pointer hover:opacity-80 transition-all duration-200 hover:scale-105"
                 onClick={() => handleImageClick(imageUrl)}
               >
                 <Image
                   src={imageUrl}
                   alt={`${t("reviewImage")} ${index + 1}`}
-                  width={64}
-                  height={64}
+                  width={56}
+                  height={56}
                   className="w-full h-full object-cover"
                 />
               </div>
             ))}
             {review.imageUrls.length > 4 && (
-              <div className={`flex-shrink-0 w-16 h-16 rounded-xl flex items-center justify-center border-2 border-dashed cursor-pointer hover:scale-105 transition-transform ${
+              <div className={`flex-shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-xl flex items-center justify-center border-2 border-dashed cursor-pointer hover:scale-105 transition-transform ${
                 isDarkMode ? "border-gray-600 text-gray-400" : "border-gray-300 text-gray-500"
               }`}>
                 <span className="text-xs font-medium">+{review.imageUrls.length - 4}</span>
@@ -217,8 +217,8 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
         )}
 
         {/* Review text */}
-        <div className="mb-4">
-          <p className={`text-sm leading-relaxed ${isLongReview ? 'line-clamp-4' : ''} ${
+        <div className="mb-3 sm:mb-4">
+          <p className={`text-xs sm:text-sm leading-relaxed ${isLongReview ? 'line-clamp-4' : ''} ${
             isDarkMode ? "text-gray-300" : "text-gray-700"
           }`}>
             {isTranslated ? translatedText : review.review}
@@ -227,29 +227,31 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
 
         {/* Actions */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             {/* Translation button */}
             <button
               onClick={handleTranslate}
               disabled={isTranslating}
-              className={`flex items-center gap-2 px-3 py-1 rounded-lg text-xs font-medium transition-all duration-200 hover:scale-105 ${
+              className={`flex items-center gap-1.5 px-2 py-1 sm:px-3 rounded-lg text-xs font-medium transition-all duration-200 hover:scale-105 ${
                 isDarkMode
                   ? "bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-orange-400"
                   : "bg-gray-100 text-gray-600 hover:bg-orange-50 hover:text-orange-600"
               }`}
             >
               <Languages className="w-3 h-3" />
-              {isTranslating
-                ? t("translating")
-                : isTranslated
-                ? t("original")
-                : t("translate")}
+              <span className="hidden sm:inline">
+                {isTranslating
+                  ? t("translating")
+                  : isTranslated
+                  ? t("original")
+                  : t("translate")}
+              </span>
             </button>
 
             {/* Like button */}
             <button
               onClick={() => onLike(review.id)}
-              className={`flex items-center gap-2 px-3 py-1 rounded-lg text-xs font-medium transition-all duration-200 hover:scale-105 ${
+              className={`flex items-center gap-1.5 px-2 py-1 sm:px-3 rounded-lg text-xs font-medium transition-all duration-200 hover:scale-105 ${
                 isLiked
                   ? "bg-blue-50 text-blue-600 border border-blue-200"
                   : isDarkMode
@@ -290,33 +292,33 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
 const LoadingSkeleton: React.FC<{ isDarkMode?: boolean }> = ({ 
   isDarkMode = false 
 }) => (
-  <div className={`rounded-2xl p-6 border shadow-sm ${
+  <div className={`rounded-2xl sm:rounded-none p-4 sm:p-6 border shadow-sm -mx-4 sm:mx-0 ${
     isDarkMode 
       ? "bg-gray-800 border-gray-700" 
       : "bg-white border-gray-200"
   }`}>
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header skeleton */}
       <div className="flex justify-between items-center">
-        <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-xl animate-pulse ${
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl animate-pulse ${
             isDarkMode ? "bg-gray-700" : "bg-gray-200"
           }`} />
-          <div className={`w-32 h-6 rounded animate-pulse ${
+          <div className={`w-24 sm:w-32 h-5 sm:h-6 rounded animate-pulse ${
             isDarkMode ? "bg-gray-700" : "bg-gray-200"
           }`} />
         </div>
-        <div className={`w-24 h-8 rounded-xl animate-pulse ${
+        <div className={`w-20 h-6 sm:w-24 sm:h-8 rounded-xl animate-pulse ${
           isDarkMode ? "bg-gray-700" : "bg-gray-200"
         }`} />
       </div>
 
       {/* Reviews skeleton */}
-      <div className="flex gap-4 overflow-hidden">
+      <div className="flex gap-3 sm:gap-4 overflow-hidden">
         {Array.from({ length: 2 }).map((_, i) => (
           <div
             key={i}
-            className={`min-w-80 w-80 h-48 rounded-2xl animate-pulse ${
+            className={`min-w-72 w-72 sm:min-w-80 sm:w-80 h-40 sm:h-48 rounded-2xl sm:rounded-none animate-pulse ${
               isDarkMode ? "bg-gray-700" : "bg-gray-200"
             }`}
           />
@@ -379,13 +381,13 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
 
   const scrollLeft = useCallback(() => {
     if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollBy({ left: -350, behavior: "smooth" });
+      scrollContainerRef.current.scrollBy({ left: -300, behavior: "smooth" });
     }
   }, []);
 
   const scrollRight = useCallback(() => {
     if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollBy({ left: 350, behavior: "smooth" });
+      scrollContainerRef.current.scrollBy({ left: 300, behavior: "smooth" });
     }
   }, []);
 
@@ -468,29 +470,29 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
   }
 
   return (
-    <div className={`rounded-2xl p-6 border shadow-sm ${
+    <div className={`rounded-2xl sm:rounded-none p-4 sm:p-6 border shadow-sm -mx-4 sm:mx-0 ${
       isDarkMode 
         ? "bg-gray-800 border-gray-700" 
         : "bg-white border-gray-200"
     }`}>
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         {/* Header */}
         <div className="flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-xl ${
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className={`p-1.5 sm:p-2 rounded-xl ${
               isDarkMode 
                 ? "bg-orange-900/20 text-orange-400" 
                 : "bg-orange-100 text-orange-600"
             }`}>
-              <MessageSquare className="w-5 h-5" />
+              <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
-              <h3 className={`text-xl font-bold ${
+              <h3 className={`text-lg sm:text-xl font-bold ${
                 isDarkMode ? "text-white" : "text-gray-900"
               }`}>
                 {t("title")}
               </h3>
-              <p className={`text-sm ${
+              <p className={`text-xs sm:text-sm ${
                 isDarkMode ? "text-gray-400" : "text-gray-600"
               }`}>
                 {totalReviewCount} {t("verifiedReviews")}
@@ -500,14 +502,16 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
           
           <button
             onClick={handleSeeAllReviews}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm transition-all duration-200 hover:scale-105 ${
+            className={`flex items-center gap-1 sm:gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl font-semibold text-xs sm:text-sm transition-all duration-200 hover:scale-105 ${
               isDarkMode
                 ? "bg-orange-900/20 text-orange-400 hover:bg-orange-900/30 border border-orange-700"
                 : "bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200"
             }`}
           >
-            {t("viewAll")} ({totalReviewCount})
-            <ChevronRight className="w-4 h-4" />
+            <span className="hidden sm:inline">{t("viewAll")}</span>
+            <span className="sm:hidden">{t("all")}</span>
+            <span className="hidden sm:inline">({totalReviewCount})</span>
+            <ChevronRight className="w-3 h-3 sm:w-4 sm:h-4" />
           </button>
         </div>
 
@@ -517,13 +521,13 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
           {canScrollLeft && (
             <button
               onClick={scrollLeft}
-              className={`absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 shadow-xl rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-110 ${
+              className={`absolute left-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 sm:w-10 sm:h-10 shadow-xl rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-110 ${
                 isDarkMode
                   ? "bg-gray-700 text-gray-300 hover:text-orange-400 border border-gray-600"
                   : "bg-white text-gray-600 hover:text-orange-600 border border-gray-200"
               }`}
             >
-              <ChevronLeft className="w-5 h-5" />
+              <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           )}
 
@@ -531,20 +535,20 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
           {canScrollRight && (
             <button
               onClick={scrollRight}
-              className={`absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 shadow-xl rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-110 ${
+              className={`absolute right-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 sm:w-10 sm:h-10 shadow-xl rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-110 ${
                 isDarkMode
                   ? "bg-gray-700 text-gray-300 hover:text-orange-400 border border-gray-600"
                   : "bg-white text-gray-600 hover:text-orange-600 border border-gray-200"
               }`}
             >
-              <ChevronRight className="w-5 h-5" />
+              <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           )}
 
           {/* Scrollable container */}
           <div
             ref={scrollContainerRef}
-            className="flex gap-4 overflow-x-auto scrollbar-hide pb-2 scroll-smooth [&::-webkit-scrollbar]:hidden"
+            className="flex gap-3 sm:gap-4 overflow-x-auto scrollbar-hide pb-2 scroll-smooth [&::-webkit-scrollbar]:hidden"
             style={{
               scrollbarWidth: "none",
               msOverflowStyle: "none",

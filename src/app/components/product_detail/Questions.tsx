@@ -57,20 +57,20 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
   const isLongAnswer = question.answerText.length > 120;
 
   return (
-    <div className={`group min-w-80 w-80 rounded-2xl p-5 border transition-all duration-300 hover:shadow-lg hover:scale-[1.02] ${
+    <div className={`group min-w-80 w-80 rounded-2xl sm:rounded-2xl rounded-none p-4 sm:p-5 border transition-all duration-300 hover:shadow-lg hover:scale-[1.02] ${
       isDarkMode 
         ? "bg-gradient-to-br from-gray-800 to-gray-850 border-gray-700 hover:border-orange-500" 
         : "bg-gradient-to-br from-white to-gray-50 border-gray-200 hover:border-orange-300"
     }`}>
       {/* Header with date and asker */}
-      <div className="flex justify-between items-start mb-4">
+      <div className="flex justify-between items-start mb-3 sm:mb-4">
         <div className="flex items-center gap-2">
-          <div className={`p-1.5 rounded-lg ${
+          <div className={`p-1 sm:p-1.5 rounded-lg ${
             isDarkMode ? "bg-blue-900/20 text-blue-400" : "bg-blue-50 text-blue-600"
           }`}>
-            <User className="w-3 h-3" />
+            <User className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
           </div>
-          <span className={`text-sm font-semibold ${
+          <span className={`text-xs sm:text-sm font-semibold ${
             isDarkMode ? "text-white" : "text-gray-900"
           }`}>
             {displayName}
@@ -85,12 +85,12 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
       </div>
 
       {/* Question section */}
-      <div className="mb-4">
+      <div className="mb-3 sm:mb-4">
         <div className="flex items-start gap-2 mb-2">
-          <HelpCircle className={`w-4 h-4 mt-0.5 flex-shrink-0 ${
+          <HelpCircle className={`w-3.5 h-3.5 sm:w-4 sm:h-4 mt-0.5 flex-shrink-0 ${
             isDarkMode ? "text-orange-400" : "text-orange-600"
           }`} />
-          <p className={`text-sm font-medium leading-relaxed ${
+          <p className={`text-xs sm:text-sm font-medium leading-relaxed ${
             isDarkMode ? "text-gray-300" : "text-gray-700"
           }`}>
             {question.questionText}
@@ -99,32 +99,32 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
       </div>
 
       {/* Answer section */}
-      <div className={`rounded-xl p-4 border ${
+      <div className={`rounded-xl p-3 sm:p-4 border ${
         isDarkMode ? "bg-gray-700/50 border-gray-600" : "bg-gray-50 border-gray-100"
       }`}>
-        <div className="flex gap-3">
+        <div className="flex gap-2 sm:gap-3">
           {/* Seller avatar */}
           <div className="flex-shrink-0">
             {sellerImageUrl ? (
               <Image
                 src={sellerImageUrl}
                 alt={t("seller")}
-                width={32}
-                height={32}
-                className="rounded-full object-cover"
+                width={28}
+                height={28}
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover"
               />
             ) : (
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+              <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center ${
                 isDarkMode ? "bg-orange-900/20 text-orange-400" : "bg-orange-100 text-orange-600"
               }`}>
-                <User className="w-4 h-4" />
+                <User className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
             )}
           </div>
 
           {/* Answer content */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2 mb-1.5 sm:mb-2">
               <span className={`text-xs font-semibold ${
                 isDarkMode ? "text-orange-400" : "text-orange-600"
               }`}>
@@ -140,7 +140,7 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
               </span>
             </div>
             
-            <p className={`text-sm leading-relaxed ${isLongAnswer ? 'line-clamp-3' : ''} ${
+            <p className={`text-xs sm:text-sm leading-relaxed ${isLongAnswer ? 'line-clamp-3' : ''} ${
               isDarkMode ? "text-gray-300" : "text-gray-700"
             }`}>
               {question.answerText}
@@ -168,23 +168,23 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
 const LoadingSkeleton: React.FC<{ isDarkMode?: boolean }> = ({ 
   isDarkMode = false 
 }) => (
-  <div className={`rounded-2xl p-6 border shadow-sm ${
+  <div className={`rounded-2xl sm:rounded-2xl rounded-none p-4 sm:p-6 border shadow-sm ${
     isDarkMode 
       ? "bg-gray-800 border-gray-700" 
       : "bg-white border-gray-200"
   }`}>
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header skeleton */}
       <div className="flex justify-between items-center">
-        <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-xl animate-pulse ${
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl animate-pulse ${
             isDarkMode ? "bg-gray-700" : "bg-gray-200"
           }`} />
-          <div className={`w-40 h-6 rounded animate-pulse ${
+          <div className={`w-32 h-5 sm:w-40 sm:h-6 rounded animate-pulse ${
             isDarkMode ? "bg-gray-700" : "bg-gray-200"
           }`} />
         </div>
-        <div className={`w-24 h-8 rounded-xl animate-pulse ${
+        <div className={`w-20 h-7 sm:w-24 sm:h-8 rounded-xl animate-pulse ${
           isDarkMode ? "bg-gray-700" : "bg-gray-200"
         }`} />
       </div>
@@ -194,7 +194,7 @@ const LoadingSkeleton: React.FC<{ isDarkMode?: boolean }> = ({
         {Array.from({ length: 2 }).map((_, i) => (
           <div
             key={i}
-            className={`min-w-80 w-80 h-56 rounded-2xl animate-pulse ${
+            className={`min-w-80 w-80 h-48 sm:h-56 rounded-2xl sm:rounded-2xl rounded-none animate-pulse ${
               isDarkMode ? "bg-gray-700" : "bg-gray-200"
             }`}
           />
@@ -333,29 +333,29 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
     : sellerInfo?.profileImage;
 
   return (
-    <div className={`rounded-2xl p-6 border shadow-sm ${
+    <div className={`sm:rounded-2xl rounded-none p-4 sm:p-6 border shadow-sm -mx-4 sm:mx-0 ${
       isDarkMode 
         ? "bg-gray-800 border-gray-700" 
         : "bg-white border-gray-200"
     }`}>
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         {/* Header */}
         <div className="flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-xl ${
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className={`p-1.5 sm:p-2 rounded-xl ${
               isDarkMode 
                 ? "bg-orange-900/20 text-orange-400" 
                 : "bg-orange-100 text-orange-600"
             }`}>
-              <MessageCircle className="w-5 h-5" />
+              <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
-              <h3 className={`text-xl font-bold ${
+              <h3 className={`text-lg sm:text-xl font-bold ${
                 isDarkMode ? "text-white" : "text-gray-900"
               }`}>
                 {t("title")}
               </h3>
-              <p className={`text-sm ${
+              <p className={`text-xs sm:text-sm ${
                 isDarkMode ? "text-gray-400" : "text-gray-600"
               }`}>
                 {totalQuestions} {t("answeredQuestions")}
@@ -365,14 +365,14 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
           
           <button
             onClick={handleViewAllQuestions}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm transition-all duration-200 hover:scale-105 ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl font-semibold text-xs sm:text-sm transition-all duration-200 hover:scale-105 ${
               isDarkMode
                 ? "bg-orange-900/20 text-orange-400 hover:bg-orange-900/30 border border-orange-700"
                 : "bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200"
             }`}
           >
             {t("viewAll")} ({totalQuestions})
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
         </div>
 
@@ -382,13 +382,13 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
           {canScrollLeft && (
             <button
               onClick={scrollLeft}
-              className={`absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 shadow-xl rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-110 ${
+              className={`absolute left-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 sm:w-10 sm:h-10 shadow-xl rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-110 ${
                 isDarkMode
                   ? "bg-gray-700 text-gray-300 hover:text-orange-400 border border-gray-600"
                   : "bg-white text-gray-600 hover:text-orange-600 border border-gray-200"
               }`}
             >
-              <ChevronLeft className="w-5 h-5" />
+              <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           )}
 
@@ -396,13 +396,13 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
           {canScrollRight && (
             <button
               onClick={scrollRight}
-              className={`absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 shadow-xl rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-110 ${
+              className={`absolute right-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 sm:w-10 sm:h-10 shadow-xl rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-110 ${
                 isDarkMode
                   ? "bg-gray-700 text-gray-300 hover:text-orange-400 border border-gray-600"
                   : "bg-white text-gray-600 hover:text-orange-600 border border-gray-200"
               }`}
             >
-              <ChevronRight className="w-5 h-5" />
+              <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           )}
 
