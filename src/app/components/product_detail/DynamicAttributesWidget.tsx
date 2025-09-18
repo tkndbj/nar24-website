@@ -1,7 +1,8 @@
 // src/components/productdetail/DynamicAttributesWidget.tsx
 
-import React from "react";
+import React, { useCallback } from "react";
 import { Package, Ruler, Palette, Wrench } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 interface Product {
   attributes: Record<string, unknown>;
@@ -11,6 +12,7 @@ interface DynamicAttributesWidgetProps {
   product: Product | null;
   isLoading?: boolean;
   isDarkMode?: boolean;
+  localization?: ReturnType<typeof useTranslations>;
 }
 
 interface AttributeCardProps {
@@ -84,58 +86,87 @@ const LoadingSkeleton: React.FC<{ isDarkMode?: boolean }> = ({
   </div>
 );
 
-// Enhanced localization function with icons
-const localizeAttribute = (
-  key: string,
-  value: unknown
-): { title: string; localizedValue: string; icon: React.ReactNode } => {
-  const titleMappings: Record<string, { title: string; icon: React.ReactNode }> = {
-    color: { title: "Color", icon: <Palette className="w-4 h-4" /> },
-    size: { title: "Size", icon: <Ruler className="w-4 h-4" /> },
-    material: { title: "Material", icon: <Package className="w-4 h-4" /> },
-    brand: { title: "Brand", icon: <Package className="w-4 h-4" /> },
-    model: { title: "Model", icon: <Wrench className="w-4 h-4" /> },
-    weight: { title: "Weight", icon: <Package className="w-4 h-4" /> },
-    dimensions: { title: "Dimensions", icon: <Ruler className="w-4 h-4" /> },
-    warranty: { title: "Warranty", icon: <Package className="w-4 h-4" /> },
-    origin: { title: "Origin", icon: <Package className="w-4 h-4" /> },
-    category: { title: "Category", icon: <Package className="w-4 h-4" /> },
-    subcategory: { title: "Subcategory", icon: <Package className="w-4 h-4" /> },
-    condition: { title: "Condition", icon: <Package className="w-4 h-4" /> },
-    style: { title: "Style", icon: <Palette className="w-4 h-4" /> },
-    type: { title: "Type", icon: <Package className="w-4 h-4" /> },
-  };
-
-  const mapping = titleMappings[key.toLowerCase()] || {
-    title: key.charAt(0).toUpperCase() + key.slice(1),
-    icon: <Package className="w-4 h-4" />
-  };
-
-  let localizedValue = "";
-  if (value === null || value === undefined) {
-    localizedValue = "";
-  } else if (typeof value === "boolean") {
-    localizedValue = value ? "Yes" : "No";
-  } else if (typeof value === "number") {
-    localizedValue = value.toString();
-  } else if (Array.isArray(value)) {
-    localizedValue = value.join(", ");
-  } else {
-    localizedValue = value.toString();
-  }
-
-  return { 
-    title: mapping.title, 
-    localizedValue, 
-    icon: mapping.icon 
-  };
-};
-
 const DynamicAttributesWidget: React.FC<DynamicAttributesWidgetProps> = ({
   product,
   isLoading = false,
   isDarkMode = false,
+  localization,
 }) => {
+  // ✅ FIXED: Proper nested translation function that uses JSON files
+  const t = useCallback((key: string) => {
+    if (!localization) {
+      return key;
+    }
+
+    try {
+      // Try to get the nested DynamicAttributesWidget translation
+      const translation = localization(`DynamicAttributesWidget.${key}`);
+      
+      // Check if we got a valid translation (not the same as the key we requested)
+      if (translation && translation !== `DynamicAttributesWidget.${key}`) {
+        return translation;
+      }
+      
+      // If nested translation doesn't exist, try direct key
+      const directTranslation = localization(key);
+      if (directTranslation && directTranslation !== key) {
+        return directTranslation;
+      }
+      
+      // Return the key as fallback
+      return key;
+    } catch (error) {
+      console.warn(`Translation error for key: ${key}`, error);
+      return key;
+    }
+  }, [localization]);
+
+  // Enhanced localization function with icons
+  const localizeAttribute = useCallback((
+    key: string,
+    value: unknown
+  ): { title: string; localizedValue: string; icon: React.ReactNode } => {
+    const titleMappings: Record<string, { titleKey: string; icon: React.ReactNode }> = {
+      color: { titleKey: "color", icon: <Palette className="w-4 h-4" /> },
+      size: { titleKey: "size", icon: <Ruler className="w-4 h-4" /> },
+      material: { titleKey: "material", icon: <Package className="w-4 h-4" /> },
+      brand: { titleKey: "brand", icon: <Package className="w-4 h-4" /> },
+      model: { titleKey: "model", icon: <Wrench className="w-4 h-4" /> },
+      weight: { titleKey: "weight", icon: <Package className="w-4 h-4" /> },
+      dimensions: { titleKey: "dimensions", icon: <Ruler className="w-4 h-4" /> },
+      warranty: { titleKey: "warranty", icon: <Package className="w-4 h-4" /> },
+      origin: { titleKey: "origin", icon: <Package className="w-4 h-4" /> },
+      category: { titleKey: "category", icon: <Package className="w-4 h-4" /> },
+      subcategory: { titleKey: "subcategory", icon: <Package className="w-4 h-4" /> },
+      condition: { titleKey: "condition", icon: <Package className="w-4 h-4" /> },
+      style: { titleKey: "style", icon: <Palette className="w-4 h-4" /> },
+      type: { titleKey: "type", icon: <Package className="w-4 h-4" /> },
+    };
+
+    const mapping = titleMappings[key.toLowerCase()];
+    const title = mapping ? t(mapping.titleKey) : key.charAt(0).toUpperCase() + key.slice(1);
+    const icon = mapping ? mapping.icon : <Package className="w-4 h-4" />;
+
+    let localizedValue = "";
+    if (value === null || value === undefined) {
+      localizedValue = "";
+    } else if (typeof value === "boolean") {
+      localizedValue = value ? t("yes") : t("no");
+    } else if (typeof value === "number") {
+      localizedValue = value.toString();
+    } else if (Array.isArray(value)) {
+      localizedValue = value.join(", ");
+    } else {
+      localizedValue = value.toString();
+    }
+
+    return { 
+      title, 
+      localizedValue, 
+      icon 
+    };
+  }, [t]);
+
   if (isLoading || !product) {
     return (
       <div className={`rounded-2xl p-6 border ${
@@ -196,7 +227,7 @@ const DynamicAttributesWidget: React.FC<DynamicAttributesWidgetProps> = ({
           <h3 className={`text-xl font-bold ${
             isDarkMode ? "text-white" : "text-gray-900"
           }`}>
-            Product Specifications
+            {t("title")}
           </h3>
         </div>
 

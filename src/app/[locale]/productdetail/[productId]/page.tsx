@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import {
   ArrowLeft,
   Share2,
@@ -69,7 +70,37 @@ const hasSelectableOptions = (product: Product | null): boolean => {
 
 const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   const router = useRouter();
+  const localization = useTranslations();
   const [productId, setProductId] = useState<string>("");
+
+  // ✅ FIXED: Proper nested translation function that uses JSON files
+  const t = useCallback((key: string) => {
+    if (!localization) {
+      return key;
+    }
+
+    try {
+      // Try to get the nested ProductDetailPage translation
+      const translation = localization(`ProductDetailPage.${key}`);
+      
+      // Check if we got a valid translation (not the same as the key we requested)
+      if (translation && translation !== `ProductDetailPage.${key}`) {
+        return translation;
+      }
+      
+      // If nested translation doesn't exist, try direct key
+      const directTranslation = localization(key);
+      if (directTranslation && directTranslation !== key) {
+        return directTranslation;
+      }
+      
+      // Return the key as fallback
+      return key;
+    } catch (error) {
+      console.warn(`Translation error for key: ${key}`, error);
+      return key;
+    }
+  }, [localization]);
 
   // Cart and user hooks
   const {
@@ -162,7 +193,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         const response = await fetch(`/api/products/${productId}`);
 
         if (!response.ok) {
-          throw new Error("Product not found");
+          throw new Error(t("productNotFound"));
         }
 
         const productData = await response.json();
@@ -173,14 +204,14 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         recordDetailView(parsedProduct);
       } catch (err) {
         console.error("Error fetching product:", err);
-        setError(err instanceof Error ? err.message : "Failed to load product");
+        setError(err instanceof Error ? err.message : t("failedToLoadProduct"));
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchProduct();
-  }, [productId]);
+  }, [productId, t]);
 
   // Analytics recording
   const recordDetailView = useCallback(async (product: Product) => {
@@ -214,7 +245,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
       if (navigator.share && product) {
         await navigator.share({
           title: product.productName,
-          text: `Check out this ${product.productName}`,
+          text: `${t("checkOutThis")} ${product.productName}`,
           url: window.location.href,
         });
       } else {
@@ -223,7 +254,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     } catch (error) {
       console.error("Error sharing:", error);
     }
-  }, [product]);
+  }, [product, t]);
 
   // Favorite toggle
   const handleToggleFavorite = useCallback(async () => {
@@ -387,7 +418,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     if (!product)
       return {
         icon: <ShoppingCart className="w-5 h-5" />,
-        text: "Sepete Ekle",
+        text: t("addToCart"),
       };
 
     const productInCart = isInCart(product.id);
@@ -399,7 +430,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         icon: (
           <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
         ),
-        text: "Ekleniyor...",
+        text: t("adding"),
       };
     }
 
@@ -408,34 +439,34 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         icon: (
           <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
         ),
-        text: "Çıkarılıyor...",
+        text: t("removing"),
       };
     }
 
     if (cartButtonState === "added") {
       return {
         icon: <Check className="w-5 h-5" />,
-        text: "Sepete Eklendi!",
+        text: t("addedToCart"),
       };
     }
 
     if (cartButtonState === "removed") {
       return {
         icon: <Check className="w-5 h-5" />,
-        text: "Sepetten Çıkarıldı!",
+        text: t("removedFromCart"),
       };
     }
 
     if (productInCart) {
       return {
         icon: <Minus className="w-5 h-5" />,
-        text: "Sepetten Çıkar",
+        text: t("removeFromCart"),
       };
     }
 
     return {
       icon: <ShoppingCart className="w-5 h-5" />,
-      text: "Sepete Ekle",
+      text: t("addToCart"),
     };
   }, [
     product,
@@ -443,6 +474,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     isOptimisticallyAdding,
     isOptimisticallyRemoving,
     cartButtonState,
+    t,
   ]);
 
   // 🚀 SIMPLIFIED: Single effect to handle state resets
@@ -548,18 +580,18 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               isDarkMode ? "text-white" : "text-gray-900"
             }`}
           >
-            Product Not Found
+            {t("productNotFound")}
           </h1>
           <p
             className={`mb-4 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}
           >
-            {error || "The product you're looking for doesn't exist."}
+            {error || t("productNotFoundDescription")}
           </p>
           <button
             onClick={() => router.back()}
             className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
           >
-            Go Back
+            {t("goBack")}
           </button>
         </div>
       </div>
@@ -663,7 +695,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                         isDarkMode ? "bg-gray-600" : "bg-gray-300"
                       }`}
                     />
-                    <p>No image available</p>
+                    <p>{t("noImageAvailable")}</p>
                   </div>
                 </div>
               )}
@@ -681,7 +713,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               {/* Best Seller Badge */}
               {product.bestSellerRank && product.bestSellerRank <= 10 && (
                 <div className="absolute top-4 left-4 px-3 py-1 bg-gradient-to-r from-orange-500 to-orange-600 text-white text-sm font-bold rounded-full shadow-lg">
-                  #{product.bestSellerRank} Best Seller
+                  #{product.bestSellerRank} {t("bestSeller")}
                 </div>
               )}
             </div>
@@ -703,7 +735,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                   >
                     <Image
                       src={url}
-                      alt={`Product image ${index + 1}`}
+                      alt={`${t("productImage")} ${index + 1}`}
                       width={80}
                       height={80}
                       className="w-full h-full object-cover"
@@ -753,6 +785,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               onToggleFavorite={handleToggleFavorite}
               isFavorite={isFavorite}
               isDarkMode={isDarkMode}
+              localization={localization}
             />
 
             {/* Action Buttons */}
@@ -804,7 +837,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                 onClick={handleBuyNow}
                 className="flex-1 py-4 px-6 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white rounded-xl font-semibold text-lg transition-all duration-300 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
               >
-                Şimdi Satın Al
+                {t("buyNow")}
               </button>
             </div>
 
@@ -814,10 +847,15 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               sellerName={product.sellerName}
               shopId={product.shopId}
               isDarkMode={isDarkMode}
+              localization={localization}
             />
 
             {/* Product Attributes */}
-            <DynamicAttributesWidget product={product} isDarkMode={isDarkMode} />
+            <DynamicAttributesWidget 
+              product={product} 
+              isDarkMode={isDarkMode}
+              localization={localization}
+            />
           </div>
         </div>
 
@@ -837,16 +875,15 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                   isDarkMode ? "text-white" : "text-gray-900"
                 }`}
               >
-                Product Description
+                {t("productDescription")}
               </h3>
               <p
-  className={`leading-relaxed text-base ${
-    isDarkMode ? "text-gray-300" : "text-gray-700"
-  }`}
->
-  {product.description}
-</p>
-
+                className={`leading-relaxed text-base ${
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                }`}
+              >
+                {product.description}
+              </p>
             </div>
           )}
 
@@ -854,17 +891,20 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
             productId={product.id}
             shopId={product.shopId}
             isDarkMode={isDarkMode}
+            localization={localization}
           />
 
           <BundleComponent
             productId={product.id}
             shopId={product.shopId}
             isDarkMode={isDarkMode}
+            localization={localization}
           />
 
           <ProductDetailReviewsTab
             productId={product.id}
             isDarkMode={isDarkMode}
+            localization={localization}
           />
 
           <ProductQuestionsWidget
@@ -872,6 +912,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
             sellerId={product.shopId || product.userId}
             isShop={!!product.shopId}
             isDarkMode={isDarkMode}
+            localization={localization}
           />
 
           <ProductDetailRelatedProducts
@@ -879,6 +920,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
             category={product.category}
             subcategory={product.subcategory}
             isDarkMode={isDarkMode}
+            localization={localization}
           />
         </div>
 
@@ -891,7 +933,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         initialIndex={currentImageIndex}
         isOpen={showFullScreenViewer}
         onClose={() => setShowFullScreenViewer(false)}
-        isDarkMode={isDarkMode}
+        isDarkMode={isDarkMode}        
       />
 
       {showVideoModal && product.videoUrl && (
@@ -919,19 +961,22 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           isOpen={showCartOptionSelector}
           onClose={handleCartOptionSelectorClose}
           onConfirm={handleCartOptionSelectorConfirm}
+          isDarkMode={isDarkMode}
+          localization={localization}
         />
       )}
 
-<AskToSellerBubble
-  onTap={() => {
-    // Determine seller ID and whether it's a shop
-    const sellerId = product.shopId || product.userId;
-    const isShop = !!product.shopId;
-    
-    router.push(`/asktoseller?productId=${product.id}&sellerId=${sellerId}&isShop=${isShop}`);
-  }}
-  isDarkMode={isDarkMode}
-/>
+      <AskToSellerBubble
+        onTap={() => {
+          // Determine seller ID and whether it's a shop
+          const sellerId = product.shopId || product.userId;
+          const isShop = !!product.shopId;
+          
+          router.push(`/asktoseller?productId=${product.id}&sellerId=${sellerId}&isShop=${isShop}`);
+        }}
+        isDarkMode={isDarkMode}
+        localization={localization}
+      />
     </div>
   );
 };

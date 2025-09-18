@@ -32,6 +32,7 @@ interface ProductOptionSelectorProps {
   onClose: () => void;
   onConfirm: (result: OptionSelectorResult) => void;
   isDarkMode?: boolean;
+  localization?: ReturnType<typeof useTranslations>;
 }
 
 interface ColorThumbProps {
@@ -42,6 +43,7 @@ interface ColorThumbProps {
   onSelect: () => void;
   label?: string;
   isDarkMode?: boolean;
+  t: (key: string) => string;
 }
 
 interface AttributeChipProps {
@@ -59,9 +61,8 @@ const ColorThumb: React.FC<ColorThumbProps> = ({
   onSelect,
   label,
   isDarkMode = false,
+  t,
 }) => {
-  const t = useTranslations();
-
   return (
     <button
       onClick={disabled ? undefined : onSelect}
@@ -79,7 +80,7 @@ const ColorThumb: React.FC<ColorThumbProps> = ({
     >
       <img
         src={imageUrl}
-        alt={label || `Color ${colorKey}`}
+        alt={label || `${t('color')} ${colorKey}`}
         className="w-full h-full object-cover"
         onError={(e) => {
           const target = e.target as HTMLImageElement;
@@ -99,7 +100,7 @@ const ColorThumb: React.FC<ColorThumbProps> = ({
       {disabled && (
         <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center">
           <span className="text-white text-xs font-bold text-center px-1">
-            {t('noStock') || 'No Stock'}
+            {t('noStock')}
           </span>
         </div>
       )}
@@ -144,6 +145,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
   onClose,
   onConfirm,
   isDarkMode = false,
+  localization,
 }) => {
   // Auto-detect dark mode if not provided as prop
   const [detectedDarkMode, setDetectedDarkMode] = React.useState(false);
@@ -165,10 +167,38 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
     }
   }, []);
 
+  // ✅ FIXED: Proper nested translation function that uses JSON files
+  const t = useCallback((key: string) => {
+    if (!localization) {
+      return key;
+    }
+
+    try {
+      // Try to get the nested ProductOptionSelector translation
+      const translation = localization(`ProductOptionSelector.${key}`);
+      
+      // Check if we got a valid translation (not the same as the key we requested)
+      if (translation && translation !== `ProductOptionSelector.${key}`) {
+        return translation;
+      }
+      
+      // If nested translation doesn't exist, try direct key
+      const directTranslation = localization(key);
+      if (directTranslation && directTranslation !== key) {
+        return directTranslation;
+      }
+      
+      // Return the key as fallback
+      return key;
+    } catch (error) {
+      console.warn(`Translation error for key: ${key}`, error);
+      return key;
+    }
+  }, [localization]);
+
   // Use provided isDarkMode prop or auto-detected value
   const actualDarkMode = isDarkMode || detectedDarkMode;
   const { user } = useUser();
-  const t = useTranslations();
   
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
@@ -390,12 +420,8 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
               : 'text-orange-600 dark:text-orange-400'
           }`}>
             {hasDiscount 
-              ? `${t('discountApplied') || 'Discount applied'}: ${discountPercentage}%`
-              : t('localeName') === 'tr' 
-                ? `${discountThreshold} tane alırsan %${discountPercentage} indirim kazanırsın!`
-                : t('localeName') === 'ru'
-                ? `Если купишь ${discountThreshold} штук, получишь скидку ${discountPercentage}%!`
-                : `Buy ${discountThreshold} for ${discountPercentage}% discount!`
+              ? `${t('discountApplied')}: ${discountPercentage}%`
+              : `${t('buyText')} ${discountThreshold} ${t('forDiscount')} ${discountPercentage}%!`
             }
           </p>
         </div>
@@ -409,7 +435,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
     return (
       <div className="mb-6">
         <h3 className="text-center text-orange-500 font-bold text-base mb-3">
-          {t('selectColor') || 'Select Color'}
+          {t('selectColor')}
         </h3>
         <div className="flex overflow-x-auto pb-2 px-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           {/* Default option - only show if main imageUrls exist */}
@@ -424,7 +450,8 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
                 setSelectedColor('default');
                 console.log('ProductOptionSelector - Color selected:', { productId: product.id, selectedColor: 'default' });
               }}
-              label="Default"
+              label={t('default')}
+              t={t}
             />
           )}
           
@@ -444,6 +471,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
                   console.log('ProductOptionSelector - Color selected:', { productId: product.id, selectedColor: colorKey, availableQty: qty });
                 }}
                 label={colorKey}
+                t={t}
               />
             );
           })}
@@ -456,13 +484,13 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
     return (
       <div key={attributeKey} className="mb-6">
         <h3 className="text-center text-orange-500 font-bold text-base mb-3">
-          {AttributeLocalizationUtils.getLocalizedAttributeTitle(attributeKey, t)}
+          {localization ? AttributeLocalizationUtils.getLocalizedAttributeTitle(attributeKey, localization) : attributeKey}
         </h3>
         <div className="flex flex-wrap justify-center">
           {options.map((option) => (
             <AttributeChip
               key={option}
-              label={AttributeLocalizationUtils.getLocalizedSingleValue(attributeKey, option, t)}
+              label={localization ? AttributeLocalizationUtils.getLocalizedSingleValue(attributeKey, option, localization) : option}
               isSelected={selections[attributeKey] === option}
               isDarkMode={actualDarkMode}
               onSelect={() => {
@@ -479,7 +507,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
         </div>
       </div>
     );
-  }, [selections, t, product.id, actualDarkMode]);
+  }, [selections, localization, product.id, actualDarkMode]);
 
   const renderQuantitySelector = useCallback(() => {
     const maxAllowed = getMaxQuantityAllowed();
@@ -487,7 +515,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
     return (
       <div className="mb-6">
         <h3 className="text-center text-orange-500 font-bold text-base mb-3">
-          {t('quantity') || 'Quantity'}
+          {t('quantity')}
         </h3>
         <div className="flex items-center justify-center gap-4">
           <button
@@ -572,7 +600,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
                 <h2 className={`text-lg font-semibold ${
                   isDarkMode ? 'text-white' : 'text-gray-900'
                 }`}>
-                  {t('selectOptions') || 'Select Options'}
+                  {t('selectOptions')}
                 </h2>
                 <button
                   onClick={onClose}
@@ -620,7 +648,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
                     }
                   `}
                 >
-                  {t('confirm') || 'Confirm'} {selectedQuantity > 1 && `(${selectedQuantity})`}
+                  {t('confirm')} {selectedQuantity > 1 && `(${selectedQuantity})`}
                 </button>
                 
                 <button
@@ -631,7 +659,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
                       : 'text-gray-600 hover:text-gray-800'
                   }`}
                 >
-                  {t('cancel') || 'Cancel'}
+                  {t('cancel')}
                 </button>
               </div>
             </div>

@@ -1,8 +1,9 @@
 // src/components/productdetail/ProductDetailSellerInfo.tsx
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { ChevronRight, Verified, Store, User, Star, Package, MessageCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 interface SellerInfo {
   sellerName: string;
@@ -19,6 +20,7 @@ interface ProductDetailSellerInfoProps {
   shopId?: string;
   isLoading?: boolean;
   isDarkMode?: boolean;
+  localization?: ReturnType<typeof useTranslations>;
 }
 
 const LoadingSkeleton: React.FC<{ isDarkMode?: boolean }> = ({ 
@@ -54,11 +56,41 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
   shopId,
   isLoading = false,
   isDarkMode = false,
+  localization,
 }) => {
   const router = useRouter();
   const [sellerInfo, setSellerInfo] = useState<SellerInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // ✅ FIXED: Proper nested translation function that uses JSON files
+  const t = useCallback((key: string) => {
+    if (!localization) {
+      return key;
+    }
+
+    try {
+      // Try to get the nested ProductDetailSellerInfo translation
+      const translation = localization(`ProductDetailSellerInfo.${key}`);
+      
+      // Check if we got a valid translation (not the same as the key we requested)
+      if (translation && translation !== `ProductDetailSellerInfo.${key}`) {
+        return translation;
+      }
+      
+      // If nested translation doesn't exist, try direct key
+      const directTranslation = localization(key);
+      if (directTranslation && directTranslation !== key) {
+        return directTranslation;
+      }
+      
+      // Return the key as fallback
+      return key;
+    } catch (error) {
+      console.warn(`Translation error for key: ${key}`, error);
+      return key;
+    }
+  }, [localization]);
 
   const isShop = shopId && shopId.trim().length > 0;
 
@@ -78,7 +110,7 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
         );
 
         if (!response.ok) {
-          throw new Error("Failed to fetch seller info");
+          throw new Error(t("failedToFetchSellerInfo"));
         }
 
         const data = await response.json();
@@ -86,11 +118,11 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
       } catch (err) {
         console.error("Error fetching seller info:", err);
         setError(
-          err instanceof Error ? err.message : "Failed to load seller info"
+          err instanceof Error ? err.message : t("failedToLoadSellerInfo")
         );
 
         setSellerInfo({
-          sellerName: sellerName || "Unknown Seller",
+          sellerName: sellerName || t("unknownSeller"),
           sellerAverageRating: 0,
           shopAverageRating: 0,
           sellerIsVerified: false,
@@ -103,15 +135,15 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
     };
 
     fetchSellerInfo();
-  }, [sellerId, shopId, sellerName]);
+  }, [sellerId, shopId, sellerName, t]);
 
-  const handleSellerClick = () => {
+  const handleSellerClick = useCallback(() => {
     if (isShop && shopId) {
       router.push(`/shop/${shopId}`);
     } else if (sellerId) {
       router.push(`/seller/${sellerId}/reviews`);
     }
-  };
+  }, [isShop, shopId, sellerId, router]);
 
   if (isLoading || loading) {
     return <LoadingSkeleton isDarkMode={isDarkMode} />;
@@ -176,13 +208,13 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
               <h4 className={`font-bold text-lg truncate ${
                 isDarkMode ? "text-white" : "text-gray-900"
               }`}>
-                {displayName || "Unknown Seller"}
+                {displayName || t("unknownSeller")}
               </h4>
               
               <span className={`text-sm ${
                 isDarkMode ? "text-gray-400" : "text-gray-600"
               }`}>
-                {isShop ? "Official Store" : "Individual Seller"}
+                {isShop ? t("officialStore") : t("individualSeller")}
               </span>
             </div>
 
@@ -213,7 +245,7 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
                   <span className={`${
                     isDarkMode ? "text-gray-400" : "text-gray-500"
                   }`}>
-                    {sellerInfo.totalProductsSold} sold
+                    {sellerInfo.totalProductsSold} {t("sold")}
                   </span>
                 </div>
               )}
@@ -240,7 +272,7 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
               : "bg-green-50 text-green-700 border border-green-200"
           }`}>
             <Verified className="w-3 h-3" />
-            Verified {isShop ? "Store" : "Seller"}
+            {t("verified")} {isShop ? t("store") : t("seller")}
           </div>
           
           <div className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${
@@ -249,7 +281,7 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
               : "bg-blue-50 text-blue-700 border border-blue-200"
           }`}>
             <MessageCircle className="w-3 h-3" />
-            Fast Response
+            {t("fastResponse")}
           </div>
         </div>
       </button>

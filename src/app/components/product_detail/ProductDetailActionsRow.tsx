@@ -1,8 +1,9 @@
 // src/components/productdetail/ProductDetailActionsRow.tsx
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Heart, Star, StarHalf, Shield, Truck, Award} from "lucide-react";
 import { useFavorites } from "@/context/FavoritesProvider";
+import { useTranslations } from "next-intl";
 
 import ProductOptionSelector from "@/app/components/ProductOptionSelector";
 import { Product } from "@/app/models/Product";
@@ -14,6 +15,7 @@ interface ProductDetailActionsRowProps {
   onToggleFavorite?: () => void;
   isFavorite?: boolean;
   isDarkMode?: boolean;
+  localization?: ReturnType<typeof useTranslations>;
 }
 
 interface RotatingCountTextProps {
@@ -21,14 +23,15 @@ interface RotatingCountTextProps {
   favoriteCount: number;
   purchaseCount: number;
   isDarkMode?: boolean;
+  t: (key: string) => string;
 }
-
 
 const RotatingCountText: React.FC<RotatingCountTextProps> = ({
   cartCount,
   favoriteCount,
   purchaseCount,
   isDarkMode = false,
+  t,
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isVisible, setIsVisible] = useState(true);
@@ -36,21 +39,21 @@ const RotatingCountText: React.FC<RotatingCountTextProps> = ({
   const messages = [];
   if (purchaseCount > 0) {
     messages.push({
-      text: `${purchaseCount} purchased`,
+      text: `${purchaseCount} ${t("purchased")}`,
       color: isDarkMode ? "text-green-400" : "text-green-600",
       icon: <Award className="w-3 h-3" />,
     });
   }
   if (favoriteCount > 0) {
     messages.push({
-      text: `${favoriteCount} favorites`,
+      text: `${favoriteCount} ${t("favorites")}`,
       color: isDarkMode ? "text-pink-400" : "text-pink-600",
       icon: <Heart className="w-3 h-3" />,
     });
   }
   if (cartCount > 0) {
     messages.push({
-      text: `${cartCount} in cart`,
+      text: `${cartCount} ${t("inCart")}`,
       color: isDarkMode ? "text-orange-400" : "text-orange-600",
       icon: <Truck className="w-3 h-3" />,
     });
@@ -92,10 +95,18 @@ const RotatingCountText: React.FC<RotatingCountTextProps> = ({
   );
 };
 
-const StarRating: React.FC<{ rating: number; reviewCount?: number; isDarkMode?: boolean }> = ({ 
+interface StarRatingProps {
+  rating: number;
+  reviewCount?: number;
+  isDarkMode?: boolean;
+  t: (key: string) => string;
+}
+
+const StarRating: React.FC<StarRatingProps> = ({ 
   rating, 
   reviewCount,
-  isDarkMode = false 
+  isDarkMode = false,
+  t
 }) => {
   const fullStars = Math.floor(rating);
   const hasHalfStar = rating - fullStars >= 0.5;
@@ -127,7 +138,7 @@ const StarRating: React.FC<{ rating: number; reviewCount?: number; isDarkMode?: 
           <span className={`text-sm ${
             isDarkMode ? "text-gray-400" : "text-gray-500"
           }`}>
-            ({reviewCount} reviews)
+            ({reviewCount} {t("reviews")})
           </span>
         )}
       </div>
@@ -135,12 +146,14 @@ const StarRating: React.FC<{ rating: number; reviewCount?: number; isDarkMode?: 
   );
 };
 
-const TrustBadge: React.FC<{ 
+interface TrustBadgeProps {
   icon: React.ReactNode;
-  title: string; 
-  value: string; 
+  title: string;
+  value: string;
   isDarkMode?: boolean;
-}> = ({
+}
+
+const TrustBadge: React.FC<TrustBadgeProps> = ({
   icon,
   title,
   value,
@@ -205,20 +218,46 @@ const LoadingSkeleton: React.FC<{ isDarkMode?: boolean }> = ({
 const ProductDetailActionsRow: React.FC<ProductDetailActionsRowProps> = ({
   product,
   isLoading = false,
-  
   onToggleFavorite,
   isDarkMode = false,
+  localization,
 }) => {
   const { addToFavorites, isFavorite: isProductFavorite } = useFavorites();
   
-
   const [showOptionSelector, setShowOptionSelector] = useState(false);
   const [, setFavoriteButtonState] = useState<'idle' | 'adding' | 'added' | 'removing' | 'removed'>('idle');
   const [, setShowFavoriteAnimation] = useState(false);
 
-  const actualIsFavorite = product ? isProductFavorite(product.id) : false;
+  // ✅ FIXED: Proper nested translation function that uses JSON files
+  const t = useCallback((key: string) => {
+    if (!localization) {
+      return key;
+    }
 
-  
+    try {
+      // Try to get the nested ProductDetailActionsRow translation
+      const translation = localization(`ProductDetailActionsRow.${key}`);
+      
+      // Check if we got a valid translation (not the same as the key we requested)
+      if (translation && translation !== `ProductDetailActionsRow.${key}`) {
+        return translation;
+      }
+      
+      // If nested translation doesn't exist, try direct key
+      const directTranslation = localization(key);
+      if (directTranslation && directTranslation !== key) {
+        return directTranslation;
+      }
+      
+      // Return the key as fallback
+      return key;
+    } catch (error) {
+      console.warn(`Translation error for key: ${key}`, error);
+      return key;
+    }
+  }, [localization]);
+
+  const actualIsFavorite = product ? isProductFavorite(product.id) : false;
 
   const performFavoriteToggle = async (selectedOptions?: { selectedColor?: string; selectedColorImage?: string; quantity: number; [key: string]: unknown }) => {
     if (!product) return;
@@ -274,7 +313,8 @@ const ProductDetailActionsRow: React.FC<ProductDetailActionsRowProps> = ({
           <StarRating 
             rating={product.averageRating} 
             reviewCount={product.reviewCount || undefined}
-            isDarkMode={isDarkMode} 
+            isDarkMode={isDarkMode}
+            t={t}
           />
           
           <RotatingCountText
@@ -282,6 +322,7 @@ const ProductDetailActionsRow: React.FC<ProductDetailActionsRowProps> = ({
             favoriteCount={product.favoritesCount}
             purchaseCount={product.purchaseCount}
             isDarkMode={isDarkMode}
+            t={t}
           />
         </div>
 
@@ -289,14 +330,14 @@ const ProductDetailActionsRow: React.FC<ProductDetailActionsRowProps> = ({
         <div className="grid grid-cols-2 gap-3">
           <TrustBadge
             icon={<Shield className="w-4 h-4" />}
-            title="Brand"
-            value={product.brandModel || "Generic"}
+            title={t("brand")}
+            value={product.brandModel || t("generic")}
             isDarkMode={isDarkMode}
           />
           <TrustBadge
             icon={<Truck className="w-4 h-4" />}
-            title="Delivery"
-            value={product.deliveryOption || "Standard"}
+            title={t("delivery")}
+            value={product.deliveryOption || t("standard")}
             isDarkMode={isDarkMode}
           />
         </div>
@@ -307,7 +348,7 @@ const ProductDetailActionsRow: React.FC<ProductDetailActionsRowProps> = ({
           product={product}
           isOpen={showOptionSelector}
           onClose={handleOptionSelectorClose}
-          onConfirm={handleOptionSelectorConfirm}
+          onConfirm={handleOptionSelectorConfirm}          
         />
       )}
     </>

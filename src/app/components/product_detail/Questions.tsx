@@ -1,8 +1,9 @@
 // src/components/productdetail/ProductQuestionsWidget.tsx
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { ChevronLeft, ChevronRight, User, HelpCircle, MessageCircle } from "lucide-react";
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 
 interface Question {
   id: string;
@@ -26,6 +27,7 @@ interface ProductQuestionsWidgetProps {
   isShop: boolean;
   isLoading?: boolean;
   isDarkMode?: boolean;
+  localization?: ReturnType<typeof useTranslations>;
 }
 
 interface QuestionAnswerCardProps {
@@ -33,6 +35,7 @@ interface QuestionAnswerCardProps {
   sellerImageUrl?: string;
   onReadAll: () => void;
   isDarkMode?: boolean;
+  t: (key: string) => string;
 }
 
 const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
@@ -40,6 +43,7 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
   sellerImageUrl,
   onReadAll,
   isDarkMode = false,
+  t,
 }) => {
   const formatDate = (timestamp: string) => {
     const date = new Date(timestamp);
@@ -48,7 +52,7 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
 
   const displayName = question.askerNameVisible
     ? question.askerName
-    : "Anonymous";
+    : t("anonymous");
   const isLongAnswer = question.answerText.length > 120;
 
   return (
@@ -103,7 +107,7 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
             {sellerImageUrl ? (
               <Image
                 src={sellerImageUrl}
-                alt="Seller"
+                alt={t("seller")}
                 width={32}
                 height={32}
                 className="rounded-full object-cover"
@@ -123,7 +127,7 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
               <span className={`text-xs font-semibold ${
                 isDarkMode ? "text-orange-400" : "text-orange-600"
               }`}>
-                Seller Reply
+                {t("sellerReply")}
               </span>
               <div className={`w-1 h-1 rounded-full ${
                 isDarkMode ? "bg-gray-600" : "bg-gray-300"
@@ -131,7 +135,7 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
               <span className={`text-xs ${
                 isDarkMode ? "text-gray-400" : "text-gray-500"
               }`}>
-                Official Response
+                {t("officialResponse")}
               </span>
             </div>
             
@@ -150,7 +154,7 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
                     : "text-orange-600 hover:text-orange-700"
                 }`}
               >
-                Read Full Answer
+                {t("readFullAnswer")}
               </button>
             )}
           </div>
@@ -205,6 +209,7 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
   isShop,
   isLoading = false,
   isDarkMode = false,
+  localization,
 }) => {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [sellerInfo, setSellerInfo] = useState<SellerInfo | null>(null);
@@ -214,25 +219,54 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
   const [canScrollRight, setCanScrollRight] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  const checkScrollPosition = () => {
+  // ✅ FIXED: Proper nested translation function that uses JSON files
+  const t = useCallback((key: string) => {
+    if (!localization) {
+      return key;
+    }
+
+    try {
+      // Try to get the nested ProductQuestionsWidget translation
+      const translation = localization(`ProductQuestionsWidget.${key}`);
+      
+      // Check if we got a valid translation (not the same as the key we requested)
+      if (translation && translation !== `ProductQuestionsWidget.${key}`) {
+        return translation;
+      }
+      
+      // If nested translation doesn't exist, try direct key
+      const directTranslation = localization(key);
+      if (directTranslation && directTranslation !== key) {
+        return directTranslation;
+      }
+      
+      // Return the key as fallback
+      return key;
+    } catch (error) {
+      console.warn(`Translation error for key: ${key}`, error);
+      return key;
+    }
+  }, [localization]);
+
+  const checkScrollPosition = useCallback(() => {
     if (scrollContainerRef.current) {
       const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
       setCanScrollLeft(scrollLeft > 0);
       setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1);
     }
-  };
+  }, []);
 
-  const scrollLeft = () => {
+  const scrollLeft = useCallback(() => {
     if (scrollContainerRef.current) {
       scrollContainerRef.current.scrollBy({ left: -350, behavior: "smooth" });
     }
-  };
+  }, []);
 
-  const scrollRight = () => {
+  const scrollRight = useCallback(() => {
     if (scrollContainerRef.current) {
       scrollContainerRef.current.scrollBy({ left: 350, behavior: "smooth" });
     }
-  };
+  }, []);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -241,7 +275,7 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
       container.addEventListener("scroll", checkScrollPosition);
       return () => container.removeEventListener("scroll", checkScrollPosition);
     }
-  }, [questions]);
+  }, [questions, checkScrollPosition]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -277,13 +311,13 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
     fetchData();
   }, [productId, sellerId, isShop]);
 
-  const handleViewAllQuestions = () => {
+  const handleViewAllQuestions = useCallback(() => {
     window.location.href = `/questions/${productId}?sellerId=${sellerId}&isShop=${isShop}`;
-  };
+  }, [productId, sellerId, isShop]);
 
-  const handleReadAll = () => {
+  const handleReadAll = useCallback(() => {
     handleViewAllQuestions();
-  };
+  }, [handleViewAllQuestions]);
 
   if (isLoading || loading) {
     return <LoadingSkeleton isDarkMode={isDarkMode} />;
@@ -318,12 +352,12 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
               <h3 className={`text-xl font-bold ${
                 isDarkMode ? "text-white" : "text-gray-900"
               }`}>
-                Product Q&A
+                {t("title")}
               </h3>
               <p className={`text-sm ${
                 isDarkMode ? "text-gray-400" : "text-gray-600"
               }`}>
-                {totalQuestions} answered questions
+                {totalQuestions} {t("answeredQuestions")}
               </p>
             </div>
           </div>
@@ -336,7 +370,7 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
                 : "bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200"
             }`}
           >
-            View All ({totalQuestions})
+            {t("viewAll")} ({totalQuestions})
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
@@ -387,6 +421,7 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
                 sellerImageUrl={sellerImageUrl}
                 onReadAll={handleReadAll}
                 isDarkMode={isDarkMode}
+                t={t}
               />
             ))}
           </div>

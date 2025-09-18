@@ -1,8 +1,9 @@
 // src/app/components/productdetail/AskToSeller.tsx
 "use client";
 
-import React from "react";
+import React, { useCallback } from "react";
 import { MessageCircleQuestion } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 interface AskSellerBubbleProps {
   onTap: () => void;
@@ -10,6 +11,7 @@ interface AskSellerBubbleProps {
   size?: number;
   color?: string;
   isDarkMode?: boolean;
+  localization?: ReturnType<typeof useTranslations>;
 }
 
 const AskSellerBubble: React.FC<AskSellerBubbleProps> = ({
@@ -17,8 +19,37 @@ const AskSellerBubble: React.FC<AskSellerBubbleProps> = ({
   alignment = "bottomRight",
   size = 64,
   color = "#3b82f6", // blue-500
-  
+  localization,
 }) => {
+  // ✅ FIXED: Proper nested translation function that uses JSON files
+  const t = useCallback((key: string) => {
+    if (!localization) {
+      return key;
+    }
+
+    try {
+      // Try to get the nested AskSellerBubble translation
+      const translation = localization(`AskSellerBubble.${key}`);
+      
+      // Check if we got a valid translation (not the same as the key we requested)
+      if (translation && translation !== `AskSellerBubble.${key}`) {
+        return translation;
+      }
+      
+      // If nested translation doesn't exist, try direct key
+      const directTranslation = localization(key);
+      if (directTranslation && directTranslation !== key) {
+        return directTranslation;
+      }
+      
+      // Return the key as fallback
+      return key;
+    } catch (error) {
+      console.warn(`Translation error for key: ${key}`, error);
+      return key;
+    }
+  }, [localization]);
+
   const getAlignmentClasses = () => {
     switch (alignment) {
       case "bottomLeft":
@@ -39,7 +70,7 @@ const AskSellerBubble: React.FC<AskSellerBubbleProps> = ({
         onClick={onTap}
         className="relative group transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-4 focus:ring-blue-300 rounded-full"
         style={{ width: size, height: size }}
-        aria-label="Ask seller a question"
+        aria-label={t("askSellerAriaLabel")}
       >
         {/* Main circle */}
         <div
@@ -61,7 +92,7 @@ const AskSellerBubble: React.FC<AskSellerBubbleProps> = ({
           className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 px-2 py-1 rounded-lg text-xs font-semibold text-white whitespace-nowrap transition-all duration-300 group-hover:scale-105"
           style={{ backgroundColor: color }}
         >
-          Ask Seller
+          {t("askSeller")}
         </div>
 
         {/* Pulse animation ring */}

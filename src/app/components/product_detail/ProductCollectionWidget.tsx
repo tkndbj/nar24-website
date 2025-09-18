@@ -1,9 +1,10 @@
 // src/components/productdetail/ProductCollectionWidget.tsx
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { ChevronLeft, ChevronRight, Package } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 
 interface Product {
   id: string;
@@ -25,6 +26,7 @@ interface ProductCollectionWidgetProps {
   shopId?: string;
   isLoading?: boolean;
   isDarkMode?: boolean;
+  localization?: ReturnType<typeof useTranslations>;
 }
 
 interface CollectionProductCardProps {
@@ -136,6 +138,7 @@ const ProductCollectionWidget: React.FC<ProductCollectionWidgetProps> = ({
   shopId,
   isLoading = false,
   isDarkMode = false,
+  localization,
 }) => {
   const router = useRouter();
   const [collectionData, setCollectionData] = useState<CollectionData | null>(null);
@@ -145,25 +148,54 @@ const ProductCollectionWidget: React.FC<ProductCollectionWidgetProps> = ({
   const [canScrollRight, setCanScrollRight] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  const checkScrollPosition = () => {
+  // ✅ FIXED: Proper nested translation function that uses JSON files
+  const t = useCallback((key: string) => {
+    if (!localization) {
+      return key;
+    }
+
+    try {
+      // Try to get the nested ProductCollectionWidget translation
+      const translation = localization(`ProductCollectionWidget.${key}`);
+      
+      // Check if we got a valid translation (not the same as the key we requested)
+      if (translation && translation !== `ProductCollectionWidget.${key}`) {
+        return translation;
+      }
+      
+      // If nested translation doesn't exist, try direct key
+      const directTranslation = localization(key);
+      if (directTranslation && directTranslation !== key) {
+        return directTranslation;
+      }
+      
+      // Return the key as fallback
+      return key;
+    } catch (error) {
+      console.warn(`Translation error for key: ${key}`, error);
+      return key;
+    }
+  }, [localization]);
+
+  const checkScrollPosition = useCallback(() => {
     if (scrollContainerRef.current) {
       const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
       setCanScrollLeft(scrollLeft > 0);
       setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1);
     }
-  };
+  }, []);
 
-  const scrollLeft = () => {
+  const scrollLeft = useCallback(() => {
     if (scrollContainerRef.current) {
       scrollContainerRef.current.scrollBy({ left: -300, behavior: "smooth" });
     }
-  };
+  }, []);
 
-  const scrollRight = () => {
+  const scrollRight = useCallback(() => {
     if (scrollContainerRef.current) {
       scrollContainerRef.current.scrollBy({ left: 300, behavior: "smooth" });
     }
-  };
+  }, []);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -172,7 +204,7 @@ const ProductCollectionWidget: React.FC<ProductCollectionWidgetProps> = ({
       container.addEventListener("scroll", checkScrollPosition);
       return () => container.removeEventListener("scroll", checkScrollPosition);
     }
-  }, [collectionData]);
+  }, [collectionData, checkScrollPosition]);
 
   useEffect(() => {
     const fetchProductCollection = async () => {
@@ -197,33 +229,33 @@ const ProductCollectionWidget: React.FC<ProductCollectionWidgetProps> = ({
         });
 
         if (!response.ok) {
-          throw new Error("Failed to fetch collection");
+          throw new Error(t("failedToFetchCollection"));
         }
 
         const data = await response.json();
         setCollectionData(data);
       } catch (err) {
         console.error("Error fetching product collection:", err);
-        setError(err instanceof Error ? err.message : "Failed to load collection");
+        setError(err instanceof Error ? err.message : t("failedToLoadCollection"));
       } finally {
         setLoading(false);
       }
     };
 
     fetchProductCollection();
-  }, [productId, shopId]);
+  }, [productId, shopId, t]);
 
-  const handleProductClick = (clickedProductId: string) => {
+  const handleProductClick = useCallback((clickedProductId: string) => {
     router.push(`/productdetail/${clickedProductId}`);
-  };
+  }, [router]);
 
-  const handleViewAll = () => {
+  const handleViewAll = useCallback(() => {
     if (collectionData && shopId) {
       sessionStorage.setItem('collectionShopId', shopId);
       sessionStorage.setItem('collectionName', collectionData.name);
       router.push(`/collections/${collectionData.id}`);
     }
-  };
+  }, [collectionData, shopId, router]);
 
   if (isLoading || loading) {
     return <LoadingSkeleton isDarkMode={isDarkMode} />;
@@ -254,7 +286,7 @@ const ProductCollectionWidget: React.FC<ProductCollectionWidgetProps> = ({
               <h3 className={`text-xl font-bold ${
                 isDarkMode ? "text-white" : "text-gray-900"
               }`}>
-                From This Collection
+                {t("title")}
               </h3>
               <p className={`text-sm ${
                 isDarkMode ? "text-gray-400" : "text-gray-600"
@@ -272,7 +304,7 @@ const ProductCollectionWidget: React.FC<ProductCollectionWidgetProps> = ({
                 : "bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200"
             }`}
           >
-            View All
+            {t("viewAll")}
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>

@@ -1,9 +1,10 @@
 // src/components/productdetail/ProductDetailRelatedProducts.tsx
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { ChevronLeft, ChevronRight, Shuffle } from "lucide-react";
 import ProductCard from "../../components/ProductCard";
 import { Product } from "@/app/models/Product";
+import { useTranslations } from "next-intl";
 
 interface ProductDetailRelatedProductsProps {
   productId?: string;
@@ -11,6 +12,7 @@ interface ProductDetailRelatedProductsProps {
   subcategory?: string;
   isLoading?: boolean;
   isDarkMode?: boolean;
+  localization?: ReturnType<typeof useTranslations>;
 }
 
 const LoadingSkeleton: React.FC<{
@@ -64,6 +66,7 @@ const ProductDetailRelatedProducts: React.FC<ProductDetailRelatedProductsProps> 
   subcategory,
   isLoading = false,
   isDarkMode = false,
+  localization,
 }) => {
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,6 +75,35 @@ const ProductDetailRelatedProducts: React.FC<ProductDetailRelatedProductsProps> 
   const [canScrollRight, setCanScrollRight] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // ✅ FIXED: Proper nested translation function that uses JSON files
+  const t = useCallback((key: string) => {
+    if (!localization) {
+      return key;
+    }
+
+    try {
+      // Try to get the nested ProductDetailRelatedProducts translation
+      const translation = localization(`ProductDetailRelatedProducts.${key}`);
+      
+      // Check if we got a valid translation (not the same as the key we requested)
+      if (translation && translation !== `ProductDetailRelatedProducts.${key}`) {
+        return translation;
+      }
+      
+      // If nested translation doesn't exist, try direct key
+      const directTranslation = localization(key);
+      if (directTranslation && directTranslation !== key) {
+        return directTranslation;
+      }
+      
+      // Return the key as fallback
+      return key;
+    } catch (error) {
+      console.warn(`Translation error for key: ${key}`, error);
+      return key;
+    }
+  }, [localization]);
 
   // Detect mobile device
   useEffect(() => {
@@ -85,7 +117,7 @@ const ProductDetailRelatedProducts: React.FC<ProductDetailRelatedProductsProps> 
   }, []);
 
   // Calculate responsive dimensions
-  const getResponsiveDimensions = () => {
+  const getResponsiveDimensions = useCallback(() => {
     if (typeof window === "undefined") {
       return {
         listViewHeight: 400,
@@ -104,20 +136,20 @@ const ProductDetailRelatedProducts: React.FC<ProductDetailRelatedProductsProps> 
       cardCount: mobile ? 3 : 6,
       gap: mobile ? 12 : 16,
     };
-  };
+  }, []);
 
   const { listViewHeight, cardWidth, cardCount, gap } = getResponsiveDimensions();
 
   // Scroll position checking
-  const checkScrollPosition = () => {
+  const checkScrollPosition = useCallback(() => {
     if (scrollContainerRef.current) {
       const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
       setCanScrollLeft(scrollLeft > 0);
       setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1);
     }
-  };
+  }, []);
 
-  const scrollLeft = () => {
+  const scrollLeft = useCallback(() => {
     if (scrollContainerRef.current) {
       const scrollAmount = cardWidth + gap;
       scrollContainerRef.current.scrollBy({
@@ -125,9 +157,9 @@ const ProductDetailRelatedProducts: React.FC<ProductDetailRelatedProductsProps> 
         behavior: "smooth",
       });
     }
-  };
+  }, [cardWidth, gap]);
 
-  const scrollRight = () => {
+  const scrollRight = useCallback(() => {
     if (scrollContainerRef.current) {
       const scrollAmount = cardWidth + gap;
       scrollContainerRef.current.scrollBy({
@@ -135,7 +167,7 @@ const ProductDetailRelatedProducts: React.FC<ProductDetailRelatedProductsProps> 
         behavior: "smooth",
       });
     }
-  };
+  }, [cardWidth, gap]);
 
   // Update scroll position when products change
   useEffect(() => {
@@ -145,7 +177,7 @@ const ProductDetailRelatedProducts: React.FC<ProductDetailRelatedProductsProps> 
       container.addEventListener("scroll", checkScrollPosition);
       return () => container.removeEventListener("scroll", checkScrollPosition);
     }
-  }, [relatedProducts]);
+  }, [relatedProducts, checkScrollPosition]);
 
   useEffect(() => {
     const fetchRelatedProducts = async () => {
@@ -192,14 +224,14 @@ const ProductDetailRelatedProducts: React.FC<ProductDetailRelatedProductsProps> 
 
         if (err instanceof Error) {
           if (err.name === "AbortError") {
-            setError("Request timeout - please try again");
+            setError(t("requestTimeout"));
           } else if (err.message.includes("Failed to fetch")) {
-            setError("Network error - check your connection");
+            setError(t("networkError"));
           } else {
             setError(err.message);
           }
         } else {
-          setError("Failed to load related products");
+          setError(t("failedToLoadRelated"));
         }
 
         setRelatedProducts([]);
@@ -209,7 +241,7 @@ const ProductDetailRelatedProducts: React.FC<ProductDetailRelatedProductsProps> 
     };
 
     fetchRelatedProducts();
-  }, [productId, category, subcategory]);
+  }, [productId, category, subcategory, t]);
 
   return (
     <div className={`rounded-2xl p-6 border shadow-sm ${
@@ -232,12 +264,12 @@ const ProductDetailRelatedProducts: React.FC<ProductDetailRelatedProductsProps> 
               <h3 className={`text-xl font-bold ${
                 isDarkMode ? "text-white" : "text-gray-900"
               }`}>
-                You Might Also Like
+                {t("title")}
               </h3>
               <p className={`text-sm ${
                 isDarkMode ? "text-gray-400" : "text-gray-600"
               }`}>
-                Similar products customers viewed
+                {t("subtitle")}
               </p>
             </div>
           </div>
@@ -247,7 +279,7 @@ const ProductDetailRelatedProducts: React.FC<ProductDetailRelatedProductsProps> 
               isDarkMode ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gray-600"
             }`}>
               <Shuffle className="w-3 h-3" />
-              {relatedProducts.length} items
+              {relatedProducts.length} {t("items")}
             </div>
           )}
         </div>
@@ -341,7 +373,7 @@ const ProductDetailRelatedProducts: React.FC<ProductDetailRelatedProductsProps> 
                     isDarkMode ? "text-gray-600" : "text-gray-400"
                   }`} />
                   <div>
-                    <p className="font-medium">No related products found</p>
+                    <p className="font-medium">{t("noRelatedProductsFound")}</p>
                     <p className="text-sm">{error}</p>
                   </div>
                   <button
@@ -352,7 +384,7 @@ const ProductDetailRelatedProducts: React.FC<ProductDetailRelatedProductsProps> 
                         : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                     }`}
                   >
-                    Try Again
+                    {t("tryAgain")}
                   </button>
                 </div>
               </div>

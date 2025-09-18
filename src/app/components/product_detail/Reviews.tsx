@@ -1,6 +1,6 @@
 // src/components/productdetail/ProductDetailReviewsTab.tsx
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Star,
   StarHalf,
@@ -13,6 +13,7 @@ import {
   Shield,
 } from "lucide-react";
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 
 interface Review {
   id: string;
@@ -28,6 +29,7 @@ interface ProductDetailReviewsTabProps {
   productId: string;
   isLoading?: boolean;
   isDarkMode?: boolean;
+  localization?: ReturnType<typeof useTranslations>;
 }
 
 interface ReviewTileProps {
@@ -35,6 +37,7 @@ interface ReviewTileProps {
   onLike: (reviewId: string) => void;
   currentUserId?: string;
   isDarkMode?: boolean;
+  t: (key: string) => string;
 }
 
 const StarRating: React.FC<{ rating: number; size?: number }> = ({
@@ -64,12 +67,20 @@ const StarRating: React.FC<{ rating: number; size?: number }> = ({
   );
 };
 
-const FullScreenImageModal: React.FC<{
+interface FullScreenImageModalProps {
   imageUrl: string;
   isOpen: boolean;
   onClose: () => void;
   isDarkMode?: boolean;
-}> = ({ imageUrl, isOpen, onClose }) => {
+  t: (key: string) => string;
+}
+
+const FullScreenImageModal: React.FC<FullScreenImageModalProps> = ({ 
+  imageUrl, 
+  isOpen, 
+  onClose, 
+  t 
+}) => {
   if (!isOpen) return null;
 
   return (
@@ -83,7 +94,7 @@ const FullScreenImageModal: React.FC<{
         </button>
         <Image
           src={imageUrl}
-          alt="Review image"
+          alt={t("reviewImage")}
           width={800}
           height={600}
           className="max-w-full max-h-full object-contain rounded-xl"
@@ -99,6 +110,7 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
   onLike,
   currentUserId,
   isDarkMode = false,
+  t,
 }) => {
   const [isTranslated, setIsTranslated] = useState(false);
   const [translatedText, setTranslatedText] = useState("");
@@ -171,7 +183,7 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
             isDarkMode ? "bg-green-900/20 text-green-400 border border-green-800" : "bg-green-50 text-green-700 border border-green-200"
           }`}>
             <Shield className="w-3 h-3" />
-            <span className="text-xs font-medium">Verified</span>
+            <span className="text-xs font-medium">{t("verified")}</span>
           </div>
         </div>
 
@@ -186,7 +198,7 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
               >
                 <Image
                   src={imageUrl}
-                  alt={`Review image ${index + 1}`}
+                  alt={`${t("reviewImage")} ${index + 1}`}
                   width={64}
                   height={64}
                   className="w-full h-full object-cover"
@@ -227,10 +239,10 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
             >
               <Languages className="w-3 h-3" />
               {isTranslating
-                ? "Translating..."
+                ? t("translating")
                 : isTranslated
-                ? "Original"
-                : "Translate"}
+                ? t("original")
+                : t("translate")}
             </button>
 
             {/* Like button */}
@@ -256,7 +268,7 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
                 ? "text-orange-400 hover:text-orange-300"
                 : "text-orange-600 hover:text-orange-700"
             }`}>
-              Read More
+              {t("readMore")}
             </button>
           )}
         </div>
@@ -268,6 +280,7 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
         isOpen={!!selectedImageUrl}
         onClose={() => setSelectedImageUrl(null)}
         isDarkMode={isDarkMode}
+        t={t}
       />
     </>
   );
@@ -316,6 +329,7 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
   productId,
   isLoading = false,
   isDarkMode = false,
+  localization,
 }) => {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
@@ -324,25 +338,54 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
   const [canScrollRight, setCanScrollRight] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  const checkScrollPosition = () => {
+  // ✅ FIXED: Proper nested translation function that uses JSON files
+  const t = useCallback((key: string) => {
+    if (!localization) {
+      return key;
+    }
+
+    try {
+      // Try to get the nested ProductDetailReviewsTab translation
+      const translation = localization(`ProductDetailReviewsTab.${key}`);
+      
+      // Check if we got a valid translation (not the same as the key we requested)
+      if (translation && translation !== `ProductDetailReviewsTab.${key}`) {
+        return translation;
+      }
+      
+      // If nested translation doesn't exist, try direct key
+      const directTranslation = localization(key);
+      if (directTranslation && directTranslation !== key) {
+        return directTranslation;
+      }
+      
+      // Return the key as fallback
+      return key;
+    } catch (error) {
+      console.warn(`Translation error for key: ${key}`, error);
+      return key;
+    }
+  }, [localization]);
+
+  const checkScrollPosition = useCallback(() => {
     if (scrollContainerRef.current) {
       const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
       setCanScrollLeft(scrollLeft > 0);
       setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1);
     }
-  };
+  }, []);
 
-  const scrollLeft = () => {
+  const scrollLeft = useCallback(() => {
     if (scrollContainerRef.current) {
       scrollContainerRef.current.scrollBy({ left: -350, behavior: "smooth" });
     }
-  };
+  }, []);
 
-  const scrollRight = () => {
+  const scrollRight = useCallback(() => {
     if (scrollContainerRef.current) {
       scrollContainerRef.current.scrollBy({ left: 350, behavior: "smooth" });
     }
-  };
+  }, []);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -351,7 +394,7 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
       container.addEventListener("scroll", checkScrollPosition);
       return () => container.removeEventListener("scroll", checkScrollPosition);
     }
-  }, [reviews]);
+  }, [reviews, checkScrollPosition]);
 
   useEffect(() => {
     const fetchReviews = async () => {
@@ -362,7 +405,7 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
 
         const response = await fetch(`/api/reviews/${productId}`);
         if (!response.ok) {
-          throw new Error("Failed to fetch reviews");
+          throw new Error(t("failedToFetchReviews"));
         }
 
         const data = await response.json();
@@ -378,9 +421,9 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
     };
 
     fetchReviews();
-  }, [productId]);
+  }, [productId, t]);
 
-  const handleLike = async (reviewId: string) => {
+  const handleLike = useCallback(async (reviewId: string) => {
     try {
       const response = await fetch("/api/reviews/toggle-like", {
         method: "POST",
@@ -408,11 +451,11 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
     } catch (error) {
       console.error("Error toggling like:", error);
     }
-  };
+  }, [productId]);
 
-  const handleSeeAllReviews = () => {
+  const handleSeeAllReviews = useCallback(() => {
     window.location.href = `/reviews/${productId}`;
-  };
+  }, [productId]);
 
   if (isLoading || loading) {
     return <LoadingSkeleton isDarkMode={isDarkMode} />;
@@ -443,12 +486,12 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
               <h3 className={`text-xl font-bold ${
                 isDarkMode ? "text-white" : "text-gray-900"
               }`}>
-                Customer Reviews
+                {t("title")}
               </h3>
               <p className={`text-sm ${
                 isDarkMode ? "text-gray-400" : "text-gray-600"
               }`}>
-                {totalReviewCount} verified reviews
+                {totalReviewCount} {t("verifiedReviews")}
               </p>
             </div>
           </div>
@@ -461,7 +504,7 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
                 : "bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200"
             }`}
           >
-            View All ({totalReviewCount})
+            {t("viewAll")} ({totalReviewCount})
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
@@ -512,6 +555,7 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
                 onLike={handleLike}
                 currentUserId="current-user"
                 isDarkMode={isDarkMode}
+                t={t}
               />
             ))}
           </div>
