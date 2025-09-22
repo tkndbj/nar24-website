@@ -110,6 +110,9 @@ export default function DynamicMarketPage() {
   const subcategory = searchParams.get("subcategory");
   const subsubcategory = searchParams.get("subsubcategory");
 
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+const [touchEnd, setTouchEnd] = useState<number | null>(null);
+
   // Handle theme detection
   useEffect(() => {
     const checkTheme = () => {
@@ -141,6 +144,19 @@ export default function DynamicMarketPage() {
     }
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    if (showSidebar) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+  
+    // Cleanup function to restore scrolling when component unmounts
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [showSidebar]);
 
   // Set category title and available subcategories based on URL params
   useEffect(() => {
@@ -217,6 +233,27 @@ export default function DynamicMarketPage() {
       console.log("🔄 Filters reset for new category:", categoryKey);
     }
   }, [category, subcategory, subsubcategory]);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+  
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+  
+  const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > 50;    
+    
+    // Close drawer on left swipe (swipe left to close)
+    if (isLeftSwipe && showSidebar) {
+      setShowSidebar(false);
+    }
+  };
 
   const getLocalizedSubcategoryName = (
     categoryKey: string,
@@ -475,30 +512,42 @@ export default function DynamicMarketPage() {
 
           {/* Filter Sidebar */}
           <div
-            className={`
-              fixed lg:sticky lg:top-16 lg:h-[calc(100vh-4rem)] top-16 left-0 h-[calc(100vh-4rem)] w-64 transform transition-transform duration-300 z-40
-              ${
-                showSidebar
-                  ? "translate-x-0"
-                  : "-translate-x-full lg:translate-x-0"
-              }
-              ${isDarkMode ? "bg-gray-800" : "bg-white"}
-              border-r ${isDarkMode ? "border-gray-700" : "border-gray-200"}
-              overflow-y-auto overflow-x-hidden flex-shrink-0
-            `}
-          >
+  className={`
+    fixed lg:sticky lg:top-16 lg:h-[calc(100vh-4rem)] top-0 left-0 h-screen w-64 transform transition-transform duration-300 z-50 lg:z-40
+    ${
+      showSidebar
+        ? "translate-x-0"
+        : "-translate-x-full lg:translate-x-0"
+    }
+    ${isDarkMode ? "bg-gray-800" : "bg-white"}
+    border-r ${isDarkMode ? "border-gray-700" : "border-gray-200"}
+    overflow-y-auto overflow-x-hidden flex-shrink-0
+  `}
+  onTouchStart={handleTouchStart}
+  onTouchMove={handleTouchMove}
+  onTouchEnd={handleTouchEnd}
+>
             {/* Mobile Close Button */}
-            <div className="lg:hidden p-3 border-b border-gray-200 dark:border-gray-700">
-              <button
-                onClick={() => setShowSidebar(false)}
-                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
-              >
-                <X
-                  size={18}
-                  className={isDarkMode ? "text-gray-400" : "text-gray-600"}
-                />
-              </button>
-            </div>
+            <div className="lg:hidden p-4 border-b border-gray-200 dark:border-gray-700">
+  <div className="flex items-center justify-between">
+    <h2
+      className={`font-semibold ${
+        isDarkMode ? "text-white" : "text-gray-900"
+      }`}
+    >
+      Filters
+    </h2>
+    <button
+      onClick={() => setShowSidebar(false)}
+      className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
+    >
+      <X
+        size={18}
+        className={isDarkMode ? "text-gray-400" : "text-gray-600"}
+      />
+    </button>
+  </div>
+</div>
 
             {/* Filter Content */}
             <div className="p-3">
@@ -802,15 +851,7 @@ export default function DynamicMarketPage() {
                 </div>
               </div>
             </div>
-          </div>
-
-          {/* Overlay for mobile */}
-          {showSidebar && (
-            <div
-              className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-30"
-              onClick={() => setShowSidebar(false)}
-            />
-          )}
+          </div>          
 
           {/* Main Content */}
           <div className="flex-1 w-full overflow-hidden">
