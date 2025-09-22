@@ -701,7 +701,7 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
         {/* Sidebar - This stays static and doesn't reload */}
         <div
   className={`
-  fixed lg:sticky lg:top-0 lg:h-screen top-0 left-0 h-screen w-64 transform transition-transform duration-300 z-50
+  fixed lg:sticky lg:top-0 lg:h-screen top-0 left-0 h-screen w-64 transform transition-transform duration-300 z-50 lg:z-0
   ${
     showSidebar ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
   }
@@ -1252,15 +1252,7 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Overlay for mobile */}
-        {showSidebar && (
-  <div
-    className="lg:hidden fixed top-0 left-64 right-0 bottom-0 bg-black bg-opacity-75 z-40"
-    onClick={() => setShowSidebar(false)}
-  />
-)}
+        </div>     
 
         {/* Main Content - This is the only part that reloads when filters change */}
         <div className="flex-1 min-w-0">
