@@ -138,7 +138,7 @@ const ProductDetailRelatedProducts: React.FC<ProductDetailRelatedProductsProps> 
     };
   }, []);
 
-  const { listViewHeight, cardWidth, cardCount, gap } = getResponsiveDimensions();
+  const { cardWidth, cardCount, gap } = getResponsiveDimensions();
 
   // Scroll position checking
   const checkScrollPosition = useCallback(() => {

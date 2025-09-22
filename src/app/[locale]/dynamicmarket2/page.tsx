@@ -239,8 +239,7 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
     if (!touchStart || !touchEnd) return;
     
     const distance = touchStart - touchEnd;
-    const isLeftSwipe = distance > 50;
-    const isRightSwipe = distance < -50;
+    const isLeftSwipe = distance > 50;    
     
     // Close drawer on left swipe (swipe left to close)
     if (isLeftSwipe && showSidebar) {
