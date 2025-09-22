@@ -852,18 +852,12 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               isDarkMode={isDarkMode}
               localization={localization}
             />
-
-            {/* Product Attributes */}
-            <DynamicAttributesWidget 
-              product={product} 
-              isDarkMode={isDarkMode}
-              localization={localization}              
-            />
+            
           </div>
         </div>
 
-        {/* Bottom Sections - Full width on mobile */}
-        <div className="mt-8 sm:mt-12 space-y-6 sm:space-y-8">
+       {/* Bottom Sections - Full width on mobile */}
+       <div className="mt-8 sm:mt-12 space-y-6 sm:space-y-8">
           {/* Description - More compact padding on mobile */}
           {product.description && (
             <div
@@ -890,13 +884,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
             </div>
           )}
 
-          <ProductCollectionWidget
-            productId={product.id}
-            shopId={product.shopId}
-            isDarkMode={isDarkMode}
-            localization={localization}
-          />
-
           <BundleComponent
             productId={product.id}
             shopId={product.shopId}
@@ -917,6 +904,26 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
             isDarkMode={isDarkMode}
             localization={localization}
           />
+        </div>
+
+        <div className="h-20 sm:h-24" />
+      </div>
+
+      {/* Full width widgets on mobile - NO horizontal padding */}
+      <div className="w-full sm:max-w-6xl sm:mx-auto sm:px-4 lg:px-6">
+        <div className="space-y-6 sm:space-y-8">
+          <DynamicAttributesWidget 
+            product={product} 
+            isDarkMode={isDarkMode}
+            localization={localization}              
+          />
+
+          <ProductCollectionWidget
+            productId={product.id}
+            shopId={product.shopId}
+            isDarkMode={isDarkMode}
+            localization={localization}
+          />
 
           <ProductDetailRelatedProducts
             productId={product.id}
@@ -926,9 +933,9 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
             localization={localization}
           />
         </div>
-
-        <div className="h-20 sm:h-24" />
       </div>
+
+      
 
       {/* Modals */}
       <FullScreenImageViewer
