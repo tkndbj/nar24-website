@@ -701,7 +701,7 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
         {/* Sidebar - This stays static and doesn't reload */}
         <div
   className={`
-  fixed lg:fixed lg:top-0 lg:h-screen top-0 left-0 h-screen w-64 transform transition-transform duration-300 z-50 lg:z-20
+  fixed lg:sticky lg:top-0 lg:h-screen top-0 left-0 h-screen w-64 transform transition-transform duration-300 z-50 lg:z-0
   ${
     showSidebar ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
   }

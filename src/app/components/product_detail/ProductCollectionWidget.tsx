@@ -97,7 +97,7 @@ const CollectionProductCard: React.FC<CollectionProductCardProps> = ({
 const LoadingSkeleton: React.FC<{ isDarkMode?: boolean }> = ({ 
   isDarkMode = false 
 }) => (
-  <div className={`rounded-2xl md:rounded-2xl rounded-none p-6 md:p-6 px-0 py-4 border md:border border-0 shadow-sm md:shadow-sm shadow-none ${
+  <div className={`rounded-none sm:rounded-2xl px-0 py-4 sm:p-6 border-0 sm:border sm:shadow-sm ${
     isDarkMode 
       ? "bg-gray-800 border-gray-700" 
       : "bg-white border-gray-200"
@@ -266,7 +266,7 @@ const ProductCollectionWidget: React.FC<ProductCollectionWidgetProps> = ({
   }
 
   return (
-    <div className={`rounded-2xl md:rounded-2xl rounded-none p-6 md:p-6 p-4 border md:border border-0 shadow-sm md:shadow-sm shadow-none ${
+    <div className={`rounded-none sm:rounded-2xl px-0 py-4 sm:p-6 border-0 sm:border sm:shadow-sm ${
       isDarkMode 
         ? "bg-gray-800 border-gray-700" 
         : "bg-white border-gray-200"
