@@ -1257,7 +1257,7 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
         {/* Overlay for mobile */}
         {showSidebar && (
   <div
-    className="lg:hidden fixed inset-0 bg-black bg-opacity-75 z-30"
+    className="lg:hidden fixed top-0 left-64 right-0 bottom-0 bg-black bg-opacity-75 z-40"
     onClick={() => setShowSidebar(false)}
   />
 )}
