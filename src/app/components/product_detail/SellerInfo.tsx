@@ -139,7 +139,7 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
 
   const handleSellerClick = useCallback(() => {
     if (isShop && shopId) {
-      router.push(`/shop/${shopId}`);
+      router.push(`/shopdetail/${shopId}`);
     } else if (sellerId) {
       router.push(`/seller/${sellerId}/reviews`);
     }

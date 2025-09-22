@@ -320,15 +320,15 @@ const LogoPlaceholder: React.FC<{ size?: number }> = ({ size = 120 }) => {
       style={{ width: size, height: size }}
     >
       <Image
-        src="/images/narsiyah.png"
-        alt="Narsiyah Logo"
-        width={size * 0.8}
-        height={size * 0.8}
-        className="object-contain"
-        onError={() => setImageError(true)}
-        priority={false}
-        sizes={`${size}px`}
-      />
+  src="/images/narsiyah.png"
+  alt="Narsiyah Logo"
+  width={size * 0.8}
+  height={size * 0.8}
+  className="object-contain"
+  onError={() => setImageError(true)}
+  priority={false}
+  sizes={`${Math.round(size * 0.8)}px`}
+/>
     </div>
   );
 };

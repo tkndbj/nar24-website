@@ -19,14 +19,14 @@ const LoadingSkeleton: React.FC<{
   cardCount: number;
   isDarkMode?: boolean;
 }> = ({ cardCount, isDarkMode = false }) => (
-  <div className="flex gap-3 sm:gap-4 overflow-hidden">
+  <div className="flex gap-2 overflow-hidden">
     {Array.from({ length: cardCount }).map((_, i) => (
       <div
         key={i}
         className={`flex-shrink-0 w-48 sm:w-60 rounded-xl sm:rounded-2xl animate-pulse ${
           isDarkMode ? "bg-gray-700" : "bg-gray-200"
         }`}
-        style={{ height: "280px" }}
+        style={{ height: "180px" }}
       >
         <div className="p-3 sm:p-4 space-y-2 sm:space-y-3 h-full flex flex-col">
           {/* Image placeholder */}
@@ -120,21 +120,21 @@ const ProductDetailRelatedProducts: React.FC<ProductDetailRelatedProductsProps> 
   const getResponsiveDimensions = useCallback(() => {
     if (typeof window === "undefined") {
       return {
-        listViewHeight: 400,
+        listViewHeight: 450, // Increased height
         cardWidth: 240,
         cardCount: 6,
-        gap: 16,
+        gap: 8,
       };
     }
-
+  
     const screenWidth = window.innerWidth;
     const mobile = screenWidth < 768;
     
     return {
-      listViewHeight: mobile ? 320 : 400,
+      listViewHeight: mobile ? 380 : 450, // Increased heights
       cardWidth: mobile ? 180 : 240,
       cardCount: mobile ? 3 : 6,
-      gap: mobile ? 12 : 16,
+      gap: mobile ? 8 : 10,
     };
   }, []);
 
@@ -244,12 +244,12 @@ const ProductDetailRelatedProducts: React.FC<ProductDetailRelatedProductsProps> 
   }, [productId, category, subcategory, t]);
 
   return (
-    <div className={`rounded-none sm:rounded-2xl px-0 py-4 sm:p-6 border-0 sm:border sm:shadow-sm ${
+    <div className={`rounded-none sm:rounded-2xl px-0 py-2 sm:px-6 sm:py-3 border-0 sm:border sm:shadow-sm ${
       isDarkMode 
         ? "bg-gray-800 sm:border-gray-700" 
         : "bg-white sm:border-gray-200"
     }`}>
-      <div className="space-y-4 sm:space-y-6">
+      <div className="space-y-2 sm:space-y-3">
         {/* Header */}
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2 sm:gap-3">
@@ -315,14 +315,7 @@ const ProductDetailRelatedProducts: React.FC<ProductDetailRelatedProductsProps> 
           )}
 
           {/* Products container */}
-          <div
-            className="overflow-hidden"
-            style={{
-              height: `${listViewHeight}px`,
-              minHeight: `${listViewHeight}px`,
-              maxHeight: `${listViewHeight}px`,
-            }}
-          >
+          <div className="overflow-hidden">
             {isLoading || loading ? (
               <LoadingSkeleton
                 cardCount={cardCount}
@@ -330,42 +323,42 @@ const ProductDetailRelatedProducts: React.FC<ProductDetailRelatedProductsProps> 
               />
             ) : relatedProducts.length > 0 ? (
               <div
-                ref={scrollContainerRef}
-                className="flex gap-3 sm:gap-4 overflow-x-auto h-full scroll-smooth [&::-webkit-scrollbar]:hidden"
-                style={{
-                  scrollbarWidth: "none",
-                  msOverflowStyle: "none",
-                  paddingBottom: "0",
-                  paddingLeft: isMobile ? "4px" : "0",
-                }}
-              >
-                {relatedProducts.map((product, index) => (
-                  <div
-                    key={`${product.id}-${index}`}
-                    className="flex-shrink-0"
-                    style={{
-                      width: `${cardWidth}px`,
-                      minWidth: `${cardWidth}px`,
-                    }}
-                  >
-                    <ProductCard
-                      product={product}
-                      scaleFactor={isMobile ? 0.75 : 0.85}
-                      internalScaleFactor={1.1}
-                      showCartIcon={true}
-                      showExtraLabels={false}
-                      onFavoriteToggle={(productId) => {
-                        console.log("Toggle favorite for:", productId);
-                      }}
-                      onAddToCart={(productId) => {
-                        console.log("Add to cart:", productId);
-                      }}
-                    />
-                  </div>
-                ))}
-              </div>
+  ref={scrollContainerRef}
+  className="flex gap-2 overflow-x-auto h-full scroll-smooth [&::-webkit-scrollbar]:hidden items-start" // Changed from gap-3 sm:gap-4 to gap-2
+  style={{
+    scrollbarWidth: "none",
+    msOverflowStyle: "none",
+    paddingBottom: "0",
+    paddingLeft: isMobile ? "4px" : "0",
+  }}
+>
+  {relatedProducts.map((product, index) => (
+    <div
+      key={`${product.id}-${index}`}
+      className="flex-shrink-0 flex items-start"
+      style={{
+        width: `${cardWidth}px`,
+        minWidth: `${cardWidth}px`,
+      }}
+    >
+      <ProductCard
+        product={product}
+        scaleFactor={isMobile ? 0.65 : 0.85}// Reduced from 0.75/0.85 to make cards smaller
+        internalScaleFactor={1.1}
+        showCartIcon={true}
+        showExtraLabels={false}
+        onFavoriteToggle={(productId) => {
+          console.log("Toggle favorite for:", productId);
+        }}
+        onAddToCart={(productId) => {
+          console.log("Add to cart:", productId);
+        }}
+      />
+    </div>
+  ))}
+</div>
             ) : error ? (
-              <div className="flex items-center justify-center h-full">
+              <div className="flex items-center justify-center">
                 <div className={`text-center space-y-2 sm:space-y-3 ${
                   isDarkMode ? "text-gray-400" : "text-gray-500"
                 }`}>

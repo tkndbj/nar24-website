@@ -97,6 +97,8 @@ const DynamicMarketPage: React.FC = () => {
   // Filter and sort states
   const [selectedSortOption, setSelectedSortOption] = useState("None");
   const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const [filters, setFilters] = useState<FilterState>({
     subcategories: [],
     colors: [],
@@ -223,6 +225,28 @@ const DynamicMarketPage: React.FC = () => {
 
     return () => observer.disconnect();
   }, []);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+  
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+  
+  const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > 50;
+    const isRightSwipe = distance < -50;
+    
+    // Close drawer on left swipe (swipe left to close)
+    if (isLeftSwipe && showSidebar) {
+      setShowSidebar(false);
+    }
+  };
 
   // Optimized fetch products function
   const fetchProducts = useCallback(
@@ -387,6 +411,19 @@ const DynamicMarketPage: React.FC = () => {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, [hasMore, isLoadingMore, currentPage]);
+
+  useEffect(() => {
+    if (showSidebar) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+  
+    // Cleanup function to restore scrolling when component unmounts
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [showSidebar]);
 
   // Memoized filter handlers to prevent unnecessary re-renders
   const handleToggleFilter = useCallback(
@@ -664,16 +701,19 @@ const DynamicMarketPage: React.FC = () => {
 
         {/* Sidebar - This stays static and doesn't reload */}
         <div
-          className={`
-          fixed lg:sticky lg:top-0 lg:h-screen top-0 left-0 h-screen w-64 transform transition-transform duration-300 z-40
-          ${
-            showSidebar ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-          }
-          ${isDarkMode ? "bg-gray-800" : "bg-white"}
-          border-r ${isDarkMode ? "border-gray-700" : "border-gray-200"}
-          overflow-y-auto overflow-x-hidden flex-shrink-0
-        `}
-        >
+  className={`
+  fixed lg:sticky lg:top-0 lg:h-screen top-0 left-0 h-screen w-64 transform transition-transform duration-300 z-50
+  ${
+    showSidebar ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+  }
+  ${isDarkMode ? "bg-gray-800" : "bg-white"}
+  border-r ${isDarkMode ? "border-gray-700" : "border-gray-200"}
+  overflow-y-auto overflow-x-hidden flex-shrink-0
+`}
+  onTouchStart={handleTouchStart}
+  onTouchMove={handleTouchMove}
+  onTouchEnd={handleTouchEnd}
+>
           {/* Sidebar Header */}
           <div
             className={`border-b ${
@@ -1217,11 +1257,11 @@ const DynamicMarketPage: React.FC = () => {
 
         {/* Overlay for mobile */}
         {showSidebar && (
-          <div
-            className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-30"
-            onClick={() => setShowSidebar(false)}
-          />
-        )}
+  <div
+    className="lg:hidden fixed inset-0 bg-black bg-opacity-75 z-30"
+    onClick={() => setShowSidebar(false)}
+  />
+)}
 
         {/* Main Content - This is the only part that reloads when filters change */}
         <div className="flex-1 min-w-0">

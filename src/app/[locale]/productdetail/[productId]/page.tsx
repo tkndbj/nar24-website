@@ -671,16 +671,15 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               {product.imageUrls.length > 0 &&
               !imageErrors.has(currentImageIndex) ? (
                 <Image
-                  src={product.imageUrls[currentImageIndex]}
-                  alt={product.productName}
-                  fill
-                  className="object-contain cursor-pointer hover:scale-105 transition-transform duration-300"
-                  style={{ maxWidth: '100%', height: 'auto' }}
-                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                  onClick={() => setShowFullScreenViewer(true)}
-                  onError={() => handleImageError(currentImageIndex)}
-                  priority
-                />
+  src={product.imageUrls[currentImageIndex]}
+  alt={product.productName}
+  fill
+  className="object-contain cursor-pointer hover:scale-105 transition-transform duration-300"
+  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+  onClick={() => setShowFullScreenViewer(true)}
+  onError={() => handleImageError(currentImageIndex)}
+  priority
+/>
               ) : (
                 <div
                   className={`w-full h-full flex items-center justify-center ${

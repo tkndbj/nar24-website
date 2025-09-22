@@ -402,7 +402,7 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
                   fill
                   className="object-fill"
                   priority={index === 0}
-                  sizes="100vw"
+                  sizes={screenInfo.isLarger ? "90vw" : "100vw"}
                   quality={isActive ? 85 : 75}
                   loading={index === 0 ? "eager" : "lazy"}
                   onLoad={() => {
