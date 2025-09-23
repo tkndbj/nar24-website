@@ -44,10 +44,10 @@ export default function SearchBar({
   onSearchStateChange,
   searchTerm,
   onSearchTermChange,
-  onSearchSubmit,
+  
   onKeyPress,
   onSuggestionClick,
-  onHistoryItemClick,
+  
   isMobile = false,
   t,
 }: SearchBarProps) {
