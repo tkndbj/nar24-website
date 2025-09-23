@@ -1241,6 +1241,7 @@
   "pleaseSelectKitchenAppliance": "Lütfen bir mutfak aleti seçin",
   "selectKitchenAppliance": "Mutfak Aleti Seç",
   "selectKitchenApplianceType": "Mutfak aleti türünü seçin",
+  "categories": "Kategoriler",
   "shops": {
     "title": "Mağazalar",
     "createYourShop": "Mağazanı Oluştur",
@@ -1288,7 +1289,7 @@
   },
   "createShop": {
     "createYourShop": "Mağazanı Oluştur",
-    "createAndNameYourShop": "Mağazanı oluştur ve adlandır",
+    "createAndNameYourShop": "Mağazanızı oluşturun ve Nar24'ün resmi satıcısı olun!",
     "nameYourShop": "Mağazanı Adlandır",
     "enterShopName": "Mağaza adını girin",
     "email": "E-posta",
@@ -1302,6 +1303,10 @@
     "taxPlateCertificate": "Vergi Levhası Belgesi",
     "uploadProfileImage": "Profil Resmi Yükle",
     "uploadCoverImage": "Kapak Resimleri Yükle",
+    "upload": "Yükle",
+    "iHaveReadAndAccept": "Okudum ve kabul ediyorum",
+    "sellerAgreement": "Satıcı Sözleşmesi",
+    "mustAcceptAgreement": "Devam etmek için Satıcı Sözleşmesini kabul etmelisiniz",
     "apply": "Başvur",
     "submitting": "Gönderiliyor",
     "done": "Tamam",
@@ -2744,11 +2749,16 @@
     "shipping": "Kargo Bilgisi",
     "returns": "İade & Geri Ödeme",
     "legal": "Yasal",
-    "termsOfService": "Hizmet Şartları",
+    "termsOfService": "Kullanım Koşulları",
     "membershipAgreement": "Üyelik Sözleşmesi",
     "cookiePolicy": "Çerez Politikası",
     "made": "ile yapıldı",
-    "allRightsReserved": "Tüm hakları saklıdır. Nar24, E.C.T.S TRADING LTD ürünüdür"
+    "allRightsReserved": "Tüm hakları saklıdır. Nar24, E.C.T.S TRADING LTD ürünüdür",
+    "profile": "Profil",
+    "orders": "Siparişler",
+    "sellOnVitrin": "Vitrin'de Sat",
+    "accountSettings": "Hesap Ayarları",
+    "pickupPoints": "Gel-Al Noktaları"
   },
   "cookieConsent": {
     "title": "Gizliliğinize Değer Veriyoruz",
@@ -2955,6 +2965,131 @@
           "Üye, Sözleşmeyi ve haklarını önceden ECTS'nin yazılı iznini almaksızın üçüncü kişilere devir veya temlik edemez.",
           "ECTS, haklarını, menfaatlerini ve yükümlülüklerini, Üyenin iznini almaksızın bağlı şirketlerine, iştiraklerine veya üçüncü kişilere devir ve temlik edebilir.",
           "Web sitesinin kullanılması, Kullanıcı tarafından bu sözleşmenin okunduğunu ve kabul edildiğini gösterir."
+        ]
+      }
+    }
+  },
+  "sellerAgreement": {
+    "title": "Satıcı Üyelik ve İş Ortaklığı Sözleşmesi",
+    "lastUpdated": "Son Güncelleme",
+    "updateDate": "Ocak 2025",
+    "introduction": "İşbu Satıcı Üyelik ve İş Ortaklığı Sözleşmesi, E.C.T.S TRADING LTD platformunda satıcı olarak faaliyet göstermek isteyen gerçek veya tüzel kişiler ile platform arasında akdedilmiştir. Sözleşmeyi onaylamakla, tüm hüküm ve koşulları kabul etmiş sayılırsınız.",
+    "footerNote": "Platformumuzu kullanmaya devam ederek, işbu Satıcı Üyelik ve İş Ortaklığı Sözleşmesi'ni okuduğunuzu, anladığınızı ve kabul ettiğinizi beyan etmiş olursunuz.",
+    "sections": {
+      "parties": {
+        "title": "Taraflar ve Genel Hükümler",
+        "content": [
+          "İşbu sözleşme E.C.T.S TRADING LTD ile Satıcı arasında akdedilmiş olup, elektronik ticaret platformunda sanal mağaza açılması ve ürün satışına ilişkin hak ve yükümlülükleri düzenler.",
+          "Satıcı, 18 yaşını doldurmuş gerçek kişi veya tüzel kişinin yetkili temsilcisi olmalıdır.",
+          "Sözleşmenin ekleri ve Web sitesinde sunulan tüm belgeler sözleşmenin ayrılmaz parçalarıdır.",
+          "E.C.T.S, Satıcı başvurularını değerlendirme ve sebep göstermeksizin reddetme hakkını saklı tutar."
+        ]
+      },
+      "definitions": {
+        "title": "Tanımlar",
+        "content": [
+          "Alıcı: Platform üzerinden satıcının ürünlerini satın alan gerçek veya tüzel kişi üyeyi ifade eder.",
+          "Hizmet: Satıcıların ürünlerini platformda yayınlama, satışa sunma ve pazarlama için E.C.T.S tarafından sunulan tüm hizmetleri ifade eder.",
+          "Sanal Mağaza: Satıcılara tahsis edilen ve ürünlerini sergileyebildikleri sanal alanı ifade eder.",
+          "Platform/Web sitesi: E.C.T.S'ye ait olan ve hizmetlerin sunulduğu tüm internet sitesi, mobil uygulama ve mobil siteyi ifade eder.",
+          "Kargo Şirketi: Ürünlerin alıcıya teslimini sağlayan E.C.T.S'nin kendisi ve/veya anlaşmalı kargo şirketini ifade eder."
+        ]
+      },
+      "purpose": {
+        "title": "Sözleşmenin Amacı ve Kapsamı",
+        "content": [
+          "E.C.T.S, elektronik ticaret platformunu işletmekte olup satıcı ve alıcıları bir araya getiren aracı hizmet sağlayıcıdır.",
+          "Sözleşme uyarınca Satıcı platforma üye olarak sanal mağaza açabilir ve ürün satışı yapabilir.",
+          "E.C.T.S, platformda yer alan ürünlerin satıcısı konumunda değildir, yalnızca aracılık hizmeti sunar.",
+          "Satıcı ile alıcılar arasındaki ilişki bu sözleşmenin kapsamına girmez; satıcı tüm yükümlülüklerden bizzat sorumludur."
+        ]
+      },
+      "sellerObligations": {
+        "title": "Satıcının Hak ve Yükümlülükleri",
+        "content": [
+          "Satıcı, başvuru sırasında EK-1'de belirtilen tüm belgeleri eksiksiz olarak temin edecektir.",
+          "Satıcı, üyelik formunu eksiksiz ve gerçeğe uygun şekilde dolduracak, yanlış bilgilerden sorumlu olacaktır.",
+          "Satıcı, şifre güvenliğinden tamamen sorumludur; şifresi ile yapılan tüm işlemler kendisine aittir.",
+          "Satıcı, tüm bilgi ve belge değişikliklerini 15 gün içinde platforma bildirmekle yükümlüdür.",
+          "Satıcı, ürünleri eksiksiz, ayıpsız ve mevzuata uygun olarak alıcıya teslim etmeyi taahhüt eder.",
+          "Satıcı, platformda yayınlanan tüm ilan ve içeriklerin doğruluğundan, hukuka uygunluğundan bizzat sorumludur.",
+          "Satıcı, alıcılarla yalnızca platform üzerinden iletişim kuracak ve sözleşme akdedecektir.",
+          "Satıcı, yasaklı ürünler listesinde (EK-2) yer alan ürünleri satışa sunmayacaktır.",
+          "Satıcı, platformdaki kampanya ve indirimleri ihlal edecek faaliyetlerde bulunmayacaktır."
+        ]
+      },
+      "platformRights": {
+        "title": "Platformun Hak ve Yetkileri",
+        "content": [
+          "E.C.T.S, platformun çalışabilmesi için her türlü değişiklik yapma hakkına sahiptir.",
+          "E.C.T.S, satıcı başvurularını sebep göstermeksizin reddetme ve ek belge talep etme hakkını saklı tutar.",
+          "E.C.T.S, sözleşme şartlarına aykırı ilanları geçici veya sürekli durdurabilir, üyeliği sonlandırabilir.",
+          "E.C.T.S, hizmet komisyonu oranlarını ve ödeme koşullarını değiştirme hakkını saklı tutar.",
+          "E.C.T.S, mücbir sebepler dışında platformun kesintisiz çalışmasını garanti etmez.",
+          "E.C.T.S, içerikleri kontrol etme ve erişime kapatma hakkına sahiptir.",
+          "E.C.T.S, satıcının maruz kaldığı zararları satıcının cari hesabından mahsup edebilir."
+        ]
+      },
+      "salesConditions": {
+        "title": "Satış ve İlan Koşulları",
+        "content": [
+          "Satıcı, ürünlerinin satışının ve teşhirinin yürürlükteki mevzuata uygun olduğunu taahhüt eder.",
+          "Satıcı, taklit/sahte ürün teşhir etmeyecek ve satmayacaktır.",
+          "Satıcı, tüm faaliyetlerini platforma teknik zarar vermeyecek şekilde yürütecektir.",
+          "Satıcı, alıcılarla yapılan mesafeli satış sözleşmelerinde satıcı taraf olduğunu kabul eder.",
+          "Satıcı, ürünlerin kalitesinden, garanti belgesi verilmesinden ve satış sonrası hizmetlerden sorumludur.",
+          "Satıcı, ürünleri doğru kategoride listelemekle ve yanıltıcı bilgi yayınlamamakla yükümlüdür.",
+          "Satıcı, E.C.T.S'nin fikri mülkiyet haklarını izinsiz kullanamaz.",
+          "Satıcı, cayma hakkı kapsamında iade işlemlerini mevzuata uygun şekilde yerine getirecektir."
+        ]
+      },
+      "financial": {
+        "title": "Mali Hususlar",
+        "content": [
+          "Satıcı, edimlerini tam olarak yerine getirmesi koşuluyla satış bedelini almaya hak kazanır.",
+          "Komisyon oranları, ödeme koşulları ve mali şartlar EK-3'te belirtildiği şekilde uygulanır.",
+          "Satıcı, satılan ürünler için fatura veya perakende satış fişi düzenlemek zorundadır.",
+          "Ödeme, ürünün tesliminden ve alıcı onayından sonra belirtilen vade tarihinde yapılır.",
+          "Kargo ücretleri satıcı tarafından karşılanır ve E.C.T.S tarafından faturalandırılır.",
+          "Ürün teslimatında gecikme veya kusurlu teslimat durumunda cezai şart uygulanır.",
+          "Satıcı, 7 gün içinde cayma hakkı kapsamında iade taleplerini karşılamakla yükümlüdür.",
+          "Banka ve ödeme kuruluşu komisyonları satıcıya aittir."
+        ]
+      },
+      "termination": {
+        "title": "Sözleşmenin Süresi ve Feshi",
+        "content": [
+          "Sözleşme, satıcı tarafından elektronik ortamda onaylanmakla yürürlüğe girer ve belirsiz sürelidir.",
+          "Taraflar, 1 ay önceden yazılı bildirimde bulunarak sözleşmeyi feshedebilir.",
+          "Sözleşme şartlarına aykırılık halinde E.C.T.S sözleşmeyi derhal feshedebilir.",
+          "İflas, tasfiye veya acze düşme hallerinde sözleşme kendiliğinden sona erer.",
+          "Sözleşmenin feshi durumunda satıcının alıcılara karşı sorumlulukları devam eder.",
+          "E.C.T.S, hizmetleri geçici olarak durdurma ve askıya alma hakkına sahiptir.",
+          "Satıcı, sözleşme ihlalinden kaynaklanan tüm zararları tazmin etmekle yükümlüdür."
+        ]
+      },
+      "confidentiality": {
+        "title": "Gizlilik ve Kişisel Verilerin Korunması",
+        "content": [
+          "Tarafların ticari, mali ve teknik bilgileri gizli bilgi olarak kabul edilir.",
+          "Gizlilik yükümlülüğü sözleşme sona erdikten sonra 3 yıl boyunca devam eder.",
+          "Satıcı, kişisel verileri yürürlükteki mevzuata uygun olarak işleyecektir.",
+          "Satıcı, kişisel verilerin korunması için gerekli tüm teknik ve idari tedbirleri alacaktır.",
+          "E.C.T.S, satıcı bilgilerini güvenli ortamda saklayacak ve belirtilen amaçlarla kullanabilecektir.",
+          "Taraflar, zorunlu hallerde danışmanlarına bilgi verebilir ancak gizlilik yükümlülüğünden sorumludur."
+        ]
+      },
+      "disputeResolution": {
+        "title": "Uyuşmazlıkların Çözümü ve Diğer Hükümler",
+        "content": [
+          "Sözleşme münhasıran KKTC yasalarına tabidir.",
+          "İhtilaflar KKTC mahkemelerinin yargı yetkisindedir.",
+          "E.C.T.S'nin kayıtları bağlayıcı ve kesin delil teşkil eder.",
+          "Sözleşme, taraflar arasında acentelik, ortaklık ilişkisi kurmaz.",
+          "Satıcı, sözleşmeden doğan haklarını E.C.T.S'nin yazılı izni olmadan devredemez.",
+          "Mücbir sebepler halinde taraflar sorumlu tutulamaz.",
+          "Sözleşme değişiklikleri E.C.T.S tarafından tek taraflı yapılabilir ve yayınlandığı tarihte yürürlüğe girer.",
+          "Bildirimler, kayıtlı e-posta adresine veya fiziki adrese yapılacaktır."
         ]
       }
     }

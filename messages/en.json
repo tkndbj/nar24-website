@@ -1241,7 +1241,7 @@
   "pleaseSelectKitchenAppliance": "Please select a kitchen appliance",
   "selectKitchenAppliance": "Select Kitchen Appliance",
   "selectKitchenApplianceType": "Select the type of kitchen appliance",
-
+  "categories": "Categories",
   "shops": {
     "title": "Shops",
     "createYourShop": "Create Your Shop",
@@ -1289,7 +1289,7 @@
   },
   "createShop": {
     "createYourShop": "Create Your Shop",
-    "createAndNameYourShop": "Create and name your shop",
+    "createAndNameYourShop": "Set up your shop and become an official Nar24 retailer!",
     "nameYourShop": "Name Your Shop",
     "enterShopName": "Enter shop name",
     "email": "Email",
@@ -1303,6 +1303,10 @@
     "taxPlateCertificate": "Tax Plate Certificate",
     "uploadProfileImage": "Upload Profile Image",
     "uploadCoverImage": "Upload Cover Images",
+    "upload": "Upload",
+    "iHaveReadAndAccept": "I have read and accept the",
+    "sellerAgreement": "Seller Agreement",
+    "mustAcceptAgreement": "You must accept the Seller Agreement to continue",
     "apply": "Apply",
     "submitting": "Submitting",
     "done": "Done",
@@ -2758,7 +2762,12 @@
     "membershipAgreement": "Membership Agreement",
     "cookiePolicy": "Cookie Policy",
     "made": "Made with",
-    "allRightsReserved": "All rights reserved. Nar24 is a product of E.C.T.S TRADING LTD"
+    "allRightsReserved": "All rights reserved. Nar24 is a product of E.C.T.S TRADING LTD",
+    "profile": "Profile",
+    "orders": "Orders",
+    "sellOnVitrin": "Sell on Vitrin",
+    "accountSettings": "Account Settings",
+    "pickupPoints": "Pickup Points"
   },
   "cookieConsent": {
     "title": "We Value Your Privacy",
@@ -2965,6 +2974,131 @@
           "Members cannot assign rights or obligations under this Agreement without ECTS's prior written consent.",
           "ECTS may assign its rights and obligations to affiliated companies, subsidiaries, or third parties without Member consent.",
           "Use of the website indicates acceptance of this Agreement by users, visitors, and members."
+        ]
+      }
+    }
+  },
+  "sellerAgreement": {
+    "title": "Seller Membership and Partnership Agreement",
+    "lastUpdated": "Last Updated",
+    "updateDate": "January 2025",
+    "introduction": "This Seller Membership and Partnership Agreement is executed between E.C.T.S TRADING LTD platform and individuals or legal entities wishing to operate as sellers. By approving this agreement, you accept all terms and conditions.",
+    "footerNote": "By continuing to use our platform, you acknowledge that you have read, understood, and agreed to this Seller Membership and Partnership Agreement.",
+    "sections": {
+      "parties": {
+        "title": "Parties and General Provisions",
+        "content": [
+          "This agreement is executed between E.C.T.S TRADING LTD and the Seller, regulating the rights and obligations regarding virtual store opening and product sales on the e-commerce platform.",
+          "The Seller must be an individual over 18 years of age or an authorized representative of a legal entity.",
+          "The annexes to the agreement and all documents presented on the website are integral parts of the agreement.",
+          "E.C.T.S reserves the right to evaluate seller applications and reject them without stating a reason."
+        ]
+      },
+      "definitions": {
+        "title": "Definitions",
+        "content": [
+          "Buyer: Refers to the individual or legal entity member who purchases the seller's products through the platform.",
+          "Service: Refers to all services provided by E.C.T.S for sellers to publish, offer for sale, and market their products on the platform.",
+          "Virtual Store: Refers to the virtual space allocated to sellers where they can display their products.",
+          "Platform/Website: Refers to all internet sites, mobile applications, and mobile sites owned by E.C.T.S where services are provided.",
+          "Cargo Company: Refers to E.C.T.S itself and/or contracted cargo company that ensures product delivery to buyers."
+        ]
+      },
+      "purpose": {
+        "title": "Purpose and Scope of the Agreement",
+        "content": [
+          "E.C.T.S operates an e-commerce platform and is an intermediary service provider that brings sellers and buyers together.",
+          "Under the agreement, the Seller can become a member of the platform, open a virtual store, and sell products.",
+          "E.C.T.S is not the seller of products on the platform; it only provides intermediary services.",
+          "The relationship between the Seller and buyers is not covered by this agreement; the seller is personally responsible for all obligations."
+        ]
+      },
+      "sellerObligations": {
+        "title": "Seller's Rights and Obligations",
+        "content": [
+          "The Seller shall provide all documents specified in ANNEX-1 completely during application.",
+          "The Seller shall fill out the membership form completely and accurately and be responsible for incorrect information.",
+          "The Seller is fully responsible for password security; all transactions made with their password belong to them.",
+          "The Seller is obliged to notify the platform of all information and document changes within 15 days.",
+          "The Seller commits to delivering products to buyers completely, without defects, and in compliance with legislation.",
+          "The Seller is personally responsible for the accuracy and legality of all announcements and content published on the platform.",
+          "The Seller shall only communicate with buyers and enter into contracts through the platform.",
+          "The Seller shall not offer prohibited products listed in ANNEX-2 for sale.",
+          "The Seller shall not engage in activities that violate platform campaigns and discounts."
+        ]
+      },
+      "platformRights": {
+        "title": "Platform Rights and Authorities",
+        "content": [
+          "E.C.T.S has the right to make any changes for the platform to function properly.",
+          "E.C.T.S reserves the right to reject seller applications without stating a reason and request additional documents.",
+          "E.C.T.S can temporarily or permanently suspend listings that violate agreement terms and terminate membership.",
+          "E.C.T.S reserves the right to change service commission rates and payment terms.",
+          "E.C.T.S does not guarantee uninterrupted platform operation except in cases of force majeure.",
+          "E.C.T.S has the right to control content and block access.",
+          "E.C.T.S can offset damages incurred from the seller's current account."
+        ]
+      },
+      "salesConditions": {
+        "title": "Sales and Listing Conditions",
+        "content": [
+          "The Seller commits that the sale and display of their products comply with current legislation.",
+          "The Seller shall not display or sell counterfeit/fake products.",
+          "The Seller shall conduct all activities without causing technical damage to the platform.",
+          "The Seller accepts being the seller party in distance sales contracts made with buyers.",
+          "The Seller is responsible for product quality, warranty certificate issuance, and after-sales services.",
+          "The Seller is obliged to list products in the correct category and not publish misleading information.",
+          "The Seller cannot use E.C.T.S's intellectual property rights without permission.",
+          "The Seller shall fulfill return processes within the scope of withdrawal rights in accordance with legislation."
+        ]
+      },
+      "financial": {
+        "title": "Financial Matters",
+        "content": [
+          "The Seller earns the right to receive the sales price on condition of fully fulfilling their obligations.",
+          "Commission rates, payment terms, and financial conditions are applied as specified in ANNEX-3.",
+          "The Seller is required to issue an invoice or retail sales receipt for sold products.",
+          "Payment is made on the specified due date after product delivery and buyer approval.",
+          "Cargo costs are covered by the seller and invoiced by E.C.T.S.",
+          "Penalty clauses apply in case of delay or defective delivery.",
+          "The Seller is obliged to fulfill return requests within the scope of withdrawal rights within 7 days.",
+          "Bank and payment institution commissions belong to the seller."
+        ]
+      },
+      "termination": {
+        "title": "Term and Termination of the Agreement",
+        "content": [
+          "The agreement enters into force upon electronic approval by the seller and is indefinite.",
+          "Parties can terminate the agreement by giving 1 month written notice.",
+          "E.C.T.S can immediately terminate the agreement in case of violation of agreement terms.",
+          "The agreement automatically terminates in cases of bankruptcy, liquidation, or insolvency.",
+          "The seller's responsibilities to buyers continue in case of agreement termination.",
+          "E.C.T.S has the right to temporarily suspend and pause services.",
+          "The Seller is obliged to compensate all damages arising from breach of agreement."
+        ]
+      },
+      "confidentiality": {
+        "title": "Confidentiality and Personal Data Protection",
+        "content": [
+          "Commercial, financial, and technical information of the parties is considered confidential.",
+          "The confidentiality obligation continues for 3 years after the agreement ends.",
+          "The Seller shall process personal data in accordance with current legislation.",
+          "The Seller shall take all necessary technical and administrative measures to protect personal data.",
+          "E.C.T.S will store seller information in a secure environment and may use it for specified purposes.",
+          "Parties may provide information to their advisors in mandatory cases but are responsible for confidentiality obligations."
+        ]
+      },
+      "disputeResolution": {
+        "title": "Dispute Resolution and Other Provisions",
+        "content": [
+          "The agreement is exclusively subject to TRNC laws.",
+          "Disputes are under the jurisdiction of TRNC courts.",
+          "E.C.T.S's records constitute binding and conclusive evidence.",
+          "The agreement does not establish agency or partnership relations between parties.",
+          "The Seller cannot transfer rights arising from the agreement without E.C.T.S's written permission.",
+          "Parties are not held responsible in cases of force majeure.",
+          "Agreement changes can be made unilaterally by E.C.T.S and enter into force on the publication date.",
+          "Notifications will be made to the registered email address or physical address."
         ]
       }
     }

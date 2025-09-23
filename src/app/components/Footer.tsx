@@ -47,15 +47,18 @@ export default function Footer() {
   };
 
   const quickLinks = [
-    { label: t("aboutUs"), href: "/about" },
     { label: t("shops"), href: "/shops" },
-    { label: t("categories"), href: "/categories" },
+    { label: "Vitrin", href: "/dynamicteras" },
     { label: t("becomeASeller"), href: "/createshop" },
+    { label: t("profile"), href: "/profile" },
+    { label: t("orders"), href: "/orders" },
+    { label: t("sellOnVitrin"), href: "/listproduct" },
+    { label: t("accountSettings"), href: "/account-settings" },
   ];
 
   const supportLinks = [
     { label: t("helpCenter"), href: "/support-and-faq" },
-    { label: t("contactUs"), href: "/contact" },
+    { label: t("pickupPoints"), href: "/pickup-points" },
     { label: t("shipping"), href: "/shipping" },
     { label: t("returns"), href: "/returns" },
   ];

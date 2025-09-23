@@ -147,26 +147,42 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
+  // Add this new useEffect to handle body scroll locking for desktop dropdown
+  useEffect(() => {
+    if (!isMobile && showCategoriesMenu) {
+      // Disable body scroll when desktop menu is open
+      document.body.style.overflow = "hidden";
+    } else {
+      // Re-enable body scroll when desktop menu is closed
+      document.body.style.overflow = "";
+    }
+
+    // Cleanup function to restore scrolling
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [showCategoriesMenu, isMobile]);
+
   // ✅ Fix 3: Handle body scroll when mobile drawer is open/closed
   useEffect(() => {
     if (isMobile && showMobileDrawer) {
       // Disable scrolling when drawer is open (any state)
-      document.body.style.overflow = 'hidden';
+      document.body.style.overflow = "hidden";
       // Prevent scrolling on iOS Safari
-      document.body.style.position = 'fixed';
-      document.body.style.width = '100%';
+      document.body.style.position = "fixed";
+      document.body.style.width = "100%";
     } else {
       // Re-enable scrolling when drawer is closed
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.width = '';
+      document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.width = "";
     }
-  
+
     // Cleanup function to ensure scrolling is restored
     return () => {
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.width = '';
+      document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.width = "";
     };
   }, [showMobileDrawer, isMobile, drawerState]);
 
@@ -188,7 +204,7 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
     // Create the "Kategoriler" button first
     const categoriesButton: CategoryItem = {
       id: "categories",
-      name: "Kategoriler",
+      name: t("categories") || "Kategoriler",
       icon: Grid3x3,
       path: "/categories",
     };
@@ -385,10 +401,13 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
       setSelectedMainCategory(buyerCategory);
       setDrawerState("subcategory");
     } else {
-      const path = `/category/${buyerCategory.key
-        .toLowerCase()
-        .replace(/\s+/g, "-")}`;
-      router.push(path);
+      const params = new URLSearchParams();
+      params.set(
+        "category",
+        buyerCategory.key.toLowerCase().replace(/\s+/g, "-")
+      );
+      router.push(`/dynamicmarket?${params.toString()}`);
+
       setShowCategoriesMenu(false);
       setHoveredCategory(null);
     }
@@ -765,131 +784,111 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
                             >
                               {chunk.map((subcategory) => (
                                 <div key={subcategory} className="space-y-2">
-                                  <button
-                                    onClick={() =>
-                                      handleSubcategoryClick(
-                                        category,
-                                        subcategory
-                                      )
-                                    }
+                                  <div
                                     className={`
-                                      text-sm font-medium hover:text-orange-500 
-                                      transition-colors duration-200 text-left block
-                                      ${
-                                        isDark
-                                          ? "text-blue-400 hover:text-orange-400"
-                                          : "text-blue-600"
-                                      }
-                                    `}
+    text-sm font-medium text-left block cursor-default
+    ${isDark ? "text-gray-300" : "text-blue-700"}
+  `}
                                   >
                                     {getLocalizedSubcategory(
                                       category.key,
                                       subcategory
                                     )}
-                                  </button>
+                                  </div>
 
                                   {/* Sub-subcategories */}
                                   <div className="space-y-1">
                                     {AllInOneCategoryData.kBuyerSubSubcategories[
                                       category.key
-                                    ]?.[subcategory]
-                                      ?.slice(0, 6)
-                                      .map((subSubcategory) => (
-                                        <button
-                                          key={subSubcategory}
-                                          onClick={() => {
-                                            const params =
-                                              new URLSearchParams();
+                                    ]?.[subcategory].map((subSubcategory) => (
+                                      <button
+                                        key={subSubcategory}
+                                        onClick={() => {
+                                          const params = new URLSearchParams();
 
-                                            if (
-                                              category.key === "Women" ||
-                                              category.key === "Men"
-                                            ) {
-                                              // ✅ FIX: Use the same logic as handleSubSubcategoryClick
-                                              const productCategoryMapping =
-                                                AllInOneCategoryData.getBuyerToProductMapping(
-                                                  category.key,
-                                                  subcategory,
-                                                  subSubcategory
-                                                );
-
-                                              const productCategory =
-                                                productCategoryMapping?.category ||
-                                                "Clothing & Fashion";
-
-                                              // Convert to URL-friendly format
-                                              const urlCategory =
-                                                REVERSE_CATEGORY_MAPPING[
-                                                  productCategory
-                                                ] ||
-                                                productCategory
-                                                  .toLowerCase()
-                                                  .replace(/[&\s]+/g, "-");
-
-                                              params.set(
-                                                "category",
-                                                urlCategory
-                                              );
-                                              params.set(
-                                                "subcategory",
-                                                subSubcategory
-                                              );
-                                              params.set(
-                                                "buyerCategory",
-                                                category.key
-                                              );
-                                              params.set(
-                                                "buyerSubcategory",
-                                                subcategory
-                                              );
-                                            } else {
-                                              // For other categories: Use standard mapping
-                                              const urlCategory =
-                                                REVERSE_CATEGORY_MAPPING[
-                                                  category.key
-                                                ] ||
-                                                category.key
-                                                  .toLowerCase()
-                                                  .replace(/\s+/g, "-");
-
-                                              params.set(
-                                                "category",
-                                                urlCategory
-                                              );
-                                              params.set(
-                                                "subcategory",
-                                                subcategory
-                                              );
-                                              params.set(
-                                                "subsubcategory",
-                                                subSubcategory
-                                              );
-                                              params.set(
-                                                "buyerCategory",
-                                                category.key
-                                              );
-                                              params.set(
-                                                "buyerSubcategory",
-                                                subcategory
-                                              );
-                                            }
-
-                                            params.set(
-                                              "displayName",
-                                              getLocalizedSubSubcategory(
+                                          if (
+                                            category.key === "Women" ||
+                                            category.key === "Men"
+                                          ) {
+                                            // ✅ FIX: Use the same logic as handleSubSubcategoryClick
+                                            const productCategoryMapping =
+                                              AllInOneCategoryData.getBuyerToProductMapping(
                                                 category.key,
                                                 subcategory,
                                                 subSubcategory
-                                              )
-                                            );
+                                              );
 
-                                            router.push(
-                                              `/dynamicmarket2?${params.toString()}`
+                                            const productCategory =
+                                              productCategoryMapping?.category ||
+                                              "Clothing & Fashion";
+
+                                            // Convert to URL-friendly format
+                                            const urlCategory =
+                                              REVERSE_CATEGORY_MAPPING[
+                                                productCategory
+                                              ] ||
+                                              productCategory
+                                                .toLowerCase()
+                                                .replace(/[&\s]+/g, "-");
+
+                                            params.set("category", urlCategory);
+                                            params.set(
+                                              "subcategory",
+                                              subSubcategory
                                             );
-                                            setShowCategoriesMenu(false);
-                                            setHoveredCategory(null);
-                                          }}
-                                          className={`
+                                            params.set(
+                                              "buyerCategory",
+                                              category.key
+                                            );
+                                            params.set(
+                                              "buyerSubcategory",
+                                              subcategory
+                                            );
+                                          } else {
+                                            // For other categories: Use standard mapping
+                                            const urlCategory =
+                                              REVERSE_CATEGORY_MAPPING[
+                                                category.key
+                                              ] ||
+                                              category.key
+                                                .toLowerCase()
+                                                .replace(/\s+/g, "-");
+
+                                            params.set("category", urlCategory);
+                                            params.set(
+                                              "subcategory",
+                                              subcategory
+                                            );
+                                            params.set(
+                                              "subsubcategory",
+                                              subSubcategory
+                                            );
+                                            params.set(
+                                              "buyerCategory",
+                                              category.key
+                                            );
+                                            params.set(
+                                              "buyerSubcategory",
+                                              subcategory
+                                            );
+                                          }
+
+                                          params.set(
+                                            "displayName",
+                                            getLocalizedSubSubcategory(
+                                              category.key,
+                                              subcategory,
+                                              subSubcategory
+                                            )
+                                          );
+
+                                          router.push(
+                                            `/dynamicmarket2?${params.toString()}`
+                                          );
+                                          setShowCategoriesMenu(false);
+                                          setHoveredCategory(null);
+                                        }}
+                                        className={`
                                           block text-xs py-1 hover:text-orange-500 
                                           transition-colors duration-200 text-left
                                           ${
@@ -898,38 +897,14 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
                                               : "text-gray-600"
                                           }
                                         `}
-                                        >
-                                          {getLocalizedSubSubcategory(
-                                            category.key,
-                                            subcategory,
-                                            subSubcategory
-                                          )}
-                                        </button>
-                                      ))}
-                                    {(AllInOneCategoryData
-                                      .kBuyerSubSubcategories[category.key]?.[
-                                      subcategory
-                                    ]?.length || 0) > 6 && (
-                                      <button
-                                        onClick={() =>
-                                          handleSubcategoryClick(
-                                            category,
-                                            subcategory
-                                          )
-                                        }
-                                        className={`
-                                          block text-xs py-1 font-medium
-                                          transition-colors duration-200 text-left
-                                          ${
-                                            isDark
-                                              ? "text-orange-400 hover:text-orange-300"
-                                              : "text-orange-600 hover:text-orange-700"
-                                          }
-                                        `}
                                       >
-                                        Tümünü Gör →
+                                        {getLocalizedSubSubcategory(
+                                          category.key,
+                                          subcategory,
+                                          subSubcategory
+                                        )}
                                       </button>
-                                    )}
+                                    ))}
                                   </div>
                                 </div>
                               ))}
@@ -967,7 +942,11 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
           <div
             className={`
               fixed inset-0 z-[9998] transition-opacity duration-300 ease-in-out
-              ${showMobileDrawer ? 'opacity-100' : 'opacity-0 pointer-events-none'}
+              ${
+                showMobileDrawer
+                  ? "opacity-100"
+                  : "opacity-0 pointer-events-none"
+              }
             `}
             onClick={closeMobileDrawer}
           />
