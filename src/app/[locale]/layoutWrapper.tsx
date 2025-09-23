@@ -9,13 +9,14 @@ import { BadgeProvider } from "@/context/BadgeProvider";
 import { SearchProvider } from "@/context/SearchProvider";
 import ConditionalHeader from "../components/ConditionalHeader";
 import { SearchHistoryProvider } from "@/context/SearchHistoryProvider";
+import Footer from "../components/Footer";
 import { PersonalizedRecommendationsProvider } from "@/context/PersonalizedRecommendationsProvider";
 import { db } from "@/lib/firebase";
 
 // Inner component that has access to user context
 function AppProviders({ children }: { children: React.ReactNode }) {
   const { user } = useUser();
-  
+
   return (
     <CartProvider user={user} db={db}>
       <FavoritesProvider>
@@ -25,6 +26,7 @@ function AppProviders({ children }: { children: React.ReactNode }) {
               <PersonalizedRecommendationsProvider>
                 <ConditionalHeader />
                 <main>{children}</main>
+                <Footer />
               </PersonalizedRecommendationsProvider>
             </SearchHistoryProvider>
           </SearchProvider>

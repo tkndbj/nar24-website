@@ -2668,7 +2668,7 @@
     "selectColor": "Renk Seç",
     "quantity": "Miktar",
     "color": "Renk",
-    "noStock": "Stok Yok", 
+    "noStock": "Stok Yok",
     "default": "Varsayılan",
     "discountApplied": "İndirim uygulandı",
     "buyText": "Satın al",
@@ -2730,5 +2730,24 @@
     "reviewFrom": "Yorumu yazan",
     "responseFrom": "Satıcıdan yanıt",
     "helpful": "Faydalı"
+  },
+  "footer": {
+    "tagline": "Kaliteli ürünler ve harika fırsatlar için güvenilir pazaryeriniz",
+    "quickLinks": "Hızlı Bağlantılar",
+    "aboutUs": "Hakkımızda",
+    "shops": "Mağazalar",
+    "categories": "Kategoriler",
+    "becomeASeller": "Satıcı Ol",
+    "support": "Destek",
+    "helpCenter": "Yardım Merkezi",
+    "contactUs": "Bize Ulaşın",
+    "shipping": "Kargo Bilgisi",
+    "returns": "İade & Geri Ödeme",
+    "legal": "Yasal",
+    "termsOfService": "Hizmet Şartları",
+    "privacyPolicy": "Gizlilik Politikası",
+    "cookiePolicy": "Çerez Politikası",
+    "made": "ile yapıldı",
+    "allRightsReserved": "Tüm hakları saklıdır. Nar24, E.C.T.S TRADING LTD ürünüdür"
   }
 }

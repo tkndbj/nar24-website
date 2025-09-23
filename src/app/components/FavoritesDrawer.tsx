@@ -14,7 +14,6 @@ import {
   FolderPlus,
   Folder,
   ChevronDown,
-  AlertCircle,
   CheckCircle,
   Circle,
 } from "lucide-react";
@@ -49,7 +48,7 @@ interface FavoriteDetails {
   addedAt?: Timestamp;
   quantity?: number;
   selectedColor?: string;
-  selectedColorImage?: string;  
+  selectedColorImage?: string;
 }
 
 interface FavoriteItem {
@@ -57,10 +56,11 @@ interface FavoriteItem {
   addedAt: Timestamp;
   quantity: number;
   selectedColor?: string;
-  selectedColorImage?: string;  
+  selectedColorImage?: string;
   product?: Product;
   isLoadingProduct?: boolean;
   loadError?: boolean;
+  isDeleted?: boolean; // NEW: Track if product was deleted
 }
 
 interface FavoritesDrawerProps {
@@ -94,35 +94,31 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
     showSuccessToast,
   } = useFavorites();
 
-  // ✅ FIXED: Proper nested translation function that uses JSON files
-  const t = useCallback((key: string) => {
-    if (!localization) {
-      // Return the key itself if no localization function is provided
-      return key;
-    }
+  const t = useCallback(
+    (key: string) => {
+      if (!localization) {
+        return key;
+      }
 
-    try {
-      // Try to get the nested FavoritesDrawer translation
-      const translation = localization(`FavoritesDrawer.${key}`);
-      
-      // Check if we got a valid translation (not the same as the key we requested)
-      if (translation && translation !== `FavoritesDrawer.${key}`) {
-        return translation;
+      try {
+        const translation = localization(`FavoritesDrawer.${key}`);
+        if (translation && translation !== `FavoritesDrawer.${key}`) {
+          return translation;
+        }
+
+        const directTranslation = localization(key);
+        if (directTranslation && directTranslation !== key) {
+          return directTranslation;
+        }
+
+        return key;
+      } catch (error) {
+        console.warn(`Translation error for key: ${key}`, error);
+        return key;
       }
-      
-      // If nested translation doesn't exist, try direct key
-      const directTranslation = localization(key);
-      if (directTranslation && directTranslation !== key) {
-        return directTranslation;
-      }
-      
-      // Return the key as fallback
-      return key;
-    } catch (error) {
-      console.warn(`Translation error for key: ${key}`, error);
-      return key;
-    }
-  }, [localization]);
+    },
+    [localization]
+  );
 
   // Local state for favorite items with product data
   const [favoriteItems, setFavoriteItems] = useState<FavoriteItem[]>([]);
@@ -159,48 +155,53 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
   }, [isOpen]);
 
   useEffect(() => {
-    // Check if it's mobile (you can adjust the breakpoint as needed)
-    const isMobile = window.innerWidth < 768; // md breakpoint
-    
+    const isMobile = window.innerWidth < 768;
+
     if (isMobile && isOpen) {
-      // Disable scrolling when drawer is open
-      document.body.style.overflow = 'hidden';
-      // Prevent scrolling on iOS Safari
-      document.body.style.position = 'fixed';
-      document.body.style.width = '100%';
+      document.body.style.overflow = "hidden";
+      document.body.style.position = "fixed";
+      document.body.style.width = "100%";
     } else if (isMobile) {
-      // Re-enable scrolling when drawer is closed (only for mobile)
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.width = '';
+      document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.width = "";
     }
-  
-    // Cleanup function to ensure scrolling is restored
+
     return () => {
-      // Only cleanup if it was mobile when the effect ran
       const wasMobile = window.innerWidth < 768;
       if (wasMobile) {
-        document.body.style.overflow = '';
-        document.body.style.position = '';
-        document.body.style.width = '';
+        document.body.style.overflow = "";
+        document.body.style.position = "";
+        document.body.style.width = "";
       }
     };
   }, [isOpen]);
 
-  // Calculate selected count
-  const selectedCount = Object.values(selectedProducts).filter(Boolean).length;
+  // Calculate selected count - only count non-deleted items
+  const selectedCount = Object.entries(selectedProducts).filter(
+    ([productId, selected]) => {
+      if (!selected) return false;
+      const item = favoriteItems.find((i) => i.productId === productId);
+      return item && !item.isDeleted;
+    }
+  ).length;
 
   // Update select all state when individual selections change
   useEffect(() => {
-    const totalItems = favoriteItems.filter((item) => item.product).length;
-    if (totalItems === 0) {
+    const validItems = favoriteItems.filter(
+      (item) => item.product && !item.isDeleted
+    );
+    if (validItems.length === 0) {
       setIsAllSelected(false);
       return;
     }
 
-    const selectedCount =
-      Object.values(selectedProducts).filter(Boolean).length;
-    setIsAllSelected(selectedCount === totalItems && selectedCount > 0);
+    const selectedValidCount = validItems.filter(
+      (item) => selectedProducts[item.productId]
+    ).length;
+    setIsAllSelected(
+      selectedValidCount === validItems.length && selectedValidCount > 0
+    );
   }, [selectedProducts, favoriteItems]);
 
   // Reset selections when basket changes or items change
@@ -250,7 +251,7 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
           addedAt: favDetails.addedAt || Timestamp.now(),
           quantity: favDetails.quantity || 1,
           selectedColor: favDetails.selectedColor,
-          selectedColorImage: favDetails.selectedColorImage,          
+          selectedColorImage: favDetails.selectedColorImage,
           isLoadingProduct: true,
         };
 
@@ -274,7 +275,8 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                   ...newItems[index],
                   product,
                   isLoadingProduct: false,
-                  loadError: !product,
+                  isDeleted: !product, // Mark as deleted if product doesn't exist
+                  loadError: false,
                 };
               }
               return newItems;
@@ -290,6 +292,7 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                 newItems[index] = {
                   ...newItems[index],
                   isLoadingProduct: false,
+                  isDeleted: true, // Mark as deleted on error
                   loadError: true,
                 };
               }
@@ -298,6 +301,11 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
           }
         })
       );
+
+      // Auto-cleanup deleted items after loading
+      setTimeout(() => {
+        cleanupDeletedItems();
+      }, 2000); // Give user 2 seconds to see what happened
     } catch (error) {
       console.error("Error loading favorite items:", error);
       showErrorToast(t("failedToLoadFavorites"));
@@ -305,6 +313,32 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
       setIsLoadingItems(false);
     }
   }, [user, favoriteProductIds, selectedBasketId, showErrorToast, t]);
+
+  // Cleanup deleted items silently
+  const cleanupDeletedItems = useCallback(async () => {
+    if (!user) return;
+
+    const deletedItems = favoriteItems.filter((item) => item.isDeleted);
+    if (deletedItems.length === 0) return;
+
+    try {
+      // Silently remove deleted items from favorites
+      const productIds = deletedItems.map((item) => item.productId);
+      await removeMultipleFromFavorites(productIds);
+
+      // Update local state to remove deleted items
+      setFavoriteItems((prev) => prev.filter((item) => !item.isDeleted));
+
+      // Clean up selections
+      setSelectedProducts((prev) => {
+        const newState = { ...prev };
+        productIds.forEach((id) => delete newState[id]);
+        return newState;
+      });
+    } catch (error) {
+      console.error("Error cleaning up deleted items:", error);
+    }
+  }, [user, favoriteItems, removeMultipleFromFavorites]);
 
   // Load favorite items with product data when favorites change
   useEffect(() => {
@@ -342,17 +376,23 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
   // Handle individual product selection
   const handleProductSelect = useCallback(
     (productId: string, selected: boolean) => {
+      // Don't allow selection of deleted items
+      const item = favoriteItems.find((i) => i.productId === productId);
+      if (item?.isDeleted) return;
+
       setSelectedProducts((prev) => ({
         ...prev,
         [productId]: selected,
       }));
     },
-    []
+    [favoriteItems]
   );
 
-  // Handle select all toggle
+  // Handle select all toggle - only select non-deleted items
   const handleSelectAll = useCallback(() => {
-    const validItems = favoriteItems.filter((item) => item.product);
+    const validItems = favoriteItems.filter(
+      (item) => item.product && !item.isDeleted
+    );
     const newSelectionState = !isAllSelected;
 
     const newSelections: Record<string, boolean> = {};
@@ -364,12 +404,11 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
     setIsAllSelected(newSelectionState);
   }, [favoriteItems, isAllSelected]);
 
-  // Handle item removal with optimistic UI
+  // Handle item removal
   const handleRemoveItem = async (productId: string) => {
     setRemovingItems((prev) => new Set(prev).add(productId));
     try {
       await removeFromFavorites(productId);
-      // Remove from selection if it was selected
       setSelectedProducts((prev) => {
         const newState = { ...prev };
         delete newState[productId];
@@ -387,7 +426,7 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
     }
   };
 
-  // Handle clear all favorites
+  // Handle clear all favorites - including deleted items
   const handleClearFavorites = async () => {
     if (favoriteCount === 0) return;
 
@@ -405,7 +444,7 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
     }
   };
 
-  // Handle basket creation
+  // Other handlers remain the same...
   const handleCreateBasket = async () => {
     if (!newBasketName.trim()) return;
 
@@ -426,7 +465,6 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
     }
   };
 
-  // Handle basket deletion
   const handleDeleteBasket = async (basketId: string) => {
     try {
       await deleteFavoriteBasket(basketId);
@@ -436,23 +474,23 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
     }
   };
 
-  // Handle basket selection
   const handleBasketSelect = (basketId: string | null) => {
     setSelectedBasket(basketId);
     setShowBasketSelector(false);
   };
 
-  // Handle transfer to basket
   const handleTransferToBasket = async () => {
     const selectedProductIds = Object.entries(selectedProducts)
-      .filter(([, selected]) => selected)
+      .filter(([productId, selected]) => {
+        if (!selected) return false;
+        const item = favoriteItems.find((i) => i.productId === productId);
+        return item && !item.isDeleted;
+      })
       .map(([productId]) => productId);
 
     if (selectedProductIds.length === 0) return;
 
-    // Check if user has baskets
     if (favoriteBaskets.length === 0) {
-      // Show create basket dialog
       setShowCreateBasket(true);
       return;
     }
@@ -462,10 +500,8 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
       let targetBasketId: string;
 
       if (favoriteBaskets.length === 1) {
-        // Only one basket, use it
         targetBasketId = favoriteBaskets[0].id;
       } else {
-        // Multiple baskets, show selection dialog
         const basketId = await showBasketSelectionDialog();
         if (!basketId) {
           setIsTransferringToBasket(false);
@@ -476,7 +512,6 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
 
       await transferFavoritesToBasket(selectedProductIds, targetBasketId);
 
-      // Clear selections
       setSelectedProducts({});
       setIsAllSelected(false);
     } catch (error) {
@@ -487,10 +522,8 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
     }
   };
 
-  // Show basket selection dialog (you'll need to implement this based on your UI library)
   const showBasketSelectionDialog = (): Promise<string | null> => {
     return new Promise((resolve) => {
-      // This is a simple implementation - you might want to use a proper modal/dialog
       const basketNames = favoriteBaskets
         .map((b) => `${b.name} (${b.id})`)
         .join("\n");
@@ -508,39 +541,39 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
     });
   };
 
-  // Handle add to cart
   const handleAddToCart = async () => {
     const selectedProductIds = Object.entries(selectedProducts)
-      .filter(([, selected]) => selected)
+      .filter(([productId, selected]) => {
+        if (!selected) return false;
+        const item = favoriteItems.find((i) => i.productId === productId);
+        return item && !item.isDeleted;
+      })
       .map(([productId]) => productId);
 
     if (selectedProductIds.length === 0) return;
 
     setIsAddingToCart(true);
     try {
-      // Here you would integrate with your cart provider
-      // For now, just log the action
       console.log("Adding to cart:", selectedProductIds);
 
-      // Get the selected items with their attributes
       const selectedItems = favoriteItems.filter(
-        (item) => selectedProductIds.includes(item.productId) && item.product
+        (item) =>
+          selectedProductIds.includes(item.productId) &&
+          item.product &&
+          !item.isDeleted
       );
 
-      // Add each item to cart with its stored attributes
       for (const item of selectedItems) {
-        // You'll need to implement this based on your cart provider
         console.log("Adding item to cart:", {
           productId: item.productId,
           quantity: item.quantity,
           selectedColor: item.selectedColor,
-          selectedColorImage: item.selectedColorImage,          
+          selectedColorImage: item.selectedColorImage,
         });
       }
 
       showSuccessToast(`${selectedProductIds.length} ${t("itemsAddedToCart")}`);
 
-      // Clear selections
       setSelectedProducts({});
       setIsAllSelected(false);
     } catch (error) {
@@ -551,13 +584,11 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
     }
   };
 
-  // Handle navigation to login
   const handleGoToLogin = () => {
     onClose();
     router.push("/login");
   };
 
-  // Backdrop click handler
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
       onClose();
@@ -570,6 +601,11 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
     ? favoriteBaskets.find((b) => b.id === selectedBasketId)?.name ||
       t("unknownBasket")
     : t("defaultFavorites");
+
+  // Filter out deleted items from count
+  const activeItemsCount = favoriteItems.filter(
+    (item) => !item.isDeleted
+  ).length;
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden">
@@ -624,14 +660,14 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                 >
                   {t("title")}
                 </h2>
-                {user && favoriteCount > 0 && (
+                {user && activeItemsCount > 0 && (
                   <p
                     className={`
                       text-sm
                       ${isDarkMode ? "text-gray-400" : "text-gray-500"}
                     `}
                   >
-                    {favoriteCount} {t("itemsCount")}
+                    {activeItemsCount} {t("itemsCount")}
                     {selectedCount > 0 && (
                       <span className="ml-2 text-orange-500 font-medium">
                         ({selectedCount} {t("selected")})
@@ -643,8 +679,8 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
             </div>
 
             <div className="flex items-center space-x-2">
-              {/* Select All Toggle - Only show when there are items */}
-              {user && favoriteCount > 0 && (
+              {/* Select All Toggle - Only show when there are active items */}
+              {user && activeItemsCount > 0 && (
                 <button
                   onClick={handleSelectAll}
                   className={`
@@ -904,7 +940,7 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
           </div>
         )}
 
-        {/* Content - This is the main scrollable area */}
+        {/* Content - Main scrollable area */}
         <div className="flex-1 overflow-y-auto min-h-0">
           {/* Not Authenticated State */}
           {!user ? (
@@ -947,12 +983,10 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                 "
               >
                 <LogIn size={18} />
-                <span className="font-medium">
-                  {t("login")}
-                </span>
+                <span className="font-medium">{t("login")}</span>
               </button>
             </div>
-          ) : /* Loading State */ isLoading || isLoadingItems ? (
+          ) : isLoading || isLoadingItems ? (
             <div className="flex flex-col items-center justify-center h-full px-6 py-12">
               <div className="animate-spin w-8 h-8 border-3 border-orange-500 border-t-transparent rounded-full mb-4"></div>
               <p
@@ -964,7 +998,7 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                 {t("loading")}
               </p>
             </div>
-          ) : /* Empty Favorites State */ favoriteCount === 0 ? (
+          ) : activeItemsCount === 0 ? (
             <div className="flex flex-col items-center justify-center h-full px-6 py-12">
               <div
                 className={`
@@ -1007,198 +1041,179 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                 "
               >
                 <ShoppingBag size={18} />
-                <span className="font-medium">
-                  {t("startShopping")}
-                </span>
+                <span className="font-medium">{t("startShopping")}</span>
               </button>
             </div>
           ) : (
             /* Favorite Items */
             <div className="px-4 py-4">
               <div className="space-y-4">
-                {favoriteItems.map((item) => {
-                  const isRemoving = removingItems.has(item.productId);
-                  const product = item.product;
-                  const isSelected = selectedProducts[item.productId] || false;
+                {favoriteItems
+                  .filter((item) => !item.isDeleted) // Only show non-deleted items
+                  .map((item) => {
+                    const isRemoving = removingItems.has(item.productId);
+                    const product = item.product;
+                    const isSelected =
+                      selectedProducts[item.productId] || false;
 
-                  return (
-                    <div
-                      key={item.productId}
-                      className={`
-                        transition-all duration-300 transform
-                        ${
-                          isRemoving || item.isLoadingProduct
-                            ? "opacity-50 scale-95"
-                            : "opacity-100 scale-100"
-                        }
-                      `}
-                    >
+                    return (
                       <div
+                        key={item.productId}
                         className={`
-                          rounded-xl border p-3 transition-all duration-200 relative
+                          transition-all duration-300 transform
                           ${
-                            isDarkMode
-                              ? "bg-gray-800 border-gray-700 hover:border-gray-600"
-                              : "bg-gray-50 border-gray-200 hover:border-gray-300"
-                          }
-                          ${item.isLoadingProduct ? "border-dashed" : ""}
-                          ${
-                            isSelected
-                              ? "ring-2 ring-orange-500 border-orange-500"
-                              : ""
+                            isRemoving || item.isLoadingProduct
+                              ? "opacity-50 scale-95"
+                              : "opacity-100 scale-100"
                           }
                         `}
                       >
-                        {/* Selection Toggle - Only show when product is loaded */}
-                        {product && (
-                          <button
-                            onClick={() =>
-                              handleProductSelect(item.productId, !isSelected)
+                        <div
+                          className={`
+                            rounded-xl border p-3 transition-all duration-200 relative
+                            ${
+                              isDarkMode
+                                ? "bg-gray-800 border-gray-700 hover:border-gray-600"
+                                : "bg-gray-50 border-gray-200 hover:border-gray-300"
                             }
-                            className={`
-                              absolute top-2 left-2 z-10 p-1 rounded-full transition-colors duration-200
-                              ${
-                                isDarkMode
-                                  ? "bg-gray-900/80 hover:bg-gray-900"
-                                  : "bg-white/80 hover:bg-white"
+                            ${item.isLoadingProduct ? "border-dashed" : ""}
+                            ${
+                              isSelected
+                                ? "ring-2 ring-orange-500 border-orange-500"
+                                : ""
+                            }
+                          `}
+                        >
+                          {/* Selection Toggle */}
+                          {product && (
+                            <button
+                              onClick={() =>
+                                handleProductSelect(item.productId, !isSelected)
                               }
-                              backdrop-blur-sm shadow-sm
-                            `}
-                          >
-                            {isSelected ? (
-                              <CheckCircle
-                                size={20}
-                                className="text-orange-500"
-                              />
-                            ) : (
-                              <Circle
-                                size={20}
-                                className={
-                                  isDarkMode ? "text-gray-400" : "text-gray-500"
+                              className={`
+                                absolute top-2 left-2 z-10 p-1 rounded-full transition-colors duration-200
+                                ${
+                                  isDarkMode
+                                    ? "bg-gray-900/80 hover:bg-gray-900"
+                                    : "bg-white/80 hover:bg-white"
                                 }
-                              />
-                            )}
-                          </button>
-                        )}
-
-                        {product ? (
-                          <ProductCard3
-                            imageUrl={
-                              item.selectedColorImage ||
-                              product.imageUrls?.[0] ||
-                              "https://via.placeholder.com/200"
-                            }
-                            colorImages={product.colorImages || {}}
-                            selectedColor={item.selectedColor}
-                            selectedColorImage={item.selectedColorImage}
-                            productName={product.productName || "Product"}
-                            brandModel={
-                              product.brandModel ||
-                              product.sellerName ||
-                              "Brand"
-                            }
-                            price={product.price || 0}
-                            currency={product.currency || "TL"}
-                            averageRating={product.averageRating || 0}
-                            quantity={item.quantity}
-                            maxQuantityAllowed={0} // No quantity controls for favorites
-                            isDarkMode={isDarkMode}
-                            scaleFactor={0.9}
-                          />
-                        ) : (
-                          <div className="flex items-center justify-center h-24">
-                            {item.isLoadingProduct ? (
-                              <div className="animate-spin w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full"></div>
-                            ) : (
-                              <div className="text-center">
-                                <AlertCircle
-                                  className="mx-auto mb-2 text-red-500"
-                                  size={24}
+                                backdrop-blur-sm shadow-sm
+                              `}
+                            >
+                              {isSelected ? (
+                                <CheckCircle
+                                  size={20}
+                                  className="text-orange-500"
                                 />
-                                <p className="text-sm text-gray-500">
-                                  {t("productLoadError")}
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Action Buttons - Hide when product is selected for batch operations */}
-                        {product && !isSelected && (
-                          <div className="mt-3 flex justify-between">
-                            <button
-                              onClick={() => {
-                                // Add to cart functionality
-                                console.log("Add to cart:", item.productId);
-                              }}
-                              className={`
-                                flex items-center space-x-2 px-3 py-2 rounded-lg text-sm
-                                transition-colors duration-200
-                                ${
-                                  isDarkMode
-                                    ? "text-green-400 hover:text-green-300 hover:bg-green-900/20"
-                                    : "text-green-600 hover:text-green-700 hover:bg-green-50"
-                                }
-                              `}
-                            >
-                              <ShoppingCart size={14} />
-                              <span>{t("addToCart")}</span>
-                            </button>
-
-                            <button
-                              onClick={() => handleRemoveItem(item.productId)}
-                              disabled={isRemoving}
-                              className={`
-                                flex items-center space-x-2 px-3 py-2 rounded-lg text-sm
-                                transition-colors duration-200
-                                ${
-                                  isDarkMode
-                                    ? "text-red-400 hover:text-red-300 hover:bg-red-900/20"
-                                    : "text-red-500 hover:text-red-600 hover:bg-red-50"
-                                }
-                                ${
-                                  isRemoving
-                                    ? "opacity-50 cursor-not-allowed"
-                                    : ""
-                                }
-                              `}
-                            >
-                              {isRemoving ? (
-                                <RefreshCw size={14} className="animate-spin" />
                               ) : (
-                                <Trash2 size={14} />
+                                <Circle
+                                  size={20}
+                                  className={
+                                    isDarkMode
+                                      ? "text-gray-400"
+                                      : "text-gray-500"
+                                  }
+                                />
                               )}
-                              <span>
-                                {isRemoving ? t("removing") : t("remove")}
-                              </span>
                             </button>
-                          </div>
-                        )}
+                          )}
 
-                        {/* Loading/Error States */}
-                        {item.isLoadingProduct && (
-                          <div className="mt-2 flex items-center space-x-2 text-xs text-gray-500">
-                            <div className="animate-spin w-3 h-3 border border-gray-400 border-t-transparent rounded-full"></div>
-                            <span>{t("loadingProductInfo")}</span>
-                          </div>
-                        )}
+                          {product && (
+                            <ProductCard3
+                              imageUrl={
+                                item.selectedColorImage ||
+                                product.imageUrls?.[0] ||
+                                "https://via.placeholder.com/200"
+                              }
+                              colorImages={product.colorImages || {}}
+                              selectedColor={item.selectedColor}
+                              selectedColorImage={item.selectedColorImage}
+                              productName={product.productName || "Product"}
+                              brandModel={
+                                product.brandModel ||
+                                product.sellerName ||
+                                "Brand"
+                              }
+                              price={product.price || 0}
+                              currency={product.currency || "TL"}
+                              averageRating={product.averageRating || 0}
+                              quantity={item.quantity}
+                              maxQuantityAllowed={0}
+                              isDarkMode={isDarkMode}
+                              scaleFactor={0.9}
+                            />
+                          )}
 
-                        {item.loadError && (
-                          <div className="mt-2 flex items-center space-x-2 text-xs text-red-500">
-                            <AlertCircle size={12} />
-                            <span>{t("productInfoError")}</span>
-                          </div>
-                        )}
+                          {/* Loading state */}
+                          {item.isLoadingProduct && (
+                            <div className="flex items-center justify-center h-24">
+                              <div className="animate-spin w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full"></div>
+                            </div>
+                          )}
+
+                          {/* Action Buttons */}
+                          {product && !isSelected && (
+                            <div className="mt-3 flex justify-between">
+                              <button
+                                onClick={() => {
+                                  console.log("Add to cart:", item.productId);
+                                }}
+                                className={`
+                                  flex items-center space-x-2 px-3 py-2 rounded-lg text-sm
+                                  transition-colors duration-200
+                                  ${
+                                    isDarkMode
+                                      ? "text-green-400 hover:text-green-300 hover:bg-green-900/20"
+                                      : "text-green-600 hover:text-green-700 hover:bg-green-50"
+                                  }
+                                `}
+                              >
+                                <ShoppingCart size={14} />
+                                <span>{t("addToCart")}</span>
+                              </button>
+
+                              <button
+                                onClick={() => handleRemoveItem(item.productId)}
+                                disabled={isRemoving}
+                                className={`
+                                  flex items-center space-x-2 px-3 py-2 rounded-lg text-sm
+                                  transition-colors duration-200
+                                  ${
+                                    isDarkMode
+                                      ? "text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                                      : "text-red-500 hover:text-red-600 hover:bg-red-50"
+                                  }
+                                  ${
+                                    isRemoving
+                                      ? "opacity-50 cursor-not-allowed"
+                                      : ""
+                                  }
+                                `}
+                              >
+                                {isRemoving ? (
+                                  <RefreshCw
+                                    size={14}
+                                    className="animate-spin"
+                                  />
+                                ) : (
+                                  <Trash2 size={14} />
+                                )}
+                                <span>
+                                  {isRemoving ? t("removing") : t("remove")}
+                                </span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
               </div>
             </div>
           )}
         </div>
 
-        {/* Bottom Action Buttons - Show only when products are selected */}
+        {/* Bottom Action Buttons */}
         {user && selectedCount > 0 && (
           <div
             className={`
@@ -1211,9 +1226,7 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
               backdrop-blur-xl bg-opacity-95
             `}
           >
-            {/* Action Buttons */}
             <div className="grid grid-cols-2 gap-3">
-              {/* Transfer to Basket Button - Only show if not in basket mode */}
               {!selectedBasketId ? (
                 <button
                   onClick={handleTransferToBasket}
@@ -1247,7 +1260,6 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
               ) : (
                 <button
                   onClick={() => {
-                    // Remove selected from basket logic here
                     console.log(
                       "Remove from basket:",
                       Object.entries(selectedProducts)
@@ -1266,11 +1278,12 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                   `}
                 >
                   <ArrowRight size={16} />
-                  <span>{t("removeFromBasket")} ({selectedCount})</span>
+                  <span>
+                    {t("removeFromBasket")} ({selectedCount})
+                  </span>
                 </button>
               )}
 
-              {/* Add to Cart Button */}
               <button
                 onClick={handleAddToCart}
                 disabled={isAddingToCart}
