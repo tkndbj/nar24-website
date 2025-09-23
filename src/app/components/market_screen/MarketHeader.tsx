@@ -148,13 +148,17 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
     }
   }, [isSearching, updateTerm]);
 
-  const handleSearchSubmit = useCallback(async () => {
-    if (searchTerm.trim()) {
+  const handleSearchSubmit = useCallback(async (term?: string) => {
+    const searchQuery = (term || searchTerm).trim();
+    if (searchQuery) {
       setShowSuggestions(false);
       setIsSearching(false);
-      router.push(`/search-results?q=${encodeURIComponent(searchTerm.trim())}`);
-      setSearchTerm("");
-      clearSearchState();
+      router.push(`/search-results?q=${encodeURIComponent(searchQuery)}`);
+      if (!term) {
+        // Only clear if it's a regular search, not from history
+        setSearchTerm("");
+        clearSearchState();
+      }
     }
   }, [searchTerm, router, clearSearchState]);
 
@@ -448,6 +452,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                 onKeyPress={handleKeyPress}
                 showSuggestions={showSuggestions}
                 onSuggestionClick={handleSuggestionClick}
+                onHistoryItemClick={handleSearchSubmit}
                 isMobile={true}
                 t={t}
               />
@@ -478,6 +483,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                 onKeyPress={handleKeyPress}
                 showSuggestions={showSuggestions}
                 onSuggestionClick={handleSuggestionClick}
+                onHistoryItemClick={handleSearchSubmit}
                 isMobile={false}
                 t={t}
               />

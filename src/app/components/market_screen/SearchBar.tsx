@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
-// Removed useRouter import - will handle navigation differently
 import {
   Search,
   Clock,
@@ -11,7 +10,7 @@ import {
   TrendingUp,
   Loader2,
 } from "lucide-react";
-
+import { useRouter } from "next/navigation";
 import {
   CategorySuggestion,
   Suggestion,
@@ -25,9 +24,10 @@ interface SearchBarProps {
   onSearchStateChange: (searching: boolean) => void;
   searchTerm: string;
   onSearchTermChange: (term: string) => void;
-  onSearchSubmit?: () => void; // Made optional since we'll handle it internally
-  onKeyPress?: (e: React.KeyboardEvent) => void; // Made optional
+  onSearchSubmit?: () => void;
+  onKeyPress?: (e: React.KeyboardEvent) => void;
   showSuggestions: boolean;
+  onHistoryItemClick?: (term: string) => void;
   onSuggestionClick: (
     suggestion: Suggestion | CategorySuggestion,
     type: "product" | "category"
@@ -43,16 +43,18 @@ export default function SearchBar({
   isSearching,
   onSearchStateChange,
   searchTerm,
-  onSearchTermChange,  
+  onSearchTermChange,
+  onSearchSubmit,
   onKeyPress,
   onSuggestionClick,
+  onHistoryItemClick,
   isMobile = false,
   t,
 }: SearchBarProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-
+  const router = useRouter();
   // Pagination state for search history
   const [currentPage, setCurrentPage] = useState(0);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -79,14 +81,12 @@ export default function SearchBar({
   // Body scroll lock when dropdown is active
   useEffect(() => {
     if (isSearching) {
-      // Prevent background scroll
       const scrollY = window.scrollY;
       document.body.style.position = 'fixed';
       document.body.style.top = `-${scrollY}px`;
       document.body.style.width = '100%';
       
       return () => {
-        // Restore scroll position
         document.body.style.position = '';
         document.body.style.top = '';
         document.body.style.width = '';
@@ -95,27 +95,24 @@ export default function SearchBar({
     }
   }, [isSearching]);
 
- // Handle click outside for search
-useEffect(() => {
-  const handleClickOutside = (event: MouseEvent) => {
-    if (
-      searchContainerRef.current &&
-      !searchContainerRef.current.contains(event.target as Node)
-    ) {
-      // Only close if currently searching/showing dropdown
-      if (isSearching) {
-        onSearchStateChange(false);
-        searchInputRef.current?.blur();
-        setCurrentPage(0);
-        
-        // Force restore body scroll
-        document.body.style.overflow = '';
+  // Handle click outside for search
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        searchContainerRef.current &&
+        !searchContainerRef.current.contains(event.target as Node)
+      ) {
+        if (isSearching) {
+          onSearchStateChange(false);
+          searchInputRef.current?.blur();
+          setCurrentPage(0);
+          document.body.style.overflow = '';
+        }
       }
-    }
-  };
-  document.addEventListener("mousedown", handleClickOutside);
-  return () => document.removeEventListener("mousedown", handleClickOutside);
-}, [onSearchStateChange, isSearching]); // Add isSearching to dependencies
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [onSearchStateChange, isSearching]);
 
   // Focus input when entering search mode
   useEffect(() => {
@@ -123,7 +120,7 @@ useEffect(() => {
       setTimeout(() => {
         searchInputRef.current?.focus();
       }, 100);
-      setCurrentPage(0); // Reset pagination when opening
+      setCurrentPage(0);
     }
   }, [isSearching]);
 
@@ -154,7 +151,6 @@ useEffect(() => {
       // Save search term to history (non-blocking)
       saveSearchTerm(searchQuery).catch(error => {
         console.error('Failed to save search term to history:', error);
-        // Don't block navigation on history save failure
       });
 
       // Close search dropdown
@@ -165,19 +161,18 @@ useEffect(() => {
         onSearchTermChange(term);
       }
 
-      // Navigate to search results using window.location for better compatibility
+      // Navigate to search results
       const searchUrl = `/search-results?q=${encodeURIComponent(searchQuery)}`;
       console.log('Navigating to:', searchUrl);
       
-      // Use window.location.href for navigation
-      window.location.href = searchUrl;
+      router.push(searchUrl);
       
     } catch (error) {
       console.error('Error during search submission:', error);
     } finally {
       setIsSubmitting(false);
     }
-  }, [searchTerm, isSubmitting, saveSearchTerm, onSearchStateChange, onSearchTermChange]);
+  }, [searchTerm, isSubmitting, saveSearchTerm, onSearchStateChange, onSearchTermChange, router]);
 
   // Enhanced key press handler
   const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
@@ -186,7 +181,6 @@ useEffect(() => {
       handleSearchSubmit();
     }
     
-    // Call original key press handler if provided
     if (onKeyPress) {
       onKeyPress(e);
     }
@@ -201,36 +195,27 @@ useEffect(() => {
     }
   }, [isSearching, handleSearchSubmit, onSearchStateChange]);
 
-  const handleHistoryItemClick = useCallback(async (historyTerm: string) => {
-    console.log('🔍 History item clicked:', historyTerm);
+  const handleHistoryItemClick = useCallback((historyTerm: string) => {
+    // Save to history
+    saveSearchTerm(historyTerm).catch(error => {
+      console.error('Failed to save search term to history:', error);
+    });
     
-    try {
-      // Save to history (non-blocking)
-      saveSearchTerm(historyTerm).catch(error => {
-        console.error('Failed to save search term to history:', error);
-      });
-      
-      // Close search dropdown
-      onSearchStateChange(false);
-      
-      // Navigate directly using window.location
-      const searchUrl = `/search-results?q=${encodeURIComponent(historyTerm)}`;
-      console.log('🔍 Navigating to:', searchUrl);
-      window.location.href = searchUrl;
-      
-    } catch (error) {
-      console.error('🔍 Error handling history item click:', error);
-    }
-  }, [saveSearchTerm, onSearchStateChange]);
+    // Close the dropdown
+    onSearchStateChange(false);
+    
+    // Navigate directly using router
+    const searchUrl = `/search-results?q=${encodeURIComponent(historyTerm)}`;
+    router.push(searchUrl);
+  }, [saveSearchTerm, onSearchStateChange, router]);
 
   // Handle delete history item
   const handleDeleteHistoryItem = useCallback(async (e: React.MouseEvent, docId: string) => {
-    e.stopPropagation(); // Prevent triggering the search
+    e.stopPropagation();
     try {
       await deleteEntry(docId);
     } catch (error) {
       console.error('Failed to delete search history item:', error);
-      // Could show a toast notification here
     }
   }, [deleteEntry]);
 
@@ -239,14 +224,12 @@ useEffect(() => {
     const target = e.target as HTMLDivElement;
     const { scrollTop, scrollHeight, clientHeight } = target;
     
-    // Check if we're near the bottom (within 50px)
     if (scrollHeight - scrollTop - clientHeight < 50) {
       const totalPages = Math.ceil(searchEntries.length / ITEMS_PER_PAGE);
       const nextPage = currentPage + 1;
       
       if (nextPage < totalPages && !isLoadingMore) {
         setIsLoadingMore(true);
-        // Simulate loading delay for smooth UX
         setTimeout(() => {
           setCurrentPage(nextPage);
           setIsLoadingMore(false);
@@ -276,18 +259,11 @@ useEffect(() => {
       <div
         className={`
           relative h-10 rounded-full
-          ${
-            isDark
-              ? "bg-gray-800 border-gray-600"
-              : "bg-gray-50 border-gray-300"
-          }
+          ${isDark ? "bg-gray-800 border-gray-600" : "bg-gray-50 border-gray-300"}
           border-2 
-          ${
-            isSearching
-              ? `shadow-lg ${
-                  isDark ? "border-blue-500" : "border-blue-400"
-                } ring-2 ring-blue-500/20`
-              : "hover:shadow-md hover:border-gray-400"
+          ${isSearching
+            ? `shadow-lg ${isDark ? "border-blue-500" : "border-blue-400"} ring-2 ring-blue-500/20`
+            : "hover:shadow-md hover:border-gray-400"
           }
         `}
       >
@@ -303,11 +279,7 @@ useEffect(() => {
           placeholder={t('header.searchPlaceholder')}
           className={`
             w-full h-full px-4 pr-12 bg-transparent border-none outline-none
-            ${
-              isDark
-                ? "placeholder:text-gray-400 text-white"
-                : "placeholder:text-gray-500 text-gray-900"
-            }
+            ${isDark ? "placeholder:text-gray-400 text-white" : "placeholder:text-gray-500 text-gray-900"}
             text-sm font-medium rounded-full
             ${isSubmitting ? 'cursor-not-allowed opacity-75' : ''}
           `}
@@ -319,10 +291,9 @@ useEffect(() => {
           className={`
             absolute right-2 top-1/2 transform -translate-y-1/2
             p-2 rounded-full transition-all duration-200
-            ${
-              isSearching
-                ? "text-blue-500 hover:text-blue-600 hover:bg-blue-50/80 dark:hover:bg-blue-900/30"
-                : "text-gray-400 hover:text-blue-500 hover:bg-blue-50/80 dark:hover:bg-blue-900/30"
+            ${isSearching
+              ? "text-blue-500 hover:text-blue-600 hover:bg-blue-50/80 dark:hover:bg-blue-900/30"
+              : "text-gray-400 hover:text-blue-500 hover:bg-blue-50/80 dark:hover:bg-blue-900/30"
             }
             active:scale-95
             ${isSubmitting ? 'cursor-not-allowed opacity-75' : ''}
@@ -332,10 +303,7 @@ useEffect(() => {
           {isSubmitting ? (
             <Loader2 size={16} className="animate-spin" />
           ) : (
-            <Search
-              size={16}
-              className={isLoading ? "animate-pulse" : ""}
-            />
+            <Search size={16} className={isLoading ? "animate-pulse" : ""} />
           )}
         </button>
       </div>
@@ -397,11 +365,7 @@ useEffect(() => {
                   <div className="p-3">
                     <div className="flex items-center space-x-2 mb-3">
                       <Grid3x3 size={16} className="text-orange-500" />
-                      <span
-                        className={`text-sm font-semibold ${
-                          isDark ? "text-gray-300" : "text-gray-700"
-                        }`}
-                      >
+                      <span className={`text-sm font-semibold ${isDark ? "text-gray-300" : "text-gray-700"}`}>
                         {t('header.categories')}
                       </span>
                       <div className="px-2 py-1 bg-orange-100 dark:bg-orange-900/30 rounded-full">
@@ -414,9 +378,7 @@ useEffect(() => {
                       {categorySuggestions.slice(0, 3).map((category) => (
                         <button
                           key={category.id}
-                          onClick={() =>
-                            onSuggestionClick(category, "category")
-                          }
+                          onClick={() => onSuggestionClick(category, "category")}
                           className={`
                             w-full flex items-center space-x-3 p-2 rounded-lg
                             hover:bg-gray-100 dark:hover:bg-gray-700 
@@ -427,27 +389,14 @@ useEffect(() => {
                             <Grid3x3 size={14} className="text-white" />
                           </div>
                           <div className="flex-1 text-left">
-                            <p
-                              className={`text-sm font-medium ${
-                                isDark ? "text-gray-200" : "text-gray-900"
-                              }`}
-                            >
+                            <p className={`text-sm font-medium ${isDark ? "text-gray-200" : "text-gray-900"}`}>
                               {category.displayName}
                             </p>
-                            <p
-                              className={`text-xs ${
-                                isDark ? "text-gray-400" : "text-gray-500"
-                              }`}
-                            >
+                            <p className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
                               {t('header.levelCategory', { level: category.level })}
                             </p>
                           </div>
-                          <TrendingUp
-                            size={14}
-                            className={`${
-                              isDark ? "text-gray-400" : "text-gray-400"
-                            }`}
-                          />
+                          <TrendingUp size={14} className={`${isDark ? "text-gray-400" : "text-gray-400"}`} />
                         </button>
                       ))}
                     </div>
@@ -460,11 +409,7 @@ useEffect(() => {
                 <div className="p-3">
                   <div className="flex items-center space-x-2 mb-3">
                     <ShoppingBag size={16} className="text-blue-500" />
-                    <span
-                      className={`text-sm font-semibold ${
-                        isDark ? "text-gray-300" : "text-gray-700"
-                      }`}
-                    >
+                    <span className={`text-sm font-semibold ${isDark ? "text-gray-300" : "text-gray-700"}`}>
                       {t('header.products')}
                     </span>
                     <div className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 rounded-full">
@@ -477,9 +422,7 @@ useEffect(() => {
                     {suggestions.map((suggestion) => (
                       <button
                         key={suggestion.id}
-                        onClick={() =>
-                          onSuggestionClick(suggestion, "product")
-                        }
+                        onClick={() => onSuggestionClick(suggestion, "product")}
                         className={`
                           w-full flex items-center space-x-3 p-2 rounded-lg
                           hover:bg-gray-100 dark:hover:bg-gray-700 
@@ -490,18 +433,10 @@ useEffect(() => {
                           <ShoppingBag size={14} className="text-white" />
                         </div>
                         <div className="flex-1 text-left">
-                          <p
-                            className={`text-sm font-medium ${
-                              isDark ? "text-gray-200" : "text-gray-900"
-                            }`}
-                          >
+                          <p className={`text-sm font-medium ${isDark ? "text-gray-200" : "text-gray-900"}`}>
                             {suggestion.name}
                           </p>
-                          <p
-                            className={`text-xs ${
-                              isDark ? "text-gray-400" : "text-gray-500"
-                            }`}
-                          >
+                          <p className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
                             {t('header.price', { amount: suggestion.price.toFixed(2) })}
                           </p>
                         </div>
@@ -512,47 +447,26 @@ useEffect(() => {
               )}
 
               {/* No Results when user has typed something */}
-              {!isLoading &&
-                !errorMessage &&
-                suggestions.length === 0 &&
-                categorySuggestions.length === 0 &&
-                searchTerm.trim() && (
-                  <div className="p-6 text-center">
-                    <div className="w-12 h-12 mx-auto rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center mb-3">
-                      <Search
-                        size={20}
-                        className={`${
-                          isDark ? "text-gray-400" : "text-gray-500"
-                        }`}
-                      />
-                    </div>
-                    <p
-                      className={`text-sm font-medium ${
-                        isDark ? "text-gray-300" : "text-gray-700"
-                      } mb-1`}
-                    >
-                      {t('header.noResults')}
-                    </p>
-                    <p
-                      className={`text-xs ${
-                        isDark ? "text-gray-400" : "text-gray-500"
-                      }`}
-                    >
-                      {t('header.tryDifferentKeywords')}
-                    </p>
+              {!isLoading && !errorMessage && suggestions.length === 0 && categorySuggestions.length === 0 && searchTerm.trim() && (
+                <div className="p-6 text-center">
+                  <div className="w-12 h-12 mx-auto rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center mb-3">
+                    <Search size={20} className={`${isDark ? "text-gray-400" : "text-gray-500"}`} />
                   </div>
-                )}
+                  <p className={`text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"} mb-1`}>
+                    {t('header.noResults')}
+                  </p>
+                  <p className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                    {t('header.tryDifferentKeywords')}
+                  </p>
+                </div>
+              )}
             </>
           ) : showSearchHistory ? (
             /* Search History Section with Pagination */
             <div className="p-3">
               <div className="flex items-center space-x-2 mb-3">
                 <Clock size={16} className="text-gray-500" />
-                <span
-                  className={`text-sm font-semibold ${
-                    isDark ? "text-gray-300" : "text-gray-700"
-                  }`}
-                >
+                <span className={`text-sm font-semibold ${isDark ? "text-gray-300" : "text-gray-700"}`}>
                   {t('header.recentSearches')}
                 </span>
                 <div className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded-full">
@@ -565,26 +479,15 @@ useEffect(() => {
                 <div className="p-4">
                   <div className="flex items-center justify-center space-x-2">
                     <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
-                    <div
-                      className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"
-                      style={{ animationDelay: "0.1s" }}
-                    ></div>
-                    <div
-                      className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"
-                      style={{ animationDelay: "0.2s" }}
-                    ></div>
+                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }}></div>
+                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
                   </div>
                 </div>
               ) : (
-                <div 
-                  ref={scrollContainerRef}
-                  className="space-y-1 max-h-60 overflow-y-auto"
-                  onScroll={handleScroll}
-                >
+                <div ref={scrollContainerRef} className="space-y-1 max-h-60 overflow-y-auto" onScroll={handleScroll}>
                   {paginatedEntries.map((entry) => (
                     <div
                       key={entry.id}
-                      onClick={() => console.log('🔍 Parent div clicked')}
                       className={`
                         flex items-center space-x-3 p-2 rounded-lg
                         hover:bg-gray-100 dark:hover:bg-gray-700 
@@ -593,20 +496,13 @@ useEffect(() => {
                     >
                       <button
                         onClick={() => handleHistoryItemClick(entry.searchTerm)}
-                        disabled={isSubmitting}
-                        className={`flex-1 flex items-center space-x-3 text-left ${
-                          isSubmitting ? 'cursor-not-allowed opacity-75' : ''
-                        }`}
+                        className="flex-1 flex items-center space-x-3 text-left"
                       >
                         <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
                           <Clock size={14} className="text-gray-500" />
                         </div>
                         <div className="flex-1">
-                          <p
-                            className={`text-sm font-medium ${
-                              isDark ? "text-gray-200" : "text-gray-900"
-                            }`}
-                          >
+                          <p className={`text-sm font-medium ${isDark ? "text-gray-200" : "text-gray-900"}`}>
                             {entry.searchTerm}
                           </p>
                         </div>
@@ -655,8 +551,7 @@ useEffect(() => {
                           text-xs px-3 py-1 rounded-full 
                           ${isDark 
                             ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' 
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                          }
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}
                           transition-colors duration-200
                         `}
                       >
@@ -668,28 +563,15 @@ useEffect(() => {
               )}
             </div>
           ) : (
-            /* Empty state - when user clicks search bar but hasn't typed anything and no history */
+            /* Empty state */
             <div className="p-6 text-center">
               <div className="w-12 h-12 mx-auto rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center mb-3">
-                <Search
-                  size={20}
-                  className={`${
-                    isDark ? "text-gray-400" : "text-gray-500"
-                  }`}
-                />
+                <Search size={20} className={`${isDark ? "text-gray-400" : "text-gray-500"}`} />
               </div>
-              <p
-                className={`text-sm font-medium ${
-                  isDark ? "text-gray-300" : "text-gray-700"
-                } mb-1`}
-              >
+              <p className={`text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"} mb-1`}>
                 {t('header.searchPlaceholder')}
               </p>
-              <p
-                className={`text-xs ${
-                  isDark ? "text-gray-400" : "text-gray-500"
-                }`}
-              >
+              <p className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
                 {t('header.startTypingPrompt')}
               </p>
             </div>
