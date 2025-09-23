@@ -20,7 +20,7 @@ import {
   Star,
   Zap,
   HelpCircle,
-  Info,  
+  Info,
   LogOut,
   ChevronRight,
   Box,
@@ -55,14 +55,15 @@ interface MainActionButton {
 
 export default function ProfilePage() {
   const { user, profileData, updateProfileData, isLoading } = useUser();
-  
+
   // For now, we'll mock userOwnsShop - you can replace this with actual logic
   const userOwnsShop = profileData?.userOwnsShop || false;
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isPaymentMethodsDrawerOpen, setIsPaymentMethodsDrawerOpen] = useState(false);
+  const [isPaymentMethodsDrawerOpen, setIsPaymentMethodsDrawerOpen] =
+    useState(false);
   const [isSellerInfoDrawerOpen, setIsSellerInfoDrawerOpen] = useState(false);
   const [isAddressesDrawerOpen, setIsAddressesDrawerOpen] = useState(false);
   const t = useTranslations();
@@ -246,7 +247,7 @@ export default function ProfilePage() {
       {
         icon: Upload,
         label: t("ProfilePage.sellOnVitrin"),
-        path: "/list_product_screen",
+        path: "/listproduct",
         description: t("ProfilePage.startSellingProducts"),
       },
       {
@@ -385,7 +386,11 @@ export default function ProfilePage() {
                         : "bg-gray-100 hover:bg-gray-200"
                     }`}
                   >
-                    <Bell className={`w-4 h-4 md:w-5 md:h-5 ${isDarkMode ? "text-white" : "text-gray-600"}`} />
+                    <Bell
+                      className={`w-4 h-4 md:w-5 md:h-5 ${
+                        isDarkMode ? "text-white" : "text-gray-600"
+                      }`}
+                    />
                     {/* Notification badge can be added here if needed */}
                   </button>
                 )}
@@ -494,7 +499,9 @@ export default function ProfilePage() {
           {mainActionButtons.map((button, index) => (
             <button
               key={index}
-              onClick={() => handleNavigation(button.path, undefined, button.isExternal)}
+              onClick={() =>
+                handleNavigation(button.path, undefined, button.isExternal)
+              }
               className={`group p-4 md:p-6 rounded-xl md:rounded-2xl shadow-md hover:shadow-lg transition-all duration-200 text-left ${
                 button.featured
                   ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white"
