@@ -266,7 +266,7 @@ const ProductCollectionWidget: React.FC<ProductCollectionWidgetProps> = ({
   }
 
   return (
-    <div className={`rounded-2xl md:rounded-2xl rounded-none p-6 md:p-6 p-4 border md:border border-0 shadow-sm md:shadow-sm shadow-none ${
+    <div className={`rounded-2xl md:rounded-2xl rounded-none -mx-3 px-3 py-4 sm:mx-0 sm:p-6 border md:border border-0 shadow-sm md:shadow-sm shadow-none ${
       isDarkMode 
         ? "bg-gray-800 border-gray-700" 
         : "bg-white border-gray-200"

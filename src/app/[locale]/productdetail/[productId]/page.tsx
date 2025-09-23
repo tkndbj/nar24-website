@@ -172,7 +172,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
       observer.disconnect();
       mediaQuery.removeEventListener("change", handleChange);
     };
-  }, []);
+  }, [productId]);
 
   // Scroll to top when product changes
   useEffect(() => {

@@ -132,7 +132,7 @@ const ProductDetailRelatedProducts: React.FC<ProductDetailRelatedProductsProps> 
     
     return {
       listViewHeight: mobile ? 380 : 450, // Increased heights
-      cardWidth: mobile ? 180 : 240,
+      cardWidth: mobile ? 200 : 240,
       cardCount: mobile ? 3 : 6,
       gap: mobile ? 8 : 10,
     };
@@ -343,7 +343,7 @@ const ProductDetailRelatedProducts: React.FC<ProductDetailRelatedProductsProps> 
     >
       <ProductCard
         product={product}
-        scaleFactor={isMobile ? 0.75 : 0.85}// Reduced from 0.75/0.85 to make cards smaller
+        scaleFactor={isMobile ? 0.80 : 0.85}// Reduced from 0.75/0.85 to make cards smaller
         internalScaleFactor={1.1}
         showCartIcon={true}
         showExtraLabels={false}

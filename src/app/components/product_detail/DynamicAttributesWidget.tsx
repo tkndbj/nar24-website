@@ -213,7 +213,7 @@ const DynamicAttributesWidget: React.FC<DynamicAttributesWidgetProps> = ({
   }
 
   return (
-    <div className={`rounded-none sm:rounded-xl px-0 py-3 sm:p-5 border-0 sm:border sm:shadow-sm ${
+    <div className={`rounded-none sm:rounded-xl -mx-3 px-3 py-3 sm:mx-0 sm:p-5 border-0 sm:border sm:shadow-sm ${
       isDarkMode 
         ? "bg-gray-800 sm:border-gray-700" 
         : "bg-white sm:border-gray-200"
