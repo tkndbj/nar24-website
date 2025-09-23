@@ -36,6 +36,16 @@ export default function Footer() {
     return () => observer.disconnect();
   }, []);
 
+  const handleLinkClick = (
+    e: React.MouseEvent,
+    link: { href?: string; action?: string }
+  ) => {
+    if (link.action === "openCookieSettings") {
+      e.preventDefault(); // ← This prevents navigation
+      window.dispatchEvent(new CustomEvent("openCookieSettings"));
+    }
+  };
+
   const quickLinks = [
     { label: t("aboutUs"), href: "/about" },
     { label: t("shops"), href: "/shops" },
@@ -51,9 +61,13 @@ export default function Footer() {
   ];
 
   const legalLinks = [
-    { label: t("termsOfService"), href: "/terms" },
-    { label: t("privacyPolicy"), href: "/privacy" },
-    { label: t("cookiePolicy"), href: "/cookies" },
+    { label: t("termsOfService"), href: "/agreements/terms" },
+    { label: t("membershipAgreement"), href: "/agreements/membership" },
+    {
+      label: t("cookiePolicy"),
+      href: "/cookies",
+      action: "openCookieSettings",
+    },
   ];
 
   const socialLinks = [
@@ -161,6 +175,7 @@ export default function Footer() {
               {quickLinks.map((link) => (
                 <li key={link.href}>
                   <Link
+                    onClick={(e) => handleLinkClick(e, link)}
                     href={link.href}
                     className={`text-sm hover:text-orange-500 transition-colors ${
                       isDarkMode ? "text-gray-400" : "text-gray-600"
@@ -186,6 +201,7 @@ export default function Footer() {
               {supportLinks.map((link) => (
                 <li key={link.href}>
                   <Link
+                    onClick={(e) => handleLinkClick(e, link)}
                     href={link.href}
                     className={`text-sm hover:text-orange-500 transition-colors ${
                       isDarkMode ? "text-gray-400" : "text-gray-600"
@@ -211,6 +227,7 @@ export default function Footer() {
               {legalLinks.map((link) => (
                 <li key={link.href}>
                   <Link
+                    onClick={(e) => handleLinkClick(e, link)}
                     href={link.href}
                     className={`text-sm hover:text-orange-500 transition-colors ${
                       isDarkMode ? "text-gray-400" : "text-gray-600"
@@ -235,6 +252,7 @@ export default function Footer() {
               {socialLinks.map((social) => (
                 <a
                   key={social.label}
+                  onClick={(e) => handleLinkClick(e, social)}
                   href={social.href}
                   target="_blank"
                   rel="noopener noreferrer"

@@ -2755,9 +2755,218 @@
     "returns": "Returns & Refunds",
     "legal": "Legal",
     "termsOfService": "Terms of Service",
-    "privacyPolicy": "Privacy Policy",
+    "membershipAgreement": "Membership Agreement",
     "cookiePolicy": "Cookie Policy",
     "made": "Made with",
     "allRightsReserved": "All rights reserved. Nar24 is a product of E.C.T.S TRADING LTD"
+  },
+  "cookieConsent": {
+    "title": "We Value Your Privacy",
+    "description": "We use cookies to enhance your browsing experience, serve personalized content, and analyze our traffic. By clicking 'Accept All', you consent to our use of cookies.",
+    "necessary": "Necessary Cookies",
+    "alwaysActive": "Always Active",
+    "necessaryDesc": "Essential for the website to function. These cookies enable core functionality such as security, authentication, and network management.",
+    "functional": "Functional Cookies",
+    "functionalDesc": "Enable enhanced functionality and personalization, such as language preferences and theme settings.",
+    "analytics": "Analytics Cookies",
+    "analyticsDesc": "Help us understand how visitors interact with our website by collecting and reporting anonymous information.",
+    "marketing": "Marketing Cookies",
+    "marketingDesc": "Used to track visitors across websites to display relevant advertisements and encourage user engagement.",
+    "customizeSettings": "Customize Settings",
+    "hideSettings": "Hide Settings",
+    "acceptAll": "Accept All",
+    "rejectAll": "Reject All",
+    "savePreferences": "Save Preferences",
+    "learnMore": "Learn more in our",
+    "and": "and",
+    "privacyPolicy": "Privacy Policy",
+    "cookiePolicy": "Cookie Policy"
+  },
+  "termsAndConditions": {
+    "title": "Terms and Conditions",
+    "lastUpdated": "Last Updated",
+    "updateDate": "January 2025",
+    "introduction": "By accessing or using this website, you agree to be bound by these Terms and Conditions. Please read them carefully before using our services.",
+    "footerNote": "By continuing to use Nar24, you acknowledge that you have read, understood, and agreed to these Terms and Conditions.",
+    "sections": {
+      "general": {
+        "title": "General Provisions",
+        "content": [
+          "Accessing this website or using any information on this website means you accept the following conditions.",
+          "E.C.T.S TRADING LTD is not responsible for any direct or indirect damages that may arise from entering this website, using the site or information and other data, programs, etc., due to breach of contract, tort, or other reasons.",
+          "E.C.T.S TRADING LTD accepts no responsibility for interruption of transactions, errors, negligence, interruptions resulting from breach of contract, tort, negligence or other reasons.",
+          "E.C.T.S TRADING LTD reserves the right to change all types of services, products, terms of use of the site and information presented on the site without prior notice, reorganize the site, and stop publication. Changes take effect at the time of publication on the site.",
+          "E.C.T.S TRADING LTD is not responsible for the content of other websites that are linked or referenced, which are not under its control."
+        ]
+      },
+      "userObligations": {
+        "title": "User Obligations",
+        "content": [
+          "The User declares and undertakes that they have read, fully understood, and unconditionally accepted all the provisions of this agreement and all matters on the website.",
+          "The User cannot use the service provided by E.C.T.S on the site in any way that disrupts public order, is contrary to general morality, harasses and disturbs others, is for an illegal purpose, or infringes on the intellectual or industrial rights of others.",
+          "The User cannot give the password provided by E.C.T.S or determined by themselves to other persons or organizations. Usage rights are personal and cannot be transferred.",
+          "The User is responsible for ensuring the security of their username and password, taking necessary precautions, and not sharing passwords with others.",
+          "The User agrees not to access or use other users' software, personal data, or other information without permission.",
+          "The User agrees not to distribute messages containing legally prohibited information, harmful software such as viruses, worms, or any other content that could harm third parties."
+        ]
+      },
+      "platformRights": {
+        "title": "Platform Rights and Authorities",
+        "content": [
+          "E.C.T.S has the right to unilaterally suspend the service permanently or temporarily, postpone, limit, or terminate user access to any page or service without stating a reason and without warning.",
+          "E.C.T.S has the right to terminate or suspend memberships of users who provide incomplete or incorrect information or act contrary to the terms of use, without any explanation.",
+          "E.C.T.S does not guarantee that the services provided on the website will be uninterrupted or error-free.",
+          "E.C.T.S has the right to reject, delay, publish late, not publish, or remove any content, email, or message from users without showing a reason.",
+          "The right to advertise and promote on the E.C.T.S site belongs only to E.C.T.S or third parties authorized by E.C.T.S.",
+          "E.C.T.S is not responsible for technical errors causing price, product, and all kinds of update errors and can update and change prices on the site at any time."
+        ]
+      },
+      "privacy": {
+        "title": "Privacy and Personal Data Processing",
+        "content": [
+          "To provide you with better service and understand your needs and interests, E.C.T.S collects, transmits, and uses personal information by making appropriate notifications and obtaining consent.",
+          "E.C.T.S may also collect information using Automatic Data Collection Tools such as web signals, cookies, scrambled web links when you visit a site.",
+          "Your personal data will be processed for purposes such as taking orders, providing products and services, making payments, contacting you for marketing purposes, and sending newsletters via email.",
+          "Personal data will be stored, used, updated, modified, classified, disclosed, shared, transferred domestically and internationally using automatic/non-automatic methods.",
+          "E.C.T.S may contact members via SMS/text message, instant notification, automatic calling, computer, phone, fax, email, and other electronic communications.",
+          "Personal data is stored securely in accordance with Personal Data Protection Law with all administrative and technical security measures taken."
+        ]
+      },
+      "termination": {
+        "title": "Termination and Modifications",
+        "content": [
+          "E.C.T.S and the User can terminate this agreement at any time.",
+          "E.C.T.S has the right to make changes, adjustments, and updates unilaterally in the terms of this User Agreement and the services offered on the website at any time.",
+          "These changes, adjustments, and updates are considered valid from the moment they are published on the Web.",
+          "The User accepts and undertakes to immediately compensate for all damages that E.C.T.S and/or third parties will suffer due to actions contrary to the rights and obligations specified in the agreement."
+        ]
+      },
+      "disputes": {
+        "title": "Dispute Resolution",
+        "content": [
+          "This agreement is subject to the laws of the Turkish Republic of Northern Cyprus and will be resolved according to these laws.",
+          "The courts of the Turkish Republic of Northern Cyprus shall have jurisdiction."
+        ]
+      },
+      "notifications": {
+        "title": "Notification Addresses",
+        "content": [
+          "The address notified by the User or Member to E.C.T.S is accepted as the legal notification address for all kinds of notifications to be made regarding this agreement.",
+          "Unless the User or Member notifies E.C.T.S in writing of changes in their current addresses within 3 (three) days, notifications made to old addresses will be valid and deemed to have been made to them.",
+          "All notifications made by E.C.T.S using the member's e-mail address registered in the system are equally valid, and the e-mail will be deemed to have reached the member 1 (one) day after being sent by E.C.T.S."
+        ]
+      },
+      "enforcement": {
+        "title": "Enforcement",
+        "content": [
+          "The User or Member declares, accepts, and undertakes that they have read, understood, accepted all the articles in this agreement, and confirmed the accuracy of the information they provided about themselves.",
+          "This agreement is concluded upon the User or member entering the website or becoming a member and has entered into force mutually and indefinitely.",
+          "The agreement will automatically become null and void without any need for notice upon termination of membership or the occurrence of any of the termination cases listed in this agreement."
+        ]
+      }
+    }
+  },
+  "membershipAgreement": {
+    "title": "Membership Agreement",
+    "lastUpdated": "Last Updated",
+    "updateDate": "January 2025",
+    "introduction": "This Membership Agreement establishes the terms and conditions between E.C.T.S TRADING LTD and Members who use our Platform services. By creating an account and using our services, you agree to be bound by this agreement.",
+    "footerNote": "By continuing to use Nar24, you acknowledge that you have read, understood, and agreed to this Membership Agreement.",
+    "sections": {
+      "parties": {
+        "title": "Parties",
+        "content": [
+          "This Membership Agreement is between E.C.T.S TRADING LTD ('ECTS') and the user ('Member') who registers and uses the Platform.",
+          "ECTS operates as an e-marketplace and e-commerce service provider through various mobile applications and websites.",
+          "Members agree to this Agreement by registering on the Platform, using the Platform, and/or conducting transactions through the Platform.",
+          "This Agreement also covers the relationship between ECTS and Buyers on the website, determining the terms and conditions for services provided."
+        ]
+      },
+      "definitions": {
+        "title": "Definitions",
+        "content": [
+          "Virtual Store: A dedicated section where Sellers can publish listings for multiple products and/or services.",
+          "Service/Services: Applications provided by ECTS to enable Members to perform their defined transactions.",
+          "User/Users: Natural and legal persons accessing the website.",
+          "Platform/Website: The website accessible through the domain name where ECTS provides services.",
+          "Member/Members: Users who register on the website and benefit from content, applications and services, including buyers and sellers.",
+          "Buyer: A Member who purchases goods and/or services offered for sale by Sellers on the Platform.",
+          "Seller: A legal or natural person Member who offers various products and/or services for sale through listings published on their account."
+        ]
+      },
+      "rightsObligations": {
+        "title": "Rights and Obligations of Parties",
+        "content": [
+          "To gain membership status, users must accept this Agreement, provide accurate and complete information, and have their application approved by ECTS.",
+          "Members must be at least 18 years old and meet other conditions determined by ECTS and applicable legislation.",
+          "Membership accounts are personal and cannot be transferred to third parties. Members must not use other Members' accounts.",
+          "ECTS acts as an intermediary service provider and/or hosting provider. ECTS is not responsible for content accuracy except for products sold directly by ECTS.",
+          "Members acknowledge that ECTS is not a party to sales contracts between Members and Sellers, except where ECTS is the seller.",
+          "Members must comply with this Agreement, Platform rules announced by ECTS, applicable legislation, and ethical standards.",
+          "Members are responsible for the security of their user credentials and must take necessary precautions to protect their account information.",
+          "ECTS may restrict, block, suspend, or terminate memberships at its sole discretion without stating reasons.",
+          "Members can terminate their membership at any time without stating reasons through the Platform.",
+          "ECTS may modify, suspend, discontinue, or charge for Platform services at its sole discretion."
+        ]
+      },
+      "dataProtection": {
+        "title": "Personal Data Protection",
+        "content": [
+          "ECTS processes personal data in accordance with applicable data protection legislation to provide services, fulfill orders, and improve Member satisfaction.",
+          "Personal data is processed for account security, fraud prevention, dispute resolution, and other purposes specified in this Agreement.",
+          "ECTS processes personal data to provide Members with suitable products within the Platform's offerings.",
+          "Members consent to their personal data being used for statistical evaluations, advertising, marketing, and commercial communications by ECTS or its partners.",
+          "ECTS will take all necessary measures to securely store personal information.",
+          "Members have the right to modify their personal information at any time."
+        ]
+      },
+      "commercialMessages": {
+        "title": "Commercial Electronic Messages",
+        "content": [
+          "ECTS may send commercial electronic messages to Members who have given consent via email or SMS for marketing purposes.",
+          "Members are responsible for keeping their email addresses and phone numbers accurate and up-to-date.",
+          "Members have the right to refuse or withdraw consent for commercial electronic messages through methods specified in applicable legislation or through Platform preferences."
+        ]
+      },
+      "intellectualProperty": {
+        "title": "Intellectual Property Rights",
+        "content": [
+          "All Platform content and elements, including trademarks, copyrights, patents, designs, software, databases, and other materials belong to ECTS.",
+          "Content shared by Members through the Platform belongs to the respective Members, subject to the full license granted to ECTS.",
+          "Membership does not grant any rights to the Platform, ECTS content, or other Member content.",
+          "Members are strictly prohibited from using, copying, reproducing, modifying, reverse engineering, or distributing Platform content outside its intended use.",
+          "Members who violate these prohibitions are obligated to compensate ECTS and/or third parties for all damages."
+        ]
+      },
+      "contractModifications": {
+        "title": "Contract Modifications and Waiver",
+        "content": [
+          "ECTS may modify this Agreement and Platform policies at any time by announcement at its sole discretion.",
+          "Changes become effective upon publication on the Platform unless otherwise stated by ECTS.",
+          "Members are deemed to accept changes by continuing to use the Platform/Services.",
+          "Waivers by ECTS are not valid unless signed. Non-exercise of rights does not constitute waiver of those rights."
+        ]
+      },
+      "forceMajeure": {
+        "title": "Force Majeure",
+        "content": [
+          "Force Majeure events include rebellion, embargo, state intervention, war, mobilization, strikes, lockouts, cyber attacks, infrastructure failures, natural disasters, legislation changes, and other events beyond ECTS's control.",
+          "ECTS is not liable for obligations prevented or delayed by Force Majeure events.",
+          "Force Majeure events do not constitute a breach of this Agreement."
+        ]
+      },
+      "miscellaneous": {
+        "title": "Miscellaneous Provisions",
+        "content": [
+          "Members accept that ECTS's official records, databases, e-archive records, and computer records constitute binding and exclusive evidence in disputes.",
+          "This Agreement is governed by the laws of the Turkish Republic of Northern Cyprus.",
+          "Courts of the Turkish Republic of Northern Cyprus have jurisdiction over disputes arising from this Agreement.",
+          "This Agreement constitutes the entire agreement between the parties. Invalidity of any provision does not affect remaining provisions.",
+          "Members cannot assign rights or obligations under this Agreement without ECTS's prior written consent.",
+          "ECTS may assign its rights and obligations to affiliated companies, subsidiaries, or third parties without Member consent.",
+          "Use of the website indicates acceptance of this Agreement by users, visitors, and members."
+        ]
+      }
+    }
   }
 }

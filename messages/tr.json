@@ -2745,9 +2745,218 @@
     "returns": "İade & Geri Ödeme",
     "legal": "Yasal",
     "termsOfService": "Hizmet Şartları",
-    "privacyPolicy": "Gizlilik Politikası",
+    "membershipAgreement": "Üyelik Sözleşmesi",
     "cookiePolicy": "Çerez Politikası",
     "made": "ile yapıldı",
     "allRightsReserved": "Tüm hakları saklıdır. Nar24, E.C.T.S TRADING LTD ürünüdür"
+  },
+  "cookieConsent": {
+    "title": "Gizliliğinize Değer Veriyoruz",
+    "description": "Tarama deneyiminizi geliştirmek, kişiselleştirilmiş içerik sunmak ve trafiğimizi analiz etmek için çerezler kullanıyoruz. 'Tümünü Kabul Et'e tıklayarak çerez kullanımımızı onaylarsınız.",
+    "necessary": "Gerekli Çerezler",
+    "alwaysActive": "Her Zaman Aktif",
+    "necessaryDesc": "Web sitesinin çalışması için gereklidir. Bu çerezler güvenlik, kimlik doğrulama ve ağ yönetimi gibi temel işlevleri etkinleştirir.",
+    "functional": "İşlevsel Çerezler",
+    "functionalDesc": "Dil tercihleri ve tema ayarları gibi gelişmiş işlevsellik ve kişiselleştirmeyi etkinleştirir.",
+    "analytics": "Analitik Çerezler",
+    "analyticsDesc": "Anonim bilgi toplayarak ve raporlayarak ziyaretçilerin web sitemizle nasıl etkileşime girdiğini anlamamıza yardımcı olur.",
+    "marketing": "Pazarlama Çerezleri",
+    "marketingDesc": "İlgili reklamları görüntülemek ve kullanıcı etkileşimini teşvik etmek için web sitelerinde ziyaretçileri izlemek için kullanılır.",
+    "customizeSettings": "Ayarları Özelleştir",
+    "hideSettings": "Ayarları Gizle",
+    "acceptAll": "Tümünü Kabul Et",
+    "rejectAll": "Tümünü Reddet",
+    "savePreferences": "Tercihleri Kaydet",
+    "learnMore": "Daha fazla bilgi için",
+    "and": "ve",
+    "privacyPolicy": "Gizlilik Politikası",
+    "cookiePolicy": "Çerez Politikası"
+  },
+  "termsAndConditions": {
+    "title": "Kullanım Koşulları",
+    "lastUpdated": "Son Güncelleme",
+    "updateDate": "Ocak 2025",
+    "introduction": "Bu internet sitesine girmeniz veya bu internet sitesindeki herhangi bir bilgiyi kullanmanız aşağıdaki koşulları kabul ettiğiniz anlamına gelir. Lütfen hizmetlerimizi kullanmadan önce dikkatlice okuyun.",
+    "footerNote": "Nar24'ü kullanmaya devam ederek, bu Kullanım Koşullarını okuduğunuzu, anladığınızı ve kabul ettiğinizi beyan edersiniz.",
+    "sections": {
+      "general": {
+        "title": "Genel Hükümler",
+        "content": [
+          "Bu internet sitesine girmeniz veya bu internet sitesindeki herhangi bir bilgiyi kullanmanız aşağıdaki koşulları kabul ettiğiniz anlamına gelir.",
+          "Bu internet sitesine girilmesi, sitenin ya da sitedeki bilgilerin ve diğer verilerin programların vs. kullanılması sebebiyle, sözleşmenin ihlali, haksız fiil, ya da başkaca sebeplere binaen, doğabilecek doğrudan ya da dolaylı hiçbir zarardan E.C.T.S TRADING LTD sorumlu değildir.",
+          "E.C.T.S TRADING LTD, sözleşmenin ihlali, haksız fiil, ihmal veya diğer sebepler neticesinde; işlemin kesintiye uğraması, hata, ihmal, kesinti hususunda herhangi bir sorumluluk kabul etmez.",
+          "E.C.T.S TRADING LTD işbu site ve site uzantısında mevcut her tür hizmet, ürün, siteyi kullanma koşulları ile sitede sunulan bilgileri önceden bir ihtara gerek olmaksızın değiştirme, siteyi yeniden organize etme, yayını durdurma hakkını saklı tutar.",
+          "E.C.T.S TRADING LTD, kontrolü altında olmayan başka internet sitelerine bağlantı veya referans içerebilir. E.C.T.S TRADING LTD, bu sitelerin içerikleri veya içerdikleri diğer bağlantılardan sorumlu değildir."
+        ]
+      },
+      "userObligations": {
+        "title": "Kullanıcının Yükümlülükleri",
+        "content": [
+          "Kullanıcı, işbu sözleşmenin tamamını okuduğunu, içeriğini tamamen anladığını ve sözleşmede belirtilen tüm hususları kayıtsız ve şartsız olarak kabul ettiğini beyan ve taahhüt eder.",
+          "Kullanıcı, E.C.T.S tarafından sitede sunulan hizmeti hiçbir şekilde kamu düzenini bozucu, genel ahlaka aykırı, başkalarını rahatsız ve taciz edecek şekilde, yasalara aykırı bir amaç için kullanamaz.",
+          "Kullanıcı, E.C.T.S tarafından kendisine verilmiş olan ya da kendisinin belirlediği şifreyi başka kişi ya da kuruluşlara veremez. Kullanım hakları sadece kendisine aittir, başkalarına devredilemez.",
+          "Kullanıcı, kullanıcı adı ve şifrenin güvenliğini sağlamanın kendi sorumluluğu altında olduğunu, gereken önlemleri almayı, şifreleri başkalarıyla paylaşmamayı kabul ve taahhüt eder.",
+          "Kullanıcı, diğer kullanıcıların yazılımlarına, kişisel verilerine veya diğer bilgilerine izinsiz olarak ulaşmamayı ve/veya bunları kullanmamayı kabul eder.",
+          "Kullanıcı, kanunen yasak bilgiler içeren mesajlar, zararlı yazılımlar ile üçüncü şahıslara zarar verebilecek içerik dağıtmayacağını kabul, beyan ve taahhüt eder."
+        ]
+      },
+      "platformRights": {
+        "title": "Platform Yetkileri",
+        "content": [
+          "E.C.T.S her zaman için tek taraflı olarak kullanıcıya verilen hizmeti sürekli veya geçici durdurabileceği gibi herhangi bir sayfasındaki ya da hizmetindeki kullanıcı erişimini neden belirtmeksizin ve uyarmaksızın, erteleme, sınırlama ve yok etme hakkına sahiptir.",
+          "E.C.T.S, üyelik bilgilerini eksik veya hatalı bildiren üyeler ile kullanım koşullarına aykırı davranan kullanıcıların, hiçbir açıklama yapmaksızın kullanımlarını, üyeliklerini sonlandırma veya dondurma hakkına sahiptir.",
+          "E.C.T.S, verdiği hizmetlerin kesintisiz veya hatasız olacağını garanti etmemektedir.",
+          "E.C.T.S, kullanıcılardan gelen içeriği, e-postayı ya da sayfalarında bulunan herhangi bir iletiyi neden göstermeden reddetme, geciktirme, yayınlamama veya yayından kaldırma hakkına sahiptir.",
+          "E.C.T.S'ye ait sitede reklam ve tanıtım faaliyetleri yapma hakkı sadece E.C.T.S'ye veya E.C.T.S'nin yetki verdiği üçüncü kişilere aittir.",
+          "E.C.T.S teknik nedenlerden kaynaklanan fiyat, ürün ve her türlü güncelleme hatalarından sorumlu olmayıp, dilediği zaman sitede yer alan fiyatları güncelleyebilir, değiştirebilir."
+        ]
+      },
+      "privacy": {
+        "title": "Gizlilik ve Kişisel Verilerin İşlenmesi",
+        "content": [
+          "Size daha iyi hizmet verebilmek, ihtiyaçlarınızı ve ilgi alanlarınızı anlayabilmek için, E.C.T.S uygun bildirim yaparak ve onay alarak kişisel bilgileri toplar, iletir ve kullanır.",
+          "E.C.T.S, bir siteyi ziyaret ettiğinizde, çerezler, web sinyalleri gibi Otomatik Veri Toplama Araçları ile de bilgi toplayabilir.",
+          "Kişisel verileriniz; siparişlerinizi almak, ürün ve hizmetlerimizi sunmak, ödemelerinizi gerçekleştirmek, pazarlama amacıyla sizinle irtibata geçmek, elektronik posta ile bülten göndermek gibi amaçlar ile işlenecektir.",
+          "Kişisel veriler otomatik olan/olmayan yöntemler ile depolanması, muhafazası, kullanılması, güncellenmesi, değiştirilmesi, sınıflandırılması, açıklanması, paylaşımı, yurt içine veya yurt dışına aktarılması şeklinde işlenecektir.",
+          "E.C.T.S üye ile SMS/kısa mesaj, anlık bildirim, otomatik arama, bilgisayar, telefon, faks, elektronik posta ve diğer elektronik iletiler ile iletişime geçebilir.",
+          "Kişisel verileriniz Kişisel Verilerin Korunması Kanunu'na uygun şekilde idari ve teknik her türlü güvenlik önlemi alınarak güvenli şekilde saklanacaktır."
+        ]
+      },
+      "termination": {
+        "title": "Fesih ve Değişiklikler",
+        "content": [
+          "E.C.T.S ve Kullanıcı bu sözleşmeyi dilediği zaman sona erdirebilir.",
+          "E.C.T.S bu Kullanım Koşulları üyelik sözleşmesinin koşullarında, web sitesinde sunduğu hizmetlerde dilediği zaman ve yasal düzenlemeler gereği de tek taraflı olarak değişiklik, ayarlama ve güncelleme yapma hakkına sahiptir.",
+          "Bu değişiklikler, ayarlamalar ve güncellemeler sitede yayınlandığı andan itibaren geçerlilik kazanmış sayılır.",
+          "Kullanıcı, sözleşme hükümleri uyarınca verilecek hizmeti kullanmaya başladığı tarihten itibaren, sözleşmede belirtilen hak ve yükümlülüklere aykırı hareketleri nedeniyle, E.C.T.S'nin ve/veya üçüncü kişilerin uğrayacağı her türlü zararı derhal tazmin etmeyi kabul ve taahhüt eder."
+        ]
+      },
+      "disputes": {
+        "title": "İhtilaf",
+        "content": [
+          "İşbu sözleşme KKTC Yasalarına tâbi olup, bu yasalara göre çözümlenecektir.",
+          "KKTC Mahkemeleri yetkili olacaktır."
+        ]
+      },
+      "notifications": {
+        "title": "Tebligat Adresleri",
+        "content": [
+          "Kullanıcı veya Üyenin E.C.T.S'ye bildirdiği adres, bu sözleşme ile ilgili olarak yapılacak her türlü bildirim için yasal tebligat adresi kabul edilir.",
+          "Kullanıcı veya Üye, mevcut adreslerindeki değişiklikleri yazılı olarak E.C.T.S'ye 3 (üç) gün içinde bildirmedikçe, eski adreslere yapılacak bildirimlerin geçerli olacağını kabul eder.",
+          "İşbu sözleşme nedeniyle E.C.T.S'nin üyenin sistemde kayıtlı e-posta adresini kullanarak yapacağı her türlü bildirim aynen geçerli olup, e-postanın E.C.T.S tarafından yollanmasından 1 (bir) gün sonra üyeye ulaştığı kabul edilecektir."
+        ]
+      },
+      "enforcement": {
+        "title": "Yürürlük",
+        "content": [
+          "Kullanıcı veya Üye, bu sözleşmede yer alan maddelerin tümünü okuduğunu, anladığını, kabul ettiğini ve kendisiyle ilgili olarak verdiği bilgilerin doğruluğunu onayladığını beyan, kabul ve taahhüt eder.",
+          "İşbu sözleşme, Kullanıcı veya üyenin Web sitesine girmesi veya üye olması anında akdedilmiş ve karşılıklı ve süresiz olarak yürürlüğe girmiştir.",
+          "Sözleşme üyeliğin sona ermesi ile veya işbu sözleşmede sayılan fesih hallerinden herhangi birinin gerçekleşmesi ile hiçbir ihtara gerek kalmaksızın kendiliğinden hükümsüz kalacaktır."
+        ]
+      }
+    }
+  },
+  "membershipAgreement": {
+    "title": "Üyelik Sözleşmesi",
+    "lastUpdated": "Son Güncelleme",
+    "updateDate": "Ocak 2025",
+    "introduction": "Bu Üyelik Sözleşmesi, E.C.T.S TRADING LTD ile Platform hizmetlerimizi kullanan Üyeler arasında hüküm ve koşulları belirler. Hesap oluşturarak ve hizmetlerimizi kullanarak, bu sözleşmeye bağlı olmayı kabul edersiniz.",
+    "footerNote": "Nar24'ü kullanmaya devam ederek, bu Üyelik Sözleşmesini okuduğunuzu, anladığınızı ve kabul ettiğinizi beyan edersiniz.",
+    "sections": {
+      "parties": {
+        "title": "Taraflar",
+        "content": [
+          "İşbu Üyelik Sözleşmesi, E.C.T.S TRADING LTD ('ECTS') ile Platforma kayıt olan ve kullanan kullanıcı ('Üye') arasındadır.",
+          "ECTS, çeşitli mobil uygulamalar ve internet siteleri aracılığıyla e-pazaryeri ve elektronik ticaret hizmet sağlayıcısı olarak faaliyet göstermektedir.",
+          "Üye, Platforma kayıt olarak ve/veya Platformu kullanarak ve/veya Platform üzerinde işlem yaparak bu Sözleşmeyi kabul eder.",
+          "Bu Sözleşme ayrıca ECTS ve web sitesindeki Alıcılar arasındaki ilişkiyi, sunulan hizmetler için şart ve koşulları belirler."
+        ]
+      },
+      "definitions": {
+        "title": "Tanımlar",
+        "content": [
+          "Sanal Mağaza: Satıcıların birden fazla mal ve/veya hizmete ilişkin ilanları özel bir bölümde yayınlayabildiği hizmet.",
+          "Hizmet/Hizmetler: Üyelerin tanımlı iş ve işlemlerini gerçekleştirmelerini sağlamak için ECTS tarafından sunulan uygulamalar.",
+          "Kullanıcı/Kullanıcılar: Web sitesine erişen gerçek ve tüzel kişiler.",
+          "Platform/Web sitesi: ECTS'nin hizmetlerini sunduğu alan adından ulaşılabilen web sitesi.",
+          "Üye/Üyeler: Web sitesine üye olan ve içerik, uygulama ve hizmetlerden yararlanan alıcı, satıcı gerçek ve tüzel tüm kişileri kapsar.",
+          "Alıcı: Satıcı tarafından satışa arz edilen mal ve/veya hizmetleri satın alan gerçek veya tüzel kişi Üye.",
+          "Satıcı: ECTS ile yaptığı sözleşme kapsamında hesabı üzerinden yayınladığı ilanlar aracılığıyla çeşitli ürün ve/veya hizmetleri satışa arz eden tüzel/gerçek kişi üye."
+        ]
+      },
+      "rightsObligations": {
+        "title": "Tarafların Hak ve Yükümlülükleri",
+        "content": [
+          "Üyelik statüsünün kazanılabilmesi için, kullanıcının bu Sözleşmeyi onaylayarak, talep edilen bilgileri doğru ve tam şekilde doldurması ve başvurunun ECTS tarafından onaylanması gerekmektedir.",
+          "Üye olmak isteyen kullanıcının 18 yaşını doldurmuş olması, ECTS tarafından belirlenecek diğer şartları sağlaması ve ilgili mevzuat uyarınca gerekli şartları haiz olması gerekmektedir.",
+          "Üyelik hesabı Üyeye özeldir; Üye, üyelik hesabını üçüncü bir kişiye kullandıramaz ve diğer Üyelerin üyelik hesaplarını kullanamaz.",
+          "ECTS, aracı hizmet sağlayıcı ve/veya yer sağlayıcı konumundadır. ECTS'nin bizzat satışa sunduğu ürünler haricinde içerik gerçekliğinden sorumlu değildir.",
+          "Üye, ECTS'nin bizzat satıcı konumunda olduğu sözleşmeler hariç, satıcılar ile akdedilecek sözleşmelerde ECTS'nin taraf olmadığını kabul eder.",
+          "Üye, Platformda gerçekleştirdiği her türlü iş ve işlemde, Sözleşme hükümlerine, Platform kurallarına, yürürlükteki mevzuata ve ahlak kurallarına uygun hareket edeceğini kabul eder.",
+          "Kullanıcı adı ve şifre bilgilerinin güvenliğinin sağlanması, gizliliğinin korunması tamamen Üyenin sorumluluğundadır.",
+          "ECTS, her zaman tek taraflı olarak üyeliği kısıtlama, engelleme, askıya alma veya sona erdirme hak ve yetkisine sahiptir.",
+          "Üye, her zaman üyeliğini herhangi bir sebep göstermeksizin tek taraflı olarak sona erdirebilir.",
+          "ECTS, Platformu ve/veya Platform aracılığıyla sunulan hizmetleri değiştirebilir, güncelleyebilir, askıya alabilir veya durdurabilir."
+        ]
+      },
+      "dataProtection": {
+        "title": "Kişisel Verilerin Korunması",
+        "content": [
+          "ECTS, kişisel verilerin korunmasına ilişkin mevzuata uygun şekilde işlenmesine, güvenliğinin sağlanmasına önem vermektedir.",
+          "Kişisel veriler, hizmetlerin sunulması, siparişin oluşması, teslimatın gerçekleşmesi, Üyenin memnuniyetinin arttırılması için işlenmektedir.",
+          "ECTS, Üyeye uygun ürünlerin sunulması amacıyla kişisel verileri işlemektedir.",
+          "Üye, kişisel verilerinin istatistiki değerlendirmeler, reklam, pazarlama ve ticari iletişim faaliyetleri için ECTS veya iş ortakları tarafından kullanılmasına rıza gösterir.",
+          "ECTS, bilgilerin güvenli şekilde saklanması için gereken her türlü tedbiri alacaktır.",
+          "Üye, kişisel bilgileri üzerinde dilediği zaman değişiklik yapma hakkına sahiptir."
+        ]
+      },
+      "commercialMessages": {
+        "title": "Ticari Elektronik İletiler",
+        "content": [
+          "ECTS, Üyenin ticari elektronik iletilere onay vermesi halinde, elektronik posta veya SMS yoluyla ticari elektronik ileti gönderebilir.",
+          "Üye, elektronik posta adresini ve telefon numarasını doğru ve güncel tutmakla yükümlüdür.",
+          "Üye, ticari elektronik iletilerin gönderilmesine onay vermeme ya da onayını geri alma hakkına sahiptir ve bu hakkı mevzuat uyarınca veya Platform vasıtasıyla kullanabilir."
+        ]
+      },
+      "intellectualProperty": {
+        "title": "Fikri Mülkiyet Hakları",
+        "content": [
+          "Platform ve Platforma ilişkin her türlü unsur ve içerik (ticaret unvanı, eser, telif, patent, marka, tasarım, yazılım vb.) ECTS'ye aittir.",
+          "Üyelerin Platform aracılığıyla paylaştığı içerikler, ECTS'nin sahip olduğu tam ruhsat saklı kalmak kaydıyla, ilgili Üyeye aittir.",
+          "Üyelik hesabının oluşturulması, Üyeye Platform, ECTS içerikleri ve/veya Diğer Üye içeriklerine ilişkin herhangi bir hak vermez.",
+          "Üyenin, Platformu, ECTS içeriklerini ve/veya Diğer Üye İçeriklerini kullanım amacı dışında kullanımı, kopyalaması, değiştirmesi, tersine mühendislik yapması mutlak suretle yasaktır.",
+          "Üye, bu madde kapsamındaki yasağı ihlal etmesi halinde ECTS'nin ve/veya üçüncü kişilerin her türlü zararını tazmin etmekle yükümlüdür."
+        ]
+      },
+      "contractModifications": {
+        "title": "Sözleşme Değişiklikleri ve Feragat",
+        "content": [
+          "ECTS, kendi takdirine bağlı olmak üzere, bu Sözleşmeyi ve Platform politikalarını, herhangi bir zamanda duyurarak tek taraflı olarak değiştirebilir.",
+          "Değişiklikler, ECTS tarafından belirtilmedikçe, Platformda yayımlandıkları tarihte geçerlilik kazanır.",
+          "Üye, Platformu kullanmaya devam etmekle değişiklikleri kabul etmiş sayılır.",
+          "ECTS tarafından imza edilmeyen feragatlar geçerli değildir. Hakların kullanılmaması, bu haklardan feragat anlamına gelmez."
+        ]
+      },
+      "forceMajeure": {
+        "title": "Mücbir Sebepler",
+        "content": [
+          "Mücbir Sebep olayları; ayaklanma, ambargo, devlet müdahalesi, savaş, grev, lokavt, siber saldırı, altyapı arızaları, doğal felaketler, mevzuat değişiklikleri ve ECTS'nin kontrolü dışındaki diğer olayları içerir.",
+          "ECTS, Mücbir Sebep sonucunda engellenen veya geciken yükümlülüklerinden sorumlu tutulamaz.",
+          "Mücbir Sebep olayları, Sözleşmenin ihlali olarak kabul edilemez."
+        ]
+      },
+      "miscellaneous": {
+        "title": "Muhtelif Hükümler",
+        "content": [
+          "Üye, Sözleşmeden doğabilecek ihtilaflarda ECTS'nin resmi defter ve ticari kayıtları, veri tabanı, e-arşiv kayıtları ve bilgisayar kayıtlarının bağlayıcı delil teşkil edeceğini kabul eder.",
+          "Bu Sözleşmenin yorumlanmasında ve uygulanmasında KKTC Yasaları geçerli olacaktır.",
+          "Sözleşmeden doğabilecek her türlü ihtilafın hallinde KKTC Mahkemeleri yetkilidir.",
+          "Sözleşme, konusuna ilişkin taraflar arasındaki anlaşmanın tamamını oluşturur. Herhangi bir hükmün geçersizliği, geri kalan hükümlerin geçerliliğini etkilemez.",
+          "Üye, Sözleşmeyi ve haklarını önceden ECTS'nin yazılı iznini almaksızın üçüncü kişilere devir veya temlik edemez.",
+          "ECTS, haklarını, menfaatlerini ve yükümlülüklerini, Üyenin iznini almaksızın bağlı şirketlerine, iştiraklerine veya üçüncü kişilere devir ve temlik edebilir.",
+          "Web sitesinin kullanılması, Kullanıcı tarafından bu sözleşmenin okunduğunu ve kabul edildiğini gösterir."
+        ]
+      }
+    }
   }
 }

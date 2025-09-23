@@ -9,7 +9,8 @@ import { BadgeProvider } from "@/context/BadgeProvider";
 import { SearchProvider } from "@/context/SearchProvider";
 import ConditionalHeader from "../components/ConditionalHeader";
 import { SearchHistoryProvider } from "@/context/SearchHistoryProvider";
-import Footer from "../components/Footer";
+import ConditionalFooter from "../components/ConditionalFooter";
+import CookieConsent from "../components/CookieConsent";
 import { PersonalizedRecommendationsProvider } from "@/context/PersonalizedRecommendationsProvider";
 import { db } from "@/lib/firebase";
 
@@ -26,7 +27,8 @@ function AppProviders({ children }: { children: React.ReactNode }) {
               <PersonalizedRecommendationsProvider>
                 <ConditionalHeader />
                 <main>{children}</main>
-                <Footer />
+                <ConditionalFooter />
+                <CookieConsent />
               </PersonalizedRecommendationsProvider>
             </SearchHistoryProvider>
           </SearchProvider>
