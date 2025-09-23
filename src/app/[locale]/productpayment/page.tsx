@@ -434,17 +434,25 @@ export default function ProductPaymentPage() {
 
   // Load cart items
   useEffect(() => {
+    // Get total from URL params first
+    const totalParam = searchParams.get("total");
     const itemsParam = searchParams.get("items");
+    
     if (itemsParam) {
       try {
         const items = JSON.parse(decodeURIComponent(itemsParam));
         setCartItems(items);
-
-        // Calculate total price
-        const total = items.reduce((sum: number, item: CartItem) => {
-          return sum + (item.price || 0) * item.quantity;
-        }, 0);
-        setTotalPrice(total);
+  
+        // ✅ USE THE TOTAL FROM URL PARAMS (already calculated by CartDrawer)
+        if (totalParam) {
+          setTotalPrice(parseFloat(totalParam));
+        } else {
+          // Fallback: calculate if total param is missing
+          const total = items.reduce((sum: number, item: CartItem) => {
+            return sum + (item.price || 0) * item.quantity;
+          }, 0);
+          setTotalPrice(total);
+        }
       } catch (error) {
         console.error("Error parsing cart items:", error);
         router.push("/");
@@ -452,15 +460,23 @@ export default function ProductPaymentPage() {
     } else {
       // Try localStorage as fallback
       const savedCart = localStorage.getItem("cartItems");
+      const savedTotal = localStorage.getItem("cartTotal");
+      
       if (savedCart) {
         try {
           const items = JSON.parse(savedCart);
           setCartItems(items);
-
-          const total = items.reduce((sum: number, item: CartItem) => {
-            return sum + (item.price || 0) * item.quantity;
-          }, 0);
-          setTotalPrice(total);
+  
+          // ✅ USE THE SAVED TOTAL FROM localStorage
+          if (savedTotal) {
+            setTotalPrice(parseFloat(savedTotal));
+          } else {
+            // Fallback: calculate if savedTotal is missing
+            const total = items.reduce((sum: number, item: CartItem) => {
+              return sum + (item.price || 0) * item.quantity;
+            }, 0);
+            setTotalPrice(total);
+          }
         } catch (error) {
           console.error("Error parsing saved cart:", error);
           router.push("/");

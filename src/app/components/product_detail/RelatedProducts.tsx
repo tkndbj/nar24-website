@@ -343,7 +343,7 @@ const ProductDetailRelatedProducts: React.FC<ProductDetailRelatedProductsProps> 
     >
       <ProductCard
         product={product}
-        scaleFactor={isMobile ? 0.80 : 0.85}// Reduced from 0.75/0.85 to make cards smaller
+        scaleFactor={isMobile ? 0.90 : 0.85}// Reduced from 0.75/0.85 to make cards smaller
         internalScaleFactor={1.1}
         showCartIcon={true}
         showExtraLabels={false}
