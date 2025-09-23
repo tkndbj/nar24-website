@@ -7,20 +7,18 @@ import React, {
   useEffect,
   useState,
   ReactNode,
-  useRef,
+  useCallback,
+  useMemo,
 } from "react";
-import { User, getIdToken as getFirebaseIdToken } from "firebase/auth";
+import { User } from "firebase/auth";
 import {
   doc,
   updateDoc,
-  getDocFromServer,
+  getDoc,
   Timestamp,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import TwoFactorService from "@/services/TwoFactorService";
-import AuthStateManager from "@/context/authStateManager";
-import StatePersistenceManager from "@/lib/statePersistence";
-import { useLocale } from "next-intl";
 
 interface ProfileData {
   displayName?: string;
@@ -81,70 +79,33 @@ interface UserProviderProps {
 }
 
 export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
-  const authManager = useRef(AuthStateManager.getInstance());
-  const statePersistence = useRef(StatePersistenceManager.getInstance());
-  const locale = useLocale();
-  const [user, setUser] = useState<User | null>(() => {
-    // Initialize with cached data if available
-    const cached = authManager.current.getCachedData();
-    return cached?.user || null;
-  });
-
-  const [isLoading, setIsLoading] = useState(() => {
-    // Check if this is a language switch - if so, don't show loading
-    if (typeof window === "undefined") {
-      // During SSR, check cached data only
-      const cached = authManager.current.getCachedData();
-      return !cached;
-    }
-
-    const isLanguageSwitch = statePersistence.current.isLanguageSwitch();
-    const cached = authManager.current.getCachedData();
-    return !cached && !isLanguageSwitch;
-  });
-
-  const [isAdmin, setIsAdmin] = useState(() => {
-    const cached = authManager.current.getCachedData();
-    return cached?.isAdmin || false;
-  });
-
-  const [profileData, setProfileData] = useState<ProfileData | null>(() => {
-    const cached = authManager.current.getCachedData();
-    return cached?.profileData || null;
-  });
-
-  const [profileComplete, setProfileCompleteState] = useState<boolean | null>(
-    null
-  );
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  const [profileComplete, setProfileCompleteState] = useState<boolean | null>(null);
   const [pending2FA, setPending2FA] = useState(false);
-  const [internalFirebaseUser, setInternalFirebaseUser] = useState<User | null>(
-    null
-  );
+  const [internalFirebaseUser, setInternalFirebaseUser] = useState<User | null>(null);
 
-  const twoFactorService = TwoFactorService.getInstance();
-  const isMountedRef = useRef(true);
+  const twoFactorService = useMemo(() => TwoFactorService.getInstance(), []);
 
   // Calculate profile completion status
-  const isProfileComplete = React.useMemo(() => {
+  const isProfileComplete = useMemo(() => {
     if (profileComplete !== null) return profileComplete;
     if (!profileData) return false;
 
-    const complete = !!(
+    return !!(
       profileData.gender &&
       profileData.birthDate &&
       profileData.languageCode
     );
-
-    return complete;
   }, [profileComplete, profileData]);
 
   // Check if user needs 2FA verification
-  const check2FARequirement = async (firebaseUser: User): Promise<boolean> => {
-    // Add safety check for SSR
+  const check2FARequirement = useCallback(async (firebaseUser: User): Promise<boolean> => {
     if (typeof window === "undefined") return false;
 
     try {
-      // Add null check for providerData
       const isEmailPasswordUser =
         firebaseUser.providerData?.some?.(
           (info) => info.providerId === "password"
@@ -158,12 +119,11 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
       if (needs2FA) {
         const userDocRef = doc(db, "users", firebaseUser.uid);
-        const userDoc = await getDocFromServer(userDocRef);
+        const userDoc = await getDoc(userDocRef);
 
         if (userDoc.exists()) {
           const userData = userDoc.data();
-          const lastVerification =
-            userData?.lastTwoFactorVerification?.toDate?.();
+          const lastVerification = userData?.lastTwoFactorVerification?.toDate?.();
 
           if (lastVerification) {
             const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
@@ -181,66 +141,58 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       console.error("Error checking 2FA requirement:", error);
       return false;
     }
-  };
+  }, [twoFactorService]);
 
-  // Initialize auth state manager
+  // Fetch user data
+  const fetchUserData = useCallback(async () => {
+    const currentUser = user || internalFirebaseUser;
+    if (!currentUser) return;
+
+    try {
+      const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+
+      if (userDoc.exists()) {
+        const data = userDoc.data();
+        setProfileData(data);
+        setIsAdmin(data.isAdmin === true);
+
+        const complete = !!(data.gender && data.birthDate && data.languageCode);
+        setProfileCompleteState(complete);
+      }
+    } catch (error) {
+      console.error("Error fetching user data:", error);
+    }
+  }, [user, internalFirebaseUser]);
+
+  // Initialize auth state listener
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // Clean up any expired flags first
-    statePersistence.current.cleanupExpiredFlags();
+    const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
+      if (firebaseUser) {
+        setInternalFirebaseUser(firebaseUser);
 
-    // Check if this is a real language switch
-    const isLanguageSwitch = statePersistence.current.isLanguageSwitch(locale);
+        const needs2FA = await check2FARequirement(firebaseUser);
 
-    // If this is a language switch, use existing auth state
-    if (isLanguageSwitch) {
-      const cached = authManager.current.getCachedData();
-      if (cached) {
-        setUser(cached.user);
-        setProfileData(cached.profileData);
-        setIsAdmin(cached.isAdmin);
-        setIsLoading(false);
-        return;
-      }
-    }
-
-    // Normal initialization
-    authManager.current.initialize();
-
-    const unsubscribe = authManager.current.subscribe(async (cachedData) => {
-      if (!isMountedRef.current) return;
-
-      if (cachedData) {
-        const {
-          user: cachedUser,
-          profileData: cachedProfile,
-          isAdmin: cachedIsAdmin,
-        } = cachedData;
-
-        // Check 2FA requirement only if not switching languages
-        if (!statePersistence.current.isLanguageSwitch()) {
-          const needs2FA = await check2FARequirement(cachedUser as User);
-
-          if (needs2FA) {
-            setPending2FA(true);
-            setInternalFirebaseUser(cachedUser);
-            setUser(null);
-          } else {
-            setUser(cachedUser);
-            setInternalFirebaseUser(cachedUser);
-            setPending2FA(false);
-          }
+        if (needs2FA) {
+          setPending2FA(true);
+          setUser(null);
         } else {
-          // During language switch, just set the user without 2FA check
-          setUser(cachedUser);
-          setInternalFirebaseUser(cachedUser);
+          setUser(firebaseUser);
           setPending2FA(false);
         }
 
-        setProfileData(cachedProfile);
-        setIsAdmin(cachedIsAdmin);
-        setIsLoading(false);
+        // Fetch profile data
+        try {
+          const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+          if (userDoc.exists()) {
+            const data = userDoc.data();
+            setProfileData(data);
+            setIsAdmin(data.isAdmin === true);
+          }
+        } catch (error) {
+          console.error("Error fetching initial user data:", error);
+        }
       } else {
         // User logged out
         setUser(null);
@@ -248,70 +200,26 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         setProfileData(null);
         setIsAdmin(false);
         setPending2FA(false);
-        setIsLoading(false);
-
-        // Clear any persisted state on logout
-        statePersistence.current.clearState();
       }
+
+      setIsLoading(false);
     });
 
-    return () => {
-      isMountedRef.current = false;
-      unsubscribe();
-    };
-  }, []); // Empty dependency array to run only once
-
-  // Fetch user data
-  const fetchUserData = async () => {
-    const currentUser = user;
-    if (!currentUser) return;
-
-    // Skip fetching during language switch
-    if (statePersistence.current.isLanguageSwitch()) {
-      console.log("Skipping user data fetch during language switch");
-      return;
-    }
-
-    try {
-      const serverDoc = await getDocFromServer(
-        doc(db, "users", currentUser.uid)
-      );
-
-      if (serverDoc.exists()) {
-        const data = serverDoc.data();
-        setProfileData(data);
-        setIsAdmin(data.isAdmin === true);
-
-        const complete = !!(data.gender && data.birthDate && data.languageCode);
-        setProfileCompleteState(complete);
-
-        // Update auth manager cache with fresh data
-        authManager.current.updateCache({
-          user: currentUser,
-          profileData: data,
-          isAdmin: data.isAdmin === true,
-        });
-      }
-    } catch (error) {
-      console.error("Error fetching user data:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    return () => unsubscribe();
+  }, [check2FARequirement]);
 
   // Refresh user
-  const refreshUser = async () => {
-    // Don't invalidate cache during language switch
-    if (!statePersistence.current.isLanguageSwitch()) {
-      authManager.current.invalidateCache();
-    }
+  const refreshUser = useCallback(async () => {
     await auth.currentUser?.reload();
-    // The subscription will handle the update
-  };
+    if (auth.currentUser) {
+      setUser(auth.currentUser);
+      await fetchUserData();
+    }
+  }, [fetchUserData]);
 
   // Update profile data
-  const updateProfileData = async (updates: Partial<ProfileData>) => {
-    const currentUser = user;
+  const updateProfileData = useCallback(async (updates: Partial<ProfileData>) => {
+    const currentUser = user || internalFirebaseUser;
     if (!currentUser) return;
 
     try {
@@ -319,13 +227,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
       const updatedProfileData = { ...(profileData || {}), ...updates };
       setProfileData(updatedProfileData);
-
-      // Update cache with new profile data
-      authManager.current.updateCache({
-        user: currentUser,
-        profileData: updatedProfileData,
-        isAdmin: updatedProfileData.isAdmin === true,
-      });
+      setIsAdmin(updatedProfileData.isAdmin === true);
 
       const complete = !!(
         updatedProfileData.gender &&
@@ -337,30 +239,30 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       console.error("Error updating profile data:", error);
       throw error;
     }
-  };
+  }, [user, internalFirebaseUser, profileData]);
 
   // Get ID token
-  const getIdToken = async (): Promise<string | null> => {
+  const getIdToken = useCallback(async (): Promise<string | null> => {
     const currentUser = user || internalFirebaseUser;
     if (!currentUser) {
       console.log("No user logged in to fetch ID token.");
       return null;
     }
     try {
-      return await getFirebaseIdToken(currentUser, true);
+      return await currentUser.getIdToken(true);
     } catch (error) {
       console.error("Error getting ID token:", error);
       return null;
     }
-  };
+  }, [user, internalFirebaseUser]);
 
   // Get profile field
-  const getProfileField = <T,>(key: string): T | null => {
+  const getProfileField = useCallback(<T,>(key: string): T | null => {
     return (profileData?.[key] as T) || null;
-  };
+  }, [profileData]);
 
   // Update user data immediately
-  const updateUserDataImmediately = async (
+  const updateUserDataImmediately = useCallback(async (
     currentUser: User,
     options?: { profileComplete?: boolean }
   ) => {
@@ -379,24 +281,24 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       setUser(currentUser);
       setPending2FA(false);
     }
-  };
+  }, [check2FARequirement]);
 
   // Set profile complete
-  const setProfileComplete = (complete: boolean) => {
+  const setProfileComplete = useCallback((complete: boolean) => {
     setProfileCompleteState(complete);
-  };
+  }, []);
 
   // Complete 2FA
-  const complete2FA = () => {
+  const complete2FA = useCallback(() => {
     if (internalFirebaseUser && pending2FA) {
       setUser(internalFirebaseUser);
       setPending2FA(false);
       fetchUserData();
     }
-  };
+  }, [internalFirebaseUser, pending2FA, fetchUserData]);
 
   // Cancel 2FA
-  const cancel2FA = async () => {
+  const cancel2FA = useCallback(async () => {
     if (internalFirebaseUser) {
       await auth.signOut();
     }
@@ -405,20 +307,9 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     setProfileData(null);
     setIsAdmin(false);
     setPending2FA(false);
+  }, [internalFirebaseUser]);
 
-    // Clear persisted state on cancel
-    statePersistence.current.clearState();
-    authManager.current.invalidateCache();
-  };
-
-  // Clean up on unmount
-  useEffect(() => {
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
-
-  const contextValue: UserContextType = {
+  const contextValue: UserContextType = useMemo(() => ({
     user,
     isLoading,
     isAdmin,
@@ -434,9 +325,27 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     isPending2FA: pending2FA,
     complete2FA,
     cancel2FA,
-  };
+  }), [
+    user,
+    isLoading,
+    isAdmin,
+    isProfileComplete,
+    profileData,
+    fetchUserData,
+    refreshUser,
+    updateProfileData,
+    getIdToken,
+    getProfileField,
+    updateUserDataImmediately,
+    setProfileComplete,
+    pending2FA,
+    complete2FA,
+    cancel2FA,
+  ]);
 
   return (
-    <UserContext.Provider value={contextValue}>{children}</UserContext.Provider>
+    <UserContext.Provider value={contextValue}>
+      {children}
+    </UserContext.Provider>
   );
 };

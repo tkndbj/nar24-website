@@ -9,17 +9,27 @@ import { BadgeProvider } from "@/context/BadgeProvider";
 import { SearchProvider } from "@/context/SearchProvider";
 import ConditionalHeader from "../components/ConditionalHeader";
 import { SearchHistoryProvider } from "@/context/SearchHistoryProvider";
-import ClientProviders from "../components/ClientProviders";
-import { db } from "@/lib/firebase"; // Adjust this import path as needed
 import { PersonalizedRecommendationsProvider } from "@/context/PersonalizedRecommendationsProvider";
+import { db } from "@/lib/firebase";
 
 // Inner component that has access to user context
-function CartProviderWrapper({ children }: { children: React.ReactNode }) {
+function AppProviders({ children }: { children: React.ReactNode }) {
   const { user } = useUser();
   
   return (
     <CartProvider user={user} db={db}>
-      {children}
+      <FavoritesProvider>
+        <BadgeProvider>
+          <SearchProvider>
+            <SearchHistoryProvider>
+              <PersonalizedRecommendationsProvider>
+                <ConditionalHeader />
+                <main>{children}</main>
+              </PersonalizedRecommendationsProvider>
+            </SearchHistoryProvider>
+          </SearchProvider>
+        </BadgeProvider>
+      </FavoritesProvider>
     </CartProvider>
   );
 }
@@ -41,24 +51,9 @@ export default function LayoutWrapper({
       locale={locale}
       timeZone={timeZone}
     >
-      <ClientProviders>
-        <UserProvider>
-          <CartProviderWrapper>
-            <FavoritesProvider>
-              <BadgeProvider>
-                <SearchProvider>
-                  <SearchHistoryProvider>
-                  <PersonalizedRecommendationsProvider>
-                    <ConditionalHeader />
-                    <main>{children}</main>
-                    </PersonalizedRecommendationsProvider>
-                  </SearchHistoryProvider>
-                </SearchProvider>
-              </BadgeProvider>
-            </FavoritesProvider>
-          </CartProviderWrapper>
-        </UserProvider>
-      </ClientProviders>
+      <UserProvider>
+        <AppProviders>{children}</AppProviders>
+      </UserProvider>
     </NextIntlClientProvider>
   );
 }

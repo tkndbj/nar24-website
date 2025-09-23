@@ -6,6 +6,8 @@ import React, {
   useState,
   ReactNode,
   useCallback,
+  useRef,
+  useEffect,
 } from "react";
 import AlgoliaServiceManager, { Suggestion, CategorySuggestion } from "@/lib/algolia";
 
@@ -40,17 +42,23 @@ interface SearchProviderProps {
 export function SearchProvider({ children }: SearchProviderProps) {
   const [term, setTerm] = useState("");
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-  const [categorySuggestions, setCategorySuggestions] = useState<
-    CategorySuggestion[]
-  >([]);
+  const [categorySuggestions, setCategorySuggestions] = useState<CategorySuggestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [hasNetworkError, setHasNetworkError] = useState(false);
-  const [debounceTimeout, setDebounceTimeout] = useState<NodeJS.Timeout | null>(
-    null
-  );
+  
+  // Use ref instead of state for timeout - doesn't cause re-renders
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const algoliaManagerRef = useRef(AlgoliaServiceManager.getInstance());
 
-  const algoliaManager = AlgoliaServiceManager.getInstance();
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const clearResults = useCallback(() => {
     setSuggestions([]);
@@ -89,31 +97,25 @@ export function SearchProvider({ children }: SearchProviderProps) {
           Promise<Suggestion[]>,
           Promise<CategorySuggestion[]>
         ] = [
-          algoliaManager.searchProductSuggestions(
+          algoliaManagerRef.current.searchProductSuggestions(
             searchTerm,
             "products",
             "alphabetical",
             0,
             5
           ),
-          algoliaManager.searchProductSuggestions(
+          algoliaManagerRef.current.searchProductSuggestions(
             searchTerm,
             "shop_products",
             "alphabetical",
             0,
             5
           ),
-          algoliaManager.searchCategories(searchTerm, 15, "en"),
+          algoliaManagerRef.current.searchCategories(searchTerm, 15, "en"),
         ];
 
         const results = await Promise.all(searchPromises);
         const [productSuggestions, shopSuggestions, categoryResults] = results;
-
-        console.log("🔍 Raw search results:", {
-          products: productSuggestions,
-          shop: shopSuggestions,
-          categories: categoryResults,
-        });
 
         const combined: Suggestion[] = [];
         const seenIds = new Set<string>();
@@ -129,12 +131,6 @@ export function SearchProvider({ children }: SearchProviderProps) {
             combined.push(suggestion);
           }
         }
-
-        console.log("🔍 Final results:", {
-          searchTerm,
-          combinedProducts: combined.length,
-          categories: categoryResults.length,
-        });
 
         setSuggestions(combined.slice(0, 10));
         setCategorySuggestions(categoryResults);
@@ -158,7 +154,7 @@ export function SearchProvider({ children }: SearchProviderProps) {
         );
       }
     },
-    [algoliaManager, handleError]
+    [handleError]
   );
 
   const search = useCallback(
@@ -182,8 +178,9 @@ export function SearchProvider({ children }: SearchProviderProps) {
       const trimmed = newTerm.trim();
       setTerm(trimmed);
 
-      if (debounceTimeout) {
-        clearTimeout(debounceTimeout);
+      // Clear existing timeout
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
       }
 
       if (!trimmed) {
@@ -193,13 +190,12 @@ export function SearchProvider({ children }: SearchProviderProps) {
 
       setLoadingState();
 
-      const timeout = setTimeout(() => {
+      // Set new timeout
+      debounceTimeoutRef.current = setTimeout(() => {
         performSearch(trimmed);
       }, 300);
-
-      setDebounceTimeout(timeout);
     },
-    [debounceTimeout, clearResults, setLoadingState, performSearch]
+    [clearResults, setLoadingState, performSearch]
   );
 
   const clearSearchState = useCallback(() => {
@@ -207,11 +203,11 @@ export function SearchProvider({ children }: SearchProviderProps) {
     setTerm("");
     clearResults();
 
-    if (debounceTimeout) {
-      clearTimeout(debounceTimeout);
-      setDebounceTimeout(null);
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+      debounceTimeoutRef.current = null;
     }
-  }, [clearResults, debounceTimeout]);
+  }, [clearResults]);
 
   const retry = useCallback(async () => {
     const current = term.trim();
@@ -247,5 +243,4 @@ export function SearchProvider({ children }: SearchProviderProps) {
   );
 }
 
-// Re-export types for convenience
 export type { Suggestion, CategorySuggestion };

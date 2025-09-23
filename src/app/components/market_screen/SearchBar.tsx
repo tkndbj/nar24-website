@@ -79,38 +79,43 @@ export default function SearchBar({
   // Body scroll lock when dropdown is active
   useEffect(() => {
     if (isSearching) {
-      // Lock body scroll
-      const originalStyle = window.getComputedStyle(document.body).overflow;
-      document.body.style.overflow = 'hidden';
+      // Prevent background scroll
+      const scrollY = window.scrollY;
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
       
       return () => {
-        // Restore body scroll
-        document.body.style.overflow = originalStyle;
+        // Restore scroll position
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+        window.scrollTo(0, scrollY);
       };
-    } else {
-      // Ensure scroll is restored when not searching
-      document.body.style.overflow = '';
     }
   }, [isSearching]);
 
-  // Handle click outside for search
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        searchContainerRef.current &&
-        !searchContainerRef.current.contains(event.target as Node)
-      ) {
+ // Handle click outside for search
+useEffect(() => {
+  const handleClickOutside = (event: MouseEvent) => {
+    if (
+      searchContainerRef.current &&
+      !searchContainerRef.current.contains(event.target as Node)
+    ) {
+      // Only close if currently searching/showing dropdown
+      if (isSearching) {
         onSearchStateChange(false);
         searchInputRef.current?.blur();
-        setCurrentPage(0); // Reset pagination when closing
+        setCurrentPage(0);
         
         // Force restore body scroll
         document.body.style.overflow = '';
       }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [onSearchStateChange]);
+    }
+  };
+  document.addEventListener("mousedown", handleClickOutside);
+  return () => document.removeEventListener("mousedown", handleClickOutside);
+}, [onSearchStateChange, isSearching]); // Add isSearching to dependencies
 
   // Focus input when entering search mode
   useEffect(() => {
@@ -579,6 +584,7 @@ export default function SearchBar({
                   {paginatedEntries.map((entry) => (
                     <div
                       key={entry.id}
+                      onClick={() => console.log('🔍 Parent div clicked')}
                       className={`
                         flex items-center space-x-3 p-2 rounded-lg
                         hover:bg-gray-100 dark:hover:bg-gray-700 

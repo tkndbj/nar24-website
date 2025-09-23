@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   Bell,
   Heart,
@@ -22,8 +22,6 @@ import { FavoritesDrawer } from "../FavoritesDrawer";
 import { NotificationDrawer } from "../NotificationDrawer";
 import { CartDrawer } from "../profile/CartDrawer";
 import SearchBar from "./SearchBar";
-import StatePersistenceManager from "@/lib/statePersistence";
-
 import {
   CategorySuggestion,
   Suggestion,
@@ -31,75 +29,43 @@ import {
 } from "@/context/SearchProvider";
 
 interface MarketHeaderProps {
-  onTakePhoto?: () => void;
-  onSelectFromAlbum?: () => void;
-  backgroundColorNotifier?: string;
-  useWhiteColors?: boolean;
-  isDefaultView?: boolean;
   className?: string;
 }
 
 export default function MarketHeader({ className = "" }: MarketHeaderProps) {
   const t = useTranslations();
-  const statePersistence = StatePersistenceManager.getInstance();
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [isDark, setIsDark] = useState(false);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [isCartOpen, setIsCartOpen] = useState(false);
-  const [showLanguageMenu, setShowLanguageMenu] = useState(false);
-  const languageMenuRef = useRef<HTMLDivElement>(null);
-  const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
-  const { favoriteCount } = useFavorites();
-  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const locale = useLocale();
-  const [loadingTimeout, setLoadingTimeout] = useState(false);
+  
   // Auth and providers
   const { user, isLoading: userLoading } = useUser();
   const { unreadNotificationsCount } = useBadgeProvider();
   const { cartCount } = useCart();
+  const { favoriteCount } = useFavorites();
   const {
     updateTerm,
-    isLoading,
+    isLoading: searchLoading,
     clearSearchState,
     suggestions,
     categorySuggestions,
     errorMessage,
   } = useSearchProvider();
 
-  useEffect(() => {
-    if (userLoading) {
-      const timer = setTimeout(() => {
-        console.warn("User loading timeout - forcing display");
-        setLoadingTimeout(true);
-      }, 10000); // 10 second timeout
-
-      return () => clearTimeout(timer);
-    } else {
-      setLoadingTimeout(false);
-    }
-  }, [userLoading]);
-
-  useEffect(() => {
-    const restoredState = statePersistence.restoreState();
-    if (restoredState) {
-      // Restore search state if it existed
-      if (restoredState.search) {
-        setSearchTerm(restoredState.search.term || "");
-        setIsSearching(
-          restoredState.search.suggestions.length > 0 ||
-            restoredState.search.categorySuggestions.length > 0 ||
-            false
-        );
-      }
-
-      // Other states will be restored by their respective providers
-      console.log("State restored after language switch");
-    }
-  }, []);
+  // UI State
+  const [isDark, setIsDark] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [showLanguageMenu, setShowLanguageMenu] = useState(false);
+  
+  // Drawers
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  
+  const languageMenuRef = useRef<HTMLDivElement>(null);
 
   // Handle theme detection
   useEffect(() => {
@@ -136,164 +102,77 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
   // Show/hide suggestions
   useEffect(() => {
     if (isSearching && searchTerm.trim()) {
-      const hasResults =
-        suggestions.length > 0 || categorySuggestions.length > 0;
+      const hasResults = suggestions.length > 0 || categorySuggestions.length > 0;
       const hasError = errorMessage !== null;
-      const shouldShow = hasResults || hasError || isLoading;
+      const shouldShow = hasResults || hasError || searchLoading;
       setShowSuggestions(shouldShow);
     } else {
       setShowSuggestions(false);
     }
-  }, [
-    isSearching,
-    searchTerm,
-    suggestions,
-    categorySuggestions,
-    errorMessage,
-    isLoading,
-  ]);
+  }, [isSearching, searchTerm, suggestions, categorySuggestions, errorMessage, searchLoading]);
 
-  // Language switching function
-  const switchLanguage = (newLocale: string, event?: React.MouseEvent) => {
-    if (event) {
-      event.preventDefault();
-      event.stopPropagation();
-    }
-
-    // Save current state before switching
-    statePersistence.saveState({
-      cart:
-        cartCount > 0
-          ? { cartCount: cartCount, cartProductIds: [], cartItems: [] }
-          : undefined,
-      favorites:
-        favoriteCount > 0
-          ? {
-              favoriteProductIds: [],
-              allFavoriteProductIds: [],
-              favoriteCount: favoriteCount,
-              selectedBasketId: null,
-            }
-          : undefined,
-      notifications:
-        unreadNotificationsCount > 0
-          ? { count: unreadNotificationsCount }
-          : undefined,
-      search: searchTerm
-        ? { term: searchTerm, suggestions: [], categorySuggestions: [] }
-        : undefined,
-    });
-
+  // Simplified language switching
+  const switchLanguage = useCallback((newLocale: string) => {
     let pathWithoutLocale = pathname;
     if (pathname.startsWith(`/${locale}`)) {
       pathWithoutLocale = pathname.substring(`/${locale}`.length) || "/";
     }
-
+    
     const newPath = `/${newLocale}${pathWithoutLocale}`;
-
-    // Preserve query parameters - THIS IS CRITICAL
+    
+    // Preserve query parameters
     const currentParams = new URLSearchParams(window.location.search);
     const queryString = currentParams.toString();
     const finalPath = queryString ? `${newPath}?${queryString}` : newPath;
-
-    // Use hard navigation for reliability
+    
+    // Use window.location for more reliable navigation during locale switch
     window.location.href = finalPath;
     setShowLanguageMenu(false);
-  };
+  }, [pathname, locale]);
 
-  const handleMobileLanguageSwitch = (newLocale: string) => {
-    console.log("Mobile handler called for:", newLocale);
-
-    // Save state before switch
-    statePersistence.saveState({
-      cart:
-        cartCount > 0
-          ? { cartCount: cartCount, cartProductIds: [], cartItems: [] }
-          : undefined,
-      favorites:
-        favoriteCount > 0
-          ? {
-              favoriteProductIds: [],
-              allFavoriteProductIds: [],
-              favoriteCount: favoriteCount,
-              selectedBasketId: null,
-            }
-          : undefined,
-      notifications:
-        unreadNotificationsCount > 0
-          ? { count: unreadNotificationsCount }
-          : undefined,
-      search: searchTerm
-        ? { term: searchTerm, suggestions: [], categorySuggestions: [] }
-        : undefined,
-    });
-
-    setTimeout(() => {
-      switchLanguage(newLocale);
-    }, 100);
-  };
-
-  const handleFavoritesClick = () => {
-    setIsFavoritesOpen(true);
-  };
-
-  const handleNotificationClick = () => {
-    setIsNotificationOpen(true);
-  };
-
-  const handleSearchStateChange = (searching: boolean) => {
+  // Handle search
+  const handleSearchStateChange = useCallback((searching: boolean) => {
     if (searching) {
       setIsSearching(true);
       setShowSuggestions(true);
     } else {
       setIsSearching(false);
-      setShowSuggestions(false);
-      clearSearchAndState();
+      setShowSuggestions(false);      
     }
-  };
+  }, []);
 
-  const clearSearchAndState = () => {
-    setSearchTerm("");
-    clearSearchState();
-  };
-
-  const handleSearchChange = (value: string) => {
+  const handleSearchChange = useCallback((value: string) => {
     setSearchTerm(value);
     if (isSearching) {
       updateTerm(value);
     }
-  };
+  }, [isSearching, updateTerm]);
 
-  const handleSearchSubmit = async () => {
+  const handleSearchSubmit = useCallback(async () => {
     if (searchTerm.trim()) {
-      // Clear the search state first
       setShowSuggestions(false);
       setIsSearching(false);
-
-      // Navigate to search results page with the query parameter
       router.push(`/search-results?q=${encodeURIComponent(searchTerm.trim())}`);
-
       setSearchTerm("");
       clearSearchState();
     }
-  };
+  }, [searchTerm, router, clearSearchState]);
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       handleSearchSubmit();
     } else if (e.key === "Escape") {
       handleSearchStateChange(false);
     }
-  };
+  }, [handleSearchSubmit, handleSearchStateChange]);
 
-  const handleSuggestionClick = (
+  const handleSuggestionClick = useCallback((
     suggestion: Suggestion | CategorySuggestion,
     type: "product" | "category"
   ) => {
-    const displayName =
-      type === "product"
-        ? (suggestion as Suggestion).name
-        : (suggestion as CategorySuggestion).displayName;
+    const displayName = type === "product"
+      ? (suggestion as Suggestion).name
+      : (suggestion as CategorySuggestion).displayName;
 
     setSearchTerm(displayName || "");
     setShowSuggestions(false);
@@ -304,11 +183,11 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
     } else {
       router.push(`/category/${suggestion.id}`);
     }
-  };
+  }, [router]);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     if (isLoggingOut) return;
-
+    
     try {
       setIsLoggingOut(true);
       await signOut(auth);
@@ -317,21 +196,28 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
       console.error("Error signing out:", error);
       setIsLoggingOut(false);
     }
-  };
+  }, [isLoggingOut, router]);
 
-  const handleNavigation = (path: string) => {
+  const handleNavigation = useCallback((path: string) => {
     router.push(path);
-  };
+  }, [router]);
 
-  const handleCartClick = () => {
+  const handleCartClick = useCallback(() => {
     setIsCartOpen(true);
-  };
+  }, []);
 
-  if (userLoading && !loadingTimeout) {
+  const handleFavoritesClick = useCallback(() => {
+    setIsFavoritesOpen(true);
+  }, []);
+
+  const handleNotificationClick = useCallback(() => {
+    setIsNotificationOpen(true);
+  }, []);
+
+  // Loading state
+  if (userLoading) {
     return (
-      <header
-        className={`sticky top-0 z-50 bg-white/95 backdrop-blur-xl border-b border-gray-200/50 ${className}`}
-      >
+      <header className={`sticky top-0 z-50 bg-white/95 backdrop-blur-xl border-b border-gray-200/50 ${className}`}>
         <div className="safe-area-top">
           <div className="h-16 px-4 flex items-center justify-center">
             <div className="animate-pulse h-8 w-20 bg-gray-200 rounded"></div>
@@ -343,23 +229,17 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
 
   return (
     <>
-      <header
-        className={`
-          sticky top-0 z-50
-          ${
-            isDark
-              ? "bg-gray-900/95 border-gray-700/50"
-              : "bg-white/95 border-gray-200/50"
-          }
-          backdrop-blur-xl border-b shadow-sm ${className}
-        `}
-      >
+      <header className={`
+        sticky top-0 z-50
+        ${isDark ? "bg-gray-900/95 border-gray-700/50" : "bg-white/95 border-gray-200/50"}
+        backdrop-blur-xl border-b shadow-sm ${className}
+      `}>
         <div className="safe-area-top">
           {/* Mobile Layout (Two Rows) */}
           <div className="lg:hidden">
             {/* First Row - Logo and Icons */}
             <div className="h-16 px-4 flex items-center justify-between">
-              {/* Logo/Brand - Always visible */}
+              {/* Logo/Brand */}
               <button
                 onClick={() => router.push("/")}
                 className="text-xl font-bold bg-gradient-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent hover:opacity-80 transition-opacity"
@@ -367,30 +247,26 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                 Nar24
               </button>
 
-              {/* Action Icons - Always visible */}
+              {/* Action Icons */}
               <div className="flex items-center gap-1">
                 {/* Notifications */}
                 <div className="relative">
                   <button
                     onClick={handleNotificationClick}
                     className={`
-        relative p-2 rounded-full transition-all duration-200
-        ${
-          isDark
-            ? "hover:bg-gray-700 text-gray-300 hover:text-white"
-            : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
-        }
-        active:scale-95 group
-      `}
+                      relative p-2 rounded-full transition-all duration-200
+                      ${isDark
+                        ? "hover:bg-gray-700 text-gray-300 hover:text-white"
+                        : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"}
+                      active:scale-95 group
+                    `}
                     aria-label={t("header.notifications")}
                   >
                     <Bell size={18} />
                     {user && unreadNotificationsCount > 0 && (
                       <div className="absolute -top-1 -right-1 min-w-[18px] h-4 bg-emerald-500 rounded-full flex items-center justify-center shadow-lg ring-2 ring-white dark:ring-gray-900">
                         <span className="text-white text-xs font-bold px-1">
-                          {unreadNotificationsCount > 10
-                            ? "+10"
-                            : unreadNotificationsCount}
+                          {unreadNotificationsCount > 10 ? "+10" : unreadNotificationsCount}
                         </span>
                       </div>
                     )}
@@ -402,14 +278,12 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                   <button
                     onClick={() => setShowLanguageMenu(!showLanguageMenu)}
                     className={`
-        relative p-2 rounded-full transition-all duration-200
-        ${
-          isDark
-            ? "hover:bg-gray-700 text-gray-300 hover:text-white"
-            : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
-        }
-        active:scale-95 group
-      `}
+                      relative p-2 rounded-full transition-all duration-200
+                      ${isDark
+                        ? "hover:bg-gray-700 text-gray-300 hover:text-white"
+                        : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"}
+                      active:scale-95 group
+                    `}
                     aria-label={t("header.languageSelection")}
                   >
                     <Globe size={18} />
@@ -417,80 +291,44 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
 
                   {/* Language Menu */}
                   {showLanguageMenu && (
-                    <div
-                      className={`
-          absolute right-0 top-full mt-2 w-32
-          ${isDark ? "bg-gray-800" : "bg-white"}
-          border ${isDark ? "border-gray-700" : "border-gray-200"}
-          rounded-lg shadow-xl backdrop-blur-xl z-50
-          overflow-hidden
-        `}
-                    >
+                    <div className={`
+                      absolute right-0 top-full mt-2 w-32
+                      ${isDark ? "bg-gray-800" : "bg-white"}
+                      border ${isDark ? "border-gray-700" : "border-gray-200"}
+                      rounded-lg shadow-xl backdrop-blur-xl z-50
+                      overflow-hidden
+                    `}>
                       <button
-                        onClick={() => handleMobileLanguageSwitch("tr")}
-                        onTouchStart={(e) => {
-                          e.stopPropagation();
-                          console.log("Touch start TR");
-                        }}
-                        onTouchEnd={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          console.log("Touch end TR - calling handler");
-                          handleMobileLanguageSwitch("tr");
-                        }}
+                        onClick={() => switchLanguage("tr")}
                         className={`
-  w-full flex items-center space-x-3 px-4 py-3 text-left
-  hover:bg-gray-100 dark:hover:bg-gray-700 
-  active:bg-gray-200 dark:active:bg-gray-600
-  transition-colors duration-150 cursor-pointer
-  ${
-    locale === "tr"
-      ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-      : ""
-  }
-`}
-                        style={{ touchAction: "manipulation" }}
+                          w-full flex items-center space-x-3 px-4 py-3 text-left
+                          hover:bg-gray-100 dark:hover:bg-gray-700 
+                          active:bg-gray-200 dark:active:bg-gray-600
+                          transition-colors duration-150 cursor-pointer
+                          ${locale === "tr"
+                            ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                            : ""}
+                        `}
                       >
                         <span className="text-lg">🇹🇷</span>
-                        <span
-                          className={`text-sm font-medium ${
-                            isDark ? "text-gray-200" : "text-gray-900"
-                          }`}
-                        >
+                        <span className={`text-sm font-medium ${isDark ? "text-gray-200" : "text-gray-900"}`}>
                           {t("header.turkish")}
                         </span>
                       </button>
                       <button
-                        onClick={() => handleMobileLanguageSwitch("en")}
-                        onTouchStart={(e) => {
-                          e.stopPropagation();
-                          console.log("Touch start EN");
-                        }}
-                        onTouchEnd={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          console.log("Touch end EN - calling handler");
-                          handleMobileLanguageSwitch("en");
-                        }}
+                        onClick={() => switchLanguage("en")}
                         className={`
-  w-full flex items-center space-x-3 px-4 py-3 text-left
-  hover:bg-gray-100 dark:hover:bg-gray-700 
-  active:bg-gray-200 dark:active:bg-gray-600
-  transition-colors duration-150 cursor-pointer
-  ${
-    locale === "en"
-      ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-      : ""
-  }
-`}
-                        style={{ touchAction: "manipulation" }}
+                          w-full flex items-center space-x-3 px-4 py-3 text-left
+                          hover:bg-gray-100 dark:hover:bg-gray-700 
+                          active:bg-gray-200 dark:active:bg-gray-600
+                          transition-colors duration-150 cursor-pointer
+                          ${locale === "en"
+                            ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                            : ""}
+                        `}
                       >
                         <span className="text-lg">🇺🇸</span>
-                        <span
-                          className={`text-sm font-medium ${
-                            isDark ? "text-gray-200" : "text-gray-900"
-                          }`}
-                        >
+                        <span className={`text-sm font-medium ${isDark ? "text-gray-200" : "text-gray-900"}`}>
                           {t("header.english")}
                         </span>
                       </button>
@@ -503,14 +341,12 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                   <button
                     onClick={handleFavoritesClick}
                     className={`
-        relative p-2 rounded-full transition-all duration-200
-        ${
-          isDark
-            ? "hover:bg-gray-700 text-gray-300 hover:text-white"
-            : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
-        }
-        active:scale-95 group
-      `}
+                      relative p-2 rounded-full transition-all duration-200
+                      ${isDark
+                        ? "hover:bg-gray-700 text-gray-300 hover:text-white"
+                        : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"}
+                      active:scale-95 group
+                    `}
                     aria-label={t("header.favorites")}
                   >
                     <Heart size={18} />
@@ -529,14 +365,12 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                   <button
                     onClick={handleCartClick}
                     className={`
-        relative p-2 rounded-full transition-all duration-200
-        ${
-          isDark
-            ? "hover:bg-gray-700 text-gray-300 hover:text-white"
-            : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
-        }
-        active:scale-95 group
-      `}
+                      relative p-2 rounded-full transition-all duration-200
+                      ${isDark
+                        ? "hover:bg-gray-700 text-gray-300 hover:text-white"
+                        : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"}
+                      active:scale-95 group
+                    `}
                     aria-label={t("header.cart")}
                   >
                     <ShoppingCart size={18} />
@@ -555,14 +389,12 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                   <button
                     onClick={() => handleNavigation("/profile")}
                     className={`
-        relative p-2 rounded-full transition-all duration-200
-        ${
-          isDark
-            ? "hover:bg-gray-700 text-gray-300 hover:text-white"
-            : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
-        }
-        active:scale-95 group
-      `}
+                      relative p-2 rounded-full transition-all duration-200
+                      ${isDark
+                        ? "hover:bg-gray-700 text-gray-300 hover:text-white"
+                        : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"}
+                      active:scale-95 group
+                    `}
                     aria-label={t("header.profile")}
                   >
                     <User size={18} />
@@ -576,30 +408,25 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                       onClick={handleLogout}
                       disabled={isLoggingOut}
                       className={`
-          relative p-2 rounded-full transition-all duration-200
-          hover:bg-red-50 dark:hover:bg-red-900/30 active:scale-95 group
-          text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300
-          ${isLoggingOut ? "opacity-50 cursor-not-allowed" : ""}
-        `}
+                        relative p-2 rounded-full transition-all duration-200
+                        hover:bg-red-50 dark:hover:bg-red-900/30 active:scale-95 group
+                        text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300
+                        ${isLoggingOut ? "opacity-50 cursor-not-allowed" : ""}
+                      `}
                       aria-label={t("header.logout")}
                     >
-                      <LogOut
-                        size={16}
-                        className={isLoggingOut ? "animate-pulse" : ""}
-                      />
+                      <LogOut size={16} className={isLoggingOut ? "animate-pulse" : ""} />
                     </button>
                   ) : (
                     <button
                       onClick={() => router.push("/login")}
                       className={`
-          relative p-2 rounded-full transition-all duration-200
-          ${
-            isDark
-              ? "hover:bg-gray-700 text-gray-300 hover:text-white"
-              : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
-          }
-          active:scale-95 group
-        `}
+                        relative p-2 rounded-full transition-all duration-200
+                        ${isDark
+                          ? "hover:bg-gray-700 text-gray-300 hover:text-white"
+                          : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"}
+                        active:scale-95 group
+                      `}
                       aria-label={t("header.login")}
                     >
                       <LogIn size={16} />
@@ -629,7 +456,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
 
           {/* Desktop Layout (Single Row) */}
           <div className="hidden lg:flex h-16 px-4 items-center w-full relative">
-            {/* Logo/Brand - Always visible */}
+            {/* Logo/Brand - Positioned absolute left with offset */}
             <div className="absolute left-1/2 transform -translate-x-1/2 -ml-127 z-10">
               <button
                 onClick={() => router.push("/")}
@@ -639,7 +466,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
               </button>
             </div>
 
-            {/* Search Bar */}
+            {/* Search Bar - Centered */}
             <div className="absolute left-1/2 transform -translate-x-1/2 z-0">
               <SearchBar
                 isDark={isDark}
@@ -656,30 +483,26 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
               />
             </div>
 
-            {/* Action Icons - Desktop - Always visible */}
+            {/* Action Icons - Desktop */}
             <div className="absolute right-4 z-10 flex items-center gap-1 lg:gap-2">
               {/* Notifications */}
               <div className="relative">
                 <button
                   onClick={handleNotificationClick}
                   className={`
-        relative p-2.5 rounded-full transition-all duration-200
-        ${
-          isDark
-            ? "hover:bg-gray-700 text-gray-300 hover:text-white"
-            : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
-        }
-        active:scale-95 group
-      `}
+                    relative p-2.5 rounded-full transition-all duration-200
+                    ${isDark
+                      ? "hover:bg-gray-700 text-gray-300 hover:text-white"
+                      : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"}
+                    active:scale-95 group
+                  `}
                   aria-label={t("header.notifications")}
                 >
                   <Bell size={20} />
                   {user && unreadNotificationsCount > 0 && (
                     <div className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-emerald-500 rounded-full flex items-center justify-center shadow-lg ring-2 ring-white dark:ring-gray-900">
                       <span className="text-white text-xs font-bold px-1">
-                        {unreadNotificationsCount > 10
-                          ? "+10"
-                          : unreadNotificationsCount}
+                        {unreadNotificationsCount > 10 ? "+10" : unreadNotificationsCount}
                       </span>
                     </div>
                   )}
@@ -691,14 +514,12 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                 <button
                   onClick={() => setShowLanguageMenu(!showLanguageMenu)}
                   className={`
-        relative p-2.5 rounded-full transition-all duration-200
-        ${
-          isDark
-            ? "hover:bg-gray-700 text-gray-300 hover:text-white"
-            : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
-        }
-        active:scale-95 group
-      `}
+                    relative p-2.5 rounded-full transition-all duration-200
+                    ${isDark
+                      ? "hover:bg-gray-700 text-gray-300 hover:text-white"
+                      : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"}
+                    active:scale-95 group
+                  `}
                   aria-label={t("header.languageSelection")}
                 >
                   <Globe size={20} />
@@ -706,56 +527,42 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
 
                 {/* Language Menu */}
                 {showLanguageMenu && (
-                  <div
-                    className={`
-          absolute right-0 top-full mt-2 w-32
-          ${isDark ? "bg-gray-800" : "bg-white"}
-          border ${isDark ? "border-gray-700" : "border-gray-200"}
-          rounded-lg shadow-xl backdrop-blur-xl z-50
-          overflow-hidden
-        `}
-                  >
+                  <div className={`
+                    absolute right-0 top-full mt-2 w-32
+                    ${isDark ? "bg-gray-800" : "bg-white"}
+                    border ${isDark ? "border-gray-700" : "border-gray-200"}
+                    rounded-lg shadow-xl backdrop-blur-xl z-50
+                    overflow-hidden
+                  `}>
                     <button
                       onClick={() => switchLanguage("tr")}
                       className={`
-            w-full flex items-center space-x-3 px-4 py-3 text-left
-            hover:bg-gray-100 dark:hover:bg-gray-700 
-            transition-colors duration-150
-            ${
-              locale === "tr"
-                ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-                : ""
-            }
-          `}
+                        w-full flex items-center space-x-3 px-4 py-3 text-left
+                        hover:bg-gray-100 dark:hover:bg-gray-700 
+                        transition-colors duration-150
+                        ${locale === "tr"
+                          ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                          : ""}
+                      `}
                     >
                       <span className="text-lg">🇹🇷</span>
-                      <span
-                        className={`text-sm font-medium ${
-                          isDark ? "text-gray-200" : "text-gray-900"
-                        }`}
-                      >
+                      <span className={`text-sm font-medium ${isDark ? "text-gray-200" : "text-gray-900"}`}>
                         {t("header.turkish")}
                       </span>
                     </button>
                     <button
                       onClick={() => switchLanguage("en")}
                       className={`
-            w-full flex items-center space-x-3 px-4 py-3 text-left
-            hover:bg-gray-100 dark:hover:bg-gray-700 
-            transition-colors duration-150
-            ${
-              locale === "en"
-                ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-                : ""
-            }
-          `}
+                        w-full flex items-center space-x-3 px-4 py-3 text-left
+                        hover:bg-gray-100 dark:hover:bg-gray-700 
+                        transition-colors duration-150
+                        ${locale === "en"
+                          ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                          : ""}
+                      `}
                     >
                       <span className="text-lg">🇺🇸</span>
-                      <span
-                        className={`text-sm font-medium ${
-                          isDark ? "text-gray-200" : "text-gray-900"
-                        }`}
-                      >
+                      <span className={`text-sm font-medium ${isDark ? "text-gray-200" : "text-gray-900"}`}>
                         {t("header.english")}
                       </span>
                     </button>
@@ -768,14 +575,12 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                 <button
                   onClick={handleFavoritesClick}
                   className={`
-        relative p-2.5 rounded-full transition-all duration-200
-        ${
-          isDark
-            ? "hover:bg-gray-700 text-gray-300 hover:text-white"
-            : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
-        }
-        active:scale-95 group
-      `}
+                    relative p-2.5 rounded-full transition-all duration-200
+                    ${isDark
+                      ? "hover:bg-gray-700 text-gray-300 hover:text-white"
+                      : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"}
+                    active:scale-95 group
+                  `}
                   aria-label={t("header.favorites")}
                 >
                   <Heart size={20} />
@@ -794,14 +599,12 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                 <button
                   onClick={handleCartClick}
                   className={`
-        relative p-2.5 rounded-full transition-all duration-200
-        ${
-          isDark
-            ? "hover:bg-gray-700 text-gray-300 hover:text-white"
-            : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
-        }
-        active:scale-95 group
-      `}
+                    relative p-2.5 rounded-full transition-all duration-200
+                    ${isDark
+                      ? "hover:bg-gray-700 text-gray-300 hover:text-white"
+                      : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"}
+                    active:scale-95 group
+                  `}
                   aria-label={t("header.cart")}
                 >
                   <ShoppingCart size={20} />
@@ -820,14 +623,12 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                 <button
                   onClick={() => handleNavigation("/profile")}
                   className={`
-        relative p-2.5 rounded-full transition-all duration-200
-        ${
-          isDark
-            ? "hover:bg-gray-700 text-gray-300 hover:text-white"
-            : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
-        }
-        active:scale-95 group
-      `}
+                    relative p-2.5 rounded-full transition-all duration-200
+                    ${isDark
+                      ? "hover:bg-gray-700 text-gray-300 hover:text-white"
+                      : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"}
+                    active:scale-95 group
+                  `}
                   aria-label={t("header.profile")}
                 >
                   <User size={20} />
@@ -841,30 +642,25 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                     onClick={handleLogout}
                     disabled={isLoggingOut}
                     className={`
-          relative p-2.5 rounded-full transition-all duration-200
-          hover:bg-red-50 dark:hover:bg-red-900/30 active:scale-95 group
-          text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300
-          ${isLoggingOut ? "opacity-50 cursor-not-allowed" : ""}
-        `}
+                      relative p-2.5 rounded-full transition-all duration-200
+                      hover:bg-red-50 dark:hover:bg-red-900/30 active:scale-95 group
+                      text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300
+                      ${isLoggingOut ? "opacity-50 cursor-not-allowed" : ""}
+                    `}
                     aria-label={t("header.logout")}
                   >
-                    <LogOut
-                      size={18}
-                      className={isLoggingOut ? "animate-pulse" : ""}
-                    />
+                    <LogOut size={18} className={isLoggingOut ? "animate-pulse" : ""} />
                   </button>
                 ) : (
                   <button
                     onClick={() => router.push("/login")}
                     className={`
-          relative p-2.5 rounded-full transition-all duration-200
-          ${
-            isDark
-              ? "hover:bg-gray-700 text-gray-300 hover:text-white"
-              : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
-          }
-          active:scale-95 group
-        `}
+                      relative p-2.5 rounded-full transition-all duration-200
+                      ${isDark
+                        ? "hover:bg-gray-700 text-gray-300 hover:text-white"
+                        : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"}
+                      active:scale-95 group
+                    `}
                     aria-label={t("header.login")}
                   >
                     <LogIn size={18} />

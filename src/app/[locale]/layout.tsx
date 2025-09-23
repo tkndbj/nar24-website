@@ -10,20 +10,15 @@ export default async function LocaleLayout({
   children: ReactNode;
   params: Promise<{ locale: string }>;
 }) {
-  // Await the params object first
   const { locale } = await params;
-
-  // Now use the locale
   const messages = await getMessages({ locale });
-
-  // You could also make this dynamic based on locale
-  const timeZone = "Europe/Istanbul"; // or "UTC" for universal
+  const timeZone = "Europe/Istanbul";
 
   return (
     <LayoutWrapper
       locale={locale}
       messages={messages}
-      timeZone={timeZone} // ADD THIS
+      timeZone={timeZone}
     >
       {children}
     </LayoutWrapper>

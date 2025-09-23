@@ -404,12 +404,7 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
                   priority={index === 0}
                   sizes={screenInfo.isLarger ? "90vw" : "100vw"}
                   quality={isActive ? 85 : 75}
-                  loading={index === 0 ? "eager" : "lazy"}
-                  onLoad={() => {
-                    if (isActive) {
-                      console.log("✅ Image loaded successfully:", banner.url);
-                    }
-                  }}
+                  loading={index === 0 ? "eager" : "lazy"}                  
                   onError={(e) => {
                     console.error("❌ Image failed to load:", banner.url);
                     const target = e.target as HTMLImageElement;
