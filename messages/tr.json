@@ -2752,6 +2752,8 @@
     "termsOfService": "Kullanım Koşulları",
     "membershipAgreement": "Üyelik Sözleşmesi",
     "cookiePolicy": "Çerez Politikası",
+    "cancelAndReturnPolicy": "İade & İptal Politikası",
+    "sellerAgreement": "Satıcı Sözleşmesi",
     "made": "ile yapıldı",
     "allRightsReserved": "Tüm hakları saklıdır. Nar24, E.C.T.S TRADING LTD ürünüdür",
     "profile": "Profil",
@@ -3792,5 +3794,117 @@
     "enterBrandName": "Marka Adı Girin",
     "brandNamePlaceholder": "Marka adını girin...",
     "confirmBrand": "Onayla"
+  },
+  "cancelAndReturnPolicy": {
+    "title": "İptal ve İade Koşulları",
+    "lastUpdated": "Son güncellenme",
+    "updateDate": "25 Eylül 2025",
+    "introduction": "Bu sayfa, online alışveriş işlemlerinizde geçerli olan iptal ve iade koşullarını detaylı olarak açıklamaktadır. Tüketici haklarınız ve süreçlerle ilgili tüm bilgileri burada bulabilirsiniz.",
+    "footerNote": "Bu koşullar, yürürlükteki mevzuat çerçevesinde hazırlanmıştır. Herhangi bir sorunuz olması durumunda müşteri hizmetlerimizle iletişime geçebilirsiniz.",
+    "sections": {
+      "general": {
+        "title": "Genel Koşullar",
+        "content": [
+          "Web sitesi üzerinden elektronik ortamda sipariş verdiğiniz takdirde, size sunulan ön bilgilendirme formunu ve mesafeli satış sözleşmesini kabul etmiş sayılırsınız.",
+          "Alıcılar, satın aldıkları ürünün satış ve teslimi ile ilgili olarak yürürlükteki tüketici koruma yasalarına tabidir.",
+          "Ürün sevkiyat masrafı olan kargo ücretleri alıcılar tarafından ödenecektir.",
+          "Satın alınan her bir ürün, 30 günlük yasal süreyi aşmamak kaydı ile belirtilen adrese teslim edilir.",
+          "Satın alınan ürün, eksiksiz ve siparişte belirtilen niteliklere uygun olarak teslim edilir.",
+          "Satın alınan ürünün satılmasının imkansızlaşması durumunda, satıcı 3 gün içinde yazılı olarak bildirim yapar ve 14 gün içinde bedel iade edilir."
+        ]
+      },
+      "rightOfWithdrawal": {
+        "title": "Cayma Hakkı",
+        "content": [
+          "Alıcı, ürünün teslim tarihinden itibaren 7 gün içerisinde hiçbir gerekçe göstermeksizin cayma hakkını kullanabilir.",
+          "Cayma hakkı bildirimi, belirlenen iletişim bilgileri üzerinden yazılı olarak yapılmalıdır.",
+          "Hizmet sözleşmelerinde cayma hakkı, sözleşmenin imzalandığı tarihten itibaren 7 gün içerisinde kullanılabilir.",
+          "Tüketicinin onayı ile ifasına başlanan hizmetlerde cayma hakkı kullanılamaz.",
+          "Cayma hakkının kullanımından kaynaklanan masraflar satıcıya aittir."
+        ]
+      },
+      "withdrawalProcess": {
+        "title": "Cayma Hakkı Süreci",
+        "content": [
+          "Cayma hakkının kullanılması için 7 günlük süre içinde iadeli taahhütlü posta veya e-posta ile yazılı bildirimde bulunulması gerekir.",
+          "İade edilecek ürünün faturası eksiksiz olarak gönderilmelidir.",
+          "Kurumsal faturalar için, kurumun düzenlediği iade faturası ile birlikte gönderilmesi gerekmektedir.",
+          "İade formu ve ürünün kutusu, ambalajı, standart aksesuarları ile birlikte eksiksiz ve hasarsız olarak teslim edilmelidir.",
+          "Ürün, işbu sözleşmede belirtilen koşullar çerçevesinde kullanılmamış olması şarttır."
+        ]
+      },
+      "returnConditions": {
+        "title": "İade Koşulları",
+        "content": [
+          "Satıcı, cayma bildirimi aldıktan sonra en geç 20 gün içinde toplam bedeli iade etmek zorundadır.",
+          "Aynı süre içinde malı iade almakla da yükümlüdür.",
+          "Alıcının kusurundan kaynaklanan değer azalması durumunda, alıcı satıcının zararlarını tazmin eder.",
+          "Cayma hakkı süresi içinde usulüne uygun kullanımdan kaynaklanan değişikliklerden alıcı sorumlu değildir.",
+          "Kampanya kapsamındaki indirim tutarının altına düşülmesi halinde, indirim miktarı iptal edilir."
+        ]
+      },
+      "nonReturnableItems": {
+        "title": "İade Edilemeyecek Ürünler",
+        "content": [
+          "Kişisel ihtiyaçlar doğrultusunda hazırlanmış ve geri gönderilmeye müsait olmayan ürünler",
+          "İç giyim alt parçaları, mayo ve bikini altları",
+          "Makyaj malzemeleri ve tek kullanımlık ürünler",
+          "Çabuk bozulma tehlikesi olan veya son kullanma tarihi geçme ihtimali olan mallar",
+          "Ambalajı açıldığı takdirde sağlık ve hijyen açısından uygun olmayan ürünler",
+          "Teslim sonrası başka ürünlerle karışan ve ayrıştırılması mümkün olmayan ürünler",
+          "Gazete, dergi gibi süreli yayınlar",
+          "Elektronik ortamda anında ifa edilen hizmetler",
+          "Ses/görüntü kayıtları, kitap, dijital içerik, yazılım programları",
+          "Ambalajı açılmış bilgisayar sarf malzemeleri"
+        ]
+      },
+      "damagedProducts": {
+        "title": "Hasarlı veya Ayıplı Ürünler",
+        "content": [
+          "Siparişi teslim alırken kolilerin eksiksiz ve sağlam olduğuna dikkat ediniz.",
+          "Kargo yetkilisi sizden eksiksiz teslim aldığınıza dair imza alacaktır.",
+          "Koli dışında hasar varsa, ürünleri teslim almayarak kargo yetkilisine tutanak tutturun.",
+          "Hasarlı ürünlerin değişimi 7 iş günü içerisinde gerçekleştirilir.",
+          "Bu durumda sizden ek nakliye veya ürün bedeli talep edilmez.",
+          "Eksik ürün varsa, diğer ürünleri teslim alarak eksik olanları not olarak belirtin.",
+          "Yanlış ürün durumunda, bu ürünü teslim almayın ve teslimat irsaliyesinde belirtin."
+        ]
+      },
+      "refundPolicy": {
+        "title": "Geri Ödeme Politikası",
+        "content": [
+          "Nakit ödemeli siparişlerin iptali durumunda, iptal tarihinden itibaren 20 gün içinde nakden ödeme yapılır.",
+          "Kredi kartı ile yapılan ödemelerde, iptal tarihinden itibaren 20 gün içinde banka hesabına iade yapılır.",
+          "Bankanın müşteri hesabına aktarım süresi 2-3 hafta olabilir.",
+          "Kullanılmış, yıpranmış ve yıkanmış ürünlerin iadesinde para iadesi yapılmaz.",
+          "Bu durumda ürün müşteriye geri gönderilir.",
+          "Demonte mobilyalarda montaj yapıldıktan sonra iade kabul edilmez.",
+          "Beyaz eşyalarda yetkisiz açım durumunda iade yapılmaz."
+        ]
+      },
+      "paymentIssues": {
+        "title": "Ödeme Sorunları",
+        "content": [
+          "Alıcının ödeme yapmaması durumunda satıcının teslim yükümlülüğü sona erer.",
+          "Kredi kartının yetkisiz kullanımı tespit edilirse, alıcı ürünü 3 gün içinde iade etmelidir.",
+          "Bu durumda nakliye gideri satıcıya aittir.",
+          "Temerrüt halinde kart sahibi banka ile arasındaki sözleşme çerçevesinde faiz öder.",
+          "Banka hukuki yollara başvurabilir ve masrafları alıcıdan talep edebilir.",
+          "Gecikme durumunda alıcı, satıcının uğradığı zarar ve ziyanı öder."
+        ]
+      },
+      "deliveryIssues": {
+        "title": "Teslimat Sorunları",
+        "content": [
+          "Öngörülemeyen mücbir sebepler durumunda teslimat gecikmesi olabilir.",
+          "Bu durumda alıcıya derhal bilgi verilir.",
+          "Alıcı siparişin iptalini, benzer ürünle değişimini veya teslimatın ertelenmesini talep edebilir.",
+          "İptal durumunda nakit ödemeler 20 gün içinde iade edilir.",
+          "Kredi kartı ödemeleri 20 gün içinde bankaya iade edilir.",
+          "Alıcı ürünü teslim almadan önce muayene etmeli ve hasarlı ürünleri kabul etmemelidir.",
+          "Teslim alınan ürün hasarsız kabul edilir ve alıcı özenle korumalıdır."
+        ]
+      }
+    }
   }
 }

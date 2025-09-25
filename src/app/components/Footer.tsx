@@ -66,6 +66,8 @@ export default function Footer() {
   const legalLinks = [
     { label: t("termsOfService"), href: "/agreements/terms" },
     { label: t("membershipAgreement"), href: "/agreements/membership" },
+    { label: t("cancelAndReturnPolicy"), href: "/agreements/refund" },
+    { label: t("sellerAgreement"), href: "/agreements/seller" },
     {
       label: t("cookiePolicy"),
       href: "/cookies",

@@ -2760,6 +2760,8 @@
     "legal": "Legal",
     "termsOfService": "Terms of Service",
     "membershipAgreement": "Membership Agreement",
+    "cancelAndReturnPolicy": "Cancel and Return Policy",
+    "sellerAgreement": "Seller Agreement",
     "cookiePolicy": "Cookie Policy",
     "made": "Made with",
     "allRightsReserved": "All rights reserved. Nar24 is a product of E.C.T.S TRADING LTD",
@@ -3801,5 +3803,117 @@
     "enterBrandName": "Enter Brand Name",
     "brandNamePlaceholder": "Enter brand name...",
     "confirmBrand": "Confirm"
+  },
+  "cancelAndReturnPolicy": {
+    "title": "Cancellation and Return Policy",
+    "lastUpdated": "Last updated",
+    "updateDate": "September 25, 2025",
+    "introduction": "This page provides detailed information about the cancellation and return conditions applicable to your online shopping transactions. You can find all information about your consumer rights and processes here.",
+    "footerNote": "These terms have been prepared in accordance with applicable legislation. If you have any questions, you can contact our customer service.",
+    "sections": {
+      "general": {
+        "title": "General Terms",
+        "content": [
+          "By placing an order electronically through the website, you are deemed to have accepted the preliminary information form and distance selling contract presented to you.",
+          "Buyers are subject to consumer protection laws in force regarding the sale and delivery of the products they purchase.",
+          "Product shipping costs (cargo fees) will be paid by the buyers.",
+          "Each purchased product is delivered to the specified address within the legal period not exceeding 30 days.",
+          "The purchased product is delivered complete and in accordance with the specifications stated in the order.",
+          "If it becomes impossible to sell the purchased product, the seller must notify in writing within 3 days of learning this situation and refund the total amount within 14 days."
+        ]
+      },
+      "rightOfWithdrawal": {
+        "title": "Right of Withdrawal",
+        "content": [
+          "The buyer can exercise the right of withdrawal within 7 days from the delivery date of the product without giving any reason.",
+          "Withdrawal notification must be made in writing through the designated contact information.",
+          "For service contracts, the right of withdrawal can be exercised within 7 days from the date of signing the contract.",
+          "The right of withdrawal cannot be exercised for services that have started with the consumer's consent.",
+          "Costs arising from the use of the right of withdrawal belong to the seller."
+        ]
+      },
+      "withdrawalProcess": {
+        "title": "Withdrawal Process",
+        "content": [
+          "To exercise the right of withdrawal, written notification must be made by registered mail or email within 7 days.",
+          "The invoice of the product to be returned must be sent completely.",
+          "For corporate invoices, it must be sent together with the return invoice issued by the corporation.",
+          "The return form and the product's box, packaging, and standard accessories must be delivered complete and undamaged.",
+          "The product must not have been used within the conditions specified in this contract."
+        ]
+      },
+      "returnConditions": {
+        "title": "Return Conditions",
+        "content": [
+          "The seller must refund the total amount within 20 days at the latest after receiving the withdrawal notification.",
+          "The seller is also obligated to collect the goods within the same period.",
+          "In case of value decrease due to the buyer's fault, the buyer compensates the seller's damages.",
+          "The buyer is not responsible for changes resulting from proper use within the withdrawal period.",
+          "If the campaign discount amount threshold is not met, the discount amount is cancelled."
+        ]
+      },
+      "nonReturnableItems": {
+        "title": "Non-Returnable Items",
+        "content": [
+          "Products prepared according to personal needs and not suitable for return",
+          "Underwear, swimwear and bikini bottoms",
+          "Makeup products and single-use items",
+          "Goods with risk of quick spoilage or expiration date",
+          "Products that are not suitable for health and hygiene if packaging is opened",
+          "Products that mix with other products after delivery and cannot be separated",
+          "Periodical publications like newspapers and magazines",
+          "Services performed instantly in electronic environment",
+          "Audio/video recordings, books, digital content, software programs",
+          "Computer consumables with opened packaging"
+        ]
+      },
+      "damagedProducts": {
+        "title": "Damaged or Defective Products",
+        "content": [
+          "When receiving your order, pay attention that the packages are complete and intact.",
+          "The cargo officer will get your signature confirming complete delivery.",
+          "If there is damage outside the package, do not accept the products and have the cargo officer prepare a report.",
+          "Exchange of damaged products is carried out within 7 business days.",
+          "In this case, no additional shipping or product fee will be requested from you.",
+          "If there are missing products, accept the other products and note the missing ones.",
+          "In case of wrong product, do not accept this product and indicate it on the delivery receipt."
+        ]
+      },
+      "refundPolicy": {
+        "title": "Refund Policy",
+        "content": [
+          "For cash payment order cancellations, cash payment is made within 20 days from the cancellation date.",
+          "For credit card payments, refund is made to the bank account within 20 days from the cancellation date.",
+          "Bank transfer to customer account may take 2-3 weeks.",
+          "No refund is made for returns of used, worn and washed products.",
+          "In this case, the product is sent back to the customer.",
+          "Returns are not accepted for furniture after assembly.",
+          "Returns are not accepted for white goods in case of unauthorized opening."
+        ]
+      },
+      "paymentIssues": {
+        "title": "Payment Issues",
+        "content": [
+          "If the buyer does not make payment, the seller's delivery obligation ends.",
+          "If unauthorized use of credit card is detected, the buyer must return the product within 3 days.",
+          "In this case, shipping cost belongs to the seller.",
+          "In case of default, the cardholder pays interest within the framework of the contract with the bank.",
+          "The bank may resort to legal remedies and request costs from the buyer.",
+          "In case of delay, the buyer pays the damage and loss suffered by the seller."
+        ]
+      },
+      "deliveryIssues": {
+        "title": "Delivery Issues",
+        "content": [
+          "Delivery delays may occur due to unforeseeable force majeure events.",
+          "In this case, the buyer is immediately informed.",
+          "The buyer can request order cancellation, exchange with a similar product, or postponement of delivery.",
+          "In case of cancellation, cash payments are refunded within 20 days.",
+          "Credit card payments are refunded to the bank within 20 days.",
+          "The buyer should inspect the product before delivery and should not accept damaged products.",
+          "The delivered product is accepted as undamaged and the buyer must protect it carefully."
+        ]
+      }
+    }
   }
 }
