@@ -1442,6 +1442,7 @@
     "geolocationNotSupported": "Coğrafi konum bu tarayıcı tarafından desteklenmiyor"
   },
   "ProfilePage": {
+    "refundForm": "İade Formu",
     "invalidFileType": "Lütfen geçerli bir resim dosyası seçin (JPG, PNG veya GIF)",
     "fileSizeError": "Resim boyutu 20MB'dan küçük olmalıdır",
     "imageUploadSuccess": "Profil resmi başarıyla güncellendi!",
@@ -1820,6 +1821,11 @@
     "promoteProduct": "Ürünü Tanıt"
   },
   "RegistrationPage": {
+    "agreeToTermsPrefix": "Kabul ediyorum:",
+  "termsAndConditions": "Kullanım Koşulları",
+  "membershipAgreement": "Üyelik Sözleşmesi",
+  "and": "ve",
+  "personalDataPolicy": "Kişisel Verilerin Korunması",
     "createAccount": "Hesap Oluştur",
     "joinUsToday": "Bugün bize katılın!",
     "name": "Ad",
@@ -2148,6 +2154,8 @@
     "locationSelected": "Konum Seçildi",
     "tapAnywhereToSetLocation": "Teslimat konumunuzu ayarlamak için haritada herhangi bir yere dokunun",
     "cancel": "İptal",
+    "iAgreeToThe": "Kabul ediyorum:",
+    "distanceSellingContract": "Mesafeli Satış Sözleşmesi",
     "confirmLocation": "Konumu Onayla",
     "loadingPayment": "Ödeme Yükleniyor",
     "preparingCheckout": "Güvenli ödeme deneyiminiz hazırlanıyor...",
@@ -2430,7 +2438,22 @@
     "emailSupport": "E-posta Desteği",
     "liveChat": "Canlı Sohbet",
     "emailSupportMessage": "Destek ekibimiz 24 saat içinde size geri dönecektir.",
-    "liveChatMessage": "Canlı sohbet Pazartesi-Cuma, 09:00 - 18:00 saatleri arasında mevcuttur."
+    "liveChatMessage": "Canlı sohbet Pazartesi-Cuma, 09:00 - 18:00 saatleri arasında mevcuttur.",
+    "contactSupport": "Destek Talep Et",
+"helpFormTitle": "Destek Talep Et",
+"nameLabel": "Ad / Soyad",
+"noName": "İsim yok",
+"emailLabel": "E-posta Adresi",
+"descriptionLabel": "Nasıl yardımcı olabiliriz?",
+"descriptionPlaceholder": "Lütfen sorununuzu veya sorunuzu detaylı bir şekilde açıklayın...",
+"descriptionRequired": "Açıklama gereklidir",
+"descriptionTooShort": "Açıklama en az 20 karakter olmalıdır",
+"descriptionHelper": "En az 20 karakter gereklidir",
+"submitButton": "Talebi Gönder",
+"submitting": "Gönderiliyor...",
+"submitError": "Talebinizi gönderirken bir hata oluştu. Lütfen tekrar deneyin.",
+"successTitle": "Talep Gönderildi!",
+"submitSuccess": "Destek talebiniz başarıyla gönderildi. En kısa sürede size geri döneceğiz."
   },
   "AccountSettings": {
     "accountSettings": "Hesap Ayarları",
@@ -2481,13 +2504,13 @@
     "refresh": "Yenile"
   },
   "Receipts": {
-    "receipts": "Fişler",
+    "receipts": "Faturalar",
     "loginRequired": "Giriş Gerekli",
-    "loginToViewReceipts": "Satın alma fişlerinizi görmek için lütfen giriş yapın.",
+    "loginToViewReceipts": "Satın alma faturalarınızı görmek için lütfen giriş yapın.",
     "login": "Giriş Yap",
-    "loadingReceipts": "Fişler yükleniyor...",
-    "noReceiptsFound": "Fiş Bulunamadı",
-    "yourPurchaseReceiptsWillAppearHere": "Satın alma fişleriniz burada görünecek.",
+    "loadingReceipts": "Faturalar yükleniyor...",
+    "noReceiptsFound": "Fatura Bulunamadı",
+    "yourPurchaseReceiptsWillAppearHere": "Satın alma faturalarınız burada görünecek.",
     "orders": "Sipariş",
     "today": "Bugün",
     "yesterday": "Dün",
@@ -2498,31 +2521,31 @@
     "card": "Kart",
     "cash": "Nakit",
     "bankTransfer": "Banka Havalesi",
-    "noMoreReceipts": "Yüklenecek başka fiş yok",
-    "errorFetchingReceipts": "Fişleri yüklerken hata oluştu"
+    "noMoreReceipts": "Yüklenecek başka fatura yok",
+    "errorFetchingReceipts": "Faturaları yüklerken hata oluştu"
   },
   "ReceiptDetail": {
-    "receiptDetails": "Fiş Detayları",
+    "receiptDetails": "Fatura Detayları",
     "loginRequired": "Giriş Gerekli",
-    "loginToViewReceipt": "Fiş detaylarını görmek için lütfen giriş yapın.",
+    "loginToViewReceipt": "Fatura detaylarını görmek için lütfen giriş yapın.",
     "login": "Giriş Yap",
-    "loadingReceipt": "Fiş yükleniyor...",
-    "receiptNotFound": "Fiş Bulunamadı",
-    "receiptNotFoundMessage": "Aradığınız fiş bulunamadı.",
+    "loadingReceipt": "Faturalar yükleniyor...",
+    "receiptNotFound": "Fatura Bulunamadı",
+    "receiptNotFoundMessage": "Aradığınız fatura bulunamadı.",
     "goBack": "Geri Dön",
     "share": "Paylaş",
     "download": "İndir",
-    "receipt": "Fiş",
+    "receipt": "Fatura",
     "orders": "Sipariş",
     "total": "Toplam",
     "date": "Tarih",
     "paymentMethod": "Ödeme Yöntemi",
     "delivery": "Teslimat",
     "copiedToClipboard": "Panoya kopyalandı",
-    "receiptPdfNotAvailable": "Fiş PDF'i mevcut değil",
+    "receiptPdfNotAvailable": "Fatura PDF'i mevcut değil",
     "orderInformation": "Sipariş Bilgileri",
     "orderNumber": "Sipariş Numarası",
-    "receiptNumber": "Fiş Numarası",
+    "receiptNumber": "Fatura Numarası",
     "deliveryAddress": "Teslimat Adresi",
     "purchasedItems": "Satın Alınan Ürünler",
     "deliveryOption1": "Gel Al",
@@ -2754,6 +2777,8 @@
     "cookiePolicy": "Çerez Politikası",
     "cancelAndReturnPolicy": "İade & İptal Politikası",
     "sellerAgreement": "Satıcı Sözleşmesi",
+    "distanceSelling": "Mesafeli Satış Sözleşmesi",
+    "personalData": "Kişisel Veri",
     "made": "ile yapıldı",
     "allRightsReserved": "Tüm hakları saklıdır. Nar24, E.C.T.S TRADING LTD ürünüdür",
     "profile": "Profil",
@@ -3906,5 +3931,233 @@
         ]
       }
     }
+  },
+  "distanceSellingContract": {
+    "title": "Mesafeli Satış Sözleşmesi",
+    "lastUpdated": "Son Güncelleme",
+    "updateDate": "Ocak 2025",
+    "introduction": "İşbu Mesafeli Satış Sözleşmesi, 40/2003 – 55/2020 sayılı Tüketicileri Koruma Yasası hükümlerine uygun olarak hazırlanmıştır. Bu sözleşmeyi kabul etmekle ALICI, sipariş edilen ürünlerle ilgili tüm şart ve koşullar hakkında bilgilendirildiğini ve tüm ödeme yükümlülüklerini yerine getireceğini kabul eder.",
+    "footerNote": "Bu sözleşmeyi kabul ederek yukarıda belirtilen tüm şart ve koşulları kabul etmiş olursunuz. Herhangi bir sorunuz veya endişeniz için lütfen müşteri hizmetleri ekibimizle iletişime geçin.",
+    "sections": {
+      "parties": {
+        "title": "Taraflar",
+        "content": [
+          "İşbu sözleşme aşağıdaki taraflar arasında aşağıda belirtilen hüküm ve şartlar çerçevesinde imzalanmıştır.",
+          "SATICI: Şirket adı, adresi, telefon ve e-posta bilgileri satın alma sırasında sağlanacaktır.",
+          "ALICI: Siparişi veren kişi, detayları (adı-soyadı, adresi, telefon, e-posta) ödeme işlemi sırasında toplanacaktır.",
+          "İşbu sözleşmeyi kabul etmekle ALICI, sözleşme konusu siparişi onayladığı takdirde sipariş konusu bedeli ve varsa kargo ücreti, vergi gibi belirtilen ek ücretleri ödeme yükümlülüğü altına gireceğini ve bu konuda bilgilendirildiğini peşinen kabul eder."
+        ]
+      },
+      "subject": {
+        "title": "Sözleşmenin Konusu",
+        "content": [
+          "İşbu sözleşmenin konusu, sözleşmenin üçüncü maddesinde özellikleri ve satış fiyatı belirtilen ürün ile ilgili olarak tarafların hak ve yükümlülüklerinin tespitidir.",
+          "İşbu sözleşme 40/2003 – 55/2020 sayılı Tüketicileri Koruma Yasası hükümlerine uygun olarak düzenlenmiştir.",
+          "İşbu sözleşmenin tarafları işbu sözleşmeyle birlikte Tüketicileri Koruma Yasasından kaynaklanan yükümlülük ve sorumluluklarını bildiklerini ve anladıklarını kabul ve beyan ederler.",
+          "İşbu sözleşme ALICI'nın işbu sözleşme ile belirlenen ürünü/ürünleri temin etmesine yöneliktir."
+        ]
+      },
+      "productInfo": {
+        "title": "Ürün Bilgileri",
+        "content": [
+          "Ürünün türü, miktarı, markası, modeli, rengi, adedi, satış bedeli, teslimat/fatura adresi, teslimat kişisi ve ödeme şekli sipariş sırasında belirtildiği gibidir.",
+          "Tüm ürün özellikleri ödeme işlemi sırasında açıkça gösterilecektir.",
+          "Satış fiyatı KDV ve tüm diğer masrafları içermektedir.",
+          "Mevcut ödeme yöntemleri: Kredi kartı, banka havalesi/EFT, kapıda ödeme (uygun olduğu yerlerde).",
+          "Teslimat ve fatura adresleri sipariş işlemi sırasında toplanacaktır."
+        ]
+      },
+      "generalProvisions": {
+        "title": "Genel Hükümler",
+        "content": [
+          "İşbu sözleşme tarafları ALICI ile SATICI olup işbu sözleşmenin yerine getirilmesi ile ilgili tüm yükümlülük ve sorumluluklar taraflara aittir. İşbu sözleşme ALICI tarafından elektronik olarak onaylandığı tarihte yürürlüğe girer.",
+          "ALICI, Madde 3'de belirtilen sözleşme konusu ürünün özellikleri ve satışa ilişkin koşulları ile ilgili tüm bilgileri okuduğunu ve anladığını, bu ürünün satın alınması için gerekli onayı verdiğini kabul, beyan ve taahhüt eder.",
+          "SATICI, sözleşme konusu ürünün sağlam, eksiksiz, siparişte belirtilen niteliklere uygun ve varsa garanti belgeleri ve kullanım kılavuzları ile birlikte kargoya teslim edilmesinden sorumludur.",
+          "Sözleşme konusu ürün, ALICI'dan başka bir kişi/kuruluşa teslim edilecek ise, teslim edilecek kişi/kuruluşun teslimatı kabul etmemesinden SATICI sorumlu tutulamaz.",
+          "Teslimat kargo şirketi aracılığı ile ALICI'nın 3. Madde'de belirtilen adresinde elden teslim edilecektir. Teslim anında alıcının adresinde bulunmaması durumunda dahi SATICI edimini tam ve eksiksiz olarak yerine getirmiş olarak kabul edilecektir.",
+          "Herhangi bir nedenle ürün bedeli ödenmez veya banka kayıtlarında iptal edilir ise, SATICI ürünün teslimi yükümlülüğünden kurtulmuş kabul edilir.",
+          "ALICI'nın 4.6.'daki halde ürünü geç teslim almasından kaynaklanan ya da ürünün kargo şirketinde beklemiş olması ve/veya kargonun SATICI'ya iade edilmesinden dolayı oluşan giderler ve sair zarar ziyandan sorumluluk ALICI'ya aittir.",
+          "Kargo ücreti sipariş toplam tutarına eklenmekte ve ALICI tarafından ödenmektedir. Kargo bedeli, ürün bedeline dâhil değildir.",
+          "Ürünün tesliminden sonra ALICI'ya ait kredi kartının ALICI'nın kusurundan kaynaklanmayan bir şekilde yetkisiz kişilerce haksız veya hukuka aykırı olarak kullanılması nedeni ile ilgili banka veya finans kuruluşun ürün bedelini SATICI'ya ödememesi halinde, ALICI'nın kendisine teslim edilmiş olması kaydıyla ürünün 3 (üç) gün içinde SATICI'ya göndermesi zorunludur. Bu takdirde nakliye giderleri ALICI'ya ait olacaktır.",
+          "Garanti belgesi ile satılan ürünlerden olan veya olmayan ürünlerin arızalı veya bozuk olanlar (ayıplı) garanti şartları içinde gerekli onarımın yetkili servise yaptırılması için SATICI'ya gönderilebilir, bu takdirde kargo giderleri SATICI tarafından karşılanacaktır.",
+          "ALICI, vadeli satışların sadece bankalara ait kredi kartları ile yapılması nedeniyle; ilgili faiz oranlarını ve temerrüt faizi ile ilgili bilgileri bankasından ayrıca teyit etmesi gerektiğini bildiğini kabul etmektedir.",
+          "ALICI, yürürlükte bulunan mevzuat hükümleri gereğince faiz ve temerrüt faizi ile ilgili hükümlerin banka ve ALICI arasındaki kredi kartı sözleşmesi kapsamında uygulanacağını kabul, beyan ve taahhüt eder.",
+          "ALICI'nın cayma hakkını kullandığı durumlarda ya da siparişe konu olan ürünün çeşitli sebeplerle tedarik edilememesi veya Tüketici Konseyi ve Mal ve Hizmetler Hakem Heyeti kararları ile Tüketiciye bedel iadesine karar verilen durumlarda alışveriş kredi kartı ile ve taksitli olarak yapılmışsa; kredi kartına iade prosedürü aşağıda belirtilmiştir:",
+          "ALICI kredi kartı ile yapılan alımlarda ve ürünün taksitli olarak ödendiği durumlarda, Alıcı ürünü kaç taksitle aldıysa: bankası da tüketiciye bedelin geri ödemesini aynı şekilde o sayıda taksitle yapmaktadır. SATICI, bankaya ürün bedelinin tamamını tek seferde ödedikten sonra; banka poslarından yapılan taksitli harcamaların ALICI'nın kredi kartına iadesi durumunda ise konuya müdahil tarafların mağdur duruma düşmemesi için talep edilen iade tutarları yine taksitli olarak hamil taraf hesaplarına banka tarafından aktarılacaktır.",
+          "Kart ile alınmış mal ve hizmetin iadesi durumunda SATICI, banka ile yapmış olduğu ayrı bir sözleşme gereği olarak ALICI'ya nakit para ile ödeme yapamaz. SATICI bir iade söz konusu olduğunda ilgili tutarı bankaya nakden veya mahsuben ödemekle yükümlü olduğundan prosedür gereğince ALICI'ya nakit olarak ödeme yapmayacaktır. Kredi kartına iadelerde ise: SATICI'nın, bankaya bedeli tek seferde ödemesinden sonra banka tarafından karta iade gerçekleştirilecektir.",
+          "Kapıdan ödeme ile havale/EFT ödeme seçeneklerinde iade Tüketiciden banka hesap bilgileri istenerek, tüketicinin belirttiği hesaba (hesabın fatura adresindeki kişinin adına veya kullanıcı üyenin adına olması şarttır) havale veya EFT şeklinde yapılacaktır.",
+          "27/1977 Sayılı Vergi Usul Yasası ve bu yasa altında çıkartılmış tebliğ ve tüzükler ve Fasıl 267 Emtia Satış ile Fasıl 149 Sözleşmeler Yasası uyarınca iade işlemlerinin yapılabilmesi için faturadaki ilgili iade bölümlerin eksiksiz olarak doldurulması ve imzalandıktan sonra SATICI'ya ürün ile birlikte geri gönderilmesi gerekmektedir. ALICI tüm bu prosedürü kabul ettiğini beyan, kabul ve taahhüt eder.",
+          "SATICI, ALICI tarafından kendisine iletilen her türden kişisel bilgileri, bilgilerin toplanması ile ilgili açıklanan amaçlar ve SATICI'nın işbu sözleşme ve nitelikli elektronik sertifika teminine ilişkin faaliyetleri dışında üçüncü kişilerle paylaşmayacak ve bu türden kişisel bilgileri 3. kişilere satmayacak ya da açıklamayacaktır ve hiçbir şart altında kullanılmasına da izin vermeyecektir. ALICI tarafından sağlanan bilgiler ALICI, ortakları ve işbirliği içinde olduğu kişi ya da kurumlar tarafından üyenin kimliği ifşa edilmeksizin çeşitli istatistiksel değerlendirmeler yapma, veri tabanı oluşturma ve/veya pazar araştırmalarında ve ALICI'dan izin alındığı takdirde ürün hizmetlere ilişkin bilgilendirme yapılması amacıyla kullanılabilir. Kişisel bilgiler, ad ve soy ad, adres, telefon numarası, elektronik posta adresi ve ALICI'yı tanımlamaya yönelik diğer her türlü bilgi olarak anlaşılır. SATICI, kişisel bilgileri kesinlikle gizli tutmayı, bu konuda sır saklama yükümü altında olduğunu addetmeyi ve gizliliğin sağlanması ve sürdürülmesi amacıyla işbu sözleşme ile belirlenen istisnalar dışında gizli bilginin tamamının veya herhangi bir kısmının yetkisiz kullanımını veya üçüncü bir kişiye ifşasını önlemek için gerekli tüm tedbirleri almayı ve bu yönde gereken özeni göstermeyi taahhüt etmektedir."
+        ]
+      },
+      "rightOfWithdrawal": {
+        "title": "Cayma Hakkı",
+        "content": [
+          "ALICI; işbu sözleşmeye konu mala ilişkin olarak, malı teslim aldığı tarihten ve sözleşmeye konu hizmete ilişkin olarak ise işbu sözleşmenin kurulduğu günden itibaren yedi gün içerisinde hiçbir hukuki ve cezai sorumluluk üstlenmeksizin ve hiçbir gerekçe göstermeksizin malı veya hizmeti reddederek sözleşmeden cayma hakkına sahiptir.",
+          "ALICI, geçerli süre içerisinde cayma hakkını kullanmak istediğine dair beyanını SATICI'ya işbu sözleşme ekinde yer alan örnek cayma hakkı formu ile ya da işbu sözleşmede belirtilen iletişim yöntemlerinden herhangi biri ile SATICI'ya iletecektir.",
+          "Tüketicinin cayma bildiriminin satıcıya ulaştığı tarihten itibaren 20 gün içinde ürün bedeli ALICI'ya iade edilir.",
+          "Cayma hakkının kullanılması için bu süre içinde ekte yer alan cayma formu ile veya SATICI'ya faks, email veya telefon ile bildirimde bulunulması ve ürünün 6. madde hükümleri çerçevesinde kullanılmamış olması şarttır.",
+          "Bu hakkın kullanılması halinde, 3. kişiye veya ALICI'ya teslim edilen ürünün SATICI'ya gönderildiğine ilişkin kargo teslim tutanağı örneği ile fatura aslının iadesi zorunludur.",
+          "Bu belgelerin ulaşmasını takip eden 20 gün içinde ürün bedeli ALICI'ya iade edilir. Fatura aslı gönderilmez ise KDV ve varsa sair yasal yükümlülükler iade edilemez.",
+          "Cayma hakkı nedeni ile iade edilen ürünün kargo bedeli SATICI tarafından karşılanır."
+        ]
+      },
+      "nonWithdrawableProducts": {
+        "title": "Cayma Hakkı Kullanılamayacak Ürünler",
+        "content": [
+          "Niteliği itibarıyla iade edilemeyecek ürünler, tek kullanımlık ürünler, kopyalanabilir yazılım ve programlar, hızlı bozulan veya son kullanım tarihi geçen ürünler için cayma hakkı kullanılamaz.",
+          "Aşağıdaki ürünlerde cayma hakkının kullanılması, ürünün ambalajının açılmamış, bozulmamış ve ürünün kullanılmamış olması şartına bağlıdır:",
+          "- Taşınabilir Bilgisayar (Orijinal işletim sistemi kurulduktan sonra iade alınmayacaktır.)",
+          "- Her türlü yazılım ve programlar",
+          "- DVD, VCD, CD ve kasetler",
+          "- Bilgisayar ve kırtasiye sarf malzemeleri (toner, kartuş, şerit v.b)",
+          "- Her türlü kozmetik ürünleri",
+          "- Telefon kontör siparişleri",
+          "Sözleşmeye konu mal, elektronik imza oluşturma aracı ve kart okuyucudur, nitelikli elektronik sertifika ise ALICI'nın özel istek ve talepleri uyarınca üretilen veya üzerinde değişiklik ya da ilaveler yapılarak kişiye özel hale getirilen mal kapsamındadır.",
+          "ALICI'nın istekleri veya kişisel ihtiyaçları doğrultusunda hazırlanan mallar söz konusu olduğunda cayma hakkını kullanamaz veya ürün veya mal bedelini ödemekten kaçınamaz."
+        ]
+      },
+      "defaultProvisions": {
+        "title": "Temerrüt Hükümleri",
+        "content": [
+          "Tarafların işbu sözleşmeden kaynaklarından edimlerini yerine getirmemesi durumunda Fasıl 149'da yer alan Borçlunun Temerrüdü kuralları uygulanacaktır.",
+          "Temerrüt durumlarında, herhangi bir tarafın edimlerini süresi içinde haklı bir sebebi olmaksızın yerine getirmemesi durumunda diğer taraf söz konusu edimin yerine getirilmesi için edimini yerine getirmeyen tarafa 14 günlük süre verecektir.",
+          "Bu süre zarfında da yerine getirilmemesi durumunda edimini yerine getirmeyen taraftan edimin ifasını talep etmek suretiyle malın teslimini ve/veya sözleşmenin feshini ve/veya bedelin iadesini ve/veya taksitli bir ödeme ise tüm bedel muaccel olacak olup tüm bedeli talep etme hakkı doğacaktır.",
+          "SATICI'nın işbu yükümlülüğünü yerine getirmesini engelleyebilecek mücbir sebepler veya nakliyeyi engelleyen hava muhalefetleri, ulaşımın kesilmesi, yangın, deprem, sel baskını gibi olağanüstü olaylar nedeni ile sözleşme konusu ürünü süresi içerisinde teslim edemez ise; bu tip durumlarda ALICI, SATICI'nın hiçbir sorumluluğu olmadığını, siparişin iptal edilmesini veya teslimat süresinin engelleyici durumunun ortadan kalkmasına kadar ertelenmesi haklarından birini kullanabilir.",
+          "ALICI'nın siparişi iptal etmesi halinde ödediği tutar 10 (on) gün içerisinde kendisine ödenir."
+        ]
+      },
+      "jurisdiction": {
+        "title": "Yetkili Mahkeme",
+        "content": [
+          "İşbu sözleşme ile ilgili çıkacak ihtilaflarda KKTC Mahkemeleri yetkilidir.",
+          "İşbu sözleşme sipariş onayı tarihinde düzenlenmiştir."
+        ]
+      }
+    },
+    "withdrawalForm": {
+      "title": "Cayma Formu (Ek-1)",
+      "description": "Cayma hakkınızı kullanmak için müşteri hizmetlerimizle iletişime geçerek veya web sitemizden indirerek cayma formunu kullanabilirsiniz. Form şunları içermelidir: Sipariş tarihi veya teslim tarihi, caymaya konu mal veya hizmet, bedel, alıcının adı ve soyadı, TC Kimlik No/Pasaport No, telefon, adres ve imza (kağıt üzerinde gönderilmesi halinde)."
+    }
+  },
+  "personalDataProtection": {
+    "title": "Kişisel Verilerin Korunması Politikası",
+    "lastUpdated": "Son Güncelleme",
+    "updateDate": "Ocak 2025",
+    "introductionText": "ECTS TRADING LTD (\"Şirket\") olarak; kişisel verilerinizin gizliliği ve güvenliği en önemli önceliklerimiz arasındadır. Kişisel bilgilerinizi 89/2007 Sayılı Kişisel Verilerin Korunması Yasası ve ilgili tüm yasal mevzuata uygun olarak işlemekteyiz. Bu politika, kişisel verilerinizi nasıl topladığımızı, kullandığımızı ve koruduğumuzu açıklamaktadır.",
+    "footerNote": "Kişisel verilerinizle ilgili sorularınız veya haklarınızı kullanmak için İletişim bölümünde belirtilen yöntemlerle bizimle iletişime geçebilirsiniz.",
+    "sections": {
+      "introduction": {
+        "title": "Giriş",
+        "content": [
+          "ECTS TRADING LTD (\"Şirket\") olarak; kişisel verilerinizin gizliliği ve güvenliği en önemli önceliklerimiz arasındadır.",
+          "Şirketimiz, 89/2007 Sayılı Kişisel Verilerin Korunması Yasası, Kişisel Verilerin Korunması Yasası 28 madde tahtında çıkarılan \"Bilgilendirme Yükümlülüğünün Yerine Getirilmesinde Uyulacak Usul ve Esaslar Tüzüğü\" ve ilgili tüm yasal mevzuata uyumlu bir şekilde kişisel verilerinizi işlemektedir.",
+          "Kişisel verileriniz, kimliğinizi belirli ya da belirlenebilir kılan her türlü bilgi anlamına gelmektedir.",
+          "Şirketimize ait mobil uygulamalarda ve/veya internet sitelerinde (hepsi birlikte \"Platform\") sunulan hizmetlerden (hepsi birlikte \"Platform Hizmetleri\") yararlanabilmek amacıyla Üyelik Sözleşmesi'ni kabul ederek \"Platform Üyesi\" olmanız halinde işlenen kişisel verileriniz hakkında sizleri bilgilendirmek isteriz."
+        ]
+      },
+      "dataCollected": {
+        "title": "Hangi Kişisel Verilerinizi İşliyoruz?",
+        "content": [
+          "Platform Üyesi olmanız halinde, aşağıdaki kişisel verileriniz işlenmektedir:",
+          "Kullanıcı Hesap Bilgileriniz: adınız, soyadınız, müşteri numaranız, üyelik e-posta adresiniz ve kullanıcı bilgilerinize eklemeniz halinde telefon numaranız, cinsiyet, doğum tarihi, boy ve kilo bilginiz, Kimlik Numaranız (yalnızca belli ürün gruplarını satın almanız halinde ilgili mevzuat uyarınca işlenmektedir).",
+          "Müşteri İşlem Bilgileriniz: sipariş ve fatura bilginiz, alışverişlerinizle ilgili gerçekleşen işlem geçmişi bilginiz, talep ve şikayet bilgileriniz, Platform kullanım bilgileriniz, Platformda yer alan ürünlere ilişkin yorum yapmanız ve/veya soru sormanız halinde yorum ve sorularınız içerisinde bizzat paylaştığınız bilgiler, puan ve değerlendirme bilgileriniz, chat kanalıyla yapılan konuşma içeriklerine yönelik bilgiler, iptal/iade bilgileriniz.",
+          "Teslimat Bilgileriniz: sipariş verdiğiniz ürünün teslimatı için eklediğiniz telefon numarası ve teslimat adresi bilgileriniz, teslimat işlem bilgileriniz.",
+          "Ödeme Bilgileriniz: tarafınızca yapılan ödemelere ve ödeme yöntemlerine ilişkin bilgileriniz, kayıtlı kart bilgileriniz.",
+          "İşlem Güvenliği Bilgileriniz: cihaz bilgileriniz, çerez bilgileriniz, platform erişim kayıtları, giriş yapma yönteminiz (Google/Facebook aracılığıyla).",
+          "Hukuki İşlem Bilgileriniz: yetkili kişi, kurum ve kuruluşlarla yazışmalardaki bilgiler, dava ve sair hakem heyeti huzurundaki dosyalarındaki bilgiler, yasal bilgi talebi bilgileriniz.",
+          "İşitsel Kayıt Bilgileriniz: çağrı merkeziyle görüşmeniz halinde ses kaydınız.",
+          "Ek hizmetler kapsamında işlenen kişisel verileriniz: Platform'da sunulan yemek, market, finansal hizmetler, sigorta, şanslı çekiliş, al sat kazan (Dolap) gibi ek hizmetlerden faydalanmanız halinde işlenen verileriniz."
+        ]
+      },
+      "processingPurposes": {
+        "title": "Hukuki Sebepler, Amaçlar ve Toplama Yöntemleri",
+        "content": [
+          "Kişisel verileriniz, Şirketimiz tarafından tamamen veya kısmen otomatik olan ya da herhangi bir veri kayıt sisteminin parçası olmak kaydıyla otomatik olmayan yollarla, üyelik sözleşmemiz kapsamında Şirketimize ait yararlandığınız Platform Hizmetinin yer aldığı mobil uygulama ya da internet siteleri üzerinden elektronik ortamda toplanmaktadır.",
+          "Üyelik ve Hesap Oluşturma: Üyelik sözleşmesinin kurulması ve ifasına yönelik süreçlerin yürütülmesi, Platform üye profilinin/hesabın oluşturulması ve kapatılması süreçlerinin yönetilmesi, iletişim bilgilerinin doğrulanması, Platform vasıtasıyla satın alım işlemlerinizin gerçekleştirilmesine yönelik faaliyetlerin yürütülmesi, Platform operasyonlarının güvenliğinin sağlanması, Tüketicileri Koruma Yasası, Mal ve Hizmetler Yasası, Vergi Usul Yasası başta olmak üzere Şirketimizin tabi olduğu mevzuattan kaynaklanan yükümlülüklerin yerine getirilmesi.",
+          "Sipariş, Teslimat ve İptal/İade: Siparişin verilmesi ve sipariş oluşturulması, mesafeli satış sözleşmesinin kurulması ve ifasının sağlanması, teslimat ve lojistik faaliyetlerin yürütülmesi, iptal/iade süreçlerinin yürütülmesi, ödeme ve fatura süreçlerinin yürütülmesi, Şirketimizin tabi olduğu mevzuatta yer alan hukuki yükümlülüklerin yerine getirilmesi.",
+          "Müşteri Deneyiminin İyileştirilmesi: Tercihlerinize ve ilgi alanlarınıza uygun olan ürünlere hızlı ve kolay ulaşabilmenizin sağlanması, Platform Hizmetleri arasındaki servis geçişlerinde daha iyi bir kullanıcı deneyiminin sağlanması, kullanıcı deneyiminin geliştirilmesi ve iyileştirilmesi, hizmet kalitemizin iyileştirilmesi, analiz ve raporlama çalışmalarının yapılması, iletişim faaliyetlerinin yürütülmesi, ürün ve hizmetlerimize ilişkin talep, şikayet ve önerilerin değerlendirilmesi, mal ve hizmet satış sonrası destek hizmetlerinin yürütülmesi.",
+          "Şirketin Bilgi Güvenliği, Risk, Denetim ve Kontrol: Finans ve muhasebe süreçlerinin yürütülmesi ve denetimi, faturalandırma süreçlerinin yürütülmesi, bilgi güvenliği süreçlerinin yürütülmesi ve şüpheli işlemlere yönelik inceleme yapılması, Platform'a ilişkin operasyonların güvenliğinin sağlanması, Şirketimizin sunduğu ürün ve hizmetlerin kalitesinin kontrolü, geliştirilmesi ve iyileştirilmesi, risk tespiti ve analizlerinin yapılması, şikâyet yönetimi yapılması, dolandırıcılıkların önlenmesi, olası şirket birleşme, devralma, ortak girişim, bölünme ve sair yapısal değişikliklerde Şirketimizin hukuki ve finansal inceleme faaliyetlerinin gerçekleştirilmesi.",
+          "Hukuki İşlemlerin Yürütülmesi: Hukuk ve dava işlerinin yürütülmesi, hukuki taleplerinizin cevaplandırılması, ilgili kişi olarak usulüne uygun olan başvurularınızın incelenmesi ve yanıtlanması, faaliyetlerin mevzuata uygun yürütülmesi, Şirketimizin tabi olduğu mevzuattan kaynaklanan yükümlülüklerin yerine getirilmesi, hukuki danışmanlık süreçlerinin yürütülmesi, talep edilmesi halinde yetkili kişi, kurum ve kuruluşlarla bilgi paylaşılması, hukuki bir ihtilaf olması halinde bir hakkın kullanılması ve korunması.",
+          "Açık Rızaya Dayalı Süreçler: Pazarlama, reklam ve tanıtım faaliyetlerinin yürütülmesi, finansal teklif süreçlerinin yürütülmesi, size özel avantajlı tekliflerin sunulabilmesi, sizleri daha iyi tanıyarak memnuniyetinizin arttırılmasına yönelik faaliyetlerin yürütülmesi ve bu kapsamda ticari elektronik iletiler gönderilmesi."
+        ]
+      },
+      "dataSharing": {
+        "title": "Kişisel Verilerinizi Kimlere Hangi Sebeplerle Aktarıyoruz?",
+        "content": [
+          "Şirketimiz, kişisel verilerinizi 'bilme gereği' ve 'kullanma gereği' ilkelerine uygun olarak, gerekli veri minimizasyonunu sağlayarak ve gerekli teknik ve idari güvenlik tedbirlerini alarak işlemeye özen göstermektedir.",
+          "Şirketimiz tarafından, kişisel verileriniz, Şirketimizin hukuki yükümlülüklerinin yerine getirebilmesi için zorunlu olması, sözleşmenin kurulması veya ifası için gerekli olması, bir hakkın tesisi, kullanılması veya korunması için veri işlemenin zorunlu olması ve/veya Şirketimizin meşru menfaati için zorunlu olması hukuki sebeplerine dayanılarak aşağıda detaylıca belirtilen alıcı grupları ile paylaşılmaktadır.",
+          "Üyelik ve Hesap Oluşturma için: Sözleşmesel ilişkimiz uyarınca Platforma ilişkin aldığımız hizmetler kapsamında Platform Hizmetleri'nden faydalanmanızın sağlanması, üyelik sözleşmesinin kurulması ve ifası amaçlarıyla iştiraklerimizle ve grup şirketlerimizle; Platform operasyonlarının yürütülmesi, bilişim, teknoloji ve yazılım hizmetlerinin alınması amacıyla bilişim altyapımızı sağlayan, işleten veya hizmet sunan iştiraklerimizle, grup şirketlerimizle, iş ortaklarımızla ve hizmet sağlayıcılarımızla paylaşılmaktadır.",
+          "Sipariş, Teslimat ve İptal/İade için: Platform Hizmetleri'nden faydalanmanızın sağlanması, satın alım ve faturalandırma süreçlerinin yürütülmesi, Şirketimizin ve ürün satın aldığınız satıcının tabi olduğu mevzuattan kaynaklanan yükümlülüklerin yerine getirilmesi amaçlarıyla satın almak istediğiniz ürünün satıcısı veya hizmet sağlayıcıyla; lojistik faaliyetlerin yürütülmesi ve teslimat süreçlerinin takibinin yapılması amacıyla ürün satıcısı, kargo firmaları, özel kuryelerle; ödeme süreçlerinizin yürütülmesi ve takibi amacıyla anlaşmalı olduğumuz bankalarla ve diğer ödeme kuruluşlarıyla paylaşılmaktadır.",
+          "Müşteri Deneyiminin İyileştirilmesi için: Mal ve hizmet satış ve satış sonrası destek hizmetlerinin sunulması, müşteri memnuniyetinin sağlanması, talep ve şikayetlerinin karşılanması amaçlarıyla çağrı merkezi hizmeti sunan iş ortaklarımız, müşteri destek hizmeti veren hizmet sağlayıcılarımızla; Şirketimizin sunduğu ürün ve hizmetlerin geliştirilmesi ve iyileştirilmesine yönelik faaliyetlerin yürütülmesi amaçlarıyla Platform hizmetlerinin sunulabilmesi ve Platform operasyonlarının yürütülmesi için yurtdışında yerleşik hizmet alınan hizmet sağlayıcılar, bilişim altyapısı, yazılım ve teknoloji hizmetleri sunan iştiraklerimizle, grup şirketlerimizle, iş ortaklarımız ve danışmanlarımızla paylaşılmaktadır.",
+          "Bilgi Güvenliği, Risk, Denetim ve Kontrol için: Faturalandırma süreçlerinin yürütülmesi, müşteriye e-faturanın elektronik olarak gönderilmesi, fiziki sözleşme veya fatura teslimatı yapılması, finansal ve muhasebe süreçlerinin yönetimi, risklerin tespiti, değerlendirilmesi, dolandırıcılıkların önlenmesi amaçlarıyla iş ortaklarımız, danışmanlarımız ve hizmet sağlayıcılarımız, bankalar, e-fatura iş ortağı, kargo ve kurye firmaları, özel entegratör, bağımsız denetim, gümrük, mali müşavir/muhasebe hizmeti sunan iş ortaklarımızla paylaşılmaktadır.",
+          "Hukuki İşlemlerin Yürütülmesi için: Şirketimizin tabi olduğu mevzuattan kaynaklanan yükümlülüklerin yerine getirilmesi ve Platform faaliyetlerinin mevzuata uygun olarak yürütülmesi, yetkili kişi, kurum ve kuruluşlara bilgi verilmesi, hukuk işlerinin takibi ve yürütülmesi, hukuki bir ihtilaf olması halinde bir hakkın kullanılması ve korunması amaçlarıyla düzenleyici ve denetleyici kurumlar ile mahkeme, hakem gibi yetkili kamu kurum ve kuruluşlarıyla; Şirketimizin denetim faaliyetlerinin yürütülmesi, hukuki danışmanlık süreçlerinin yürütülmesi amaçlarıyla avukatlar, denetçiler, vergi danışmanları, adli bilişim uzmanları, siber güvenlik danışmanları, topluluk şirketlerimiz, iştiraklerimiz, danışmanlık ve hizmet aldığımız diğer üçüncü kişiler ve iş ortaklarıyla paylaşılmaktadır."
+        ]
+      },
+      "dataProtection": {
+        "title": "Şirket Kişisel Verilerinizi Nasıl Koruyor?",
+        "content": [
+          "Şirketimiz ile paylaşılan kişisel veriler, Şirket gözetimi ve kontrolü altındadır. Şirket, yürürlükteki ilgili mevzuat hükümleri gereğince bilginin gizliliğinin ve bütünlüğünün korunması amacıyla gerekli organizasyonu kurmak ve teknik önlemleri almak ve uyarlamak konusunda veri sorumlusu sıfatıyla sorumluluğu üstlenmiştir.",
+          "Bu konudaki yükümlülüğümüzün bilincinde olarak:",
+          "Veri gizliliğini konu alan uluslararası ve ulusal teknik standartlara uygun surette periyodik aralıklarda sızma testleri yaptırılmaktadır.",
+          "Web sitesi, mobil site ve mobil uygulama aracılığıyla Şirket'e ilettiğiniz kişisel verileriniz SSL (Secure Sockets Layer) teknolojisi kullanılarak korunmaktadır.",
+          "Kişisel veri işleme faaliyetlerine ilişkin düzenli olarak risk analizleri yapılmakta ve risklerin azaltılması için aksiyonlar alınmaktadır.",
+          "Kişisel verilere yetkisiz erişimleri engellemek için erişim ve yetki kontrolleri uygulanmaktadır.",
+          "Veri işleme politikaları düzenli aralıklarla güncellenmektedir."
+        ]
+      },
+      "yourRights": {
+        "title": "Kişisel Verilerinizin Korunmasına Yönelik Haklarınız",
+        "content": [
+          "Bu aydınlatma metninin 'Hak ve Talepleriniz İçin İletişim' bölümünde yer alan yöntemlerle Şirketimize başvurarak aşağıdaki haklara sahipsiniz:",
+          "Herkesin kendisine ait kişisel verinin işlenip işlenmediğini bilmeye hakkı vardır. Bu nedenle, kontrolör kendisine yazılı olarak yanıt vermelidir.",
+          "Verinin düzeltilmesi, silinmesi veya bloke edilmesi, özellikle yanlışlıklar ve eksiklikler nedeniyle bu Yasanın kuralları uyarınca icra edilmemiş olan işleme hakkını talep edebilirsiniz.",
+          "İmkansız olmadığı ve orantısız çaba gerektirmediği sürece, verinin iletildiği üçüncü taraflara yasa uyarınca yapılmış olan her türlü düzeltme, silme ve bloke etme hakkında bildirim yapılmasını talep edebilirsiniz.",
+          "Kontrolör, başvurunun sunulmasından itibaren otuz gün içinde yanıt vermediği veya yanıtı tatmin edici olmadığı takdirde, bilgiye konu kişi Kurula başvuru hakkına sahiptir. Kurul bu konudaki kararı verir.",
+          "Bilgiye konu kişi, erişim hakkını bir uzmanın yardımıyla kullanabilir.",
+          "Kontrolör, Kurulun kararı ile bilgiye konu kişiye, bilgi verilmesini özel yasada açıkça öngörülmüş olması, üstün nitelikte bir kamu yararı özellikle Devletin iç ve dış güvenliğinin korunması açısından gerekli olması, bilgi verilmesinin idari veya cezai bir soruşturmanın amacının gerçekleşmesini güçleştirmesi durumlarında sınırlayabilir, erteleyebilir veya reddedebilir, ayrıca bunların sebebini ilgili kişiye yazılı olarak bildirir.",
+          "Kontrolör, kendisine tanınan zaman dilimi içinde yanıt vermezse, veya yanıtı tatmin edici bulunmazsa, bilgiye konu kişi Kurula başvurma ve itirazının incelenmesini talep etme hakkına sahiptir. Kurul bu konudaki kararı verir. Başkan, bilgiye konu kişinin mağduriyet riskinin yüksek olması ve itirazları mantıklı bulması ve işlemenin devam etmesi halinde, itirazlar hakkında nihai karar verilene kadar işlemeyi derhal askıya alma talimatı verebilir."
+        ]
+      },
+      "contact": {
+        "title": "Hak ve Talepleriniz İçin İletişim",
+        "content": [
+          "Kişisel verilerinizle ilgili sorularınızı ve taleplerinizi, Veri Sorumlusuna Başvuru Usul ve Esasları hakkında Tebliğ'de belirtilen şartlara uygun düzenlenmiş dilekçeyle ya da 'ECTS TRADING LTD Başvuru Formu' ile aşağıdaki yöntemlerle iletebilirsiniz:",
+          "Başvuru Yöntemi: Şahsen yazılı başvuru, Güvenli Elektronik İmza veya Mobil İmza ile imzalanarak Kayıtlı Elektronik Posta (KEP), Şirketimize daha önce bildirilen ve sistemde kayıtlı bulunan elektronik posta adresinizden.",
+          "Başvuru formunun tebligat zarfına veya e-postanın konu kısmına 'Kişisel Verileri Koruma Yasası ile İlgili Kişi Talebi' yazılmasını rica ederiz.",
+          "'Şahsen Yazılı Başvuru' yoluna başvuracak İlgili Kişilerin kimliğini tevsik edici belgeleri ibraz etmesi zorunludur. Bu bağlamda yapacağınız şahsen yazılı başvurularda başvuru formuyla birlikte kimlik fotokopisinin yalnızca ön yüzünün (kan grubu ve din hanesi gözükmeyecek şekilde) ibraz edilmesini rica ederiz.",
+          "Kişisel veri sahipleri olarak, haklarınıza ilişkin taleplerinizi Şirket'e iletmeniz durumunda Şirket talebinizi en geç 30 (otuz) gün içinde ücretsiz olarak sonuçlandıracaktır. Ancak, başvurunuza verilecek yanıtın mevzuat uyarınca bir maliyet gerektirmesi halinde Şirket tarafından Kişisel Verileri Koruma Kurulu tarafından belirlenen tarifedeki ücret talep edilebilecektir."
+        ]
+      },
+      "updates": {
+        "title": "Aydınlatma Metni Hakkında",
+        "content": [
+          "Şirket işbu Kişisel Verilerin Korunmasına İlişkin Aydınlatma Metni'ni yürürlükteki mevzuatta yapılabilecek değişiklikler çerçevesinde her zaman güncelleme hakkını saklı tutar."
+        ]
+      }
+    }
+  },
+  "RefundForm": {
+    "title": "İade Talebi",
+    "headerTitle": "İade Talebi Oluştur",
+    "headerSubtitle": "İade talebinizi göndermek için aşağıdaki formu doldurun",
+    "nameLabel": "Ad / Soyad",
+    "noName": "İsim yok",
+    "emailLabel": "E-posta Adresi",
+    "receiptNoLabel": "Fatura Numarası",
+    "findReceipt": "Fatura Bul",
+    "receiptNoPlaceholder": "Fatura numaranızı girin",
+    "receiptNoRequired": "Fatura numarası gereklidir",
+    "descriptionLabel": "Açıklama",
+    "descriptionPlaceholder": "Lütfen iade talebinizin nedenini detaylı bir şekilde açıklayın...",
+    "descriptionRequired": "Açıklama gereklidir",
+    "descriptionTooShort": "Açıklama en az 20 karakter olmalıdır",
+    "descriptionHelper": "En az 20 karakter gereklidir",
+    "submitButton": "İade Talebini Gönder",
+    "submitting": "Gönderiliyor...",
+    "successTitle": "Talep Gönderildi!",
+    "submitSuccess": "İade talebiniz başarıyla gönderildi. Talebinizi inceleyeceğiz ve en kısa sürede size geri döneceğiz.",
+    "submitError": "İade talebinizi gönderirken bir hata oluştu. Lütfen tekrar deneyin.",
+    "infoMessage": "Ekibimiz iade talebinizi 2-3 iş günü içinde inceleyecektir. Talebinizin durumu hakkında e-posta bildirimi alacaksınız."
   }
 }

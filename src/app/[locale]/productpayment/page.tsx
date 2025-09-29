@@ -370,7 +370,7 @@ export default function ProductPaymentPage() {
   // Get cart items from URL params or localStorage
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [totalPrice, setTotalPrice] = useState(0);
-
+  const [agreesToContract, setAgreesToContract] = useState(false);
   // Form state
   const [formData, setFormData] = useState<FormData>({
     cardNumber: "",
@@ -1769,6 +1769,38 @@ export default function ProductPaymentPage() {
                       </p>
                     </div>
                   </div>
+                </div>
+
+                 {/* ADD THIS NEW SECTION HERE - Contract Agreement Checkbox */}
+                 <div
+                  className={`p-4 sm:p-5 rounded-xl border mb-5 sm:mb-6 ${
+                    isDarkMode
+                      ? "bg-gray-700/30 border-gray-600/50"
+                      : "bg-gray-50 border-gray-200"
+                  }`}
+                >
+                  <label className="flex items-start space-x-2.5 sm:space-x-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={agreesToContract}
+                      onChange={(e) => setAgreesToContract(e.target.checked)}
+                      className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500 rounded focus:ring-blue-500/50 mt-0.5"
+                    />
+                    <span
+                      className={`text-xs sm:text-sm leading-relaxed ${
+                        isDarkMode ? "text-gray-300" : "text-gray-700"
+                      }`}
+                    >
+                      {t("iAgreeToThe")}{" "}
+                      <button
+                        type="button"
+                        onClick={() => router.push("/agreements/distance-selling")}
+                        className="text-blue-500 hover:text-blue-600 underline font-medium transition-colors"
+                      >
+                        {t("distanceSellingContract")}
+                      </button>
+                    </span>
+                  </label>
                 </div>
 
                 {/* Complete Payment Button */}

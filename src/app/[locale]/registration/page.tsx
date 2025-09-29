@@ -57,6 +57,7 @@ function RegistrationContent() {
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [isDark, setIsDark] = useState(false);
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     name: "",
     surname: "",
@@ -1071,10 +1072,73 @@ function RegistrationContent() {
                 </div>
               </div>
 
+               {/* Terms and Conditions Checkbox */}
+               <div className="space-y-3">
+                <label className="flex items-start space-x-3 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={agreedToTerms}
+                    onChange={(e) => setAgreedToTerms(e.target.checked)}
+                    className="mt-1 w-5 h-5 rounded border-2 border-gray-300 text-green-600 focus:ring-2 focus:ring-green-500 focus:ring-offset-0 cursor-pointer transition-colors"
+                    required
+                  />
+                  <span
+                    className={`text-sm leading-relaxed ${
+                      isDark ? "text-gray-300" : "text-gray-700"
+                    }`}
+                  >
+                    {t("RegistrationPage.agreeToTermsPrefix")}{" "}
+                    <a
+                      href="/agreements/terms"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`font-semibold underline transition-colors ${
+                        isDark
+                          ? "text-green-400 hover:text-green-300"
+                          : "text-green-600 hover:text-green-700"
+                      }`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {t("RegistrationPage.termsAndConditions")}
+                    </a>
+                    {", "}
+                    <a
+                      href="/agreements/membership"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`font-semibold underline transition-colors ${
+                        isDark
+                          ? "text-green-400 hover:text-green-300"
+                          : "text-green-600 hover:text-green-700"
+                      }`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {t("RegistrationPage.membershipAgreement")}
+                    </a>
+                    {" "}
+                    {t("RegistrationPage.and")}{" "}
+                    <a
+                      href="/agreements/personal-data"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`font-semibold underline transition-colors ${
+                        isDark
+                          ? "text-green-400 hover:text-green-300"
+                          : "text-green-600 hover:text-green-700"
+                      }`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {t("RegistrationPage.personalDataPolicy")}
+                    </a>
+                    .
+                  </span>
+                </label>
+              </div>
+
               {/* Register Button */}
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || !agreedToTerms}
                 className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-bold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] shadow-lg hover:shadow-xl disabled:scale-100 disabled:shadow-md flex items-center justify-center group"
               >
                 {isLoading ? (

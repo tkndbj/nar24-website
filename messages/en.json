@@ -1442,6 +1442,7 @@
     "geolocationNotSupported": "Geolocation is not supported by this browser"
   },
   "ProfilePage": {
+    "refundForm": "Refund Form",
     "invalidFileType": "Please select a valid image file (JPG, PNG or GIF)",
     "fileSizeError": "Image size must be smaller than 20MB",
     "imageUploadSuccess": "Profile image updated successfully!",
@@ -1820,6 +1821,11 @@
     "promoteProduct": "Promote Product"
   },
   "RegistrationPage": {
+    "agreeToTermsPrefix": "I agree to the",
+    "termsAndConditions": "Terms and Conditions",
+    "membershipAgreement": "Membership Agreement",
+    "and": "and",
+    "personalDataPolicy": "Personal Data Policy",
     "createAccount": "Create Account",
     "joinUsToday": "Join us today!",
     "name": "Name",
@@ -2147,6 +2153,8 @@
     "locationSelected": "Location Selected",
     "tapAnywhereToSetLocation": "Tap anywhere on the map to set your delivery location",
     "cancel": "Cancel",
+    "iAgreeToThe": "I agree to the",
+    "distanceSellingContract": "Distance Selling Contract",
     "confirmLocation": "Confirm Location",
     "loadingPayment": "Loading Payment",
     "preparingCheckout": "Preparing your secure checkout experience...",
@@ -2439,7 +2447,22 @@
     "emailSupport": "Email Support",
     "liveChat": "Live Chat",
     "emailSupportMessage": "Our support team will get back to you within 24 hours.",
-    "liveChatMessage": "Live chat is available Monday-Friday, 9 AM - 6 PM."
+    "liveChatMessage": "Live chat is available Monday-Friday, 9 AM - 6 PM.",
+    "contactSupport": "Contact Support",
+"helpFormTitle": "Contact Support",
+"nameLabel": "Name / Surname",
+"noName": "No name",
+"emailLabel": "Email Address",
+"descriptionLabel": "How can we help you?",
+"descriptionPlaceholder": "Please describe your issue or question in detail...",
+"descriptionRequired": "Description is required",
+"descriptionTooShort": "Description must be at least 20 characters",
+"descriptionHelper": "Minimum 20 characters required",
+"submitButton": "Submit Request",
+"submitting": "Submitting...",
+"submitError": "An error occurred while submitting your request. Please try again.",
+"successTitle": "Request Submitted!",
+"submitSuccess": "Your support request has been submitted successfully. We will get back to you soon."
   },
   "AccountSettings": {
     "accountSettings": "Account Settings",
@@ -2763,6 +2786,8 @@
     "cancelAndReturnPolicy": "Cancel and Return Policy",
     "sellerAgreement": "Seller Agreement",
     "cookiePolicy": "Cookie Policy",
+    "personalData": "Personal Data",
+    "distanceSelling": "Distance Selling Contract",
     "made": "Made with",
     "allRightsReserved": "All rights reserved. Nar24 is a product of E.C.T.S TRADING LTD",
     "profile": "Profile",
@@ -3915,5 +3940,233 @@
         ]
       }
     }
+  },
+  "distanceSellingContract": {
+    "title": "Distance Selling Contract",
+    "lastUpdated": "Last Updated",
+    "updateDate": "January 2025",
+    "introduction": "This Distance Selling Contract has been prepared in accordance with the Consumer Protection Law No. 40/2003 - 55/2020. By accepting this contract, the BUYER acknowledges that they have been informed about all terms and conditions regarding the ordered products and agrees to fulfill all payment obligations.",
+    "footerNote": "By accepting this contract, you agree to all terms and conditions stated above. For any questions or concerns, please contact our customer service team.",
+    "sections": {
+      "parties": {
+        "title": "Parties",
+        "content": [
+          "This contract has been signed between the following parties under the terms and conditions specified below.",
+          "SELLER: Company name, address, telephone, and email information will be provided at the time of purchase.",
+          "BUYER: The person placing the order, whose details (name, address, telephone, email) will be collected during the checkout process.",
+          "By accepting this contract, the BUYER acknowledges that upon confirming the order, they undertake the obligation to pay the order amount and additional charges such as shipping fees and taxes, if any, and accepts that they have been informed in advance about this matter."
+        ]
+      },
+      "subject": {
+        "title": "Subject of the Contract",
+        "content": [
+          "The subject of this contract is the determination of the rights and obligations of the parties regarding the product whose features and sales price are specified in Article 3 of this contract.",
+          "This contract has been prepared in accordance with the provisions of the Consumer Protection Law No. 40/2003 - 55/2020.",
+          "The parties to this contract acknowledge and declare that they know and understand the obligations and responsibilities arising from the Consumer Protection Law with this contract.",
+          "This contract is aimed at the BUYER's acquisition of the product(s) specified in this contract."
+        ]
+      },
+      "productInfo": {
+        "title": "Product Information",
+        "content": [
+          "The type, quantity, brand, model, color, number, sales price, delivery/invoice address, delivery person, and payment method of the product are as specified at the time of order.",
+          "All product specifications will be clearly displayed during the checkout process.",
+          "The sales price includes VAT and all other expenses.",
+          "Payment methods available: Credit card, bank transfer/EFT, cash on delivery (where applicable).",
+          "Delivery and invoice addresses will be collected during the order process."
+        ]
+      },
+      "generalProvisions": {
+        "title": "General Provisions",
+        "content": [
+          "The parties to this contract are the BUYER and the SELLER, and all obligations and responsibilities related to the fulfillment of this contract belong to the parties. This contract comes into force on the date it is electronically approved by the BUYER.",
+          "The BUYER accepts, declares, and undertakes that they have read and understood all information regarding the features of the product specified in Article 3 and the conditions related to the sale, and that they have given the necessary approval for the purchase of this product.",
+          "The SELLER is responsible for delivering the product subject to the contract in sound, complete condition, in accordance with the qualities specified in the order, and together with warranty documents and user manuals, if any, to the cargo.",
+          "If the product subject to the contract is to be delivered to a person/organization other than the BUYER, the SELLER cannot be held responsible if the person/organization to be delivered refuses to accept the delivery.",
+          "Delivery will be made by hand via the cargo company at the address specified in Article 3 of the BUYER. Even if the buyer is not at the address at the time of delivery, the SELLER will be deemed to have fulfilled its obligation fully and completely.",
+          "If the product price is not paid for any reason or is canceled in bank records, the SELLER is deemed to be released from the obligation to deliver the product.",
+          "In the situation described in 4.6, the BUYER is responsible for any expenses and other losses arising from the late receipt of the product by the BUYER, or the product having waited at the cargo company and/or the cargo being returned to the SELLER.",
+          "Shipping fee is added to the order total and paid by the BUYER. Shipping fee is not included in the product price.",
+          "If the credit card belonging to the BUYER is used illegally or unlawfully by unauthorized persons in a manner not caused by the fault of the BUYER after the delivery of the product, and the relevant bank or financial institution does not pay the product price to the SELLER, the BUYER is obliged to return the product to the SELLER within 3 (three) days, provided that it has been delivered to them. In this case, transportation costs will be borne by the BUYER.",
+          "For products sold with or without a warranty certificate, defective or faulty (defective) products can be sent to the SELLER to have the necessary repairs carried out by the authorized service under warranty conditions; in this case, cargo costs will be covered by the SELLER.",
+          "The BUYER acknowledges that they know that since installment sales are only made with credit cards belonging to banks, they need to separately confirm the relevant interest rates and information about default interest from their bank.",
+          "The BUYER accepts, declares, and undertakes that the provisions regarding interest and default interest will be applied within the scope of the credit card agreement between the bank and the BUYER in accordance with the provisions of the current legislation.",
+          "In cases where the BUYER exercises the right of withdrawal, or when the product subject to the order cannot be supplied for various reasons, or in cases where the Consumer Council and the Goods and Services Arbitration Committee decide to refund the amount to the Consumer, if the purchase was made with a credit card and in installments, the credit card refund procedure is specified below.",
+          "For purchases made with a credit card and when the product is paid in installments, the BUYER's bank also makes the refund to the consumer in the same number of installments as the BUYER purchased the product. After the SELLER pays the full product price to the bank in one payment, in case of refund of installment purchases made from bank POS systems to the BUYER's credit card, the requested refund amounts will be transferred to the cardholder's accounts by the bank in installments to prevent the parties involved from being victimized.",
+          "In case of return of goods and services purchased with a card, the SELLER cannot make payment to the BUYER in cash due to a separate contract made with the bank. Since the SELLER is obliged to pay the relevant amount to the bank in cash or by offset in case of a refund, as per the procedure, they will not make cash payment to the BUYER. In case of refunds to credit cards, the refund will be made to the card by the bank after the SELLER pays the price to the bank in one payment.",
+          "For cash on delivery and bank transfer/EFT payment options, the refund will be made by requesting bank account information from the Consumer and transferring it to the account specified by the consumer (the account must be in the name of the person at the billing address or in the name of the member user) by transfer or EFT.",
+          "In accordance with the Tax Procedure Law No. 27/1977 and the communiqués and regulations issued under this law, and Chapter 267 Commodity Sales and Chapter 149 Contracts Law, in order to carry out refund transactions, the relevant refund sections on the invoice must be filled in completely and signed and then sent back to the SELLER together with the product. The BUYER declares, accepts, and undertakes that they accept all this procedure.",
+          "The SELLER will not share any personal information communicated to them by the BUYER with third parties for purposes other than those disclosed regarding the collection of information and the SELLER's activities related to this contract and the provision of qualified electronic certificates, and will not sell or disclose such personal information to third parties, and will not allow its use under any circumstances. Information provided by the BUYER may be used by the BUYER, their partners, and persons or institutions in cooperation with them to make various statistical evaluations, create databases, and/or conduct market research without disclosing the identity of the member, and to provide information about products and services if permission is obtained from the BUYER. Personal information is understood as name and surname, address, telephone number, email address, and all other information aimed at identifying the BUYER. The SELLER undertakes to keep personal information strictly confidential, to consider itself under the obligation of confidentiality in this matter, and to take all necessary measures to prevent unauthorized use of all or any part of confidential information or disclosure to a third party, except for the exceptions determined by this contract, for the purpose of ensuring and maintaining confidentiality, and to show the necessary diligence in this direction."
+        ]
+      },
+      "rightOfWithdrawal": {
+        "title": "Right of Withdrawal",
+        "content": [
+          "The BUYER has the right to withdraw from the contract by rejecting the goods or services within seven days from the date they received the goods related to this contract and from the date this contract was established for the services subject to the contract, without assuming any legal or criminal liability and without giving any reason.",
+          "The BUYER will communicate their declaration that they wish to exercise the right of withdrawal within the valid period to the SELLER with the sample right of withdrawal form included in the annex to this contract or by any of the communication methods specified in this contract.",
+          "The product price will be refunded to the BUYER within 20 days from the date the consumer's withdrawal notice reaches the seller.",
+          "To exercise the right of withdrawal, notification must be made to the SELLER by fax, email, or telephone with the withdrawal form included in the annex within this period, and the product must not have been used within the framework of Article 6 provisions.",
+          "In case of exercising this right, it is mandatory to return the original invoice along with a copy of the cargo delivery receipt showing that the product delivered to the third party or the BUYER has been sent to the SELLER.",
+          "The product price will be refunded to the BUYER within 20 days following the receipt of these documents. If the original invoice is not sent, VAT and other legal obligations, if any, cannot be refunded.",
+          "The shipping cost of the product returned due to the right of withdrawal is covered by the SELLER."
+        ]
+      },
+      "nonWithdrawableProducts": {
+        "title": "Products for Which the Right of Withdrawal Cannot Be Exercised",
+        "content": [
+          "The right of withdrawal cannot be exercised for products that cannot be returned due to their nature, single-use products, copyable software and programs, products that spoil quickly, or products whose expiration date has passed.",
+          "For the following products, exercising the right of withdrawal is subject to the condition that the product's packaging is unopened, undamaged, and the product has not been used:",
+          "- Portable computers (will not be accepted for return after the original operating system is installed)",
+          "- All types of software and programs",
+          "- DVDs, VCDs, CDs, and cassettes",
+          "- Computer and stationery consumables (toner, cartridge, ribbon, etc.)",
+          "- All types of cosmetic products",
+          "- Telephone top-up orders",
+          "The product subject to the contract is an electronic signature creation tool and card reader, and the qualified electronic certificate is within the scope of goods produced in accordance with the BUYER's special requests and demands or with changes or additions made to it to make it personal.",
+          "When there are goods prepared according to the BUYER's requests or personal needs, they cannot exercise the right of withdrawal or avoid paying the product or goods price."
+        ]
+      },
+      "defaultProvisions": {
+        "title": "Default Provisions",
+        "content": [
+          "In case the parties fail to fulfill their obligations arising from this contract, the rules of Default of the Debtor contained in Chapter 149 will be applied.",
+          "In case of default, if either party fails to fulfill its obligations within the period without a justified reason, the other party will give the party that has not fulfilled its obligation a period of 14 days to fulfill the said obligation.",
+          "If it is not fulfilled within this period, the right to demand the fulfillment of the obligation from the party that has not fulfilled its obligation will arise, including the delivery of the goods and/or termination of the contract and/or refund of the price and/or if it is an installment payment, all the price will become due and the right to demand the entire price will arise.",
+          "If the SELLER cannot deliver the product subject to the contract within the period due to force majeure that may prevent the SELLER from fulfilling this obligation or extraordinary events such as weather opposition that prevents transportation, interruption of transportation, fire, earthquake, flood, the BUYER may use one of the rights to cancel the order or postpone the delivery period until the preventive situation is eliminated, acknowledging that the SELLER has no responsibility in such situations.",
+          "In case the BUYER cancels the order, the amount paid will be paid to them within 10 (ten) days."
+        ]
+      },
+      "jurisdiction": {
+        "title": "Jurisdiction",
+        "content": [
+          "TRNC Courts are authorized for disputes arising from this contract.",
+          "This contract has been prepared on the date specified at the time of order acceptance."
+        ]
+      }
+    },
+    "withdrawalForm": {
+      "title": "Withdrawal Form (Annex-1)",
+      "description": "For exercising your right of withdrawal, you can use the withdrawal form by contacting our customer service or downloading it from our website. The form should include: Order date or delivery date, goods or services subject to withdrawal, price, buyer's name and surname, ID/passport number, telephone, address, and signature (if sent on paper)."
+    }
+  },
+  "personalDataProtection": {
+    "title": "Personal Data Protection Policy",
+    "lastUpdated": "Last Updated",
+    "updateDate": "January 2025",
+    "introductionText": "ECTS TRADING LTD (\"Company\") prioritizes the privacy and security of your personal data. We process your personal information in compliance with Law No. 89/2007 on the Protection of Personal Data and all relevant legislation. This policy explains how we collect, use, and protect your personal information.",
+    "footerNote": "For questions about your personal data or to exercise your rights, please contact us using the methods specified in the Contact section.",
+    "sections": {
+      "introduction": {
+        "title": "Introduction",
+        "content": [
+          "As ECTS TRADING LTD (\"Company\"), the confidentiality and security of your personal data are among our top priorities.",
+          "The Company processes your personal data in compliance with the Personal Data Protection Law No. 89/2007, the Regulation on Procedures and Principles to be Followed in Fulfilling the Obligation to Inform issued under Article 28 of the Personal Data Protection Law, and all relevant legal legislation.",
+          "Personal data means any information that makes your identity specific or identifiable.",
+          "We would like to inform you about your personal data processed when you become a \"Platform Member\" by accepting the Membership Agreement in order to benefit from the services offered on our mobile applications and/or websites (collectively \"Platform\") owned by our Company (collectively \"Platform Services\")."
+        ]
+      },
+      "dataCollected": {
+        "title": "What Personal Data Do We Process?",
+        "content": [
+          "If you become a Platform Member, the following personal data is processed:",
+          "User Account Information: Your name, surname, customer number, membership email address, and if you add to your user information: phone number, gender, date of birth, height and weight information, ID Number (processed only in accordance with relevant legislation if you purchase certain product groups).",
+          "Customer Transaction Information: Your order and invoice information, transaction history information related to your purchases, your request and complaint information, Platform usage information, information you personally share in your comments and questions if you comment and/or ask questions about products on the Platform, your score and evaluation information, information about chat channel conversation content, your cancellation/return information.",
+          "Delivery Information: Phone number and delivery address information you add for the delivery of the product you ordered, delivery transaction information.",
+          "Payment Information: Information about payments made by you and payment methods, saved card information.",
+          "Transaction Security Information: Your device information, IP address information, password and passcode information, cookie information, platform access records, login method (via Google/Facebook).",
+          "Legal Process Information: Information in correspondence with authorized persons, institutions and organizations, information in files before courts and other arbitration boards, legal information request information.",
+          "Audio Recording Information: Your voice recording if you contact the call center.",
+          "Personal data processed within the scope of additional services: Data processed if you benefit from additional services such as food, market, financial services, insurance, lucky draw, buy-sell-earn (Dolap) offered on the Platform."
+        ]
+      },
+      "processingPurposes": {
+        "title": "Legal Grounds, Purposes and Collection Methods",
+        "content": [
+          "Your personal data is collected by our Company in whole or in part through automated or non-automated means, provided that it is part of a data recording system, electronically through the mobile application or websites where the Platform Service you benefit from within the scope of our membership agreement is located.",
+          "Membership and Account Creation: To establish and perform the membership agreement, create and manage your Platform member profile/account, verify contact information, conduct purchase transactions through the Platform, ensure Platform operations security, and comply with legal obligations including Consumer Protection Law, Goods and Services Law, and Tax Procedure Law.",
+          "Order, Delivery and Cancellation/Return Processes: To place and create orders, establish and perform distance sales contracts, conduct delivery and logistics activities, manage cancellation/return processes, conduct payment and invoicing processes, and fulfill legal obligations.",
+          "Customer Experience Improvement: To provide quick and easy access to products suitable for your preferences and interests, provide better user experience across Platform Services, improve and enhance user experience and service quality, conduct analysis and reporting, manage communication activities, evaluate requests, complaints and suggestions, and provide after-sales support services.",
+          "Company Information Security, Risk, Audit and Control: To conduct and audit finance and accounting processes, conduct invoicing processes, manage information security processes and investigate suspicious transactions, ensure Platform operations security, control and improve product and service quality, conduct risk analysis, manage complaints, prevent fraud, and conduct legal and financial due diligence in potential corporate mergers, acquisitions, joint ventures, divisions and other structural changes.",
+          "Legal Proceedings: To conduct legal and litigation affairs, respond to legal requests, review and respond to your applications as data subjects in accordance with procedures, conduct legal compliance activities, fulfill obligations arising from legislation, conduct legal consultancy processes, share information with authorized persons, institutions and organizations when requested, and establish, exercise or protect a right in case of legal dispute.",
+          "Consent-Based Processes: To conduct marketing, advertising and promotional activities, conduct financial offer processes, offer special advantageous offers to you, and conduct activities to increase your satisfaction by getting to know you better, including sending commercial electronic messages."
+        ]
+      },
+      "dataSharing": {
+        "title": "With Whom and Why Do We Share Your Personal Data?",
+        "content": [
+          "Our Company takes care to process your personal data in accordance with the principles of 'need to know' and 'need to use', ensuring necessary data minimization and taking necessary technical and administrative security measures.",
+          "Your personal data is shared with the recipient groups detailed below based on the legal grounds of 'being necessary to fulfill our Company's legal obligations', 'being necessary for the establishment or performance of a contract', 'being necessary for the establishment, exercise or protection of a right', and/or 'being necessary for our Company's legitimate interests'.",
+          "For membership and account creation: With our subsidiaries and group companies for providing Platform Services, establishing and performing membership agreement; with our IT infrastructure providers, operators or service providers, our subsidiaries, group companies, business partners and service providers for conducting Platform operations, receiving information technology and software services.",
+          "For order, delivery and cancellation/return: With the seller or service provider of the product you want to purchase for providing Platform Services, conducting purchase and invoicing processes, fulfilling obligations arising from legislation; with product sellers, cargo companies, special couriers for conducting logistics activities and tracking delivery processes; with contracted banks and other payment institutions for conducting and tracking payment processes.",
+          "For customer experience improvement: With our business partners providing call center services and customer support service providers for providing sales and after-sales support services, ensuring customer satisfaction, meeting requests and complaints; with service providers, IT infrastructure, software and technology service providers located abroad for conducting activities to improve and enhance products and services offered by our Company.",
+          "For information security, risk, audit and control: With business partners, consultants and service providers, banks, e-invoice partners, cargo and courier companies, independent audit, customs, financial advisor/accounting service providers for conducting invoicing processes, sending e-invoices electronically to customers, delivering physical contracts or invoices, managing financial and accounting processes, identifying and evaluating risks, preventing fraud.",
+          "For legal proceedings: With regulatory and supervisory institutions and authorized public institutions and organizations such as courts and arbitrators for fulfilling obligations arising from legislation, conducting Platform activities in accordance with legislation, providing information to authorized persons, institutions and organizations, tracking and conducting legal affairs, exercising and protecting a right in case of legal dispute; with lawyers, auditors, tax consultants, forensic IT experts, cybersecurity consultants, group companies, subsidiaries, other third parties and business partners from whom we receive consultancy and services."
+        ]
+      },
+      "dataProtection": {
+        "title": "How Does the Company Protect Your Personal Data?",
+        "content": [
+          "Personal data shared with our Company is under the supervision and control of the Company. The Company has assumed responsibility as a data controller to establish the necessary organization and take and adapt technical measures to protect the confidentiality and integrity of information in accordance with current relevant legislation provisions.",
+          "Being aware of our obligation in this regard:",
+          "Penetration tests are conducted at periodic intervals in accordance with international and national technical standards on data confidentiality.",
+          "Personal data you transmit to the Company through the website, mobile site and mobile application is protected using SSL (Secure Sockets Layer) technology.",
+          "Risk analyses are regularly conducted regarding personal data processing activities and actions are taken to reduce risks.",
+          "Access and authorization controls are applied to prevent unauthorized access to personal data.",
+          "Data processing policies are regularly updated."
+        ]
+      },
+      "yourRights": {
+        "title": "Your Rights Regarding Protection of Personal Data",
+        "content": [
+          "By contacting our Company through the methods specified in the 'Contact for Your Rights and Requests' section of this disclosure text, you have the right to:",
+          "Learn whether your personal data is being processed. The controller must respond to you in writing.",
+          "Request correction, deletion or blocking of data, especially due to errors and deficiencies not processed in accordance with the rules of this Law.",
+          "Request notification to third parties to whom the data has been transmitted about any correction, deletion and blocking made in accordance with the law, unless impossible or requiring disproportionate effort.",
+          "If the controller does not respond within thirty days from the submission of the application or if the response is not satisfactory, you have the right to apply to the Board. The Board makes the decision on this matter.",
+          "You can exercise your right of access with the help of an expert.",
+          "The controller, by decision of the Board, may limit, postpone or refuse to provide information to you if it is clearly stipulated in special law, necessary for a superior public interest especially for protecting the internal and external security of the State, or if providing information would make it difficult to achieve the purpose of an administrative or criminal investigation, and will notify you in writing of the reason.",
+          "If the controller does not respond within the time period granted, or if you do not find the response satisfactory, you have the right to apply to the Board and request review of your objections. The Board makes the decision on this matter. The President may issue an instruction to immediately suspend processing until a final decision is made on the objections if there is a high risk of harm to you and your objections are found reasonable and if processing continues."
+        ]
+      },
+      "contact": {
+        "title": "Contact for Your Rights and Requests",
+        "content": [
+          "You can submit your questions and requests regarding your personal data with a petition prepared in accordance with the conditions specified in the Communiqué on Procedures and Principles for Application to the Data Controller or with the 'ECTS TRADING LTD Application Form' using the following methods:",
+          "Application Method: In-person written application, Registered Electronic Mail (KEP) signed with Secure Electronic Signature or Mobile Signature, from your email address previously notified to our Company and registered in the system.",
+          "Please write 'Personal Data Protection Law Related Data Subject Request' on the delivery envelope or in the subject line of the email.",
+          "Data subjects who will apply through 'In-person Written Application' are required to present identity verification documents. In this context, please submit only the front side of your ID card photocopy (without showing blood type and religion section) along with the application form for in-person written applications you will make to the address.",
+          "As personal data owners, if you submit your requests regarding your rights to the Company, the Company will finalize your request free of charge within 30 (thirty) days at the latest. However, if the response to your application requires a cost in accordance with the legislation, the fee in the tariff determined by the Personal Data Protection Board may be requested by the Company."
+        ]
+      },
+      "updates": {
+        "title": "About the Disclosure Text",
+        "content": [
+          "The Company reserves the right to update this Personal Data Protection Disclosure Text at any time within the framework of changes that may be made in the current legislation."
+        ]
+      }
+    }
+  },
+  "RefundForm": {
+    "title": "Refund Request",
+    "headerTitle": "Request a Refund",
+    "headerSubtitle": "Fill out the form below to submit your refund request",
+    "nameLabel": "Name / Surname",
+    "noName": "No name",
+    "emailLabel": "Email Address",
+    "receiptNoLabel": "Receipt Number",
+    "findReceipt": "Find Receipt",
+    "receiptNoPlaceholder": "Enter your receipt number",
+    "receiptNoRequired": "Receipt number is required",
+    "descriptionLabel": "Description",
+    "descriptionPlaceholder": "Please describe the reason for your refund request in detail...",
+    "descriptionRequired": "Description is required",
+    "descriptionTooShort": "Description must be at least 20 characters",
+    "descriptionHelper": "Minimum 20 characters required",
+    "submitButton": "Submit Refund Request",
+    "submitting": "Submitting...",
+    "successTitle": "Request Submitted!",
+    "submitSuccess": "Your refund request has been submitted successfully. We will review it and get back to you soon.",
+    "submitError": "An error occurred while submitting your refund request. Please try again.",
+    "infoMessage": "Our team will review your refund request within 2-3 business days. You will receive an email notification regarding the status of your request."
   }
 }

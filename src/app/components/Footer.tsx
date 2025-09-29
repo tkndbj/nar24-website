@@ -66,21 +66,16 @@ export default function Footer() {
   const legalLinks = [
     { label: t("termsOfService"), href: "/agreements/terms" },
     { label: t("membershipAgreement"), href: "/agreements/membership" },
+    { label: t("personalData"), href: "/agreements/personal-data" },
     { label: t("cancelAndReturnPolicy"), href: "/agreements/refund" },
     { label: t("sellerAgreement"), href: "/agreements/seller" },
+    { label: t("distanceSelling"), href: "/agreements/distance-selling" },    
     {
       label: t("cookiePolicy"),
       href: "/cookies",
       action: "openCookieSettings",
     },
-  ];
-
-  const socialLinks = [
-    { icon: Facebook, href: "#", label: "Facebook" },
-    { icon: Twitter, href: "#", label: "Twitter" },
-    { icon: Instagram, href: "#", label: "Instagram" },
-    { icon: Linkedin, href: "#", label: "LinkedIn" },
-  ];
+  ]; 
 
   return (
     <footer
@@ -252,26 +247,7 @@ export default function Footer() {
             isDarkMode ? "border-gray-800" : "border-gray-200"
           }`}
         >
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              {socialLinks.map((social) => (
-                <a
-                  key={social.label}
-                  onClick={(e) => handleLinkClick(e, social)}
-                  href={social.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
-                    isDarkMode
-                      ? "bg-gray-800 hover:bg-gradient-to-r hover:from-orange-500 hover:to-pink-500 text-gray-400 hover:text-white"
-                      : "bg-gray-100 hover:bg-gradient-to-r hover:from-orange-500 hover:to-pink-500 text-gray-600 hover:text-white"
-                  }`}
-                  aria-label={social.label}
-                >
-                  <social.icon className="w-5 h-5" />
-                </a>
-              ))}
-            </div>
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">            
 
             <div className="flex items-center gap-2">
               <span

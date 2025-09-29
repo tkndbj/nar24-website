@@ -29,6 +29,7 @@ import {
   Settings,
   Receipt,
   Bell,
+  Folder,
 } from "lucide-react";
 import Image from "next/image";
 import { SavedPaymentMethodsDrawer } from "@/app/components/profile/SavedPaymentMethodsDrawer";
@@ -624,6 +625,38 @@ export default function ProfilePage() {
                   }`}
                 >
                   {t("ProfilePage.myReceipts")}
+                </span>
+                <ChevronRight
+                  className={`w-4 h-4 md:w-5 md:h-5 ml-auto ${
+                    isDarkMode ? "text-gray-600" : "text-gray-400"
+                  }`}
+                />
+              </button>
+
+              <div
+                className={`border-t ${
+                  isDarkMode ? "border-gray-700" : "border-gray-200"
+                }`}
+              ></div>
+
+              {/* Refund Form */}
+              <button
+                onClick={() => handleNavigation("/refundform")}
+                className={`w-full flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-lg md:rounded-xl transition-colors text-left ${
+                  isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"
+                }`}
+              >
+                <Folder
+                  className={`w-4 h-4 md:w-5 md:h-5 ${
+                    isDarkMode ? "text-gray-400" : "text-gray-600"
+                  }`}
+                />
+                <span
+                  className={`text-sm md:text-base ${
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  }`}
+                >
+                  {t("ProfilePage.refundForm")}
                 </span>
                 <ChevronRight
                   className={`w-4 h-4 md:w-5 md:h-5 ml-auto ${
