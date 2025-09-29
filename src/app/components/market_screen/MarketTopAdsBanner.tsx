@@ -42,16 +42,6 @@ const convertDominantColor = (cInt: number): string => {
   }
 };
 
-// Create optimized image preloader
-const preloadImage = (url: string): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    const img = new window.Image();
-    img.onload = () => resolve();
-    img.onerror = reject;
-    img.src = url;
-  });
-};
-
 export const AdsBanner: React.FC<AdsBannerProps> = ({
   onBackgroundColorChange,
 }) => {
@@ -59,10 +49,7 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
   const [banners, setBanners] = useState<BannerItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [isClient, setIsClient] = useState(false);
-  const [preloadedImages, setPreloadedImages] = useState<Set<string>>(
-    new Set()
-  );
+  const [isClient, setIsClient] = useState(false);  
 
   // Refs for optimizations
   // const cachedUrls = useRef(new Set<string>());
@@ -117,47 +104,7 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
       }
     },
     [onBackgroundColorChange, isClient]
-  );
-
-  // Bulk preload images with concurrent loading
-  const preloadBannerImages = useCallback(
-    async (items: BannerItem[]) => {
-      const imageUrls = items
-        .map((item) => item.url)
-        .filter((url) => !preloadedImages.has(url));
-
-      if (imageUrls.length === 0) return;
-
-      // Preload first 3 images immediately, others in background
-      const priorityUrls = imageUrls.slice(0, 3);
-      const backgroundUrls = imageUrls.slice(3);
-
-      try {
-        // Preload priority images first
-        await Promise.allSettled(priorityUrls.map(preloadImage));
-
-        setPreloadedImages((prev) => {
-          const newSet = new Set(prev);
-          priorityUrls.forEach((url) => newSet.add(url));
-          return newSet;
-        });
-
-        // Preload remaining images in background
-        if (backgroundUrls.length > 0) {
-          Promise.allSettled(backgroundUrls.map(preloadImage)).then(() => {
-            setPreloadedImages((prev) => {
-              const newSet = new Set(prev);
-              backgroundUrls.forEach((url) => newSet.add(url));
-              return newSet;
-            });
-          });
-        }
-      } catch (error) {
-        console.error("Error preloading images:", error);
-      }
-    },
-    [preloadedImages]
-  );
+  );  
 
   // Optimized Firestore listener with better error handling
   useEffect(() => {
@@ -219,10 +166,7 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
           updateBackgroundColor(items[0].color);
         }
 
-        // Preload images
-        if (items.length > 0) {
-          preloadBannerImages(items);
-        }
+       
       },
       (error) => {
         console.error("❌ Firestore error in AdsBanner:", error);
@@ -236,7 +180,7 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
     isClient,
     onBackgroundColorChange,
     updateBackgroundColor,
-    preloadBannerImages,
+    
   ]);
 
   // Optimized auto-slide with cleanup
@@ -283,8 +227,8 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
 
       const route =
         item.linkType === "shop"
-          ? `/shop_detail/${item.linkId}`
-          : `/product_detail/${item.linkId}`;
+          ? `/shopdetail/${item.linkId}`
+          : `/productdetail/${item.linkId}`;
 
       router.push(route);
     },
