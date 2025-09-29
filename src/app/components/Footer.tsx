@@ -7,11 +7,7 @@ import {
   ShoppingBag,
   Mail,
   Phone,
-  MapPin,
-  Facebook,
-  Twitter,
-  Instagram,
-  Linkedin,
+  MapPin,  
 } from "lucide-react";
 
 export default function Footer() {
