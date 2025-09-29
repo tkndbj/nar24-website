@@ -4159,5 +4159,48 @@
     "submitSuccess": "İade talebiniz başarıyla gönderildi. Talebinizi inceleyeceğiz ve en kısa sürede size geri döneceğiz.",
     "submitError": "İade talebinizi gönderirken bir hata oluştu. Lütfen tekrar deneyin.",
     "infoMessage": "Ekibimiz iade talebinizi 2-3 iş günü içinde inceleyecektir. Talebinizin durumu hakkında e-posta bildirimi alacaksınız."
+  },
+  "ShippingInfo": {
+    "title": "Kargo Takibi",
+    "headerTitle": "Paketinizi Takip Edin",
+    "headerSubtitle": "Sipariş durumunuzu öğrenmek için kargo kodunuzu girin",
+    "nameLabel": "Ad Soyad",
+    "noName": "İsim bilgisi yok",
+    "emailLabel": "E-posta Adresi",
+    "codeLabel": "Kargo Kodu",
+    "codeHint": "SMS ile alındı",
+    "codePlaceholder": "Kargo kodunu girin",
+    "codeHelper": "Ödeme sonrası SMS ile aldığınız kodu girin",
+    "codeRequired": "Kargo kodu gereklidir",
+    "codeTooShort": "Kargo kodu en az 6 karakter olmalıdır",
+    "trackButton": "Kargoyu Takip Et",
+    "checking": "Kontrol ediliyor...",
+    "fetchError": "Kargo bilgisi alınamadı. Lütfen tekrar deneyin.",
+    "trackingCode": "Takip Kodu",
+    "currentLocation": "Güncel Konum",
+    "lastUpdate": "Son Güncelleme",
+    "infoMessage": "Paketiniz yakında teslim edilecek. Durum güncellemeleri için bildirim alacaksınız.",
+    "status": {
+      "at-shop": {
+        "title": "Paket Mağazada",
+        "description": "Siparişiniz hazır ve kargo tarafından alınmayı bekliyor"
+      },
+      "collected": {
+        "title": "Mağazadan Toplandı",
+        "description": "Paketiniz mağazadan alındı ve teslimat için hazırlanıyor"
+      },
+      "in-transit": {
+        "title": "Yolda",
+        "description": "Paketiniz dağıtım merkezine doğru yola çıktı"
+      },
+      "out-for-delivery": {
+        "title": "Dağıtımda",
+        "description": "Paketiniz kargo görevlisinde ve bugün teslim edilecek"
+      },
+      "delivered": {
+        "title": "Teslim Edildi",
+        "description": "Paketiniz başarıyla teslim edildi. Alışveriş yaptığınız için teşekkürler!"
+      }
+    }
   }
 }

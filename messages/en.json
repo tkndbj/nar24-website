@@ -4168,5 +4168,48 @@
     "submitSuccess": "Your refund request has been submitted successfully. We will review it and get back to you soon.",
     "submitError": "An error occurred while submitting your refund request. Please try again.",
     "infoMessage": "Our team will review your refund request within 2-3 business days. You will receive an email notification regarding the status of your request."
+  },
+  "ShippingInfo": {
+    "title": "Track Shipment",
+    "headerTitle": "Track Your Package",
+    "headerSubtitle": "Enter your shipment code to track your order status",
+    "nameLabel": "Full Name",
+    "noName": "No name available",
+    "emailLabel": "Email Address",
+    "codeLabel": "Shipment Code",
+    "codeHint": "Received via SMS",
+    "codePlaceholder": "Enter shipment code",
+    "codeHelper": "Enter the code you received via SMS after payment",
+    "codeRequired": "Shipment code is required",
+    "codeTooShort": "Shipment code must be at least 6 characters",
+    "trackButton": "Track Shipment",
+    "checking": "Checking...",
+    "fetchError": "Unable to retrieve shipment information. Please try again.",
+    "trackingCode": "Tracking Code",
+    "currentLocation": "Current Location",
+    "lastUpdate": "Last Updated",
+    "infoMessage": "Your package will be delivered soon. You will receive notifications for status updates.",
+    "status": {
+      "at-shop": {
+        "title": "Package at Shop",
+        "description": "Your order is ready and waiting at the shop for collection by our courier"
+      },
+      "collected": {
+        "title": "Collected from Shop",
+        "description": "Your package has been collected from the shop and is being prepared for delivery"
+      },
+      "in-transit": {
+        "title": "In Transit",
+        "description": "Your package is on its way to the delivery hub"
+      },
+      "out-for-delivery": {
+        "title": "Out for Delivery",
+        "description": "Your package is with our courier and will be delivered today"
+      },
+      "delivered": {
+        "title": "Delivered",
+        "description": "Your package has been successfully delivered. Thank you for shopping with us!"
+      }
+    }
   }
 }

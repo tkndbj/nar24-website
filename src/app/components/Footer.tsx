@@ -55,8 +55,8 @@ export default function Footer() {
   const supportLinks = [
     { label: t("helpCenter"), href: "/support-and-faq" },
     { label: t("pickupPoints"), href: "/pickup-points" },
-    { label: t("shipping"), href: "/shipping" },
-    { label: t("returns"), href: "/returns" },
+    { label: t("shipping"), href: "/shippinginfo" },
+    { label: t("returns"), href: "/refundform" },
   ];
 
   const legalLinks = [
