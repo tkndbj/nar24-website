@@ -32,8 +32,10 @@ interface PickupPoint {
 // Updated script loader utility for modern Google Maps
 const loadGoogleMapsScript = (): Promise<void> => {
   return new Promise((resolve, reject) => {
-    // Check if already loaded
-    if (window.google && window.google.maps) {
+    // Check if already loaded and fully initialized
+    if (typeof window !== 'undefined' && 
+        window.google?.maps && 
+        'importLibrary' in window.google.maps) {
       resolve();
       return;
     }
@@ -43,17 +45,44 @@ const loadGoogleMapsScript = (): Promise<void> => {
       'script[src*="maps.googleapis.com"]'
     );
     if (existingScript) {
-      existingScript.addEventListener("load", () => resolve());
-      existingScript.addEventListener("error", reject);
+      // Wait for full initialization
+      const checkReady = setInterval(() => {
+        if (window.google?.maps && 'importLibrary' in window.google.maps) {
+          clearInterval(checkReady);
+          resolve();
+        }
+      }, 100);
+      
+      // Timeout after 10 seconds
+      setTimeout(() => {
+        clearInterval(checkReady);
+        reject(new Error('Google Maps API failed to initialize'));
+      }, 10000);
       return;
     }
 
     // Create and load script with marker library for AdvancedMarkerElement
     const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=marker,places&v=weekly&loading=async`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=marker,places&v=weekly`;
     script.async = true;
     script.defer = true;
-    script.onload = () => resolve();
+    
+    script.onload = () => {
+      // Wait for importLibrary to be available
+      const checkReady = setInterval(() => {
+        if (window.google?.maps && 'importLibrary' in window.google.maps) {
+          clearInterval(checkReady);
+          resolve();
+        }
+      }, 100);
+      
+      // Timeout after 10 seconds
+      setTimeout(() => {
+        clearInterval(checkReady);
+        reject(new Error('Google Maps API failed to initialize'));
+      }, 10000);
+    };
+    
     script.onerror = reject;
     document.head.appendChild(script);
   });
