@@ -500,7 +500,7 @@ export default function OrdersPage() {
                 isDarkMode ? "text-green-400" : "text-green-600"
               }`}
             >
-              {transaction.currency === "TRY" ? "₺" : "$"}
+              {transaction.currency === "TL" ? "₺" : "₺"}
               {transaction.price.toLocaleString()}
             </span>
             {(transaction.averageRating ?? 0) > 0 && (
