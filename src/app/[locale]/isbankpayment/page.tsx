@@ -159,8 +159,7 @@ export default function IsbankPaymentPage() {
 
     // Show success message
     setTimeout(() => {
-      const locale = window.location.pathname.split("/")[1] || "en";
-      router.push(`/${locale}/orders?success=true&orderId=${orderId}`);
+      router.push(`/orders?success=true&orderId=${orderId}`);
     }, 1500);
   };
 
