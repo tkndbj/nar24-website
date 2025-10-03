@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { ProductCard3 } from "../ProductCard3";
 import { CompactBundleWidget } from "../CompactBundle";
-import { useCart, CartTotals } from "@/context/CartProvider";
+import { useCart, CartTotals, CartItemTotal } from "@/context/CartProvider";
 import { useUser } from "@/context/UserProvider";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -58,34 +58,37 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   const [shouldRender, setShouldRender] = useState(false);
 
   // ✅ FIXED: Proper nested translation function that uses JSON files
-  const t = useCallback((key: string) => {
-    if (!localization) {
-      // Return the key itself if no localization function is provided
-      return key;
-    }
+  const t = useCallback(
+    (key: string) => {
+      if (!localization) {
+        // Return the key itself if no localization function is provided
+        return key;
+      }
 
-    try {
-      // Try to get the nested CartDrawer translation
-      const translation = localization(`CartDrawer.${key}`);
-      
-      // Check if we got a valid translation (not the same as the key we requested)
-      if (translation && translation !== `CartDrawer.${key}`) {
-        return translation;
+      try {
+        // Try to get the nested CartDrawer translation
+        const translation = localization(`CartDrawer.${key}`);
+
+        // Check if we got a valid translation (not the same as the key we requested)
+        if (translation && translation !== `CartDrawer.${key}`) {
+          return translation;
+        }
+
+        // If nested translation doesn't exist, try direct key
+        const directTranslation = localization(key);
+        if (directTranslation && directTranslation !== key) {
+          return directTranslation;
+        }
+
+        // Return the key as fallback
+        return key;
+      } catch (error) {
+        console.warn(`Translation error for key: ${key}`, error);
+        return key;
       }
-      
-      // If nested translation doesn't exist, try direct key
-      const directTranslation = localization(key);
-      if (directTranslation && directTranslation !== key) {
-        return directTranslation;
-      }
-      
-      // Return the key as fallback
-      return key;
-    } catch (error) {
-      console.warn(`Translation error for key: ${key}`, error);
-      return key;
-    }
-  }, [localization]);
+    },
+    [localization]
+  );
 
   // Handle drawer animation
   useEffect(() => {
@@ -101,28 +104,28 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   useEffect(() => {
     // Check if it's mobile (you can adjust the breakpoint as needed)
     const isMobile = window.innerWidth < 768; // md breakpoint
-    
+
     if (isMobile && isOpen) {
       // Disable scrolling when drawer is open
-      document.body.style.overflow = 'hidden';
+      document.body.style.overflow = "hidden";
       // Prevent scrolling on iOS Safari
-      document.body.style.position = 'fixed';
-      document.body.style.width = '100%';
+      document.body.style.position = "fixed";
+      document.body.style.width = "100%";
     } else if (isMobile) {
       // Re-enable scrolling when drawer is closed (only for mobile)
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.width = '';
+      document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.width = "";
     }
-  
+
     // Cleanup function to ensure scrolling is restored
     return () => {
       // Only cleanup if it was mobile when the effect ran
       const wasMobile = window.innerWidth < 768;
       if (wasMobile) {
-        document.body.style.overflow = '';
-        document.body.style.position = '';
-        document.body.style.width = '';
+        document.body.style.overflow = "";
+        document.body.style.position = "";
+        document.body.style.width = "";
       }
     };
   }, [isOpen]);
@@ -138,7 +141,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     subtotal: 0,
     total: 0,
     currency: "TL",
-    items: []
+    items: [],
   });
 
   useEffect(() => {
@@ -151,48 +154,54 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
           subtotal: 0,
           total: 0,
           currency: "TL",
-          items: []
+          items: [],
         });
       }
     };
-  
+
     calculateTotals();
   }, [cartItems, calculateCartTotals]);
 
   // Handle item removal
-  const handleRemoveItem = useCallback(async (productId: string) => {
-    try {
-      console.log('CartDrawer - Removing item:', { productId });
-      const result = await removeFromCart(productId);
-      console.log('CartDrawer - Remove result:', { productId, result });
-    } catch (error) {
-      console.error("CartDrawer - Failed to remove item:", error);
-    }
-  }, [removeFromCart]);
+  const handleRemoveItem = useCallback(
+    async (productId: string) => {
+      try {
+        console.log("CartDrawer - Removing item:", { productId });
+        const result = await removeFromCart(productId);
+        console.log("CartDrawer - Remove result:", { productId, result });
+      } catch (error) {
+        console.error("CartDrawer - Failed to remove item:", error);
+      }
+    },
+    [removeFromCart]
+  );
 
   // Handle quantity update
-  const handleQuantityChange = useCallback(async (
-    productId: string,
-    newQuantity: number
-  ) => {
-    if (newQuantity < 1) {
-      await handleRemoveItem(productId);
-      return;
-    }
-    
-    try {
-      console.log('CartDrawer - Updating quantity:', { productId, newQuantity });
-      await updateQuantity(productId, newQuantity);
-    } catch (error) {
-      console.error("CartDrawer - Failed to update quantity:", error);
-    }
-  }, [handleRemoveItem, updateQuantity]);
+  const handleQuantityChange = useCallback(
+    async (productId: string, newQuantity: number) => {
+      if (newQuantity < 1) {
+        await handleRemoveItem(productId);
+        return;
+      }
+
+      try {
+        console.log("CartDrawer - Updating quantity:", {
+          productId,
+          newQuantity,
+        });
+        await updateQuantity(productId, newQuantity);
+      } catch (error) {
+        console.error("CartDrawer - Failed to update quantity:", error);
+      }
+    },
+    [handleRemoveItem, updateQuantity]
+  );
 
   // Handle clear cart
   const handleClearCart = useCallback(async () => {
     setIsClearing(true);
     try {
-      console.log('CartDrawer - Clearing entire cart');
+      console.log("CartDrawer - Clearing entire cart");
       await clearCart();
     } catch (error) {
       console.error("CartDrawer - Failed to clear cart:", error);
@@ -203,44 +212,65 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
   // Handle navigation functions
   const handleCheckout = useCallback(() => {
-    console.log('CartDrawer - Navigating to checkout');
-
     const totalPrice = calculatedTotals.total;
-    
-    // Prepare cart items for payment page - pass ALL fields from cart documents
+
+    // Create pricing lookup from calculated totals
+    const pricingMap = new Map<string, CartItemTotal>();
+    calculatedTotals.items.forEach((itemTotal) => {
+      pricingMap.set(itemTotal.productId, itemTotal);
+    });
+
     const paymentItems = cartItems
-      .filter(item => !item.isOptimistic && item.product && !isOptimisticallyRemoving(item.productId))
-      .map(item => {
-        // Create a copy of the entire item object
-        const paymentItem = { ...item };
-        
-        // Add essential product info from the product object
+      .filter(
+        (item) =>
+          !item.isOptimistic &&
+          item.product &&
+          !isOptimisticallyRemoving(item.productId)
+      )
+      .map((item) => {
+        // Create a plain object copy instead of using spread with typed CartItem
+        const paymentItem: Record<string, unknown> = {};
+
+        // Copy all properties except the ones we want to exclude
+        Object.keys(item).forEach((key) => {
+          if (
+            key !== "product" &&
+            key !== "cartData" &&
+            key !== "isOptimistic" &&
+            key !== "isLoadingProduct" &&
+            key !== "loadError" &&
+            key !== "selectedColorImage"
+          ) {
+            paymentItem[key] = (item as Record<string, unknown>)[key];
+          }
+        });
+
+        // Add product info
         if (item.product) {
           paymentItem.price = item.product.price;
           paymentItem.productName = item.product.productName;
           paymentItem.currency = item.product.currency;
         }
-        
-        // Remove only the fields that shouldn't be sent to payment
-        delete (paymentItem as Record<string, unknown>).product; // Remove the full product object (too large)
-        delete (paymentItem as Record<string, unknown>).cartData; // Remove internal cart metadata
-        delete (paymentItem as Record<string, unknown>).isOptimistic; // Remove UI state
-        delete (paymentItem as Record<string, unknown>).isLoadingProduct; // Remove UI state
-        delete (paymentItem as Record<string, unknown>).loadError; // Remove UI state
-        delete (paymentItem as Record<string, unknown>).selectedColorImage; // Remove UI-specific field
-        
+
+        // Add calculated pricing from CartProvider
+        const calculatedPricing = pricingMap.get(item.productId);
+        if (calculatedPricing) {
+          paymentItem.calculatedUnitPrice = calculatedPricing.unitPrice;
+          paymentItem.calculatedTotal = calculatedPricing.total;
+          paymentItem.isBundleItem = calculatedPricing.isBundleItem || false;
+        }
+
         return paymentItem;
       });
-  
-    console.log('CartDrawer - Payment items prepared:', paymentItems);
-      
-    
+
+    console.log("CartDrawer - Payment items prepared:", paymentItems);
+
     // Save to localStorage as backup
-    localStorage.setItem('cartItems', JSON.stringify(paymentItems));
-    localStorage.setItem('cartTotal', totalPrice.toString());
-    
+    localStorage.setItem("cartItems", JSON.stringify(paymentItems));
+    localStorage.setItem("cartTotal", totalPrice.toString());
+
     onClose();
-    
+
     // Navigate to payment page
     try {
       const itemsParam = encodeURIComponent(JSON.stringify(paymentItems));
@@ -250,79 +280,105 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
         router.push(`/productpayment?total=${totalPrice}`);
       }
     } catch (error) {
-      console.error('Error encoding cart items for URL:', error);
+      console.error("Error encoding cart items for URL:", error);
       router.push(`/productpayment?total=${totalPrice}`);
     }
   }, [cartItems, calculatedTotals, isOptimisticallyRemoving, onClose, router]);
 
   const handleViewFullCart = useCallback(() => {
-    console.log('CartDrawer - Navigating to full cart page');
+    console.log("CartDrawer - Navigating to full cart page");
     onClose();
     router.push("/cart");
   }, [onClose, router]);
 
   const handleGoToLogin = useCallback(() => {
-    console.log('CartDrawer - Navigating to login');
+    console.log("CartDrawer - Navigating to login");
     onClose();
     router.push("/login");
   }, [onClose, router]);
 
   // Backdrop click handler
-  const handleBackdropClick = useCallback((e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  }, [onClose]);
+  const handleBackdropClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (e.target === e.currentTarget) {
+        onClose();
+      }
+    },
+    [onClose]
+  );
 
   // Format dynamic attributes for display
-  const formatItemAttributes = useCallback((item: Record<string, unknown>) => {
-    if (!localization) return '';
+  const formatItemAttributes = useCallback(
+    (item: Record<string, unknown>) => {
+      if (!localization) return "";
 
-    const attributes: Record<string, unknown> = {};
-    const excludedKeys = [
-      'productId', 'cartData', 'product', 'quantity', 'sellerName', 
-      'sellerId', 'isShop', 'isOptimistic', 'isLoadingProduct', 
-      'loadError', 'selectedColor', 'selectedColorImage', 'gender'
-    ];
+      const attributes: Record<string, unknown> = {};
+      const excludedKeys = [
+        "productId",
+        "cartData",
+        "product",
+        "quantity",
+        "sellerName",
+        "sellerId",
+        "isShop",
+        "isOptimistic",
+        "isLoadingProduct",
+        "loadError",
+        "selectedColor",
+        "selectedColorImage",
+        "gender",
+      ];
 
-    // Collect all non-excluded attributes
-    Object.entries(item).forEach(([key, value]) => {
-      if (!excludedKeys.includes(key) && 
-          value !== undefined && 
-          value !== null && 
-          value !== '' && 
-          typeof value !== 'boolean') {
-        attributes[key] = value;
+      // Collect all non-excluded attributes
+      Object.entries(item).forEach(([key, value]) => {
+        if (
+          !excludedKeys.includes(key) &&
+          value !== undefined &&
+          value !== null &&
+          value !== "" &&
+          typeof value !== "boolean"
+        ) {
+          attributes[key] = value;
+        }
+      });
+
+      // Handle selected color separately
+      if (
+        typeof item.selectedColor === "string" &&
+        item.selectedColor !== "default"
+      ) {
+        attributes["selectedColor"] = item.selectedColor;
       }
-    });
 
-    // Handle selected color separately
-    if (typeof item.selectedColor === 'string' && item.selectedColor !== 'default') {
-      attributes['selectedColor'] = item.selectedColor;
-    }
+      if (Object.keys(attributes).length === 0) return "";
 
-    if (Object.keys(attributes).length === 0) return '';
+      // Get localized values only (without titles)
+      const displayValues: string[] = [];
+      Object.entries(attributes).forEach(([key, value]) => {
+        const localizedValue =
+          AttributeLocalizationUtils.getLocalizedAttributeValue(
+            key,
+            value,
+            localization
+          );
+        if (localizedValue.trim() !== "") {
+          displayValues.push(localizedValue);
+        }
+      });
 
-    // Get localized values only (without titles)
-    const displayValues: string[] = [];
-    Object.entries(attributes).forEach(([key, value]) => {
-      const localizedValue = AttributeLocalizationUtils.getLocalizedAttributeValue(key, value, localization);
-      if (localizedValue.trim() !== '') {
-        displayValues.push(localizedValue);
-      }
-    });
-
-    return displayValues.join(', ');
-  }, [localization]);
+      return displayValues.join(", ");
+    },
+    [localization]
+  );
 
   // Check if item is from shop (to determine if we should show bundles)
   const isShopProduct = useCallback((item: Record<string, unknown>) => {
-    return typeof item.isShop === 'boolean' ? item.isShop : false;
+    return typeof item.isShop === "boolean" ? item.isShop : false;
   }, []);
 
   // Get shop ID for bundle component
   const getShopId = useCallback((item: Record<string, unknown>) => {
-    return typeof item.sellerId === 'string' ? item.sellerId : undefined;
+    return typeof item.sellerId === "string" ? item.sellerId : undefined;
   }, []);
 
   // Memoize cart items rendering with bundle integration
@@ -332,7 +388,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
       const attributesDisplay = formatItemAttributes(item);
       const showBundles = isShopProduct(item);
       const shopId = getShopId(item);
-      
+
       return (
         <div
           key={item.productId}
@@ -358,14 +414,14 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
           >
             <ProductCard3
               imageUrl={item.product?.imageUrls?.[0] || ""}
-              colorImages={item.product?.colorImages || {}} 
-              selectedColorImage={typeof item.selectedColorImage === 'string' ? item.selectedColorImage : undefined}
-              productName={
-                item.product?.productName || t("loadingProduct")
+              colorImages={item.product?.colorImages || {}}
+              selectedColorImage={
+                typeof item.selectedColorImage === "string"
+                  ? item.selectedColorImage
+                  : undefined
               }
-              brandModel={
-                item.product?.brandModel || item.sellerName
-              }
+              productName={item.product?.productName || t("loadingProduct")}
+              brandModel={item.product?.brandModel || item.sellerName}
               price={item.product?.price || 0}
               currency={item.product?.currency || "TL"}
               averageRating={item.product?.averageRating || 0}
@@ -384,14 +440,12 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
             {/* Display attributes in one line */}
             {attributesDisplay && (
               <div className="mt-2 text-xs text-gray-500">
-                <span className="font-medium">
-                  
-                </span> {attributesDisplay}
+                <span className="font-medium"></span> {attributesDisplay}
               </div>
             )}
 
             {/* CompactBundleWidget - Show only for shop products */}
-            {showBundles && shopId && shopId.trim() !== '' && (
+            {showBundles && shopId && shopId.trim() !== "" && (
               <CompactBundleWidget
                 productId={item.productId}
                 shopId={shopId}
@@ -426,12 +480,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 ) : (
                   <Trash2 size={14} />
                 )}
-                <span>
-                  {isRemoving 
-                    ? t("removing")
-                    : t("remove")
-                  }
-                </span>
+                <span>{isRemoving ? t("removing") : t("remove")}</span>
               </button>
             </div>
 
@@ -454,15 +503,15 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
       );
     });
   }, [
-    cartItems, 
-    isOptimisticallyRemoving, 
-    isDarkMode, 
-    handleQuantityChange, 
-    handleRemoveItem, 
+    cartItems,
+    isOptimisticallyRemoving,
+    isDarkMode,
+    handleQuantityChange,
+    handleRemoveItem,
     formatItemAttributes,
     isShopProduct,
     getShopId,
-    t
+    t,
   ]);
 
   if (!shouldRender) return null;
@@ -569,12 +618,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 ) : (
                   <Trash2 size={16} />
                 )}
-                <span>
-                  {isClearing 
-                    ? t("clearing")
-                    : t("clearCart")
-                  }
-                </span>
+                <span>{isClearing ? t("clearing") : t("clearCart")}</span>
               </button>
             </div>
           )}
@@ -624,9 +668,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   "
                 >
                   <LogIn size={18} />
-                  <span className="font-medium">
-                    {t("login")}
-                  </span>
+                  <span className="font-medium">{t("login")}</span>
                 </button>
               </div>
             ) : /* Loading State */ isLoading && !isInitialized ? (
@@ -684,9 +726,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   "
                 >
                   <Heart size={18} />
-                  <span className="font-medium">
-                    {t("startShopping")}
-                  </span>
+                  <span className="font-medium">{t("startShopping")}</span>
                 </button>
               </div>
             ) : (
@@ -753,7 +793,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   {t("total")}:
                 </span>
                 <span className="text-lg font-bold text-orange-500">
-                {calculatedTotals.total.toFixed(2)} TL
+                  {calculatedTotals.total.toFixed(2)} TL
                 </span>
               </div>
 

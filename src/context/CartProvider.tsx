@@ -34,7 +34,7 @@ import {
   Firestore,
 } from "firebase/firestore";
 import { User } from "firebase/auth";
-import { ProductUtils, Product } from '@/app/models/Product';
+import { ProductUtils, Product } from "@/app/models/Product";
 
 // Types
 interface CartUser {
@@ -194,10 +194,10 @@ interface CartProviderProps {
   db: Firestore;
 }
 
-export const CartProvider: React.FC<CartProviderProps> = ({ 
-  children, 
+export const CartProvider: React.FC<CartProviderProps> = ({
+  children,
   user,
-  db 
+  db,
 }) => {
   // Core state matching Flutter implementation
   const [cartProductIds, setCartProductIds] = useState<Set<string>>(new Set());
@@ -230,7 +230,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   const isSystemField = useCallback((key: string): boolean => {
     const systemFields = new Set([
       "addedAt",
-      "updatedAt", 
+      "updatedAt",
       "quantity",
       "sellerId",
       "sellerName",
@@ -244,13 +244,13 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     optimisticAddsRef.current.delete(productId);
     optimisticRemovesRef.current.delete(productId);
     optimisticItemsRef.current.delete(productId);
-    
+
     const timer = optimisticTimersRef.current.get(productId);
     if (timer) {
       clearTimeout(timer);
       optimisticTimersRef.current.delete(productId);
     }
-    
+
     operationIdsRef.current.delete(productId);
   }, []);
 
@@ -318,7 +318,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
   // Fetch sale preferences batch - matching Flutter implementation
   const fetchSalePreferencesBatch = useCallback(
-    async (productIds: string[]): Promise<Record<string, SalePreferences | null>> => {
+    async (
+      productIds: string[]
+    ): Promise<Record<string, SalePreferences | null>> => {
       const result: Record<string, SalePreferences | null> = {};
 
       try {
@@ -328,7 +330,13 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           const futures = chunk.map(async (productId) => {
             try {
               const salePrefsDoc = await getDoc(
-                doc(db, "shop_products", productId, "sale_preferences", "preferences")
+                doc(
+                  db,
+                  "shop_products",
+                  productId,
+                  "sale_preferences",
+                  "preferences"
+                )
               );
 
               if (salePrefsDoc.exists()) {
@@ -342,7 +350,10 @@ export const CartProvider: React.FC<CartProviderProps> = ({
                 result[productId] = null;
               }
             } catch (error) {
-              console.error(`Error fetching sale preferences for ${productId}:`, error);
+              console.error(
+                `Error fetching sale preferences for ${productId}:`,
+                error
+              );
               result[productId] = null;
             }
           });
@@ -363,7 +374,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
   // Get product document references - matching Flutter implementation
   const getProductDocument = useCallback(
-    async (productIds: string[]): Promise<Record<string, DocumentReference | null>> => {
+    async (
+      productIds: string[]
+    ): Promise<Record<string, DocumentReference | null>> => {
       const result: Record<string, DocumentReference | null> = {};
 
       try {
@@ -385,11 +398,11 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           });
 
           // Check remaining IDs in products collection
-          const remainingIds = batch.filter(id => !foundInShop.has(id));
+          const remainingIds = batch.filter((id) => !foundInShop.has(id));
           if (remainingIds.length > 0) {
             const productsSnapshot = await getDocs(
               query(
-                collection(db, "products"), 
+                collection(db, "products"),
                 where(documentId(), "in", remainingIds)
               )
             );
@@ -422,18 +435,18 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   const fetchProductDetailsBatch = useCallback(
     async (productIds: string[]): Promise<Record<string, Product | null>> => {
       const result: Record<string, Product | null> = {};
-  
+
       try {
         for (let i = 0; i < productIds.length; i += 10) {
           const chunk = productIds.slice(i, i + 10);
-  
+
           const snapshot = await getDocs(
             query(
               collection(db, "shop_products"),
               where(documentId(), "in", chunk)
             )
           );
-  
+
           snapshot.docs.forEach((doc) => {
             if (!result[doc.id]) {
               try {
@@ -447,11 +460,11 @@ export const CartProvider: React.FC<CartProviderProps> = ({
                     id: doc.id,
                     path: doc.ref.path,
                     parent: {
-                      id: doc.ref.parent.id
-                    }
-                  }
+                      id: doc.ref.parent.id,
+                    },
+                  },
                 };
-                
+
                 result[doc.id] = ProductUtils.fromJson(productJson);
               } catch (error) {
                 console.error(`Error parsing product ${doc.id}:`, error);
@@ -463,15 +476,18 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       } catch (error) {
         console.error("Error fetching product details:", error);
       }
-  
+
       return result;
     },
     [db]
   );
 
-  // Fetch seller info - matching Flutter implementation  
+  // Fetch seller info - matching Flutter implementation
   const fetchSellerInfo = useCallback(
-    async (prodRef: DocumentReference, productData: ProductDocumentData): Promise<SellerInfo> => {
+    async (
+      prodRef: DocumentReference,
+      productData: ProductDocumentData
+    ): Promise<SellerInfo> => {
       const parent = prodRef.parent.id;
       let sellerId: string;
       let sellerName: string;
@@ -587,7 +603,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
         // Remove from UI immediately
         if (isInitialized) {
-          setCartItems(cartItems.filter(item => item.productId !== productId));
+          setCartItems(
+            cartItems.filter((item) => item.productId !== productId)
+          );
         }
       }
 
@@ -595,7 +613,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       const timeout = setTimeout(() => {
         rollbackOptimisticUpdate(productId, isAdding);
       }, OPTIMISTIC_TIMEOUT);
-      
+
       optimisticTimersRef.current.set(productId, timeout);
     },
     [cartProductIds, cartItems, isInitialized, fetchProductDetailsBatch]
@@ -614,7 +632,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         if (isInitialized) {
           const currentItems = [...cartItems];
           const filtered = currentItems.filter(
-            item => !(item.productId === productId && item.isOptimistic)
+            (item) => !(item.productId === productId && item.isOptimistic)
           );
           setCartItems(filtered);
         }
@@ -641,56 +659,63 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   );
 
   // Process cart snapshot - reconcile with optimistic updates
-  const processCartSnapshot = useCallback((snapshot: QuerySnapshot): void => {
-    const serverIds = new Set<string>();
-    const newCache: Record<string, CartData> = {};
+  const processCartSnapshot = useCallback(
+    (snapshot: QuerySnapshot): void => {
+      const serverIds = new Set<string>();
+      const newCache: Record<string, CartData> = {};
 
-    snapshot.docs.forEach((doc) => {
-      serverIds.add(doc.id);
-      const data = doc.data();
+      snapshot.docs.forEach((doc) => {
+        serverIds.add(doc.id);
+        const data = doc.data();
 
-      const cartData: CartData = {
-        quantity: data.quantity || 1,
-        addedAt: data.addedAt,
-        updatedAt: data.updatedAt,
-        sellerId: data.sellerId || "unknown",
-        sellerName: data.sellerName || "Unknown",
-        isShop: data.isShop || false,
-      };
+        const cartData: CartData = {
+          quantity: data.quantity || 1,
+          addedAt: data.addedAt,
+          updatedAt: data.updatedAt,
+          sellerId: data.sellerId || "unknown",
+          sellerName: data.sellerName || "Unknown",
+          isShop: data.isShop || false,
+        };
 
-      // Add dynamic attributes
-      Object.entries(data).forEach(([key, value]) => {
-        if (!isSystemField(key)) {
-          cartData[key] = value;
-        }
+        // Add dynamic attributes
+        Object.entries(data).forEach(([key, value]) => {
+          if (!isSystemField(key)) {
+            cartData[key] = value;
+          }
+        });
+
+        newCache[doc.id] = cartData;
       });
 
-      newCache[doc.id] = cartData;
-    });
+      cartItemsCacheRef.current = newCache;
+      lastCacheUpdateRef.current = new Date();
 
-    cartItemsCacheRef.current = newCache;
-    lastCacheUpdateRef.current = new Date();
+      // Reconcile optimistic updates
+      const confirmedAdds = new Set(
+        [...optimisticAddsRef.current].filter((id) => serverIds.has(id))
+      );
+      confirmedAdds.forEach((productId) => clearOptimisticState(productId));
 
-    // Reconcile optimistic updates
-    const confirmedAdds = new Set([...optimisticAddsRef.current].filter(id => serverIds.has(id)));
-    confirmedAdds.forEach(productId => clearOptimisticState(productId));
+      const confirmedRemoves = new Set(
+        [...optimisticRemovesRef.current].filter((id) => !serverIds.has(id))
+      );
+      confirmedRemoves.forEach((productId) => clearOptimisticState(productId));
 
-    const confirmedRemoves = new Set([...optimisticRemovesRef.current].filter(id => !serverIds.has(id)));
-    confirmedRemoves.forEach(productId => clearOptimisticState(productId));
+      // Compute effective IDs
+      const effectiveIds = new Set(serverIds);
+      optimisticAddsRef.current.forEach((id) => effectiveIds.add(id));
+      optimisticRemovesRef.current.forEach((id) => effectiveIds.delete(id));
 
-    // Compute effective IDs
-    const effectiveIds = new Set(serverIds);
-    optimisticAddsRef.current.forEach(id => effectiveIds.add(id));
-    optimisticRemovesRef.current.forEach(id => effectiveIds.delete(id));
+      setCartProductIds(effectiveIds);
+      setCartCount(effectiveIds.size);
 
-    setCartProductIds(effectiveIds);
-    setCartCount(effectiveIds.size);
-
-    // Update cart items if initialized
-    if (isInitialized) {
-      updateCartItemsFromSnapshot(snapshot);
-    }
-  }, [isSystemField, isInitialized]);
+      // Update cart items if initialized
+      if (isInitialized) {
+        updateCartItemsFromSnapshot(snapshot);
+      }
+    },
+    [isSystemField, isInitialized]
+  );
 
   // Update cart items from snapshot - matching Flutter implementation
   const updateCartItemsFromSnapshot = useCallback(
@@ -700,7 +725,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         return;
       }
 
-      const productIds = snapshot.docs.map(doc => doc.id);
+      const productIds = snapshot.docs.map((doc) => doc.id);
       const productDetails = await fetchProductDetailsBatch(productIds);
       const salePreferencesMap = await fetchSalePreferencesBatch(productIds);
 
@@ -721,7 +746,10 @@ export const CartProvider: React.FC<CartProviderProps> = ({
             }
           });
 
-          const selectedColorImage = resolveColorImage(productDetail, cartData.selectedColor as string);
+          const selectedColorImage = resolveColorImage(
+            productDetail,
+            cartData.selectedColor as string
+          );
 
           updatedItems.push({
             cartData,
@@ -749,7 +777,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
       // Add optimistic items that aren't in server response yet
       optimisticItemsRef.current.forEach((optimisticItem, productId) => {
-        if (!updatedItems.some(item => item.productId === productId)) {
+        if (!updatedItems.some((item) => item.productId === productId)) {
           updatedItems.unshift(optimisticItem);
         }
       });
@@ -785,23 +813,22 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         // Check sale preferences before updating
         const salePrefsResult = await fetchSalePreferencesBatch([productId]);
         const salePrefs = salePrefsResult[productId];
-        
+
         if (salePrefs?.maxQuantity && newQuantity > salePrefs.maxQuantity) {
           return `Cannot set quantity to ${newQuantity}. Maximum allowed: ${salePrefs.maxQuantity}`;
         }
 
-        await writeBatch(db).update(
-          doc(db, "users", user.uid, "cart", productId),
-          {
+        await writeBatch(db)
+          .update(doc(db, "users", user.uid, "cart", productId), {
             quantity: newQuantity,
             updatedAt: serverTimestamp(),
-          }
-        ).commit();
+          })
+          .commit();
 
         // Update UI
         if (isInitialized) {
           const items = [...cartItems];
-          const idx = items.findIndex(e => e.productId === productId);
+          const idx = items.findIndex((e) => e.productId === productId);
           if (idx !== -1) {
             items[idx].quantity = newQuantity;
             items[idx].cartData.quantity = newQuantity;
@@ -825,40 +852,41 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       attributes?: CartAttributes
     ): Promise<string> => {
       const operationId = `${productId}_${Date.now()}`;
-      
+
       if (!user) return "Please log in";
       if (!productId.trim()) return "Invalid product ID";
       if (quantity < 1) return "Quantity must be at least 1";
-      if (operationIdsRef.current.has(productId)) return "Operation in progress";
-      
+      if (operationIdsRef.current.has(productId))
+        return "Operation in progress";
+
       operationIdsRef.current.set(productId, operationId);
-  
+
       try {
         const isCurrentlyInCart = cartProductIds.has(productId);
-        
+
         // Get product document reference
         const prodRef = await getProductDocument([productId]);
         if (!prodRef[productId]) {
           return "Product not found";
         }
-  
+
         // Fetch product data and seller info
         const prodSnapshot = await getDoc(prodRef[productId]!);
         if (!prodSnapshot.exists()) {
           return "Product not found";
         }
         const productData = prodSnapshot.data() as ProductDocumentData;
-  
+
         // Check sale preferences for maxQuantity limit
         const salePrefsResult = await fetchSalePreferencesBatch([productId]);
         const salePrefs = salePrefsResult[productId];
-        
+
         if (salePrefs?.maxQuantity) {
           if (isCurrentlyInCart) {
             const currentCartItem = cartItemsCacheRef.current[productId];
             const currentQuantity = currentCartItem?.quantity || 0;
             const totalQuantity = currentQuantity + quantity;
-            
+
             if (totalQuantity > salePrefs.maxQuantity) {
               return `Cannot add more. Maximum allowed: ${salePrefs.maxQuantity}`;
             }
@@ -869,55 +897,78 @@ export const CartProvider: React.FC<CartProviderProps> = ({
             }
           }
         }
-  
+
         // Apply optimistic update immediately
         await applyOptimisticUpdate(productId, true, quantity, attributes);
-  
+
         // Fetch bundle info and seller details
         const bundleData = await fetchActiveBundleForProduct(productId);
-        const sellerInfo = await fetchSellerInfo(prodRef[productId]!, productData);
-  
+        const sellerInfo = await fetchSellerInfo(
+          prodRef[productId]!,
+          productData
+        );
+
         // Run transaction - ONLY ADD, NO TOGGLE
         const result = await runTransaction(db, async (transaction) => {
           const cartRef = doc(db, "users", user.uid, "cart", productId);
           const prodSnap = await transaction.get(prodRef[productId]!);
-          
+
           if (!prodSnap.exists()) return "Product not found";
           const txProductData = prodSnap.data() as ProductDocumentData;
-  
+
           const cartSnap = await transaction.get(cartRef);
-  
+
           if (cartSnap.exists()) {
             // Update existing item quantity instead of toggling
             const existingData = cartSnap.data();
             const newQuantity = (existingData?.quantity || 0) + quantity;
-            
+
             // Check max quantity again in transaction
             if (salePrefs?.maxQuantity && newQuantity > salePrefs.maxQuantity) {
               return `Cannot add more. Maximum allowed: ${salePrefs.maxQuantity}`;
             }
-            
+
             transaction.update(cartRef, {
               quantity: newQuantity,
               updatedAt: serverTimestamp(),
             });
-            
+
             return "Updated cart quantity";
           } else {
             // Add new item to cart
-            const unitPrice = bundleData?.bundlePrice ?? txProductData.price ?? 0;
-  
+            const unitPrice =
+              bundleData?.bundlePrice ?? txProductData.price ?? 0;
+
+            // After fetching sellerInfo, add this:
+            let commissionRate = 0.0;
+            if (sellerInfo.isShop) {
+              const shopId = txProductData.shopId ?? txProductData.ownerId;
+              if (shopId) {
+                try {
+                  const shopDoc = await getDoc(doc(db, "shops", shopId));
+                  if (shopDoc.exists()) {
+                    commissionRate = shopDoc.data()?.ourComission || 0.0;
+                  }
+                } catch (error) {
+                  console.error("Error fetching shop commission:", error);
+                }
+              }
+            } else {
+              commissionRate = 10.0; // Static for user products
+            }
+
             const cartData: Record<string, unknown> = {
               addedAt: serverTimestamp(),
               updatedAt: serverTimestamp(),
               quantity,
               unitPrice,
               currency: txProductData.currency || "TL",
+              ourComission: commissionRate,
               sellerId: sellerInfo.sellerId,
               sellerName: sellerInfo.sellerName,
               isShop: sellerInfo.isShop,
             };
-  
+
             // Add bundle flag if applicable
             if (bundleData) {
               cartData.isBundle = true;
@@ -925,35 +976,35 @@ export const CartProvider: React.FC<CartProviderProps> = ({
                 cartData.bundleId = bundleData.bundleId;
               }
             }
-  
+
             // Copy product attributes
             if (txProductData.attributes) {
               Object.entries(txProductData.attributes).forEach(([k, v]) => {
                 cartData[k] = v;
               });
             }
-  
+
             // Add UI-selected attributes
             if (attributes) {
               Object.entries(attributes).forEach(([k, v]) => {
                 cartData[k] = v;
               });
             }
-  
+
             transaction.set(cartRef, cartData);
-  
+
             transaction.update(prodRef[productId]!, {
               cartCount: increment(1),
               metricsUpdatedAt: serverTimestamp(),
             });
-  
+
             return "Added to cart";
           }
         });
-  
+
         // Clear optimistic state on success
         clearOptimisticState(productId);
-  
+
         return result;
       } catch (error) {
         console.error("Cart operation error:", error);
@@ -983,89 +1034,92 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   );
 
   // Replace your current removeFromCart function with this dedicated removal logic
-const removeFromCart = useCallback(
-  async (productId: string): Promise<string> => {
-    const operationId = `remove_${productId}_${Date.now()}`;
-    
-    if (!user) return "Please log in";
-    if (!productId.trim()) return "Invalid product ID";
-    if (operationIdsRef.current.has(productId)) return "Operation in progress";
-    
-    operationIdsRef.current.set(productId, operationId);
+  const removeFromCart = useCallback(
+    async (productId: string): Promise<string> => {
+      const operationId = `remove_${productId}_${Date.now()}`;
 
-    try {
-      const isCurrentlyInCart = cartProductIds.has(productId);
-      
-      if (!isCurrentlyInCart) {
-        return "Item not in cart";
-      }
+      if (!user) return "Please log in";
+      if (!productId.trim()) return "Invalid product ID";
+      if (operationIdsRef.current.has(productId))
+        return "Operation in progress";
 
-      // Get product document reference for metrics update
-      const prodRef = await getProductDocument([productId]);
-      if (!prodRef[productId]) {
-        return "Product not found";
-      }
+      operationIdsRef.current.set(productId, operationId);
 
-      // Apply optimistic removal immediately
-      await applyOptimisticUpdate(productId, false, 0);
+      try {
+        const isCurrentlyInCart = cartProductIds.has(productId);
 
-      // Run transaction to remove from cart
-      const result = await runTransaction(db, async (transaction) => {
-        const cartRef = doc(db, "users", user.uid, "cart", productId);
-        const cartSnap = await transaction.get(cartRef);
-
-        if (!cartSnap.exists()) {
+        if (!isCurrentlyInCart) {
           return "Item not in cart";
         }
 
-        // Delete from cart
-        transaction.delete(cartRef);
-
-        // Update product metrics
-        if (prodRef[productId]) {
-          transaction.update(prodRef[productId]!, {
-            cartCount: increment(-1),
-            metricsUpdatedAt: serverTimestamp(),
-          });
+        // Get product document reference for metrics update
+        const prodRef = await getProductDocument([productId]);
+        if (!prodRef[productId]) {
+          return "Product not found";
         }
 
-        return "Removed from cart";
-      });
+        // Apply optimistic removal immediately
+        await applyOptimisticUpdate(productId, false, 0);
 
-      // Clear optimistic state on success
-      clearOptimisticState(productId);
+        // Run transaction to remove from cart
+        const result = await runTransaction(db, async (transaction) => {
+          const cartRef = doc(db, "users", user.uid, "cart", productId);
+          const cartSnap = await transaction.get(cartRef);
 
-      return result;
-    } catch (error) {
-      console.error("Remove from cart error:", error);
-      // Rollback optimistic removal
-      rollbackOptimisticUpdate(productId, false);
-      return `Failed to remove from cart: ${error}`;
-    } finally {
-      setTimeout(() => {
-        if (operationIdsRef.current.get(productId) === operationId) {
-          operationIdsRef.current.delete(productId);
-        }
-      }, 5000);
-    }
-  },
-  [
-    user,
-    cartProductIds,
-    getProductDocument,
-    applyOptimisticUpdate,
-    db,
-    clearOptimisticState,
-    rollbackOptimisticUpdate,
-  ]
-);  
+          if (!cartSnap.exists()) {
+            return "Item not in cart";
+          }
+
+          // Delete from cart
+          transaction.delete(cartRef);
+
+          // Update product metrics
+          if (prodRef[productId]) {
+            transaction.update(prodRef[productId]!, {
+              cartCount: increment(-1),
+              metricsUpdatedAt: serverTimestamp(),
+            });
+          }
+
+          return "Removed from cart";
+        });
+
+        // Clear optimistic state on success
+        clearOptimisticState(productId);
+
+        return result;
+      } catch (error) {
+        console.error("Remove from cart error:", error);
+        // Rollback optimistic removal
+        rollbackOptimisticUpdate(productId, false);
+        return `Failed to remove from cart: ${error}`;
+      } finally {
+        setTimeout(() => {
+          if (operationIdsRef.current.get(productId) === operationId) {
+            operationIdsRef.current.delete(productId);
+          }
+        }, 5000);
+      }
+    },
+    [
+      user,
+      cartProductIds,
+      getProductDocument,
+      applyOptimisticUpdate,
+      db,
+      clearOptimisticState,
+      rollbackOptimisticUpdate,
+    ]
+  );
 
   const incrementQuantity = useCallback(
     async (productId: string): Promise<string> => {
       if (!user) return "Please log in";
 
       try {
-        const cartDoc = await getDoc(doc(db, "users", user.uid, "cart", productId));
+        const cartDoc = await getDoc(
+          doc(db, "users", user.uid, "cart", productId)
+        );
         if (!cartDoc.exists()) return "Item not in cart";
 
         const currentQty = cartDoc.data()?.quantity || 1;
@@ -1082,7 +1136,9 @@ const removeFromCart = useCallback(
       if (!user) return "Please log in";
 
       try {
-        const cartDoc = await getDoc(doc(db, "users", user.uid, "cart", productId));
+        const cartDoc = await getDoc(
+          doc(db, "users", user.uid, "cart", productId)
+        );
         if (!cartDoc.exists()) return "Item not in cart";
 
         const currentQty = cartDoc.data()?.quantity || 1;
@@ -1104,7 +1160,9 @@ const removeFromCart = useCallback(
       // Optimistic UI update
       if (isInitialized) {
         const current = [...cartItems];
-        const filtered = current.filter(it => !productIds.includes(it.productId));
+        const filtered = current.filter(
+          (it) => !productIds.includes(it.productId)
+        );
         setCartItems(filtered);
       }
 
@@ -1134,7 +1192,7 @@ const removeFromCart = useCallback(
 
       if (snapshot.empty) return "Cart is already empty";
 
-      const productIds = snapshot.docs.map(doc => doc.id);
+      const productIds = snapshot.docs.map((doc) => doc.id);
       return await removeMultipleFromCart(productIds);
     } catch (error) {
       return `Failed to clear cart: ${error}`;
@@ -1142,7 +1200,9 @@ const removeFromCart = useCallback(
   }, [user, db, removeMultipleFromCart]);
 
   const validateForPayment = useCallback(
-    async (selectedProductIds: string[]): Promise<{
+    async (
+      selectedProductIds: string[]
+    ): Promise<{
       isValid: boolean;
       errors: Record<string, string>;
     }> => {
@@ -1159,7 +1219,7 @@ const removeFromCart = useCallback(
         );
 
         const productDataMap: Record<string, ProductDocumentData> = {};
-        snapshot.docs.forEach(doc => {
+        snapshot.docs.forEach((doc) => {
           productDataMap[doc.id] = doc.data();
         });
 
@@ -1190,7 +1250,9 @@ const removeFromCart = useCallback(
   );
 
   const calculateIndividualItemTotal = useCallback(
-    (cartItem: CartItem): {
+    (
+      cartItem: CartItem
+    ): {
       total: number;
       currency: string;
       item: CartItemTotal;
@@ -1208,39 +1270,49 @@ const removeFromCart = useCallback(
           },
         };
       }
-  
+
       const cartData = cartItem.cartData;
       const quantity = cartItem.quantity || 1;
       const salePreferences = cartItem.salePreferences;
-  
+
       // Get base unit price - EXACT Flutter logic
       let unitPrice: number;
       // Flutter: cartData['isBundle'] == true ? (cartData['unitPrice'] as num?)?.toDouble() ?? product.price : product.price;
       if (cartData.isBundle === true) {
-        unitPrice = typeof cartData.unitPrice === 'number' ? cartData.unitPrice : product.price;
+        unitPrice =
+          typeof cartData.unitPrice === "number"
+            ? cartData.unitPrice
+            : product.price;
       } else {
         unitPrice = product.price;
       }
-  
+
       // Apply sale preference discount if applicable - EXACT Flutter logic
       if (salePreferences) {
         const discountThreshold = salePreferences.discountThreshold;
         const discountPercentage = salePreferences.discountPercentage;
-        
-        if (discountThreshold != null && 
-            discountPercentage != null && 
-            quantity >= discountThreshold) {
+
+        if (
+          discountThreshold != null &&
+          discountPercentage != null &&
+          quantity >= discountThreshold
+        ) {
           // Apply discount to unit price
-          unitPrice = unitPrice * (1 - (discountPercentage / 100));
-          console.log(`🎯 Applied sale preference discount: ${discountPercentage}% for product ${product.id}`);
+          unitPrice = unitPrice * (1 - discountPercentage / 100);
+          console.log(
+            `🎯 Applied sale preference discount: ${discountPercentage}% for product ${product.id}`
+          );
         }
       }
-  
+
       const itemTotal = unitPrice * quantity;
-  
+
       return {
         total: itemTotal,
-        currency: product.currency && product.currency.length > 0 ? product.currency : "TL",
+        currency:
+          product.currency && product.currency.length > 0
+            ? product.currency
+            : "TL",
         item: {
           productId: product.id,
           quantity,
@@ -1251,82 +1323,93 @@ const removeFromCart = useCallback(
     },
     []
   );
-  
+
   // Fixed calculateCartTotals function for React CartProvider
   const calculateCartTotals = useCallback(
     async (selectedProductIds?: string[]): Promise<CartTotals> => {
       if (!user) {
         return { subtotal: 0, total: 0, currency: "TL", items: [] };
       }
-  
+
       try {
         const currentCartItems = cartItems;
         if (currentCartItems.length === 0) {
           return { subtotal: 0, total: 0, currency: "TL", items: [] };
         }
-  
+
         let itemsToCalculate: CartItem[];
-  
+
         if (selectedProductIds && selectedProductIds.length > 0) {
-          itemsToCalculate = currentCartItems.filter(item =>
+          itemsToCalculate = currentCartItems.filter((item) =>
             selectedProductIds.includes(item.product?.id || "")
           );
         } else {
           itemsToCalculate = currentCartItems;
         }
-  
+
         if (itemsToCalculate.length === 0) {
           return { subtotal: 0, total: 0, currency: "TL", items: [] };
         }
-  
-        console.log(`💰 Calculating totals for ${itemsToCalculate.length} items (with bundle optimization)`);
-  
+
+        console.log(
+          `💰 Calculating totals for ${itemsToCalculate.length} items (with bundle optimization)`
+        );
+
         // Filter out out-of-stock items first - EXACT Flutter logic
         const inStockItems: CartItem[] = [];
         for (const item of itemsToCalculate) {
           const product = item.product;
           if (!product) continue;
-  
+
           const cartData = item.cartData;
           const selectedColor = cartData.selectedColor as string;
-  
+
           let availableStock: number;
           // EXACT Flutter condition: selectedColor != null && selectedColor.isNotEmpty && selectedColor != 'default' && product.colorQuantities.containsKey(selectedColor)
-          if (selectedColor != null && 
-              selectedColor !== "" && 
-              selectedColor !== "default" && 
-              product.colorQuantities && 
-              Object.prototype.hasOwnProperty.call(product.colorQuantities, selectedColor)) {
+          if (
+            selectedColor != null &&
+            selectedColor !== "" &&
+            selectedColor !== "default" &&
+            product.colorQuantities &&
+            Object.prototype.hasOwnProperty.call(
+              product.colorQuantities,
+              selectedColor
+            )
+          ) {
             availableStock = product.colorQuantities[selectedColor] || 0;
           } else {
             availableStock = product.quantity;
           }
-  
+
           if (availableStock > 0) {
             inStockItems.push(item);
           } else {
-            console.log(`⏭️ Skipping out-of-stock product: ${product.productName}`);
+            console.log(
+              `⏭️ Skipping out-of-stock product: ${product.productName}`
+            );
           }
         }
-  
+
         if (inStockItems.length === 0) {
           return { subtotal: 0, total: 0, currency: "TL", items: [] };
         }
-  
+
         // Group items by bundleId for bundle detection - EXACT Flutter logic
         const bundleGroups: Record<string, CartItem[]> = {};
         const individualItems: CartItem[] = [];
-  
+
         for (const item of inStockItems) {
           const product = item.product;
           if (!product) continue;
-  
+
           // CRITICAL: This is the exact Flutter condition
           // bundleIds != null && bundleIds.isNotEmpty && product.bundlePrice != null
-          if (product.bundleIds != null && 
-              Array.isArray(product.bundleIds) && 
-              product.bundleIds.length > 0 && 
-              product.bundlePrice != null) {
+          if (
+            product.bundleIds != null &&
+            Array.isArray(product.bundleIds) &&
+            product.bundleIds.length > 0 &&
+            product.bundlePrice != null
+          ) {
             const bundleId = product.bundleIds[0]; // Flutter: bundleIds.first
             if (!bundleGroups[bundleId]) {
               bundleGroups[bundleId] = [];
@@ -1336,62 +1419,72 @@ const removeFromCart = useCallback(
             individualItems.push(item);
           }
         }
-  
+
         let subtotal = 0;
         const items: CartItemTotal[] = [];
         let currency = "TL";
         const processedBundles = new Set<string>();
-  
+
         // Process bundle groups - EXACT Flutter logic
         for (const [bundleId, bundleItems] of Object.entries(bundleGroups)) {
           if (bundleItems.length >= 2 && !processedBundles.has(bundleId)) {
             // Calculate minimum quantity across all bundle products
-            const minQuantity = Math.min(...bundleItems.map(item => item.quantity));
-            
+            const minQuantity = Math.min(
+              ...bundleItems.map((item) => item.quantity)
+            );
+
             if (minQuantity > 0) {
               const firstProduct = bundleItems[0].product!;
               const bundlePrice = firstProduct.bundlePrice || 0;
-              
+
               if (bundlePrice > 0) {
                 processedBundles.add(bundleId);
-                
+
                 // Process each bundle item with hybrid pricing - EXACT Flutter logic
                 for (const item of bundleItems) {
                   const product = item.product!;
                   const totalQuantity = item.quantity;
-                  
+
                   // Bundle portion (no sale preferences applied)
                   const bundlePortion = minQuantity;
-                  const bundleItemCost = (bundlePrice / bundleItems.length) * bundlePortion;
-                  
+                  const bundleItemCost =
+                    (bundlePrice / bundleItems.length) * bundlePortion;
+
                   // Extra portion (check sale preferences based on TOTAL quantity)
                   const extraQuantity = totalQuantity - bundlePortion;
                   let extraCost = 0;
-                  
+
                   if (extraQuantity > 0) {
                     let extraUnitPrice = product.price;
-                    
+
                     // Apply sale preferences based on TOTAL quantity, not just extra
                     const salePreferences = item.salePreferences;
                     if (salePreferences) {
-                      const discountThreshold = salePreferences.discountThreshold;
-                      const discountPercentage = salePreferences.discountPercentage;
-                      
+                      const discountThreshold =
+                        salePreferences.discountThreshold;
+                      const discountPercentage =
+                        salePreferences.discountPercentage;
+
                       // Check if TOTAL quantity meets threshold (exact Flutter logic)
-                      if (discountThreshold != null && 
-                          discountPercentage != null && 
-                          totalQuantity >= discountThreshold) {
-                        extraUnitPrice = extraUnitPrice * (1 - (discountPercentage / 100));
-                        console.log(`🎯 Applied sale preference to extra quantity: ${discountPercentage}% for ${product.id} (total qty: ${totalQuantity})`);
+                      if (
+                        discountThreshold != null &&
+                        discountPercentage != null &&
+                        totalQuantity >= discountThreshold
+                      ) {
+                        extraUnitPrice =
+                          extraUnitPrice * (1 - discountPercentage / 100);
+                        console.log(
+                          `🎯 Applied sale preference to extra quantity: ${discountPercentage}% for ${product.id} (total qty: ${totalQuantity})`
+                        );
                       }
                     }
-                    
+
                     extraCost = extraUnitPrice * extraQuantity;
                   }
-                  
+
                   const totalItemCost = bundleItemCost + extraCost;
                   subtotal += totalItemCost;
-                  
+
                   items.push({
                     productId: product.id,
                     quantity: totalQuantity,
@@ -1400,42 +1493,49 @@ const removeFromCart = useCallback(
                     isBundleItem: bundlePortion > 0,
                   });
                 }
-                
+
                 if (items.length === 1) {
-                  currency = firstProduct.currency.length > 0 ? firstProduct.currency : "TL";
+                  currency =
+                    firstProduct.currency.length > 0
+                      ? firstProduct.currency
+                      : "TL";
                 }
-                
-                console.log(`🎁 Applied hybrid bundle pricing for ${bundleId}: ${bundlePrice} + extras`);
+
+                console.log(
+                  `🎁 Applied hybrid bundle pricing for ${bundleId}: ${bundlePrice} + extras`
+                );
                 continue;
               }
             }
           }
-          
+
           // Bundle not valid or no stock - calculate individually with sale preferences
           for (const item of bundleItems) {
             const itemTotal = calculateIndividualItemTotal(item);
             subtotal += itemTotal.total;
             items.push(itemTotal.item);
-            
+
             if (items.length === 1) {
               currency = itemTotal.currency;
             }
           }
         }
-  
+
         // Process individual (non-bundle) items
         for (const item of individualItems) {
           const itemTotal = calculateIndividualItemTotal(item);
           subtotal += itemTotal.total;
           items.push(itemTotal.item);
-  
+
           if (items.length === 1) {
             currency = itemTotal.currency;
           }
         }
-  
-        console.log(`💰 Total calculation complete: ${subtotal} ${currency} for ${items.length} items`);
-  
+
+        console.log(
+          `💰 Total calculation complete: ${subtotal} ${currency} for ${items.length} items`
+        );
+
         return {
           subtotal,
           total: subtotal,
@@ -1449,7 +1549,6 @@ const removeFromCart = useCallback(
     },
     [user, cartItems, calculateIndividualItemTotal]
   );
-
 
   // Load cart page implementation
   const loadCartPage = useCallback(
@@ -1490,14 +1589,14 @@ const removeFromCart = useCallback(
   // Process cart items from docs
   const processCartItemsFromDocs = useCallback(
     async (cartDocs: DocumentSnapshot[]): Promise<void> => {
-      const productIds = cartDocs.map(doc => doc.id);
+      const productIds = cartDocs.map((doc) => doc.id);
       const productDetails = await fetchProductDetailsBatch(productIds);
       const salePreferencesMap = await fetchSalePreferencesBatch(productIds);
 
       const existingItems = new Map<string, CartItem>();
       cartItems
-        .filter(item => !item.isOptimistic)
-        .forEach(item => existingItems.set(item.productId, item));
+        .filter((item) => !item.isOptimistic)
+        .forEach((item) => existingItems.set(item.productId, item));
 
       for (const cartDoc of cartDocs) {
         const data = cartDoc.data();
@@ -1524,7 +1623,10 @@ const removeFromCart = useCallback(
             isOptimistic: false,
             quantity,
             salePreferences,
-            selectedColorImage: resolveColorImage(productDetail, cartData.selectedColor as string),
+            selectedColorImage: resolveColorImage(
+              productDetail,
+              cartData.selectedColor as string
+            ),
             sellerName: cartData.sellerName,
             sellerId: cartData.sellerId,
             isShop: cartData.isShop,
@@ -1542,7 +1644,13 @@ const removeFromCart = useCallback(
 
       setCartItems(sortedItems);
     },
-    [cartItems, fetchProductDetailsBatch, fetchSalePreferencesBatch, isSystemField, resolveColorImage]
+    [
+      cartItems,
+      fetchProductDetailsBatch,
+      fetchSalePreferencesBatch,
+      isSystemField,
+      resolveColorImage,
+    ]
   );
 
   const initializeCartIfNeeded = useCallback(async (): Promise<void> => {
@@ -1610,16 +1718,20 @@ const removeFromCart = useCallback(
     []
   );
 
-  const getCachedCartItem = useCallback((productId: string): CartData | null => {
-    if (
-      lastCacheUpdateRef.current &&
-      Date.now() - lastCacheUpdateRef.current.getTime() < CACHE_VALID_DURATION &&
-      cartItemsCacheRef.current[productId]
-    ) {
-      return { ...cartItemsCacheRef.current[productId] };
-    }
-    return null;
-  }, []);
+  const getCachedCartItem = useCallback(
+    (productId: string): CartData | null => {
+      if (
+        lastCacheUpdateRef.current &&
+        Date.now() - lastCacheUpdateRef.current.getTime() <
+          CACHE_VALID_DURATION &&
+        cartItemsCacheRef.current[productId]
+      ) {
+        return { ...cartItemsCacheRef.current[productId] };
+      }
+      return null;
+    },
+    []
+  );
 
   // Main effect for cart subscription
   useEffect(() => {
@@ -1668,68 +1780,69 @@ const removeFromCart = useCallback(
       if (batchUpdateTimerRef.current) {
         clearTimeout(batchUpdateTimerRef.current);
       }
-      optimisticTimersRef.current.forEach(timer => clearTimeout(timer));
+      optimisticTimersRef.current.forEach((timer) => clearTimeout(timer));
     };
   }, []);
 
-  const contextValue = useMemo<CartContextType>(() => ({
-    // State
-    cartCount,
-    cartProductIds,
-    cartItems,
-    isLoading,
-    isLoadingMore,
-    hasMore,
-    isInitialized,
+  const contextValue = useMemo<CartContextType>(
+    () => ({
+      // State
+      cartCount,
+      cartProductIds,
+      cartItems,
+      isLoading,
+      isLoadingMore,
+      hasMore,
+      isInitialized,
 
-    // Methods
-    addToCart,
-    removeFromCart,
-    updateQuantity,
-    incrementQuantity,
-    decrementQuantity,
-    clearCart,
-    removeMultipleFromCart,
-    initializeCartIfNeeded,
-    loadMoreItems,
-    calculateCartTotals,
-    validateForPayment,
-    refresh,
+      // Methods
+      addToCart,
+      removeFromCart,
+      updateQuantity,
+      incrementQuantity,
+      decrementQuantity,
+      clearCart,
+      removeMultipleFromCart,
+      initializeCartIfNeeded,
+      loadMoreItems,
+      calculateCartTotals,
+      validateForPayment,
+      refresh,
 
-    // Utilities
-    isInCart,
-    isOptimisticallyAdding,
-    isOptimisticallyRemoving,
-    getCachedCartItem,
-  }), [
-    cartCount,
-    cartProductIds,
-    cartItems,
-    isLoading,
-    isLoadingMore,
-    hasMore,
-    isInitialized,
-    addToCart,
-    removeFromCart,
-    updateQuantity,
-    incrementQuantity,
-    decrementQuantity,
-    clearCart,
-    removeMultipleFromCart,
-    initializeCartIfNeeded,
-    loadMoreItems,
-    calculateCartTotals,
-    validateForPayment,
-    refresh,
-    isInCart,
-    isOptimisticallyAdding,
-    isOptimisticallyRemoving,
-    getCachedCartItem,
-  ]);
+      // Utilities
+      isInCart,
+      isOptimisticallyAdding,
+      isOptimisticallyRemoving,
+      getCachedCartItem,
+    }),
+    [
+      cartCount,
+      cartProductIds,
+      cartItems,
+      isLoading,
+      isLoadingMore,
+      hasMore,
+      isInitialized,
+      addToCart,
+      removeFromCart,
+      updateQuantity,
+      incrementQuantity,
+      decrementQuantity,
+      clearCart,
+      removeMultipleFromCart,
+      initializeCartIfNeeded,
+      loadMoreItems,
+      calculateCartTotals,
+      validateForPayment,
+      refresh,
+      isInCart,
+      isOptimisticallyAdding,
+      isOptimisticallyRemoving,
+      getCachedCartItem,
+    ]
+  );
 
   return (
-    <CartContext.Provider value={contextValue}>
-      {children}
-    </CartContext.Provider>
+    <CartContext.Provider value={contextValue}>{children}</CartContext.Provider>
   );
 };
