@@ -729,21 +729,22 @@ export default function ProductPaymentPage() {
 
       console.log("✅ Payment initialized, redirecting to İşbank...");
 
-      // Navigate to İşbank payment page
-      const locale =
-        window.location.pathname.split("/").filter(Boolean)[0] || "en";
+      const pathSegments = window.location.pathname.split("/").filter(Boolean);
+      const locale = pathSegments[0] || "en";
+
+      // Build absolute URL
       const targetUrl =
-        `/${locale}/isbankpayment?` +
+        `${window.location.origin}/${locale}/isbankpayment?` +
         `gatewayUrl=${encodeURIComponent(initData.gatewayUrl)}` +
         `&orderNumber=${encodeURIComponent(orderNumber)}` +
         `&paymentParams=${encodeURIComponent(
           JSON.stringify(initData.paymentParams)
         )}`;
 
-      console.log("🎯 Navigating to:", targetUrl);
+      console.log("🎯 Full target URL:", targetUrl);
 
-      // Use string path - App Router will handle it correctly
-      router.push(targetUrl);
+      // Use window.location.href for guaranteed absolute navigation
+      window.location.href = targetUrl;
     } catch (error: unknown) {
       console.error("Payment error:", error);
       const errorMessage =
