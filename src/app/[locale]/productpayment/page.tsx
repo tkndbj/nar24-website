@@ -3,21 +3,19 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   ArrowLeft,
-  CreditCard,
   MapPin,
   ChevronDown,
   X,
   Map,
   Loader2,
   Lock,
-  Calendar,
-  User,
   Phone,
   Home,
   Building,
   Shield,
   CheckCircle2,
   Star,
+  Package,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useUser } from "@/context/UserProvider";
@@ -29,13 +27,6 @@ import { functions } from "@/lib/firebase";
 import regionsList from "@/constants/regions";
 
 // Types
-interface PaymentMethod {
-  id: string;
-  cardNumber: string;
-  expiryDate: string;
-  cardHolderName: string;
-}
-
 interface Address {
   id: string;
   addressLine1: string;
@@ -54,25 +45,28 @@ interface CartItem {
   price?: number;
   productName?: string;
   currency?: string;
+  [key: string]: string | number | boolean | string[] | undefined; // For dynamic attributes
 }
 
 interface FormData {
-  // Payment
-  cardNumber: string;
-  expiryDate: string;
-  cvv: string;
-  cardHolderName: string;
-  savePaymentDetails: boolean;
-
-  // Address
   addressLine1: string;
   addressLine2: string;
   phoneNumber: string;
   city: string;
   saveAddress: boolean;
-
-  // Location
   location: { latitude: number; longitude: number } | null;
+}
+
+interface PaymentItemPayload {
+  productId: string;
+  quantity: number;
+  [key: string]: string | number | boolean | string[] | undefined;
+}
+
+interface PaymentInitResponse {
+  success: boolean;
+  gatewayUrl: string;
+  paymentParams: Record<string, string | number>;
 }
 
 // Load Google Maps script
@@ -360,6 +354,78 @@ const LocationPickerModal: React.FC<{
   );
 };
 
+// Delivery Option Component
+const DeliveryOption: React.FC<{
+  id: string;
+  title: string;
+  description: string;
+  price: number;
+  selected: boolean;
+  onSelect: () => void;
+  isDarkMode: boolean;
+  icon: React.ReactNode;
+}> = ({ title, description, price, selected, onSelect, isDarkMode, icon }) => {
+  return (
+    <button
+      onClick={onSelect}
+      className={`w-full p-4 sm:p-5 rounded-xl border-2 transition-all duration-200 text-left ${
+        selected
+          ? isDarkMode
+            ? "border-blue-500 bg-blue-500/10 shadow-lg"
+            : "border-blue-500 bg-blue-50 shadow-lg"
+          : isDarkMode
+          ? "border-gray-700 hover:border-gray-600 hover:bg-gray-700/50"
+          : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+      }`}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-3 sm:space-x-4">
+          <div
+            className={`p-2.5 sm:p-3 rounded-xl ${
+              selected
+                ? "bg-blue-500/20"
+                : isDarkMode
+                ? "bg-gray-700"
+                : "bg-gray-100"
+            }`}
+          >
+            {icon}
+          </div>
+          <div>
+            <p
+              className={`text-sm sm:text-base font-semibold ${
+                isDarkMode ? "text-white" : "text-gray-900"
+              }`}
+            >
+              {title}
+            </p>
+            <p
+              className={`text-xs sm:text-sm mt-1 ${
+                isDarkMode ? "text-gray-400" : "text-gray-600"
+              }`}
+            >
+              {description}
+            </p>
+          </div>
+        </div>
+        <div className="text-right">
+          <p
+            className={`text-base sm:text-lg font-bold ${
+              price === 0
+                ? "text-green-500"
+                : isDarkMode
+                ? "text-white"
+                : "text-gray-900"
+            }`}
+          >
+            {price === 0 ? "Ücretsiz" : `${price.toFixed(2)} TL`}
+          </p>
+        </div>
+      </div>
+    </button>
+  );
+};
+
 // Main Payment Page Component
 export default function ProductPaymentPage() {
   const router = useRouter();
@@ -367,17 +433,13 @@ export default function ProductPaymentPage() {
   const { user, isLoading: userLoading } = useUser();
   const t = useTranslations("ProductPayment");
 
-  // Get cart items from URL params or localStorage
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [totalPrice, setTotalPrice] = useState(0);
   const [agreesToContract, setAgreesToContract] = useState(false);
-  // Form state
+  const [selectedDeliveryOption, setSelectedDeliveryOption] =
+    useState<string>("normal");
+
   const [formData, setFormData] = useState<FormData>({
-    cardNumber: "",
-    expiryDate: "",
-    cvv: "",
-    cardHolderName: "",
-    savePaymentDetails: false,
     addressLine1: "",
     addressLine2: "",
     phoneNumber: "",
@@ -386,33 +448,21 @@ export default function ProductPaymentPage() {
     location: null,
   });
 
-  // UI state
   const [isAddressExpanded, setIsAddressExpanded] = useState(true);
-  const [isPaymentExpanded, setIsPaymentExpanded] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
-  // Saved data
-  const [savedPaymentMethods, setSavedPaymentMethods] = useState<
-    PaymentMethod[]
-  >([]);
   const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
-  const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<
-    string | null
-  >(null);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(
     null
   );
 
-  // Dropdowns and modals
   const [showCityDropdown, setShowCityDropdown] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
   const [mapsLoaded, setMapsLoaded] = useState(false);
 
-  // Error handling
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Load Google Maps
   useEffect(() => {
     if (typeof window !== "undefined") {
       loadGoogleMapsScript()
@@ -421,7 +471,6 @@ export default function ProductPaymentPage() {
     }
   }, []);
 
-  // Detect dark mode
   useEffect(() => {
     const checkDarkMode = () => {
       setIsDarkMode(document.documentElement.classList.contains("dark"));
@@ -432,22 +481,18 @@ export default function ProductPaymentPage() {
     return () => observer.disconnect();
   }, []);
 
-  // Load cart items
   useEffect(() => {
-    // Get total from URL params first
     const totalParam = searchParams.get("total");
     const itemsParam = searchParams.get("items");
-    
+
     if (itemsParam) {
       try {
         const items = JSON.parse(decodeURIComponent(itemsParam));
         setCartItems(items);
-  
-        // ✅ USE THE TOTAL FROM URL PARAMS (already calculated by CartDrawer)
+
         if (totalParam) {
           setTotalPrice(parseFloat(totalParam));
         } else {
-          // Fallback: calculate if total param is missing
           const total = items.reduce((sum: number, item: CartItem) => {
             return sum + (item.price || 0) * item.quantity;
           }, 0);
@@ -458,20 +503,17 @@ export default function ProductPaymentPage() {
         router.push("/");
       }
     } else {
-      // Try localStorage as fallback
       const savedCart = localStorage.getItem("cartItems");
       const savedTotal = localStorage.getItem("cartTotal");
-      
+
       if (savedCart) {
         try {
           const items = JSON.parse(savedCart);
           setCartItems(items);
-  
-          // ✅ USE THE SAVED TOTAL FROM localStorage
+
           if (savedTotal) {
             setTotalPrice(parseFloat(savedTotal));
           } else {
-            // Fallback: calculate if savedTotal is missing
             const total = items.reduce((sum: number, item: CartItem) => {
               return sum + (item.price || 0) * item.quantity;
             }, 0);
@@ -487,31 +529,11 @@ export default function ProductPaymentPage() {
     }
   }, [searchParams, router]);
 
-  // Load saved payment methods and addresses
   useEffect(() => {
     if (user) {
-      loadSavedPaymentMethods();
       loadSavedAddresses();
     }
   }, [user]);
-
-  const loadSavedPaymentMethods = async () => {
-    if (!user) return;
-
-    try {
-      const methodsRef = collection(db, "users", user.uid, "paymentMethods");
-      const snapshot = await getDocs(methodsRef);
-
-      const methods: PaymentMethod[] = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as PaymentMethod[];
-
-      setSavedPaymentMethods(methods);
-    } catch (error) {
-      console.error("Error loading payment methods:", error);
-    }
-  };
 
   const loadSavedAddresses = async () => {
     if (!user) return;
@@ -531,7 +553,6 @@ export default function ProductPaymentPage() {
     }
   };
 
-  // Form handlers
   const handleInputChange = (
     field: keyof FormData,
     value: string | boolean | { latitude: number; longitude: number } | null
@@ -539,31 +560,6 @@ export default function ProductPaymentPage() {
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: "" }));
-    }
-  };
-
-  const handlePaymentMethodSelect = (methodId: string | null) => {
-    setSelectedPaymentMethodId(methodId);
-
-    if (methodId) {
-      const method = savedPaymentMethods.find((m) => m.id === methodId);
-      if (method) {
-        setFormData((prev) => ({
-          ...prev,
-          cardNumber: method.cardNumber,
-          expiryDate: method.expiryDate,
-          cardHolderName: method.cardHolderName,
-          cvv: "", // CVV should not be saved
-        }));
-      }
-    } else {
-      setFormData((prev) => ({
-        ...prev,
-        cardNumber: "",
-        expiryDate: "",
-        cardHolderName: "",
-        cvv: "",
-      }));
     }
   };
 
@@ -594,11 +590,22 @@ export default function ProductPaymentPage() {
     }
   };
 
-  // Validation
+  const getDeliveryPrice = () => {
+    switch (selectedDeliveryOption) {
+      case "pickup":
+        return 60.0;
+      case "normal":
+        return totalPrice >= 2000.0 ? 0.0 : 5.0;
+      case "express":
+        return totalPrice >= 10000.0 ? 0.0 : 349.0;
+      default:
+        return 0.0;
+    }
+  };
+
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
-    // Address validation
     if (!formData.addressLine1.trim()) {
       newErrors.addressLine1 = t("fieldRequired");
     }
@@ -612,34 +619,14 @@ export default function ProductPaymentPage() {
       newErrors.location = t("pinLocationRequired");
     }
 
-    // Payment validation
-    if (!formData.cardNumber.trim()) {
-      newErrors.cardNumber = t("fieldRequired");
-    } else if (formData.cardNumber.trim().length < 12) {
-      newErrors.cardNumber = t("invalidCardNumber");
-    }
-
-    if (!formData.expiryDate.trim()) {
-      newErrors.expiryDate = t("fieldRequired");
-    } else if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(formData.expiryDate.trim())) {
-      newErrors.expiryDate = t("invalidExpiryDate");
-    }
-
-    if (!formData.cvv.trim()) {
-      newErrors.cvv = t("fieldRequired");
-    } else if (formData.cvv.trim().length < 3) {
-      newErrors.cvv = t("invalidCvv");
-    }
-
-    if (!formData.cardHolderName.trim()) {
-      newErrors.cardHolderName = t("fieldRequired");
+    if (!agreesToContract) {
+      newErrors.contract = t("mustAgreeToContract");
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  // Submit payment
   const handleSubmit = async () => {
     if (!user) {
       alert(t("pleaseLogin"));
@@ -653,10 +640,55 @@ export default function ProductPaymentPage() {
     setIsProcessing(true);
 
     try {
-      const processPurchase = httpsCallable(functions, "processPurchase");
+      // Prepare items payload - exactly like Flutter
+      const itemsPayload: PaymentItemPayload[] = cartItems.map((item) => {
+        const payload: PaymentItemPayload = {
+          productId: item.productId,
+          quantity: item.quantity,
+        };
 
-      await processPurchase({
-        items: cartItems,
+        // Add all dynamic attributes except system fields
+        const systemFields = new Set([
+          "product",
+          "quantity",
+          "addedAt",
+          "updatedAt",
+          "sellerId",
+          "sellerName",
+          "isShop",
+          "price",
+          "productName",
+          "currency",
+        ]);
+
+        Object.keys(item).forEach((key) => {
+          const value = item[key];
+          if (
+            !systemFields.has(key) &&
+            value != null &&
+            value !== "" &&
+            (!Array.isArray(value) ||
+              (Array.isArray(value) && value.length > 0))
+          ) {
+            payload[key] = value;
+          }
+        });
+
+        return payload;
+      });
+
+      const orderNumber = `ORDER-${Date.now()}`;
+
+      // Get user info
+      const customerName = user.displayName || user.email || "Customer";
+      const customerEmail = user.email || "";
+
+      // Prepare cart data for cloud function
+      const cartData = {
+        items: itemsPayload,
+        cartCalculatedTotal: totalPrice,
+        deliveryOption: selectedDeliveryOption,
+        deliveryPrice: getDeliveryPrice(),
         address: {
           addressLine1: formData.addressLine1,
           addressLine2: formData.addressLine2,
@@ -668,47 +700,53 @@ export default function ProductPaymentPage() {
           },
         },
         paymentMethod: "Card",
-        usePlayPoints: false,
-        savePaymentDetails: formData.savePaymentDetails,
         saveAddress: formData.saveAddress,
-        savedPaymentMethodId: selectedPaymentMethodId,
-        paymentMethodDetails: selectedPaymentMethodId
-          ? null
-          : {
-              cardNumber: formData.cardNumber,
-              expiryDate: formData.expiryDate,
-              cvv: formData.cvv,
-              cardHolderName: formData.cardHolderName,
-            },
+      };
+
+      console.log("🔍 Initializing İşbank payment with:", {
+        amount: totalPrice + getDeliveryPrice(),
+        orderNumber,
+        customerName,
+        customerEmail,
       });
 
-      // Success
-      alert(t("paymentSuccessful"));
+      // Initialize İşbank payment
+      const initPayment = httpsCallable(functions, "initializeIsbankPayment");
+      const initResponse = await initPayment({
+        amount: totalPrice + getDeliveryPrice(),
+        orderNumber,
+        customerName,
+        customerEmail,
+        customerPhone: formData.phoneNumber,
+        cartData,
+      });
 
-      // Clear cart and redirect
-      localStorage.removeItem("cartItems");
-      router.push("/orders");
+      const initData = initResponse.data as PaymentInitResponse;
+
+      if (initData?.success !== true) {
+        throw new Error("Payment initialization failed");
+      }
+
+      console.log("✅ Payment initialized, redirecting to İşbank...");
+
+      // Navigate to İşbank payment page
+      const locale = window.location.pathname.split("/")[1] || "en";
+      router.push(
+        `/${locale}/isbankpayment?` +
+          `gatewayUrl=${encodeURIComponent(initData.gatewayUrl)}` +
+          `&orderNumber=${encodeURIComponent(orderNumber)}` +
+          `&paymentParams=${encodeURIComponent(
+            JSON.stringify(initData.paymentParams)
+          )}`
+      );
     } catch (error: unknown) {
       console.error("Payment error:", error);
-      alert((error as Error).message || t("paymentFailed"));
+      const errorMessage =
+        error instanceof Error ? error.message : t("paymentFailed");
+      alert(errorMessage);
     } finally {
       setIsProcessing(false);
     }
-  };
-
-  // Format card number for display
-  const formatCardNumber = (cardNumber: string) => {
-    return cardNumber.replace(/(\d{4})(?=\d)/g, "$1 ");
-  };
-
-  // Format expiry date input
-  const handleExpiryDateChange = (value: string) => {
-    let formattedValue = value.replace(/\D/g, "");
-    if (formattedValue.length >= 3) {
-      formattedValue =
-        formattedValue.substring(0, 2) + "/" + formattedValue.substring(2, 4);
-    }
-    handleInputChange("expiryDate", formattedValue);
   };
 
   if (userLoading || cartItems.length === 0) {
@@ -813,6 +851,60 @@ export default function ProductPaymentPage() {
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 sm:gap-8">
           {/* Left Column - Forms */}
           <div className="lg:col-span-3 space-y-6 sm:space-y-8">
+            {/* Delivery Options Section */}
+            <div
+              className={`rounded-2xl shadow-lg border backdrop-blur-sm p-6 sm:p-8 ${
+                isDarkMode
+                  ? "bg-gray-800/80 border-gray-700/50"
+                  : "bg-white/80 border-gray-200/50"
+              }`}
+            >
+              <div className="flex items-center space-x-3 sm:space-x-4 mb-6">
+                <div className="p-3 rounded-xl bg-purple-500/20">
+                  <Package size={20} className="sm:size-6 text-purple-500" />
+                </div>
+                <div>
+                  <h2
+                    className={`text-lg sm:text-xl font-bold ${
+                      isDarkMode ? "text-white" : "text-gray-900"
+                    }`}
+                  >
+                    {t("deliveryOption")}
+                  </h2>
+                  <p
+                    className={`text-xs sm:text-sm ${
+                      isDarkMode ? "text-gray-400" : "text-gray-600"
+                    }`}
+                  >
+                    {t("selectDeliveryMethod")}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <DeliveryOption
+                  id="normal"
+                  title={t("standardDelivery")}
+                  description={t("standardDeliveryDesc")}
+                  price={totalPrice >= 2000 ? 0 : 5}
+                  selected={selectedDeliveryOption === "normal"}
+                  onSelect={() => setSelectedDeliveryOption("normal")}
+                  isDarkMode={isDarkMode}
+                  icon={<Package size={20} className="text-blue-500" />}
+                />
+                <DeliveryOption
+                  id="express"
+                  title={t("expressDelivery")}
+                  description={t("expressDeliveryDesc")}
+                  price={totalPrice >= 10000 ? 0 : 349}
+                  selected={selectedDeliveryOption === "express"}
+                  onSelect={() => setSelectedDeliveryOption("express")}
+                  isDarkMode={isDarkMode}
+                  icon={<Package size={20} className="text-purple-500" />}
+                />
+              </div>
+            </div>
+
             {/* Address Section */}
             <div
               className={`rounded-2xl shadow-lg border backdrop-blur-sm ${
@@ -1269,342 +1361,6 @@ export default function ProductPaymentPage() {
                 </div>
               )}
             </div>
-
-            {/* Payment Section */}
-            <div
-              className={`rounded-2xl shadow-lg border backdrop-blur-sm ${
-                isDarkMode
-                  ? "bg-gray-800/80 border-gray-700/50"
-                  : "bg-white/80 border-gray-200/50"
-              }`}
-            >
-              <button
-                onClick={() => setIsPaymentExpanded(!isPaymentExpanded)}
-                className="w-full p-6 sm:p-8 flex items-center justify-between group"
-              >
-                <div className="flex items-center space-x-3 sm:space-x-5">
-                  <div
-                    className={`p-3 sm:p-4 rounded-2xl transition-all duration-200 ${
-                      isDarkMode ? "bg-green-500/20" : "bg-green-50"
-                    } group-hover:scale-105`}
-                  >
-                    <CreditCard
-                      size={20}
-                      className="sm:size-6 text-green-500"
-                    />
-                  </div>
-                  <div className="text-left">
-                    <h2
-                      className={`text-lg sm:text-xl font-bold ${
-                        isDarkMode ? "text-white" : "text-gray-900"
-                      }`}
-                    >
-                      {t("paymentMethod")}
-                    </h2>
-                    <p
-                      className={`text-xs sm:text-sm mt-1 ${
-                        isDarkMode ? "text-gray-400" : "text-gray-600"
-                      }`}
-                    >
-                      {t("securePaymentProcessing")}
-                    </p>
-                  </div>
-                </div>
-                <ChevronDown
-                  size={18}
-                  className={`sm:size-5 transform transition-all duration-200 ${
-                    isPaymentExpanded ? "rotate-180" : ""
-                  } ${
-                    isDarkMode ? "text-gray-400" : "text-gray-500"
-                  } group-hover:text-green-500`}
-                />
-              </button>
-
-              {isPaymentExpanded && (
-                <div
-                  className={`px-6 sm:px-8 pb-6 sm:pb-8 border-t ${
-                    isDarkMode ? "border-gray-700/50" : "border-gray-200/50"
-                  }`}
-                >
-                  {/* Saved Payment Methods */}
-                  {savedPaymentMethods.length > 0 && (
-                    <div className="mb-6 sm:mb-8 mt-4 sm:mt-6">
-                      <h3
-                        className={`text-xs sm:text-sm font-semibold mb-3 sm:mb-4 flex items-center space-x-2 ${
-                          isDarkMode ? "text-gray-300" : "text-gray-700"
-                        }`}
-                      >
-                        <Star size={14} className="sm:size-4" />
-                        <span>{t("savedPaymentMethods")}</span>
-                      </h3>
-                      <div className="space-y-2 sm:space-y-3">
-                        {savedPaymentMethods.map((method) => (
-                          <label
-                            key={method.id}
-                            className={`flex items-center space-x-3 sm:space-x-4 p-3 sm:p-4 rounded-xl border cursor-pointer transition-all duration-200 ${
-                              selectedPaymentMethodId === method.id
-                                ? isDarkMode
-                                  ? "border-green-500 bg-green-500/10 shadow-lg"
-                                  : "border-green-500 bg-green-50 shadow-lg"
-                                : isDarkMode
-                                ? "border-gray-700 hover:border-gray-600 hover:bg-gray-700/50"
-                                : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-                            }`}
-                          >
-                            <input
-                              type="radio"
-                              name="paymentMethod"
-                              value={method.id}
-                              checked={selectedPaymentMethodId === method.id}
-                              onChange={() =>
-                                handlePaymentMethodSelect(method.id)
-                              }
-                              className="text-green-500"
-                            />
-                            <div className="flex-1">
-                              <p
-                                className={`text-sm sm:text-base font-semibold ${
-                                  isDarkMode ? "text-white" : "text-gray-900"
-                                }`}
-                              >
-                                •••• •••• •••• {method.cardNumber.slice(-4)}
-                              </p>
-                              <p
-                                className={`text-xs sm:text-sm mt-1 ${
-                                  isDarkMode ? "text-gray-400" : "text-gray-600"
-                                }`}
-                              >
-                                {method.cardHolderName} • {t("expires")}{" "}
-                                {method.expiryDate}
-                              </p>
-                            </div>
-                          </label>
-                        ))}
-
-                        <label
-                          className={`flex items-center space-x-3 sm:space-x-4 p-3 sm:p-4 rounded-xl border cursor-pointer transition-all duration-200 ${
-                            selectedPaymentMethodId === null
-                              ? isDarkMode
-                                ? "border-green-500 bg-green-500/10 shadow-lg"
-                                : "border-green-500 bg-green-50 shadow-lg"
-                              : isDarkMode
-                              ? "border-gray-700 hover:border-gray-600 hover:bg-gray-700/50"
-                              : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="paymentMethod"
-                            value=""
-                            checked={selectedPaymentMethodId === null}
-                            onChange={() => handlePaymentMethodSelect(null)}
-                            className="text-green-500"
-                          />
-                          <span
-                            className={`text-sm sm:text-base font-semibold ${
-                              isDarkMode ? "text-white" : "text-gray-900"
-                            }`}
-                          >
-                            {t("enterNewPaymentMethod")}
-                          </span>
-                        </label>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Payment Form */}
-                  <div className="space-y-4 sm:space-y-6">
-                    <div>
-                      <label
-                        className={`block text-xs sm:text-sm font-semibold mb-2 sm:mb-3 ${
-                          isDarkMode ? "text-gray-300" : "text-gray-700"
-                        }`}
-                      >
-                        {t("cardNumber")} *
-                      </label>
-                      <div className="relative group">
-                        <CreditCard
-                          size={16}
-                          className={`sm:size-[18px] absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 transition-colors ${
-                            isDarkMode ? "text-gray-400" : "text-gray-500"
-                          } group-focus-within:text-green-500`}
-                        />
-                        <input
-                          type="text"
-                          value={formatCardNumber(formData.cardNumber)}
-                          onChange={(e) =>
-                            handleInputChange(
-                              "cardNumber",
-                              e.target.value.replace(/\s/g, "")
-                            )
-                          }
-                          maxLength={19}
-                          className={`w-full pl-10 sm:pl-12 pr-3 sm:pr-4 py-3 sm:py-4 rounded-xl border transition-all duration-200 text-sm sm:text-base ${
-                            errors.cardNumber
-                              ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
-                              : isDarkMode
-                              ? "border-gray-600 bg-gray-700/50 text-white focus:border-green-500 focus:ring-green-500/20"
-                              : "border-gray-300 bg-white text-gray-900 focus:border-green-500 focus:ring-green-500/20"
-                          } focus:outline-none focus:ring-4`}
-                          placeholder={t("cardNumberPlaceholder")}
-                        />
-                      </div>
-                      {errors.cardNumber && (
-                        <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm text-red-500 flex items-center space-x-1">
-                          <X size={12} className="sm:size-[14px]" />
-                          <span>{errors.cardNumber}</span>
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4 sm:gap-6">
-                      <div>
-                        <label
-                          className={`block text-xs sm:text-sm font-semibold mb-2 sm:mb-3 ${
-                            isDarkMode ? "text-gray-300" : "text-gray-700"
-                          }`}
-                        >
-                          {t("expiryDate")} *
-                        </label>
-                        <div className="relative group">
-                          <Calendar
-                            size={16}
-                            className={`sm:size-[18px] absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 transition-colors ${
-                              isDarkMode ? "text-gray-400" : "text-gray-500"
-                            } group-focus-within:text-green-500`}
-                          />
-                          <input
-                            type="text"
-                            value={formData.expiryDate}
-                            onChange={(e) =>
-                              handleExpiryDateChange(e.target.value)
-                            }
-                            maxLength={5}
-                            className={`w-full pl-10 sm:pl-12 pr-3 sm:pr-4 py-3 sm:py-4 rounded-xl border transition-all duration-200 text-sm sm:text-base ${
-                              errors.expiryDate
-                                ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
-                                : isDarkMode
-                                ? "border-gray-600 bg-gray-700/50 text-white focus:border-green-500 focus:ring-green-500/20"
-                                : "border-gray-300 bg-white text-gray-900 focus:border-green-500 focus:ring-green-500/20"
-                            } focus:outline-none focus:ring-4`}
-                            placeholder={t("expiryDatePlaceholder")}
-                          />
-                        </div>
-                        {errors.expiryDate && (
-                          <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm text-red-500 flex items-center space-x-1">
-                            <X size={12} className="sm:size-[14px]" />
-                            <span>{errors.expiryDate}</span>
-                          </p>
-                        )}
-                      </div>
-
-                      <div>
-                        <label
-                          className={`block text-xs sm:text-sm font-semibold mb-2 sm:mb-3 ${
-                            isDarkMode ? "text-gray-300" : "text-gray-700"
-                          }`}
-                        >
-                          {t("cvv")} *
-                        </label>
-                        <div className="relative group">
-                          <Lock
-                            size={16}
-                            className={`sm:size-[18px] absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 transition-colors ${
-                              isDarkMode ? "text-gray-400" : "text-gray-500"
-                            } group-focus-within:text-green-500`}
-                          />
-                          <input
-                            type="password"
-                            value={formData.cvv}
-                            onChange={(e) =>
-                              handleInputChange("cvv", e.target.value)
-                            }
-                            maxLength={4}
-                            className={`w-full pl-10 sm:pl-12 pr-3 sm:pr-4 py-3 sm:py-4 rounded-xl border transition-all duration-200 text-sm sm:text-base ${
-                              errors.cvv
-                                ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
-                                : isDarkMode
-                                ? "border-gray-600 bg-gray-700/50 text-white focus:border-green-500 focus:ring-green-500/20"
-                                : "border-gray-300 bg-white text-gray-900 focus:border-green-500 focus:ring-green-500/20"
-                            } focus:outline-none focus:ring-4`}
-                            placeholder={t("cvvPlaceholder")}
-                          />
-                        </div>
-                        {errors.cvv && (
-                          <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm text-red-500 flex items-center space-x-1">
-                            <X size={12} className="sm:size-[14px]" />
-                            <span>{errors.cvv}</span>
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    <div>
-                      <label
-                        className={`block text-xs sm:text-sm font-semibold mb-2 sm:mb-3 ${
-                          isDarkMode ? "text-gray-300" : "text-gray-700"
-                        }`}
-                      >
-                        {t("cardHolderName")} *
-                      </label>
-                      <div className="relative group">
-                        <User
-                          size={16}
-                          className={`sm:size-[18px] absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 transition-colors ${
-                            isDarkMode ? "text-gray-400" : "text-gray-500"
-                          } group-focus-within:text-green-500`}
-                        />
-                        <input
-                          type="text"
-                          value={formData.cardHolderName}
-                          onChange={(e) =>
-                            handleInputChange("cardHolderName", e.target.value)
-                          }
-                          className={`w-full pl-10 sm:pl-12 pr-3 sm:pr-4 py-3 sm:py-4 rounded-xl border transition-all duration-200 text-sm sm:text-base ${
-                            errors.cardHolderName
-                              ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
-                              : isDarkMode
-                              ? "border-gray-600 bg-gray-700/50 text-white focus:border-green-500 focus:ring-green-500/20"
-                              : "border-gray-300 bg-white text-gray-900 focus:border-green-500 focus:ring-green-500/20"
-                          } focus:outline-none focus:ring-4`}
-                          placeholder={t("nameOnCard")}
-                        />
-                      </div>
-                      {errors.cardHolderName && (
-                        <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm text-red-500 flex items-center space-x-1">
-                          <X size={12} className="sm:size-[14px]" />
-                          <span>{errors.cardHolderName}</span>
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Save Payment Method */}
-                    {selectedPaymentMethodId === null && (
-                      <label className="flex items-center space-x-2.5 sm:space-x-3 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={formData.savePaymentDetails}
-                          onChange={(e) =>
-                            handleInputChange(
-                              "savePaymentDetails",
-                              e.target.checked
-                            )
-                          }
-                          className="w-4 h-4 sm:w-5 sm:h-5 text-green-500 rounded focus:ring-green-500/50"
-                        />
-                        <span
-                          className={`text-xs sm:text-sm font-medium ${
-                            isDarkMode ? "text-gray-300" : "text-gray-700"
-                          }`}
-                        >
-                          {t("savePaymentMethodForFuture")}
-                        </span>
-                      </label>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
 
           {/* Right Column - Order Summary */}
@@ -1618,7 +1374,7 @@ export default function ProductPaymentPage() {
             >
               <div className="flex items-center space-x-2.5 sm:space-x-3 mb-5 sm:mb-6">
                 <div className="p-2.5 sm:p-3 rounded-xl bg-gradient-to-r from-blue-500/20 to-purple-500/20">
-                  <CreditCard size={20} className="sm:size-6 text-blue-500" />
+                  <Package size={20} className="sm:size-6 text-blue-500" />
                 </div>
                 <h3
                   className={`text-lg sm:text-xl font-bold ${
@@ -1667,7 +1423,7 @@ export default function ProductPaymentPage() {
                         }`}
                       >
                         {t("unitPrice")}: {(item.price || 0).toFixed(2)}{" "}
-                        {item.currency || "USD"}
+                        {item.currency || "TL"}
                       </p>
                     </div>
                     <div className="text-right">
@@ -1683,7 +1439,7 @@ export default function ProductPaymentPage() {
                           isDarkMode ? "text-gray-400" : "text-gray-600"
                         }`}
                       >
-                        {item.currency || "USD"}
+                        {item.currency || "TL"}
                       </p>
                     </div>
                   </div>
@@ -1709,7 +1465,7 @@ export default function ProductPaymentPage() {
                       isDarkMode ? "text-white" : "text-gray-900"
                     }`}
                   >
-                    {totalPrice.toFixed(2)} {cartItems[0]?.currency || "USD"}
+                    {totalPrice.toFixed(2)} {cartItems[0]?.currency || "TL"}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -1721,25 +1477,17 @@ export default function ProductPaymentPage() {
                     {t("deliveryFee")}
                   </span>
                   <span
-                    className={`text-sm sm:text-base font-medium text-green-500`}
-                  >
-                    {t("free")}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span
-                    className={`text-xs sm:text-sm ${
-                      isDarkMode ? "text-gray-400" : "text-gray-600"
-                    }`}
-                  >
-                    {t("tax")}
-                  </span>
-                  <span
                     className={`text-sm sm:text-base font-medium ${
-                      isDarkMode ? "text-white" : "text-gray-900"
+                      getDeliveryPrice() === 0
+                        ? "text-green-500"
+                        : isDarkMode
+                        ? "text-white"
+                        : "text-gray-900"
                     }`}
                   >
-                    {t("included")}
+                    {getDeliveryPrice() === 0
+                      ? t("free")
+                      : `${getDeliveryPrice().toFixed(2)} TL`}
                   </span>
                 </div>
 
@@ -1758,21 +1506,21 @@ export default function ProductPaymentPage() {
                     </span>
                     <div className="text-right">
                       <span className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent">
-                        {totalPrice.toFixed(2)}
+                        {(totalPrice + getDeliveryPrice()).toFixed(2)}
                       </span>
                       <p
                         className={`text-xs sm:text-sm ${
                           isDarkMode ? "text-gray-400" : "text-gray-600"
                         }`}
                       >
-                        {cartItems[0]?.currency || "USD"}
+                        {cartItems[0]?.currency || "TL"}
                       </p>
                     </div>
                   </div>
                 </div>
 
-                 {/* ADD THIS NEW SECTION HERE - Contract Agreement Checkbox */}
-                 <div
+                {/* Contract Agreement Checkbox */}
+                <div
                   className={`p-4 sm:p-5 rounded-xl border mb-5 sm:mb-6 ${
                     isDarkMode
                       ? "bg-gray-700/30 border-gray-600/50"
@@ -1794,19 +1542,27 @@ export default function ProductPaymentPage() {
                       {t("iAgreeToThe")}{" "}
                       <button
                         type="button"
-                        onClick={() => router.push("/agreements/distance-selling")}
+                        onClick={() =>
+                          router.push("/agreements/distance-selling")
+                        }
                         className="text-blue-500 hover:text-blue-600 underline font-medium transition-colors"
                       >
                         {t("distanceSellingContract")}
                       </button>
                     </span>
                   </label>
+                  {errors.contract && (
+                    <p className="mt-2 text-xs text-red-500 flex items-center space-x-1">
+                      <X size={12} />
+                      <span>{errors.contract}</span>
+                    </p>
+                  )}
                 </div>
 
                 {/* Complete Payment Button */}
                 <button
                   onClick={handleSubmit}
-                  disabled={isProcessing}
+                  disabled={isProcessing || !agreesToContract}
                   className="w-full py-4 sm:py-5 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white font-bold text-base sm:text-lg rounded-2xl hover:from-blue-600 hover:via-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center space-x-2.5 sm:space-x-3 shadow-xl transform hover:scale-[1.02] active:scale-[0.98]"
                 >
                   {isProcessing ? (
@@ -1817,7 +1573,7 @@ export default function ProductPaymentPage() {
                   ) : (
                     <>
                       <Lock size={20} className="sm:size-6" />
-                      <span>{t("completeSecurePayment")}</span>
+                      <span>{t("proceedToPayment")}</span>
                     </>
                   )}
                 </button>
