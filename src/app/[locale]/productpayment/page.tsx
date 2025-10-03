@@ -729,22 +729,27 @@ export default function ProductPaymentPage() {
 
       console.log("✅ Payment initialized, redirecting to İşbank...");
 
+      // Build ABSOLUTE URL with protocol and domain
+      const protocol = window.location.protocol; // https:
+      const host = window.location.host; // www.nar24.com
       const locale =
         window.location.pathname.split("/").filter(Boolean)[0] || "en";
 
-      const targetPath =
-        `/isbankpayment?` +
+      const fullUrl =
+        `${protocol}//${host}/${locale}/isbankpayment?` +
         `gatewayUrl=${encodeURIComponent(initData.gatewayUrl)}` +
         `&orderNumber=${encodeURIComponent(orderNumber)}` +
         `&paymentParams=${encodeURIComponent(
           JSON.stringify(initData.paymentParams)
         )}`;
 
+      console.log("🎯 Full absolute URL:", fullUrl);
+      console.log("🎯 Protocol:", protocol);
+      console.log("🎯 Host:", host);
       console.log("🎯 Locale:", locale);
-      console.log("🎯 Target path:", `/${locale}${targetPath}`);
 
-      // Use replace to force a clean navigation
-      router.replace(`/${locale}${targetPath}`);
+      // Force full page navigation
+      window.location.href = fullUrl;
     } catch (error: unknown) {
       console.error("Payment error:", error);
       const errorMessage =
