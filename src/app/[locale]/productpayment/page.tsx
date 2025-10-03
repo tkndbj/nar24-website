@@ -729,27 +729,22 @@ export default function ProductPaymentPage() {
 
       console.log("✅ Payment initialized, redirecting to İşbank...");
 
-      // Build ABSOLUTE URL with protocol and domain
-      const protocol = window.location.protocol; // https:
-      const host = window.location.host; // www.nar24.com
-      const locale =
-        window.location.pathname.split("/").filter(Boolean)[0] || "en";
-
-      const fullUrl =
-        `${protocol}//${host}/${locale}/isbankpayment?` +
-        `gatewayUrl=${encodeURIComponent(initData.gatewayUrl)}` +
+      const searchParamsString =
+        `?gatewayUrl=${encodeURIComponent(initData.gatewayUrl)}` +
         `&orderNumber=${encodeURIComponent(orderNumber)}` +
         `&paymentParams=${encodeURIComponent(
           JSON.stringify(initData.paymentParams)
         )}`;
 
-      console.log("🎯 Full absolute URL:", fullUrl);
-      console.log("🎯 Protocol:", protocol);
-      console.log("🎯 Host:", host);
-      console.log("🎯 Locale:", locale);
+      // Don't try to extract locale, just use relative path from current location
+      // The middleware will handle locale preservation
+      const targetPath = `/isbankpayment${searchParamsString}`;
 
-      // Force full page navigation
-      window.location.href = fullUrl;
+      console.log("Navigating to:", targetPath);
+
+      // Use router.push with just the path (no locale prefix)
+      // The middleware should preserve the current locale
+      router.push(targetPath);
     } catch (error: unknown) {
       console.error("Payment error:", error);
       const errorMessage =
