@@ -82,6 +82,7 @@ interface CartItem {
   isOptimistic?: boolean;
   isLoadingProduct?: boolean;
   loadError?: boolean;
+  sellerContactNo?: string | null;
   salePreferences?: SalePreferences | null;
   selectedColorImage?: string;
   [key: string]: unknown;
@@ -95,6 +96,7 @@ interface SellerInfo {
   sellerId: string;
   sellerName: string;
   isShop: boolean;
+  sellerContactNo?: string | null;
 }
 
 interface ProductDocumentData {
@@ -492,17 +494,20 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       let sellerId: string;
       let sellerName: string;
       let isShop: boolean;
-
+      let sellerContactNo: string | null = null;  // ADD THIS
+  
       if (parent === "shop_products") {
         const shopId = productData.shopId || productData.ownerId;
         sellerId = shopId || "unknown";
         isShop = true;
-
+  
         if (shopId) {
           try {
             const shopDoc = await getDoc(doc(db, "shops", shopId));
             if (shopDoc.exists()) {
-              sellerName = shopDoc.data()?.name || "Unknown Shop";
+              const shopData = shopDoc.data();
+              sellerName = shopData?.name || "Unknown Shop";
+              sellerContactNo = shopData?.contactNo || null;  // ADD THIS
             } else {
               sellerName = productData.shopName || "Unknown Shop";
             }
@@ -517,12 +522,17 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         const ownerId = productData.ownerId;
         sellerId = ownerId || "unknown";
         isShop = false;
-
+  
         if (ownerId) {
           try {
             const userDoc = await getDoc(doc(db, "users", ownerId));
             if (userDoc.exists()) {
-              sellerName = userDoc.data()?.displayName || "Unknown Seller";
+              const userData = userDoc.data();
+              const sellerInfo = userData?.sellerInfo;  // ADD THIS
+              sellerName = sellerInfo?.name || 
+                           userData?.displayName || 
+                           "Unknown Seller";
+              sellerContactNo = sellerInfo?.phone || null;  // ADD THIS
             } else {
               sellerName = productData.sellerName || "Unknown Seller";
             }
@@ -534,8 +544,8 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           sellerName = "Unknown Seller";
         }
       }
-
-      return { sellerId, sellerName, isShop };
+  
+      return { sellerId, sellerName, isShop, sellerContactNo };  // MODIFIED
     },
     [db]
   );
@@ -762,6 +772,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
             sellerName: cartData.sellerName,
             sellerId: cartData.sellerId,
             isShop: cartData.isShop,
+            sellerContactNo: cartData.sellerContactNo as string | null,
             ...dynamicAttributes,
           });
         }
@@ -967,6 +978,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
               sellerId: sellerInfo.sellerId,
               sellerName: sellerInfo.sellerName,
               isShop: sellerInfo.isShop,
+              sellerContactNo: sellerInfo.sellerContactNo,
             };
 
             // Add bundle flag if applicable
@@ -1630,6 +1642,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
             sellerName: cartData.sellerName,
             sellerId: cartData.sellerId,
             isShop: cartData.isShop,
+            sellerContactNo: cartData.sellerContactNo as string | null,
             ...dynamicAttributes,
           });
         }
