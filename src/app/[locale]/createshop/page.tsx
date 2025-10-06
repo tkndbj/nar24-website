@@ -17,8 +17,9 @@ import {
   CheckIcon,
   CameraIcon,
   DocumentTextIcon,
+  MapPinIcon,
 } from "@heroicons/react/24/outline";
-
+const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 interface AppLocalizations {
   [key: string]: string;
 }
@@ -26,6 +27,12 @@ interface AppLocalizations {
 interface Category {
   code: string;
   name: string;
+}
+
+declare global {
+  interface Window {
+    google: typeof google;
+  }
 }
 
 // Get categories from AllInOneCategoryData with localization
@@ -71,6 +78,15 @@ export default function CreateShopPage() {
   const [selectedCategories, setSelectedCategories] = useState<Category[]>([]);
   const [acceptedAgreement, setAcceptedAgreement] = useState(false);
 
+  const [coordinates, setCoordinates] = useState<{
+    latitude: number | null;
+    longitude: number | null;
+  }>({
+    latitude: null,
+    longitude: null,
+  });
+  const [showMapModal, setShowMapModal] = useState(false);
+
   // Images
   const [profileImage, setProfileImage] = useState<File | null>(null);
   const [coverImages, setCoverImages] = useState<(File | null)[]>([
@@ -104,6 +120,81 @@ export default function CreateShopPage() {
 
   // Get localized categories
   const CATEGORIES = getLocalizedCategories(t);
+
+  // Load Google Maps when modal opens
+  React.useEffect(() => {
+    if (!showMapModal) return;
+
+    const loadGoogleMaps = () => {
+      if (window.google?.maps) {
+        initMap();
+        return;
+      }
+
+      const existingScript = document.querySelector(
+        'script[src*="maps.googleapis.com"]'
+      );
+      if (existingScript) {
+        existingScript.addEventListener("load", initMap);
+        return;
+      }
+
+      const script = document.createElement("script");
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&callback=Function.prototype`;
+      script.async = true;
+      script.defer = true;
+      script.onload = initMap;
+      script.onerror = () => {
+        console.error("Failed to load Google Maps");
+        alert("Failed to load map. Please try again.");
+      };
+      document.head.appendChild(script);
+    };
+
+    const initMap = () => {
+      const mapElement = document.getElementById("shop-location-map");
+      if (!mapElement) return;
+
+      const defaultLocation = {
+        lat: coordinates.latitude || 35.1264,
+        lng: coordinates.longitude || 33.9293,
+      };
+
+      const map = new google.maps.Map(mapElement, {
+        center: defaultLocation,
+        zoom: 15,
+      });
+
+      const marker = new google.maps.Marker({
+        position: defaultLocation,
+        map: map,
+        draggable: true,
+        title: t("pinShopLocation"),
+      });
+
+      marker.addListener("dragend", () => {
+        const position = marker.getPosition();
+        if (position) {
+          setCoordinates({
+            latitude: position.lat(),
+            longitude: position.lng(),
+          });
+        }
+      });
+
+      map.addListener("click", (e: google.maps.MapMouseEvent) => {
+        if (e.latLng) {
+          marker.setPosition(e.latLng);
+          setCoordinates({
+            latitude: e.latLng.lat(),
+            longitude: e.latLng.lng(),
+          });
+        }
+      });
+    };
+
+    loadGoogleMaps();
+  }, [showMapModal, t, coordinates.latitude, coordinates.longitude]);
 
   // Handle theme detection
   React.useEffect(() => {
@@ -219,7 +310,9 @@ export default function CreateShopPage() {
       selectedCategories.length === 0 ||
       !profileImage ||
       !taxCertificate ||
-      coverImages.every((img) => img === null)
+      coverImages.every((img) => img === null) ||
+      !coordinates.latitude ||
+      !coordinates.longitude
     ) {
       alert(t("enterAllFields"));
       return;
@@ -261,6 +354,8 @@ export default function CreateShopPage() {
         profileImageUrl,
         coverImageUrl: coverImageUrls.join(","),
         taxPlateCertificateUrl: taxCertificateUrl,
+        latitude: coordinates.latitude, // ADD THIS
+        longitude: coordinates.longitude,
         createdAt: serverTimestamp(),
         status: "pending",
       });
@@ -589,6 +684,54 @@ export default function CreateShopPage() {
                 />
               </div>
 
+              {/* Pin Location Button */}
+              <div
+                className={`p-5 sm:p-6 rounded-xl backdrop-blur-lg shadow-md border transition-all duration-300 ${
+                  isDarkMode
+                    ? "bg-gray-800/90 border-gray-700"
+                    : "bg-white border-gray-200"
+                }`}
+              >
+                <label
+                  className={`block text-base sm:text-lg font-semibold mb-3 ${
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  }`}
+                >
+                  {t("pinShopLocation")}
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowMapModal(true)}
+                  className={`w-full p-3 sm:p-4 rounded-lg flex items-center justify-between transition-all duration-300 hover:scale-[1.01] ${
+                    isDarkMode
+                      ? "bg-gray-700/80 text-white hover:bg-gray-600/80"
+                      : "bg-gray-50 text-gray-900 hover:bg-gray-100"
+                  }`}
+                >
+                  <div className="flex items-center space-x-3">
+                    <MapPinIcon className="w-5 h-5" />
+                    <span className="text-sm sm:text-base">
+                      {coordinates.latitude && coordinates.longitude
+                        ? t("locationPinned")
+                        : t("pinShopLocation")}
+                    </span>
+                  </div>
+                  {coordinates.latitude && coordinates.longitude && (
+                    <CheckIcon className="w-5 h-5 text-green-500" />
+                  )}
+                </button>
+                {coordinates.latitude && coordinates.longitude && (
+                  <p
+                    className={`text-xs sm:text-sm mt-2 text-center ${
+                      isDarkMode ? "text-gray-400" : "text-gray-600"
+                    }`}
+                  >
+                    {coordinates.latitude.toFixed(6)},{" "}
+                    {coordinates.longitude.toFixed(6)}
+                  </p>
+                )}
+              </div>
+
               {/* Categories */}
               <div
                 className={`p-5 sm:p-6 rounded-xl backdrop-blur-lg shadow-md border transition-all duration-300 ${
@@ -784,6 +927,79 @@ export default function CreateShopPage() {
           </div>
         </div>
       </div>
+
+      {/* Map Location Picker Modal */}
+      {showMapModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div
+            className={`w-full max-w-4xl rounded-2xl p-6 max-h-[90vh] overflow-hidden shadow-2xl transition-all duration-300 flex flex-col ${
+              isDarkMode ? "bg-gray-800" : "bg-white"
+            }`}
+          >
+            <div className="flex justify-between items-center mb-5">
+              <h3
+                className={`text-xl font-bold ${
+                  isDarkMode ? "text-white" : "text-gray-900"
+                }`}
+              >
+                {t("pinShopLocation")}
+              </h3>
+              <button
+                onClick={() => setShowMapModal(false)}
+                className={`p-2 rounded-lg transition-colors duration-200 ${
+                  isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"
+                }`}
+              >
+                <XMarkIcon
+                  className={`w-6 h-6 ${
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  }`}
+                />
+              </button>
+            </div>
+
+            <div className="flex-1 mb-5">
+              <div
+                id="shop-location-map"
+                className="w-full h-[500px] rounded-xl border-2 border-gray-200 dark:border-gray-600"
+              />
+              <p
+                className={`text-sm mt-4 text-center ${
+                  isDarkMode ? "text-gray-400" : "text-gray-600"
+                }`}
+              >
+                {t("mapInstructions")}
+              </p>
+              {coordinates.latitude && coordinates.longitude && (
+                <p className="text-sm font-semibold text-blue-600 dark:text-blue-400 mt-2 text-center">
+                  {coordinates.latitude.toFixed(6)},{" "}
+                  {coordinates.longitude.toFixed(6)}
+                </p>
+              )}
+            </div>
+
+            <div className="flex space-x-4">
+              <button
+                onClick={() => setShowMapModal(false)}
+                className={`flex-1 py-3 rounded-lg font-semibold transition-all duration-200 ${
+                  isDarkMode
+                    ? "bg-gray-700 hover:bg-gray-600 text-white"
+                    : "bg-gray-200 hover:bg-gray-300 text-gray-900"
+                }`}
+              >
+                {t("cancel")}
+              </button>
+              <button
+                onClick={() => setShowMapModal(false)}
+                disabled={!coordinates.latitude || !coordinates.longitude}
+                className="flex-1 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-400 text-white font-semibold rounded-lg transition-all duration-200"
+              >
+                {t("confirmLocation")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Category Modal */}
       {showCategoryModal && (
