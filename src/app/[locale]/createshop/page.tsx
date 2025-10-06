@@ -163,7 +163,17 @@ export default function CreateShopPage() {
       const map = new google.maps.Map(mapElement, {
         center: defaultLocation,
         zoom: 15,
+        gestureHandling: "greedy", // ADD THIS - allows scroll zoom without Ctrl key
       });
+
+      // ADD THIS - Prevent scroll propagation to background
+      mapElement.addEventListener(
+        "wheel",
+        (e) => {
+          e.stopPropagation();
+        },
+        { passive: false }
+      );
 
       const marker = new google.maps.Marker({
         position: defaultLocation,
