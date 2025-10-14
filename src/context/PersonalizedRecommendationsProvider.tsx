@@ -160,13 +160,32 @@ export const PersonalizedRecommendationsProvider: React.FC<{ children: React.Rea
     }
   }, []);
 
+  // ✅ MATCHES FLUTTER: New user recommendations
+  const getNewUserRecommendations = useCallback(async (): Promise<Product[]> => {
+    try {
+      const q = query(
+        collection(db, "shop_products"),
+        where("quantity", ">", 0),
+        orderBy("quantity"),
+        orderBy("rankingScore", "desc"),
+        firestoreLimit(BATCH_SIZE)
+      );
+
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => convertDocumentToProduct(doc));
+    } catch (e) {
+      console.error('Error in new user recommendations:', e);
+      return [];
+    }
+  }, []);
+
   // ✅ MATCHES FLUTTER: Personalized recommendations
   const getPersonalizedRecommendations = useCallback(async (userId: string, limit: number): Promise<Product[]> => {
     try {
       const preferences = await getUserPreferences(userId);
       
       if (!preferences) {
-        return getNewUserRecommendations(limit);
+        return getNewUserRecommendations();
       }
 
       // ✅ MATCHES FLUTTER: Single optimized query using whereIn
@@ -197,28 +216,9 @@ export const PersonalizedRecommendationsProvider: React.FC<{ children: React.Rea
       return products;
     } catch (e) {
       console.error('Error in personalized recommendations:', e);
-      return getNewUserRecommendations(limit);
+      return getNewUserRecommendations();
     }
-  }, [getUserPreferences]);
-
-  // ✅ MATCHES FLUTTER: New user recommendations
-  const getNewUserRecommendations = useCallback(async (limit: number): Promise<Product[]> => {
-    try {
-      const q = query(
-        collection(db, "shop_products"),
-        where("quantity", ">", 0),
-        orderBy("quantity"),
-        orderBy("rankingScore", "desc"),
-        firestoreLimit(BATCH_SIZE)
-      );
-
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => convertDocumentToProduct(doc));
-    } catch (e) {
-      console.error('Error in new user recommendations:', e);
-      return [];
-    }
-  }, []);
+  }, [getUserPreferences, getNewUserRecommendations]);
 
   // ✅ MATCHES FLUTTER: Generic recommendations for non-authenticated users
   const getGenericRecommendations = useCallback(async (limit: number): Promise<Product[]> => {
