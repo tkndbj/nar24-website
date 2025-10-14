@@ -140,7 +140,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
       }
       
       return key;
-    } catch (error) {
+    } catch {
       return key;
     }
   }, [localization]);
@@ -542,7 +542,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   useEffect(() => {
     if (!product) return;
 
-    const productInCart = isInCart(product.id);
+    
     const isOptimisticAdd = isOptimisticallyAdding(product.id);
     const isOptimisticRemove = isOptimisticallyRemoving(product.id);
 

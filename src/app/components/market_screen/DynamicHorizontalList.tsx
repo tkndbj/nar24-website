@@ -29,8 +29,7 @@ interface DynamicListData {
   gradientEnd?: string;
   selectedProductIds?: string[];
   selectedShopId?: string;
-  limit?: number;
-  showViewAllButton?: boolean;
+  limit?: number;  
 }
 
 // Shimmer loading component
@@ -251,15 +250,7 @@ const DynamicList: React.FC<{
               <h2 className="text-lg font-bold text-white max-w-[70%] truncate">
                 {listData.title || "Product List"}
               </h2>
-              {listData.showViewAllButton && (
-                <button
-                  onClick={handleViewAll}
-                  className="flex items-center text-sm font-bold text-white underline decoration-white hover:opacity-80 transition-opacity"
-                >
-                  {t("viewAll")}
-                  <ChevronRight size={16} className="ml-1" />
-                </button>
-              )}
+              
             </div>
           </div>
 
