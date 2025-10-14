@@ -12,6 +12,8 @@ import {
   DocumentData,
   QueryConstraint,
   CollectionReference,
+  QuerySnapshot,
+  QueryDocumentSnapshot,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Product, ProductUtils } from "@/app/models/Product";
@@ -131,10 +133,10 @@ function extractQueryParams(searchParams: URLSearchParams): QueryParams {
 }
 
 // Parse products from snapshot
-function parseProducts(snapshot: any): Product[] {
+function parseProducts(snapshot: QuerySnapshot<DocumentData>): Product[] {
   const products: Product[] = [];
   
-  snapshot.docs.forEach((doc: any) => {
+  snapshot.docs.forEach((doc: QueryDocumentSnapshot<DocumentData>) => {
     try {
       const data = { id: doc.id, ...doc.data() };
       const product = ProductUtils.fromJson(data);
