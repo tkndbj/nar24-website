@@ -1,11 +1,10 @@
-// providers/PersonalizedRecommendationsProvider.tsx
+// context/PersonalizedRecommendationsProvider.tsx
 "use client";
 
 import React, {
   createContext,
   useContext,
   useState,
-  useEffect,
   useRef,
   useCallback,
   useMemo,
@@ -15,54 +14,30 @@ import {
   query, 
   where, 
   orderBy, 
-  limit, 
+  limit as firestoreLimit, 
   getDocs,
-  doc,
-  getDoc,  
-  Timestamp,  
-  DocumentData 
+  QueryDocumentSnapshot,
+  DocumentData,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Product, ProductUtils } from "@/app/models/Product";
 import { useUser } from "@/context/UserProvider";
-import { QueryDocumentSnapshot } from "firebase/firestore/lite";
-
-// ============= TYPES & INTERFACES =============
-interface UserPreferences {
-  categoryClicks: Record<string, number>;
-  subcategoryClicks: Record<string, number>;
-  totalInteractions: number;
-  topCategories: string[];
-  topSubcategories: string[];
-}
-
-interface ScoredProduct {
-  product: Product;
-  score: number;
-}
-
-interface RecommendationsState {
-  recommendations: Product[];
-  cachedRecommendations: Product[];
-  isLoading: boolean;
-  error: string | null;
-  lastFetchTime: Date | null;
-  lastSuccessfulFetch: Date | null;
-}
-
-interface PersonalizedRecommendationsContextType extends RecommendationsState {
-  fetchPersonalizedRecommendations: (options?: { limit?: number; forceRefresh?: boolean }) => Promise<Product[]>;
-  refreshRecommendations: () => Promise<void>;
-  clearCache: () => void;
-  hasValidCache: boolean;
-}
 
 // ============= CONFIGURATION =============
-const CACHE_VALIDITY = 6 * 60 * 60 * 1000; // 6 hours
-const REFRESH_INTERVAL = 60 * 60 * 1000; // 1 hour
-const DEBOUNCE_DELAY = 2000; // 2 seconds
-const MAX_RECENTLY_SHOWN = 50;
-const MIN_FETCH_INTERVAL = 5 * 60 * 1000; // 5 minutes
+const CACHE_EXPIRY = 2 * 60 * 60 * 1000; // 2 hours (matches Flutter)
+const BATCH_SIZE = 30; // matches Flutter
+const CLICK_WEIGHT = 1;
+const PURCHASE_WEIGHT = 5;
+
+// ============= TYPES =============
+interface PersonalizedRecommendationsContextType {
+  recommendations: Product[];
+  isLoading: boolean;
+  error: string | null;
+  hasRecommendations: boolean;
+  fetchRecommendations: (options?: { limit?: number; forceRefresh?: boolean }) => Promise<void>;
+  refresh: () => Promise<void>;
+}
 
 // ============= CONTEXT =============
 const PersonalizedRecommendationsContext = createContext<PersonalizedRecommendationsContextType | undefined>(undefined);
@@ -75,538 +50,300 @@ export const usePersonalizedRecommendations = () => {
   return context;
 };
 
-// ============= PROVIDER COMPONENT =============
+// ============= HELPER FUNCTIONS =============
+const convertDocumentToProduct = (doc: QueryDocumentSnapshot<DocumentData>): Product => {
+  const data = doc.data();
+  return ProductUtils.fromJson({
+    ...data,
+    id: doc.id,
+  });
+};
+
+// ============= PROVIDER =============
 export const PersonalizedRecommendationsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useUser();
-  const [state, setState] = useState<RecommendationsState>({
-    recommendations: [],
-    cachedRecommendations: [],
-    isLoading: false,
-    error: null,
-    lastFetchTime: null,
-    lastSuccessfulFetch: null,
-  });
+  
+  // ✅ MATCHES FLUTTER: Minimal state
+  const [recommendations, setRecommendations] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  // ✅ MATCHES FLUTTER: Cache tracking
+  const lastFetchRef = useRef<Date | null>(null);
+  const shownProductIdsRef = useRef<Set<string>>(new Set());
+  
+  // ✅ COMPUTED: hasRecommendations
+  const hasRecommendations = useMemo(() => recommendations.length > 0, [recommendations.length]);
 
-  // User tracking state
-  const [categoryScores, setCategoryScores] = useState<Record<string, number>>({});
-  const [subcategoryScores, setSubcategoryScores] = useState<Record<string, number>>({});
-  const [recentlyShownIds, setRecentlyShownIds] = useState<Set<string>>(new Set());
-  const [productLastShown, setProductLastShown] = useState<Map<string, Date>>(new Map());
+  // ✅ MATCHES FLUTTER: Remove duplicates
+  const removeDuplicates = useCallback((products: Product[]): Product[] => {
+    const seen = new Set<string>();
+    const filtered: Product[] = [];
 
-  // Refs for timers
-  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
-  const refreshTimer = useRef<NodeJS.Timeout | null>(null);
-  const fetchAttempts = useRef(0);
-  const isMounted = useRef(true);
-
-  // ============= COMPUTED VALUES =============
-  const hasValidCache = useMemo(() => {
-    return !!(
-      state.lastSuccessfulFetch &&
-      Date.now() - state.lastSuccessfulFetch.getTime() < CACHE_VALIDITY
-    );
-  }, [state.lastSuccessfulFetch]);
-
-  const recommendations = useMemo(() => {
-    return state.recommendations.length > 0 
-      ? state.recommendations 
-      : state.cachedRecommendations;
-  }, [state.recommendations, state.cachedRecommendations]);
-
-  // ============= HELPER FUNCTIONS =============
-  const shouldFetch = useCallback((forceRefresh: boolean): boolean => {
-    if (forceRefresh) return true;
-    if (state.isLoading) return false;
-    if (state.recommendations.length === 0 && state.cachedRecommendations.length === 0) return true;
-    
-    if (!state.lastFetchTime) return true;
-    const timeSinceFetch = Date.now() - state.lastFetchTime.getTime();
-    
-    if (timeSinceFetch < MIN_FETCH_INTERVAL) return false;
-    return timeSinceFetch > REFRESH_INTERVAL;
-  }, [state.isLoading, state.recommendations, state.cachedRecommendations, state.lastFetchTime]);
-
-  const calculateWeightedScores = (clicks: Record<string, number>): Record<string, number> => {
-    const scores: Record<string, number> = {};
-    const total = Object.values(clicks).reduce((a, b) => a + b, 0);
-    
-    if (total === 0) return scores;
-    
-    for (const [key, value] of Object.entries(clicks)) {
-      scores[key] = Math.log(value + 1) / Math.log(total + 1);
+    for (const product of products) {
+      if (shownProductIdsRef.current.has(product.id) || !seen.add(product.id)) {
+        continue;
+      }
+      filtered.push(product);
     }
-    
-    return scores;
-  };
 
-  const getTopItems = (items: Record<string, number>, count: number): string[] => {
-    return Object.entries(items)
-      .filter(([key]) => key !== 'Unknown')
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, count)
-      .map(([key]) => key);
-  };
+    return filtered;
+  }, []);
 
-  const wasRecentlyShown = (productId: string): boolean => {
-    const lastShown = productLastShown.get(productId);
-    if (!lastShown) return false;
-    return Date.now() - lastShown.getTime() < 24 * 60 * 60 * 1000; // 24 hours
-  };
-
-  // ============= USER PREFERENCES =============
-  const loadUserPreferences = async (userId: string): Promise<UserPreferences> => {
+  // ✅ MATCHES FLUTTER: Get user preferences with SINGLE read
+  const getUserPreferences = useCallback(async (userId: string) => {
     try {
-      const prefsRef = collection(db, "users", userId, "preferences");
-      const [categoryDoc, subcategoryDoc] = await Promise.all([
-        getDoc(doc(prefsRef, "categoryClicks")),
-        getDoc(doc(prefsRef, "subcategoryClicks"))
-      ]);
+      const prefsSnapshot = await getDocs(
+        collection(db, "users", userId, "preferences")
+      );
 
-      const categoryClicks = (categoryDoc.data() || {}) as Record<string, number>;
-      const subcategoryClicks = (subcategoryDoc.data() || {}) as Record<string, number>;
+      if (prefsSnapshot.docs.length === 0) {
+        return null;
+      }
 
-      setCategoryScores(calculateWeightedScores(categoryClicks));
-      setSubcategoryScores(calculateWeightedScores(subcategoryClicks));
+      const categoryScores: Record<string, number> = {};
+      const subcategoryScores: Record<string, number> = {};
+      const purchasedCategories = new Set<string>();
+      const purchasedSubcategories = new Set<string>();
 
-      const totalInteractions = Object.values(categoryClicks).reduce((a, b) => a + b, 0);
+      for (const doc of prefsSnapshot.docs) {
+        const data = doc.data();
 
-      return {
-        categoryClicks,
-        subcategoryClicks,
-        totalInteractions,
-        topCategories: getTopItems(categoryClicks, 5),
-        topSubcategories: getTopItems(subcategoryClicks, 7),
-      };
-    } catch (error) {
-      console.error("Error loading preferences:", error);
-      return {
-        categoryClicks: {},
-        subcategoryClicks: {},
-        totalInteractions: 0,
-        topCategories: [],
-        topSubcategories: [],
-      };
-    }
-  };
-
-  // ============= HELPER FUNCTION =============
-  const convertDocumentToProduct = (doc: QueryDocumentSnapshot<DocumentData>): Product => {
-    const data = doc.data();
-    return ProductUtils.fromJson({
-      ...data,
-      id: doc.id,
-      reference: doc.ref ? {
-        id: doc.ref.id,
-        path: doc.ref.path,
-        parent: {
-          id: doc.ref.parent?.id || ''
+        switch (doc.id) {
+          case 'categoryClicks':
+            Object.assign(categoryScores, data);
+            break;
+          case 'subcategoryClicks':
+            Object.assign(subcategoryScores, data);
+            break;
+          case 'purchases':
+            if (data.categories) {
+              data.categories.forEach((cat: string) => purchasedCategories.add(cat));
+            }
+            if (data.subcategories) {
+              data.subcategories.forEach((sub: string) => purchasedSubcategories.add(sub));
+            }
+            break;
         }
-      } : undefined
-    });
-  };
+      }
 
-  // ============= FETCH STRATEGIES =============
-  const fetchCategoryBased = async (preferences: UserPreferences, fetchLimit: number): Promise<Product[]> => {
-    if (preferences.topCategories.length === 0) return [];
+      // ✅ MATCHES FLUTTER: Calculate weighted scores
+      const finalScores: Record<string, number> = {};
 
+      Object.entries(categoryScores).forEach(([cat, clicks]) => {
+        finalScores[cat] = clicks * CLICK_WEIGHT;
+      });
+
+      purchasedCategories.forEach(cat => {
+        finalScores[cat] = (finalScores[cat] || 0) + (10 * PURCHASE_WEIGHT);
+      });
+
+      if (Object.keys(finalScores).length === 0) {
+        return null;
+      }
+
+      // ✅ MATCHES FLUTTER: Get top 5 categories
+      const topCategories = Object.entries(finalScores)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 5)
+        .map(([cat]) => cat)
+        .filter(cat => cat !== 'Unknown' && cat.length > 0);
+
+      if (topCategories.length === 0) {
+        return null;
+      }
+
+      return { topCategories, finalScores };
+    } catch (e) {
+      console.error('Error loading preferences:', e);
+      return null;
+    }
+  }, []);
+
+  // ✅ MATCHES FLUTTER: Personalized recommendations
+  const getPersonalizedRecommendations = useCallback(async (userId: string, limit: number): Promise<Product[]> => {
     try {
+      const preferences = await getUserPreferences(userId);
+      
+      if (!preferences) {
+        return getNewUserRecommendations(limit);
+      }
+
+      // ✅ MATCHES FLUTTER: Single optimized query using whereIn
       const q = query(
         collection(db, "shop_products"),
         where("category", "in", preferences.topCategories.slice(0, 10)),
         where("quantity", ">", 0),
         orderBy("quantity"),
         orderBy("rankingScore", "desc"),
-        limit(fetchLimit * 2)
+        firestoreLimit(BATCH_SIZE)
       );
 
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => convertDocumentToProduct(doc));
-    } catch (error) {
-      console.error("Error in fetchCategoryBased:", error);
-      return [];
+      const products = snapshot.docs.map(doc => convertDocumentToProduct(doc));
+
+      // ✅ MATCHES FLUTTER: Sort by category preference scores
+      products.sort((a, b) => {
+        const aScore = preferences.finalScores[a.category] || 0;
+        const bScore = preferences.finalScores[b.category] || 0;
+        if (aScore !== bScore) return bScore - aScore;
+
+        // Secondary sort by ranking score
+        const aRank = a.rankingScore || 0;
+        const bRank = b.rankingScore || 0;
+        return bRank - aRank;
+      });
+
+      return products;
+    } catch (e) {
+      console.error('Error in personalized recommendations:', e);
+      return getNewUserRecommendations(limit);
     }
-  };
+  }, [getUserPreferences]);
 
-  const fetchTrending = async (categories: string[], fetchLimit: number): Promise<Product[]> => {
-    if (categories.length === 0) return [];
-
+  // ✅ MATCHES FLUTTER: New user recommendations
+  const getNewUserRecommendations = useCallback(async (limit: number): Promise<Product[]> => {
     try {
       const q = query(
         collection(db, "shop_products"),
-        where("category", "in", categories.slice(0, 10)),
-        where("dailyClickCount", ">", 5),
-        orderBy("dailyClickCount", "desc"),
-        limit(fetchLimit)
-      );
-
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => convertDocumentToProduct(doc));
-    } catch (error) {
-      console.error("Error in fetchTrending:", error);
-      return [];
-    }
-  };
-
-  const fetchCollaborative = async (preferences: UserPreferences, fetchLimit: number): Promise<Product[]> => {
-    if (preferences.topCategories.length === 0) return [];
-
-    try {
-      const q = query(
-        collection(db, "shop_products"),
-        where("category", "in", preferences.topCategories.slice(0, 3)),
-        where("purchaseCount", ">", 5),
-        where("averageRating", ">", 4),
-        orderBy("purchaseCount", "desc"),
-        orderBy("averageRating", "desc"),
-        limit(fetchLimit)
-      );
-
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => convertDocumentToProduct(doc));
-    } catch (error) {
-      console.error("Error in fetchCollaborative:", error);
-      return [];
-    }
-  };
-
-  const fetchExploration = async (fetchLimit: number): Promise<Product[]> => {
-    const cutoffDate = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
-
-    try {
-      const q = query(
-        collection(db, "shop_products"),
-        where("createdAt", ">", Timestamp.fromDate(cutoffDate)),
         where("quantity", ">", 0),
-        orderBy("createdAt", "desc"),
+        orderBy("quantity"),
         orderBy("rankingScore", "desc"),
-        limit(fetchLimit)
+        firestoreLimit(BATCH_SIZE)
       );
 
       const snapshot = await getDocs(q);
       return snapshot.docs.map(doc => convertDocumentToProduct(doc));
-    } catch (error) {
-      console.error("Error in fetchExploration:", error);
+    } catch (e) {
+      console.error('Error in new user recommendations:', e);
       return [];
     }
-  };
+  }, []);
 
-  const fetchUnauthenticatedRecommendations = async (fetchLimit: number): Promise<Product[]> => {
+  // ✅ MATCHES FLUTTER: Generic recommendations for non-authenticated users
+  const getGenericRecommendations = useCallback(async (limit: number): Promise<Product[]> => {
     try {
-      const strategies = await Promise.all([
-        getDocs(query(
-          collection(db, "shop_products"),
-          where("quantity", ">", 0),
-          where("rankingScore", ">", 0.7),
-          orderBy("rankingScore", "desc"),
-          orderBy("quantity", "desc"),
-          limit(Math.ceil(fetchLimit * 0.4))
-        )),
-        getDocs(query(
-          collection(db, "shop_products"),
-          where("quantity", ">", 0),
-          where("dailyClickCount", ">", 5),
-          orderBy("dailyClickCount", "desc"),
-          orderBy("quantity", "desc"),
-          limit(Math.ceil(fetchLimit * 0.3))
-        )),
-        getDocs(query(
-          collection(db, "shop_products"),
-          where("quantity", ">", 0),
-          where("purchaseCount", ">", 5),
-          orderBy("purchaseCount", "desc"),
-          orderBy("quantity", "desc"),
-          limit(Math.ceil(fetchLimit * 0.3))
-        ))
-      ]);
-
-      const products: Product[] = [];
-      const seen = new Set<string>();
-
-      for (const snapshot of strategies) {
-        for (const doc of snapshot.docs) {
-          const product = convertDocumentToProduct(doc);
-          if (!seen.has(product.id)) {
-            seen.add(product.id);
-            products.push(product);
-          }
-        }
-      }
-
-      // Shuffle for variety
-      return products.sort(() => Math.random() - 0.5).slice(0, fetchLimit);
-    } catch (error) {
-      console.error("Error in unauthenticated recommendations:", error);
-      return fetchFallbackProducts(fetchLimit);
-    }
-  };
-
-  const fetchFallbackProducts = async (fetchLimit: number): Promise<Product[]> => {
-    try {
-      const snapshot = await getDocs(
-        query(
-          collection(db, "shop_products"),
-          limit(fetchLimit)
-        )
+      const q = query(
+        collection(db, "shop_products"),
+        where("quantity", ">", 0),
+        orderBy("quantity"),
+        orderBy("purchaseCount", "desc"),
+        firestoreLimit(BATCH_SIZE)
       );
-      
+
+      const snapshot = await getDocs(q);
       return snapshot.docs.map(doc => convertDocumentToProduct(doc));
-    } catch (error) {
-      console.error("Critical error in fallback:", error);
+    } catch (e) {
+      console.error('Error in generic recommendations:', e);
+      return getFallbackRecommendations(limit);
+    }
+  }, []);
+
+  // ✅ MATCHES FLUTTER: Fallback recommendations
+  const getFallbackRecommendations = useCallback(async (limit: number): Promise<Product[]> => {
+    try {
+      const q = query(
+        collection(db, "shop_products"),
+        orderBy("createdAt", "desc"),
+        firestoreLimit(limit)
+      );
+
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => convertDocumentToProduct(doc));
+    } catch (e) {
+      console.error('Fallback failed:', e);
       return [];
     }
-  };
+  }, []);
 
-  // ============= SMART DIVERSIFICATION =============
-  const applySmartDiversification = (products: Product[], fetchLimit: number): Product[] => {
-    if (products.length <= fetchLimit) return products;
-
-    const diversified: Product[] = [];
-    const categoryCount: Record<string, number> = {};
-    const subcategoryCount: Record<string, number> = {};
-
-    for (const product of products) {
-      if (diversified.length >= fetchLimit) break;
-
-      const cat = product.category || 'Unknown';
-      const subcat = `${cat}_${product.subcategory || 'Unknown'}`;
-
-      // Check if product was recently shown
-      if (wasRecentlyShown(product.id)) continue;
-      
-      // Check if we've already shown this product in current session
-      if (recentlyShownIds.has(product.id)) continue;
-      
-      // Limit per category/subcategory
-      if ((categoryCount[cat] || 0) >= 5) continue;
-      if ((subcategoryCount[subcat] || 0) >= 3) continue;
-
-      diversified.push(product);
-      categoryCount[cat] = (categoryCount[cat] || 0) + 1;
-      subcategoryCount[subcat] = (subcategoryCount[subcat] || 0) + 1;
-    }
-
-    // Fill remaining slots if needed
-    if (diversified.length < fetchLimit) {
-      for (const product of products) {
-        if (!diversified.find(p => p.id === product.id)) {
-          diversified.push(product);
-          if (diversified.length >= fetchLimit) break;
-        }
-      }
-    }
-
-    return diversified;
-  };
-
-  // Helper function to clean up old shown products
-  const cleanupRecentlyShown = useCallback(() => {
-    if (recentlyShownIds.size > MAX_RECENTLY_SHOWN) {
-      // Sort by last shown time and keep only the most recent
-      const sortedEntries = Array.from(productLastShown.entries())
-        .sort(([, a], [, b]) => b.getTime() - a.getTime())
-        .slice(0, MAX_RECENTLY_SHOWN);
-      
-      const newRecentlyShown = new Set(sortedEntries.map(([id]) => id));
-      const newProductLastShown = new Map(sortedEntries);
-      
-      setRecentlyShownIds(newRecentlyShown);
-      setProductLastShown(newProductLastShown);
-    }
-  }, [recentlyShownIds.size, productLastShown]);
-
-  // ============= MAIN FETCH METHOD =============
-  const performFetch = async (fetchLimit: number): Promise<Product[]> => {
-    try {
-      setState(prev => ({ ...prev, isLoading: true, error: null }));
-      fetchAttempts.current++;
-
-      let results: Product[];
-
-      if (!user) {
-        results = await fetchUnauthenticatedRecommendations(fetchLimit);
-      } else {
-        const preferences = await loadUserPreferences(user.uid);
-
-        if (preferences.totalInteractions < 3) {
-          // New user - fetch diverse popular products
-          results = await fetchUnauthenticatedRecommendations(fetchLimit);
-        } else {
-          // Experienced user - use weighted strategies
-          const strategies = await Promise.all([
-            fetchCategoryBased(preferences, Math.ceil(fetchLimit * 0.4)),
-            fetchTrending(preferences.topCategories, Math.ceil(fetchLimit * 0.25)),
-            fetchCollaborative(preferences, Math.ceil(fetchLimit * 0.2)),
-            fetchExploration(Math.ceil(fetchLimit * 0.15))
-          ]);
-
-          // Merge and score using category preferences
-          const scoredProducts = new Map<string, ScoredProduct>();
-          const weights = [0.4, 0.25, 0.2, 0.15];
-
-          for (let i = 0; i < strategies.length; i++) {
-            for (const product of strategies[i]) {
-              if (!scoredProducts.has(product.id)) {
-                scoredProducts.set(product.id, { product, score: 0 });
-              }
-              const scored = scoredProducts.get(product.id)!;
-              
-              // Base score from strategy weight
-              let productScore = weights[i];
-              
-              // Bonus score based on category preference
-              if (product.category && categoryScores[product.category]) {
-                productScore += categoryScores[product.category] * 0.1;
-              }
-              
-              // Bonus score based on subcategory preference
-              if (product.subcategory && subcategoryScores[product.subcategory]) {
-                productScore += subcategoryScores[product.subcategory] * 0.05;
-              }
-              
-              scored.score += productScore;
-            }
-          }
-
-          // Sort by score
-          const sorted = Array.from(scoredProducts.values())
-            .sort((a, b) => b.score - a.score)
-            .map(sp => sp.product);
-
-          results = applySmartDiversification(sorted, fetchLimit);
-        }
-
-        // Update recently shown tracking
-        const now = new Date();
-        for (const product of results) {
-          setRecentlyShownIds(prev => new Set([...prev, product.id]));
-          setProductLastShown(prev => new Map(prev).set(product.id, now));
-        }
-        
-        // Cleanup old entries if needed
-        cleanupRecentlyShown();
-      }
-
-      // Update state
-      if (isMounted.current) {
-        setState(prev => ({
-          ...prev,
-          recommendations: results,
-          cachedRecommendations: [...results],
-          lastFetchTime: new Date(),
-          lastSuccessfulFetch: new Date(),
-          isLoading: false,
-        }));
-      }
-
-      fetchAttempts.current = 0;
-      return results;
-
-    } catch (error) {
-      console.error("Error fetching recommendations:", error);
-      
-      if (isMounted.current) {
-        setState(prev => ({
-          ...prev,
-          error: "Failed to load recommendations",
-          isLoading: false,
-        }));
-      }
-
-      // Use cached recommendations if available
-      if (state.cachedRecommendations.length > 0) {
-        return state.cachedRecommendations;
-      }
-
-      // Last resort - fetch fallback
-      const fallback = await fetchFallbackProducts(fetchLimit);
-      if (isMounted.current) {
-        setState(prev => ({
-          ...prev,
-          recommendations: fallback,
-          isLoading: false,
-        }));
-      }
-      return fallback;
-    }
-  };
-
-  const fetchPersonalizedRecommendations = useCallback(async (
+  // ✅ MATCHES FLUTTER: Main fetch method
+  const fetchRecommendations = useCallback(async (
     options: { limit?: number; forceRefresh?: boolean } = {}
-  ): Promise<Product[]> => {
+  ): Promise<void> => {
     const { limit = 20, forceRefresh = false } = options;
 
-    if (!shouldFetch(forceRefresh)) {
-      return recommendations;
+    // ✅ MATCHES FLUTTER: Skip if recently fetched (unless forced)
+    if (
+      !forceRefresh &&
+      lastFetchRef.current &&
+      Date.now() - lastFetchRef.current.getTime() < CACHE_EXPIRY &&
+      recommendations.length > 0
+    ) {
+      console.log(`Using cached recommendations (${recommendations.length} items)`);
+      return;
     }
 
-    // Debounce multiple calls
-    if (debounceTimer.current) {
-      clearTimeout(debounceTimer.current);
-    }
+    if (isLoading) return;
 
-    return new Promise((resolve) => {
-      debounceTimer.current = setTimeout(async () => {
-        const results = await performFetch(limit);
-        resolve(results);
-      }, DEBOUNCE_DELAY);
-    });
-  }, [shouldFetch, recommendations]);
+    setIsLoading(true);
+    setError(null);
 
-  const refreshRecommendations = useCallback(async (): Promise<void> => {
-    await fetchPersonalizedRecommendations({ forceRefresh: true });
-  }, [fetchPersonalizedRecommendations]);
+    try {
+      let products: Product[];
 
-  const clearCache = useCallback((): void => {
-    setState(prev => ({
-      ...prev,
-      cachedRecommendations: [],
-      lastSuccessfulFetch: null,
-    }));
-  }, []);
-
-  // ============= EFFECTS =============
-  useEffect(() => {
-    // Initial fetch
-    if (!state.lastFetchTime && !state.isLoading) {
-      fetchPersonalizedRecommendations();
-    }
-
-    // Setup periodic refresh
-    refreshTimer.current = setInterval(() => {
-      if (!hasValidCache) {
-        fetchPersonalizedRecommendations();
+      if (user) {
+        products = await getPersonalizedRecommendations(user.uid, limit);
+      } else {
+        products = await getGenericRecommendations(limit);
       }
-    }, REFRESH_INTERVAL);
 
-    return () => {
-      isMounted.current = false;
-      if (debounceTimer.current) clearTimeout(debounceTimer.current);
-      if (refreshTimer.current) clearInterval(refreshTimer.current);
-    };
-  }, []);
+      // ✅ MATCHES FLUTTER: Remove duplicates
+      products = removeDuplicates(products);
 
-  // Handle user changes
-  useEffect(() => {
-    if (user?.uid) {
-      // User logged in or changed - fetch new recommendations
-      fetchPersonalizedRecommendations({ forceRefresh: true });
-    } else {
-      // User logged out - clear personalized data
-      setCategoryScores({});
-      setSubcategoryScores({});
-      setRecentlyShownIds(new Set());
-      setProductLastShown(new Map());
+      // ✅ MATCHES FLUTTER: Supplement with generic if too few results
+      if (products.length < limit) {
+        const supplemental = await getGenericRecommendations(limit - products.length);
+        products.push(...removeDuplicates(supplemental));
+      }
+
+      const finalProducts = products.slice(0, limit);
+      
+      setRecommendations(finalProducts);
+      lastFetchRef.current = new Date();
+      setError(null);
+
+      // ✅ MATCHES FLUTTER: Track shown products
+      shownProductIdsRef.current.clear();
+      finalProducts.forEach(p => shownProductIdsRef.current.add(p.id));
+
+      console.log(`Fetched ${finalProducts.length} personalized recommendations`);
+    } catch (e) {
+      console.error('Error fetching recommendations:', e);
+      setError('Failed to load recommendations');
+
+      // ✅ MATCHES FLUTTER: Keep existing recommendations on error
+      if (recommendations.length === 0) {
+        const fallback = await getFallbackRecommendations(limit);
+        setRecommendations(fallback);
+      }
+    } finally {
+      setIsLoading(false);
     }
-  }, [user?.uid]);
+  }, [
+    user,
+    isLoading,
+    recommendations.length,
+    getPersonalizedRecommendations,
+    getGenericRecommendations,
+    removeDuplicates,
+    getFallbackRecommendations,
+  ]);
 
-  const contextValue: PersonalizedRecommendationsContextType = {
-    ...state,
+  // ✅ MATCHES FLUTTER: Refresh method
+  const refresh = useCallback(async (): Promise<void> => {
+    lastFetchRef.current = null;
+    await fetchRecommendations({ forceRefresh: true });
+  }, [fetchRecommendations]);
+
+  // ✅ OPTIMIZED: Memoized context value to prevent unnecessary re-renders
+  const contextValue = useMemo<PersonalizedRecommendationsContextType>(() => ({
     recommendations,
-    hasValidCache,
-    fetchPersonalizedRecommendations,
-    refreshRecommendations,
-    clearCache,
-  };
+    isLoading,
+    error,
+    hasRecommendations,
+    fetchRecommendations,
+    refresh,
+  }), [recommendations, isLoading, error, hasRecommendations, fetchRecommendations, refresh]);
 
   return (
     <PersonalizedRecommendationsContext.Provider value={contextValue}>

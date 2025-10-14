@@ -10,15 +10,18 @@ import React, {
 import {
   collection,
   query,
+  where,
   orderBy,
   onSnapshot,
   QuerySnapshot,
+  DocumentData,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 
 interface BannerItem {
+  id: string;
   url: string;
   color: string;
   linkType?: string;
@@ -27,15 +30,18 @@ interface BannerItem {
 
 interface AdsBannerProps {
   onBackgroundColorChange?: (color: string) => void;
-  headerHeight?: number;
 }
 
-// Optimize color conversion with memoization
-const convertDominantColor = (cInt: number): string => {
-  if (!cInt) return "#808080";
+// ✅ OPTIMIZED: Color conversion with validation
+const convertDominantColor = (cInt: number | null | undefined): string => {
+  if (!cInt || cInt === 0) return "#808080";
+  
   try {
-    const hexValue = Math.abs(cInt).toString(16);
-    return `#${hexValue.padStart(6, "0").substring(0, 6)}`;
+    // Handle negative values by using absolute value
+    const absValue = Math.abs(cInt);
+    const hexValue = absValue.toString(16).padStart(8, "0");
+    // Extract RGB (skip alpha channel)
+    return `#${hexValue.substring(2, 8)}`;
   } catch (e) {
     console.error("Color conversion error:", e);
     return "#808080";
@@ -46,24 +52,28 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
   onBackgroundColorChange,
 }) => {
   const router = useRouter();
+  
+  // ✅ OPTIMIZED: Minimal state
   const [banners, setBanners] = useState<BannerItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [isClient, setIsClient] = useState(false);  
+  const [isClient, setIsClient] = useState(false);
+  const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
 
-  // Refs for optimizations
-  // const cachedUrls = useRef(new Set<string>());
+  // ✅ OPTIMIZED: Refs for cleanup and performance
+  const cachedUrls = useRef(new Set<string>());
   const carouselInterval = useRef<NodeJS.Timeout | null>(null);
   const touchStartX = useRef<number>(0);
   const touchEndX = useRef<number>(0);
   const unsubscribeRef = useRef<(() => void) | null>(null);
+  const lastColorRef = useRef<string>("");
 
-  // Client-side mounting check with immediate effect
+  // Client-side mounting check
   useEffect(() => {
     setIsClient(true);
   }, []);
 
-  // Memoize screen size calculations
+  // ✅ RESTORED: Original design dimensions
   const screenInfo = useMemo(() => {
     if (typeof window === "undefined" || !isClient) {
       return { isLarger: false, bannerHeight: 220 };
@@ -73,7 +83,7 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
     const shortestSide = Math.min(innerWidth, innerHeight);
     const isLarger = shortestSide >= 600 || innerWidth >= 900;
 
-    let bannerHeight = 220;
+    let bannerHeight = 220; // Default height
     if (!isLarger) {
       bannerHeight = 150;
     } else {
@@ -88,104 +98,108 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
     return { isLarger, bannerHeight };
   }, [isClient]);
 
-  // Optimized background color handler with debouncing
+  // ✅ OPTIMIZED: Background color handler with localStorage caching
   const updateBackgroundColor = useCallback(
     (color: string) => {
+      // Prevent unnecessary updates
+      if (color === lastColorRef.current) return;
+      
+      lastColorRef.current = color;
+
       if (onBackgroundColorChange) {
         onBackgroundColorChange(color);
+      }
 
-        if (isClient) {
-          try {
-            localStorage.setItem("lastAdsBannerColor", color);
-          } catch (error) {
-            console.error("Failed to save banner color:", error);
-          }
+      if (isClient) {
+        try {
+          localStorage.setItem("lastAdsBannerColor", color);
+        } catch (error) {
+          console.error("Failed to save banner color:", error);
         }
       }
     },
     [onBackgroundColorChange, isClient]
-  );  
+  );
 
-  // Optimized Firestore listener with better error handling
+  // ✅ OPTIMIZED: Firestore listener (matches Flutter exactly)
   useEffect(() => {
     if (!isClient) return;
 
-    console.log("🔥 Setting up Firestore listener for market_top_ads_banners");
-
-    // Restore background color immediately
+    // Restore last background color from localStorage
     try {
       const storedColor = localStorage.getItem("lastAdsBannerColor");
-      if (storedColor && onBackgroundColorChange) {
-        onBackgroundColorChange(storedColor);
+      if (storedColor) {
+        updateBackgroundColor(storedColor);
       }
     } catch (error) {
       console.error("Failed to restore banner color:", error);
     }
 
+    // ✅ MATCHES FLUTTER: Query with isActive filter and descending order
     const q = query(
       collection(db, "market_top_ads_banners"),
+      where("isActive", "==", true),
       orderBy("createdAt", "desc")
     );
 
     const unsubscribe = onSnapshot(
       q,
-      (snapshot: QuerySnapshot) => {
-        console.log(
-          "📸 Firestore snapshot received:",
-          snapshot.docs.length,
-          "documents"
-        );
-
+      (snapshot: QuerySnapshot<DocumentData>) => {
         const items: BannerItem[] = [];
 
-        snapshot.docs.forEach((doc) => {
+        snapshot.docs.forEach((doc, index) => {
           const data = doc.data();
           const url = data.imageUrl as string;
 
-          if (!url) {
-            console.warn("⚠️ No imageUrl found in document:", doc.id);
-            return;
-          }
+          if (!url) return;
 
           const color = convertDominantColor(data.dominantColor as number);
 
+          // ✅ MATCHES FLUTTER: Extract linkId from linkedShopId or linkedProductId
+          const linkId = data.linkedShopId || data.linkedProductId;
+
           items.push({
+            id: doc.id, // ✅ MATCHES FLUTTER: Store document ID
             url,
             color,
             linkType: data.linkType as string | undefined,
-            linkId: data.linkId as string | undefined,
+            linkId: linkId as string | undefined,
           });
+
+          // ✅ MATCHES FLUTTER: Prefetch images that aren't cached
+          if (!cachedUrls.current.has(url)) {
+            cachedUrls.current.add(url);
+            
+            // Prefetch with delay for non-first images
+            if (index > 0) {
+              setTimeout(() => {
+                const img = new window.Image();
+                img.src = url;
+              }, index * 100);
+            }
+          }
         });
 
-        console.log("✅ Processed banners:", items.length);
         setBanners(items);
         setIsLoading(false);
 
-        // Update background color with first banner
+        // ✅ MATCHES FLUTTER: Update background with first banner's color
         if (items.length > 0) {
           updateBackgroundColor(items[0].color);
         }
-
-       
       },
       (error) => {
-        console.error("❌ Firestore error in AdsBanner:", error);
+        console.error("Firestore error in AdsBanner:", error);
         setIsLoading(false);
       }
     );
 
     unsubscribeRef.current = unsubscribe;
     return () => unsubscribe();
-  }, [
-    isClient,
-    onBackgroundColorChange,
-    updateBackgroundColor,
-    
-  ]);
+  }, [isClient, updateBackgroundColor]);
 
-  // Optimized auto-slide with cleanup
+  // ✅ OPTIMIZED: Auto-slide with proper cleanup
   useEffect(() => {
-    // Clear existing interval
     if (carouselInterval.current) {
       clearInterval(carouselInterval.current);
       carouselInterval.current = null;
@@ -205,37 +219,54 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
     };
   }, [banners.length]);
 
-  // Optimized page change handler
-  const handlePageChange = useCallback(
-    (index: number) => {
-      if (index < banners.length && index >= 0) {
-        updateBackgroundColor(banners[index].color);
-      }
-    },
-    [banners, updateBackgroundColor]
-  );
-
-  // Update background color when index changes
+  // ✅ MATCHES FLUTTER: Update background color on page change
   useEffect(() => {
-    handlePageChange(currentIndex);
-  }, [currentIndex, handlePageChange]);
+    if (currentIndex < banners.length && currentIndex >= 0) {
+      const color = banners[currentIndex].color;
+      updateBackgroundColor(color);
+    }
+  }, [currentIndex, banners, updateBackgroundColor]);
 
-  // Optimized banner click handler
+  // ✅ MATCHES FLUTTER: Banner click handler with analytics tracking point
   const handleBannerClick = useCallback(
     (item: BannerItem) => {
-      if (!item.linkType || !item.linkId) return;
+      // ✅ TODO: Add AdAnalyticsService.trackAdClick here when available
+      // AdAnalyticsService.trackAdClick({
+      //   adId: item.id,
+      //   adType: 'topBanner',
+      //   linkedType: item.linkType,
+      //   linkedId: item.linkId,
+      // });
 
-      const route =
-        item.linkType === "shop"
-          ? `/shopdetail/${item.linkId}`
-          : `/productdetail/${item.linkId}`;
+      console.log('Banner tapped - linkType:', item.linkType, 'linkId:', item.linkId);
 
-      router.push(route);
+      if (!item.linkType || !item.linkId) {
+        console.log('Banner has no link');
+        return;
+      }
+
+      // ✅ MATCHES FLUTTER: Exact same routing logic
+      try {
+        switch (item.linkType) {
+          case 'shop':
+            console.log('Navigating to shop:', item.linkId);
+            router.push(`/shop_detail/${item.linkId}`);
+            break;
+          case 'product':
+          case 'shop_product':
+          default:
+            console.log('Navigating to product:', item.linkId);
+            router.push(`/product_detail/${item.linkId}`);
+            break;
+        }
+      } catch (error) {
+        console.error('Navigation error:', error);
+      }
     },
     [router]
   );
 
-  // Optimized touch handlers
+  // ✅ OPTIMIZED: Touch handlers for swipe gestures
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     touchStartX.current = e.targetTouches[0].clientX;
     touchEndX.current = 0;
@@ -255,16 +286,14 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
 
     setCurrentIndex((prev) => {
       if (distance > 0) {
-        // Left swipe (next)
         return prev < banners.length - 1 ? prev + 1 : prev;
       } else {
-        // Right swipe (previous)
         return prev > 0 ? prev - 1 : prev;
       }
     });
   }, [banners.length]);
 
-  // Optimized slide navigation
+  // Navigation handlers
   const goToSlide = useCallback(
     (index: number) => {
       if (index >= 0 && index < banners.length) {
@@ -274,7 +303,6 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
     [banners.length]
   );
 
-  // Navigation handlers
   const goToPrevious = useCallback(() => {
     setCurrentIndex((prev) => (prev === 0 ? banners.length - 1 : prev - 1));
   }, [banners.length]);
@@ -282,6 +310,11 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
   const goToNext = useCallback(() => {
     setCurrentIndex((prev) => (prev + 1) % banners.length);
   }, [banners.length]);
+
+  // ✅ OPTIMIZED: Image error handler
+  const handleImageError = useCallback((index: number) => {
+    setImageErrors(prev => new Set(prev).add(index));
+  }, []);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -295,7 +328,7 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
     };
   }, []);
 
-  // Show loading skeleton with proper height
+  // ✅ RESTORED: Loading skeleton with original design
   if (isLoading || banners.length === 0) {
     return (
       <div
@@ -327,10 +360,11 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
         {banners.map((banner, index) => {
           const isActive = index === currentIndex;
           const isAdjacent = Math.abs(index - currentIndex) <= 1;
+          const hasError = imageErrors.has(index);
 
           return (
             <div
-              key={`${banner.url}-${index}`}
+              key={`${banner.id}-${index}`}
               className={`w-full h-full flex-shrink-0 relative ${
                 banner.linkType && banner.linkId
                   ? "cursor-pointer"
@@ -338,8 +372,8 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
               }`}
               onClick={() => handleBannerClick(banner)}
             >
-              {/* Only render images for active and adjacent slides for performance */}
-              {isAdjacent && (
+              {/* ✅ RESTORED: Original image rendering */}
+              {isAdjacent && !hasError ? (
                 <Image
                   src={banner.url}
                   alt={`Banner ${index + 1}`}
@@ -348,33 +382,34 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
                   priority={index === 0}
                   sizes={screenInfo.isLarger ? "90vw" : "100vw"}
                   quality={isActive ? 85 : 75}
-                  loading={index === 0 ? "eager" : "lazy"}                  
-                  onError={(e) => {
-                    console.error("❌ Image failed to load:", banner.url);
-                    const target = e.target as HTMLImageElement;
-                    target.style.display = "none";
-                  }}
+                  loading={index === 0 ? "eager" : "lazy"}
+                  onError={() => handleImageError(index)}
                 />
-              )}
+              ) : hasError ? (
+                // Error placeholder
+                <div className="absolute inset-0 bg-gray-200 flex items-center justify-center">
+                  <svg
+                    className={`text-gray-400 ${
+                      screenInfo.isLarger ? "w-8 h-8" : "w-6 h-6"
+                    }`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    />
+                  </svg>
+                </div>
+              ) : null}
 
-              {/* Fallback for failed images */}
-              <div className="absolute inset-0 bg-gray-200 flex items-center justify-center opacity-0 transition-opacity">
-                <svg
-                  className={`text-gray-400 ${
-                    screenInfo.isLarger ? "w-8 h-8" : "w-6 h-6"
-                  }`}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                  />
-                </svg>
-              </div>
+              {/* Loading placeholder */}
+              {!isActive && !hasError && (
+                <div className="absolute inset-0 bg-gray-200" />
+              )}
             </div>
           );
         })}
@@ -382,15 +417,15 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
 
       {/* Navigation Dots */}
       {banners.length > 1 && (
-        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2">
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2 z-10">
           {banners.map((_, index) => (
             <button
               key={index}
               onClick={() => goToSlide(index)}
-              className={`w-2 h-2 rounded-full transition-all duration-200 ${
+              className={`transition-all duration-200 ${
                 index === currentIndex
-                  ? "bg-white scale-125 shadow-lg"
-                  : "bg-white/50 hover:bg-white/75"
+                  ? "w-6 h-2 bg-white rounded-full shadow-lg"
+                  : "w-2 h-2 bg-white/50 hover:bg-white/75 rounded-full"
               }`}
               aria-label={`Go to slide ${index + 1}`}
             />
@@ -403,7 +438,7 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
         <>
           <button
             onClick={goToPrevious}
-            className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-black/20 hover:bg-black/40 text-white p-2 rounded-full transition-all duration-200"
+            className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-black/20 hover:bg-black/40 text-white p-2 rounded-full transition-all duration-200 z-10"
             aria-label="Previous slide"
           >
             <svg
@@ -423,7 +458,7 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
 
           <button
             onClick={goToNext}
-            className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-black/20 hover:bg-black/40 text-white p-2 rounded-full transition-all duration-200"
+            className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-black/20 hover:bg-black/40 text-white p-2 rounded-full transition-all duration-200 z-10"
             aria-label="Next slide"
           >
             <svg
