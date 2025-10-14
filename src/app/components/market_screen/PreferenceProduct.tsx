@@ -65,7 +65,7 @@ export const PreferenceProduct = React.memo(() => {
   const t = useTranslations("MarketScreen");
   
   // ✅ MATCHES FLUTTER: Fixed dimensions
-  const screenHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
+  
   const portraitImageHeight = 380;
   const infoAreaHeight = 80;
   const rowHeight = portraitImageHeight + infoAreaHeight + 40;
