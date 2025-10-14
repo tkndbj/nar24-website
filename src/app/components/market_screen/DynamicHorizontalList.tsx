@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ProductCard } from "../ProductCard";
 import { ChevronRight, ChevronLeft } from "lucide-react";
-import { useRouter } from "next/navigation";
+
 import {
   collection,
   query,
