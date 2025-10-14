@@ -361,7 +361,7 @@ const DynamicList: React.FC<{
 };
 
 // Main component
-export const DynamicHorizontalList: React.FC = () => {
+export default function DynamicHorizontalList() {
   const [dynamicLists, setDynamicLists] = useState<DynamicListData[]>([]);
   const [loading, setLoading] = useState(true);
   const [isClient, setIsClient] = useState(false);

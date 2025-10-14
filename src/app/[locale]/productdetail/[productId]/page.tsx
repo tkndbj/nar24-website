@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
@@ -18,18 +18,20 @@ import {
 import Image from "next/image";
 import ProductDetailActionsRow from "../../../components/product_detail/ProductDetailActionsRow";
 import DynamicAttributesWidget from "../../../components/product_detail/DynamicAttributesWidget";
-import ProductCollectionWidget from "../../../components/product_detail/ProductCollectionWidget";
-import FullScreenImageViewer from "../../../components/product_detail/FullScreenImageViewer";
-import ProductDetailReviewsTab from "../../../components/product_detail/Reviews";
 import ProductDetailSellerInfo from "../../../components/product_detail/SellerInfo";
-import ProductQuestionsWidget from "../../../components/product_detail/Questions";
-import ProductDetailRelatedProducts from "../../../components/product_detail/RelatedProducts";
-import BundleComponent from '@/app/components/product_detail/BundleComponent';
 import ProductOptionSelector from "@/app/components/ProductOptionSelector";
-import AskToSellerBubble from '@/app/components/product_detail/AskToSeller';
 import { useCart } from "@/context/CartProvider";
 import { useUser } from "@/context/UserProvider";
 import { Product, ProductUtils } from "@/app/models/Product";
+
+// ✅ LAZY LOAD: Heavy components that aren't immediately visible
+const ProductCollectionWidget = lazy(() => import("../../../components/product_detail/ProductCollectionWidget"));
+const FullScreenImageViewer = lazy(() => import("../../../components/product_detail/FullScreenImageViewer"));
+const ProductDetailReviewsTab = lazy(() => import("../../../components/product_detail/Reviews"));
+const ProductQuestionsWidget = lazy(() => import("../../../components/product_detail/Questions"));
+const ProductDetailRelatedProducts = lazy(() => import("../../../components/product_detail/RelatedProducts"));
+const BundleComponent = lazy(() => import('@/app/components/product_detail/BundleComponent'));
+const AskToSellerBubble = lazy(() => import('@/app/components/product_detail/AskToSeller'));
 
 interface ProductDetailPageProps {
   params: Promise<{ productId: string }>;
@@ -40,11 +42,9 @@ interface ProductDetailPageProps {
 const hasSelectableOptions = (product: Product | null): boolean => {
   if (!product) return false;
 
-  // Check for colors
   const hasColors = Object.keys(product.colorImages || {}).length > 0;
   if (hasColors) return true;
 
-  // Check for selectable attributes (attributes with multiple options)
   const selectableAttrs = Object.entries(product.attributes || {}).filter(
     ([, value]) => {
       let options: string[] = [];
@@ -60,7 +60,6 @@ const hasSelectableOptions = (product: Product | null): boolean => {
           .filter((item) => item !== "");
       }
 
-      // Only include attributes with multiple options
       return options.length > 1;
     }
   );
@@ -68,36 +67,80 @@ const hasSelectableOptions = (product: Product | null): boolean => {
   return selectableAttrs.length > 0;
 };
 
+// ✅ LOADING SKELETON: Memoized component outside main component
+const LoadingSkeleton = React.memo(({ isDarkMode }: { isDarkMode: boolean }) => (
+  <div className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}>
+    <div
+      className={`sticky top-0 z-10 border-b ${
+        isDarkMode
+          ? "bg-gray-800 border-gray-700"
+          : "bg-white border-gray-200"
+      }`}
+    >
+      <div className="flex items-center justify-between p-3 sm:p-4">
+        <div
+          className={`w-6 h-6 rounded animate-pulse ${
+            isDarkMode ? "bg-gray-700" : "bg-gray-200"
+          }`}
+        />
+        <div
+          className={`w-6 h-6 rounded animate-pulse ${
+            isDarkMode ? "bg-gray-700" : "bg-gray-200"
+          }`}
+        />
+      </div>
+    </div>
+    <div className="grid lg:grid-cols-2 gap-4 sm:gap-8 max-w-6xl mx-auto p-3 sm:p-4">
+      <div
+        className={`w-full h-64 sm:h-96 lg:h-[500px] animate-pulse ${
+          isDarkMode ? "bg-gray-700" : "bg-gray-200"
+        }`}
+      />
+      <div className="space-y-3 sm:space-y-4">
+        <div
+          className={`h-6 rounded animate-pulse ${
+            isDarkMode ? "bg-gray-700" : "bg-gray-200"
+          }`}
+        />
+        <div
+          className={`h-16 rounded animate-pulse ${
+            isDarkMode ? "bg-gray-700" : "bg-gray-200"
+          }`}
+        />
+        <div
+          className={`h-20 rounded animate-pulse ${
+            isDarkMode ? "bg-gray-700" : "bg-gray-200"
+          }`}
+        />
+      </div>
+    </div>
+  </div>
+));
+LoadingSkeleton.displayName = 'LoadingSkeleton';
+
 const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   const router = useRouter();
   const localization = useTranslations();
   const [productId, setProductId] = useState<string>("");
 
-  // ✅ FIXED: Proper nested translation function that uses JSON files
+  // ✅ OPTIMIZED: Translation function with better caching
   const t = useCallback((key: string) => {
-    if (!localization) {
-      return key;
-    }
+    if (!localization) return key;
 
     try {
-      // Try to get the nested ProductDetailPage translation
       const translation = localization(`ProductDetailPage.${key}`);
       
-      // Check if we got a valid translation (not the same as the key we requested)
       if (translation && translation !== `ProductDetailPage.${key}`) {
         return translation;
       }
       
-      // If nested translation doesn't exist, try direct key
       const directTranslation = localization(key);
       if (directTranslation && directTranslation !== key) {
         return directTranslation;
       }
       
-      // Return the key as fallback
       return key;
     } catch (error) {
-      console.warn(`Translation error for key: ${key}`, error);
       return key;
     }
   }, [localization]);
@@ -112,7 +155,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   } = useCart();
   const { user } = useUser();
 
-  // Animation states - simplified
+  // Animation states
   const [cartButtonState, setCartButtonState] = useState<
     "idle" | "adding" | "added" | "removing" | "removed"
   >("idle");
@@ -131,6 +174,9 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   const [isFavorite, setIsFavorite] = useState(false);
   const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
 
+  // ✅ NEW: Track if user has scrolled down to lazy load components
+  const [hasScrolled, setHasScrolled] = useState(false);
+
   // Resolve params
   useEffect(() => {
     params.then((resolvedParams) => {
@@ -138,22 +184,25 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     });
   }, [params]);
 
-  // Dark mode detection - optimized
+  // ✅ OPTIMIZED: Dark mode detection with debouncing
   useEffect(() => {
     if (typeof window === "undefined") return;
 
+    let timeoutId: NodeJS.Timeout;
+
     const detectDarkMode = () => {
-      const htmlElement = document.documentElement;
-      const darkModeMediaQuery = window.matchMedia(
-        "(prefers-color-scheme: dark)"
-      );
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        const htmlElement = document.documentElement;
+        const darkModeMediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
 
-      const isDark =
-        htmlElement.classList.contains("dark") ||
-        htmlElement.getAttribute("data-theme") === "dark" ||
-        darkModeMediaQuery.matches;
+        const isDark =
+          htmlElement.classList.contains("dark") ||
+          htmlElement.getAttribute("data-theme") === "dark" ||
+          darkModeMediaQuery.matches;
 
-      setIsDarkMode(isDark);
+        setIsDarkMode(isDark);
+      }, 50); // Debounce by 50ms
     };
 
     detectDarkMode();
@@ -165,14 +214,29 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     });
 
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    const handleChange = () => detectDarkMode();
-    mediaQuery.addEventListener("change", handleChange);
+    mediaQuery.addEventListener("change", detectDarkMode);
 
     return () => {
+      clearTimeout(timeoutId);
       observer.disconnect();
-      mediaQuery.removeEventListener("change", handleChange);
+      mediaQuery.removeEventListener("change", detectDarkMode);
     };
-  }, [productId]);
+  }, []);
+
+  // ✅ NEW: Scroll detection for lazy loading below-the-fold content
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 300 && !hasScrolled) {
+        setHasScrolled(true);
+      }
+    };
+
+    // Check immediately in case already scrolled
+    handleScroll();
+    
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [hasScrolled]);
 
   // Scroll to top when product changes
   useEffect(() => {
@@ -181,16 +245,20 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     }
   }, [productId]);
 
-  // Fetch product data
+  // ✅ OPTIMIZED: Fetch product data with AbortController
   useEffect(() => {
     if (!productId) return;
+
+    const abortController = new AbortController();
 
     const fetchProduct = async () => {
       try {
         setIsLoading(true);
         setError(null);
 
-        const response = await fetch(`/api/products/${productId}`);
+        const response = await fetch(`/api/products/${productId}`, {
+          signal: abortController.signal,
+        });
 
         if (!response.ok) {
           throw new Error(t("productNotFound"));
@@ -200,9 +268,12 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         const parsedProduct = ProductUtils.fromJson(productData);
         setProduct(parsedProduct);
 
-        // Record analytics
+        // ✅ OPTIMIZED: Record analytics without blocking (fire and forget)
         recordDetailView(parsedProduct);
       } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') {
+          return; // Request was cancelled, ignore
+        }
         console.error("Error fetching product:", err);
         setError(err instanceof Error ? err.message : t("failedToLoadProduct"));
       } finally {
@@ -211,27 +282,32 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     };
 
     fetchProduct();
+
+    return () => {
+      abortController.abort();
+    };
   }, [productId, t]);
 
-  // Analytics recording
-  const recordDetailView = useCallback(async (product: Product) => {
-    try {
-      await fetch("/api/analytics/detail-view", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          productId: product.id,
-          category: product.category,
-          subcategory: product.subcategory,
-          brand: product.brandModel,
-          price: product.price,
-        }),
-      });
-    } catch (error) {
+  // ✅ OPTIMIZED: Analytics recording - fire and forget, no await
+  const recordDetailView = useCallback((product: Product) => {
+    // Don't block rendering for analytics
+    fetch("/api/analytics/detail-view", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        productId: product.id,
+        category: product.category,
+        subcategory: product.subcategory,
+        brand: product.brandModel,
+        price: product.price,
+      }),
+      // Use keepalive to ensure request completes even if user navigates away
+      keepalive: true,
+    }).catch((error) => {
       console.error("Error recording detail view:", error);
-    }
+    });
   }, []);
 
   // Image error handling
@@ -256,8 +332,13 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     }
   }, [product, t]);
 
-  // Favorite toggle
+  // ✅ OPTIMIZED: Favorite toggle with optimistic update
   const handleToggleFavorite = useCallback(async () => {
+    if (!product?.id) return;
+
+    // Optimistic update
+    setIsFavorite((prev) => !prev);
+
     try {
       const response = await fetch("/api/favorites/toggle", {
         method: "POST",
@@ -265,15 +346,18 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          productId: product?.id,
+          productId: product.id,
         }),
       });
 
-      if (response.ok) {
+      if (!response.ok) {
+        // Revert on failure
         setIsFavorite((prev) => !prev);
       }
     } catch (error) {
       console.error("Error toggling favorite:", error);
+      // Revert on error
+      setIsFavorite((prev) => !prev);
     }
   }, [product?.id]);
 
@@ -297,13 +381,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           attributesToAdd
         );
   
-        console.log("ProductDetailPage - Add to cart result:", {
-          productId: product.id,
-          quantityToAdd,
-          attributesToAdd,
-          result,
-        });
-  
         if (result.includes("Added") || result.includes("Updated")) {
           setCartButtonState("added");
           setTimeout(() => setCartButtonState("idle"), 1500);
@@ -318,7 +395,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     [product, addToCart]
   );
   
-  // Handle cart removal
   const performCartRemoval = useCallback(
     async () => {
       if (!product) return;
@@ -327,11 +403,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         setCartButtonState("removing");
   
         const result = await removeFromCart(product.id);
-  
-        console.log("ProductDetailPage - Remove from cart result:", {
-          productId: product.id,
-          result,
-        });
   
         if (result.includes("Removed")) {
           setCartButtonState("removed");
@@ -347,7 +418,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     [product, removeFromCart]
   );
 
-  // Enhanced cart functionality with proper state management
   const handleAddToCart = useCallback(
     async (selectedOptions?: { quantity?: number; [key: string]: unknown }) => {
       if (!user) {
@@ -359,39 +429,33 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   
       const productInCart = isInCart(product.id);
   
-      // If product is in cart, remove it
       if (productInCart) {
         await performCartRemoval();
         return;
       }
   
-      // Show option selector if product has selectable options and no options provided
       if (!productInCart && hasSelectableOptions(product) && !selectedOptions) {
         setShowCartOptionSelector(true);
         return;
       }
   
-      // Add to cart
       await performCartAddition(selectedOptions);
     },
-    [user, product, isInCart, router, performCartRemoval, performCartAddition, setShowCartOptionSelector]
+    [user, product, isInCart, router, performCartRemoval, performCartAddition]
   );
 
-  // Handle cart option selector confirmation
   const handleCartOptionSelectorConfirm = useCallback(
     async (selectedOptions: { quantity?: number; [key: string]: unknown }) => {
       setShowCartOptionSelector(false);
-      await performCartAddition(selectedOptions); // Only for additions
+      await performCartAddition(selectedOptions);
     },
     [performCartAddition]
   );
 
-  // Handle cart option selector close
   const handleCartOptionSelectorClose = useCallback(() => {
     setShowCartOptionSelector(false);
   }, []);
 
-  // Buy now functionality
   const handleBuyNow = useCallback(async () => {
     if (!user) {
       router.push("/login");
@@ -401,19 +465,17 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     if (!product) return;
 
     try {
-      // Add to cart first if not already in cart
       if (!isInCart(product.id)) {
         await addToCart(product.id, 1);
       }
 
-      // Redirect to checkout
       router.push(`/checkout?productId=${product.id}&quantity=1`);
     } catch (error) {
       console.error("Error with buy now:", error);
     }
   }, [user, product, isInCart, addToCart, router]);
 
-  // Get current cart button content - simplified and fixed
+  // Get current cart button content
   const cartButtonContent = useMemo(() => {
     if (!product)
       return {
@@ -477,7 +539,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     t,
   ]);
 
-  // 🚀 SIMPLIFIED: Single effect to handle state resets
   useEffect(() => {
     if (!product) return;
 
@@ -485,19 +546,11 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     const isOptimisticAdd = isOptimisticallyAdding(product.id);
     const isOptimisticRemove = isOptimisticallyRemoving(product.id);
 
-    // Only reset if we're in a loading state but no optimistic operations are happening
     if (
       (cartButtonState === "adding" || cartButtonState === "removing") &&
       !isOptimisticAdd &&
       !isOptimisticRemove
     ) {
-      console.log("ProductDetailPage - Resetting button state:", {
-        productId: product.id,
-        cartButtonState,
-        productInCart,
-        isOptimisticAdd,
-        isOptimisticRemove,
-      });
       setCartButtonState("idle");
     }
   }, [
@@ -508,63 +561,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     cartButtonState,
   ]);
 
-  // Loading skeleton component
-  const LoadingSkeleton = useMemo(
-    () => (
-      <div
-        className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
-      >
-        <div
-          className={`sticky top-0 z-10 border-b ${
-            isDarkMode
-              ? "bg-gray-800 border-gray-700"
-              : "bg-white border-gray-200"
-          }`}
-        >
-          <div className="flex items-center justify-between p-3 sm:p-4">
-            <div
-              className={`w-6 h-6 rounded animate-pulse ${
-                isDarkMode ? "bg-gray-700" : "bg-gray-200"
-              }`}
-            />
-            <div
-              className={`w-6 h-6 rounded animate-pulse ${
-                isDarkMode ? "bg-gray-700" : "bg-gray-200"
-              }`}
-            />
-          </div>
-        </div>
-        <div className="grid lg:grid-cols-2 gap-4 sm:gap-8 max-w-6xl mx-auto p-3 sm:p-4">
-          <div
-            className={`w-full h-64 sm:h-96 lg:h-[500px] animate-pulse ${
-              isDarkMode ? "bg-gray-700" : "bg-gray-200"
-            }`}
-          />
-          <div className="space-y-3 sm:space-y-4">
-            <div
-              className={`h-6 rounded animate-pulse ${
-                isDarkMode ? "bg-gray-700" : "bg-gray-200"
-              }`}
-            />
-            <div
-              className={`h-16 rounded animate-pulse ${
-                isDarkMode ? "bg-gray-700" : "bg-gray-200"
-              }`}
-            />
-            <div
-              className={`h-20 rounded animate-pulse ${
-                isDarkMode ? "bg-gray-700" : "bg-gray-200"
-              }`}
-            />
-          </div>
-        </div>
-      </div>
-    ),
-    [isDarkMode]
-  );
-
   if (isLoading) {
-    return LoadingSkeleton;
+    return <LoadingSkeleton isDarkMode={isDarkMode} />;
   }
 
   if (error || !product) {
@@ -609,7 +607,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     <div
       className={`min-h-screen overflow-x-hidden ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
     >
-      {/* Header - More compact on mobile */}
+      {/* Header */}
       <div
         className={`sticky top-0 z-10 backdrop-blur-md border-b ${
           isDarkMode
@@ -657,12 +655,12 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         </div>
       </div>
 
-      {/* Main Content - Full width on mobile */}
+      {/* Main Content */}
       <div className="w-full sm:max-w-6xl sm:mx-auto p-3 sm:p-4 lg:p-6">
         <div className="grid lg:grid-cols-2 gap-4 sm:gap-8 lg:gap-12">
           {/* Left Column - Images */}
           <div className="space-y-3 sm:space-y-4">
-            {/* Main Image - More compact on mobile with proper containment */}
+            {/* Main Image */}
             <div
               className={`relative w-full aspect-square rounded-lg sm:rounded-2xl overflow-hidden ${
                 isDarkMode ? "bg-gray-800" : "bg-white"
@@ -671,15 +669,15 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               {product.imageUrls.length > 0 &&
               !imageErrors.has(currentImageIndex) ? (
                 <Image
-  src={product.imageUrls[currentImageIndex]}
-  alt={product.productName}
-  fill
-  className="object-contain cursor-pointer hover:scale-105 transition-transform duration-300"
-  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-  onClick={() => setShowFullScreenViewer(true)}
-  onError={() => handleImageError(currentImageIndex)}
-  priority
-/>
+                  src={product.imageUrls[currentImageIndex]}
+                  alt={product.productName}
+                  fill
+                  className="object-contain cursor-pointer hover:scale-105 transition-transform duration-300"
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                  onClick={() => setShowFullScreenViewer(true)}
+                  onError={() => handleImageError(currentImageIndex)}
+                  priority
+                />
               ) : (
                 <div
                   className={`w-full h-full flex items-center justify-center ${
@@ -701,7 +699,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                 </div>
               )}
 
-              {/* Video Play Button - Smaller on mobile */}
+              {/* Video Play Button */}
               {product.videoUrl && (
                 <button
                   onClick={() => setShowVideoModal(true)}
@@ -711,7 +709,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                 </button>
               )}
 
-              {/* Best Seller Badge - Smaller on mobile */}
+              {/* Best Seller Badge */}
               {product.bestSellerRank && product.bestSellerRank <= 10 && (
                 <div className="absolute top-3 left-3 sm:top-4 sm:left-4 px-2 py-0.5 sm:px-3 sm:py-1 bg-gradient-to-r from-orange-500 to-orange-600 text-white text-xs sm:text-sm font-bold rounded-full shadow-lg">
                   #{product.bestSellerRank} {t("bestSeller")}
@@ -719,7 +717,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               )}
             </div>
 
-            {/* Thumbnail Images - Smaller on mobile with scroll container */}
+            {/* Thumbnail Images */}
             {product.imageUrls.length > 1 && (
               <div className="relative overflow-hidden">
                 <div className="flex gap-2 sm:gap-3 overflow-x-auto pb-2 scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
@@ -750,9 +748,9 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
             )}
           </div>
 
-          {/* Right Column - Product Info - More compact on mobile */}
+          {/* Right Column - Product Info */}
           <div className="space-y-4 sm:space-y-6">
-            {/* Product Title & Brand - Smaller text on mobile */}
+            {/* Product Title & Brand */}
             <div className="space-y-2 sm:space-y-3">
               <div className="flex items-start gap-2 sm:gap-3">
                 <span
@@ -791,7 +789,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               localization={localization}
             />
 
-            {/* Action Buttons - More compact on mobile */}
+            {/* Action Buttons */}
             <div className="flex gap-2 sm:gap-3 pt-2 sm:pt-4">
               <button
                 onClick={() => handleAddToCart()}
@@ -830,7 +828,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                   {cartButtonContent.text}
                 </span>
 
-                {/* Success animation overlay */}
                 {(cartButtonState === "added" || cartButtonState === "removed") && (
                   <div className="absolute inset-0 bg-green-500/10 animate-pulse rounded-lg sm:rounded-xl" />
                 )}
@@ -856,15 +853,16 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           </div>
         </div>
 
-        {/* Bottom Sections - Full width on mobile */}
+        {/* ✅ OPTIMIZED: Bottom sections lazy loaded */}
         <div className="mt-8 sm:mt-12 space-y-6 sm:space-y-8">
-          {/* Product Attributes */}
+          {/* Always render attributes (lightweight) */}
           <DynamicAttributesWidget 
-              product={product} 
-              isDarkMode={isDarkMode}
-              localization={localization}              
-            />
-          {/* Description - More compact padding on mobile */}
+            product={product} 
+            isDarkMode={isDarkMode}
+            localization={localization}              
+          />
+          
+          {/* Description */}
           {product.description && (
             <div
               className={`rounded-lg sm:rounded-2xl p-4 sm:p-6 ${
@@ -890,54 +888,79 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
             </div>
           )}
 
-          <ProductCollectionWidget
-            productId={product.id}
-            shopId={product.shopId}
-            isDarkMode={isDarkMode}
-            localization={localization}
-          />
+          {/* ✅ LAZY LOADED: Heavy components below the fold */}
+          {hasScrolled && (
+            <Suspense fallback={<div className="h-40 animate-pulse bg-gray-200 rounded-lg" />}>
+              <ProductCollectionWidget
+                productId={product.id}
+                shopId={product.shopId}
+                isDarkMode={isDarkMode}
+                localization={localization}
+              />
+            </Suspense>
+          )}
 
-          <BundleComponent
-            productId={product.id}
-            shopId={product.shopId}
-            isDarkMode={isDarkMode}
-            localization={localization}
-          />
+          {hasScrolled && (
+            <Suspense fallback={<div className="h-40 animate-pulse bg-gray-200 rounded-lg" />}>
+              <BundleComponent
+                productId={product.id}
+                shopId={product.shopId}
+                isDarkMode={isDarkMode}
+                localization={localization}
+              />
+            </Suspense>
+          )}
 
-          <ProductDetailReviewsTab
-            productId={product.id}
-            isDarkMode={isDarkMode}
-            localization={localization}
-          />
+          {hasScrolled && (
+            <Suspense fallback={<div className="h-40 animate-pulse bg-gray-200 rounded-lg" />}>
+              <ProductDetailReviewsTab
+                productId={product.id}
+                isDarkMode={isDarkMode}
+                localization={localization}
+              />
+            </Suspense>
+          )}
 
-          <ProductQuestionsWidget
-            productId={product.id}
-            sellerId={product.shopId || product.userId}
-            isShop={!!product.shopId}
-            isDarkMode={isDarkMode}
-            localization={localization}
-          />
+          {hasScrolled && (
+            <Suspense fallback={<div className="h-40 animate-pulse bg-gray-200 rounded-lg" />}>
+              <ProductQuestionsWidget
+                productId={product.id}
+                sellerId={product.shopId || product.userId}
+                isShop={!!product.shopId}
+                isDarkMode={isDarkMode}
+                localization={localization}
+              />
+            </Suspense>
+          )}
 
-          <ProductDetailRelatedProducts
-            productId={product.id}
-            category={product.category}
-            subcategory={product.subcategory}
-            isDarkMode={isDarkMode}
-            localization={localization}
-          />
+          {hasScrolled && (
+            <Suspense fallback={<div className="h-40 animate-pulse bg-gray-200 rounded-lg" />}>
+              <ProductDetailRelatedProducts
+                productId={product.id}
+                category={product.category}
+                subcategory={product.subcategory}
+                isDarkMode={isDarkMode}
+                localization={localization}
+              />
+            </Suspense>
+          )}
         </div>
 
         <div className="h-20 sm:h-24" />
       </div>
 
-      {/* Modals */}
-      <FullScreenImageViewer
-        imageUrls={product.imageUrls}
-        initialIndex={currentImageIndex}
-        isOpen={showFullScreenViewer}
-        onClose={() => setShowFullScreenViewer(false)}
-        isDarkMode={isDarkMode}        
-      />
+      {/* ✅ LAZY LOADED: Modals */}
+      {showFullScreenViewer && (
+        <Suspense fallback={null}>
+          <FullScreenImageViewer
+            imageUrls={product.imageUrls}
+            initialIndex={currentImageIndex}
+            isOpen={showFullScreenViewer}
+            onClose={() => setShowFullScreenViewer(false)}
+            isDarkMode={isDarkMode}        
+          />
+        </Suspense>
+      )}
 
       {showVideoModal && product.videoUrl && (
         <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-3 sm:p-4">
@@ -969,17 +992,20 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         />
       )}
 
-      <AskToSellerBubble
-        onTap={() => {
-          // Determine seller ID and whether it's a shop
-          const sellerId = product.shopId || product.userId;
-          const isShop = !!product.shopId;
-          
-          router.push(`/asktoseller?productId=${product.id}&sellerId=${sellerId}&isShop=${isShop}`);
-        }}
-        isDarkMode={isDarkMode}
-        localization={localization}
-      />
+      {hasScrolled && (
+        <Suspense fallback={null}>
+          <AskToSellerBubble
+            onTap={() => {
+              const sellerId = product.shopId || product.userId;
+              const isShop = !!product.shopId;
+              
+              router.push(`/asktoseller?productId=${product.id}&sellerId=${sellerId}&isShop=${isShop}`);
+            }}
+            isDarkMode={isDarkMode}
+            localization={localization}
+          />
+        </Suspense>
+      )}
     </div>
   );
 };

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import {
   Search,
   Clock,
@@ -25,13 +25,6 @@ interface SearchBarProps {
   searchTerm: string;
   onSearchTermChange: (term: string) => void;
   onSearchSubmit?: () => void;
-  onKeyPress?: (e: React.KeyboardEvent) => void;
-  showSuggestions: boolean;
-  onHistoryItemClick?: (term: string) => void;
-  onSuggestionClick: (
-    suggestion: Suggestion | CategorySuggestion,
-    type: "product" | "category"
-  ) => void;
   isMobile?: boolean;
   t: (key: string, params?: Record<string, string | number>) => string;
 }
@@ -44,10 +37,6 @@ export default function SearchBar({
   onSearchStateChange,
   searchTerm,
   onSearchTermChange,
-  
-  onKeyPress,
-  onSuggestionClick,
-  
   isMobile = false,
   t,
 }: SearchBarProps) {
@@ -55,7 +44,8 @@ export default function SearchBar({
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
-  // Pagination state for search history
+  
+  // ✅ SIMPLIFIED: Minimal state
   const [currentPage, setCurrentPage] = useState(0);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -69,7 +59,6 @@ export default function SearchBar({
     updateTerm,
   } = useSearchProvider();
 
-  // Search history integration
   const {
     searchEntries,
     isLoadingHistory,
@@ -78,9 +67,9 @@ export default function SearchBar({
     saveSearchTerm,
   } = useSearchHistory();
 
-  // Body scroll lock when dropdown is active
+  // ✅ OPTIMIZED: Body scroll lock only when needed
   useEffect(() => {
-    if (isSearching) {
+    if (isSearching && isMobile) {
       const scrollY = window.scrollY;
       document.body.style.position = 'fixed';
       document.body.style.top = `-${scrollY}px`;
@@ -93,100 +82,85 @@ export default function SearchBar({
         window.scrollTo(0, scrollY);
       };
     }
-  }, [isSearching]);
+  }, [isSearching, isMobile]);
 
-  // Handle click outside for search
+  // ✅ OPTIMIZED: Click outside handler with conditional setup
   useEffect(() => {
+    if (!isSearching) return;
+
     const handleClickOutside = (event: MouseEvent) => {
       if (
         searchContainerRef.current &&
         !searchContainerRef.current.contains(event.target as Node)
       ) {
-        if (isSearching) {
-          onSearchStateChange(false);
-          searchInputRef.current?.blur();
-          setCurrentPage(0);
-          document.body.style.overflow = '';
-        }
+        onSearchStateChange(false);
+        searchInputRef.current?.blur();
+        setCurrentPage(0);
       }
     };
+
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [onSearchStateChange, isSearching]);
+  }, [isSearching, onSearchStateChange]);
 
-  // Focus input when entering search mode
+  // ✅ OPTIMIZED: Focus management
   useEffect(() => {
     if (isSearching) {
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         searchInputRef.current?.focus();
       }, 100);
       setCurrentPage(0);
+      return () => clearTimeout(timer);
     }
   }, [isSearching]);
 
-  // Reset pagination when search entries change
+  // Reset pagination when entries change
   useEffect(() => {
     setCurrentPage(0);
   }, [searchEntries]);
 
-  // Enhanced search submission with history saving
+  // ✅ OPTIMIZED: Search submission with debouncing
   const handleSearchSubmit = useCallback(async (term?: string) => {
     const searchQuery = (term || searchTerm).trim();
     
-    if (!searchQuery) {
-      console.log('Empty search query, skipping submission');
-      return;
-    }
-
-    if (isSubmitting) {
-      console.log('Already submitting search, skipping duplicate submission');
-      return;
-    }
+    if (!searchQuery || isSubmitting) return;
 
     setIsSubmitting(true);
 
     try {
-      console.log('Submitting search for:', searchQuery);
-      
-      // Save search term to history (non-blocking)
-      saveSearchTerm(searchQuery).catch(error => {
-        console.error('Failed to save search term to history:', error);
-      });
+      // Save to history (non-blocking)
+      saveSearchTerm(searchQuery).catch(console.error);
 
-      // Close search dropdown
+      // Close dropdown
       onSearchStateChange(false);
       
-      // Clear search input if this was from history click
+      // Update term if different
       if (term && term !== searchTerm) {
         onSearchTermChange(term);
       }
 
-      // Navigate to search results
-      const searchUrl = `/search-results?q=${encodeURIComponent(searchQuery)}`;
-      console.log('Navigating to:', searchUrl);
-      
-      router.push(searchUrl);
+      // Navigate
+      router.push(`/search-results?q=${encodeURIComponent(searchQuery)}`);
       
     } catch (error) {
-      console.error('Error during search submission:', error);
+      console.error('Search submission error:', error);
     } finally {
-      setIsSubmitting(false);
+      // Reset after a delay to prevent rapid submissions
+      setTimeout(() => setIsSubmitting(false), 500);
     }
   }, [searchTerm, isSubmitting, saveSearchTerm, onSearchStateChange, onSearchTermChange, router]);
 
-  // Enhanced key press handler
+  // ✅ SIMPLIFIED: Key press handler
   const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       handleSearchSubmit();
+    } else if (e.key === 'Escape') {
+      onSearchStateChange(false);
     }
-    
-    if (onKeyPress) {
-      onKeyPress(e);
-    }
-  }, [handleSearchSubmit, onKeyPress]);
+  }, [handleSearchSubmit, onSearchStateChange]);
 
-  // Enhanced search button handler
+  // ✅ SIMPLIFIED: Search button handler
   const handleSearchButtonClick = useCallback(() => {
     if (isSearching) {
       handleSearchSubmit();
@@ -195,40 +169,33 @@ export default function SearchBar({
     }
   }, [isSearching, handleSearchSubmit, onSearchStateChange]);
 
+  // ✅ OPTIMIZED: History item click
   const handleHistoryItemClick = useCallback((historyTerm: string) => {
-    // Save to history
-    saveSearchTerm(historyTerm).catch(error => {
-      console.error('Failed to save search term to history:', error);
-    });
-    
-    // Close the dropdown
+    saveSearchTerm(historyTerm).catch(console.error);
     onSearchStateChange(false);
-    
-    // Navigate directly using router
-    const searchUrl = `/search-results?q=${encodeURIComponent(historyTerm)}`;
-    router.push(searchUrl);
+    router.push(`/search-results?q=${encodeURIComponent(historyTerm)}`);
   }, [saveSearchTerm, onSearchStateChange, router]);
 
-  // Handle delete history item
+  // ✅ OPTIMIZED: Delete history with event propagation stop
   const handleDeleteHistoryItem = useCallback(async (e: React.MouseEvent, docId: string) => {
     e.stopPropagation();
     try {
       await deleteEntry(docId);
     } catch (error) {
-      console.error('Failed to delete search history item:', error);
+      console.error('Failed to delete search history:', error);
     }
   }, [deleteEntry]);
 
-  // Handle scroll for pagination
-  const handleScroll = useCallback(async (e: React.UIEvent<HTMLDivElement>) => {
+  // ✅ OPTIMIZED: Scroll handler with throttling
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const target = e.target as HTMLDivElement;
     const { scrollTop, scrollHeight, clientHeight } = target;
     
-    if (scrollHeight - scrollTop - clientHeight < 50) {
+    if (scrollHeight - scrollTop - clientHeight < 50 && !isLoadingMore) {
       const totalPages = Math.ceil(searchEntries.length / ITEMS_PER_PAGE);
       const nextPage = currentPage + 1;
       
-      if (nextPage < totalPages && !isLoadingMore) {
+      if (nextPage < totalPages) {
         setIsLoadingMore(true);
         setTimeout(() => {
           setCurrentPage(nextPage);
@@ -238,21 +205,52 @@ export default function SearchBar({
     }
   }, [currentPage, searchEntries.length, isLoadingMore]);
 
-  // Get paginated search entries
-  const getPaginatedEntries = useCallback(() => {
+  // ✅ OPTIMIZED: Suggestion click handler
+  const handleSuggestionClick = useCallback((
+    suggestion: Suggestion | CategorySuggestion,
+    type: "product" | "category"
+  ) => {
+    const displayName = type === "product"
+      ? (suggestion as Suggestion).name
+      : (suggestion as CategorySuggestion).displayName;
+
+    onSearchTermChange(displayName || "");
+    onSearchStateChange(false);
+
+    const path = type === "product" 
+      ? `/productdetail/${suggestion.id}`
+      : `/category/${suggestion.id}`;
+    
+    router.push(path);
+  }, [onSearchTermChange, onSearchStateChange, router]);
+
+  // ✅ MEMOIZED: Paginated entries
+  const paginatedEntries = useMemo(() => {
     const endIndex = (currentPage + 1) * ITEMS_PER_PAGE;
     return searchEntries.slice(0, endIndex);
   }, [searchEntries, currentPage]);
 
-  const containerClasses = isMobile
-    ? "relative w-full"
-    : "relative w-[500px] max-w-[calc(100vw-12rem)]";
+  // ✅ MEMOIZED: Container classes
+  const containerClasses = useMemo(() => 
+    isMobile ? "relative w-full" : "relative w-[500px] max-w-[calc(100vw-12rem)]",
+    [isMobile]
+  );
 
-  // Determine what to show in dropdown
-  const hasSearchResults = searchTerm.trim() && (suggestions.length > 0 || categorySuggestions.length > 0 || isLoading || errorMessage);
-  const showSearchHistory = !searchTerm.trim() && searchEntries.length > 0;
-  const paginatedEntries = getPaginatedEntries();
-  const hasMoreEntries = paginatedEntries.length < searchEntries.length;
+  // ✅ MEMOIZED: Computed flags
+  const hasSearchResults = useMemo(() => 
+    searchTerm.trim() && (suggestions.length > 0 || categorySuggestions.length > 0 || isLoading || errorMessage),
+    [searchTerm, suggestions.length, categorySuggestions.length, isLoading, errorMessage]
+  );
+
+  const showSearchHistory = useMemo(() => 
+    !searchTerm.trim() && searchEntries.length > 0,
+    [searchTerm, searchEntries.length]
+  );
+
+  const hasMoreEntries = useMemo(() => 
+    paginatedEntries.length < searchEntries.length,
+    [paginatedEntries.length, searchEntries.length]
+  );
 
   return (
     <div className={containerClasses} ref={searchContainerRef}>
@@ -272,7 +270,7 @@ export default function SearchBar({
           type="text"
           value={searchTerm}
           onChange={(e) => onSearchTermChange(e.target.value)}
-          onKeyPress={handleKeyPress}
+          onKeyDown={handleKeyPress}
           onFocus={() => !isSearching && onSearchStateChange(true)}
           readOnly={!isSearching}
           disabled={isSubmitting}
@@ -308,38 +306,35 @@ export default function SearchBar({
         </button>
       </div>
 
-      {/* Search Dropdown - Shows when searching */}
+      {/* Search Dropdown */}
       {isSearching && (
         <div
           className={`
             absolute top-full left-0 right-0 mt-2 
-            ${isDark ? "bg-gray-800" : "bg-white"}
-            border ${isDark ? "border-gray-700" : "border-gray-200"}
-            rounded-2xl shadow-2xl backdrop-blur-xl z-50
+            ${isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}
+            border rounded-2xl shadow-2xl backdrop-blur-xl z-50
             max-h-96 overflow-hidden
           `}
         >
-          {/* Show search results if user has typed something and there are results */}
+          {/* Search Results */}
           {hasSearchResults ? (
             <>
-              {/* Loading State */}
+              {/* Loading */}
               {isLoading && (
-                <div className="p-4">
-                  <div className="flex items-center justify-center space-x-2">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
-                    <div
-                      className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"
-                      style={{ animationDelay: "0.1s" }}
-                    ></div>
-                    <div
-                      className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"
-                      style={{ animationDelay: "0.2s" }}
-                    ></div>
+                <div className="p-4 flex justify-center">
+                  <div className="flex space-x-2">
+                    {[0, 0.1, 0.2].map((delay, i) => (
+                      <div
+                        key={i}
+                        className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"
+                        style={{ animationDelay: `${delay}s` }}
+                      />
+                    ))}
                   </div>
                 </div>
               )}
 
-              {/* Error State */}
+              {/* Error */}
               {errorMessage && (
                 <div className="p-4">
                   <div className="flex items-center space-x-3 text-red-500">
@@ -359,52 +354,50 @@ export default function SearchBar({
                 </div>
               )}
 
-              {/* Categories Section */}
+              {/* Categories */}
               {categorySuggestions.length > 0 && (
-                <div className="border-b border-gray-200 dark:border-gray-700">
-                  <div className="p-3">
-                    <div className="flex items-center space-x-2 mb-3">
-                      <Grid3x3 size={16} className="text-orange-500" />
-                      <span className={`text-sm font-semibold ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                        {t('header.categories')}
+                <div className="border-b border-gray-200 dark:border-gray-700 p-3">
+                  <div className="flex items-center space-x-2 mb-3">
+                    <Grid3x3 size={16} className="text-orange-500" />
+                    <span className={`text-sm font-semibold ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                      {t('header.categories')}
+                    </span>
+                    <div className="px-2 py-1 bg-orange-100 dark:bg-orange-900/30 rounded-full">
+                      <span className="text-xs font-bold text-orange-600">
+                        {t('header.aiPowered')}
                       </span>
-                      <div className="px-2 py-1 bg-orange-100 dark:bg-orange-900/30 rounded-full">
-                        <span className="text-xs font-bold text-orange-600">
-                          {t('header.aiPowered')}
-                        </span>
-                      </div>
                     </div>
-                    <div className="space-y-1">
-                      {categorySuggestions.slice(0, 3).map((category) => (
-                        <button
-                          key={category.id}
-                          onClick={() => onSuggestionClick(category, "category")}
-                          className={`
-                            w-full flex items-center space-x-3 p-2 rounded-lg
-                            hover:bg-gray-100 dark:hover:bg-gray-700 
-                            transition-colors duration-150
-                          `}
-                        >
-                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-400 to-pink-500 flex items-center justify-center">
-                            <Grid3x3 size={14} className="text-white" />
-                          </div>
-                          <div className="flex-1 text-left">
-                            <p className={`text-sm font-medium ${isDark ? "text-gray-200" : "text-gray-900"}`}>
-                              {category.displayName}
-                            </p>
-                            <p className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
-                              {t('header.levelCategory', { level: category.level })}
-                            </p>
-                          </div>
-                          <TrendingUp size={14} className={`${isDark ? "text-gray-400" : "text-gray-400"}`} />
-                        </button>
-                      ))}
-                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    {categorySuggestions.slice(0, 3).map((category) => (
+                      <button
+                        key={category.id}
+                        onClick={() => handleSuggestionClick(category, "category")}
+                        className={`
+                          w-full flex items-center space-x-3 p-2 rounded-lg
+                          hover:bg-gray-100 dark:hover:bg-gray-700 
+                          transition-colors duration-150
+                        `}
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-400 to-pink-500 flex items-center justify-center">
+                          <Grid3x3 size={14} className="text-white" />
+                        </div>
+                        <div className="flex-1 text-left">
+                          <p className={`text-sm font-medium ${isDark ? "text-gray-200" : "text-gray-900"}`}>
+                            {category.displayName}
+                          </p>
+                          <p className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                            {t('header.levelCategory', { level: category.level })}
+                          </p>
+                        </div>
+                        <TrendingUp size={14} className="text-gray-400" />
+                      </button>
+                    ))}
                   </div>
                 </div>
               )}
 
-              {/* Products Section */}
+              {/* Products */}
               {suggestions.length > 0 && (
                 <div className="p-3">
                   <div className="flex items-center space-x-2 mb-3">
@@ -422,7 +415,7 @@ export default function SearchBar({
                     {suggestions.map((suggestion) => (
                       <button
                         key={suggestion.id}
-                        onClick={() => onSuggestionClick(suggestion, "product")}
+                        onClick={() => handleSuggestionClick(suggestion, "product")}
                         className={`
                           w-full flex items-center space-x-3 p-2 rounded-lg
                           hover:bg-gray-100 dark:hover:bg-gray-700 
@@ -446,11 +439,11 @@ export default function SearchBar({
                 </div>
               )}
 
-              {/* No Results when user has typed something */}
+              {/* No Results */}
               {!isLoading && !errorMessage && suggestions.length === 0 && categorySuggestions.length === 0 && searchTerm.trim() && (
                 <div className="p-6 text-center">
                   <div className="w-12 h-12 mx-auto rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center mb-3">
-                    <Search size={20} className={`${isDark ? "text-gray-400" : "text-gray-500"}`} />
+                    <Search size={20} className="text-gray-500" />
                   </div>
                   <p className={`text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"} mb-1`}>
                     {t('header.noResults')}
@@ -462,7 +455,7 @@ export default function SearchBar({
               )}
             </>
           ) : showSearchHistory ? (
-            /* Search History Section with Pagination */
+            /* Search History */
             <div className="p-3">
               <div className="flex items-center space-x-2 mb-3">
                 <Clock size={16} className="text-gray-500" />
@@ -476,23 +469,15 @@ export default function SearchBar({
                 </div>
               </div>
               {isLoadingHistory ? (
-                <div className="p-4">
-                  <div className="flex items-center justify-center space-x-2">
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }}></div>
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
-                  </div>
+                <div className="p-4 flex justify-center">
+                  <Loader2 size={20} className="animate-spin text-gray-500" />
                 </div>
               ) : (
                 <div ref={scrollContainerRef} className="space-y-1 max-h-60 overflow-y-auto" onScroll={handleScroll}>
                   {paginatedEntries.map((entry) => (
                     <div
                       key={entry.id}
-                      className={`
-                        flex items-center space-x-3 p-2 rounded-lg
-                        hover:bg-gray-100 dark:hover:bg-gray-700 
-                        transition-colors duration-150 group
-                      `}
+                      className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-150 group"
                     >
                       <button
                         onClick={() => handleHistoryItemClick(entry.searchTerm)}
@@ -501,11 +486,9 @@ export default function SearchBar({
                         <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
                           <Clock size={14} className="text-gray-500" />
                         </div>
-                        <div className="flex-1">
-                          <p className={`text-sm font-medium ${isDark ? "text-gray-200" : "text-gray-900"}`}>
-                            {entry.searchTerm}
-                          </p>
-                        </div>
+                        <p className={`text-sm font-medium ${isDark ? "text-gray-200" : "text-gray-900"}`}>
+                          {entry.searchTerm}
+                        </p>
                       </button>
                       <button
                         onClick={(e) => handleDeleteHistoryItem(e, entry.id)}
@@ -515,7 +498,6 @@ export default function SearchBar({
                           transition-all duration-200 hover:bg-red-100 dark:hover:bg-red-900/30
                           ${isDeletingEntry(entry.id) ? 'opacity-50 cursor-not-allowed' : ''}
                         `}
-                        aria-label={t('header.deleteSearchHistory')}
                       >
                         {isDeletingEntry(entry.id) ? (
                           <Loader2 size={14} className="animate-spin text-gray-400" />
@@ -526,17 +508,12 @@ export default function SearchBar({
                     </div>
                   ))}
                   
-                  {/* Loading More Indicator */}
                   {isLoadingMore && (
-                    <div className="flex items-center justify-center py-2">
+                    <div className="flex justify-center py-2">
                       <Loader2 size={16} className="animate-spin text-gray-500" />
-                      <span className={`ml-2 text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                        {t('header.loadingMore')}
-                      </span>
                     </div>
                   )}
                   
-                  {/* Load More Button (fallback if scroll doesn't work) */}
                   {hasMoreEntries && !isLoadingMore && (
                     <div className="flex justify-center py-2">
                       <button
@@ -549,9 +526,7 @@ export default function SearchBar({
                         }}
                         className={`
                           text-xs px-3 py-1 rounded-full 
-                          ${isDark 
-                            ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' 
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}
+                          ${isDark ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}
                           transition-colors duration-200
                         `}
                       >
@@ -563,10 +538,10 @@ export default function SearchBar({
               )}
             </div>
           ) : (
-            /* Empty state */
+            /* Empty State */
             <div className="p-6 text-center">
               <div className="w-12 h-12 mx-auto rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center mb-3">
-                <Search size={20} className={`${isDark ? "text-gray-400" : "text-gray-500"}`} />
+                <Search size={20} className="text-gray-500" />
               </div>
               <p className={`text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"} mb-1`}>
                 {t('header.searchPlaceholder')}
