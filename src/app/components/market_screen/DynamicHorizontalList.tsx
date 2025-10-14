@@ -14,7 +14,7 @@ import {
   getDocs,
   limit as firestoreLimit,
 } from "firebase/firestore";
-import { useTranslations } from "next-intl";
+
 import { db } from "@/lib/firebase"; // Adjust import path as needed
 
 import { Product } from "@/app/models/Product";
@@ -65,7 +65,7 @@ const DynamicList: React.FC<{
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const router = useRouter();
+  
   // Parse colors with fallback
   const parseColor = (colorString?: string): string => {
     if (!colorString) return "#FF6B35";
