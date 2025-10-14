@@ -180,7 +180,7 @@ export const PersonalizedRecommendationsProvider: React.FC<{ children: React.Rea
   }, []);
 
   // ✅ MATCHES FLUTTER: Personalized recommendations
-  const getPersonalizedRecommendations = useCallback(async (userId: string, limit: number): Promise<Product[]> => {
+  const getPersonalizedRecommendations = useCallback(async (userId: string): Promise<Product[]> => {
     try {
       const preferences = await getUserPreferences(userId);
       
@@ -282,7 +282,7 @@ export const PersonalizedRecommendationsProvider: React.FC<{ children: React.Rea
       let products: Product[];
 
       if (user) {
-        products = await getPersonalizedRecommendations(user.uid, limit);
+        products = await getPersonalizedRecommendations(user.uid);
       } else {
         products = await getGenericRecommendations(limit);
       }
