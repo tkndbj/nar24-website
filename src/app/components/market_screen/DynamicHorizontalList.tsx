@@ -66,7 +66,6 @@ const DynamicList: React.FC<{
   const [canScrollRight, setCanScrollRight] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
-  const t = useTranslations("MarketScreen");
   // Parse colors with fallback
   const parseColor = (colorString?: string): string => {
     if (!colorString) return "#FF6B35";
@@ -116,7 +115,7 @@ const DynamicList: React.FC<{
   };
 
   // Fetch products based on list configuration
-  const fetchProducts = async () => {
+  const fetchProducts = React.useCallback(async () => {
     setLoading(true);
     console.log(`Fetching products for list: ${listData.title}`);
     console.log("Full list data:", JSON.stringify(listData, null, 2));
@@ -209,21 +208,13 @@ const DynamicList: React.FC<{
     } finally {
       setLoading(false);
     }
-  };
+  }, [listData.id, listData.selectedProductIds, listData.selectedShopId, listData.limit]);
 
   // Load products when component mounts
   useEffect(() => {
     fetchProducts();
-  }, [listData.id, listData.selectedProductIds, listData.selectedShopId]);
+  }, [fetchProducts]);
 
-  // Handle "View All" navigation
-  const handleViewAll = () => {
-    router.push(
-      `/dynamic_list_view?listId=${listData.id}&title=${
-        listData.title
-      }&listData=${JSON.stringify(listData)}`
-    );
-  };
 
   // Scale factors
   const scaleFactor = 0.88;
