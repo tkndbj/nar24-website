@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -62,12 +62,12 @@ const DynamicMarketPage: React.FC = () => {
   const searchParams = useSearchParams();
   const router = useRouter();
   const t = useTranslations();
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Theme state - detect from system/localStorage
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
 
-  // Get URL parameters (these won't change frequently)
+  // URL parameters - memoized to prevent unnecessary re-renders
   const urlParams = useMemo(
     () => ({
       category: searchParams.get("category") || "",
@@ -85,7 +85,6 @@ const DynamicMarketPage: React.FC = () => {
     [searchParams]
   );
 
-  // Products state
   const [products, setProducts] = useState<Product[]>([]);
   const [boostedProducts, setBoostedProducts] = useState<Product[]>([]);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -94,11 +93,10 @@ const DynamicMarketPage: React.FC = () => {
   const [hasMore, setHasMore] = useState(true);
   const [currentPage, setCurrentPage] = useState(0);
   const [showSortDropdown, setShowSortDropdown] = useState(false);
-  // Filter and sort states
   const [selectedSortOption, setSelectedSortOption] = useState("None");
   const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
   const [touchStart, setTouchStart] = useState<number | null>(null);
-const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const [filters, setFilters] = useState<FilterState>({
     subcategories: [],
     colors: [],
@@ -107,12 +105,7 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
     maxPrice: undefined,
   });
 
-  // Available subcategories based on selected category
-  const [availableSubcategories, setAvailableSubcategories] = useState<
-    string[]
-  >([]);
-
-  // Filter UI states
+  const [availableSubcategories, setAvailableSubcategories] = useState<string[]>([]);
   const [expandedSections, setExpandedSections] = useState({
     subcategory: true,
     color: true,
@@ -124,24 +117,10 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const [minPriceInput, setMinPriceInput] = useState("");
   const [maxPriceInput, setMaxPriceInput] = useState("");
 
-  // Filter types matching Flutter implementation
-  const filterTypes = [
-    "",
-    "deals",
-    "boosted",
-    "trending",
-    "fiveStar",
-    "bestSellers",
-  ];
-  const sortOptions = [
-    "None",
-    "Alphabetical",
-    "Date",
-    "Price Low to High",
-    "Price High to Low",
-  ];
+  const filterTypes = ["", "deals", "boosted", "trending", "fiveStar", "bestSellers"];
+  const sortOptions = ["None", "Alphabetical", "Date", "Price Low to High", "Price High to Low"];
 
-  // Memoize filter string to avoid unnecessary re-renders
+  // Stable filter string for comparison
   const filterString = useMemo(() => {
     return JSON.stringify({
       subcategories: filters.subcategories.sort(),
@@ -152,7 +131,7 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
     });
   }, [filters]);
 
-  // Set available subcategories based on URL params
+  // Set available subcategories
   useEffect(() => {
     if (urlParams.category) {
       const formattedCategory = urlParams.category
@@ -164,18 +143,11 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
       let subcats: string[] = [];
 
       if (categoryKey === "Women" || categoryKey === "Men") {
-        const buyerSubcategories = AllInOneCategoryData.getSubcategories(
-          categoryKey,
-          true
-        );
+        const buyerSubcategories = AllInOneCategoryData.getSubcategories(categoryKey, true);
         const allSubSubcategories: string[] = [];
 
         buyerSubcategories.forEach((buyerSub) => {
-          const subSubs = AllInOneCategoryData.getSubSubcategories(
-            categoryKey,
-            buyerSub,
-            true
-          );
+          const subSubs = AllInOneCategoryData.getSubSubcategories(categoryKey, buyerSub, true);
           allSubSubcategories.push(...subSubs);
         });
 
@@ -185,8 +157,6 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
       }
 
       setAvailableSubcategories(subcats);
-
-      // Reset filters when category changes
       setFilters({
         subcategories: [],
         colors: [],
@@ -197,13 +167,9 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
       setMinPriceInput("");
       setMaxPriceInput("");
     }
-  }, [
-    urlParams.category,
-    urlParams.selectedSubcategory,
-    urlParams.selectedSubSubcategory,
-  ]);
+  }, [urlParams.category, urlParams.selectedSubcategory, urlParams.selectedSubSubcategory]);
 
-  // Theme detection from system/localStorage
+  // Theme detection
   useEffect(() => {
     const checkTheme = () => {
       if (typeof document !== "undefined") {
@@ -211,10 +177,8 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
       }
     };
 
-    // Initial theme check
     checkTheme();
 
-    // Watch for theme changes
     const observer = new MutationObserver(checkTheme);
     if (typeof document !== "undefined") {
       observer.observe(document.documentElement, {
@@ -230,26 +194,33 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
     setTouchEnd(null);
     setTouchStart(e.targetTouches[0].clientX);
   };
-  
+
   const handleTouchMove = (e: React.TouchEvent) => {
     setTouchEnd(e.targetTouches[0].clientX);
   };
-  
+
   const handleTouchEnd = () => {
     if (!touchStart || !touchEnd) return;
-    
+
     const distance = touchStart - touchEnd;
-    const isLeftSwipe = distance > 50;    
-    
-    // Close drawer on left swipe (swipe left to close)
+    const isLeftSwipe = distance > 50;
+
     if (isLeftSwipe && showSidebar) {
       setShowSidebar(false);
     }
   };
 
-  // Optimized fetch products function
+  // Optimized fetch with abort controller for request cancellation
   const fetchProducts = useCallback(
     async (page: number = 0, reset: boolean = false) => {
+      // Cancel any ongoing requests
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+
+      // Create new abort controller
+      abortControllerRef.current = new AbortController();
+
       try {
         if (reset) {
           setIsProductsLoading(true);
@@ -261,32 +232,20 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
           setIsLoadingMore(true);
         }
 
-        // Build query parameters
         const queryParams = new URLSearchParams({
           ...(urlParams.category && { category: urlParams.category }),
-          ...(urlParams.selectedSubcategory && {
-            subcategory: urlParams.selectedSubcategory,
-          }),
-          ...(urlParams.selectedSubSubcategory && {
-            subsubcategory: urlParams.selectedSubSubcategory,
-          }),
-          ...(urlParams.buyerCategory && {
-            buyerCategory: urlParams.buyerCategory,
-          }),
-          ...(urlParams.buyerSubcategory && {
-            buyerSubcategory: urlParams.buyerSubcategory,
-          }),
+          ...(urlParams.selectedSubcategory && { subcategory: urlParams.selectedSubcategory }),
+          ...(urlParams.selectedSubSubcategory && { subsubcategory: urlParams.selectedSubSubcategory }),
+          ...(urlParams.buyerCategory && { buyerCategory: urlParams.buyerCategory }),
+          ...(urlParams.buyerSubcategory && { buyerSubcategory: urlParams.buyerSubcategory }),
           page: page.toString(),
           sort: getSortCode(selectedSortOption),
           ...(selectedFilter && { filter: selectedFilter }),
         });
 
-        // Add filter parameters
+        // Add filter parameters only if they have values
         if (filters.subcategories.length > 0) {
-          queryParams.set(
-            "filterSubcategories",
-            filters.subcategories.join(",")
-          );
+          queryParams.set("filterSubcategories", filters.subcategories.join(","));
         }
         if (filters.colors.length > 0) {
           queryParams.set("colors", filters.colors.join(","));
@@ -301,9 +260,9 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
           queryParams.set("maxPrice", filters.maxPrice.toString());
         }
 
-        const response = await fetch(
-          `/api/fetchDynamicProducts?${queryParams}`
-        );
+        const response = await fetch(`/api/fetchDynamicProducts?${queryParams}`, {
+          signal: abortControllerRef.current.signal,
+        });
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -321,6 +280,10 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
         setHasMore(data.hasMore || false);
         setCurrentPage(page);
       } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") {
+          // Request was cancelled, don't update state
+          return;
+        }
         console.error("Error fetching products:", error);
         setHasMore(false);
         if (reset) {
@@ -336,7 +299,6 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
     [urlParams, selectedSortOption, selectedFilter, filters]
   );
 
-  // Convert sort option to API code
   const getSortCode = (option: string): string => {
     switch (option) {
       case "Alphabetical":
@@ -352,7 +314,7 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
     }
   };
 
-  // Initial load effect - only runs when URL params change
+  // Initial load effect
   useEffect(() => {
     if (urlParams.category) {
       fetchProducts(0, true);
@@ -365,79 +327,79 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
     urlParams.buyerSubcategory,
   ]);
 
-  // Filter and sort change effect - optimized with memoized dependencies
+  // Filter and sort change effect
   useEffect(() => {
     if (urlParams.category) {
       fetchProducts(0, true);
     }
   }, [selectedSortOption, selectedFilter, filterString]);
 
-  // Handle back button
   const handleBack = () => {
     router.back();
   };
 
-  // Handle sort selection
   const handleSortSelect = (option: string) => {
     setSelectedSortOption(option);
   };
 
-  // Handle filter selection
   const handleFilterSelect = (filter: string | null) => {
     setSelectedFilter(filter);
   };
 
-  // Handle load more
   const handleLoadMore = () => {
     if (hasMore && !isLoadingMore) {
       fetchProducts(currentPage + 1, false);
     }
   };
 
-  // Handle scroll to load more
+  // Optimized scroll handler with throttling
   useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+
     const handleScroll = () => {
-      if (
-        window.innerHeight + document.documentElement.scrollTop >=
-        document.documentElement.offsetHeight - 300
-      ) {
-        if (hasMore && !isLoadingMore) {
-          handleLoadMore();
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        if (
+          window.innerHeight + document.documentElement.scrollTop >=
+          document.documentElement.offsetHeight - 300
+        ) {
+          if (hasMore && !isLoadingMore) {
+            handleLoadMore();
+          }
         }
-      }
+      }, 100);
     };
 
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      clearTimeout(timeoutId);
+    };
   }, [hasMore, isLoadingMore, currentPage]);
 
   useEffect(() => {
     if (showSidebar) {
-      document.body.style.overflow = 'hidden';
+      document.body.style.overflow = "hidden";
     } else {
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = "unset";
     }
-  
-    // Cleanup function to restore scrolling when component unmounts
+
     return () => {
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = "unset";
     };
   }, [showSidebar]);
 
-  // Memoized filter handlers to prevent unnecessary re-renders
-  const handleToggleFilter = useCallback(
-    (type: keyof FilterState, value: string) => {
-      setFilters((prev) => {
-        const currentList = prev[type] as string[];
-        const newList = currentList.includes(value)
-          ? currentList.filter((item) => item !== value)
-          : [...currentList, value];
+  // Memoized filter handlers
+  const handleToggleFilter = useCallback((type: keyof FilterState, value: string) => {
+    setFilters((prev) => {
+      const currentList = prev[type] as string[];
+      const newList = currentList.includes(value)
+        ? currentList.filter((item) => item !== value)
+        : [...currentList, value];
 
-        return { ...prev, [type]: newList };
-      });
-    },
-    []
-  );
+      return { ...prev, [type]: newList };
+    });
+  }, []);
 
   const handleSetPriceFilter = useCallback(() => {
     const min = minPriceInput ? parseFloat(minPriceInput) : undefined;
@@ -467,7 +429,6 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
     setMaxPriceInput("");
   }, []);
 
-  // Get localized color name
   const getLocalizedColorName = (colorName: string): string => {
     const colorKey = `color${colorName.replace(/\s+/g, "")}`;
     try {
@@ -477,7 +438,6 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
     }
   };
 
-  // Other handler functions
   const getFilterButtonText = (filter: string) => {
     switch (filter) {
       case "":
@@ -528,9 +488,7 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
   };
 
   const shouldShowCategoriesFilter = () => {
-    return (
-      urlParams.buyerCategory === "Women" || urlParams.buyerCategory === "Men"
-    );
+    return urlParams.buyerCategory === "Women" || urlParams.buyerCategory === "Men";
   };
 
   const getAvailableSubSubcategories = () => {
@@ -550,12 +508,10 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
         ""
       )?.category || formattedCategory;
 
-    const subSubcategoriesMap =
-      AllInOneCategoryData.kSubSubcategories?.[productCategory];
+    const subSubcategoriesMap = AllInOneCategoryData.kSubSubcategories?.[productCategory];
 
     if (subSubcategoriesMap) {
-      const subSubcategories =
-        subSubcategoriesMap[urlParams.selectedSubcategory] || [];
+      const subSubcategories = subSubcategoriesMap[urlParams.selectedSubcategory] || [];
       return subSubcategories;
     }
 
@@ -563,11 +519,7 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
   };
 
   const getLocalizedSubcategoryName = (subcategoryKey: string): string => {
-    if (
-      !shouldShowCategoriesFilter() ||
-      !urlParams.buyerCategory ||
-      !urlParams.selectedSubcategory
-    ) {
+    if (!shouldShowCategoriesFilter() || !urlParams.buyerCategory || !urlParams.selectedSubcategory) {
       return subcategoryKey;
     }
 
@@ -593,18 +545,12 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
     brand.toLowerCase().includes(brandSearch.toLowerCase())
   );
 
-  // Show initial loading only on first load
   if (isInitialLoading) {
     return (
-      <div
-        className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
-      >
-        {/* Header */}
+      <div className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}>
         <div
           className={`shadow-sm p-4 flex items-center gap-4 ${
-            isDarkMode
-              ? "bg-gray-800 border-gray-700"
-              : "bg-white border-gray-200"
+            isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
           }`}
         >
           <button
@@ -613,28 +559,20 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
               isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"
             }`}
           >
-            <ArrowLeft
-              size={24}
-              className={isDarkMode ? "text-gray-300" : "text-gray-600"}
-            />
+            <ArrowLeft size={24} className={isDarkMode ? "text-gray-300" : "text-gray-600"} />
           </button>
           <div className="flex-1">
             <div className="flex items-center gap-2">
               <div className="px-3 py-1 bg-gradient-to-r from-orange-500 to-pink-500 rounded-lg text-white text-sm font-bold shadow-md">
                 Nar24
               </div>
-              <span
-                className={`font-semibold ${
-                  isDarkMode ? "text-white" : "text-gray-900"
-                }`}
-              >
+              <span className={`font-semibold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
                 {urlParams.displayName}
               </span>
             </div>
           </div>
         </div>
 
-        {/* Loading skeleton */}
         <div className="p-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {Array.from({ length: 6 }).map((_, i) => (
@@ -645,25 +583,19 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
                 }`}
               >
                 <div
-                  className={`aspect-[3/4] rounded-t-xl ${
+                  className={`aspect-square rounded-t-xl ${
                     isDarkMode ? "bg-gray-700" : "bg-gray-200"
                   }`}
                 ></div>
-                <div className="p-3 space-y-2">
+                <div className="p-2 space-y-2">
                   <div
-                    className={`h-4 rounded ${
-                      isDarkMode ? "bg-gray-700" : "bg-gray-200"
-                    }`}
+                    className={`h-3 rounded ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`}
                   ></div>
                   <div
-                    className={`h-3 rounded w-3/4 ${
-                      isDarkMode ? "bg-gray-700" : "bg-gray-200"
-                    }`}
+                    className={`h-2 rounded w-3/4 ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`}
                   ></div>
                   <div
-                    className={`h-4 rounded w-1/2 ${
-                      isDarkMode ? "bg-gray-700" : "bg-gray-200"
-                    }`}
+                    className={`h-3 rounded w-1/2 ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`}
                   ></div>
                 </div>
               </div>
@@ -675,13 +607,8 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
   }
 
   return (
-    <div
-      className={`min-h-screen w-full ${
-        isDarkMode ? "bg-gray-900" : "bg-gray-50"
-      }`}
-    >
+    <div className={`min-h-screen w-full ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}>
       <div className="flex max-w-7xl mx-auto">
-        {/* Mobile Filter Button */}
         <div className="lg:hidden fixed bottom-4 right-4 z-50">
           <button
             onClick={() => setShowSidebar(true)}
@@ -698,33 +625,21 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
           </button>
         </div>
 
-        {/* Sidebar - This stays static and doesn't reload */}
         <div
-  className={`
-  fixed lg:sticky lg:top-0 lg:h-screen top-0 left-0 h-screen w-64 transform transition-transform duration-300 z-50 lg:z-0
-  ${
-    showSidebar ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-  }
-  ${isDarkMode ? "bg-gray-800" : "bg-white"}
-  border-r ${isDarkMode ? "border-gray-700" : "border-gray-200"}
-  overflow-y-auto overflow-x-hidden flex-shrink-0
-`}
-  onTouchStart={handleTouchStart}
-  onTouchMove={handleTouchMove}
-  onTouchEnd={handleTouchEnd}
->
-          {/* Sidebar Header */}
-          <div
-            className={`border-b ${
-              isDarkMode ? "border-gray-700" : "border-gray-200"
-            }`}
-          >
+          className={`
+          fixed lg:sticky lg:top-0 lg:h-screen top-0 left-0 h-screen w-64 transform transition-transform duration-300 z-50 lg:z-0
+          ${showSidebar ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
+          ${isDarkMode ? "bg-gray-800" : "bg-white"}
+          border-r ${isDarkMode ? "border-gray-700" : "border-gray-200"}
+          overflow-y-auto overflow-x-hidden flex-shrink-0
+        `}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          <div className={`border-b ${isDarkMode ? "border-gray-700" : "border-gray-200"}`}>
             <div className="p-4 flex items-center justify-between">
-              <h2
-                className={`font-semibold ${
-                  isDarkMode ? "text-white" : "text-gray-900"
-                }`}
-              >
+              <h2 className={`font-semibold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
                 {t("DynamicMarket.filters")}
               </h2>
               <button
@@ -738,9 +653,7 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
             </div>
           </div>
 
-          {/* Filter Content */}
           <div className="p-3">
-            {/* Clear All Filters Button */}
             {getActiveFiltersCount() > 0 && (
               <button
                 onClick={handleClearAllFilters}
@@ -751,154 +664,67 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
             )}
 
             <div className="space-y-4">
-              {/* Categories Filter (only for Women/Men buyer categories) */}
-              {shouldShowCategoriesFilter() &&
-                getAvailableSubSubcategories().length > 0 && (
-                  <div>
-                    <button
-                      onClick={() =>
-                        setExpandedSections((prev) => ({
-                          ...prev,
-                          subcategory: !prev.subcategory,
-                        }))
-                      }
-                      className="w-full flex items-center justify-between text-left py-1.5"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`font-medium text-xs ${
-                            isDarkMode ? "text-white" : "text-gray-900"
-                          }`}
-                        >
-                          {t("DynamicMarket.categories")}
+              {shouldShowCategoriesFilter() && getAvailableSubSubcategories().length > 0 && (
+                <div>
+                  <button
+                    onClick={() =>
+                      setExpandedSections((prev) => ({
+                        ...prev,
+                        subcategory: !prev.subcategory,
+                      }))
+                    }
+                    className="w-full flex items-center justify-between text-left py-1.5"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`font-medium text-xs ${
+                          isDarkMode ? "text-white" : "text-gray-900"
+                        }`}
+                      >
+                        {t("DynamicMarket.categories")}
+                      </span>
+                      {filters.subcategories.length > 0 && (
+                        <span className="bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full font-semibold">
+                          {filters.subcategories.length}
                         </span>
-                        {filters.subcategories.length > 0 && (
-                          <span className="bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full font-semibold">
-                            {filters.subcategories.length}
-                          </span>
-                        )}
-                      </div>
-                      {expandedSections.subcategory ? (
-                        <ChevronUp size={14} className="text-gray-400" />
-                      ) : (
-                        <ChevronDown size={14} className="text-gray-400" />
                       )}
-                    </button>
-
-                    {expandedSections.subcategory && (
-                      <div className="mt-1.5 space-y-1.5">
-                        {filters.subcategories.length > 0 && (
-                          <button
-                            onClick={() => {
-                              setFilters((prev) => ({
-                                ...prev,
-                                subcategories: [],
-                              }));
-                            }}
-                            className="w-full text-left py-1 px-2 text-xs text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded transition-colors"
-                          >
-                            {t("DynamicMarket.clearAllCategories")}
-                          </button>
-                        )}
-
-                        <div className="max-h-40 overflow-y-auto space-y-1.5">
-                          {getAvailableSubSubcategories().map(
-                            (subSubcategory) => {
-                              const localizedName =
-                                getLocalizedSubcategoryName(subSubcategory);
-
-                              return (
-                                <label
-                                  key={subSubcategory}
-                                  className="flex items-center space-x-2 cursor-pointer py-0.5"
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={filters.subcategories.includes(
-                                      subSubcategory
-                                    )}
-                                    onChange={() =>
-                                      handleToggleFilter(
-                                        "subcategories",
-                                        subSubcategory
-                                      )
-                                    }
-                                    className="w-3 h-3 text-orange-500 rounded border-gray-300 focus:ring-orange-500"
-                                  />
-                                  <span
-                                    className={`text-xs ${
-                                      isDarkMode
-                                        ? "text-gray-300"
-                                        : "text-gray-700"
-                                    } leading-tight`}
-                                  >
-                                    {localizedName}
-                                  </span>
-                                </label>
-                              );
-                            }
-                          )}
-                        </div>
-                      </div>
+                    </div>
+                    {expandedSections.subcategory ? (
+                      <ChevronUp size={14} className="text-gray-400" />
+                    ) : (
+                      <ChevronDown size={14} className="text-gray-400" />
                     )}
-                  </div>
-                )}
+                  </button>
 
-              {/* Subcategories Filter (for non-Women/Men categories) */}
-              {!shouldShowCategoriesFilter() &&
-                availableSubcategories.length > 0 && (
-                  <div>
-                    <button
-                      onClick={() =>
-                        setExpandedSections((prev) => ({
-                          ...prev,
-                          subcategory: !prev.subcategory,
-                        }))
-                      }
-                      className="w-full flex items-center justify-between text-left py-1.5"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`font-medium text-xs ${
-                            isDarkMode ? "text-white" : "text-gray-900"
-                          }`}
+                  {expandedSections.subcategory && (
+                    <div className="mt-1.5 space-y-1.5">
+                      {filters.subcategories.length > 0 && (
+                        <button
+                          onClick={() => {
+                            setFilters((prev) => ({
+                              ...prev,
+                              subcategories: [],
+                            }));
+                          }}
+                          className="w-full text-left py-1 px-2 text-xs text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded transition-colors"
                         >
-                          {t("DynamicMarket.subcategories")}
-                        </span>
-                        {filters.subcategories.length > 0 && (
-                          <span className="bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full font-semibold">
-                            {filters.subcategories.length}
-                          </span>
-                        )}
-                      </div>
-                      {expandedSections.subcategory ? (
-                        <ChevronUp size={14} className="text-gray-400" />
-                      ) : (
-                        <ChevronDown size={14} className="text-gray-400" />
+                          {t("DynamicMarket.clearAllCategories")}
+                        </button>
                       )}
-                    </button>
 
-                    {expandedSections.subcategory && (
-                      <div className="mt-1.5 space-y-1.5 max-h-40 overflow-y-auto">
-                        {availableSubcategories.map((sub) => {
-                          const localizedName = sub;
+                      <div className="max-h-40 overflow-y-auto space-y-1.5">
+                        {getAvailableSubSubcategories().map((subSubcategory) => {
+                          const localizedName = getLocalizedSubcategoryName(subSubcategory);
 
                           return (
                             <label
-                              key={sub}
+                              key={subSubcategory}
                               className="flex items-center space-x-2 cursor-pointer py-0.5"
                             >
                               <input
                                 type="checkbox"
-                                checked={filters.subcategories.includes(
-                                  localizedName
-                                )}
-                                onChange={() =>
-                                  handleToggleFilter(
-                                    "subcategories",
-                                    localizedName
-                                  )
-                                }
+                                checked={filters.subcategories.includes(subSubcategory)}
+                                onChange={() => handleToggleFilter("subcategories", subSubcategory)}
                                 className="w-3 h-3 text-orange-500 rounded border-gray-300 focus:ring-orange-500"
                               />
                               <span
@@ -912,11 +738,74 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
                           );
                         })}
                       </div>
-                    )}
-                  </div>
-                )}
+                    </div>
+                  )}
+                </div>
+              )}
 
-              {/* Brands Filter */}
+              {!shouldShowCategoriesFilter() && availableSubcategories.length > 0 && (
+                <div>
+                  <button
+                    onClick={() =>
+                      setExpandedSections((prev) => ({
+                        ...prev,
+                        subcategory: !prev.subcategory,
+                      }))
+                    }
+                    className="w-full flex items-center justify-between text-left py-1.5"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`font-medium text-xs ${
+                          isDarkMode ? "text-white" : "text-gray-900"
+                        }`}
+                      >
+                        {t("DynamicMarket.subcategories")}
+                      </span>
+                      {filters.subcategories.length > 0 && (
+                        <span className="bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full font-semibold">
+                          {filters.subcategories.length}
+                        </span>
+                      )}
+                    </div>
+                    {expandedSections.subcategory ? (
+                      <ChevronUp size={14} className="text-gray-400" />
+                    ) : (
+                      <ChevronDown size={14} className="text-gray-400" />
+                    )}
+                  </button>
+
+                  {expandedSections.subcategory && (
+                    <div className="mt-1.5 space-y-1.5 max-h-40 overflow-y-auto">
+                      {availableSubcategories.map((sub) => {
+                        const localizedName = sub;
+
+                        return (
+                          <label
+                            key={sub}
+                            className="flex items-center space-x-2 cursor-pointer py-0.5"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={filters.subcategories.includes(localizedName)}
+                              onChange={() => handleToggleFilter("subcategories", localizedName)}
+                              className="w-3 h-3 text-orange-500 rounded border-gray-300 focus:ring-orange-500"
+                            />
+                            <span
+                              className={`text-xs ${
+                                isDarkMode ? "text-gray-300" : "text-gray-700"
+                              } leading-tight`}
+                            >
+                              {localizedName}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div>
                 <button
                   onClick={() =>
@@ -928,11 +817,7 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
                   className="w-full flex items-center justify-between text-left py-1.5"
                 >
                   <div className="flex items-center gap-2">
-                    <span
-                      className={`font-medium text-xs ${
-                        isDarkMode ? "text-white" : "text-gray-900"
-                      }`}
-                    >
+                    <span className={`font-medium text-xs ${isDarkMode ? "text-white" : "text-gray-900"}`}>
                       {t("DynamicMarket.brands")}
                     </span>
                     {filters.brands.length > 0 && (
@@ -988,10 +873,7 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
 
                     <div className="max-h-40 overflow-y-auto space-y-1.5">
                       {filteredBrands.map((brand) => (
-                        <label
-                          key={brand}
-                          className="flex items-center space-x-2 cursor-pointer py-0.5"
-                        >
+                        <label key={brand} className="flex items-center space-x-2 cursor-pointer py-0.5">
                           <input
                             type="checkbox"
                             checked={filters.brands.includes(brand)}
@@ -1012,7 +894,6 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
                 )}
               </div>
 
-              {/* Colors Filter */}
               <div>
                 <button
                   onClick={() =>
@@ -1024,11 +905,7 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
                   className="w-full flex items-center justify-between text-left py-1.5"
                 >
                   <div className="flex items-center gap-2">
-                    <span
-                      className={`font-medium text-xs ${
-                        isDarkMode ? "text-white" : "text-gray-900"
-                      }`}
-                    >
+                    <span className={`font-medium text-xs ${isDarkMode ? "text-white" : "text-gray-900"}`}>
                       {t("DynamicMarket.colors")}
                     </span>
                     {filters.colors.length > 0 && (
@@ -1070,9 +947,7 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
                             <input
                               type="checkbox"
                               checked={filters.colors.includes(colorData.name)}
-                              onChange={() =>
-                                handleToggleFilter("colors", colorData.name)
-                              }
+                              onChange={() => handleToggleFilter("colors", colorData.name)}
                               className="w-3 h-3 text-orange-500 rounded border-gray-300 focus:ring-orange-500"
                             />
                             <div
@@ -1094,7 +969,6 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
                 )}
               </div>
 
-              {/* Price Range Filter */}
               <div>
                 <button
                   onClick={() =>
@@ -1106,18 +980,11 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
                   className="w-full flex items-center justify-between text-left py-1.5"
                 >
                   <div className="flex items-center gap-2">
-                    <span
-                      className={`font-medium text-xs ${
-                        isDarkMode ? "text-white" : "text-gray-900"
-                      }`}
-                    >
+                    <span className={`font-medium text-xs ${isDarkMode ? "text-white" : "text-gray-900"}`}>
                       {t("DynamicMarket.priceRange")}
                     </span>
-                    {(filters.minPrice !== undefined ||
-                      filters.maxPrice !== undefined) && (
-                      <div className="bg-orange-500 text-white text-xs px-1 rounded-full">
-                        ✓
-                      </div>
+                    {(filters.minPrice !== undefined || filters.maxPrice !== undefined) && (
+                      <div className="bg-orange-500 text-white text-xs px-1 rounded-full">✓</div>
                     )}
                   </div>
                   {expandedSections.price ? (
@@ -1129,16 +996,14 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
 
                 {expandedSections.price && (
                   <div className="mt-1.5 space-y-2">
-                    {(filters.minPrice !== undefined ||
-                      filters.maxPrice !== undefined) && (
+                    {(filters.minPrice !== undefined || filters.maxPrice !== undefined) && (
                       <div
                         className={`p-2 rounded ${
                           isDarkMode ? "bg-orange-900/30" : "bg-orange-100"
                         } flex items-center justify-between`}
                       >
                         <span className="text-xs text-orange-600 dark:text-orange-400 font-medium">
-                          {filters.minPrice || 0} - {filters.maxPrice || "∞"}{" "}
-                          {t("DynamicMarket.currency")}
+                          {filters.minPrice || 0} - {filters.maxPrice || "∞"} {t("DynamicMarket.currency")}
                         </span>
                         <button
                           onClick={() => {
@@ -1173,9 +1038,7 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
                       focus:ring-1 focus:ring-orange-500 focus:border-orange-500
                     `}
                       />
-                      <span className="text-xs text-gray-500 self-center">
-                        -
-                      </span>
+                      <span className="text-xs text-gray-500 self-center">-</span>
                       <input
                         type="number"
                         placeholder={t("DynamicMarket.max")}
@@ -1191,9 +1054,7 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
                       focus:ring-1 focus:ring-orange-500 focus:border-orange-500
                     `}
                       />
-                      <span className="text-xs text-gray-500 self-center">
-                        {t("DynamicMarket.currency")}
-                      </span>
+                      <span className="text-xs text-gray-500 self-center">{t("DynamicMarket.currency")}</span>
                     </div>
 
                     <button
@@ -1204,11 +1065,7 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
                     </button>
 
                     <div className="pt-2">
-                      <p
-                        className={`text-xs mb-2 ${
-                          isDarkMode ? "text-gray-400" : "text-gray-600"
-                        }`}
-                      >
+                      <p className={`text-xs mb-2 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
                         {t("DynamicMarket.quickRanges")}:
                       </p>
                       <div className="grid grid-cols-2 gap-1">
@@ -1219,8 +1076,7 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
                           { label: "1K+", min: 1000, max: undefined },
                         ].map((range) => {
                           const isSelected =
-                            filters.minPrice === range.min &&
-                            filters.maxPrice === range.max;
+                            filters.minPrice === range.min && filters.maxPrice === range.max;
                           return (
                             <button
                               key={range.label}
@@ -1252,46 +1108,33 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
               </div>
             </div>
           </div>
-        </div>     
+        </div>
 
-        {/* Main Content - This is the only part that reloads when filters change */}
         <div className="flex-1 min-w-0">
-          {/* Header - Static, doesn't reload */}
-          {/* Header - Static, doesn't reload */}
           <div
             className={`shadow-md sticky top-0 z-10 backdrop-blur-xl ${
-              isDarkMode
-                ? "bg-gray-800/95 border-gray-700"
-                : "bg-white/95 border-gray-200"
+              isDarkMode ? "bg-gray-800/95 border-gray-700" : "bg-white/95 border-gray-200"
             } border-b`}
           >
             <div className="p-4 flex items-center gap-3">
-              {/* Back button */}
               <button
                 onClick={handleBack}
                 className={`p-2 rounded-lg transition-colors flex-shrink-0 ${
                   isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"
                 }`}
               >
-                <ArrowLeft
-                  size={24}
-                  className={isDarkMode ? "text-gray-300" : "text-gray-600"}
-                />
+                <ArrowLeft size={24} className={isDarkMode ? "text-gray-300" : "text-gray-600"} />
               </button>
 
-              {/* Nar24 Logo */}
               <div className="px-3 py-1 bg-gradient-to-r from-orange-500 to-pink-500 rounded-lg text-white text-sm font-bold shadow-md flex-shrink-0">
                 Nar24
               </div>
 
-              {/* Filter buttons - now in the same row */}
               <div className="flex gap-2 overflow-x-auto scrollbar-hide flex-1">
                 {filterTypes.map((filter) => (
                   <button
                     key={filter}
-                    onClick={() =>
-                      handleFilterSelect(filter === "" ? null : filter)
-                    }
+                    onClick={() => handleFilterSelect(filter === "" ? null : filter)}
                     className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all duration-200 flex-shrink-0 ${
                       selectedFilter === (filter === "" ? null : filter)
                         ? "bg-gradient-to-r from-orange-500 to-pink-500 text-white shadow-lg"
@@ -1305,51 +1148,30 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
                 ))}
               </div>
 
-              {/* Sort button */}
               <div className="relative">
                 <button
                   onClick={() => setShowSortDropdown(!showSortDropdown)}
                   className={`flex items-center gap-1 px-3 py-2 rounded-lg transition-colors flex-shrink-0 ${
-                    isDarkMode
-                      ? "hover:bg-gray-700 text-gray-300"
-                      : "hover:bg-gray-100 text-gray-600"
-                  } ${
-                    showSortDropdown
-                      ? isDarkMode
-                        ? "bg-gray-700"
-                        : "bg-gray-100"
-                      : ""
-                  }`}
+                    isDarkMode ? "hover:bg-gray-700 text-gray-300" : "hover:bg-gray-100 text-gray-600"
+                  } ${showSortDropdown ? (isDarkMode ? "bg-gray-700" : "bg-gray-100") : ""}`}
                 >
                   <SortAsc size={18} />
                   <span className="hidden sm:inline text-xs font-medium">
-                    {selectedSortOption !== "None"
-                      ? getSortOptionText(selectedSortOption)
-                      : t("DynamicMarket.sort")}
+                    {selectedSortOption !== "None" ? getSortOptionText(selectedSortOption) : t("DynamicMarket.sort")}
                   </span>
                   <ChevronDown
                     size={14}
-                    className={`ml-1 transition-transform ${
-                      showSortDropdown ? "rotate-180" : ""
-                    }`}
+                    className={`ml-1 transition-transform ${showSortDropdown ? "rotate-180" : ""}`}
                   />
                 </button>
 
-                {/* Dropdown Menu */}
                 {showSortDropdown && (
                   <>
-                    {/* Backdrop to close dropdown when clicking outside */}
-                    <div
-                      className="fixed inset-0 z-10"
-                      onClick={() => setShowSortDropdown(false)}
-                    />
+                    <div className="fixed inset-0 z-10" onClick={() => setShowSortDropdown(false)} />
 
-                    {/* Dropdown content */}
                     <div
                       className={`absolute right-0 mt-2 w-48 rounded-lg shadow-lg z-20 border ${
-                        isDarkMode
-                          ? "bg-gray-800 border-gray-700"
-                          : "bg-white border-gray-200"
+                        isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
                       }`}
                     >
                       <div className="py-1">
@@ -1384,9 +1206,7 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
             </div>
           </div>
 
-          {/* Products Grid - This is the only part that shows loading when filters change */}
           <div className="p-4 relative">
-            {/* Loading overlay for products area only */}
             {isProductsLoading && (
               <div
                 className={`absolute inset-0 ${
@@ -1395,38 +1215,22 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
               >
                 <div className="text-center">
                   <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
-                  <p
-                    className={`mt-4 text-sm ${
-                      isDarkMode ? "text-gray-300" : "text-gray-600"
-                    }`}
-                  >
+                  <p className={`mt-4 text-sm ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
                     {t("DynamicMarket.updatingProducts")}
                   </p>
                 </div>
               </div>
             )}
 
-            {/* Boosted products first (only on default filter) */}
             {selectedFilter === null && boostedProducts.length > 0 && (
               <div className="mb-8">
-                <div
-                  className={`flex items-center gap-3 mb-4 ${
-                    isDarkMode ? "text-white" : "text-gray-900"
-                  }`}
-                >
+                <div className={`flex items-center gap-3 mb-4 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
                   <div className="w-1 h-8 bg-gradient-to-b from-orange-500 to-pink-500 rounded-full"></div>
-                  <h3 className="text-xl font-bold">
-                    {t("DynamicMarket.featuredProducts")}
-                  </h3>
+                  <h3 className="text-xl font-bold">{t("DynamicMarket.featuredProducts")}</h3>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {boostedProducts.map((product) => (
-                    <div
-                      key={`boosted-${product.id}`}
-                      className={`rounded-xl shadow-md transition-all duration-200 hover:shadow-lg hover:scale-105 ${
-                        isDarkMode ? "bg-gray-800" : "bg-white"
-                      }`}
-                    >
+                    <div key={`boosted-${product.id}`} className="w-full">
                       <ProductCard
                         product={product}
                         onTap={() => handleProductClick(product)}
@@ -1444,23 +1248,14 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
               </div>
             )}
 
-            {/* Regular products */}
             {products.length > 0 ? (
               <div>
-                <div
-                  className={`flex items-center gap-3 mb-4 ${
-                    isDarkMode ? "text-white" : "text-gray-900"
-                  }`}
-                >
+                <div className={`flex items-center gap-3 mb-4 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
                   <div className="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full"></div>
-                  <h3 className="text-xl font-bold">
-                    {t("DynamicMarket.allProducts")}
-                  </h3>
+                  <h3 className="text-xl font-bold">{t("DynamicMarket.allProducts")}</h3>
                   <span
                     className={`text-sm px-3 py-1 rounded-full ${
-                      isDarkMode
-                        ? "bg-gray-700 text-gray-300"
-                        : "bg-gray-100 text-gray-600"
+                      isDarkMode ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gray-600"
                     }`}
                   >
                     {products.length} {t("DynamicMarket.products")}
@@ -1468,24 +1263,16 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
                   {getActiveFiltersCount() > 0 && (
                     <span
                       className={`text-sm px-3 py-1 rounded-full ${
-                        isDarkMode
-                          ? "bg-orange-900/30 text-orange-400"
-                          : "bg-orange-100 text-orange-600"
+                        isDarkMode ? "bg-orange-900/30 text-orange-400" : "bg-orange-100 text-orange-600"
                       }`}
                     >
-                      {getActiveFiltersCount()}{" "}
-                      {t("DynamicMarket.filtersApplied")}
+                      {getActiveFiltersCount()} {t("DynamicMarket.filtersApplied")}
                     </span>
                   )}
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6">
                   {products.map((product) => (
-                    <div
-                      key={product.id}
-                      className={`rounded-xl shadow-md transition-all duration-200 hover:shadow-lg hover:scale-105 ${
-                        isDarkMode ? "bg-gray-800" : "bg-white"
-                      }`}
-                    >
+                    <div key={product.id} className="w-full">
                       <ProductCard
                         product={product}
                         onTap={() => handleProductClick(product)}
@@ -1504,25 +1291,13 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
             ) : (
               !isProductsLoading && (
                 <div className="text-center py-16">
-                  <div
-                    className={`mb-6 ${
-                      isDarkMode ? "text-gray-500" : "text-gray-400"
-                    }`}
-                  >
+                  <div className={`mb-6 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
                     <Filter size={64} className="mx-auto" />
                   </div>
-                  <h3
-                    className={`text-xl font-semibold mb-2 ${
-                      isDarkMode ? "text-gray-300" : "text-gray-600"
-                    }`}
-                  >
+                  <h3 className={`text-xl font-semibold mb-2 ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
                     {t("DynamicMarket.noProductsFound")}
                   </h3>
-                  <p
-                    className={`text-sm mb-4 ${
-                      isDarkMode ? "text-gray-500" : "text-gray-500"
-                    }`}
-                  >
+                  <p className={`text-sm mb-4 ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
                     {t("DynamicMarket.tryAdjustingFilters")}
                   </p>
                   {getActiveFiltersCount() > 0 && (
@@ -1537,41 +1312,31 @@ const [touchEnd, setTouchEnd] = useState<number | null>(null);
               )
             )}
 
-            {/* Loading more indicator */}
             {isLoadingMore && (
               <div className="text-center py-8">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
-                <p
-                  className={`mt-2 text-sm ${
-                    isDarkMode ? "text-gray-400" : "text-gray-600"
-                  }`}
-                >
+                <p className={`mt-2 text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
                   {t("DynamicMarket.loadingMore")}
                 </p>
               </div>
             )}
 
-            {/* Load more button */}
-            {hasMore &&
-              !isLoadingMore &&
-              products.length > 0 &&
-              !isProductsLoading && (
-                <div className="text-center py-8">
-                  <button
-                    onClick={handleLoadMore}
-                    className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 ${
-                      isDarkMode
-                        ? "bg-gray-700 hover:bg-gray-600 text-white border border-gray-600"
-                        : "bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 shadow-sm"
-                    }`}
-                  >
-                    {t("DynamicMarket.loadMore")}
-                  </button>
-                </div>
-              )}
+            {hasMore && !isLoadingMore && products.length > 0 && !isProductsLoading && (
+              <div className="text-center py-8">
+                <button
+                  onClick={handleLoadMore}
+                  className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 ${
+                    isDarkMode
+                      ? "bg-gray-700 hover:bg-gray-600 text-white border border-gray-600"
+                      : "bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 shadow-sm"
+                  }`}
+                >
+                  {t("DynamicMarket.loadMore")}
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Bottom spacing */}
           <div className="h-20"></div>
         </div>
       </div>

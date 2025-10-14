@@ -17,122 +17,90 @@ import { db } from "@/lib/firebase";
 import { Product, ProductUtils } from "@/app/models/Product";
 
 const LIMIT = 20;
+const MAX_ARRAY_FILTER_SIZE = 10;
+
+// Category mapping cache to avoid repeated string operations
+const CATEGORY_MAPPING: Record<string, string> = {
+  "clothing-fashion": "Clothing & Fashion",
+  "footwear": "Footwear",
+  "accessories": "Accessories",
+  "bags-luggage": "Bags & Luggage",
+  "beauty-personal-care": "Beauty & Personal Care",
+  "mother-child": "Mother & Child",
+  "home-furniture": "Home & Furniture",
+  "electronics": "Electronics",
+  "sports-outdoor": "Sports & Outdoor",
+  "books-stationery-hobby": "Books, Stationery & Hobby",
+  "tools-hardware": "Tools & Hardware",
+  "pet-supplies": "Pet Supplies",
+  "automotive": "Automotive",
+  "health-wellness": "Health & Wellness",
+};
+
+interface QueryParams {
+  category?: string | null;
+  subcategory?: string | null;
+  subsubcategory?: string | null;
+  buyerCategory?: string | null;
+  buyerSubcategory?: string | null;
+  sortOption: string;
+  quickFilter?: string | null;
+  brands: string[];
+  colors: string[];
+  filterSubcategories: string[];
+  minPrice?: number | null;
+  maxPrice?: number | null;
+  page: number;
+}
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
 
-    // Extract parameters
-    const category = searchParams.get("category");
-    const subcategory = searchParams.get("subcategory");
-    const subsubcategory = searchParams.get("subsubcategory");
-    const buyerCategory = searchParams.get("buyerCategory");
-    const buyerSubcategory = searchParams.get("buyerSubcategory");
-    const page = parseInt(searchParams.get("page") || "0");
-    const sortOption = searchParams.get("sort") || "date";
-    const quickFilter = searchParams.get("filter");
+    // Extract and parse parameters
+    const params = extractQueryParams(searchParams);
 
-    // Dynamic filters from sidebar
-    const filterSubcategories =
-      searchParams.get("filterSubcategories")?.split(",") || [];
-    const colors = searchParams.get("colors")?.split(",") || [];
-    const brands = searchParams.get("brands")?.split(",") || [];
-    const minPrice = searchParams.get("minPrice")
-      ? parseFloat(searchParams.get("minPrice")!)
-      : null;
-    const maxPrice = searchParams.get("maxPrice")
-      ? parseFloat(searchParams.get("maxPrice")!)
+    // Convert category to Firestore format
+    const firestoreCategory = params.category 
+      ? CATEGORY_MAPPING[params.category] || params.category 
       : null;
 
-    console.log("🔍 API Request params:", {
-      category,
-      subcategory,
-      subsubcategory,
-      buyerCategory,
-      buyerSubcategory,
-      page,
-      sortOption,
-      quickFilter,
-      filterSubcategories,
-      colors,
-      brands,
-      minPrice,
-      maxPrice,
-    });
-
-    // Convert URL-friendly category back to Firestore format
-    const firestoreCategory = convertToFirestoreCategory(category);
-
-    console.log("🔍 Converted category:", {
-      original: category,
-      firestore: firestoreCategory,
-    });
-
-    // Build the main query
-    const q = buildServerSideQuery({
+    // Build main products query
+    const productsQuery = buildProductsQuery({
+      ...params,
       category: firestoreCategory,
-      subcategory,
-      subsubcategory,
-      buyerCategory,
-      buyerSubcategory,
-      sortOption,
-      quickFilter,
-      dynamicBrands: brands,
-      dynamicColors: colors,
-      dynamicSubSubcategories: filterSubcategories,
-      minPrice,
-      maxPrice,
     });
 
-    // Execute query
-    console.log("🔍 Executing Firestore query...");
-    const snapshot = await getDocs(q);
-    console.log(`🔍 Query returned ${snapshot.size} documents`);
+    // Execute query with error handling
+    const snapshot = await getDocs(productsQuery);
+    
+    // Parse products efficiently
+    const products = parseProducts(snapshot);
 
-    const products: Product[] = [];
-
-    snapshot.docs.forEach((doc) => {
-      try {
-        const data = { id: doc.id, ...doc.data() };
-        const product = ProductUtils.fromJson(data);
-        products.push(product);
-      } catch (error) {
-        console.warn(`Failed to parse product ${doc.id}:`, error);
-      }
-    });
-
-    // Fetch boosted products separately (only for default filter)
+    // Fetch boosted products if needed (only for default filter)
     let boostedProducts: Product[] = [];
-    if (!quickFilter && firestoreCategory && subsubcategory) {
-      console.log("🔍 Fetching boosted products...");
+    if (!params.quickFilter && firestoreCategory && params.subsubcategory) {
       boostedProducts = await fetchBoostedProducts({
         category: firestoreCategory,
-        subsubcategory,
-        buyerCategory,
-        dynamicBrands: brands,
-        dynamicColors: colors,
-        dynamicSubSubcategories: filterSubcategories,
-        minPrice,
-        maxPrice,
+        subsubcategory: params.subsubcategory,
+        buyerCategory: params.buyerCategory,
+        dynamicBrands: params.brands,
+        dynamicColors: params.colors,
+        dynamicSubSubcategories: params.filterSubcategories,
+        minPrice: params.minPrice,
+        maxPrice: params.maxPrice,
       });
-      console.log(`🔍 Found ${boostedProducts.length} boosted products`);
     }
-
-    console.log("🔍 API Response:", {
-      products: products.length,
-      boostedProducts: boostedProducts.length,
-      hasMore: products.length >= LIMIT,
-    });
 
     return NextResponse.json({
       products,
       boostedProducts,
       hasMore: products.length >= LIMIT,
-      page,
+      page: params.page,
       total: snapshot.size,
     });
   } catch (error) {
-    console.error("❌ Error fetching products:", error);
+    console.error("Error fetching products:", error);
     return NextResponse.json(
       {
         error: "Failed to fetch products",
@@ -143,213 +111,167 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Helper function to convert URL-friendly category to Firestore format
-function convertToFirestoreCategory(urlCategory: string | null): string | null {
-  if (!urlCategory) return null;
-
-  const categoryMapping: { [key: string]: string } = {
-    "clothing-fashion": "Clothing & Fashion",
-    footwear: "Footwear",
-    accessories: "Accessories",
-    "bags-luggage": "Bags & Luggage",
-    "beauty-personal-care": "Beauty & Personal Care",
-    "mother-child": "Mother & Child",
-    "home-furniture": "Home & Furniture",
-    electronics: "Electronics",
-    "sports-outdoor": "Sports & Outdoor",
-    "books-stationery-hobby": "Books, Stationery & Hobby",
-    "tools-hardware": "Tools & Hardware",
-    "pet-supplies": "Pet Supplies",
-    automotive: "Automotive",
-    "health-wellness": "Health & Wellness",
+// Extract and validate query parameters
+function extractQueryParams(searchParams: URLSearchParams): QueryParams {
+  return {
+    category: searchParams.get("category"),
+    subcategory: searchParams.get("subcategory"),
+    subsubcategory: searchParams.get("subsubcategory"),
+    buyerCategory: searchParams.get("buyerCategory"),
+    buyerSubcategory: searchParams.get("buyerSubcategory"),
+    page: parseInt(searchParams.get("page") || "0", 10),
+    sortOption: searchParams.get("sort") || "date",
+    quickFilter: searchParams.get("filter"),
+    filterSubcategories: searchParams.get("filterSubcategories")?.split(",").filter(Boolean) || [],
+    colors: searchParams.get("colors")?.split(",").filter(Boolean) || [],
+    brands: searchParams.get("brands")?.split(",").filter(Boolean) || [],
+    minPrice: searchParams.get("minPrice") ? parseFloat(searchParams.get("minPrice")!) : null,
+    maxPrice: searchParams.get("maxPrice") ? parseFloat(searchParams.get("maxPrice")!) : null,
   };
-
-  return categoryMapping[urlCategory] || urlCategory;
 }
 
-interface QueryParams {
-  category?: string | null;
-  subcategory?: string | null;
-  subsubcategory?: string | null;
-  buyerCategory?: string | null;
-  buyerSubcategory?: string | null;
-  sortOption: string;
-  quickFilter?: string | null;
-  dynamicBrands: string[];
-  dynamicColors: string[];
-  dynamicSubSubcategories: string[];
-  minPrice?: number | null;
-  maxPrice?: number | null;
-}
-
-function buildServerSideQuery({
-  category,
-  subcategory,
-  subsubcategory,
-  buyerCategory,
-  sortOption,
-  quickFilter,
-  dynamicBrands,
-  dynamicColors,
-  dynamicSubSubcategories,
-  minPrice,
-  maxPrice,
-}: QueryParams): Query<DocumentData, DocumentData> {
-  const collectionRef: CollectionReference<DocumentData, DocumentData> =
-    collection(db, "shop_products");
-  const constraints: QueryConstraint[] = [];
-
-  console.log("🔍 Building query with params:", {
-    category,
-    subcategory,
-    subsubcategory,
-    buyerCategory,
-    sortOption,
-    quickFilter,
+// Parse products from snapshot
+function parseProducts(snapshot: any): Product[] {
+  const products: Product[] = [];
+  
+  snapshot.docs.forEach((doc: any) => {
+    try {
+      const data = { id: doc.id, ...doc.data() };
+      const product = ProductUtils.fromJson(data);
+      products.push(product);
+    } catch (error) {
+      console.warn(`Failed to parse product ${doc.id}:`, error);
+    }
   });
 
-  // ========== BASIC FILTERS ==========
-  if (category) {
-    constraints.push(where("category", "==", category));
-    console.log("🔍 Added category filter:", category);
+  return products;
+}
+
+function buildProductsQuery(params: QueryParams): Query<DocumentData, DocumentData> {
+  const collectionRef: CollectionReference<DocumentData, DocumentData> = collection(db, "shop_products");
+  const constraints: QueryConstraint[] = [];
+
+  // Basic filters - only add if values exist
+  if (params.category) {
+    constraints.push(where("category", "==", params.category));
   }
 
-  if (subcategory) {
-    constraints.push(where("subcategory", "==", subcategory));
-    console.log("🔍 Added subcategory filter:", subcategory);
+  if (params.subcategory) {
+    constraints.push(where("subcategory", "==", params.subcategory));
   }
 
-  if (subsubcategory) {
-    constraints.push(where("subsubcategory", "==", subsubcategory));
-    console.log("🔍 Added subsubcategory filter:", subsubcategory);
+  if (params.subsubcategory) {
+    constraints.push(where("subsubcategory", "==", params.subsubcategory));
   }
 
-  // ========== GENDER FILTERING ==========
-  if (buyerCategory === "Women" || buyerCategory === "Men") {
-    constraints.push(where("gender", "in", [buyerCategory, "Unisex"]));
-    console.log("🔍 Added gender filter:", [buyerCategory, "Unisex"]);
+  // Gender filtering for Women/Men categories
+  if (params.buyerCategory === "Women" || params.buyerCategory === "Men") {
+    constraints.push(where("gender", "in", [params.buyerCategory, "Unisex"]));
   }
 
-  // ========== DYNAMIC FILTERS ==========
-  if (dynamicSubSubcategories.length > 0) {
-    if (dynamicSubSubcategories.length <= 10) {
-      constraints.push(where("subsubcategory", "in", dynamicSubSubcategories));
-    } else {
-      constraints.push(
-        where("subsubcategory", "in", dynamicSubSubcategories.slice(0, 10))
-      );
-    }
-    console.log(
-      "🔍 Added dynamic subsubcategories filter:",
-      dynamicSubSubcategories
-    );
+  // Dynamic filters - respect Firestore's 10-item limit for 'in' and 'array-contains-any'
+  if (params.filterSubcategories.length > 0) {
+    const subcats = params.filterSubcategories.slice(0, MAX_ARRAY_FILTER_SIZE);
+    constraints.push(where("subsubcategory", "in", subcats));
   }
 
-  if (dynamicBrands.length > 0) {
-    if (dynamicBrands.length <= 10) {
-      constraints.push(where("brandModel", "in", dynamicBrands));
-    } else {
-      constraints.push(where("brandModel", "in", dynamicBrands.slice(0, 10)));
-    }
-    console.log("🔍 Added dynamic brands filter:", dynamicBrands);
+  if (params.brands.length > 0) {
+    const brands = params.brands.slice(0, MAX_ARRAY_FILTER_SIZE);
+    constraints.push(where("brandModel", "in", brands));
   }
 
-  if (dynamicColors.length > 0) {
-    if (dynamicColors.length <= 10) {
-      constraints.push(
-        where("availableColors", "array-contains-any", dynamicColors)
-      );
-    } else {
-      constraints.push(
-        where(
-          "availableColors",
-          "array-contains-any",
-          dynamicColors.slice(0, 10)
-        )
-      );
-    }
-    console.log("🔍 Added dynamic colors filter:", dynamicColors);
+  if (params.colors.length > 0) {
+    const colors = params.colors.slice(0, MAX_ARRAY_FILTER_SIZE);
+    constraints.push(where("availableColors", "array-contains-any", colors));
   }
 
-  if (minPrice !== null) {
-    constraints.push(where("price", ">=", minPrice));
-    console.log("🔍 Added minPrice filter:", minPrice);
+  // Price range filters
+  if (params.minPrice !== null && params.minPrice !== undefined) {
+    constraints.push(where("price", ">=", params.minPrice));
   }
 
-  if (maxPrice !== null) {
-    constraints.push(where("price", "<=", maxPrice));
-    console.log("🔍 Added maxPrice filter:", maxPrice);
+  if (params.maxPrice !== null && params.maxPrice !== undefined) {
+    constraints.push(where("price", "<=", params.maxPrice));
   }
 
-  // ========== QUICK FILTERS ==========
-  if (quickFilter) {
-    console.log("🔍 Adding quick filter:", quickFilter);
-    switch (quickFilter) {
-      case "deals":
-        constraints.push(where("discountPercentage", ">", 0));
-        break;
-      case "boosted":
-        constraints.push(where("isBoosted", "==", true));
-        break;
-      case "trending":
-        constraints.push(where("dailyClickCount", ">=", 10));
-        break;
-      case "fiveStar":
-        constraints.push(where("averageRating", "==", 5));
-        break;
-      case "bestSellers":
-        // Don't add constraint here, handle in sorting
-        break;
-    }
+  // Quick filters
+  if (params.quickFilter) {
+    applyQuickFilter(constraints, params.quickFilter);
   }
 
-  // ========== SORTING (SIMPLIFIED TO MATCH FLUTTER) ==========
-  console.log("🔍 Adding sorting for option:", sortOption);
+  // Sorting - optimized for Firestore indexes
+  applySorting(constraints, params.sortOption, params.quickFilter);
 
-  // Use the exact same sorting logic as Flutter
-  if (quickFilter === "bestSellers") {
-    // For best sellers: boosted first, then by purchase count
-    constraints.push(orderBy("isBoosted", "desc"));
-    constraints.push(orderBy("purchaseCount", "desc"));
-  } else {
-    switch (sortOption) {
-      case "alphabetical":
-        constraints.push(orderBy("isBoosted", "desc"));
-        constraints.push(orderBy("productName", "asc"));
-        break;
-      case "price_asc":
-        constraints.push(orderBy("isBoosted", "desc"));
-        constraints.push(orderBy("price", "asc"));
-        break;
-      case "price_desc":
-        constraints.push(orderBy("isBoosted", "desc"));
-        constraints.push(orderBy("price", "desc"));
-        break;
-      case "date":
-      default:
-        // PRIMARY SORT: Try promotionScore first, fallback to legacy
-        try {
-          constraints.push(orderBy("promotionScore", "desc"));
-          constraints.push(orderBy("createdAt", "desc"));
-          console.log("🔍 Using promotionScore sorting");
-        } catch {
-          // If promotionScore fails, use fallback
-          constraints.push(orderBy("isBoosted", "desc"));
-          constraints.push(orderBy("rankingScore", "desc"));
-          constraints.push(orderBy("createdAt", "desc"));
-          console.log("🔍 Using fallback sorting");
-        }
-        break;
-    }
-  }
-
-  // Add limit constraint
+  // Limit results
   constraints.push(limit(LIMIT));
 
-  console.log("🔍 Final query constraints count:", constraints.length);
   return query(collectionRef, ...constraints);
 }
 
+// Apply quick filter constraints
+function applyQuickFilter(constraints: QueryConstraint[], quickFilter: string) {
+  switch (quickFilter) {
+    case "deals":
+      constraints.push(where("discountPercentage", ">", 0));
+      break;
+    case "boosted":
+      constraints.push(where("isBoosted", "==", true));
+      break;
+    case "trending":
+      constraints.push(where("dailyClickCount", ">=", 10));
+      break;
+    case "fiveStar":
+      constraints.push(where("averageRating", "==", 5));
+      break;
+    case "bestSellers":
+      // Handled in sorting
+      break;
+  }
+}
+
+// Apply sorting constraints
+function applySorting(
+  constraints: QueryConstraint[], 
+  sortOption: string, 
+  quickFilter?: string | null
+) {
+  if (quickFilter === "bestSellers") {
+    // Best sellers: boosted first, then by purchase count
+    constraints.push(orderBy("isBoosted", "desc"));
+    constraints.push(orderBy("purchaseCount", "desc"));
+    return;
+  }
+
+  switch (sortOption) {
+    case "alphabetical":
+      constraints.push(orderBy("isBoosted", "desc"));
+      constraints.push(orderBy("productName", "asc"));
+      break;
+    case "price_asc":
+      constraints.push(orderBy("isBoosted", "desc"));
+      constraints.push(orderBy("price", "asc"));
+      break;
+    case "price_desc":
+      constraints.push(orderBy("isBoosted", "desc"));
+      constraints.push(orderBy("price", "desc"));
+      break;
+    case "date":
+    default:
+      // Default sorting: promotionScore or fallback to legacy
+      try {
+        constraints.push(orderBy("promotionScore", "desc"));
+        constraints.push(orderBy("createdAt", "desc"));
+      } catch {
+        // Fallback if promotionScore doesn't exist
+        constraints.push(orderBy("isBoosted", "desc"));
+        constraints.push(orderBy("rankingScore", "desc"));
+        constraints.push(orderBy("createdAt", "desc"));
+      }
+      break;
+  }
+}
+
+// Fetch boosted products separately
 async function fetchBoostedProducts({
   category,
   subsubcategory,
@@ -377,40 +299,33 @@ async function fetchBoostedProducts({
       where("subsubcategory", "==", subsubcategory),
     ];
 
-    console.log("🔍 Building boosted query with:", {
-      category,
-      subsubcategory,
-      buyerCategory,
-    });
-
-    // Add buyer category gender filtering for boosted products
+    // Gender filtering for boosted products
     if (buyerCategory === "Women" || buyerCategory === "Men") {
       constraints.push(where("gender", "in", [buyerCategory, "Unisex"]));
     }
 
-    // Apply dynamic filters to boosted products as well
-    if (dynamicBrands.length > 0 && dynamicBrands.length <= 10) {
+    // Apply dynamic filters to boosted products
+    if (dynamicBrands.length > 0 && dynamicBrands.length <= MAX_ARRAY_FILTER_SIZE) {
       constraints.push(where("brandModel", "in", dynamicBrands));
     }
-    if (dynamicColors.length > 0 && dynamicColors.length <= 10) {
-      constraints.push(
-        where("availableColors", "array-contains-any", dynamicColors)
-      );
+
+    if (dynamicColors.length > 0 && dynamicColors.length <= MAX_ARRAY_FILTER_SIZE) {
+      constraints.push(where("availableColors", "array-contains-any", dynamicColors));
     }
-    if (
-      dynamicSubSubcategories.length > 0 &&
-      dynamicSubSubcategories.length <= 10
-    ) {
+
+    if (dynamicSubSubcategories.length > 0 && dynamicSubSubcategories.length <= MAX_ARRAY_FILTER_SIZE) {
       constraints.push(where("subsubcategory", "in", dynamicSubSubcategories));
     }
-    if (minPrice !== null) {
+
+    if (minPrice !== null && minPrice !== undefined) {
       constraints.push(where("price", ">=", minPrice));
     }
-    if (maxPrice !== null) {
+
+    if (maxPrice !== null && maxPrice !== undefined) {
       constraints.push(where("price", "<=", maxPrice));
     }
 
-    // Enhanced sorting for boosted products
+    // Sorting for boosted products
     try {
       constraints.push(orderBy("promotionScore", "desc"));
       constraints.push(limit(20));
@@ -422,19 +337,8 @@ async function fetchBoostedProducts({
 
     const q = query(collectionRef, ...constraints);
     const snapshot = await getDocs(q);
-    const boostedProducts: Product[] = [];
 
-    snapshot.docs.forEach((doc) => {
-      try {
-        const data = { id: doc.id, ...doc.data() };
-        const product = ProductUtils.fromJson(data);
-        boostedProducts.push(product);
-      } catch (error) {
-        console.warn(`Failed to parse boosted product ${doc.id}:`, error);
-      }
-    });
-
-    return boostedProducts;
+    return parseProducts(snapshot);
   } catch (error) {
     console.error("Error fetching boosted products:", error);
     return [];

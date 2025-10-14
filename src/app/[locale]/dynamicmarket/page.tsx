@@ -474,6 +474,73 @@ export default function DynamicMarketPage() {
     console.log("Color selected for product:", productId, color);
   }, []);
 
+  // Shimmer component for loading skeleton
+  const ProductCardSkeleton = () => (
+    <div className="w-full">
+      <div className={`rounded-lg overflow-hidden ${isDarkMode ? "bg-gray-800" : "bg-gray-200"}`}>
+        {/* Image skeleton with shimmer effect */}
+        <div 
+          className={`w-full relative overflow-hidden ${isDarkMode ? "bg-gray-700" : "bg-gray-300"}`}
+          style={{ height: "320px" }}
+        >
+          <div 
+            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"
+            style={{
+              backgroundSize: "200% 100%",
+            }}
+          />
+        </div>
+        
+        {/* Content skeleton */}
+        <div className="p-3 space-y-2.5">
+          {/* Title lines */}
+          <div className="space-y-2">
+            <div 
+              className={`h-3.5 rounded ${isDarkMode ? "bg-gray-700" : "bg-gray-300"} relative overflow-hidden`}
+              style={{ width: "85%" }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
+            </div>
+            <div 
+              className={`h-3.5 rounded ${isDarkMode ? "bg-gray-700" : "bg-gray-300"} relative overflow-hidden`}
+              style={{ width: "60%" }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
+            </div>
+          </div>
+          
+          {/* Price */}
+          <div 
+            className={`h-5 rounded ${isDarkMode ? "bg-gray-700" : "bg-gray-300"} relative overflow-hidden`}
+            style={{ width: "45%" }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
+          </div>
+          
+          {/* Rating and colors */}
+          <div className="flex items-center justify-between pt-1">
+            <div 
+              className={`h-3 rounded ${isDarkMode ? "bg-gray-700" : "bg-gray-300"} relative overflow-hidden`}
+              style={{ width: "40%" }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
+            </div>
+            <div className="flex gap-1">
+              {[...Array(3)].map((_, i) => (
+                <div
+                  key={i}
+                  className={`w-4 h-4 rounded-full ${isDarkMode ? "bg-gray-700" : "bg-gray-300"} relative overflow-hidden`}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   if (!category) {
     return (
       <>
@@ -843,13 +910,12 @@ export default function DynamicMarketPage() {
 
             {/* Content */}
             <div className="px-4 pb-8">
-              {/* Loading state */}
+              {/* Loading state with shimmer skeletons */}
               {loading && products.length === 0 && (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 size={32} className="animate-spin text-orange-500" />
-                  <span className={`ml-3 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                    Loading products...
-                  </span>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6">
+                  {[...Array(8)].map((_, index) => (
+                    <ProductCardSkeleton key={index} />
+                  ))}
                 </div>
               )}
 
