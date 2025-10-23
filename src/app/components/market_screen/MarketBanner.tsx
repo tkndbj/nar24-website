@@ -73,12 +73,13 @@ const useMarketBanners = () => {
 
   // Prefetch images to smooth scrolling (matches Flutter's approach)
   const prefetchImage = useCallback((url: string) => {
-    if (prefetchedUrls.has(url)) return;
-    
-    const img = new Image();
-    img.src = url;
-    setPrefetchedUrls(prev => new Set(prev).add(url));
-  }, [prefetchedUrls]);
+    setPrefetchedUrls(prev => {
+      if (prev.has(url)) return prev;
+      const img = new Image();
+      img.src = url;
+      return new Set(prev).add(url);
+    });
+  }, []);
 
   // Fetch banners from Firebase - matches Flutter fetchNextPage exactly
   const fetchNextPage = useCallback(async () => {
@@ -129,8 +130,12 @@ const useMarketBanners = () => {
         })
         .filter((banner): banner is MarketBannerItem => banner !== null);
 
-      // Update banners list
-      setBanners((prev) => [...prev, ...processedBanners]);
+      // Update banners list - filter out duplicates to prevent key errors
+      setBanners((prev) => {
+        const existingIds = new Set(prev.map(b => b.id));
+        const newBanners = processedBanners.filter(b => !existingIds.has(b.id));
+        return [...prev, ...newBanners];
+      });
 
       // Update pagination state
       const hasMoreData = snapshot.docs.length === BATCH_SIZE;

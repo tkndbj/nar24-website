@@ -126,8 +126,9 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
           const lastVerification = userData?.lastTwoFactorVerification?.toDate?.();
 
           if (lastVerification) {
-            const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-            if (lastVerification > fiveMinutesAgo) {
+            // Reduced from 5 minutes to 2 minutes for better security
+            const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+            if (lastVerification > twoMinutesAgo) {
               return false;
             }
           }

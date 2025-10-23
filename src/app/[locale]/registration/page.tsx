@@ -166,10 +166,37 @@ function RegistrationContent() {
       toast.error(t("RegistrationPage.passwordRequired"));
       return false;
     }
-    if (formData.password.length < 6) {
-      toast.error(t("RegistrationPage.passwordTooShort"));
+
+    // Strengthened password validation
+    if (formData.password.length < 8) {
+      toast.error("Password must be at least 8 characters long");
       return false;
     }
+
+    // Check for uppercase letter
+    if (!/[A-Z]/.test(formData.password)) {
+      toast.error("Password must contain at least one uppercase letter");
+      return false;
+    }
+
+    // Check for lowercase letter
+    if (!/[a-z]/.test(formData.password)) {
+      toast.error("Password must contain at least one lowercase letter");
+      return false;
+    }
+
+    // Check for number
+    if (!/[0-9]/.test(formData.password)) {
+      toast.error("Password must contain at least one number");
+      return false;
+    }
+
+    // Check for special character
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(formData.password)) {
+      toast.error("Password must contain at least one special character (!@#$%^&*...)");
+      return false;
+    }
+
     if (formData.password !== formData.confirmPassword) {
       toast.error(t("RegistrationPage.passwordsDoNotMatch"));
       return false;

@@ -563,11 +563,13 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       if (isAdding) {
         optimisticAddsRef.current.add(productId);
 
-        // Update cart IDs immediately
-        const newIds = new Set(cartProductIds);
-        newIds.add(productId);
-        setCartProductIds(newIds);
-        setCartCount(newIds.size);
+        // Update cart IDs immediately - use functional update to avoid race conditions
+        setCartProductIds(prev => {
+          const newIds = new Set(prev);
+          newIds.add(productId);
+          setCartCount(newIds.size);
+          return newIds;
+        });
 
         // If initialized, try to add optimistic item with product data
         if (isInitialized) {
@@ -596,25 +598,25 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
             optimisticItemsRef.current.set(productId, optimisticItem);
 
-            // Add to UI immediately
-            const currentItems = [...cartItems];
-            currentItems.unshift(optimisticItem);
-            setCartItems(currentItems);
+            // Add to UI immediately - use functional update to avoid race conditions
+            setCartItems(prevItems => [optimisticItem, ...prevItems]);
           }
         }
       } else {
         optimisticRemovesRef.current.add(productId);
 
-        // Remove from IDs immediately
-        const newIds = new Set(cartProductIds);
-        newIds.delete(productId);
-        setCartProductIds(newIds);
-        setCartCount(newIds.size);
+        // Remove from IDs immediately - use functional update to avoid race conditions
+        setCartProductIds(prev => {
+          const newIds = new Set(prev);
+          newIds.delete(productId);
+          setCartCount(newIds.size);
+          return newIds;
+        });
 
-        // Remove from UI immediately
+        // Remove from UI immediately - use functional update to avoid race conditions
         if (isInitialized) {
-          setCartItems(
-            cartItems.filter((item) => item.productId !== productId)
+          setCartItems(prevItems =>
+            prevItems.filter((item) => item.productId !== productId)
           );
         }
       }
@@ -626,7 +628,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
       optimisticTimersRef.current.set(productId, timeout);
     },
-    [cartProductIds, cartItems, isInitialized, fetchProductDetailsBatch]
+    [isInitialized, fetchProductDetailsBatch]
   );
 
   // Rollback optimistic update - matching Flutter implementation

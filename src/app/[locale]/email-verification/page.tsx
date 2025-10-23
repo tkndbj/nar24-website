@@ -70,21 +70,27 @@ function EmailVerificationContent() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Initialize from URL params
+  // Initialize from sessionStorage (secure alternative to URL params)
   useEffect(() => {
-    const emailParam = searchParams.get("email");
-    const passwordParam = searchParams.get("password");
+    if (typeof window !== 'undefined') {
+      const emailStored = sessionStorage.getItem('verification_email');
+      const passwordStored = sessionStorage.getItem('verification_password');
 
-    if (emailParam) setEmail(emailParam);
-    if (passwordParam) setPassword(passwordParam);
+      if (emailStored) setEmail(emailStored);
+      if (passwordStored) setPassword(passwordStored);
 
-    // Auto-send verification code when component loads
-    if (emailParam && passwordParam) {
-      setTimeout(() => {
-        resendVerificationCode();
-      }, 1000);
+      // Auto-send verification code when component loads
+      if (emailStored && passwordStored) {
+        setTimeout(() => {
+          resendVerificationCode();
+        }, 1000);
+      }
+
+      // Clear credentials from sessionStorage after reading (one-time use)
+      sessionStorage.removeItem('verification_email');
+      sessionStorage.removeItem('verification_password');
     }
-  }, [searchParams]);
+  }, []);
 
   // Cooldown timer effect
   useEffect(() => {

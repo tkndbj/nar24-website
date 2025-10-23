@@ -147,6 +147,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   const basketNameCacheRef = useRef<Record<string, string | null>>({});
   const lastCacheUpdateRef = useRef<Date | null>(null);
   const removeFavoriteTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const selectedBasketIdRef = useRef<string | null>(null); // Fix circular dependency
   const basketDeletionTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Subscription cleanup
@@ -169,6 +170,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
     setAllFavoriteProductIds(new Set());
     setFavoriteCount(0);
     setSelectedBasketIdState(null);
+    selectedBasketIdRef.current = null; // Keep ref in sync
     setFavoriteBaskets([]);
     setIsLoading(false);
 
@@ -221,13 +223,15 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         unsubscribeFavoritesRef.current();
       }
 
-      const favCollection = selectedBasketId
+      // Use ref instead of state to avoid circular dependency
+      const basketId = selectedBasketIdRef.current;
+      const favCollection = basketId
         ? collection(
             db,
             "users",
             userId,
             "favorite_baskets",
-            selectedBasketId,
+            basketId,
             "favorites"
           )
         : collection(db, "users", userId, "favorites");
@@ -251,7 +255,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         }
       );
     },
-    [selectedBasketId]
+    [] // Remove selectedBasketId dependency to fix circular dependency
   );
 
   // Subscribe to all favorites (global)
@@ -749,6 +753,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
         if (selectedBasketId === basketId) {
           setSelectedBasketIdState(null);
+          selectedBasketIdRef.current = null; // Keep ref in sync
         }
 
         // Clear cache
@@ -769,6 +774,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   // Set selected basket
   const setSelectedBasket = useCallback((basketId: string | null) => {
     setSelectedBasketIdState(basketId);
+    selectedBasketIdRef.current = basketId; // Keep ref in sync
     // Clear cache when switching baskets
     basketFavoriteCacheRef.current = {};
     basketNameCacheRef.current = {};

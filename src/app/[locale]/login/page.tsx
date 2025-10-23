@@ -198,12 +198,13 @@ function LoginContent() {
 
         if (isEmailPasswordUser) {
           await auth.signOut();
-          // NEW: Redirect to email verification page instead of showing message
-          router.push(
-            `/email-verification?email=${encodeURIComponent(
-              email.trim()
-            )}&password=${encodeURIComponent(password)}`
-          );
+          // Store credentials securely in sessionStorage (temporary, auto-clears on tab close)
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem('verification_email', email.trim());
+            sessionStorage.setItem('verification_password', password);
+          }
+          // Redirect to email verification page without credentials in URL
+          router.push(`/email-verification`);
           return;
         }
       }
@@ -436,15 +437,42 @@ function LoginContent() {
         // Fallback: force sign out and reset
         try {
           await auth.signOut();
+
+          // Verify logout was successful
+          const stillLoggedIn = auth.currentUser;
+          if (stillLoggedIn) {
+            console.error("User still logged in after signOut attempt");
+            // Force clear all auth state
+            if (typeof window !== 'undefined') {
+              sessionStorage.clear();
+              localStorage.removeItem('firebase:authUser');
+            }
+          }
+
           setTwoFAPending(false);
           twoFactorService.reset();
 
-          // Nuclear option to ensure clean state
+          // Ensure clean state and redirect
           window.location.href = "/";
         } catch (fallbackError) {
           console.error("Fallback sign out failed:", fallbackError);
-          // Last resort
-          window.location.reload();
+          // Clear all local auth data before redirect
+          if (typeof window !== 'undefined') {
+            sessionStorage.clear();
+            try {
+              // Clear all Firebase-related localStorage keys
+              for (let i = localStorage.length - 1; i >= 0; i--) {
+                const key = localStorage.key(i);
+                if (key && (key.includes('firebase') || key.includes('firebaseui'))) {
+                  localStorage.removeItem(key);
+                }
+              }
+            } catch (e) {
+              console.error("Error clearing localStorage:", e);
+            }
+          }
+          // Force redirect to home
+          window.location.href = "/";
         }
       }
     } else {

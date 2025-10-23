@@ -1,6 +1,7 @@
 // src/app/api/shops/[shopId]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getFirestoreAdmin } from "@/lib/firebase-admin";
+import { checkRateLimit } from "@/lib/auth-middleware";
 
 export async function GET(
   request: NextRequest,
@@ -17,6 +18,11 @@ export async function GET(
         { status: 400 }
       );
     }
+
+    // Rate limiting (100 requests per minute per IP)
+    const clientIp = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
+    const rateLimitResult = await checkRateLimit(clientIp, 100, 60000);
+    if (rateLimitResult.error) return rateLimitResult.error;
 
     const db = getFirestoreAdmin();
     
