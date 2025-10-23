@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, Suspense } from "react";
-import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { getFunctions, httpsCallable } from "firebase/functions";
@@ -18,7 +18,7 @@ import { useTranslations, useLocale } from "next-intl";
 // Create a separate component for the email verification content
 function EmailVerificationContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+
   const pathname = usePathname();
   const locale = useLocale();
   const t = useTranslations();
@@ -72,9 +72,9 @@ function EmailVerificationContent() {
 
   // Initialize from sessionStorage (secure alternative to URL params)
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const emailStored = sessionStorage.getItem('verification_email');
-      const passwordStored = sessionStorage.getItem('verification_password');
+    if (typeof window !== "undefined") {
+      const emailStored = sessionStorage.getItem("verification_email");
+      const passwordStored = sessionStorage.getItem("verification_password");
 
       if (emailStored) setEmail(emailStored);
       if (passwordStored) setPassword(passwordStored);
@@ -87,8 +87,8 @@ function EmailVerificationContent() {
       }
 
       // Clear credentials from sessionStorage after reading (one-time use)
-      sessionStorage.removeItem('verification_email');
-      sessionStorage.removeItem('verification_password');
+      sessionStorage.removeItem("verification_email");
+      sessionStorage.removeItem("verification_password");
     }
   }, []);
 
