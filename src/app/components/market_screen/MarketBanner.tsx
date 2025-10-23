@@ -66,14 +66,14 @@ const useMarketBanners = () => {
   const [hasMore, setHasMore] = useState(true);
   const [lastDoc, setLastDoc] =
     useState<QueryDocumentSnapshot<DocumentData> | null>(null);
-  const [prefetchedUrls, setPrefetchedUrls] = useState<Set<string>>(new Set());
+  const [, setPrefetchedUrls] = useState<Set<string>>(new Set());
 
   const BATCH_SIZE = 20;
   const PREFETCH_COUNT = 3;
 
   // Prefetch images to smooth scrolling (matches Flutter's approach)
   const prefetchImage = useCallback((url: string) => {
-    setPrefetchedUrls(prev => {
+    setPrefetchedUrls((prev) => {
       if (prev.has(url)) return prev;
       const img = new Image();
       img.src = url;
@@ -84,7 +84,7 @@ const useMarketBanners = () => {
   // Fetch banners from Firebase - matches Flutter fetchNextPage exactly
   const fetchNextPage = useCallback(async () => {
     if (!hasMore || isLoading) return;
-    
+
     setIsLoading(true);
     setError(null);
 
@@ -118,22 +118,26 @@ const useMarketBanners = () => {
         .map((doc): MarketBannerItem | null => {
           const data = doc.data();
           const url = data.imageUrl || "";
-          
+
           if (!url) return null;
 
           return {
             id: doc.id,
             url: url,
             linkType: data.linkType as string | undefined,
-            linkId: (data.linkedShopId || data.linkedProductId) as string | undefined,
+            linkId: (data.linkedShopId || data.linkedProductId) as
+              | string
+              | undefined,
           };
         })
         .filter((banner): banner is MarketBannerItem => banner !== null);
 
       // Update banners list - filter out duplicates to prevent key errors
       setBanners((prev) => {
-        const existingIds = new Set(prev.map(b => b.id));
-        const newBanners = processedBanners.filter(b => !existingIds.has(b.id));
+        const existingIds = new Set(prev.map((b) => b.id));
+        const newBanners = processedBanners.filter(
+          (b) => !existingIds.has(b.id)
+        );
         return [...prev, ...newBanners];
       });
 
@@ -147,21 +151,23 @@ const useMarketBanners = () => {
 
       // Prefetch first few images for smooth scrolling (matches Flutter)
       const toPrefetch = processedBanners.slice(0, PREFETCH_COUNT);
-      toPrefetch.forEach(banner => prefetchImage(banner.url));
+      toPrefetch.forEach((banner) => prefetchImage(banner.url));
 
       console.log("Fetched banners:", processedBanners.length);
     } catch (err) {
-      let errorMessage = err instanceof Error ? err.message : "Failed to load banners";
-      
+      let errorMessage =
+        err instanceof Error ? err.message : "Failed to load banners";
+
       // Provide helpful index error message (matches Flutter)
       if (errorMessage.includes("index")) {
-        errorMessage = "Database index required. Check console for index creation link.";
+        errorMessage =
+          "Database index required. Check console for index creation link.";
         console.error("🔥 FIRESTORE INDEX REQUIRED 🔥");
         console.error("Create this index in Firebase Console:");
         console.error("Collection: market_banners");
         console.error("Fields: isActive (Ascending) + createdAt (Descending)");
       }
-      
+
       setError(errorMessage);
       console.error("Error fetching banners:", err);
     } finally {
@@ -195,7 +201,8 @@ export default function MarketBannerGrid() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
   const [loadingImages, setLoadingImages] = useState<Set<string>>(new Set());
-  const { banners, isLoading, error, hasMore, fetchNextPage } = useMarketBanners();
+  const { banners, isLoading, error, hasMore, fetchNextPage } =
+    useMarketBanners();
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
@@ -373,14 +380,16 @@ export default function MarketBannerGrid() {
 
             {/* Infinite scroll trigger + loading indicator (matches Flutter) */}
             {hasMore && (
-              <div 
+              <div
                 ref={loadMoreRef}
                 className="flex justify-center mt-0 lg:mt-6 py-6 lg:py-4"
               >
                 {isLoading && (
                   <div className="flex items-center space-x-2">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
-                    <span className={isDarkMode ? "text-gray-300" : "text-gray-600"}>
+                    <span
+                      className={isDarkMode ? "text-gray-300" : "text-gray-600"}
+                    >
                       Loading...
                     </span>
                   </div>

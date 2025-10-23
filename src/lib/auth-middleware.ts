@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuth } from 'firebase-admin/auth';
-import { initFirebaseAdmin } from './firebase-admin';
+import { initializeFirebaseAdmin } from './firebase-admin';
 
 export interface AuthenticatedRequest extends NextRequest {
   userId?: string;
@@ -47,7 +47,7 @@ export async function verifyAuth(request: NextRequest): Promise<{
     }
 
     // Initialize Firebase Admin if needed
-    await initFirebaseAdmin();
+    initializeFirebaseAdmin();
 
     // Verify token
     const decodedToken = await getAuth().verifyIdToken(token);
