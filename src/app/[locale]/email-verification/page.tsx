@@ -15,7 +15,7 @@ import { toast } from "react-hot-toast";
 import { AuthError } from "firebase/auth";
 import { useTranslations, useLocale } from "next-intl";
 
-// Create a separate component for the email verification content
+// Create a separate component for the email verification content!
 function EmailVerificationContent() {
   const router = useRouter();
 
@@ -91,7 +91,7 @@ function EmailVerificationContent() {
     return () => {
       mounted = false;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Auto-send verification code when email and password are set
@@ -108,7 +108,7 @@ function EmailVerificationContent() {
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [email, password]); // Only trigger when email/password change
 
   // Cooldown timer effect
@@ -271,8 +271,13 @@ function EmailVerificationContent() {
 
     // Validate email and password are available
     if (!email || !password) {
-      toast.error("Email and password are required. Please try logging in again.");
-      console.error("Missing email or password:", { email: !!email, password: !!password });
+      toast.error(
+        "Email and password are required. Please try logging in again."
+      );
+      console.error("Missing email or password:", {
+        email: !!email,
+        password: !!password,
+      });
       router.push("/login");
       return;
     }
@@ -299,14 +304,22 @@ function EmailVerificationContent() {
           "verifyEmailCode"
         );
 
-        console.log("Calling verifyEmailCode function with code:", verificationCode);
-        const result = await verifyEmailCodeFunction({ code: verificationCode });
+        console.log(
+          "Calling verifyEmailCode function with code:",
+          verificationCode
+        );
+        const result = await verifyEmailCodeFunction({
+          code: verificationCode,
+        });
         console.log("Verification result:", result);
 
         // Reload user to get updated verification status
         await user.reload();
         const updatedUser = auth.currentUser;
-        console.log("User reloaded, emailVerified:", updatedUser?.emailVerified);
+        console.log(
+          "User reloaded, emailVerified:",
+          updatedUser?.emailVerified
+        );
 
         if (updatedUser?.emailVerified) {
           toast.success(
@@ -327,7 +340,9 @@ function EmailVerificationContent() {
           }, 1500);
         } else {
           console.error("Email not verified after calling function");
-          toast.error("Verification succeeded but email not marked as verified. Please try again.");
+          toast.error(
+            "Verification succeeded but email not marked as verified. Please try again."
+          );
         }
       }
     } catch (error: unknown) {
