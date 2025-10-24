@@ -42,6 +42,7 @@ export default function SearchBar({
 }: SearchBarProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   
@@ -89,14 +90,41 @@ export default function SearchBar({
     if (!isSearching) return;
 
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        searchContainerRef.current &&
-        !searchContainerRef.current.contains(event.target as Node)
-      ) {
-        onSearchStateChange(false);
-        searchInputRef.current?.blur();
-        setCurrentPage(0);
+      const target = event.target as HTMLElement;
+
+      // Check if clicked element or any parent has data-search-action attribute
+      const searchAction = target.closest('[data-search-action]');
+
+      console.log('👆 Click detected:', {
+        target: target.tagName,
+        hasSearchAction: !!searchAction,
+        searchAction: searchAction?.getAttribute('data-search-action'),
+        isInDropdown: dropdownRef.current?.contains(target),
+        isInContainer: searchContainerRef.current?.contains(target),
+      });
+
+      // Don't close if clicking on a search action element (history item, suggestion, etc.)
+      if (searchAction) {
+        console.log('✋ Prevented close - search action element');
+        return;
       }
+
+      // Don't close if clicking inside the dropdown
+      if (dropdownRef.current?.contains(target)) {
+        console.log('✋ Prevented close - click inside dropdown');
+        return;
+      }
+
+      // Don't close if clicking on the search input/button
+      if (searchContainerRef.current?.contains(target)) {
+        console.log('✋ Prevented close - click in search container');
+        return;
+      }
+
+      console.log('🚪 Closing dropdown - outside click');
+      onSearchStateChange(false);
+      searchInputRef.current?.blur();
+      setCurrentPage(0);
     };
 
     document.addEventListener("mousedown", handleClickOutside);
@@ -171,6 +199,7 @@ export default function SearchBar({
 
   // ✅ OPTIMIZED: History item click
   const handleHistoryItemClick = useCallback((historyTerm: string) => {
+    console.log('🔍 History item clicked:', historyTerm);
     saveSearchTerm(historyTerm).catch(console.error);
     onSearchStateChange(false);
     router.push(`/search-results?q=${encodeURIComponent(historyTerm)}`);
@@ -309,8 +338,9 @@ export default function SearchBar({
       {/* Search Dropdown */}
       {isSearching && (
         <div
+          ref={dropdownRef}
           className={`
-            absolute top-full left-0 right-0 mt-2 
+            absolute top-full left-0 right-0 mt-2
             ${isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}
             border rounded-2xl shadow-2xl backdrop-blur-xl z-50
             max-h-96 overflow-hidden
@@ -373,9 +403,10 @@ export default function SearchBar({
                       <button
                         key={category.id}
                         onClick={() => handleSuggestionClick(category, "category")}
+                        data-search-action="category-suggestion"
                         className={`
                           w-full flex items-center space-x-3 p-2 rounded-lg
-                          hover:bg-gray-100 dark:hover:bg-gray-700 
+                          hover:bg-gray-100 dark:hover:bg-gray-700
                           transition-colors duration-150
                         `}
                       >
@@ -416,9 +447,10 @@ export default function SearchBar({
                       <button
                         key={suggestion.id}
                         onClick={() => handleSuggestionClick(suggestion, "product")}
+                        data-search-action="product-suggestion"
                         className={`
                           w-full flex items-center space-x-3 p-2 rounded-lg
-                          hover:bg-gray-100 dark:hover:bg-gray-700 
+                          hover:bg-gray-100 dark:hover:bg-gray-700
                           transition-colors duration-150
                         `}
                       >
@@ -481,6 +513,7 @@ export default function SearchBar({
                     >
                       <button
                         onClick={() => handleHistoryItemClick(entry.searchTerm)}
+                        data-search-action="history-item"
                         className="flex-1 flex items-center space-x-3 text-left cursor-pointer"
                       >
                         <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
