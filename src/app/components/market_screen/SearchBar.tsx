@@ -481,7 +481,7 @@ export default function SearchBar({
                     >
                       <button
                         onClick={() => handleHistoryItemClick(entry.searchTerm)}
-                        className="flex-1 flex items-center space-x-3 text-left"
+                        className="flex-1 flex items-center space-x-3 text-left cursor-pointer"
                       >
                         <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
                           <Clock size={14} className="text-gray-500" />
@@ -494,9 +494,11 @@ export default function SearchBar({
                         onClick={(e) => handleDeleteHistoryItem(e, entry.id)}
                         disabled={isDeletingEntry(entry.id)}
                         className={`
-                          p-1 rounded-full opacity-0 group-hover:opacity-100 
-                          transition-all duration-200 hover:bg-red-100 dark:hover:bg-red-900/30
-                          ${isDeletingEntry(entry.id) ? 'opacity-50 cursor-not-allowed' : ''}
+                          p-1 rounded-full transition-all duration-200 hover:bg-red-100 dark:hover:bg-red-900/30 flex-shrink-0
+                          ${isDeletingEntry(entry.id)
+                            ? 'opacity-50 cursor-not-allowed'
+                            : 'opacity-0 group-hover:opacity-100 cursor-pointer pointer-events-none group-hover:pointer-events-auto'
+                          }
                         `}
                       >
                         {isDeletingEntry(entry.id) ? (
