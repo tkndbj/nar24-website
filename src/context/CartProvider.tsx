@@ -311,7 +311,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           isBundle: true,
         };
       } catch (error) {
-        console.error("Error fetching bundle:", error);
+        if (process.env.NODE_ENV === 'development') {
+          console.error("Error fetching bundle:", error);
+        }
         return null;
       }
     },
@@ -352,10 +354,12 @@ export const CartProvider: React.FC<CartProviderProps> = ({
                 result[productId] = null;
               }
             } catch (error) {
-              console.error(
-                `Error fetching sale preferences for ${productId}:`,
-                error
-              );
+              if (process.env.NODE_ENV === 'development') {
+                console.error(
+                  `Error fetching sale preferences for ${productId}:`,
+                  error
+                );
+              }
               result[productId] = null;
             }
           });
@@ -363,7 +367,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           await Promise.all(futures);
         }
       } catch (error) {
-        console.error("Error in fetchSalePreferencesBatch:", error);
+        if (process.env.NODE_ENV === 'development') {
+          console.error("Error in fetchSalePreferencesBatch:", error);
+        }
         productIds.forEach((productId) => {
           result[productId] = null;
         });
@@ -422,7 +428,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           });
         }
       } catch (error) {
-        console.error("Error fetching product documents:", error);
+        if (process.env.NODE_ENV === 'development') {
+          console.error("Error fetching product documents:", error);
+        }
         productIds.forEach((productId) => {
           result[productId] = null;
         });
@@ -469,14 +477,18 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
                 result[doc.id] = ProductUtils.fromJson(productJson);
               } catch (error) {
-                console.error(`Error parsing product ${doc.id}:`, error);
+                if (process.env.NODE_ENV === 'development') {
+                  console.error(`Error parsing product ${doc.id}:`, error);
+                }
                 result[doc.id] = null;
               }
             }
           });
         }
       } catch (error) {
-        console.error("Error fetching product details:", error);
+        if (process.env.NODE_ENV === 'development') {
+          console.error("Error fetching product details:", error);
+        }
       }
 
       return result;
@@ -512,7 +524,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({
               sellerName = productData.shopName || "Unknown Shop";
             }
           } catch (error) {
-            console.error("Error fetching shop info:", error);
+            if (process.env.NODE_ENV === 'development') {
+              console.error("Error fetching shop info:", error);
+            }
             sellerName = productData.shopName || "Unknown Shop";
           }
         } else {
@@ -537,7 +551,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({
               sellerName = productData.sellerName || "Unknown Seller";
             }
           } catch (error) {
-            console.error("Error fetching user info:", error);
+            if (process.env.NODE_ENV === 'development') {
+              console.error("Error fetching user info:", error);
+            }
             sellerName = productData.sellerName || "Unknown Seller";
           }
         } else {
@@ -963,7 +979,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({
                     commissionRate = shopDoc.data()?.ourComission || 0.0;
                   }
                 } catch (error) {
-                  console.error("Error fetching shop commission:", error);
+                  if (process.env.NODE_ENV === 'development') {
+                    console.error("Error fetching shop commission:", error);
+                  }
                 }
               }
             } else {
@@ -1021,7 +1039,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
         return result;
       } catch (error) {
-        console.error("Cart operation error:", error);
+        if (process.env.NODE_ENV === 'development') {
+          console.error("Cart operation error:", error);
+        }
         rollbackOptimisticUpdate(productId, true);
         return `Failed to update cart: ${error}`;
       } finally {
@@ -1103,7 +1123,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
         return result;
       } catch (error) {
-        console.error("Remove from cart error:", error);
+        if (process.env.NODE_ENV === 'development') {
+          console.error("Remove from cart error:", error);
+        }
         // Rollback optimistic removal
         rollbackOptimisticUpdate(productId, false);
         return `Failed to remove from cart: ${error}`;
@@ -1313,9 +1335,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         ) {
           // Apply discount to unit price
           unitPrice = unitPrice * (1 - discountPercentage / 100);
-          console.log(
-            `🎯 Applied sale preference discount: ${discountPercentage}% for product ${product.id}`
-          );
         }
       }
 
@@ -1365,10 +1384,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           return { subtotal: 0, total: 0, currency: "TL", items: [] };
         }
 
-        console.log(
-          `💰 Calculating totals for ${itemsToCalculate.length} items (with bundle optimization)`
-        );
-
         // Filter out out-of-stock items first - EXACT Flutter logic
         const inStockItems: CartItem[] = [];
         for (const item of itemsToCalculate) {
@@ -1397,10 +1412,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
           if (availableStock > 0) {
             inStockItems.push(item);
-          } else {
-            console.log(
-              `⏭️ Skipping out-of-stock product: ${product.productName}`
-            );
           }
         }
 
@@ -1487,9 +1498,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
                       ) {
                         extraUnitPrice =
                           extraUnitPrice * (1 - discountPercentage / 100);
-                        console.log(
-                          `🎯 Applied sale preference to extra quantity: ${discountPercentage}% for ${product.id} (total qty: ${totalQuantity})`
-                        );
                       }
                     }
 
@@ -1515,9 +1523,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
                       : "TL";
                 }
 
-                console.log(
-                  `🎁 Applied hybrid bundle pricing for ${bundleId}: ${bundlePrice} + extras`
-                );
                 continue;
               }
             }
@@ -1546,10 +1551,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           }
         }
 
-        console.log(
-          `💰 Total calculation complete: ${subtotal} ${currency} for ${items.length} items`
-        );
-
         return {
           subtotal,
           total: subtotal,
@@ -1557,7 +1558,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           items,
         };
       } catch (error) {
-        console.error("❌ Error calculating cart totals:", error);
+        if (process.env.NODE_ENV === 'development') {
+          console.error("Error calculating cart totals:", error);
+        }
         return { subtotal: 0, total: 0, currency: "TL", items: [] };
       }
     },
@@ -1670,24 +1673,22 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
   const initializeCartIfNeeded = useCallback(async (): Promise<void> => {
     if (!user) {
-      console.warn("Cannot initialize cart - no user logged in");
       return;
     }
 
     if (isInitialized || isLoading) {
-      console.log("Cart already initialized or loading");
       return;
     }
 
-    console.log(`Initializing cart for user: ${user.uid}`);
     setIsLoading(true);
 
     try {
       await loadCartPage(0);
       setIsInitialized(true);
-      console.log("Cart initialized successfully");
     } catch (error) {
-      console.error("Error initializing cart:", error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error("Error initializing cart:", error);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -1700,7 +1701,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     try {
       await loadCartPage(currentPageRef.current + 1);
     } catch (error) {
-      console.error("Error loading more cart items:", error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error("Error loading more cart items:", error);
+      }
     } finally {
       setIsLoadingMore(false);
     }
@@ -1762,7 +1765,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           processCartSnapshot(snapshot);
         },
         (error) => {
-          console.error("Cart subscription error:", error);
+          if (process.env.NODE_ENV === 'development') {
+            console.error("Cart subscription error:", error);
+          }
           if (retryCountRef.current < MAX_RETRIES) {
             retryCountRef.current++;
             setTimeout(() => {

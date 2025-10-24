@@ -8,6 +8,7 @@ import React, {
   useRef,
   ReactNode,
   useCallback,
+  useMemo,
 } from "react";
 import {
   collection,
@@ -209,7 +210,9 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
         return null;
       } catch (error) {
-        console.error("Error finding product document:", error);
+        if (process.env.NODE_ENV === 'development') {
+          console.error("Error finding product document:", error);
+        }
         return null;
       }
     },
@@ -251,7 +254,9 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
           setFavoriteCount(ids.size);
         },
         (error) => {
-          console.error("Favorites subscription error:", error);
+          if (process.env.NODE_ENV === 'development') {
+            console.error("Favorites subscription error:", error);
+          }
         }
       );
     },
@@ -323,7 +328,9 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         setFavoriteBaskets(baskets);
       },
       (error) => {
-        console.error("Baskets subscription error:", error);
+        if (process.env.NODE_ENV === 'development') {
+          console.error("Baskets subscription error:", error);
+        }
       }
     );
   }, []);
@@ -368,7 +375,9 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
       lastCacheUpdateRef.current = new Date();
     } catch (error) {
-      console.error("Error loading all favorites:", error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error("Error loading all favorites:", error);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -377,13 +386,17 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   // Toast notifications (you can replace with your preferred toast library)
   const showSuccessToast = useCallback((message: string) => {
     // Replace with your preferred toast implementation
-    console.log("Success:", message);
+    if (process.env.NODE_ENV === 'development') {
+      console.log("Success:", message);
+    }
     // Example: toast.success(message);
   }, []);
 
   const showErrorToast = useCallback((message: string) => {
     // Replace with your preferred toast implementation
-    console.error("Error:", message);
+    if (process.env.NODE_ENV === 'development') {
+      console.error("Error:", message);
+    }
     // Example: toast.error(message);
   }, []);
 
@@ -534,7 +547,9 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
           }
         });
       } catch (error) {
-        console.error("Error in add/remove favorite:", error);
+        if (process.env.NODE_ENV === 'development') {
+          console.error("Error in add/remove favorite:", error);
+        }
         showErrorToast("Failed to update favorites");
         return `Failed to update favorites: ${error}`;
       }
@@ -629,7 +644,9 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         showSuccessToast("Removed from all favorites");
         return "Removed from all favorites";
       } catch (error) {
-        console.error("Error globally removing favorite:", error);
+        if (process.env.NODE_ENV === 'development') {
+          console.error("Error globally removing favorite:", error);
+        }
         showErrorToast("Failed to remove from favorites");
         return `Failed to remove from favorites: ${error}`;
       }
@@ -653,7 +670,9 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         showSuccessToast("Products removed from favorites");
         return "Products removed from favorites";
       } catch (error) {
-        console.error("Error removing multiple favorites:", error);
+        if (process.env.NODE_ENV === 'development') {
+          console.error("Error removing multiple favorites:", error);
+        }
         showErrorToast("Failed to remove favorites");
         return `Failed to remove favorites: ${error}`;
       }
@@ -733,7 +752,9 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         showSuccessToast("Basket created successfully");
         return "Basket created successfully";
       } catch (error) {
-        console.error("Error creating basket:", error);
+        if (process.env.NODE_ENV === 'development') {
+          console.error("Error creating basket:", error);
+        }
         showErrorToast("Failed to create basket");
         return `Failed to create basket: ${error}`;
       }
@@ -763,7 +784,9 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         showDebouncedBasketDeletionToast();
         return "Basket deleted successfully";
       } catch (error) {
-        console.error("Error deleting basket:", error);
+        if (process.env.NODE_ENV === 'development') {
+          console.error("Error deleting basket:", error);
+        }
         showErrorToast("Failed to delete basket");
         return `Failed to delete basket: ${error}`;
       }
@@ -796,7 +819,9 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         showSuccessToast("Products transferred to basket");
         return "Products transferred to basket";
       } catch (error) {
-        console.error("Error transferring favorites:", error);
+        if (process.env.NODE_ENV === 'development') {
+          console.error("Error transferring favorites:", error);
+        }
         showErrorToast("Failed to transfer favorites");
         return `Failed to transfer favorites: ${error}`;
       }
@@ -855,7 +880,9 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   
         await batch.commit();
       } catch (error) {
-        console.error("Error in transferBatch:", error);
+        if (process.env.NODE_ENV === 'development') {
+          console.error("Error in transferBatch:", error);
+        }
         throw error;
       }
     },
@@ -879,7 +906,9 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         showSuccessToast("Products moved to default favorites");
         return "Products moved to default favorites";
       } catch (error) {
-        console.error("Error moving favorites:", error);
+        if (process.env.NODE_ENV === 'development') {
+          console.error("Error moving favorites:", error);
+        }
         showErrorToast("Failed to move favorites");
         return `Failed to move favorites: ${error}`;
       }
@@ -938,7 +967,9 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   
         await batch.commit();
       } catch (error) {
-        console.error("Error in moveFromBasketBatch:", error);
+        if (process.env.NODE_ENV === 'development') {
+          console.error("Error in moveFromBasketBatch:", error);
+        }
         throw error;
       }
     },
@@ -983,7 +1014,9 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
         return isFavorited;
       } catch (error) {
-        console.error("Error checking basket favorite:", error);
+        if (process.env.NODE_ENV === 'development') {
+          console.error("Error checking basket favorite:", error);
+        }
         return false;
       }
     },
@@ -1029,7 +1062,9 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
         return basketName;
       } catch (error) {
-        console.error("Error getting basket name:", error);
+        if (process.env.NODE_ENV === 'development') {
+          console.error("Error getting basket name:", error);
+        }
         return null;
       }
     },
@@ -1112,38 +1147,63 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
     };
   }, []);
 
-  const contextValue: FavoritesContextType = {
-    // State
-    favoriteProductIds,
-    allFavoriteProductIds,
-    favoriteCount,
-    selectedBasketId,
-    favoriteBaskets,
-    isLoading,
+  const contextValue = useMemo<FavoritesContextType>(
+    () => ({
+      // State
+      favoriteProductIds,
+      allFavoriteProductIds,
+      favoriteCount,
+      selectedBasketId,
+      favoriteBaskets,
+      isLoading,
 
-    // Methods
-    addToFavorites,
-    removeFromFavorites,
-    removeGloballyFromFavorites,
-    removeMultipleFromFavorites,
+      // Methods
+      addToFavorites,
+      removeFromFavorites,
+      removeGloballyFromFavorites,
+      removeMultipleFromFavorites,
 
-    // Basket management
-    createFavoriteBasket,
-    deleteFavoriteBasket,
-    setSelectedBasket,
-    transferFavoritesToBasket,
-    moveFavoritesFromBasketToDefault,
+      // Basket management
+      createFavoriteBasket,
+      deleteFavoriteBasket,
+      setSelectedBasket,
+      transferFavoritesToBasket,
+      moveFavoritesFromBasketToDefault,
 
-    // Utility methods
-    isFavorite,
-    isGloballyFavorited,
-    isFavoritedInBasket,
-    getBasketNameForProduct,
+      // Utility methods
+      isFavorite,
+      isGloballyFavorited,
+      isFavoritedInBasket,
+      getBasketNameForProduct,
 
-    // Toast notifications
-    showSuccessToast,
-    showErrorToast,
-  };
+      // Toast notifications
+      showSuccessToast,
+      showErrorToast,
+    }),
+    [
+      favoriteProductIds,
+      allFavoriteProductIds,
+      favoriteCount,
+      selectedBasketId,
+      favoriteBaskets,
+      isLoading,
+      addToFavorites,
+      removeFromFavorites,
+      removeGloballyFromFavorites,
+      removeMultipleFromFavorites,
+      createFavoriteBasket,
+      deleteFavoriteBasket,
+      setSelectedBasket,
+      transferFavoritesToBasket,
+      moveFavoritesFromBasketToDefault,
+      isFavorite,
+      isGloballyFavorited,
+      isFavoritedInBasket,
+      getBasketNameForProduct,
+      showSuccessToast,
+      showErrorToast,
+    ]
+  );
 
   return (
     <FavoritesContext.Provider value={contextValue}>
