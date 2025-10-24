@@ -72,25 +72,44 @@ function EmailVerificationContent() {
 
   // Initialize from sessionStorage (secure alternative to URL params)
   useEffect(() => {
+    let mounted = true;
+
     if (typeof window !== "undefined") {
       const emailStored = sessionStorage.getItem("verification_email");
       const passwordStored = sessionStorage.getItem("verification_password");
 
-      if (emailStored) setEmail(emailStored);
-      if (passwordStored) setPassword(passwordStored);
-
-      // Auto-send verification code when component loads
-      if (emailStored && passwordStored) {
-        setTimeout(() => {
-          resendVerificationCode();
-        }, 1000);
-      }
+      if (emailStored && mounted) setEmail(emailStored);
+      if (passwordStored && mounted) setPassword(passwordStored);
 
       // Clear credentials from sessionStorage after reading (one-time use)
-      sessionStorage.removeItem("verification_email");
-      sessionStorage.removeItem("verification_password");
+      if (emailStored || passwordStored) {
+        sessionStorage.removeItem("verification_email");
+        sessionStorage.removeItem("verification_password");
+      }
     }
+
+    return () => {
+      mounted = false;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Auto-send verification code when email and password are set
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+
+    if (email && password && !isResending && resendCooldown === 0) {
+      console.log("Auto-sending verification code for:", email);
+      timeoutId = setTimeout(() => {
+        resendVerificationCode();
+      }, 1000);
+    }
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [email, password]); // Only trigger when email/password change
 
   // Cooldown timer effect
   useEffect(() => {
@@ -136,6 +155,7 @@ function EmailVerificationContent() {
       newCode.every((digit) => digit !== "") &&
       newCode.join("").length === 6
     ) {
+      console.log("Code complete, verifying:", newCode.join(""));
       setTimeout(() => verifyEmailCode(newCode.join("")), 100);
     }
   };
@@ -249,16 +269,27 @@ function EmailVerificationContent() {
       return;
     }
 
+    // Validate email and password are available
+    if (!email || !password) {
+      toast.error("Email and password are required. Please try logging in again.");
+      console.error("Missing email or password:", { email: !!email, password: !!password });
+      router.push("/login");
+      return;
+    }
+
     setIsVerifying(true);
+    console.log("Starting verification with code:", verificationCode);
 
     try {
       // First, sign in to get the user context
+      console.log("Attempting sign in with email:", email);
       const userCredential = await signInWithEmailAndPassword(
         auth,
         email.trim(),
         password
       );
       const user = userCredential.user;
+      console.log("Sign in successful, user:", user.uid);
 
       if (user) {
         // Call the verify code function
@@ -268,11 +299,14 @@ function EmailVerificationContent() {
           "verifyEmailCode"
         );
 
-        await verifyEmailCodeFunction({ code: verificationCode });
+        console.log("Calling verifyEmailCode function with code:", verificationCode);
+        const result = await verifyEmailCodeFunction({ code: verificationCode });
+        console.log("Verification result:", result);
 
         // Reload user to get updated verification status
         await user.reload();
         const updatedUser = auth.currentUser;
+        console.log("User reloaded, emailVerified:", updatedUser?.emailVerified);
 
         if (updatedUser?.emailVerified) {
           toast.success(
@@ -291,9 +325,13 @@ function EmailVerificationContent() {
           setTimeout(() => {
             router.push("/");
           }, 1500);
+        } else {
+          console.error("Email not verified after calling function");
+          toast.error("Verification succeeded but email not marked as verified. Please try again.");
         }
       }
     } catch (error: unknown) {
+      console.error("Verification error:", error);
       let message = t("LoginPage.verificationError") || "Verification failed";
 
       if (error && typeof error === "object" && "code" in error) {

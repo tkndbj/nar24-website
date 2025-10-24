@@ -23,6 +23,7 @@ import {
   GiftIcon,
   UserGroupIcon,
   ArrowLeftIcon,
+  CheckCircleIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import { AuthError } from "firebase/auth";
@@ -821,6 +822,76 @@ function RegistrationContent() {
                       )}
                     </button>
                   </div>
+
+                  {/* Password Strength Indicator */}
+                  {formData.password && (
+                    <div className={`mt-3 p-3 rounded-lg ${isDark ? 'bg-gray-800/50' : 'bg-gray-50'}`}>
+                      <p className={`text-xs font-semibold mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                        {t("RegistrationPage.passwordRequirements")}
+                      </p>
+                      <div className="space-y-1">
+                        {/* Minimum Length */}
+                        <div className="flex items-center gap-2">
+                          {formData.password.length >= 8 ? (
+                            <CheckCircleIcon className="h-4 w-4 text-green-500 flex-shrink-0" />
+                          ) : (
+                            <div className={`h-4 w-4 rounded-full border-2 flex-shrink-0 ${isDark ? 'border-gray-600' : 'border-gray-300'}`} />
+                          )}
+                          <span className={`text-xs ${formData.password.length >= 8 ? 'text-green-500 font-medium' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                            {t("RegistrationPage.passwordMinLength")}
+                          </span>
+                        </div>
+
+                        {/* Uppercase Letter */}
+                        <div className="flex items-center gap-2">
+                          {/[A-Z]/.test(formData.password) ? (
+                            <CheckCircleIcon className="h-4 w-4 text-green-500 flex-shrink-0" />
+                          ) : (
+                            <div className={`h-4 w-4 rounded-full border-2 flex-shrink-0 ${isDark ? 'border-gray-600' : 'border-gray-300'}`} />
+                          )}
+                          <span className={`text-xs ${/[A-Z]/.test(formData.password) ? 'text-green-500 font-medium' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                            {t("RegistrationPage.passwordUppercase")}
+                          </span>
+                        </div>
+
+                        {/* Lowercase Letter */}
+                        <div className="flex items-center gap-2">
+                          {/[a-z]/.test(formData.password) ? (
+                            <CheckCircleIcon className="h-4 w-4 text-green-500 flex-shrink-0" />
+                          ) : (
+                            <div className={`h-4 w-4 rounded-full border-2 flex-shrink-0 ${isDark ? 'border-gray-600' : 'border-gray-300'}`} />
+                          )}
+                          <span className={`text-xs ${/[a-z]/.test(formData.password) ? 'text-green-500 font-medium' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                            {t("RegistrationPage.passwordLowercase")}
+                          </span>
+                        </div>
+
+                        {/* Number */}
+                        <div className="flex items-center gap-2">
+                          {/[0-9]/.test(formData.password) ? (
+                            <CheckCircleIcon className="h-4 w-4 text-green-500 flex-shrink-0" />
+                          ) : (
+                            <div className={`h-4 w-4 rounded-full border-2 flex-shrink-0 ${isDark ? 'border-gray-600' : 'border-gray-300'}`} />
+                          )}
+                          <span className={`text-xs ${/[0-9]/.test(formData.password) ? 'text-green-500 font-medium' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                            {t("RegistrationPage.passwordNumber")}
+                          </span>
+                        </div>
+
+                        {/* Special Character */}
+                        <div className="flex items-center gap-2">
+                          {/[!@#$%^&*(),.?":{}|<>]/.test(formData.password) ? (
+                            <CheckCircleIcon className="h-4 w-4 text-green-500 flex-shrink-0" />
+                          ) : (
+                            <div className={`h-4 w-4 rounded-full border-2 flex-shrink-0 ${isDark ? 'border-gray-600' : 'border-gray-300'}`} />
+                          )}
+                          <span className={`text-xs ${/[!@#$%^&*(),.?":{}|<>]/.test(formData.password) ? 'text-green-500 font-medium' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                            {t("RegistrationPage.passwordSpecialChar")}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Confirm Password Field */}
