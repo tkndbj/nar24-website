@@ -1934,7 +1934,10 @@
     "accountCreatedSuccessfully": "Account Created Successfully!",
     "verificationEmailSentMessage": "We've sent a verification email to your inbox. Please check your email and click the verification link to activate your account.",
     "resendEmail": "Resend Email",
-    "resendInSeconds": "Resend in {seconds}s"
+    "resendInSeconds": "Resend in {seconds}s",
+    "sendingEmail": "Sending...",
+    "resetEmailSent": "Password reset email sent! Please check your inbox.",
+    "resetEmailFailed": "Failed to send reset email. Please try again."
   },
   "Collection": {
     "collection": "Collection",
