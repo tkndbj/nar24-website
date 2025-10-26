@@ -6,6 +6,7 @@ import {
   signInWithEmailAndPassword,
   signInWithPopup,
   GoogleAuthProvider,
+  sendPasswordResetEmail,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import {
@@ -37,6 +38,9 @@ function LoginContent() {
 
   // 🔥 CRITICAL: Get user context to check 2FA state
   const { isPending2FA, cancel2FA } = useUser();
+
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetMessage, setResetMessage] = useState("");
 
   // State management
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
@@ -109,6 +113,59 @@ function LoginContent() {
     }
     return () => clearTimeout(timer);
   }, [resendCooldown]);
+
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      toast.error(
+        t("LoginPage.emailRequired") || "Please enter your email address"
+      );
+      return;
+    }
+
+    if (!validateEmail(email)) {
+      toast.error(
+        t("LoginPage.invalidEmail") || "Please enter a valid email address"
+      );
+      return;
+    }
+
+    setResetLoading(true);
+    setResetMessage("");
+
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+      setResetMessage(
+        t("LoginPage.resetEmailSent") ||
+          "Password reset email sent! Please check your inbox."
+      );
+      toast.success(
+        t("LoginPage.resetEmailSent") || "Password reset email sent!"
+      );
+    } catch (error) {
+      const authError = error as AuthError;
+      let errorMessage =
+        t("LoginPage.resetEmailFailed") || "Failed to send reset email";
+
+      switch (authError.code) {
+        case "auth/user-not-found":
+          errorMessage =
+            t("LoginPage.userNotFound") || "No account found with this email";
+          break;
+        case "auth/invalid-email":
+          errorMessage = t("LoginPage.invalidEmail") || "Invalid email address";
+          break;
+        case "auth/too-many-requests":
+          errorMessage =
+            t("LoginPage.tooManyRequests") ||
+            "Too many requests. Please try again later";
+          break;
+      }
+
+      toast.error(errorMessage);
+    } finally {
+      setResetLoading(false);
+    }
+  };
 
   // Language switching function
   const switchLanguage = (newLocale: string, event?: React.MouseEvent) => {
@@ -199,9 +256,9 @@ function LoginContent() {
         if (isEmailPasswordUser) {
           await auth.signOut();
           // Store credentials securely in sessionStorage (temporary, auto-clears on tab close)
-          if (typeof window !== 'undefined') {
-            sessionStorage.setItem('verification_email', email.trim());
-            sessionStorage.setItem('verification_password', password);
+          if (typeof window !== "undefined") {
+            sessionStorage.setItem("verification_email", email.trim());
+            sessionStorage.setItem("verification_password", password);
           }
           // Redirect to email verification page without credentials in URL
           router.push(`/email-verification`);
@@ -443,9 +500,9 @@ function LoginContent() {
           if (stillLoggedIn) {
             console.error("User still logged in after signOut attempt");
             // Force clear all auth state
-            if (typeof window !== 'undefined') {
+            if (typeof window !== "undefined") {
               sessionStorage.clear();
-              localStorage.removeItem('firebase:authUser');
+              localStorage.removeItem("firebase:authUser");
             }
           }
 
@@ -457,13 +514,16 @@ function LoginContent() {
         } catch (fallbackError) {
           console.error("Fallback sign out failed:", fallbackError);
           // Clear all local auth data before redirect
-          if (typeof window !== 'undefined') {
+          if (typeof window !== "undefined") {
             sessionStorage.clear();
             try {
               // Clear all Firebase-related localStorage keys
               for (let i = localStorage.length - 1; i >= 0; i--) {
                 const key = localStorage.key(i);
-                if (key && (key.includes('firebase') || key.includes('firebaseui'))) {
+                if (
+                  key &&
+                  (key.includes("firebase") || key.includes("firebaseui"))
+                ) {
                   localStorage.removeItem(key);
                 }
               }
@@ -826,17 +886,40 @@ function LoginContent() {
               <div className="flex justify-end">
                 <button
                   type="button"
-                  onClick={() => router.push("/forgot-password")}
+                  onClick={handleForgotPassword}
                   className={`text-sm font-medium transition-colors duration-200 ${
                     isDark
                       ? "text-gray-400 hover:text-gray-200"
                       : "text-gray-600 hover:text-gray-800"
-                  }`}
-                  disabled={isLoading || isPending2FA || twoFAPending}
+                  } ${resetLoading ? "opacity-50 cursor-not-allowed" : ""}`}
+                  disabled={
+                    isLoading || isPending2FA || twoFAPending || resetLoading
+                  }
                 >
-                  {t("LoginPage.forgotPassword") || "Forgot Password?"}
+                  {resetLoading
+                    ? t("LoginPage.sendingEmail") || "Sending..."
+                    : t("LoginPage.forgotPassword") || "Forgot Password?"}
                 </button>
               </div>
+
+              {/* Password Reset Success Message */}
+              {resetMessage && (
+                <div
+                  className={`mt-4 p-4 rounded-xl ${
+                    isDark
+                      ? "bg-green-900/20 border border-green-700"
+                      : "bg-green-50 border border-green-200"
+                  }`}
+                >
+                  <p
+                    className={`text-sm text-center ${
+                      isDark ? "text-green-300" : "text-green-600"
+                    }`}
+                  >
+                    {resetMessage}
+                  </p>
+                </div>
+              )}
 
               {/* Login Button */}
               <button
