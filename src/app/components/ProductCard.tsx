@@ -39,6 +39,10 @@ interface ProductCardProps {
   isInCart?: boolean;
 }
 
+const isFantasyProduct = (product: Product): boolean => {
+  return product.subsubcategory?.toLowerCase() === "fantasy";
+};
+
 // Enhanced helper function to check if product has selectable options
 const hasSelectableOptions = (product: Product | null): boolean => {
   if (!product) return false;
@@ -320,15 +324,15 @@ const LogoPlaceholder: React.FC<{ size?: number }> = ({ size = 120 }) => {
       style={{ width: size, height: size }}
     >
       <Image
-  src="/images/narsiyah.png"
-  alt="Narsiyah Logo"
-  width={size * 0.8}
-  height={size * 0.8}
-  className="object-contain"
-  onError={() => setImageError(true)}
-  priority={false}
-  sizes={`${Math.round(size * 0.8)}px`}
-/>
+        src="/images/narsiyah.png"
+        alt="Narsiyah Logo"
+        width={size * 0.8}
+        height={size * 0.8}
+        className="object-contain"
+        onError={() => setImageError(true)}
+        priority={false}
+        sizes={`${Math.round(size * 0.8)}px`}
+      />
     </div>
   );
 };
@@ -345,10 +349,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   onTap,
   onColorSelect,
   onFavoriteToggle,
-  onAddToCart,  
+  onAddToCart,
 }) => {
   const router = useRouter();
-  
+
   // Cart, favorites, and user hooks
   const {
     addToCart,
@@ -370,7 +374,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
   // Option selector states
   const [showCartOptionSelector, setShowCartOptionSelector] = useState(false);
-  const [showFavoriteOptionSelector, setShowFavoriteOptionSelector] = useState(false);
+  const [showFavoriteOptionSelector, setShowFavoriteOptionSelector] =
+    useState(false);
 
   // Animation states
   const [cartButtonState, setCartButtonState] = useState<
@@ -447,28 +452,28 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     setInternalSelectedColor(selectedColor || null);
   }, [selectedColor]);
 
-   // Separated cart operation logic
-   const performCartOperation = useCallback(
+  // Separated cart operation logic
+  const performCartOperation = useCallback(
     async (selectedOptions?: { quantity?: number; [key: string]: unknown }) => {
       try {
         // Set loading state immediately
         setCartButtonState("adding");
-  
+
         // Extract quantity from selectedOptions if provided
         let quantityToAdd = 1;
         const attributesToAdd = selectedOptions;
-  
+
         if (selectedOptions && typeof selectedOptions.quantity === "number") {
           quantityToAdd = selectedOptions.quantity;
         }
-  
+
         // Call the cart function with the correct quantity
         const result = await addToCart(
           product.id,
           quantityToAdd,
           attributesToAdd
         );
-  
+
         // Set success state based on result
         if (result.includes("Added") || result.includes("Updated")) {
           setCartButtonState("added");
@@ -476,7 +481,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         } else {
           setCartButtonState("idle");
         }
-  
+
         // Call prop callback if provided
         if (onAddToCart) {
           onAddToCart(product.id);
@@ -489,32 +494,29 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     [product, addToCart, onAddToCart]
   );
 
-   // Add this new function to handle removal:
-   const performCartRemoval = useCallback(
-    async () => {
-      try {
-        setCartButtonState("removing");
-        
-        const result = await removeFromCart(product.id);
-        
-        if (result.includes("Removed")) {
-          setCartButtonState("removed");
-          setTimeout(() => setCartButtonState("idle"), 1500);
-        } else {
-          setCartButtonState("idle");
-        }
-  
-        // Call prop callback if provided
-        if (onAddToCart) {
-          onAddToCart(product.id);
-        }
-      } catch (error) {
-        console.error("Error removing from cart:", error);
+  // Add this new function to handle removal:
+  const performCartRemoval = useCallback(async () => {
+    try {
+      setCartButtonState("removing");
+
+      const result = await removeFromCart(product.id);
+
+      if (result.includes("Removed")) {
+        setCartButtonState("removed");
+        setTimeout(() => setCartButtonState("idle"), 1500);
+      } else {
         setCartButtonState("idle");
       }
-    },
-    [product.id, removeFromCart, onAddToCart]
-  );
+
+      // Call prop callback if provided
+      if (onAddToCart) {
+        onAddToCart(product.id);
+      }
+    } catch (error) {
+      console.error("Error removing from cart:", error);
+      setCartButtonState("idle");
+    }
+  }, [product.id, removeFromCart, onAddToCart]);
 
   const handleAddToCart = useCallback(
     async (selectedOptions?: { quantity?: number; [key: string]: unknown }) => {
@@ -522,27 +524,34 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         router.push("/login");
         return;
       }
-  
+
       const productInCart = actualIsInCart;
-  
+
       // If product is in cart, remove it directly
       if (productInCart) {
         await performCartRemoval();
         return;
       }
-  
+
       // Only show option selector when ADDING to cart (not removing)
       if (!productInCart && hasSelectableOptions(product) && !selectedOptions) {
         setShowCartOptionSelector(true);
         return;
       }
-  
+
       // Perform cart addition
       await performCartOperation(selectedOptions);
     },
-    [user, product, actualIsInCart, router, performCartRemoval, performCartOperation, setShowCartOptionSelector]
+    [
+      user,
+      product,
+      actualIsInCart,
+      router,
+      performCartRemoval,
+      performCartOperation,
+      setShowCartOptionSelector,
+    ]
   );
- 
 
   // Enhanced favorite functionality
   const handleToggleFavorite = useCallback(async () => {
@@ -563,15 +572,20 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
   // Separated favorite toggle logic
   const performFavoriteToggle = useCallback(
-    async (selectedOptions?: { selectedColor?: string; selectedColorImage?: string; quantity: number; [key: string]: unknown }) => {
+    async (selectedOptions?: {
+      selectedColor?: string;
+      selectedColorImage?: string;
+      quantity: number;
+      [key: string]: unknown;
+    }) => {
       try {
         const wasInFavorites = actualIsFavorite;
-        
+
         setFavoriteButtonState(wasInFavorites ? "removing" : "adding");
 
         // Pass selected options if available
         const result = await addToFavorites(product.id, selectedOptions);
-        
+
         if (result.includes("Added")) {
           setFavoriteButtonState("added");
         } else if (result.includes("Removed")) {
@@ -586,7 +600,6 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         if (onFavoriteToggle) {
           onFavoriteToggle(product.id);
         }
-
       } catch (error) {
         console.error("Error with favorite operation:", error);
         setFavoriteButtonState("idle");
@@ -605,7 +618,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   );
 
   const handleFavoriteOptionSelectorConfirm = useCallback(
-    async (selectedOptions: { selectedColor?: string; selectedColorImage?: string; quantity: number; [key: string]: unknown }) => {
+    async (selectedOptions: {
+      selectedColor?: string;
+      selectedColorImage?: string;
+      quantity: number;
+      [key: string]: unknown;
+    }) => {
       setShowFavoriteOptionSelector(false);
       await performFavoriteToggle(selectedOptions);
     },
@@ -682,14 +700,18 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const getFavoriteButtonContent = useCallback(() => {
     if (favoriteButtonState === "adding") {
       return {
-        icon: <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />,
+        icon: (
+          <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+        ),
         className: isDarkMode ? "text-pink-400" : "text-pink-600",
       };
     }
 
     if (favoriteButtonState === "removing") {
       return {
-        icon: <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />,
+        icon: (
+          <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+        ),
         className: isDarkMode ? "text-gray-400" : "text-gray-600",
       };
     }
@@ -812,25 +834,27 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     [internalSelectedColor, onColorSelect]
   );
 
-  const handlePrevImage = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation();
-      setCurrentImageIndex((prev) =>
-        prev === 0 ? currentImageUrls.length - 1 : prev - 1
-      );
-    },
-    [currentImageUrls.length]
-  );
+  const handleNextImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
 
-  const handleNextImage = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation();
-      setCurrentImageIndex((prev) =>
-        prev === currentImageUrls.length - 1 ? 0 : prev + 1
-      );
-    },
-    [currentImageUrls.length]
-  );
+    // Don't allow navigation for fantasy products
+    if (isFantasyProduct(product)) return;
+
+    setCurrentImageIndex((prev) =>
+      prev === currentImageUrls.length - 1 ? 0 : prev + 1
+    );
+  };
+
+  const handlePrevImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    // Don't allow navigation for fantasy products
+    if (isFantasyProduct(product)) return;
+
+    setCurrentImageIndex((prev) =>
+      prev === 0 ? currentImageUrls.length - 1 : prev - 1
+    );
+  };
 
   // Determine active dot for pagination (max 3 dots)
   const getActiveDotIndex = () => {
@@ -877,7 +901,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             <div className="w-full h-full rounded-t-xl overflow-hidden bg-gray-200 relative">
               {currentImageUrls.length > 0 ? (
                 <div className="relative w-full h-full">
-                  {/* Image with smooth transition - FIXED VERSION */}
+                  {/* Image with smooth transition */}
                   <div className="relative w-full h-full">
                     {isImageLoaded && !imageError ? (
                       <Image
@@ -900,26 +924,60 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                     )}
                   </div>
 
-                  {/* Navigation buttons - show on hover instantly for multiple images */}
-                  {currentImageUrls.length > 1 && (
-                    <>
-                      <button
-                        className={`absolute left-2 top-1/2 transform -translate-y-1/2 w-8 h-8 bg-black bg-opacity-50 rounded-full flex items-center justify-center text-white transition-opacity duration-150 ${
-                          isHovered ? "opacity-100" : "opacity-0"
-                        }`}
-                        onClick={handlePrevImage}
+                  {/* Navigation buttons - hide for fantasy products, show on hover for others */}
+                  {currentImageUrls.length > 1 &&
+                    !isFantasyProduct(product) && (
+                      <>
+                        <button
+                          className={`absolute left-2 top-1/2 transform -translate-y-1/2 w-8 h-8 bg-black bg-opacity-50 rounded-full flex items-center justify-center text-white transition-opacity duration-150 ${
+                            isHovered ? "opacity-100" : "opacity-0"
+                          }`}
+                          onClick={handlePrevImage}
+                        >
+                          <ChevronLeft size={16} />
+                        </button>
+                        <button
+                          className={`absolute right-2 top-1/2 transform -translate-y-1/2 w-8 h-8 bg-black bg-opacity-50 rounded-full flex items-center justify-center text-white transition-opacity duration-150 ${
+                            isHovered ? "opacity-100" : "opacity-0"
+                          }`}
+                          onClick={handleNextImage}
+                        >
+                          <ChevronRight size={16} />
+                        </button>
+                      </>
+                    )}
+
+                  {/* Blur overlay for fantasy products */}
+                  {isFantasyProduct(product) && (
+                    <div
+                      className="absolute inset-0 backdrop-blur-[15px] bg-black/10"
+                      style={{
+                        backdropFilter: "blur(15px)",
+                        WebkitBackdropFilter: "blur(15px)",
+                      }}
+                    />
+                  )}
+
+                  {/* +18 Label for fantasy products */}
+                  {isFantasyProduct(product) && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div
+                        className="px-6 py-3 bg-red-600/90 rounded-xl border-2 border-white"
+                        style={{
+                          boxShadow: "0 4px 6px rgba(0, 0, 0, 0.3)",
+                        }}
                       >
-                        <ChevronLeft size={16} />
-                      </button>
-                      <button
-                        className={`absolute right-2 top-1/2 transform -translate-y-1/2 w-8 h-8 bg-black bg-opacity-50 rounded-full flex items-center justify-center text-white transition-opacity duration-150 ${
-                          isHovered ? "opacity-100" : "opacity-0"
-                        }`}
-                        onClick={handleNextImage}
-                      >
-                        <ChevronRight size={16} />
-                      </button>
-                    </>
+                        <span
+                          className="text-white font-bold"
+                          style={{
+                            fontSize: "32px",
+                            letterSpacing: "2px",
+                          }}
+                        >
+                          +18
+                        </span>
+                      </div>
+                    </div>
                   )}
                 </div>
               ) : (
@@ -1129,7 +1187,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 >
                   <span
                     className={`transition-all duration-300 ${
-                      cartButtonState === "added" || cartButtonState === "removed"
+                      cartButtonState === "added" ||
+                      cartButtonState === "removed"
                         ? "animate-pulse"
                         : ""
                     } ${cartButtonContent.className}`}
