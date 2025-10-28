@@ -1,14 +1,22 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X, Plus, Minus, Check, Loader2 } from 'lucide-react';
-import { doc, getDoc } from 'firebase/firestore';
-import { useTranslations } from 'next-intl';
-import { db } from '@/lib/firebase';
-import { useUser } from '@/context/UserProvider';
-import { AttributeLocalizationUtils } from '@/constants/AttributeLocalization';
-import { Product } from '@/app/models/Product';
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  X,
+  Plus,
+  Minus,
+  Check,
+  Loader2,
+  MoveHorizontal,
+  MoveVertical,
+} from "lucide-react";
+import { doc, getDoc } from "firebase/firestore";
+import { useTranslations } from "next-intl";
+import { db } from "@/lib/firebase";
+import { useUser } from "@/context/UserProvider";
+import { AttributeLocalizationUtils } from "@/constants/AttributeLocalization";
+import { Product } from "@/app/models/Product";
 
 interface SalePreferences {
   maxQuantity?: number;
@@ -23,7 +31,8 @@ interface OptionSelectorResult {
   selectedColor?: string;
   selectedColorImage?: string;
   quantity: number;
-  selectedMetres?: number;
+  curtainWidth?: number;
+  curtainHeight?: number;
   [key: string]: unknown;
 }
 
@@ -70,30 +79,33 @@ const ColorThumb: React.FC<ColorThumbProps> = ({
       disabled={disabled}
       className={`
         relative flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden border-2 transition-all duration-200 mx-1
-        ${isSelected 
-          ? 'border-orange-500 border-3 shadow-lg' 
-          : isDarkMode 
-            ? 'border-gray-600 hover:border-orange-400' 
-            : 'border-gray-300 hover:border-orange-400'
+        ${
+          isSelected
+            ? "border-orange-500 border-3 shadow-lg"
+            : isDarkMode
+            ? "border-gray-600 hover:border-orange-400"
+            : "border-gray-300 hover:border-orange-400"
         }
-        ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+        ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
       `}
     >
       <img
         src={imageUrl}
-        alt={label || `${t('color')} ${colorKey}`}
+        alt={label || `${t("color")} ${colorKey}`}
         className="w-full h-full object-cover"
         onError={(e) => {
           const target = e.target as HTMLImageElement;
-          target.style.display = 'none';
-          target.nextElementSibling?.classList.remove('hidden');
+          target.style.display = "none";
+          target.nextElementSibling?.classList.remove("hidden");
         }}
       />
-      
+
       {/* Fallback icon */}
-      <div className={`hidden absolute inset-0 flex items-center justify-center ${
-        isDarkMode ? 'bg-gray-700' : 'bg-gray-200'
-      }`}>
+      <div
+        className={`hidden absolute inset-0 flex items-center justify-center ${
+          isDarkMode ? "bg-gray-700" : "bg-gray-200"
+        }`}
+      >
         <div className="w-6 h-6 bg-gray-400 rounded" />
       </div>
 
@@ -101,7 +113,7 @@ const ColorThumb: React.FC<ColorThumbProps> = ({
       {disabled && (
         <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center">
           <span className="text-white text-xs font-bold text-center px-1">
-            {t('noStock')}
+            {t("noStock")}
           </span>
         </div>
       )}
@@ -127,11 +139,12 @@ const AttributeChip: React.FC<AttributeChipProps> = ({
       onClick={onSelect}
       className={`
         px-4 py-2 rounded-full border transition-all duration-200 text-sm font-medium mx-1 mb-2
-        ${isSelected
-          ? 'border-orange-500 border-2 text-orange-500 bg-orange-50 dark:bg-orange-950'
-          : isDarkMode
-            ? 'border-gray-600 text-gray-300 hover:border-orange-400'
-            : 'border-gray-300 text-gray-700 hover:border-orange-400'
+        ${
+          isSelected
+            ? "border-orange-500 border-2 text-orange-500 bg-orange-50 dark:bg-orange-950"
+            : isDarkMode
+            ? "border-gray-600 text-gray-300 hover:border-orange-400"
+            : "border-gray-300 text-gray-700 hover:border-orange-400"
         }
       `}
     >
@@ -154,68 +167,74 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
   React.useEffect(() => {
     if (typeof document !== "undefined") {
       const checkTheme = () => {
-        setDetectedDarkMode(document.documentElement.classList.contains("dark"));
+        setDetectedDarkMode(
+          document.documentElement.classList.contains("dark")
+        );
       };
-      
+
       checkTheme();
       const observer = new MutationObserver(checkTheme);
       observer.observe(document.documentElement, {
         attributes: true,
         attributeFilter: ["class"],
       });
-      
+
       return () => observer.disconnect();
     }
   }, []);
 
   // ✅ FIXED: Proper nested translation function that uses JSON files
-  const t = useCallback((key: string) => {
-    if (!localization) {
-      return key;
-    }
+  const t = useCallback(
+    (key: string) => {
+      if (!localization) {
+        return key;
+      }
 
-    try {
-      // Try to get the nested ProductOptionSelector translation
-      const translation = localization(`ProductOptionSelector.${key}`);
-      
-      // Check if we got a valid translation (not the same as the key we requested)
-      if (translation && translation !== `ProductOptionSelector.${key}`) {
-        return translation;
+      try {
+        // Try to get the nested ProductOptionSelector translation
+        const translation = localization(`ProductOptionSelector.${key}`);
+
+        // Check if we got a valid translation (not the same as the key we requested)
+        if (translation && translation !== `ProductOptionSelector.${key}`) {
+          return translation;
+        }
+
+        // If nested translation doesn't exist, try direct key
+        const directTranslation = localization(key);
+        if (directTranslation && directTranslation !== key) {
+          return directTranslation;
+        }
+
+        // Return the key as fallback
+        return key;
+      } catch (error) {
+        console.warn(`Translation error for key: ${key}`, error);
+        return key;
       }
-      
-      // If nested translation doesn't exist, try direct key
-      const directTranslation = localization(key);
-      if (directTranslation && directTranslation !== key) {
-        return directTranslation;
-      }
-      
-      // Return the key as fallback
-      return key;
-    } catch (error) {
-      console.warn(`Translation error for key: ${key}`, error);
-      return key;
-    }
-  }, [localization]);
+    },
+    [localization]
+  );
 
   // Use provided isDarkMode prop or auto-detected value
   const actualDarkMode = isDarkMode || detectedDarkMode;
   const { user } = useUser();
-  
+
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [selectedQuantity, setSelectedQuantity] = useState(1);
-  const [selectedMetres, setSelectedMetres] = useState(1);
-  const [salePreferences, setSalePreferences] = useState<SalePreferences | null>(null);
-  const [isLoadingSalePrefs, setIsLoadingSalePrefs] = useState(false);
-  
 
+  // Curtain dimension states
+  const [curtainWidth, setCurtainWidth] = useState("");
+  const [curtainHeight, setCurtainHeight] = useState("");
+
+  const [salePreferences, setSalePreferences] =
+    useState<SalePreferences | null>(null);
+  const [isLoadingSalePrefs, setIsLoadingSalePrefs] = useState(false);
+
+  // Check if product is a curtain
   const isCurtain = useMemo(() => {
-    return product.subsubcategory === "Curtains";
+    return product.subsubcategory?.toLowerCase() === "curtains";
   }, [product.subsubcategory]);
-  
-  const maxMetres = useMemo(() => {    
-    return product.maxMetre && product.maxMetre > 0 ? product.maxMetre : 100;
-  }, [product.maxMetre]);
 
   // Initialize default selections and load sale preferences
   useEffect(() => {
@@ -228,13 +247,13 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
 
       if (Array.isArray(value)) {
         options = value
-          .map(item => item.toString())
-          .filter(item => item.trim() !== '');
-      } else if (typeof value === 'string' && value.trim() !== '') {
+          .map((item) => item.toString())
+          .filter((item) => item.trim() !== "");
+      } else if (typeof value === "string" && value.trim() !== "") {
         options = value
-          .split(',')
-          .map(item => item.trim())
-          .filter(item => item !== '');
+          .split(",")
+          .map((item) => item.trim())
+          .filter((item) => item !== "");
       }
 
       // Auto-select single options
@@ -244,13 +263,17 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
     });
 
     setSelections(newSelections);
-    if (Object.keys(product.colorImages || {}).length === 0 && product.imageUrls && product.imageUrls.length > 0) {
-      setSelectedColor('default');
+
+    // Auto-select default color if no color options available
+    if (Object.keys(product.colorImages || {}).length === 0) {
+      setSelectedColor("default");
     } else {
       setSelectedColor(null);
     }
+
     setSelectedQuantity(1);
-    setSelectedMetres(1);
+    setCurtainWidth("");
+    setCurtainHeight("");
     setSalePreferences(null);
 
     // Load sale preferences for shop products
@@ -262,13 +285,13 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
 
     try {
       setIsLoadingSalePrefs(true);
-      
+
       // Check if this is a shop product
       const parentCollection = product.reference.parent?.id;
-      if (parentCollection !== 'shop_products') return;
+      if (parentCollection !== "shop_products") return;
 
       const salePrefsDoc = await getDoc(
-        doc(db, product.reference.path, 'sale_preferences', 'preferences')
+        doc(db, product.reference.path, "sale_preferences", "preferences")
       );
 
       if (salePrefsDoc.exists()) {
@@ -282,23 +305,26 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
         }
       }
     } catch (error) {
-      console.error('Error loading sale preferences:', error);
+      console.error("Error loading sale preferences:", error);
     } finally {
       setIsLoadingSalePrefs(false);
     }
   }, [product.reference, selectedQuantity]);
 
-  const getMaxQuantityAllowed = useCallback((prefs?: SalePreferences | null) => {
-    const stockQuantity = getMaxQuantity();
-    const preferences = prefs || salePreferences;
-    
-    if (!preferences?.maxQuantity) return stockQuantity;
-    
-    return Math.min(stockQuantity, preferences.maxQuantity);
-  }, [selectedColor, product.quantity, product.colorQuantities, salePreferences]);
+  const getMaxQuantityAllowed = useCallback(
+    (prefs?: SalePreferences | null) => {
+      const stockQuantity = getMaxQuantity();
+      const preferences = prefs || salePreferences;
+
+      if (!preferences?.maxQuantity) return stockQuantity;
+
+      return Math.min(stockQuantity, preferences.maxQuantity);
+    },
+    [selectedColor, product.quantity, product.colorQuantities, salePreferences]
+  );
 
   const getMaxQuantity = useCallback(() => {
-    if (selectedColor && selectedColor !== 'default') {
+    if (selectedColor && selectedColor !== "default") {
       return product.colorQuantities[selectedColor] || 0;
     }
     return product.quantity;
@@ -312,13 +338,13 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
 
       if (Array.isArray(value)) {
         options = value
-          .map(item => item.toString())
-          .filter(item => item.trim() !== '');
-      } else if (typeof value === 'string' && value.trim() !== '') {
+          .map((item) => item.toString())
+          .filter((item) => item.trim() !== "");
+      } else if (typeof value === "string" && value.trim() !== "") {
         options = value
-          .split(',')
-          .map(item => item.trim())
-          .filter(item => item !== '');
+          .split(",")
+          .map((item) => item.trim())
+          .filter((item) => item !== "");
       }
 
       // Only include attributes with multiple options
@@ -331,10 +357,48 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
   }, [product.attributes]);
 
   const hasColors = useMemo(() => {
-    return Object.keys(product.colorImages || {}).length > 0;  // ✅ CHANGED - Only check colorImages
+    return Object.keys(product.colorImages || {}).length > 0;
   }, [product.colorImages]);
 
+  // Validate curtain dimensions
+  const validateCurtainDimensions = useCallback(() => {
+    if (!isCurtain) return true;
+
+    const widthText = curtainWidth.trim();
+    const heightText = curtainHeight.trim();
+
+    if (!widthText || !heightText) return false;
+
+    const width = parseFloat(widthText);
+    const height = parseFloat(heightText);
+
+    if (isNaN(width) || width <= 0) return false;
+    if (isNaN(height) || height <= 0) return false;
+
+    // Check against max dimensions from attributes
+    const maxWidth = product.attributes?.curtainMaxWidth;
+    const maxHeight = product.attributes?.curtainMaxHeight;
+
+    if (maxWidth != null) {
+      const maxW = parseFloat(maxWidth.toString());
+      if (!isNaN(maxW) && width > maxW) return false;
+    }
+
+    if (maxHeight != null) {
+      const maxH = parseFloat(maxHeight.toString());
+      if (!isNaN(maxH) && height > maxH) return false;
+    }
+
+    return true;
+  }, [isCurtain, curtainWidth, curtainHeight, product.attributes]);
+
   const isConfirmEnabled = useMemo(() => {
+    // For curtains, check dimensions instead of quantity
+    if (isCurtain) {
+      if (!validateCurtainDimensions()) return false;
+    }
+
+    // Only check color if product has color options
     if (hasColors && !selectedColor) return false;
 
     // Check if all selectable attributes have been selected
@@ -342,28 +406,43 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
       if (!selections[key]) return false;
     }
 
-    return selectedQuantity > 0;
-  }, [hasColors, selectedColor, selections, getSelectableAttributes, selectedQuantity]);
+    return true;
+  }, [
+    isCurtain,
+    validateCurtainDimensions,
+    hasColors,
+    selectedColor,
+    selections,
+    getSelectableAttributes,
+  ]);
 
   const handleConfirm = useCallback(() => {
-    console.log('ProductOptionSelector - Confirm clicked', {
+    console.log("ProductOptionSelector - Confirm clicked", {
       productId: product.id,
       selectedColor,
       selectedQuantity,
-      selectedMetres: isCurtain ? selectedMetres : undefined,  // ✅ ADD THIS LINE
+      curtainWidth: isCurtain ? curtainWidth : undefined,
+      curtainHeight: isCurtain ? curtainHeight : undefined,
       selections,
     });
-  
+
     const result: OptionSelectorResult = {
-      quantity: selectedQuantity,
-      selectedMetres: isCurtain ? selectedMetres : undefined,
-    };    
+      quantity: isCurtain ? 1 : selectedQuantity, // Curtains always quantity 1
+      ...selections, // Include all dynamic attribute selections
+    };
+
+    // Handle curtain dimensions or quantity
+    if (isCurtain) {
+      result.curtainWidth = parseFloat(curtainWidth.trim());
+      result.curtainHeight = parseFloat(curtainHeight.trim());
+    }
+
     // Add color selection if applicable
-    if (selectedColor) {  // ✅ CHANGED - Remove hasColors check
+    if (selectedColor) {
       result.selectedColor = selectedColor;
-      
+
       // Add selected color image URL if color is selected
-      if (selectedColor !== 'default') {
+      if (selectedColor !== "default") {
         const colorImages = product.colorImages[selectedColor];
         if (colorImages && colorImages.length > 0) {
           result.selectedColorImage = colorImages[0];
@@ -372,30 +451,38 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
         result.selectedColorImage = product.imageUrls[0];
       }
     }
-    
-    // ✅ ADD THIS - Include all selected attributes (like size)
-    Object.entries(selections).forEach(([key, value]) => {
-      result[key] = value;
-    });
-    
-    onConfirm(result);
-  }, [isConfirmEnabled, selectedQuantity, selections, hasColors, selectedColor, product, onConfirm, isCurtain, selectedMetres]);
 
-  const handleQuantityChange = useCallback((increment: number) => {
-    const maxAllowed = getMaxQuantityAllowed();
-    const newQuantity = selectedQuantity + increment;
-    
-    if (newQuantity >= 1 && newQuantity <= maxAllowed) {
-      setSelectedQuantity(newQuantity);
-      
-      console.log('ProductOptionSelector - Quantity changed:', {
-        productId: product.id,
-        oldQuantity: selectedQuantity,
-        newQuantity,
-        maxAllowed
-      });
-    }
-  }, [selectedQuantity, getMaxQuantityAllowed, product.id]);
+    onConfirm(result);
+  }, [
+    isConfirmEnabled,
+    selectedQuantity,
+    selections,
+    selectedColor,
+    product,
+    onConfirm,
+    isCurtain,
+    curtainWidth,
+    curtainHeight,
+  ]);
+
+  const handleQuantityChange = useCallback(
+    (increment: number) => {
+      const maxAllowed = getMaxQuantityAllowed();
+      const newQuantity = selectedQuantity + increment;
+
+      if (newQuantity >= 1 && newQuantity <= maxAllowed) {
+        setSelectedQuantity(newQuantity);
+
+        console.log("ProductOptionSelector - Quantity changed:", {
+          productId: product.id,
+          oldQuantity: selectedQuantity,
+          newQuantity,
+          maxAllowed,
+        });
+      }
+    },
+    [selectedQuantity, getMaxQuantityAllowed, product.id]
+  );
 
   // Update selected quantity when color changes (to respect color-specific stock limits)
   useEffect(() => {
@@ -403,39 +490,57 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
     if (selectedQuantity > maxAllowed) {
       const adjustedQuantity = Math.max(1, maxAllowed);
       setSelectedQuantity(adjustedQuantity);
-      
-      console.log('ProductOptionSelector - Quantity adjusted for color/stock:', {
-        productId: product.id,
-        selectedColor,
-        oldQuantity: selectedQuantity,
-        newQuantity: adjustedQuantity,
-        maxAllowed
-      });
+
+      console.log(
+        "ProductOptionSelector - Quantity adjusted for color/stock:",
+        {
+          productId: product.id,
+          selectedColor,
+          oldQuantity: selectedQuantity,
+          newQuantity: adjustedQuantity,
+          maxAllowed,
+        }
+      );
     }
-  }, [selectedColor, salePreferences, selectedQuantity, getMaxQuantityAllowed, product.id]);
+  }, [
+    selectedColor,
+    salePreferences,
+    selectedQuantity,
+    getMaxQuantityAllowed,
+    product.id,
+  ]);
 
   const renderSalePreferenceInfo = useCallback(() => {
-    if (!salePreferences?.discountThreshold || !salePreferences?.discountPercentage) return null;
+    if (
+      !salePreferences?.discountThreshold ||
+      !salePreferences?.discountPercentage
+    )
+      return null;
 
     const { discountThreshold, discountPercentage } = salePreferences;
     const hasDiscount = selectedQuantity >= discountThreshold;
 
     return (
-      <div className={`mt-4 p-3 rounded-lg border ${
-        actualDarkMode 
-          ? 'bg-blue-900/20 border-blue-800' 
-          : 'bg-blue-50 border-blue-200'
-      }`}>
+      <div
+        className={`mt-4 p-3 rounded-lg border ${
+          actualDarkMode
+            ? "bg-blue-900/20 border-blue-800"
+            : "bg-blue-50 border-blue-200"
+        }`}
+      >
         <div className="text-center">
-          <p className={`text-sm font-medium ${
-            hasDiscount 
-              ? 'text-green-600 dark:text-green-400' 
-              : 'text-orange-600 dark:text-orange-400'
-          }`}>
-            {hasDiscount 
-              ? `${t('discountApplied')}: ${discountPercentage}%`
-              : `${t('buyText')} ${discountThreshold} ${t('forDiscount')} ${discountPercentage}%!`
-            }
+          <p
+            className={`text-sm font-medium ${
+              hasDiscount
+                ? "text-green-600 dark:text-green-400"
+                : "text-orange-600 dark:text-orange-400"
+            }`}
+          >
+            {hasDiscount
+              ? `${t("discountApplied")}: ${discountPercentage}%`
+              : `${t("buyText")} ${discountThreshold} ${t(
+                  "forDiscount"
+                )} ${discountPercentage}%!`}
           </p>
         </div>
       </div>
@@ -448,87 +553,253 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
     return (
       <div className="mb-6">
         <h3 className="text-center text-orange-500 font-bold text-base mb-3">
-          {t('selectColor')}
+          {t("selectColor")}
         </h3>
-        <div className="flex overflow-x-auto pb-2 px-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        <div
+          className="flex overflow-x-auto pb-2 px-1"
+          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+        >
           {/* Default option - only show if main imageUrls exist */}
           {product.imageUrls && product.imageUrls.length > 0 && (
             <ColorThumb
               colorKey="default"
               imageUrl={product.imageUrls[0]}
-              isSelected={selectedColor === 'default'}
+              isSelected={selectedColor === "default"}
               disabled={product.quantity === 0}
               isDarkMode={actualDarkMode}
               onSelect={() => {
-                setSelectedColor('default');
-                console.log('ProductOptionSelector - Color selected:', { productId: product.id, selectedColor: 'default' });
+                setSelectedColor("default");
+                console.log("ProductOptionSelector - Color selected:", {
+                  productId: product.id,
+                  selectedColor: "default",
+                });
               }}
-              label={t('default')}
+              label={t("default")}
               t={t}
             />
           )}
-          
+
           {/* Color options from colorImages */}
-          {Object.entries(product.colorImages || {}).map(([colorKey, images]) => {
-            const qty = product.colorQuantities[colorKey] || 0;
-            return (
-              <ColorThumb
-                key={colorKey}
-                colorKey={colorKey}
-                imageUrl={images[0]}
-                isSelected={selectedColor === colorKey}
-                disabled={qty === 0}
-                isDarkMode={actualDarkMode}
-                onSelect={() => {
-                  setSelectedColor(colorKey);
-                  console.log('ProductOptionSelector - Color selected:', { productId: product.id, selectedColor: colorKey, availableQty: qty });
-                }}
-                label={colorKey}
-                t={t}
-              />
-            );
-          })}
+          {Object.entries(product.colorImages || {}).map(
+            ([colorKey, images]) => {
+              const qty = product.colorQuantities[colorKey] || 0;
+              return (
+                <ColorThumb
+                  key={colorKey}
+                  colorKey={colorKey}
+                  imageUrl={images[0]}
+                  isSelected={selectedColor === colorKey}
+                  disabled={qty === 0}
+                  isDarkMode={actualDarkMode}
+                  onSelect={() => {
+                    setSelectedColor(colorKey);
+                    console.log("ProductOptionSelector - Color selected:", {
+                      productId: product.id,
+                      selectedColor: colorKey,
+                      availableQty: qty,
+                    });
+                  }}
+                  label={colorKey}
+                  t={t}
+                />
+              );
+            }
+          )}
         </div>
       </div>
     );
   }, [hasColors, product, selectedColor, t, actualDarkMode]);
 
-  const renderAttributeSelector = useCallback((attributeKey: string, options: string[]) => {
-    return (
-      <div key={attributeKey} className="mb-6">
-        <h3 className="text-center text-orange-500 font-bold text-base mb-3">
-          {localization ? AttributeLocalizationUtils.getLocalizedAttributeTitle(attributeKey, localization) : attributeKey}
-        </h3>
-        <div className="flex flex-wrap justify-center">
-          {options.map((option) => (
-            <AttributeChip
-              key={option}
-              label={localization ? AttributeLocalizationUtils.getLocalizedSingleValue(attributeKey, option, localization) : option}
-              isSelected={selections[attributeKey] === option}
-              isDarkMode={actualDarkMode}
-              onSelect={() => {
-                setSelections(prev => ({ ...prev, [attributeKey]: option }));
-                console.log('ProductOptionSelector - Attribute selected:', { 
-                  productId: product.id, 
-                  attributeKey, 
-                  option,
-                  allSelections: { ...selections, [attributeKey]: option }
-                });
-              }}
-            />
-          ))}
+  const renderAttributeSelector = useCallback(
+    (attributeKey: string, options: string[]) => {
+      return (
+        <div key={attributeKey} className="mb-6">
+          <h3 className="text-center text-orange-500 font-bold text-base mb-3">
+            {localization
+              ? AttributeLocalizationUtils.getLocalizedAttributeTitle(
+                  attributeKey,
+                  localization
+                )
+              : attributeKey}
+          </h3>
+          <div className="flex flex-wrap justify-center">
+            {options.map((option) => (
+              <AttributeChip
+                key={option}
+                label={
+                  localization
+                    ? AttributeLocalizationUtils.getLocalizedSingleValue(
+                        attributeKey,
+                        option,
+                        localization
+                      )
+                    : option
+                }
+                isSelected={selections[attributeKey] === option}
+                isDarkMode={actualDarkMode}
+                onSelect={() => {
+                  setSelections((prev) => ({
+                    ...prev,
+                    [attributeKey]: option,
+                  }));
+                  console.log("ProductOptionSelector - Attribute selected:", {
+                    productId: product.id,
+                    attributeKey,
+                    option,
+                    allSelections: { ...selections, [attributeKey]: option },
+                  });
+                }}
+              />
+            ))}
+          </div>
         </div>
-      </div>
-    );
-  }, [selections, localization, product.id, actualDarkMode]);
+      );
+    },
+    [selections, localization, product.id, actualDarkMode]
+  );
 
-  const renderQuantitySelector = useCallback(() => {
-    const maxAllowed = getMaxQuantityAllowed();
-    
+  const renderCurtainDimensionsInput = useCallback(() => {
+    if (!isCurtain) return null;
+
+    const maxWidth = product.attributes?.curtainMaxWidth;
+    const maxHeight = product.attributes?.curtainMaxHeight;
+
+    const widthValue = parseFloat(curtainWidth);
+    const heightValue = parseFloat(curtainHeight);
+    const maxWidthValue = maxWidth ? parseFloat(maxWidth.toString()) : null;
+    const maxHeightValue = maxHeight ? parseFloat(maxHeight.toString()) : null;
+
+    const widthExceedsMax =
+      !isNaN(widthValue) &&
+      maxWidthValue !== null &&
+      widthValue > maxWidthValue;
+    const heightExceedsMax =
+      !isNaN(heightValue) &&
+      maxHeightValue !== null &&
+      heightValue > maxHeightValue;
+
     return (
       <div className="mb-6">
         <h3 className="text-center text-orange-500 font-bold text-base mb-3">
-          {t('quantity')}
+          {t("curtainDimensions")}
+        </h3>
+        <div
+          className={`p-3 rounded-lg border ${
+            actualDarkMode
+              ? "bg-gray-800/50 border-gray-700"
+              : "bg-gray-50 border-gray-200"
+          }`}
+        >
+          {/* Width input */}
+          <div className="mb-3">
+            <div className="flex items-center gap-2 mb-2">
+              <MoveHorizontal className="text-orange-500" size={20} />
+              <label
+                className={`text-sm font-medium ${
+                  actualDarkMode ? "text-gray-300" : "text-gray-700"
+                }`}
+              >
+                {t("maxWidth")}
+              </label>
+            </div>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={curtainWidth}
+              onChange={(e) => setCurtainWidth(e.target.value)}
+              placeholder={`${t("enterValue")} (${t("metersUnit")})`}
+              className={`w-full px-3 py-2 rounded-lg border ${
+                widthExceedsMax
+                  ? "border-red-500 focus:border-red-500 focus:ring-red-500"
+                  : "border-orange-500 focus:border-orange-500 focus:ring-orange-500"
+              } focus:ring-2 focus:outline-none ${
+                actualDarkMode
+                  ? "bg-gray-900 text-white"
+                  : "bg-white text-gray-900"
+              }`}
+            />
+            {maxWidth != null && (
+              <p
+                className={`text-xs mt-1 ${
+                  actualDarkMode ? "text-gray-400" : "text-gray-600"
+                }`}
+              >
+                {t("maximum")}: {maxWidth.toString()} {t("metersUnit")}
+              </p>
+            )}
+            {widthExceedsMax && (
+              <p className="text-xs text-red-500 mt-1">
+                {t("widthExceedsMaximum")}!
+              </p>
+            )}
+          </div>
+
+          {/* Height input */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <MoveVertical className="text-orange-500" size={20} />
+              <label
+                className={`text-sm font-medium ${
+                  actualDarkMode ? "text-gray-300" : "text-gray-700"
+                }`}
+              >
+                {t("maxHeight")}
+              </label>
+            </div>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={curtainHeight}
+              onChange={(e) => setCurtainHeight(e.target.value)}
+              placeholder={`${t("enterValue")} (${t("metersUnit")})`}
+              className={`w-full px-3 py-2 rounded-lg border ${
+                heightExceedsMax
+                  ? "border-red-500 focus:border-red-500 focus:ring-red-500"
+                  : "border-orange-500 focus:border-orange-500 focus:ring-orange-500"
+              } focus:ring-2 focus:outline-none ${
+                actualDarkMode
+                  ? "bg-gray-900 text-white"
+                  : "bg-white text-gray-900"
+              }`}
+            />
+            {maxHeight != null && (
+              <p
+                className={`text-xs mt-1 ${
+                  actualDarkMode ? "text-gray-400" : "text-gray-600"
+                }`}
+              >
+                {t("maximum")}: {maxHeight.toString()} {t("metersUnit")}
+              </p>
+            )}
+            {heightExceedsMax && (
+              <p className="text-xs text-red-500 mt-1">
+                {t("heightExceedsMaximum")}!
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }, [
+    isCurtain,
+    curtainWidth,
+    curtainHeight,
+    product.attributes,
+    t,
+    actualDarkMode,
+  ]);
+
+  const renderQuantitySelector = useCallback(() => {
+    if (isCurtain) return null; // Don't show for curtains
+
+    const maxAllowed = getMaxQuantityAllowed();
+
+    return (
+      <div className="mb-6">
+        <h3 className="text-center text-orange-500 font-bold text-base mb-3">
+          {t("quantity")}
         </h3>
         <div className="flex items-center justify-center gap-4">
           <button
@@ -536,29 +807,29 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
             disabled={selectedQuantity <= 1}
             className={`p-2 rounded-full border transition-colors ${
               actualDarkMode
-                ? 'border-gray-600 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed'
-                : 'border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed'
+                ? "border-gray-600 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                : "border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
             }`}
           >
             <Minus size={20} />
           </button>
-          
+
           <div className="px-4 py-2 border border-orange-500 rounded-lg min-w-[60px] text-center">
             <span className="text-lg font-semibold">{selectedQuantity}</span>
           </div>
-          
+
           <button
             onClick={() => handleQuantityChange(1)}
             disabled={selectedQuantity >= maxAllowed}
             className={`p-2 rounded-full border transition-colors ${
               actualDarkMode
-                ? 'border-gray-600 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed'
-                : 'border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed'
+                ? "border-gray-600 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                : "border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
             }`}
           >
             <Plus size={20} />
           </button>
-        </div>        
+        </div>
 
         {/* Loading indicator for sale preferences */}
         {isLoadingSalePrefs && (
@@ -568,72 +839,15 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
         )}
       </div>
     );
-  }, [selectedQuantity, getMaxQuantityAllowed, handleQuantityChange, isLoadingSalePrefs, t, actualDarkMode]);
-
-  const renderMetreSelector = useCallback(() => {
-    if (!isCurtain) return null;
-    
-    return (
-      <div className="mb-6">
-        <h3 className="text-center text-orange-500 font-bold text-base mb-3">
-          {t('metres')} {t('max')}: {maxMetres}m
-        </h3>
-        <div className="flex items-center justify-center gap-4">
-          <button
-            onClick={() => setSelectedMetres(prev => Math.max(1, prev - 1))}
-            disabled={selectedMetres <= 1}
-            className={`p-2 rounded-full border transition-colors ${
-              actualDarkMode
-                ? 'border-gray-600 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed'
-                : 'border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed'
-            }`}
-          >
-            <Minus size={20} />
-          </button>
-          
-          <div className="flex items-center gap-2">
-            <input
-              type="number"
-              min="1"
-              max={maxMetres}
-              value={selectedMetres}
-              onChange={(e) => {
-                const value = Math.min(Math.max(1, parseInt(e.target.value) || 1), maxMetres);
-                setSelectedMetres(value);
-              }}
-              className={`px-4 py-2 border border-orange-500 rounded-lg w-24 text-center text-lg font-semibold ${
-                actualDarkMode 
-                  ? 'bg-gray-800 text-white' 
-                  : 'bg-white text-gray-900'
-              }`}
-            />
-            <span className={`text-sm ${actualDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-              m
-            </span>
-          </div>
-          
-          <button
-            onClick={() => setSelectedMetres(prev => Math.min(maxMetres, prev + 1))}
-            disabled={selectedMetres >= maxMetres}
-            className={`p-2 rounded-full border transition-colors ${
-              actualDarkMode
-                ? 'border-gray-600 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed'
-                : 'border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed'
-            }`}
-          >
-            <Plus size={20} />
-          </button>
-        </div>
-        
-        {/* Info text */}
-        <p className={`text-xs text-center mt-2 ${
-          actualDarkMode ? 'text-gray-400' : 'text-gray-500'
-        }`}>
-          {t('metreInfo') || 'Enter the length in metres'}
-        </p>
-      </div>
-    );
-  }, [isCurtain, maxMetres, selectedMetres, t, actualDarkMode]);
+  }, [
+    isCurtain,
+    selectedQuantity,
+    getMaxQuantityAllowed,
+    handleQuantityChange,
+    isLoadingSalePrefs,
+    t,
+    actualDarkMode,
+  ]);
 
   // Redirect to login if user is not authenticated
   useEffect(() => {
@@ -657,7 +871,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
             exit={{ opacity: 0 }}
             onClick={onClose}
             className="fixed inset-0 z-50"
-            style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+            style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
           />
 
           {/* Modal */}
@@ -665,27 +879,33 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
             initial={{ opacity: 0, y: 100 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 100 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
             className="fixed inset-x-0 bottom-0 z-50 max-h-[90vh]"
           >
-            <div className={`rounded-t-2xl shadow-2xl max-w-lg mx-auto ${
-              isDarkMode ? 'bg-gray-900' : 'bg-white'
-            }`}>
+            <div
+              className={`rounded-t-2xl shadow-2xl max-w-lg mx-auto ${
+                isDarkMode ? "bg-gray-900" : "bg-white"
+              }`}
+            >
               {/* Header */}
-              <div className={`flex items-center justify-between p-4 border-b ${
-                isDarkMode ? 'border-gray-700' : 'border-gray-200'
-              }`}>
-                <h2 className={`text-lg font-semibold ${
-                  isDarkMode ? 'text-white' : 'text-gray-900'
-                }`}>
-                  {t('selectOptions')}
+              <div
+                className={`flex items-center justify-between p-4 border-b ${
+                  isDarkMode ? "border-gray-700" : "border-gray-200"
+                }`}
+              >
+                <h2
+                  className={`text-lg font-semibold ${
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  }`}
+                >
+                  {t("selectOptions")}
                 </h2>
                 <button
                   onClick={onClose}
                   className={`p-1 rounded-full transition-colors ${
-                    isDarkMode 
-                      ? 'hover:bg-gray-800 text-gray-500' 
-                      : 'hover:bg-gray-100 text-gray-500'
+                    isDarkMode
+                      ? "hover:bg-gray-800 text-gray-500"
+                      : "hover:bg-gray-100 text-gray-500"
                   }`}
                 >
                   <X size={20} />
@@ -694,7 +914,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
 
               {/* Content */}
               <div className="p-4 max-h-[60vh] overflow-y-auto">
-                {/* Color selector */}
+                {/* Color selector - only show if product has color options */}
                 {renderColorSelector()}
 
                 {/* Dynamic attribute selectors */}
@@ -702,45 +922,53 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
                   renderAttributeSelector(key, options)
                 )}
 
-                {/* Quantity selector */}
-                {!isCurtain && renderQuantitySelector()}
-
-                {/* Metre selector */}
-                {renderMetreSelector()}
-
-                {/* Sale preference info */}
-                {renderSalePreferenceInfo()}
+                {/* Conditional rendering: Curtain dimensions OR Quantity selector */}
+                {isCurtain ? (
+                  renderCurtainDimensionsInput()
+                ) : (
+                  <>
+                    {renderQuantitySelector()}
+                    {/* Sale preference info */}
+                    {renderSalePreferenceInfo()}
+                  </>
+                )}
               </div>
 
               {/* Footer */}
-              <div className={`p-4 border-t space-y-2 ${
-                isDarkMode ? 'border-gray-700' : 'border-gray-200'
-              }`}>
+              <div
+                className={`p-4 border-t space-y-2 ${
+                  isDarkMode ? "border-gray-700" : "border-gray-200"
+                }`}
+              >
                 <button
                   onClick={handleConfirm}
                   disabled={!isConfirmEnabled}
                   className={`
                     w-full py-3 px-4 rounded-lg font-semibold transition-all duration-200
-                    ${isConfirmEnabled
-                      ? 'bg-orange-500 hover:bg-orange-600 text-white'
-                      : isDarkMode
-                        ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    ${
+                      isConfirmEnabled
+                        ? "bg-orange-500 hover:bg-orange-600 text-white"
+                        : isDarkMode
+                        ? "bg-gray-700 text-gray-500 cursor-not-allowed"
+                        : "bg-gray-300 text-gray-500 cursor-not-allowed"
                     }
                   `}
                 >
-                  {t('confirm')} {selectedQuantity > 1 && `(${selectedQuantity})`}
+                  {t("confirm")}{" "}
+                  {!isCurtain &&
+                    selectedQuantity > 1 &&
+                    `(${selectedQuantity})`}
                 </button>
-                
+
                 <button
                   onClick={onClose}
                   className={`w-full py-2 px-4 transition-colors ${
-                    isDarkMode 
-                      ? 'text-gray-400 hover:text-gray-200' 
-                      : 'text-gray-600 hover:text-gray-800'
+                    isDarkMode
+                      ? "text-gray-400 hover:text-gray-200"
+                      : "text-gray-600 hover:text-gray-800"
                   }`}
                 >
-                  {t('cancel')}
+                  {t("cancel")}
                 </button>
               </div>
             </div>

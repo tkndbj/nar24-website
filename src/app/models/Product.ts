@@ -59,7 +59,6 @@ export interface Product {
   colorImages: Record<string, string[]>;
   videoUrl?: string;
   attributes: Record<string, unknown>;
-  maxMetre?: number;
   // Add reference property for Firestore document reference
   reference?: {
     id: string;
@@ -169,7 +168,7 @@ export class ProductUtils {
     return {};
   }
 
-  static safeReference(value: unknown): Product['reference'] {
+  static safeReference(value: unknown): Product["reference"] {
     if (value != null && typeof value === "object" && !Array.isArray(value)) {
       const ref = value as Record<string, unknown>;
       if (ref.id && ref.path && ref.parent) {
@@ -177,8 +176,8 @@ export class ProductUtils {
           id: String(ref.id),
           path: String(ref.path),
           parent: {
-            id: String((ref.parent as Record<string, unknown>)?.id || '')
-          }
+            id: String((ref.parent as Record<string, unknown>)?.id || ""),
+          },
         };
       }
     }
@@ -191,13 +190,13 @@ export class ProductUtils {
 
     // Determine sourceCollection from reference path if available
     let sourceCollection: string | undefined;
-    if (json.reference && typeof json.reference === 'object') {
+    if (json.reference && typeof json.reference === "object") {
       const ref = json.reference as Record<string, unknown>;
-      const path = String(ref.path || '');
-      if (path.startsWith('products/')) {
-        sourceCollection = 'products';
-      } else if (path.startsWith('shop_products/')) {
-        sourceCollection = 'shop_products';
+      const path = String(ref.path || "");
+      if (path.startsWith("products/")) {
+        sourceCollection = "products";
+      } else if (path.startsWith("shop_products/")) {
+        sourceCollection = "shop_products";
       }
     }
 
@@ -217,9 +216,10 @@ export class ProductUtils {
       reviewCount: ProductUtils.safeInt(json.reviewCount),
       gender: ProductUtils.safeStringNullable(json.gender),
       bundleIds: ProductUtils.safeStringArray(json.bundleIds),
-      bundlePrice: json.bundlePrice != null
-        ? ProductUtils.safeDouble(json.bundlePrice)
-        : undefined,
+      bundlePrice:
+        json.bundlePrice != null
+          ? ProductUtils.safeDouble(json.bundlePrice)
+          : undefined,
       originalPrice:
         json.originalPrice != null
           ? ProductUtils.safeDouble(json.originalPrice)
@@ -257,7 +257,6 @@ export class ProductUtils {
       subcategory: ProductUtils.safeString(json.subcategory),
       subsubcategory: ProductUtils.safeString(json.subsubcategory),
       quantity: ProductUtils.safeInt(json.quantity),
-      maxMetre: ProductUtils.safeInt(json.maxMetre),
       bestSellerRank:
         json.bestSellerRank != null
           ? ProductUtils.safeInt(json.bestSellerRank)
@@ -324,7 +323,6 @@ export class ProductUtils {
       subcategory: product.subcategory,
       subsubcategory: product.subsubcategory,
       quantity: product.quantity,
-      maxMetre: product.maxMetre,
       bestSellerRank: product.bestSellerRank,
       sold: product.sold,
       clickCount: product.clickCount,
@@ -368,13 +366,13 @@ export class ProductUtils {
   static fromAlgolia(json: ApiData): Product {
     // Algolia uses objectID instead of id
     // Extract and normalize the ID
-    let normalizedId = String(json.objectID ?? json.id ?? '');
+    let normalizedId = String(json.objectID ?? json.id ?? "");
 
     // Remove common Algolia prefixes
-    if (normalizedId.startsWith('products_')) {
-      normalizedId = normalizedId.substring('products_'.length);
-    } else if (normalizedId.startsWith('shop_products_')) {
-      normalizedId = normalizedId.substring('shop_products_'.length);
+    if (normalizedId.startsWith("products_")) {
+      normalizedId = normalizedId.substring("products_".length);
+    } else if (normalizedId.startsWith("shop_products_")) {
+      normalizedId = normalizedId.substring("shop_products_".length);
     }
 
     const modifiedJson: ApiData = {
@@ -404,11 +402,11 @@ export class ProductUtils {
       // Handle originalPrice with explicit null control
       originalPrice: setOriginalPriceNull
         ? undefined
-        : (otherUpdates.originalPrice ?? product.originalPrice),
-      // Handle discountPercentage with explicit null control  
+        : otherUpdates.originalPrice ?? product.originalPrice,
+      // Handle discountPercentage with explicit null control
       discountPercentage: setDiscountPercentageNull
         ? undefined
-        : (otherUpdates.discountPercentage ?? product.discountPercentage),
+        : otherUpdates.discountPercentage ?? product.discountPercentage,
     };
   }
 }

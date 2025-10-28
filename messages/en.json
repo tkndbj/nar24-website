@@ -1964,27 +1964,7 @@
     "loadMore": "Load More",
     "endOfResults": "You've reached the end"
   },
-  "productOptionSelector": {
-    "selectOptions": "Select Options",
-    "quantity": "Quantity",
-    "confirm": "Confirm",
-    "cancel": "Cancel",
-    "noStock": "No Stock",
-    "discountApplied": "Discount Applied",
-    "buyForDiscount": "Buy {threshold} for {percentage}% discount!",
-    "selectAllOptionsFirst": "Please select all available options first",
-    "pleaseSelectColor": "Please select a color",
-    "pleaseSelectSize": "Please select a size",
-    "pleaseSelectAllAttributes": "Please select all required attributes",
-    "quantityNotAvailable": "Selected quantity is not available",
-    "outOfStock": "Out of Stock",
-    "limitedStock": "Only {count} left in stock",
-    "maxQuantityReached": "Maximum quantity reached",
-    "minQuantityRequired": "Minimum 1 quantity required",
-    "metres": "Metres",
-    "max": "Max",
-    "metreInfo": "Enter the length in metres"
-  },
+
   "CartDrawer": {
     "title": "My Cart",
     "itemsCount": "items",
@@ -2744,7 +2724,6 @@
     "askSellerAriaLabel": "Ask seller a question"
   },
   "ProductOptionSelector": {
-    "selectOptions": "Select Options",
     "selectColor": "Select Color",
     "quantity": "Quantity",
     "color": "Color",
@@ -2757,7 +2736,16 @@
     "cancel": "Cancel",
     "metres": "Metres",
     "max": "Max",
-    "metreInfo": "Enter the length in metres"
+    "metreInfo": "Enter the length in metres",
+    "curtainDimensions": "Curtain Dimensions",
+    "maxWidth": "Width",
+    "maxHeight": "Height",
+    "metersUnit": "m",
+    "enterValue": "Enter",
+    "maximum": "Max",
+    "widthExceedsMaximum": "Width exceeds maximum",
+    "selectOptions": "Select Options",
+    "heightExceedsMaximum": "Height exceeds maximum"
   },
   "AllQuestionsPage": {
     "allQuestionsTitle": "All Questions",
