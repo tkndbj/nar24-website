@@ -207,7 +207,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
   const [selectedMetres, setSelectedMetres] = useState(1);
   const [salePreferences, setSalePreferences] = useState<SalePreferences | null>(null);
   const [isLoadingSalePrefs, setIsLoadingSalePrefs] = useState(false);
-  const hasInitializedRef = useRef(false);
+  
 
   const isCurtain = useMemo(() => {
     return product.subsubcategory === "Curtains";
