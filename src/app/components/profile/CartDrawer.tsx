@@ -337,6 +337,14 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
         "selectedColor",
         "selectedColorImage",
         "gender",
+        "salePreferences",
+        "sellerContactNo",        // ✅ ADD
+  "ourComission",           // ✅ ADD
+  "unitPrice",              // ✅ ADD
+  "currency",               // ✅ ADD
+  "addedAt",                // ✅ ADD
+  "updatedAt",              // ✅ ADD
+  "price",    
       ];
 
       // Collect all non-excluded attributes
