@@ -58,6 +58,7 @@ interface OrderItem {
   timestamp: Timestamp;
   selectedColor?: string;
   selectedSize?: string;
+  selectedMetres?: number;
 }
 
 const SHIPMENT_STATUSES = {
@@ -170,6 +171,7 @@ export default function BoughtProductsPage() {
           timestamp: data.timestamp,
           selectedColor: data.selectedColor,
           selectedSize: data.selectedSize,
+          selectedMetres: data.selectedMetres,
         });
       });
 
@@ -599,20 +601,25 @@ export default function BoughtProductsPage() {
                 </div>
 
                 {/* Variants */}
-                {(item.selectedColor || item.selectedSize) && (
-                  <div className="flex space-x-2">
-                    {item.selectedColor && (
-                      <span className="px-2 py-1 bg-indigo-100 text-indigo-600 text-xs font-semibold rounded">
-                        {item.selectedColor}
-                      </span>
-                    )}
-                    {item.selectedSize && (
-                      <span className="px-2 py-1 bg-purple-100 text-purple-600 text-xs font-semibold rounded">
-                        {item.selectedSize}
-                      </span>
-                    )}
-                  </div>
-                )}
+                {(item.selectedColor || item.selectedSize || item.selectedMetres) && (
+  <div className="flex flex-wrap gap-2 mt-2">
+    {item.selectedColor && (
+      <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded">
+        {item.selectedColor}
+      </span>
+    )}
+    {item.selectedSize && (
+      <span className="text-xs px-2 py-1 bg-purple-100 text-purple-800 rounded">
+        {item.selectedSize}
+      </span>
+    )}
+    {item.selectedMetres && (
+      <span className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded">
+        {item.selectedMetres}m
+      </span>
+    )}
+  </div>
+)}
               </div>
             ))}
 
