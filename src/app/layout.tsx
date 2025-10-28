@@ -11,7 +11,10 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "Nar24",
-  description: "Kıbrın'ın en büyük market platformu", 
+  description: "Kıbrın'ın en büyük market platformu",
+  icons: {
+    icon: '/pomegranate.png',
+  },
 };
 
 export default function RootLayout({
