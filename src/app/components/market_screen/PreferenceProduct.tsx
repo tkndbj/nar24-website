@@ -46,7 +46,11 @@ const ShimmerList = React.memo(({ rowHeight, isDarkMode }: { rowHeight: number; 
 ));
 ShimmerList.displayName = 'ShimmerList';
 
-export const PreferenceProduct = React.memo(() => {
+interface PreferenceProductProps {
+  keyPrefix?: string;
+}
+
+export const PreferenceProduct = React.memo(({ keyPrefix = '' }: PreferenceProductProps) => {
   const {
     recommendations,
     isLoading,
@@ -249,7 +253,7 @@ export const PreferenceProduct = React.memo(() => {
                 <div className="flex gap-0 px-0 lg:px-2 h-full pr-0 lg:pr-2 -ml-2 lg:ml-0">
                   {recommendations.map((product) => (
                     <div
-                      key={product.id}
+                      key={`${keyPrefix}${product.id}`}
                       className="flex-shrink-0"
                       style={{ width: "205px" }}
                     >

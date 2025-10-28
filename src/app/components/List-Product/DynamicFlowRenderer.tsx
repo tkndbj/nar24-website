@@ -14,6 +14,8 @@ import JewelerTypeStep from "./JeweleryType";
 import KitchenAppliancesStep from "./KitchenAppliances";
 import PantDetailStep from "./PantDetail";
 import WhiteGoodsStep from "./WhiteGoods";
+import FantasyWearStep from "./FantasyWear";
+import CurtainDimensionsStep from "./Curtains";
 
 // Add Error Boundary Component
 interface ErrorBoundaryState {
@@ -117,6 +119,8 @@ const STEP_COMPONENTS = {
   list_kitchen_appliances: KitchenAppliancesStep,
   list_pant: PantDetailStep,
   list_white_goods: WhiteGoodsStep,
+  list_fantasy_wear: FantasyWearStep,
+  list_curtain_dimensions: CurtainDimensionsStep,
 
   // Keep old naming for backward compatibility
   brand: BrandStep,
@@ -131,6 +135,8 @@ const STEP_COMPONENTS = {
   kitchen_appliances: KitchenAppliancesStep,
   pant_detail: PantDetailStep,
   white_goods: WhiteGoodsStep,
+  fantasy_wear: FantasyWearStep, // ✅ Matches the import
+  curtain_dimensions: CurtainDimensionsStep,
 } as const;
 
 interface DynamicFlowRendererProps {
@@ -200,7 +206,6 @@ export default function DynamicFlowRenderer({
       subcategory,
       subsubcategory,
       initialAttributes,
-      onBack,
     };
 
     switch (stepId) {
@@ -245,6 +250,10 @@ export default function DynamicFlowRenderer({
       case "list_kitchen_appliances":
       case "white_goods":
       case "list_white_goods":
+      case "fantasy_wear":
+      case "list_fantasy_wear":
+      case "curtain_dimensions":
+      case "list_curtain_dimensions":
         return baseProps;
 
       default:

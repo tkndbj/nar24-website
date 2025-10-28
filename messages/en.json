@@ -322,6 +322,7 @@
   "subSubcategoryBucketHats": "Bucket Hats",
   "subSubcategoryBerets": "Berets",
   "subSubcategorySnapbacks": "Snapbacks",
+  "subSubcategoryFantasy": "Fantasy Wear",
 
   "subSubcategorySilkScarves": "Silk Scarves",
   "subSubcategoryWinterScarves": "Winter Scarves",
@@ -2486,6 +2487,47 @@
     "submitError": "An error occurred while submitting your request. Please try again.",
     "successTitle": "Request Submitted!",
     "submitSuccess": "Your support request has been submitted successfully. We will get back to you soon."
+  },
+  "attributeLocalization": {
+    "fantasyWearType": "Fantasy Wear Type",
+    "fantasyWearLingerie": "Lingerie",
+    "fantasyWearBabydoll": "Babydoll",
+    "fantasyWearChemise": "Chemise",
+    "fantasyWearTeddy": "Teddy",
+    "fantasyWearBodysuit": "Bodysuit",
+    "fantasyWearCorset": "Corset",
+    "fantasyWearBustier": "Bustier",
+    "fantasyWearGarter": "Garter Belt & Sets",
+    "fantasyWearRobe": "Robe",
+    "fantasyWearKimono": "Kimono",
+    "fantasyWearCostume": "Costume",
+    "fantasyWearRolePlay": "Role Play",
+    "fantasyWearSleepwear": "Fantasy Sleepwear",
+    "fantasyWearOther": "Other"
+  },
+  "fantasyWearStep": {
+    "title": "Fantasy Wear",
+    "selectFantasyWearType": "Select Fantasy Wear Type",
+    "description": "Choose the type of fantasy wear you're selling",
+    "pleaseSelectFantasyWearType": "Please select a fantasy wear type",
+    "save": "Save & Continue",
+    "selectedType": "Selected Type",
+    "types": {
+      "Lingerie": "Lingerie",
+      "Babydoll": "Babydoll",
+      "Chemise": "Chemise",
+      "Teddy": "Teddy",
+      "Bodysuit": "Bodysuit",
+      "Corset": "Corset",
+      "Bustier": "Bustier",
+      "Garter": "Garter Belt & Sets",
+      "Robe": "Robe",
+      "Kimono": "Kimono",
+      "Costume": "Costume",
+      "RolePlay": "Role Play",
+      "Sleepwear": "Fantasy Sleepwear",
+      "Other": "Other"
+    }
   },
   "AccountSettings": {
     "accountSettings": "Account Settings",

@@ -59,7 +59,8 @@ const DynamicList: React.FC<{
   listData: DynamicListData;
   portraitImageHeight: number;
   rowHeight: number;
-}> = ({ listData, portraitImageHeight, rowHeight }) => {
+  keyPrefix?: string;
+}> = ({ listData, portraitImageHeight, rowHeight, keyPrefix = '' }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -318,7 +319,7 @@ const DynamicList: React.FC<{
                 <div className="flex gap-0 px-0 lg:px-2 h-full pr-0 lg:pr-2 -ml-2 lg:ml-0">
                   {products.map((product) => (
                     <div
-                      key={product.id}
+                      key={`${keyPrefix}${product.id}`}
                       className="flex-shrink-0"
                       style={{ width: "205px" }}
                     >
@@ -343,7 +344,11 @@ const DynamicList: React.FC<{
 };
 
 // Main component
-export default function DynamicHorizontalList() {
+interface DynamicHorizontalListProps {
+  keyPrefix?: string;
+}
+
+export default function DynamicHorizontalList({ keyPrefix = '' }: DynamicHorizontalListProps) {
   const [dynamicLists, setDynamicLists] = useState<DynamicListData[]>([]);
   const [loading, setLoading] = useState(true);
   const [isClient, setIsClient] = useState(false);
@@ -508,11 +513,12 @@ export default function DynamicHorizontalList() {
   return (
     <div className="w-full">
       {dynamicLists.map((listData, index) => (
-        <div key={listData.id}>
+        <div key={`${keyPrefix}${listData.id}`}>
           <DynamicList
             listData={listData}
             portraitImageHeight={portraitImageHeight}
             rowHeight={rowHeight}
+            keyPrefix={keyPrefix}
           />
           {/* Add spacing between lists except after the last one */}
           {index < dynamicLists.length - 1 && <div className="h-3" />}

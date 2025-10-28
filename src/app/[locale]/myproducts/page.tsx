@@ -16,7 +16,6 @@ import {
   Heart,
   ShoppingCart,
   Eye,
-  Star,
   Clock,
 } from "lucide-react";
 import { useUser } from "@/context/UserProvider";
@@ -240,10 +239,10 @@ export default function MyProductsPage() {
     if (timeRemaining === "00:00:00") return null;
 
     return (
-      <div className="inline-flex items-center px-2 sm:px-3 py-1 sm:py-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-full shadow-lg">
-        <Zap size={10} className="sm:size-3 mr-1 animate-pulse" />
-        <span className="text-xs sm:text-xs font-bold">
-          {t("boosted")}: {timeRemaining}
+      <div className="inline-flex items-center px-2 py-0.5 sm:py-1 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-full shadow-sm">
+        <Zap size={10} className="mr-1 animate-pulse" />
+        <span className="text-[10px] sm:text-xs font-semibold">
+          {timeRemaining}
         </span>
       </div>
     );
@@ -256,13 +255,13 @@ export default function MyProductsPage() {
 
     return (
       <div
-        className={`group relative rounded-xl sm:rounded-2xl border transition-all duration-300 overflow-hidden hover:shadow-xl hover:scale-[1.02] ${
+        className={`group relative rounded-lg border transition-all duration-200 overflow-hidden hover:shadow-lg ${
           isBoosted
-            ? "border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 dark:border-emerald-700"
+            ? "border-emerald-300 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 dark:border-emerald-600"
             : isDarkMode
             ? "bg-gray-800 border-gray-700 hover:border-gray-600"
             : "bg-white border-gray-200 hover:border-gray-300"
-        } ${isExpanded ? "shadow-2xl scale-[1.02]" : ""}`}
+        } ${isExpanded ? "shadow-xl" : ""}`}
       >
         {/* Boost Glow Effect */}
         {isBoosted && (
@@ -272,18 +271,18 @@ export default function MyProductsPage() {
         {/* Main product content */}
         <div className="relative">
           <div
-            className="flex p-3 sm:p-6 cursor-pointer"
+            className="flex p-3 sm:p-4 cursor-pointer"
             onClick={() => router.push(`/product/${product.id}`)}
           >
             {/* Product Image */}
-            <div className="relative w-16 h-16 sm:w-24 sm:h-24 flex-shrink-0 mr-3 sm:mr-6">
+            <div className="relative w-14 h-14 sm:w-20 sm:h-20 flex-shrink-0 mr-3 sm:mr-4">
               {product.imageUrls.length > 0 ? (
-                <div className="relative w-full h-full rounded-lg sm:rounded-xl overflow-hidden shadow-lg">
+                <div className="relative w-full h-full rounded-lg overflow-hidden">
                   <Image
                     src={product.imageUrls[0]}
                     alt={product.productName}
                     fill
-                    className="object-cover transition-transform group-hover:scale-110"
+                    className="object-cover transition-transform group-hover:scale-105"
                   />
                   {isBoosted && (
                     <div className="absolute inset-0 bg-gradient-to-t from-emerald-500/20 to-transparent" />
@@ -291,16 +290,16 @@ export default function MyProductsPage() {
                 </div>
               ) : (
                 <div
-                  className={`w-full h-full rounded-lg sm:rounded-xl flex items-center justify-center border-2 border-dashed transition-colors ${
+                  className={`w-full h-full rounded-lg flex items-center justify-center border border-dashed ${
                     isDarkMode
                       ? "bg-gray-700 border-gray-600"
                       : "bg-gray-100 border-gray-300"
                   }`}
                 >
                   <Package
-                    size={20}
-                    className={`sm:size-7 ${
-                      isDarkMode ? "text-gray-400" : "text-gray-500"
+                    size={18}
+                    className={`sm:size-6 ${
+                      isDarkMode ? "text-gray-500" : "text-gray-400"
                     }`}
                   />
                 </div>
@@ -309,9 +308,9 @@ export default function MyProductsPage() {
 
             {/* Product Info */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-start justify-between mb-1 sm:mb-2">
+              <div className="flex items-start justify-between mb-1">
                 <h3
-                  className={`text-sm sm:text-xl font-bold line-clamp-2 ${
+                  className={`text-sm sm:text-base font-semibold line-clamp-2 ${
                     isDarkMode ? "text-white" : "text-gray-900"
                   }`}
                 >
@@ -326,131 +325,122 @@ export default function MyProductsPage() {
 
               {product.brandModel && (
                 <p
-                  className={`text-xs sm:text-sm mb-2 sm:mb-3 font-medium ${
-                    isDarkMode ? "text-gray-300" : "text-gray-600"
+                  className={`text-xs mb-1.5 ${
+                    isDarkMode ? "text-gray-400" : "text-gray-500"
                   }`}
                 >
                   {product.brandModel}
                 </p>
               )}
 
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
-                <div className="flex items-center space-x-2 sm:space-x-4">
-                  <div className="bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">
-                    <span className="text-lg sm:text-2xl font-bold">
-                      {product.price.toFixed(2)} {product.currency}
-                    </span>
-                  </div>
-
-                  {product.averageRating && (
-                    <div className="flex items-center space-x-1 bg-amber-100 dark:bg-amber-900/30 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">
-                      <Star
-                        size={10}
-                        className="sm:size-3.5 text-amber-500 fill-current"
-                      />
-                      <span className="text-xs sm:text-sm font-semibold text-amber-700 dark:text-amber-300">
-                        {product.averageRating.toFixed(1)}
-                      </span>
-                    </div>
-                  )}
+              <div className="space-y-1.5">
+                <div className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                  <span className="text-sm sm:text-base font-bold">
+                    {product.price.toFixed(2)} {product.currency}
+                  </span>
                 </div>
 
-                {/* Quick Stats */}
-                <div className="flex items-center space-x-2 sm:space-x-3 text-xs sm:text-sm">
-                  <div className="flex items-center space-x-1 text-blue-600">
-                    <Eye size={10} className="sm:size-3.5" />
-                    <span className="font-semibold">
-                      {product.clickCount || 0}
-                    </span>
+                {/* Quick Stats and Actions Row */}
+                <div className="flex items-center justify-between">
+                  {/* Quick Stats */}
+                  <div className="flex items-center space-x-2 sm:space-x-3 text-xs">
+                    <div className="flex items-center space-x-1 text-blue-600 dark:text-blue-400">
+                      <Eye size={12} className="sm:size-3.5" />
+                      <span className="font-medium">
+                        {product.clickCount || 0}
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-1 text-red-500 dark:text-red-400">
+                      <Heart size={12} className="sm:size-3.5" />
+                      <span className="font-medium">
+                        {product.favoritesCount || 0}
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-1 text-green-600 dark:text-green-400">
+                      <ShoppingCart size={12} className="sm:size-3.5" />
+                      <span className="font-medium">
+                        {product.cartCount || 0}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-1 text-red-500">
-                    <Heart size={10} className="sm:size-3.5" />
-                    <span className="font-semibold">
-                      {product.favoritesCount || 0}
-                    </span>
-                  </div>
-                  <div className="flex items-center space-x-1 text-green-600">
-                    <ShoppingCart size={10} className="sm:size-3.5" />
-                    <span className="font-semibold">
-                      {product.cartCount || 0}
-                    </span>
+
+                  {/* Action Buttons - Always Visible */}
+                  <div className="flex space-x-1">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setExpandedProductId(isExpanded ? null : product.id);
+                      }}
+                      className="w-6 h-6 sm:w-7 sm:h-7 rounded-md bg-blue-500 text-white flex items-center justify-center hover:bg-blue-600 transition-colors"
+                    >
+                      <Info size={12} className="sm:size-3.5" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/edit-product/${product.id}`);
+                      }}
+                      className="w-6 h-6 sm:w-7 sm:h-7 rounded-md bg-amber-500 text-white flex items-center justify-center hover:bg-amber-600 transition-colors"
+                    >
+                      <Edit size={12} className="sm:size-3.5" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/boost?productId=${product.id}`);
+                      }}
+                      className="w-6 h-6 sm:w-7 sm:h-7 rounded-md bg-emerald-500 text-white flex items-center justify-center hover:bg-emerald-600 transition-colors"
+                    >
+                      <Zap size={12} className="sm:size-3.5" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteProduct(product.id);
+                      }}
+                      className="w-6 h-6 sm:w-7 sm:h-7 rounded-md bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors"
+                    >
+                      <Trash2 size={12} className="sm:size-3.5" />
+                    </button>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="absolute top-2 sm:top-4 right-2 sm:right-4 flex space-x-1 sm:space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setExpandedProductId(isExpanded ? null : product.id);
-              }}
-              className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 text-white flex items-center justify-center hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl"
-            >
-              <Info size={12} className="sm:size-4" />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                router.push(`/edit-product/${product.id}`);
-              }}
-              className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white flex items-center justify-center hover:from-amber-600 hover:to-orange-600 transition-all shadow-lg hover:shadow-xl"
-            >
-              <Edit size={12} className="sm:size-4" />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                router.push(`/boost?productId=${product.id}`);
-              }}
-              className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white flex items-center justify-center hover:from-emerald-600 hover:to-teal-600 transition-all shadow-lg hover:shadow-xl"
-            >
-              <Zap size={12} className="sm:size-4" />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDeleteProduct(product.id);
-              }}
-              className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-gradient-to-r from-red-500 to-pink-500 text-white flex items-center justify-center hover:from-red-600 hover:to-pink-600 transition-all shadow-lg hover:shadow-xl"
-            >
-              <Trash2 size={12} className="sm:size-4" />
-            </button>
           </div>
         </div>
 
         {/* Expanded Stats */}
         {isExpanded && (
           <div
-            className={`border-t backdrop-blur-sm ${
+            className={`border-t ${
               isDarkMode
-                ? "border-gray-700 bg-gray-800/80"
-                : "border-gray-200 bg-white/80"
+                ? "border-gray-700 bg-gray-800/90"
+                : "border-gray-200 bg-gray-50"
             }`}
           >
-            <div className="p-3 sm:p-6">
-              <div className="flex justify-between items-center mb-3 sm:mb-6">
+            <div className="p-3 sm:p-4">
+              <div className="flex justify-between items-center mb-3">
                 <div className="flex items-center space-x-2">
-                  <TrendingUp size={16} className="sm:size-5 text-purple-500" />
+                  <TrendingUp size={14} className="sm:size-4 text-purple-500" />
                   <h4
-                    className={`text-base sm:text-lg font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent`}
+                    className={`text-sm sm:text-base font-semibold ${
+                      isDarkMode ? "text-gray-200" : "text-gray-700"
+                    }`}
                   >
                     {t("productStats") || "Product Statistics"}
                   </h4>
                 </div>
                 <button
                   onClick={() => setExpandedProductId(null)}
-                  className={`p-1.5 sm:p-2 rounded-lg sm:rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
-                    isDarkMode ? "text-gray-300" : "text-gray-600"
+                  className={`p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
+                    isDarkMode ? "text-gray-400" : "text-gray-500"
                   }`}
                 >
-                  <X size={14} className="sm:size-4.5" />
+                  <X size={14} />
                 </button>
               </div>
 
-              <div className="grid grid-cols-3 gap-3 sm:gap-6">
+              <div className="grid grid-cols-3 gap-2 sm:gap-3">
                 {[
                   {
                     label: t("clicks") || "Clicks",
@@ -479,23 +469,32 @@ export default function MyProductsPage() {
                 ].map((stat, index) => (
                   <div
                     key={index}
-                    className={`relative p-2 sm:p-4 rounded-xl sm:rounded-2xl bg-gradient-to-br ${stat.bgColor} border border-white/20 shadow-lg`}
+                    className={`relative p-2 sm:p-3 rounded-lg bg-gradient-to-br ${
+                      stat.bgColor
+                    } border ${
+                      isDarkMode ? "border-gray-700" : "border-gray-200"
+                    }`}
                   >
-                    <div className="flex items-center justify-between mb-1 sm:mb-2">
+                    <div className="flex items-center justify-between mb-1">
                       <div
-                        className={`w-6 h-6 sm:w-8 sm:h-8 rounded-md sm:rounded-lg bg-gradient-to-r ${stat.color} flex items-center justify-center`}
+                        className={`w-6 h-6 sm:w-7 sm:h-7 rounded-md bg-gradient-to-r ${stat.color} flex items-center justify-center`}
                       >
-                        <stat.icon size={12} className="sm:size-4 text-white" />
+                        <stat.icon
+                          size={12}
+                          className="sm:size-3.5 text-white"
+                        />
                       </div>
                     </div>
                     <div
-                      className={`text-lg sm:text-2xl font-bold bg-gradient-to-r ${stat.color} bg-clip-text text-transparent`}
+                      className={`text-base sm:text-xl font-bold ${
+                        isDarkMode ? "text-white" : "text-gray-900"
+                      }`}
                     >
                       {stat.value}
                     </div>
                     <div
-                      className={`text-xs sm:text-sm font-medium mt-1 ${
-                        isDarkMode ? "text-gray-300" : "text-gray-600"
+                      className={`text-xs font-medium mt-0.5 ${
+                        isDarkMode ? "text-gray-400" : "text-gray-600"
                       }`}
                     >
                       {stat.label}
@@ -505,11 +504,11 @@ export default function MyProductsPage() {
               </div>
 
               {/* Creation Date */}
-              <div className="mt-3 sm:mt-6 pt-3 sm:pt-6 border-t border-gray-200 dark:border-gray-700">
-                <div className="flex items-center space-x-2 text-xs sm:text-sm">
-                  <Clock size={12} className="sm:size-4 text-gray-500" />
+              <div className="mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex items-center space-x-1.5 text-xs">
+                  <Clock size={12} className="text-gray-400" />
                   <span
-                    className={isDarkMode ? "text-gray-300" : "text-gray-600"}
+                    className={isDarkMode ? "text-gray-400" : "text-gray-500"}
                   >
                     Created: {product.createdAt.toDate().toLocaleDateString()}
                   </span>
@@ -524,14 +523,12 @@ export default function MyProductsPage() {
 
   // Loading skeleton
   const LoadingSkeleton = () => (
-    <div className="space-y-4 sm:space-y-6 p-2 sm:p-4">
+    <div className="space-y-2 sm:space-y-3 p-3 sm:p-4">
       {[...Array(5)].map((_, i) => (
         <div
           key={i}
-          className={`animate-pulse rounded-xl sm:rounded-2xl h-24 sm:h-32 bg-gradient-to-r ${
-            isDarkMode
-              ? "from-gray-800 to-gray-700"
-              : "from-gray-200 to-gray-100"
+          className={`animate-pulse rounded-lg h-20 sm:h-24 ${
+            isDarkMode ? "bg-gray-800" : "bg-gray-200"
           }`}
         />
       ))}
@@ -575,71 +572,71 @@ export default function MyProductsPage() {
     >
       {/* Header */}
       <div
-        className={`sticky top-0 z-10 border-b backdrop-blur-xl ${
+        className={`sticky top-0 z-10 border-b backdrop-blur-lg ${
           isDarkMode
-            ? "bg-gray-900/80 border-gray-700"
-            : "bg-white/80 border-gray-200"
+            ? "bg-gray-900/90 border-gray-700"
+            : "bg-white/90 border-gray-200"
         }`}
       >
-        <div className="px-2 sm:px-4 lg:px-8 py-2 sm:py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2 sm:space-x-4">
-              <button
-                onClick={() => router.back()}
-                className={`p-2 sm:p-3 rounded-lg sm:rounded-xl transition-all hover:scale-105 ${
-                  isDarkMode
-                    ? "hover:bg-gray-800 text-white"
-                    : "hover:bg-gray-100 text-gray-900"
-                }`}
-              >
-                <ArrowLeft size={16} className="sm:size-5" />
-              </button>
-              <h1
-                className={`text-lg sm:text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent`}
-              >
-                {t("myProducts") || "My Products"}
-              </h1>
-            </div>
+        <div className="max-w-6xl mx-auto px-3 sm:px-4 lg:px-6 py-2 sm:py-3">
+          <div className="flex items-center space-x-2 sm:space-x-3">
+            <button
+              onClick={() => router.back()}
+              className={`p-1.5 sm:p-2 rounded-lg transition-colors ${
+                isDarkMode
+                  ? "hover:bg-gray-800 text-gray-300"
+                  : "hover:bg-gray-100 text-gray-700"
+              }`}
+            >
+              <ArrowLeft size={18} className="sm:size-5" />
+            </button>
+            <h1
+              className={`text-base sm:text-xl font-bold ${
+                isDarkMode ? "text-white" : "text-gray-900"
+              }`}
+            >
+              {t("myProducts") || "My Products"}
+            </h1>
           </div>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-2 sm:px-4 lg:px-8 py-4 sm:py-8">
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
         {/* Search and Filter Bar */}
-        <div className="mb-4 sm:mb-8 space-y-3 sm:space-y-6">
+        <div className="mb-3 sm:mb-4 space-y-2 sm:space-y-3">
           {/* Search */}
           <div className="relative">
             <Search
               size={16}
-              className="sm:size-5 absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 text-gray-400"
+              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
             />
             <input
               type="text"
               placeholder={t("searchProducts") || "Search products..."}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className={`w-full pl-9 sm:pl-12 pr-3 sm:pr-4 py-3 sm:py-4 rounded-xl sm:rounded-2xl border-2 transition-all focus:scale-[1.02] text-sm sm:text-base ${
+              className={`w-full pl-9 pr-3 py-2.5 sm:py-3 rounded-lg border transition-colors text-sm ${
                 isDarkMode
-                  ? "bg-gray-800/50 border-gray-700 text-white placeholder-gray-400 focus:border-blue-500"
-                  : "bg-white/70 border-gray-200 text-gray-900 placeholder-gray-500 focus:border-blue-500"
-              } focus:ring-4 focus:ring-blue-200 dark:focus:ring-blue-800 backdrop-blur-sm shadow-lg`}
+                  ? "bg-gray-800 border-gray-700 text-white placeholder-gray-400 focus:border-blue-500"
+                  : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500"
+              } focus:outline-none focus:ring-2 focus:ring-blue-500/20`}
             />
           </div>
 
           {/* Date Range Filter */}
-          <div className="flex flex-wrap gap-2 sm:gap-3">
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setShowDatePicker(!showDatePicker)}
-              className={`flex items-center space-x-1.5 sm:space-x-2 px-3 sm:px-6 py-2 sm:py-3 rounded-xl sm:rounded-2xl border-2 transition-all hover:scale-105 text-sm sm:text-base ${
+              className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg border text-sm transition-colors ${
                 selectedDateRange
-                  ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-transparent shadow-lg"
+                  ? "bg-emerald-500 text-white border-emerald-500"
                   : isDarkMode
-                  ? "border-gray-600 text-gray-300 hover:bg-gray-800 bg-gray-800/50"
-                  : "border-gray-300 text-gray-700 hover:bg-white bg-white/70"
-              } backdrop-blur-sm`}
+                  ? "border-gray-600 text-gray-300 hover:bg-gray-800 bg-gray-800"
+                  : "border-gray-300 text-gray-700 hover:bg-gray-50 bg-white"
+              }`}
             >
-              <Calendar size={14} className="sm:size-4.5" />
-              <span className="font-semibold">
+              <Calendar size={14} />
+              <span className="font-medium">
                 {selectedDateRange
                   ? formatDateRange(selectedDateRange)
                   : t("filterByDate") || "Filter by Date"}
@@ -649,9 +646,9 @@ export default function MyProductsPage() {
             {selectedDateRange && (
               <button
                 onClick={clearDateRange}
-                className="flex items-center space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm bg-red-100 dark:bg-red-900/30 text-red-600 hover:bg-red-200 dark:hover:bg-red-900/50 rounded-xl sm:rounded-2xl transition-all hover:scale-105 font-semibold"
+                className="flex items-center space-x-1 px-3 py-2 text-xs bg-red-100 dark:bg-red-900/30 text-red-600 hover:bg-red-200 dark:hover:bg-red-900/50 rounded-lg transition-colors font-medium"
               >
-                <X size={12} className="sm:size-4" />
+                <X size={12} />
                 <span>{t("clear") || "Clear"}</span>
               </button>
             )}
@@ -659,22 +656,19 @@ export default function MyProductsPage() {
 
           {/* Quick date range buttons */}
           {showDatePicker && (
-            <div className="flex flex-wrap gap-2 sm:gap-3">
+            <div className="flex flex-wrap gap-2">
               {[
                 {
                   label: t("last7Days") || "Last 7 Days",
                   days: 7,
-                  color: "from-blue-500 to-cyan-500",
                 },
                 {
                   label: t("last30Days") || "Last 30 Days",
                   days: 30,
-                  color: "from-purple-500 to-pink-500",
                 },
                 {
                   label: t("last90Days") || "Last 90 Days",
                   days: 90,
-                  color: "from-orange-500 to-red-500",
                 },
               ].map((range) => (
                 <button
@@ -686,7 +680,11 @@ export default function MyProductsPage() {
                     setSelectedDateRange({ start, end });
                     setShowDatePicker(false);
                   }}
-                  className={`px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm rounded-lg sm:rounded-xl bg-gradient-to-r ${range.color} text-white hover:scale-105 transition-all shadow-lg font-semibold`}
+                  className={`px-3 py-1.5 text-xs rounded-lg border transition-colors font-medium ${
+                    isDarkMode
+                      ? "border-gray-600 text-gray-300 hover:bg-gray-800 bg-gray-800"
+                      : "border-gray-300 text-gray-700 hover:bg-gray-50 bg-white"
+                  }`}
                 >
                   {range.label}
                 </button>
@@ -723,7 +721,7 @@ export default function MyProductsPage() {
             </p>
             {!searchQuery && !selectedDateRange && (
               <button
-                onClick={() => router.push("/list-product")}
+                onClick={() => router.push("/listproduct")}
                 className="inline-flex items-center space-x-2 sm:space-x-3 px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl sm:rounded-2xl hover:from-emerald-600 hover:to-teal-600 transition-all shadow-lg hover:shadow-xl hover:scale-105 font-semibold text-sm sm:text-lg"
               >
                 <Plus size={20} className="sm:size-6" />
@@ -732,7 +730,7 @@ export default function MyProductsPage() {
             )}
           </div>
         ) : (
-          <div className="space-y-3 sm:space-y-6">
+          <div className="space-y-2 sm:space-y-3">
             {filteredProducts.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}
@@ -741,14 +739,14 @@ export default function MyProductsPage() {
 
         {/* Add Product Button */}
         {filteredProducts.length > 0 && (
-          <div className="fixed bottom-4 sm:bottom-8 right-4 sm:right-8">
+          <div className="fixed bottom-4 sm:bottom-6 right-4 sm:right-6">
             <button
-              onClick={() => router.push("/list-product")}
-              className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl sm:rounded-2xl shadow-2xl hover:from-emerald-600 hover:to-teal-600 transition-all flex items-center justify-center hover:scale-110 group"
+              onClick={() => router.push("/listproduct")}
+              className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl shadow-xl hover:shadow-2xl hover:from-emerald-600 hover:to-teal-600 transition-all flex items-center justify-center hover:scale-105 group"
             >
               <Plus
                 size={20}
-                className="sm:size-7 group-hover:rotate-90 transition-transform"
+                className="sm:size-6 group-hover:rotate-90 transition-transform"
               />
             </button>
           </div>

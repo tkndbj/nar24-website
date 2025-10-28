@@ -112,6 +112,14 @@ export interface WhiteGoodsStepProps extends BaseStepProps {
   };
 }
 
+// Curtain dimensions step props - includes curtain dimensions attribute
+export interface CurtainDimensionsStepProps extends BaseStepProps {
+  initialAttributes?: {
+    curtainMaxWidth?: number;
+    curtainMaxHeight?: number;
+    [key: string]: unknown;
+  };
+}
 // Generic step component type
 export type StepComponent = React.ComponentType<
   BaseStepProps | BrandStepProps | ColorStepProps

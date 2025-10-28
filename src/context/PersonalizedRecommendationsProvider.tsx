@@ -293,11 +293,30 @@ export const PersonalizedRecommendationsProvider: React.FC<{ children: React.Rea
       // ✅ MATCHES FLUTTER: Supplement with generic if too few results
       if (products.length < limit) {
         const supplemental = await getGenericRecommendations(limit - products.length);
-        products.push(...removeDuplicates(supplemental));
+
+        // Create a Set of existing product IDs to avoid duplicates
+        const existingIds = new Set(products.map(p => p.id));
+
+        // Filter out products that already exist in our current list
+        const uniqueSupplemental = supplemental.filter(p => !existingIds.has(p.id));
+
+        products.push(...removeDuplicates(uniqueSupplemental));
       }
 
-      const finalProducts = products.slice(0, limit);
-      
+      // Take the final slice
+      let finalProducts = products.slice(0, limit);
+
+      // Final deduplication safety check - ensure no duplicates made it through
+      const uniqueProductIds = new Set<string>();
+      finalProducts = finalProducts.filter(product => {
+        if (uniqueProductIds.has(product.id)) {
+          console.warn(`Duplicate product detected and removed: ${product.id}`);
+          return false;
+        }
+        uniqueProductIds.add(product.id);
+        return true;
+      });
+
       setRecommendations(finalProducts);
       lastFetchRef.current = new Date();
       setError(null);

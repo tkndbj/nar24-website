@@ -171,6 +171,7 @@
   "subSubcategoryMidiDresses": "Midi Elbiseler",
   "subSubcategoryWeddingDresses": "Gelinlikler",
   "subSubcategorySundresses": "Yazlık Elbiseler",
+  "subSubcategoryFantasy": "Fantezi Giyim",
 
   "subSubcategoryTShirts": "Tişörtler",
   "subSubcategoryShirts": "Gömlekler",
@@ -2175,6 +2176,47 @@
     "deleteSearchHistory": "Arama geçmişini sil",
     "loadingMore": "Daha fazla yükleniyor...",
     "startTypingPrompt": "Öneriler görmek için yazmaya başlayın..."
+  },
+  "attributeLocalization": {
+    "fantasyWearType": "Fantezi Giyim Türü",
+    "fantasyWearLingerie": "İç Giyim",
+    "fantasyWearBabydoll": "Babydoll",
+    "fantasyWearChemise": "Şemiz",
+    "fantasyWearTeddy": "Teddy",
+    "fantasyWearBodysuit": "Vücut Giysisi",
+    "fantasyWearCorset": "Korse",
+    "fantasyWearBustier": "Büstiye",
+    "fantasyWearGarter": "Jartiyer & Takımları",
+    "fantasyWearRobe": "Sabahlık",
+    "fantasyWearKimono": "Kimono",
+    "fantasyWearCostume": "Kostüm",
+    "fantasyWearRolePlay": "Rol Yapma",
+    "fantasyWearSleepwear": "Fantezi Gecelik",
+    "fantasyWearOther": "Diğer"
+  },
+  "fantasyWearStep": {
+    "title": "Fantezi Giyim",
+    "selectFantasyWearType": "Fantezi Giyim Türünü Seçin",
+    "description": "Satacağınız fantezi giyim türünü seçin",
+    "pleaseSelectFantasyWearType": "Lütfen bir fantezi giyim türü seçin",
+    "save": "Kaydet & Devam Et",
+    "selectedType": "Seçilen Tür",
+    "types": {
+      "Lingerie": "İç Giyim",
+      "Babydoll": "Babydoll",
+      "Chemise": "Şemiz",
+      "Teddy": "Teddy",
+      "Bodysuit": "Vücut Giysisi",
+      "Corset": "Korse",
+      "Bustier": "Büstiye",
+      "Garter": "Jartiyer & Takımları",
+      "Robe": "Sabahlık",
+      "Kimono": "Kimono",
+      "Costume": "Kostüm",
+      "RolePlay": "Rol Yapma",
+      "Sleepwear": "Fantezi Gecelik",
+      "Other": "Diğer"
+    }
   },
   "ProductPayment": {
     "clickToSelectLocation": "Konum seçmek için tıklayın",

@@ -114,13 +114,13 @@ export default function Home() {
           >
             {/* Mobile: full width */}
             <div className="block lg:hidden">
-              <PreferenceProduct />
+              <PreferenceProduct keyPrefix="mobile-" />
             </div>
 
             {/* Desktop: centered layout */}
             <div className="hidden lg:block">
               <div className="max-w-6xl mx-auto px-4">
-                <PreferenceProduct />
+                <PreferenceProduct keyPrefix="desktop-" />
               </div>
             </div>
           </div>
@@ -133,13 +133,13 @@ export default function Home() {
               >
                 {/* Mobile: full width */}
                 <div className="block lg:hidden">
-                  <DynamicHorizontalList />
+                  <DynamicHorizontalList keyPrefix="mobile-" />
                 </div>
 
                 {/* Desktop: centered layout */}
                 <div className="hidden lg:block">
                   <div className="max-w-6xl mx-auto px-4">
-                    <DynamicHorizontalList />
+                    <DynamicHorizontalList keyPrefix="desktop-" />
                   </div>
                 </div>
               </div>
