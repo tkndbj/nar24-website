@@ -371,16 +371,25 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         setCartButtonState("adding");
   
         let quantityToAdd = 1;
-        const attributesToAdd = selectedOptions;
+        const attributesToAdd: Record<string, unknown> = {}; // ✅ CHANGED
   
-        if (selectedOptions && typeof selectedOptions.quantity === "number") {
-          quantityToAdd = selectedOptions.quantity;
+        if (selectedOptions) {
+          if (typeof selectedOptions.quantity === "number") {
+            quantityToAdd = selectedOptions.quantity;
+          }
+          
+          // ✅ ADD THIS - Copy all attributes EXCEPT quantity
+          Object.entries(selectedOptions).forEach(([key, value]) => {
+            if (key !== 'quantity') {
+              attributesToAdd[key] = value;
+            }
+          });
         }
   
         const result = await addToCart(
           product.id,
           quantityToAdd,
-          attributesToAdd
+          attributesToAdd  // Now only has selectedColor, selectedColorImage, selectedMetres
         );
   
         if (result.includes("Added") || result.includes("Updated")) {

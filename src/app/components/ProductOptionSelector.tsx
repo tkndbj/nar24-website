@@ -212,9 +212,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
     return product.subsubcategory === "Curtains";
   }, [product.subsubcategory]);
   
-  const maxMetres = useMemo(() => {
-    console.log('🔍 DEBUG - product.maxMetre:', product.maxMetre, 'Type:', typeof product.maxMetre);
-    console.log('🔍 Full product:', product);
+  const maxMetres = useMemo(() => {    
     return product.maxMetre && product.maxMetre > 0 ? product.maxMetre : 100;
   }, [product.maxMetre]);
 
