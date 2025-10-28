@@ -1009,19 +1009,14 @@ export const CartProvider: React.FC<CartProviderProps> = ({
               if (bundleData.bundleId) {
                 cartData.bundleId = bundleData.bundleId;
               }
-            }
-
-            // Copy product attributes
-            if (txProductData.attributes) {
-              Object.entries(txProductData.attributes).forEach(([k, v]) => {
-                cartData[k] = v;
-              });
-            }
+            }            
 
             // Add UI-selected attributes
             if (attributes) {
               Object.entries(attributes).forEach(([k, v]) => {
-                cartData[k] = v;
+                if (v !== undefined && v !== null) {  // ✅ ADD THIS CHECK
+                  cartData[k] = v;
+                }
               });
             }
 

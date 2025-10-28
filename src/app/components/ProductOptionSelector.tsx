@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Plus, Minus, Check, Loader2 } from 'lucide-react';
 import { doc, getDoc } from 'firebase/firestore';
@@ -207,6 +207,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
   const [selectedMetres, setSelectedMetres] = useState(1);
   const [salePreferences, setSalePreferences] = useState<SalePreferences | null>(null);
   const [isLoadingSalePrefs, setIsLoadingSalePrefs] = useState(false);
+  const hasInitializedRef = useRef(false);
 
   const isCurtain = useMemo(() => {
     return product.subsubcategory === "Curtains";
@@ -243,7 +244,11 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
     });
 
     setSelections(newSelections);
-    setSelectedColor(null);
+    if (Object.keys(product.colorImages || {}).length === 0 && product.imageUrls && product.imageUrls.length > 0) {
+      setSelectedColor('default');
+    } else {
+      setSelectedColor(null);
+    }
     setSelectedQuantity(1);
     setSelectedMetres(1);
     setSalePreferences(null);
@@ -326,9 +331,8 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
   }, [product.attributes]);
 
   const hasColors = useMemo(() => {
-    return Object.keys(product.colorImages || {}).length > 0 || 
-           (product.imageUrls && product.imageUrls.length > 0);
-  }, [product.colorImages, product.imageUrls]);
+    return Object.keys(product.colorImages || {}).length > 0;  // ✅ CHANGED - Only check colorImages
+  }, [product.colorImages]);
 
   const isConfirmEnabled = useMemo(() => {
     if (hasColors && !selectedColor) return false;
@@ -352,11 +356,10 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
   
     const result: OptionSelectorResult = {
       quantity: selectedQuantity,
-      selectedMetres: isCurtain ? selectedMetres : undefined,  // ✅ ADD THIS LINE
-    };
-
+      selectedMetres: isCurtain ? selectedMetres : undefined,
+    };    
     // Add color selection if applicable
-    if (hasColors && selectedColor) {
+    if (selectedColor) {  // ✅ CHANGED - Remove hasColors check
       result.selectedColor = selectedColor;
       
       // Add selected color image URL if color is selected
@@ -369,18 +372,14 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
         result.selectedColorImage = product.imageUrls[0];
       }
     }
-
-    // Debug log
-    console.log('ProductOptionSelector - Confirming with options:', {
-      productId: product.id,
-      selectedQuantity,
-      selectedColor,
-      selections,
-      finalResult: result
+    
+    // ✅ ADD THIS - Include all selected attributes (like size)
+    Object.entries(selections).forEach(([key, value]) => {
+      result[key] = value;
     });
-
+    
     onConfirm(result);
-  }, [isConfirmEnabled, selectedQuantity, selections, hasColors, selectedColor, product, onConfirm]);
+  }, [isConfirmEnabled, selectedQuantity, selections, hasColors, selectedColor, product, onConfirm, isCurtain, selectedMetres]);
 
   const handleQuantityChange = useCallback((increment: number) => {
     const maxAllowed = getMaxQuantityAllowed();
