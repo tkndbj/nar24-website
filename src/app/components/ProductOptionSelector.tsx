@@ -23,6 +23,7 @@ interface OptionSelectorResult {
   selectedColor?: string;
   selectedColorImage?: string;
   quantity: number;
+  selectedMetres?: number;
   [key: string]: unknown;
 }
 
@@ -203,8 +204,19 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [selectedQuantity, setSelectedQuantity] = useState(1);
+  const [selectedMetres, setSelectedMetres] = useState(1);
   const [salePreferences, setSalePreferences] = useState<SalePreferences | null>(null);
   const [isLoadingSalePrefs, setIsLoadingSalePrefs] = useState(false);
+
+  const isCurtain = useMemo(() => {
+    return product.subsubcategory === "Curtains";
+  }, [product.subsubcategory]);
+  
+  const maxMetres = useMemo(() => {
+    console.log('🔍 DEBUG - product.maxMetre:', product.maxMetre, 'Type:', typeof product.maxMetre);
+    console.log('🔍 Full product:', product);
+    return product.maxMetre && product.maxMetre > 0 ? product.maxMetre : 100;
+  }, [product.maxMetre]);
 
   // Initialize default selections and load sale preferences
   useEffect(() => {
@@ -235,6 +247,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
     setSelections(newSelections);
     setSelectedColor(null);
     setSelectedQuantity(1);
+    setSelectedMetres(1);
     setSalePreferences(null);
 
     // Load sale preferences for shop products
@@ -331,14 +344,17 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
   }, [hasColors, selectedColor, selections, getSelectableAttributes, selectedQuantity]);
 
   const handleConfirm = useCallback(() => {
-    if (!isConfirmEnabled) return;
-
-    // Build comprehensive result object with all selected options
+    console.log('ProductOptionSelector - Confirm clicked', {
+      productId: product.id,
+      selectedColor,
+      selectedQuantity,
+      selectedMetres: isCurtain ? selectedMetres : undefined,  // ✅ ADD THIS LINE
+      selections,
+    });
+  
     const result: OptionSelectorResult = {
-      // Ensure quantity is properly included
       quantity: selectedQuantity,
-      // Add all attribute selections
-      ...selections,
+      selectedMetres: isCurtain ? selectedMetres : undefined,  // ✅ ADD THIS LINE
     };
 
     // Add color selection if applicable
@@ -557,6 +573,71 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
     );
   }, [selectedQuantity, getMaxQuantityAllowed, handleQuantityChange, isLoadingSalePrefs, t, actualDarkMode]);
 
+  const renderMetreSelector = useCallback(() => {
+    if (!isCurtain) return null;
+    
+    return (
+      <div className="mb-6">
+        <h3 className="text-center text-orange-500 font-bold text-base mb-3">
+          {t('metres')} {t('max')}: {maxMetres}m
+        </h3>
+        <div className="flex items-center justify-center gap-4">
+          <button
+            onClick={() => setSelectedMetres(prev => Math.max(1, prev - 1))}
+            disabled={selectedMetres <= 1}
+            className={`p-2 rounded-full border transition-colors ${
+              actualDarkMode
+                ? 'border-gray-600 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed'
+                : 'border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed'
+            }`}
+          >
+            <Minus size={20} />
+          </button>
+          
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min="1"
+              max={maxMetres}
+              value={selectedMetres}
+              onChange={(e) => {
+                const value = Math.min(Math.max(1, parseInt(e.target.value) || 1), maxMetres);
+                setSelectedMetres(value);
+              }}
+              className={`px-4 py-2 border border-orange-500 rounded-lg w-24 text-center text-lg font-semibold ${
+                actualDarkMode 
+                  ? 'bg-gray-800 text-white' 
+                  : 'bg-white text-gray-900'
+              }`}
+            />
+            <span className={`text-sm ${actualDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+              m
+            </span>
+          </div>
+          
+          <button
+            onClick={() => setSelectedMetres(prev => Math.min(maxMetres, prev + 1))}
+            disabled={selectedMetres >= maxMetres}
+            className={`p-2 rounded-full border transition-colors ${
+              actualDarkMode
+                ? 'border-gray-600 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed'
+                : 'border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed'
+            }`}
+          >
+            <Plus size={20} />
+          </button>
+        </div>
+        
+        {/* Info text */}
+        <p className={`text-xs text-center mt-2 ${
+          actualDarkMode ? 'text-gray-400' : 'text-gray-500'
+        }`}>
+          {t('metreInfo') || 'Enter the length in metres'}
+        </p>
+      </div>
+    );
+  }, [isCurtain, maxMetres, selectedMetres, t, actualDarkMode]);
+
   // Redirect to login if user is not authenticated
   useEffect(() => {
     if (isOpen && !user) {
@@ -626,6 +707,9 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
 
                 {/* Quantity selector */}
                 {renderQuantitySelector()}
+
+                {/* Metre selector */}
+                {renderMetreSelector()}
 
                 {/* Sale preference info */}
                 {renderSalePreferenceInfo()}

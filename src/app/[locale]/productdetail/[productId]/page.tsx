@@ -42,6 +42,8 @@ interface ProductDetailPageProps {
 const hasSelectableOptions = (product: Product | null): boolean => {
   if (!product) return false;
 
+  if (product.subsubcategory === "Curtains") return true;
+
   const hasColors = Object.keys(product.colorImages || {}).length > 0;
   if (hasColors) return true;
 

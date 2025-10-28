@@ -68,6 +68,7 @@ interface CartData {
   currency?: string;
   selectedColor?: string;
   selectedSize?: string;
+  selectedMetres?: number;
   [key: string]: unknown;
 }
 
@@ -237,6 +238,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       "sellerId",
       "sellerName",
       "isShop",
+      "selectedMetres",
     ]);
     return systemFields.has(key);
   }, []);

@@ -59,6 +59,7 @@ export interface Product {
   colorImages: Record<string, string[]>;
   videoUrl?: string;
   attributes: Record<string, unknown>;
+  maxMetre?: number;
   // Add reference property for Firestore document reference
   reference?: {
     id: string;
@@ -256,6 +257,7 @@ export class ProductUtils {
       subcategory: ProductUtils.safeString(json.subcategory),
       subsubcategory: ProductUtils.safeString(json.subsubcategory),
       quantity: ProductUtils.safeInt(json.quantity),
+      maxMetre: ProductUtils.safeInt(json.maxMetre),
       bestSellerRank:
         json.bestSellerRank != null
           ? ProductUtils.safeInt(json.bestSellerRank)
@@ -322,6 +324,7 @@ export class ProductUtils {
       subcategory: product.subcategory,
       subsubcategory: product.subsubcategory,
       quantity: product.quantity,
+      maxMetre: product.maxMetre,
       bestSellerRank: product.bestSellerRank,
       sold: product.sold,
       clickCount: product.clickCount,

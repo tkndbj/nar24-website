@@ -1981,7 +1981,10 @@
     "outOfStock": "Stok Tükendi",
     "limitedStock": "Stokta sadece {count} adet kaldı",
     "maxQuantityReached": "Maksimum adet sınırına ulaşıldı",
-    "minQuantityRequired": "Minimum 1 adet gerekli"
+    "minQuantityRequired": "Minimum 1 adet gerekli",
+    "metres": "Metre",
+    "max": "Maks",
+    "metreInfo": "Metreyi giriniz"
   },
   "CartDrawer": {
     "title": "Sepetim",
@@ -2742,7 +2745,10 @@
     "buyText": "Satın al",
     "forDiscount": "indirim için",
     "confirm": "Onayla",
-    "cancel": "İptal"
+    "cancel": "İptal",
+    "metres": "Metre",
+    "max": "Maks",
+    "metreInfo": "Metreyi giriniz"
   },
   "AllQuestionsPage": {
     "allQuestionsTitle": "Tüm Sorular",

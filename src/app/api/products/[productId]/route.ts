@@ -201,6 +201,7 @@ export async function GET(
       subcategory: safeString(data.subcategory),
       subsubcategory: safeString(data.subsubcategory),
       quantity: safeInt(data.quantity),
+      maxMetre: safeInt(data.maxMetre), 
       bestSellerRank: data.bestSellerRank !== null && data.bestSellerRank !== undefined ? safeInt(data.bestSellerRank) : null,
       sold: data.sold === true,
       clickCount: safeInt(data.clickCount),

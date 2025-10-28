@@ -1980,7 +1980,10 @@
     "outOfStock": "Out of Stock",
     "limitedStock": "Only {count} left in stock",
     "maxQuantityReached": "Maximum quantity reached",
-    "minQuantityRequired": "Minimum 1 quantity required"
+    "minQuantityRequired": "Minimum 1 quantity required",
+    "metres": "Metres",
+    "max": "Max",
+    "metreInfo": "Enter the length in metres"
   },
   "CartDrawer": {
     "title": "My Cart",
@@ -2751,7 +2754,10 @@
     "buyText": "Buy",
     "forDiscount": "for",
     "confirm": "Confirm",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "metres": "Metres",
+    "max": "Max",
+    "metreInfo": "Enter the length in metres"
   },
   "AllQuestionsPage": {
     "allQuestionsTitle": "All Questions",
