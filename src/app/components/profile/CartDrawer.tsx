@@ -245,6 +245,16 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
           }
         });
 
+        if (item.cartData) {
+          if (item.cartData.selectedMetres) {
+            paymentItem.selectedMetres = item.cartData.selectedMetres;
+          }
+          if (item.cartData.selectedColor) {
+            paymentItem.selectedColor = item.cartData.selectedColor;
+          }
+          // Add any other cart-specific fields you need
+        }
+
         // Add product info
         if (item.product) {
           paymentItem.price = item.product.price;

@@ -595,7 +595,7 @@ export default function ProductPaymentPage() {
       case "pickup":
         return 60.0;
       case "normal":
-        return totalPrice >= 2000.0 ? 0.0 : 5.0;
+        return totalPrice >= 2000.0 ? 0.0 : 1.0;
       case "express":
         return totalPrice >= 10000.0 ? 0.0 : 349.0;
       default:

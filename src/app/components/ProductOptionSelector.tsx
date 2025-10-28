@@ -704,7 +704,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
                 )}
 
                 {/* Quantity selector */}
-                {renderQuantitySelector()}
+                {!isCurtain && renderQuantitySelector()}
 
                 {/* Metre selector */}
                 {renderMetreSelector()}
