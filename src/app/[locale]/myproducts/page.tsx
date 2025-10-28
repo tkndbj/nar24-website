@@ -18,6 +18,7 @@ import {
   Eye,
   Clock,
 } from "lucide-react";
+import { getFunctions, httpsCallable } from "firebase/functions";
 import { useUser } from "@/context/UserProvider";
 import { useRouter } from "next/navigation";
 import {
@@ -25,8 +26,6 @@ import {
   query,
   where,
   orderBy,
-  doc,
-  deleteDoc,
   onSnapshot,
   Timestamp,
 } from "firebase/firestore";
@@ -70,6 +69,8 @@ export default function MyProductsPage() {
   const [selectedDateRange, setSelectedDateRange] = useState<DateRange | null>(
     null
   );
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [, setDeletingProductId] = useState<string | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [expandedProductId, setExpandedProductId] = useState<string | null>(
     null
@@ -172,6 +173,51 @@ export default function MyProductsPage() {
     return unsubscribe;
   };
 
+  // Deleting Modal Component
+  const DeletingModal = () => (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div
+        className={`w-full max-w-sm rounded-2xl p-6 shadow-2xl ${
+          isDarkMode ? "bg-gray-800" : "bg-white"
+        }`}
+      >
+        <div className="flex flex-col items-center space-y-4">
+          {/* Animated Delete Icon */}
+          <div className="relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-red-500 to-red-600 rounded-full animate-ping opacity-75" />
+            <div className="relative w-16 h-16 bg-gradient-to-r from-red-500 to-red-600 rounded-full flex items-center justify-center animate-spin">
+              <Trash2 size={32} className="text-white" />
+            </div>
+          </div>
+
+          {/* Text */}
+          <div className="text-center space-y-2">
+            <h3
+              className={`text-xl font-bold ${
+                isDarkMode ? "text-white" : "text-gray-900"
+              }`}
+            >
+              {t("deletingProduct") || "Deleting Product"}
+            </h3>
+            <p
+              className={`text-sm ${
+                isDarkMode ? "text-gray-400" : "text-gray-600"
+              }`}
+            >
+              {t("deletingProductDesc") ||
+                "Please wait while we remove your product..."}
+            </p>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+            <div className="h-full bg-gradient-to-r from-red-500 to-red-600 rounded-full animate-progress" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   const handleDeleteProduct = async (productId: string) => {
     if (
       !confirm(
@@ -181,12 +227,30 @@ export default function MyProductsPage() {
       return;
     }
 
+    setDeletingProductId(productId);
+    setShowDeleteModal(true);
+
     try {
-      await deleteDoc(doc(db, "products", productId));
-      // Products will be automatically updated via the listener
-    } catch (error) {
+      const functions = getFunctions(undefined, "europe-west3");
+      const deleteProduct = httpsCallable(functions, "deleteProduct");
+
+      await deleteProduct({ productId });
+
+      // Close modal after successful deletion
+      setShowDeleteModal(false);
+      setDeletingProductId(null);
+
+      // Show success message (optional - you can use a toast library)
+      alert(t("productDeleted") || "Product deleted successfully!");
+    } catch (error: unknown) {
       console.error("Error deleting product:", error);
-      alert(t("deleteError") || "Error deleting product");
+      setShowDeleteModal(false);
+      setDeletingProductId(null);
+      alert(
+        error instanceof Error
+          ? error.message
+          : t("deleteError") || "Error deleting product"
+      );
     }
   };
 
@@ -751,6 +815,9 @@ export default function MyProductsPage() {
             </button>
           </div>
         )}
+
+        {/* Delete Modal */}
+        {showDeleteModal && <DeletingModal />}
       </div>
     </div>
   );

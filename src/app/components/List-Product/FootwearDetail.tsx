@@ -14,6 +14,17 @@ export default function FootwearDetailStep({
   const t = useTranslations("footwearSizeStep");
 
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    const checkDarkMode = () => {
+      setIsDarkMode(document.documentElement.classList.contains("dark"));
+    };
+    checkDarkMode();
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, { attributes: true });
+    return () => observer.disconnect();
+  }, []);
 
   const womenSizes = ["35", "36", "37", "38", "39", "40", "41", "42", "43"];
   const menSizes = ["39", "40", "41", "42", "43", "44", "45", "46", "47", "48"];
@@ -123,16 +134,16 @@ export default function FootwearDetailStep({
   const categoryInfo = getCategoryInfo();
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Enhanced App Bar with glassmorphism */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-200/50 shadow-lg">
-        <div className="flex items-center px-6 py-4">
+    <div className={`min-h-screen ${isDarkMode ? "bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900" : "bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50"}`}>
+      {/* App Bar */}
+      <div className={`fixed top-0 left-0 right-0 z-50 backdrop-blur-lg border-b ${isDarkMode ? "bg-gray-900/90 border-gray-700" : "bg-white/90 border-gray-200"}`}>
+        <div className="flex items-center px-4 py-3">
           <button
             onClick={onCancel}
-            className="group p-3 mr-3 text-slate-600 hover:text-slate-800 hover:bg-gray-100/50 rounded-2xl transition-all duration-300 hover:scale-105"
+            className={`p-2 mr-2 rounded-lg transition-colors ${isDarkMode ? "text-gray-300 hover:bg-gray-800" : "text-gray-700 hover:bg-gray-100"}`}
           >
             <svg
-              className="w-6 h-6 transform group-hover:-translate-x-1 transition-transform duration-300"
+              className="w-5 h-5"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -145,23 +156,11 @@ export default function FootwearDetailStep({
               />
             </svg>
           </button>
-          <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 bg-gradient-to-r ${categoryInfo.color} rounded-2xl flex items-center justify-center shadow-lg`}>
-              <svg
-                className="w-6 h-6 text-white"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-                />
-              </svg>
+          <div className="flex items-center gap-2">
+            <div className={`w-8 h-8 bg-gradient-to-r ${categoryInfo.color} rounded-lg flex items-center justify-center`}>
+              <span className="text-white text-sm">{categoryInfo.icon}</span>
             </div>
-            <h1 className="text-xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
+            <h1 className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
               {t("title")}
             </h1>
           </div>
@@ -169,70 +168,50 @@ export default function FootwearDetailStep({
       </div>
 
       {/* Content with proper top spacing */}
-      <div className="pt-20 min-h-screen px-4 pb-8">
-        <div className="max-w-lg mx-auto">
-          {/* Header section */}
-          <div className="mb-8 text-center">
-            <div className={`w-16 h-16 bg-gradient-to-r ${categoryInfo.bgColor} rounded-3xl flex items-center justify-center mx-auto mb-4`}>
-              <span className="text-3xl">{categoryInfo.icon}</span>
-            </div>
-            <h2 className="text-xl font-bold text-slate-800 mb-2">
-              {t("selectAvailableSizes")}
-            </h2>
-            <p className="text-slate-600">
-              Choose all available sizes for your footwear
-            </p>
-            <div className={`inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r ${categoryInfo.bgColor} rounded-full mt-3`}>
-              <span className="text-sm font-medium text-slate-700 capitalize">
-                {categoryInfo.type} Collection
-              </span>
-            </div>
-          </div>
+      <div className="pt-16 min-h-screen px-3 pb-6">
+        <div className="max-w-lg mx-auto space-y-4">
 
           {/* Sizes Grid */}
-          <div className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-xl border border-gray-200/50 overflow-hidden mb-8">
-            <div className={`p-6 border-b border-opacity-50 bg-gradient-to-r ${categoryInfo.bgColor}`}>
-              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-3">
-                <div className={`w-8 h-8 bg-gradient-to-r ${categoryInfo.color} rounded-xl flex items-center justify-center`}>
+          <div className={`rounded-lg shadow-lg border overflow-hidden ${isDarkMode ? "bg-gray-800/90 border-gray-700" : "bg-white/90 border-gray-200"}`}>
+            <div className={`p-4 border-b ${isDarkMode ? "border-gray-700 bg-gray-700/50" : "border-purple-100/50 bg-gradient-to-r from-purple-50/50 to-indigo-50/50"}`}>
+              <h2 className={`text-base font-bold flex items-center gap-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                <div className={`w-7 h-7 bg-gradient-to-r ${categoryInfo.color} rounded-lg flex items-center justify-center`}>
                   <span className="text-white text-sm">📏</span>
                 </div>
-                Available Sizes
-              </h3>
-              <p className="text-sm text-slate-600 mt-2">
-                {selectedSizes.length} size{selectedSizes.length !== 1 ? 's' : ''} selected
+                {t("selectAvailableSizes")}
+              </h2>
+              <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                {selectedSizes.length} size{selectedSizes.length !== 1 ? 's' : ''} selected ({categoryInfo.type})
               </p>
             </div>
-            
-            <div className="p-6">
-              <div className="grid grid-cols-4 gap-3">
+
+            <div className="p-3">
+              <div className="grid grid-cols-4 gap-2">
                 {availableSizes.map((size) => {
                   const isSelected = selectedSizes.includes(size);
                   return (
                     <button
                       key={size}
                       onClick={() => handleSizeToggle(size)}
-                      className={`relative group p-4 rounded-2xl border-2 transition-all duration-300 transform hover:scale-105 ${
+                      className={`relative group p-3 rounded-lg border-2 transition-all text-sm ${
                         isSelected
-                          ? `border-opacity-100 bg-gradient-to-r ${categoryInfo.bgColor} shadow-lg`
-                          : "border-gray-200 bg-white hover:border-opacity-50 hover:shadow-md"
+                          ? `border-purple-400 ${isDarkMode ? "bg-purple-900/20" : "bg-purple-50"}`
+                          : isDarkMode ? "border-gray-600 bg-gray-700 hover:border-purple-400" : "border-gray-200 bg-white hover:border-purple-300"
                       }`}
-                      style={{
-                        borderColor: isSelected ? undefined : '#e5e7eb'
-                      }}
                     >
                       <span
-                        className={`font-bold text-lg transition-colors duration-300 ${
+                        className={`font-bold ${
                           isSelected
-                            ? "text-slate-800"
-                            : "text-slate-600 group-hover:text-slate-800"
+                            ? isDarkMode ? "text-purple-400" : "text-purple-700"
+                            : isDarkMode ? "text-gray-200" : "text-gray-700"
                         }`}
                       >
                         {size}
                       </span>
                       {isSelected && (
-                        <div className={`absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-r ${categoryInfo.color} rounded-full flex items-center justify-center shadow-lg`}>
+                        <div className={`absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-r ${categoryInfo.color} rounded-full flex items-center justify-center`}>
                           <svg
-                            className="w-3 h-3 text-white"
+                            className="w-2.5 h-2.5 text-white"
                             fill="currentColor"
                             viewBox="0 0 20 20"
                           >
@@ -251,45 +230,17 @@ export default function FootwearDetailStep({
             </div>
           </div>
 
-          {/* Size Range Info */}
-          <div className={`mb-6 p-4 bg-gradient-to-r ${categoryInfo.bgColor} rounded-2xl border border-opacity-30`}>
-            <div className="flex items-center gap-3">
-              <div className={`w-8 h-8 bg-gradient-to-r ${categoryInfo.color} rounded-xl flex items-center justify-center`}>
-                <svg
-                  className="w-4 h-4 text-white"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-              </div>
-              <div>
-                <p className="font-medium text-slate-700">Size Range</p>
-                <p className="text-sm text-slate-600">
-                  Available sizes: {availableSizes[0]} - {availableSizes[availableSizes.length - 1]}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Enhanced Save Button */}
-          <div className="pt-4">
+          {/* Save Button */}
+          <div className="pt-2">
             <button
               onClick={handleSaveFootwearSizes}
               disabled={selectedSizes.length === 0}
-              className={`w-full group relative overflow-hidden bg-gradient-to-r ${categoryInfo.color} hover:opacity-90 text-white font-bold py-5 px-6 rounded-3xl transition-all duration-300 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 shadow-2xl hover:shadow-3xl`}
+              className={`w-full bg-gradient-to-r ${categoryInfo.color} hover:opacity-90 text-white font-bold py-3 px-6 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm`}
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-              <span className="relative flex items-center justify-center gap-3">
+              <span className="flex items-center justify-center gap-2">
                 {t("save")}
                 <svg
-                  className="w-5 h-5 transform group-hover:translate-x-1 transition-transform duration-300"
+                  className="w-4 h-4"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -307,11 +258,11 @@ export default function FootwearDetailStep({
 
           {/* Selection Summary */}
           {selectedSizes.length > 0 && (
-            <div className={`mt-6 p-4 bg-gradient-to-r ${categoryInfo.bgColor} rounded-2xl border border-opacity-50`}>
-              <div className="flex items-start gap-3">
-                <div className={`w-8 h-8 bg-gradient-to-r ${categoryInfo.color} rounded-xl flex items-center justify-center flex-shrink-0`}>
+            <div className={`mt-4 p-3 rounded-lg border ${isDarkMode ? "bg-purple-900/30 border-purple-800" : "bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-200"}`}>
+              <div className="flex items-center gap-2">
+                <div className={`w-6 h-6 bg-gradient-to-r ${categoryInfo.color} rounded-lg flex items-center justify-center`}>
                   <svg
-                    className="w-4 h-4 text-white"
+                    className="w-3 h-3 text-white"
                     fill="currentColor"
                     viewBox="0 0 20 20"
                   >
@@ -323,17 +274,10 @@ export default function FootwearDetailStep({
                   </svg>
                 </div>
                 <div>
-                  <p className="font-medium text-slate-700">Selected Sizes</p>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {selectedSizes.sort((a, b) => parseInt(a) - parseInt(b)).map((size) => (
-                      <span
-                        key={size}
-                        className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gradient-to-r ${categoryInfo.color} text-white`}
-                      >
-                        {size}
-                      </span>
-                    ))}
-                  </div>
+                  <p className={`font-medium text-sm ${isDarkMode ? "text-purple-400" : "text-purple-700"}`}>Selected Sizes</p>
+                  <p className={`text-xs ${isDarkMode ? "text-purple-500" : "text-purple-600"}`}>
+                    {selectedSizes.sort((a, b) => parseInt(a) - parseInt(b)).join(", ")}
+                  </p>
                 </div>
               </div>
             </div>

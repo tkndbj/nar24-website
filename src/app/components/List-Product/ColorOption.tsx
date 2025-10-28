@@ -66,6 +66,17 @@ export default function ColorOptionStep({
   const [compressionStats, setCompressionStats] = useState<{
     [colorName: string]: CompressionResult;
   }>({});
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    const checkDarkMode = () => {
+      setIsDarkMode(document.documentElement.classList.contains("dark"));
+    };
+    checkDarkMode();
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, { attributes: true });
+    return () => observer.disconnect();
+  }, []);
 
   // FIXED: Better initialization with proper error handling
   useEffect(() => {
@@ -337,14 +348,14 @@ export default function ColorOptionStep({
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-violet-50 via-purple-50 to-fuchsia-50">
+    <div className={`min-h-screen ${isDarkMode ? "bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900" : "bg-gradient-to-br from-violet-50 via-purple-50 to-fuchsia-50"}`}>
       {/* Enhanced App Bar with glassmorphism */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-b border-white/20 shadow-lg">
-        <div className="flex items-center justify-between px-6 py-4">
+      <div className={`fixed top-0 left-0 right-0 z-50 backdrop-blur-xl border-b shadow-lg ${isDarkMode ? "bg-gray-900/90 border-gray-700" : "bg-white/80 border-white/20"}`}>
+        <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center">
             <button
               onClick={onCancel}
-              className="group p-3 mr-3 text-slate-600 hover:text-slate-800 hover:bg-white/50 rounded-2xl transition-all duration-300 hover:scale-105"
+              className={`group p-2 mr-2 rounded-lg transition-all duration-300 hover:scale-105 ${isDarkMode ? "text-gray-300 hover:text-gray-100 hover:bg-gray-800" : "text-slate-600 hover:text-slate-800 hover:bg-white/50"}`}
             >
               <svg
                 className="w-6 h-6 transform group-hover:-translate-x-1 transition-transform duration-300"
@@ -360,10 +371,10 @@ export default function ColorOptionStep({
                 />
               </svg>
             </button>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-r from-violet-500 to-purple-500 rounded-2xl flex items-center justify-center shadow-lg">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-gradient-to-r from-violet-500 to-purple-500 rounded-lg flex items-center justify-center shadow-lg">
                 <svg
-                  className="w-6 h-6 text-white"
+                  className="w-4 h-4 text-white"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -376,7 +387,7 @@ export default function ColorOptionStep({
                   />
                 </svg>
               </div>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
+              <h1 className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
                 {t("title")}
               </h1>
             </div>
@@ -436,36 +447,36 @@ export default function ColorOptionStep({
       </div>
 
       {/* Content with proper top spacing */}
-      <div className="pt-20 min-h-screen px-4 pb-8">
-        <div className="max-w-lg mx-auto space-y-8">
+      <div className="pt-16 min-h-screen px-3 pb-6">
+        <div className="max-w-lg mx-auto space-y-4">
           {/* Initial Question */}
-          <div className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-xl border border-white/20 overflow-hidden">
-            <div className="p-6 border-b border-violet-100/50 bg-gradient-to-r from-violet-50/50 to-purple-50/50">
-              <h2 className="text-lg font-bold text-slate-800 flex items-center gap-3">
-                <div className="w-8 h-8 bg-gradient-to-r from-violet-400 to-purple-400 rounded-xl flex items-center justify-center">
+          <div className={`backdrop-blur-xl rounded-lg shadow-lg border overflow-hidden ${isDarkMode ? "bg-gray-800/90 border-gray-700" : "bg-white/70 border-white/20"}`}>
+            <div className={`p-4 border-b ${isDarkMode ? "border-gray-700 bg-gray-700/50" : "border-violet-100/50 bg-gradient-to-r from-violet-50/50 to-purple-50/50"}`}>
+              <h2 className={`text-base font-bold flex items-center gap-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                <div className="w-7 h-7 bg-gradient-to-r from-violet-400 to-purple-400 rounded-lg flex items-center justify-center">
                   <span className="text-white text-sm">🎨</span>
                 </div>
                 {t("moreColorOptions")}
               </h2>
-              <p className="text-sm text-slate-600 mt-2">
+              <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
                 Do you want to offer different color variations?
               </p>
             </div>
 
-            <div className="p-6 space-y-4">
+            <div className="p-3 space-y-2">
               <button
                 onClick={() => setWantsColorOptions(true)}
-                className={`w-full group flex items-center justify-between p-4 rounded-2xl border-2 transition-all duration-300 transform hover:scale-[1.02] ${
+                className={`w-full group flex items-center justify-between p-3 rounded-lg border-2 transition-all duration-300 text-sm ${
                   wantsColorOptions === true
-                    ? "border-violet-400 bg-gradient-to-r from-violet-50 to-purple-50 shadow-lg"
-                    : "border-slate-200 bg-white hover:border-violet-300 hover:bg-violet-50/50"
+                    ? `border-violet-400 ${isDarkMode ? "bg-violet-900/20" : "bg-gradient-to-r from-violet-50 to-purple-50"} shadow-lg`
+                    : isDarkMode ? "border-gray-600 bg-gray-700 hover:border-violet-300" : "border-gray-200 bg-white hover:border-violet-300 hover:bg-violet-50/50"
                 }`}
               >
                 <span
                   className={`font-medium transition-colors duration-300 ${
                     wantsColorOptions === true
-                      ? "text-violet-700"
-                      : "text-slate-700 group-hover:text-violet-600"
+                      ? isDarkMode ? "text-violet-400" : "text-violet-700"
+                      : isDarkMode ? "text-gray-200 group-hover:text-violet-400" : "text-gray-700 group-hover:text-violet-600"
                   }`}
                 >
                   {t("yes")}
@@ -485,17 +496,17 @@ export default function ColorOptionStep({
 
               <button
                 onClick={handleNoColorOptions}
-                className={`w-full group flex items-center justify-between p-4 rounded-2xl border-2 transition-all duration-300 transform hover:scale-[1.02] ${
+                className={`w-full group flex items-center justify-between p-3 rounded-lg border-2 transition-all duration-300 text-sm ${
                   wantsColorOptions === false
-                    ? "border-slate-400 bg-gradient-to-r from-slate-50 to-gray-50 shadow-lg"
-                    : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50"
+                    ? isDarkMode ? "border-gray-600 bg-gray-700/50 shadow-lg" : "border-gray-400 bg-gradient-to-r from-gray-50 to-gray-50 shadow-lg"
+                    : isDarkMode ? "border-gray-600 bg-gray-700 hover:border-gray-500" : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50/50"
                 }`}
               >
                 <span
                   className={`font-medium transition-colors duration-300 ${
                     wantsColorOptions === false
-                      ? "text-slate-700"
-                      : "text-slate-700 group-hover:text-slate-600"
+                      ? isDarkMode ? "text-gray-300" : "text-gray-700"
+                      : isDarkMode ? "text-gray-300 group-hover:text-gray-200" : "text-gray-700 group-hover:text-gray-600"
                   }`}
                 >
                   {t("no")}
@@ -517,24 +528,24 @@ export default function ColorOptionStep({
 
           {/* Color Selection Grid */}
           {wantsColorOptions === true && (
-            <div className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-xl border border-white/20 overflow-hidden">
-              <div className="p-6 border-b border-fuchsia-100/50 bg-gradient-to-r from-fuchsia-50/50 to-pink-50/50">
-                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-3">
-                  <div className="w-8 h-8 bg-gradient-to-r from-fuchsia-400 to-pink-400 rounded-xl flex items-center justify-center">
+            <div className={`backdrop-blur-xl rounded-lg shadow-lg border overflow-hidden ${isDarkMode ? "bg-gray-800/90 border-gray-700" : "bg-white/70 border-white/20"}`}>
+              <div className={`p-4 border-b ${isDarkMode ? "border-gray-700 bg-gray-700/50" : "border-fuchsia-100/50 bg-gradient-to-r from-fuchsia-50/50 to-pink-50/50"}`}>
+                <h3 className={`text-base font-bold flex items-center gap-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                  <div className="w-7 h-7 bg-gradient-to-r from-fuchsia-400 to-pink-400 rounded-lg flex items-center justify-center">
                     <span className="text-white text-sm">🌈</span>
                   </div>
                   {t("selectColors")}
                 </h3>
-                <p className="text-sm text-slate-600 mt-2">
+                <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
                   Choose colors for your product variations
-                  <span className="block text-xs text-violet-600 mt-1">
+                  <span className={`block text-xs mt-1 ${isDarkMode ? "text-violet-400" : "text-violet-600"}`}>
                     {t("imageOptimization")}
                   </span>
                 </p>
               </div>
 
-              <div className="p-6">
-                <div className="grid grid-cols-5 gap-4 mb-8">
+              <div className="p-4">
+                <div className="grid grid-cols-5 gap-3 mb-6">
                   {availableColors.map((colorData) => {
                     const isSelected = selectedColors[colorData.name];
                     const localizedName = getLocalizedColorName(colorData.name);
@@ -589,11 +600,11 @@ export default function ColorOptionStep({
 
                 {/* FIXED: Selected Colors Details */}
                 {Object.keys(selectedColors).length > 0 && (
-                  <div className="space-y-6">
+                  <div className="space-y-4">
                     <div className="text-center">
-                      <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-100 to-purple-100 rounded-full">
+                      <div className={`inline-flex items-center gap-2 px-3 py-2 rounded-full ${isDarkMode ? "bg-violet-900/30 border border-violet-800" : "bg-gradient-to-r from-violet-100 to-purple-100"}`}>
                         <svg
-                          className="w-5 h-5 text-violet-600"
+                          className={`w-4 h-4 ${isDarkMode ? "text-violet-400" : "text-violet-600"}`}
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -605,13 +616,13 @@ export default function ColorOptionStep({
                             d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                           />
                         </svg>
-                        <span className="text-violet-700 font-medium text-sm">
+                        <span className={`font-medium text-xs ${isDarkMode ? "text-violet-400" : "text-violet-700"}`}>
                           {t("pleaseAddImageForColor")}
                         </span>
                       </div>
                     </div>
 
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       {Object.entries(selectedColors).map(
                         ([colorName, data]) => {
                           const colorData = availableColors.find(
@@ -634,7 +645,7 @@ export default function ColorOptionStep({
                           return (
                             <div
                               key={colorName}
-                              className="bg-gradient-to-r from-white to-violet-50/30 rounded-2xl p-4 border border-violet-100 shadow-sm"
+                              className={`rounded-lg p-3 border shadow-sm ${isDarkMode ? "bg-gray-700/50 border-violet-800" : "bg-gradient-to-r from-white to-violet-50/30 border-violet-100"}`}
                             >
                               <div className="flex items-center gap-4">
                                 {/* Color Circle */}
@@ -646,12 +657,12 @@ export default function ColorOptionStep({
                                 />
 
                                 {/* Color Name and Quantity Input */}
-                                <div className="flex-1 space-y-3">
-                                  <h4 className="font-semibold text-slate-800">
+                                <div className="flex-1 space-y-2">
+                                  <h4 className={`font-semibold text-sm ${isDarkMode ? "text-white" : "text-gray-900"}`}>
                                     {localizedName}
                                   </h4>
                                   <div>
-                                    <label className="block text-xs font-medium text-slate-600 mb-1">
+                                    <label className={`block text-xs font-medium mb-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
                                       {t("quantity")}
                                     </label>
                                     <input
@@ -664,7 +675,7 @@ export default function ColorOptionStep({
                                           e.target.value
                                         )
                                       }
-                                      className="w-full px-3 py-2 border border-violet-200 rounded-xl bg-white/70 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent transition-all duration-200"
+                                      className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent transition-all duration-200 ${isDarkMode ? "bg-gray-600 border-gray-500 text-white" : "border-violet-200 bg-white/70 text-gray-900"}`}
                                     />
                                     {data.quantity <= 0 && (
                                       <div className="text-xs text-red-500 mt-1 flex items-center gap-1">
@@ -721,7 +732,7 @@ export default function ColorOptionStep({
                                     key={`${colorName}-upload-${data.quantity}`} // Stable key
                                   />
                                   <div
-                                    className={`w-24 h-24 border-2 border-dashed border-violet-300 rounded-2xl flex flex-col items-center justify-center bg-white/70 hover:bg-violet-50/50 transition-all duration-300 group cursor-pointer ${
+                                    className={`w-20 h-20 border-2 border-dashed rounded-lg flex flex-col items-center justify-center hover:bg-violet-50/50 transition-all duration-300 group cursor-pointer ${isDarkMode ? "border-violet-600 bg-gray-700/70" : "border-violet-300 bg-white/70"} ${
                                       isCompressing
                                         ? "opacity-50 cursor-not-allowed"
                                         : ""

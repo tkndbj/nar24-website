@@ -78,6 +78,17 @@ export default function ConsolesStep({
 
   const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    const checkDarkMode = () => {
+      setIsDarkMode(document.documentElement.classList.contains("dark"));
+    };
+    checkDarkMode();
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, { attributes: true });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     // Load from dynamic attributes if provided
@@ -159,16 +170,16 @@ export default function ConsolesStep({
   };
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Enhanced App Bar with glassmorphism */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-200/50 shadow-lg">
-        <div className="flex items-center px-6 py-4">
+    <div className={`min-h-screen ${isDarkMode ? "bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900" : "bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50"}`}>
+      {/* App Bar */}
+      <div className={`fixed top-0 left-0 right-0 z-50 backdrop-blur-lg border-b ${isDarkMode ? "bg-gray-900/90 border-gray-700" : "bg-white/90 border-gray-200"}`}>
+        <div className="flex items-center px-4 py-3">
           <button
             onClick={onCancel}
-            className="group p-3 mr-3 text-slate-600 hover:text-slate-800 hover:bg-gray-100/50 rounded-2xl transition-all duration-300 hover:scale-105"
+            className={`p-2 mr-2 rounded-lg transition-colors ${isDarkMode ? "text-gray-300 hover:bg-gray-800" : "text-gray-700 hover:bg-gray-100"}`}
           >
             <svg
-              className="w-6 h-6 transform group-hover:-translate-x-1 transition-transform duration-300"
+              className="w-5 h-5"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -181,10 +192,10 @@ export default function ConsolesStep({
               />
             </svg>
           </button>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-2xl flex items-center justify-center shadow-lg">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-lg flex items-center justify-center">
               <svg
-                className="w-6 h-6 text-white"
+                className="w-4 h-4 text-white"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -197,7 +208,7 @@ export default function ConsolesStep({
                 />
               </svg>
             </div>
-            <h1 className="text-xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
+            <h1 className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
               {t("title")}
             </h1>
           </div>
@@ -205,66 +216,66 @@ export default function ConsolesStep({
       </div>
 
       {/* Content with proper top spacing */}
-      <div className="pt-20 min-h-screen px-4 pb-8">
-        <div className="max-w-lg mx-auto space-y-8">
+      <div className="pt-16 min-h-screen px-3 pb-6">
+        <div className="max-w-lg mx-auto space-y-4">
           {/* Console Brand Section */}
-          <div className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-xl border border-gray-200/50 overflow-hidden">
-            <div className="p-6 border-b border-purple-100/50 bg-gradient-to-r from-purple-50/50 to-indigo-50/50">
-              <h2 className="text-lg font-bold text-slate-800 flex items-center gap-3">
-                <div className="w-8 h-8 bg-gradient-to-r from-purple-400 to-indigo-400 rounded-xl flex items-center justify-center">
+          <div className={`rounded-lg shadow-lg border overflow-hidden ${isDarkMode ? "bg-gray-800/90 border-gray-700" : "bg-white/90 border-gray-200"}`}>
+            <div className={`p-4 border-b ${isDarkMode ? "border-gray-700 bg-gray-700/50" : "border-purple-100/50 bg-gradient-to-r from-purple-50/50 to-indigo-50/50"}`}>
+              <h2 className={`text-base font-bold flex items-center gap-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                <div className="w-7 h-7 bg-gradient-to-r from-purple-400 to-indigo-400 rounded-lg flex items-center justify-center">
                   <span className="text-white text-sm">🎮</span>
                 </div>
                 {t("selectConsoleBrand")}
               </h2>
-              <p className="text-sm text-slate-600 mt-2">
+              <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
                 Choose your gaming platform
               </p>
             </div>
 
-            <div className="p-6 space-y-3">
+            <div className="p-3 space-y-2">
               {consoleBrands.map((brand) => {
                 const isSelected = selectedBrand === brand;
                 return (
                   <button
                     key={brand}
                     onClick={() => handleBrandChange(brand)}
-                    className={`w-full group flex items-center justify-between p-4 rounded-2xl border-2 transition-all duration-300 transform hover:scale-[1.02] ${
+                    className={`w-full group flex items-center justify-between p-3 rounded-lg border-2 transition-all text-sm ${
                       isSelected
-                        ? "border-purple-400 bg-gradient-to-r from-purple-50 to-indigo-50 shadow-lg"
-                        : "border-gray-200 bg-white hover:border-purple-300 hover:bg-purple-50/50"
+                        ? "border-purple-400 bg-purple-50 dark:bg-purple-900/20"
+                        : isDarkMode ? "border-gray-600 bg-gray-700 hover:border-purple-400" : "border-gray-200 bg-white hover:border-purple-300"
                     }`}
                   >
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3">
                       <div
-                        className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 ${
+                        className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all ${
                           isSelected
-                            ? "bg-gradient-to-r from-purple-400 to-indigo-400 shadow-lg scale-110"
-                            : "bg-gray-100 group-hover:bg-purple-100"
+                            ? "bg-gradient-to-r from-purple-400 to-indigo-400"
+                            : isDarkMode ? "bg-gray-600" : "bg-gray-100"
                         }`}
                       >
-                        <span className="text-xl">
+                        <span className="text-lg">
                           {getBrandIcon(brand)}
                         </span>
                       </div>
                       <span
-                        className={`font-medium transition-colors duration-300 ${
+                        className={`font-medium ${
                           isSelected
-                            ? "text-purple-700"
-                            : "text-slate-700 group-hover:text-purple-600"
+                            ? "text-purple-700 dark:text-purple-400"
+                            : isDarkMode ? "text-gray-200" : "text-gray-700"
                         }`}
                       >
                         {localizedBrand(brand)}
                       </span>
                     </div>
                     <div
-                      className={`w-6 h-6 rounded-full border-2 transition-all duration-300 ${
+                      className={`w-5 h-5 rounded-full border-2 transition-all ${
                         isSelected
                           ? "bg-gradient-to-r from-purple-500 to-indigo-500 border-purple-500"
-                          : "border-gray-300 group-hover:border-purple-400"
+                          : isDarkMode ? "border-gray-600" : "border-gray-300"
                       } flex items-center justify-center`}
                     >
                       {isSelected && (
-                        <div className="w-2 h-2 bg-white rounded-full"></div>
+                        <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
                       )}
                     </div>
                   </button>
@@ -275,50 +286,50 @@ export default function ConsolesStep({
 
           {/* Console Variant Section */}
           {selectedBrand && (
-            <div className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-xl border border-gray-200/50 overflow-hidden animate-fadeIn">
-              <div className="p-6 border-b border-indigo-100/50 bg-gradient-to-r from-indigo-50/50 to-blue-50/50">
-                <h2 className="text-lg font-bold text-slate-800 flex items-center gap-3">
-                  <div className="w-8 h-8 bg-gradient-to-r from-indigo-400 to-blue-400 rounded-xl flex items-center justify-center">
+            <div className={`rounded-lg shadow-lg border overflow-hidden animate-fadeIn ${isDarkMode ? "bg-gray-800/90 border-gray-700" : "bg-white/90 border-gray-200"}`}>
+              <div className={`p-4 border-b ${isDarkMode ? "border-gray-700 bg-gray-700/50" : "border-indigo-100/50 bg-gradient-to-r from-indigo-50/50 to-blue-50/50"}`}>
+                <h2 className={`text-base font-bold flex items-center gap-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                  <div className="w-7 h-7 bg-gradient-to-r from-indigo-400 to-blue-400 rounded-lg flex items-center justify-center">
                     <span className="text-white text-sm">🎯</span>
                   </div>
                   {t("selectConsoleVariant")}
                 </h2>
-                <p className="text-sm text-slate-600 mt-2">
+                <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
                   Select your specific {localizedBrand(selectedBrand)} model
                 </p>
               </div>
 
-              <div className="p-6 space-y-3 max-h-80 overflow-y-auto">
+              <div className="p-3 space-y-2 max-h-80 overflow-y-auto">
                 {(consoleVariants[selectedBrand] || []).map((variant) => {
                   const isSelected = selectedVariant === variant;
                   return (
                     <button
                       key={variant}
                       onClick={() => setSelectedVariant(variant)}
-                      className={`w-full group flex items-center justify-between p-4 rounded-2xl border-2 transition-all duration-300 transform hover:scale-[1.02] ${
+                      className={`w-full group flex items-center justify-between p-3 rounded-lg border-2 transition-all text-sm ${
                         isSelected
-                          ? "border-indigo-400 bg-gradient-to-r from-indigo-50 to-blue-50 shadow-lg"
-                          : "border-gray-200 bg-white hover:border-indigo-300 hover:bg-indigo-50/50"
+                          ? "border-indigo-400 bg-indigo-50 dark:bg-indigo-900/20"
+                          : isDarkMode ? "border-gray-600 bg-gray-700 hover:border-indigo-400" : "border-gray-200 bg-white hover:border-indigo-300"
                       }`}
                     >
                       <span
-                        className={`font-medium transition-colors duration-300 ${
+                        className={`font-medium ${
                           isSelected
-                            ? "text-indigo-700"
-                            : "text-slate-700 group-hover:text-indigo-600"
+                            ? "text-indigo-700 dark:text-indigo-400"
+                            : isDarkMode ? "text-gray-200" : "text-gray-700"
                         }`}
                       >
                         {localizedVariant(variant)}
                       </span>
                       <div
-                        className={`w-6 h-6 rounded-full border-2 transition-all duration-300 ${
+                        className={`w-5 h-5 rounded-full border-2 transition-all ${
                           isSelected
                             ? "bg-gradient-to-r from-indigo-500 to-blue-500 border-indigo-500"
-                            : "border-gray-300 group-hover:border-indigo-400"
+                            : isDarkMode ? "border-gray-600" : "border-gray-300"
                         } flex items-center justify-center`}
                       >
                         {isSelected && (
-                          <div className="w-2 h-2 bg-white rounded-full"></div>
+                          <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
                         )}
                       </div>
                     </button>
@@ -328,18 +339,17 @@ export default function ConsolesStep({
             </div>
           )}
 
-          {/* Enhanced Save Button */}
-          <div className="pt-4">
+          {/* Save Button */}
+          <div className="pt-2">
             <button
               onClick={handleSaveConsoleSelection}
               disabled={!selectedBrand || !selectedVariant}
-              className="w-full group relative overflow-hidden bg-gradient-to-r from-purple-500 via-indigo-500 to-blue-500 hover:from-purple-600 hover:via-indigo-600 hover:to-blue-600 text-white font-bold py-5 px-6 rounded-3xl transition-all duration-300 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 shadow-2xl hover:shadow-3xl"
+              className="w-full bg-gradient-to-r from-purple-500 via-indigo-500 to-blue-500 hover:from-purple-600 hover:via-indigo-600 hover:to-blue-600 text-white font-bold py-3 px-6 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-              <span className="relative flex items-center justify-center gap-3">
+              <span className="flex items-center justify-center gap-2">
                 {t("save")}
                 <svg
-                  className="w-5 h-5 transform group-hover:translate-x-1 transition-transform duration-300"
+                  className="w-4 h-4"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -356,18 +366,18 @@ export default function ConsolesStep({
           </div>
 
           {/* Progress indicator */}
-          <div className="flex justify-center space-x-2 pt-4">
-            <div className={`w-3 h-3 rounded-full transition-all duration-300 ${selectedBrand ? 'bg-purple-400' : 'bg-gray-200'}`}></div>
-            <div className={`w-3 h-3 rounded-full transition-all duration-300 ${selectedVariant ? 'bg-indigo-400' : 'bg-gray-200'}`}></div>
+          <div className="flex justify-center space-x-2 pt-2">
+            <div className={`w-2 h-2 rounded-full transition-all ${selectedBrand ? 'bg-purple-400' : isDarkMode ? 'bg-gray-600' : 'bg-gray-300'}`}></div>
+            <div className={`w-2 h-2 rounded-full transition-all ${selectedVariant ? 'bg-indigo-400' : isDarkMode ? 'bg-gray-600' : 'bg-gray-300'}`}></div>
           </div>
 
           {/* Selection summary */}
           {selectedBrand && selectedVariant && (
-            <div className="mt-6 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-2xl border border-purple-200">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-gradient-to-r from-purple-400 to-indigo-400 rounded-xl flex items-center justify-center">
+            <div className={`mt-4 p-3 rounded-lg border ${isDarkMode ? "bg-purple-900/30 border-purple-800" : "bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-200"}`}>
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 bg-gradient-to-r from-purple-400 to-indigo-400 rounded-lg flex items-center justify-center">
                   <svg
-                    className="w-4 h-4 text-white"
+                    className="w-3 h-3 text-white"
                     fill="currentColor"
                     viewBox="0 0 20 20"
                   >
@@ -379,8 +389,8 @@ export default function ConsolesStep({
                   </svg>
                 </div>
                 <div>
-                  <p className="font-medium text-purple-700">Selected Console</p>
-                  <p className="text-sm text-purple-600">
+                  <p className={`font-medium text-sm ${isDarkMode ? "text-purple-400" : "text-purple-700"}`}>Selected Console</p>
+                  <p className={`text-xs ${isDarkMode ? "text-purple-500" : "text-purple-600"}`}>
                     {localizedBrand(selectedBrand)} - {localizedVariant(selectedVariant)}
                   </p>
                 </div>

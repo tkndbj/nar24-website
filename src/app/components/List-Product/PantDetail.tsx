@@ -78,6 +78,17 @@ export default function PantDetailStep({
   ];
 
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    const checkDarkMode = () => {
+      setIsDarkMode(document.documentElement.classList.contains("dark"));
+    };
+    checkDarkMode();
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, { attributes: true });
+    return () => observer.disconnect();
+  }, []);
 
   // Pick which size-list to show based on category
   const sizes = category === "Men" ? menSizes : womenSizes;
@@ -157,13 +168,13 @@ export default function PantDetailStep({
   const categoryInfo = getCategoryInfo();
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className={`min-h-screen ${isDarkMode ? "bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900" : "bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50"}`}>
       {/* Enhanced App Bar with glassmorphism */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-200/50 shadow-lg">
-        <div className="flex items-center px-6 py-4">
+      <div className={`fixed top-0 left-0 right-0 z-50 backdrop-blur-xl border-b shadow-lg ${isDarkMode ? "bg-gray-900/90 border-gray-700" : "bg-white/80 border-gray-200/50"}`}>
+        <div className="flex items-center px-4 py-3">
           <button
             onClick={onCancel}
-            className="group p-3 mr-3 text-slate-600 hover:text-slate-800 hover:bg-gray-100/50 rounded-2xl transition-all duration-300 hover:scale-105"
+            className={`group p-2 mr-2 rounded-lg transition-all duration-300 hover:scale-105 ${isDarkMode ? "text-gray-300 hover:text-gray-100 hover:bg-gray-800" : "text-slate-600 hover:text-slate-800 hover:bg-gray-100/50"}`}
           >
             <svg
               className="w-6 h-6 transform group-hover:-translate-x-1 transition-transform duration-300"
@@ -179,10 +190,10 @@ export default function PantDetailStep({
               />
             </svg>
           </button>
-          <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 bg-gradient-to-r ${categoryInfo.color} rounded-2xl flex items-center justify-center shadow-lg`}>
+          <div className="flex items-center gap-2">
+            <div className={`w-8 h-8 bg-gradient-to-r ${categoryInfo.color} rounded-lg flex items-center justify-center shadow-lg`}>
               <svg
-                className="w-6 h-6 text-white"
+                className="w-4 h-4 text-white"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -195,7 +206,7 @@ export default function PantDetailStep({
                 />
               </svg>
             </div>
-            <h1 className="text-xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
+            <h1 className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
               {t("title")}
             </h1>
           </div>
@@ -203,59 +214,41 @@ export default function PantDetailStep({
       </div>
 
       {/* Content with proper top spacing */}
-      <div className="pt-20 min-h-screen px-4 pb-8">
-        <div className="max-w-lg mx-auto">
-          {/* Header section */}
-          <div className="mb-8 text-center">
-            <div className={`w-16 h-16 bg-gradient-to-r ${categoryInfo.bgColor} rounded-3xl flex items-center justify-center mx-auto mb-4`}>
-              <span className="text-3xl">{categoryInfo.icon}</span>
-            </div>
-            <h2 className="text-xl font-bold text-slate-800 mb-2">
-              {t("selectAvailableSizes")}
-            </h2>
-            <p className="text-slate-600">
-              {categoryInfo.description}
-            </p>
-            <div className={`inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r ${categoryInfo.bgColor} rounded-full mt-3`}>
-              <span className="text-sm font-medium text-slate-700">
-                {selectedSizes.length} size{selectedSizes.length !== 1 ? 's' : ''} selected
-              </span>
-            </div>
-          </div>
-
+      <div className="pt-16 min-h-screen px-3 pb-6">
+        <div className="max-w-lg mx-auto space-y-4">
           {/* Sizes Grid */}
-          <div className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-xl border border-gray-200/50 overflow-hidden mb-8">
-            <div className={`p-6 border-b border-opacity-50 bg-gradient-to-r ${categoryInfo.bgColor}`}>
-              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-3">
-                <div className={`w-8 h-8 bg-gradient-to-r ${categoryInfo.color} rounded-xl flex items-center justify-center`}>
+          <div className={`backdrop-blur-xl rounded-lg shadow-lg border overflow-hidden ${isDarkMode ? "bg-gray-800/90 border-gray-700" : "bg-white/70 border-gray-200/50"}`}>
+            <div className={`p-4 border-b ${isDarkMode ? "border-gray-700 bg-gray-700/50" : `border-opacity-50 bg-gradient-to-r ${categoryInfo.bgColor}`}`}>
+              <h3 className={`text-base font-bold flex items-center gap-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                <div className={`w-7 h-7 bg-gradient-to-r ${categoryInfo.color} rounded-lg flex items-center justify-center`}>
                   <span className="text-white text-sm">📏</span>
                 </div>
                 Available Sizes
               </h3>
-              <p className="text-sm text-slate-600 mt-2">
-                Select all sizes you have in stock
+              <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                {selectedSizes.length} size{selectedSizes.length !== 1 ? 's' : ''} selected
               </p>
             </div>
-            
-            <div className="p-6">
-              <div className="grid grid-cols-3 gap-3">
+
+            <div className="p-3">
+              <div className="grid grid-cols-3 gap-2">
                 {sizes.map((size) => {
                   const isSelected = selectedSizes.includes(size);
                   return (
                     <button
                       key={size}
                       onClick={() => handleSizeToggle(size)}
-                      className={`relative group aspect-[2.5/1] rounded-2xl border-2 transition-all duration-300 transform hover:scale-105 flex items-center justify-center ${
+                      className={`relative group aspect-[2.5/1] rounded-lg border-2 transition-all duration-300 text-sm flex items-center justify-center ${
                         isSelected
-                          ? `border-opacity-100 bg-gradient-to-r ${categoryInfo.bgColor} shadow-lg`
-                          : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-md"
+                          ? `border-opacity-100 ${isDarkMode ? `bg-${categoryInfo.color.split('-')[1]}-900/20` : `bg-gradient-to-r ${categoryInfo.bgColor}`} shadow-lg`
+                          : isDarkMode ? "border-gray-600 bg-gray-700 hover:border-gray-500" : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-md"
                       }`}
                     >
                       <span
-                        className={`font-bold text-sm transition-colors duration-300 text-center px-2 ${
+                        className={`font-bold transition-colors duration-300 text-center px-2 ${
                           isSelected
-                            ? "text-slate-800"
-                            : "text-slate-600 group-hover:text-slate-800"
+                            ? isDarkMode ? `text-${categoryInfo.color.split('-')[1]}-400` : `text-${categoryInfo.color.split('-')[1]}-700`
+                            : isDarkMode ? "text-gray-200 group-hover:text-gray-100" : "text-gray-600 group-hover:text-gray-800"
                         }`}
                       >
                         {size}

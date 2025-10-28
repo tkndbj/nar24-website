@@ -12,6 +12,17 @@ export default function GenderStep({
   const t = useTranslations("genderStep");
 
   const [selectedGender, setSelectedGender] = useState<string | null>(null);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    const checkDarkMode = () => {
+      setIsDarkMode(document.documentElement.classList.contains("dark"));
+    };
+    checkDarkMode();
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, { attributes: true });
+    return () => observer.disconnect();
+  }, []);
 
   // Available gender options matching the original component
   const genderOptions = [
@@ -74,16 +85,16 @@ export default function GenderStep({
   };
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Enhanced App Bar with glassmorphism */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-200/50 shadow-lg">
-        <div className="flex items-center px-6 py-4">
+    <div className={`min-h-screen ${isDarkMode ? "bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900" : "bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50"}`}>
+      {/* App Bar */}
+      <div className={`fixed top-0 left-0 right-0 z-50 backdrop-blur-lg border-b ${isDarkMode ? "bg-gray-900/90 border-gray-700" : "bg-white/90 border-gray-200"}`}>
+        <div className="flex items-center px-4 py-3">
           <button
             onClick={onCancel}
-            className="group p-3 mr-3 text-slate-600 hover:text-slate-800 hover:bg-gray-100/50 rounded-2xl transition-all duration-300 hover:scale-105"
+            className={`p-2 mr-2 rounded-lg transition-colors ${isDarkMode ? "text-gray-300 hover:bg-gray-800" : "text-gray-700 hover:bg-gray-100"}`}
           >
             <svg
-              className="w-6 h-6 transform group-hover:-translate-x-1 transition-transform duration-300"
+              className="w-5 h-5"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -96,10 +107,10 @@ export default function GenderStep({
               />
             </svg>
           </button>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl flex items-center justify-center shadow-lg">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-lg flex items-center justify-center">
               <svg
-                className="w-6 h-6 text-white"
+                className="w-4 h-4 text-white"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -112,7 +123,7 @@ export default function GenderStep({
                 />
               </svg>
             </div>
-            <h1 className="text-xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
+            <h1 className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
               {t("title", { fallback: "Select Gender" })}
             </h1>
           </div>
@@ -120,59 +131,59 @@ export default function GenderStep({
       </div>
 
       {/* Content with proper top spacing */}
-      <div className="pt-20 min-h-screen px-4 pb-8">
+      <div className="pt-16 min-h-screen px-3 pb-6">
         <div className="max-w-lg mx-auto">
           {/* Header section */}
-          <div className="mb-8 text-center">
-            <div className="w-16 h-16 bg-gradient-to-r from-emerald-100 to-teal-100 rounded-3xl flex items-center justify-center mx-auto mb-4">
-              <span className="text-3xl">🎯</span>
+          <div className="mb-4 text-center">
+            <div className={`w-14 h-14 rounded-lg flex items-center justify-center mx-auto mb-3 ${isDarkMode ? "bg-emerald-900/30" : "bg-gradient-to-r from-emerald-100 to-teal-100"}`}>
+              <span className="text-2xl">🎯</span>
             </div>
-            <h2 className="text-xl font-bold text-slate-800 mb-2">
+            <h2 className={`text-lg font-bold mb-1 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
               {t("selectGender", { fallback: "Select Gender" })}
             </h2>
-            <p className="text-slate-600">
+            <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
               Choose the target gender for your product
             </p>
           </div>
 
           {/* Gender Options */}
-          <div className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-xl border border-gray-200/50 overflow-hidden mb-8">
-            <div className="p-6 space-y-4">
+          <div className={`rounded-lg shadow-lg border overflow-hidden mb-6 ${isDarkMode ? "bg-gray-800/90 border-gray-700" : "bg-white/90 border-gray-200"}`}>
+            <div className="p-4 space-y-3">
               {genderOptions.map((option) => {
                 const isSelected = selectedGender === option.key;
                 return (
                   <button
                     key={option.key}
                     onClick={() => handleSelectGender(option.key)}
-                    className={`w-full group flex items-center justify-between p-6 rounded-2xl border-2 transition-all duration-300 transform hover:scale-[1.02] ${
+                    className={`w-full group flex items-center justify-between p-4 rounded-lg border-2 transition-all ${
                       isSelected
-                        ? `border-opacity-100 bg-gradient-to-r ${option.bgColor} shadow-lg`
-                        : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-md"
+                        ? `border-opacity-100 ${isDarkMode ? "bg-opacity-10" : `bg-gradient-to-r ${option.bgColor}`} border-${option.color.split('-')[1]}-500`
+                        : isDarkMode ? "border-gray-700 bg-gray-700/50 hover:border-gray-600" : "border-gray-200 bg-white hover:border-gray-300"
                     }`}
                   >
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3">
                       <div
-                        className={`w-16 h-16 rounded-3xl flex items-center justify-center transition-all duration-300 ${
+                        className={`w-12 h-12 rounded-lg flex items-center justify-center transition-all ${
                           isSelected
-                            ? `bg-gradient-to-r ${option.color} shadow-lg scale-110`
-                            : "bg-gray-100 group-hover:bg-gray-200"
+                            ? `bg-gradient-to-r ${option.color}`
+                            : isDarkMode ? "bg-gray-600" : "bg-gray-100"
                         }`}
                       >
-                        <span className="text-2xl">
+                        <span className="text-xl">
                           {isSelected ? "✨" : option.icon}
                         </span>
                       </div>
                       <div className="text-left">
                         <span
-                          className={`font-bold text-lg transition-colors duration-300 ${
+                          className={`font-bold text-base transition-colors ${
                             isSelected
-                              ? "text-slate-800"
-                              : "text-slate-700 group-hover:text-slate-800"
+                              ? isDarkMode ? "text-white" : "text-gray-900"
+                              : isDarkMode ? "text-gray-200" : "text-gray-700"
                           }`}
                         >
                           {option.label}
                         </span>
-                        <p className="text-sm text-slate-500 mt-1">
+                        <p className={`text-xs mt-0.5 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
                           {option.key === "Women" && "Products for women"}
                           {option.key === "Men" && "Products for men"}
                           {option.key === "Unisex" && "Products for everyone"}
@@ -180,15 +191,15 @@ export default function GenderStep({
                       </div>
                     </div>
                     <div
-                      className={`w-8 h-8 rounded-full border-2 transition-all duration-300 ${
+                      className={`w-6 h-6 rounded-full border-2 transition-all ${
                         isSelected
                           ? `bg-gradient-to-r ${option.color} border-transparent`
-                          : "border-gray-300 group-hover:border-gray-400"
+                          : isDarkMode ? "border-gray-600" : "border-gray-300"
                       } flex items-center justify-center`}
                     >
                       {isSelected && (
                         <svg
-                          className="w-4 h-4 text-white"
+                          className="w-3 h-3 text-white"
                           fill="currentColor"
                           viewBox="0 0 20 20"
                         >
@@ -209,10 +220,10 @@ export default function GenderStep({
           {/* Selection confirmation */}
           {selectedGender && (
             <div className="text-center">
-              <div className="inline-flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-emerald-100 to-teal-100 rounded-2xl border border-emerald-200">
-                <div className="w-8 h-8 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-xl flex items-center justify-center">
+              <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg border ${isDarkMode ? "bg-emerald-900/30 border-emerald-800" : "bg-gradient-to-r from-emerald-100 to-teal-100 border-emerald-200"}`}>
+                <div className="w-6 h-6 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-lg flex items-center justify-center">
                   <svg
-                    className="w-4 h-4 text-white"
+                    className="w-3 h-3 text-white"
                     fill="currentColor"
                     viewBox="0 0 20 20"
                   >
@@ -224,8 +235,8 @@ export default function GenderStep({
                   </svg>
                 </div>
                 <div>
-                  <p className="font-medium text-emerald-700">Gender Selected</p>
-                  <p className="text-sm text-emerald-600">
+                  <p className={`font-medium text-sm ${isDarkMode ? "text-emerald-400" : "text-emerald-700"}`}>Gender Selected</p>
+                  <p className={`text-xs ${isDarkMode ? "text-emerald-500" : "text-emerald-600"}`}>
                     {genderOptions.find(opt => opt.key === selectedGender)?.label}
                   </p>
                 </div>

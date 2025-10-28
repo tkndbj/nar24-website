@@ -138,9 +138,21 @@ export default function ListProductForm() {
     null
   );
   const [isDirty, setIsDirty] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
   // Edit mode detection (like Flutter)
   const isEditMode = false; // TODO: Add edit mode support
+
+  // Dark mode detection
+  useEffect(() => {
+    const checkDarkMode = () => {
+      setIsDarkMode(document.documentElement.classList.contains("dark"));
+    };
+    checkDarkMode();
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, { attributes: true });
+    return () => observer.disconnect();
+  }, []);
 
   // Flow data loading from Firestore (matching Flutter)
   useEffect(() => {
@@ -1261,17 +1273,17 @@ export default function ListProductForm() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      {/* ADD THIS HEADER SECTION */}
-      <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200">
-        <div className="max-w-5xl mx-auto px-4">
-          <div className="flex items-center h-16">
+    <div className={`min-h-screen ${isDarkMode ? "bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900" : "bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50"}`}>
+      {/* Header Section */}
+      <div className={`sticky top-0 z-40 backdrop-blur-lg border-b ${isDarkMode ? "bg-gray-900/90 border-gray-700" : "bg-white/90 border-gray-200"}`}>
+        <div className="max-w-5xl mx-auto px-3 sm:px-4">
+          <div className="flex items-center h-14">
             <button
               onClick={() => router.back()}
-              className="group flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl hover:border-slate-300 hover:shadow-md transition-all duration-200"
+              className={`p-1.5 sm:p-2 rounded-lg transition-colors ${isDarkMode ? "hover:bg-gray-800 text-gray-300" : "hover:bg-gray-100 text-gray-700"}`}
             >
               <svg
-                className="w-5 h-5 text-slate-600 group-hover:text-slate-800 transition-colors"
+                className="w-5 h-5"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -1283,21 +1295,20 @@ export default function ListProductForm() {
                   d="M10 19l-7-7m0 0l7-7m-7 7h18"
                 />
               </svg>
-              <span className="text-sm font-medium text-slate-600 group-hover:text-slate-800 transition-colors"></span>
             </button>
-            <h1 className="ml-4 text-xl font-semibold text-slate-800">
+            <h1 className={`ml-3 text-base sm:text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
               {t("pageTitle")}
             </h1>
           </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 pt-8 pb-12">
-        <form onSubmit={handleSubmit} className="max-w-5xl mx-auto space-y-8">
+      <div className="container mx-auto px-3 sm:px-4 pt-4 pb-8">
+        <form onSubmit={handleSubmit} className="max-w-5xl mx-auto space-y-4">
           {/* Media Upload Section */}
-          <div className="bg-white/70 backdrop-blur-sm rounded-3xl shadow-xl border border-white/20 p-8 hover:shadow-2xl transition-all duration-500">
-            <h2 className="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-3">
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center">
+          <div className={`backdrop-blur-sm rounded-lg shadow-lg border p-4 sm:p-6 transition-shadow ${isDarkMode ? "bg-gray-800/90 border-gray-700" : "bg-white/90 border-gray-200"}`}>
+            <h2 className={`text-lg sm:text-xl font-bold mb-4 flex items-center gap-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+              <div className="w-7 h-7 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">📸</span>
               </div>
               {t("sections.mediaGallery")}
@@ -1305,10 +1316,12 @@ export default function ListProductForm() {
 
             {/* Drag & Drop Zone */}
             <div
-              className={`relative border-2 border-dashed rounded-2xl p-12 text-center transition-all duration-300 ${
+              className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-all duration-300 ${
                 dragActive
-                  ? "border-blue-500 bg-blue-50/50 scale-[1.02]"
-                  : "border-slate-300 hover:border-blue-400 hover:bg-slate-50/50"
+                  ? "border-blue-500 bg-blue-500/10 scale-[1.01]"
+                  : isDarkMode
+                  ? "border-gray-600 hover:border-blue-400 hover:bg-gray-700/50"
+                  : "border-gray-300 hover:border-blue-400 hover:bg-gray-50"
               }`}
               onDrop={handleDrop}
               onDragOver={(e) => {
@@ -1361,13 +1374,13 @@ export default function ListProductForm() {
               )}
 
               <UploadIcon />
-              <h3 className="text-lg font-semibold text-slate-700 mt-4">
+              <h3 className={`text-base font-semibold mt-3 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
                 {t("media.dragDropTitle")}
               </h3>
-              <p className="text-slate-500 mt-2">
+              <p className={`text-sm mt-2 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
                 {t("media.dragDropSubtitle")}
               </p>
-              <p className="text-xs text-slate-400 mt-2">
+              <p className={`text-xs mt-1.5 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
                 {t("media.autoCompressionNote", {
                   fallback: "Images will be automatically optimized",
                 })}
@@ -1444,8 +1457,8 @@ export default function ListProductForm() {
 
             {/* Image Preview Grid */}
             {images.length > 0 && (
-              <div className="mt-8">
-                <h4 className="text-lg font-semibold text-slate-700 mb-4">
+              <div className="mt-6">
+                <h4 className={`text-base font-semibold mb-3 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
                   {t("media.uploadedImages")} ({images.length})
                 </h4>
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
@@ -1479,16 +1492,16 @@ export default function ListProductForm() {
             )}
 
             {/* Video Upload */}
-            <div className="mt-8 pt-8 border-t border-slate-200">
-              <div className="flex items-center gap-3 mb-4">
+            <div className={`mt-6 pt-6 border-t ${isDarkMode ? "border-gray-700" : "border-gray-200"}`}>
+              <div className="flex items-center gap-2 mb-3">
                 <VideoIcon />
-                <h4 className="text-lg font-semibold text-slate-700">
+                <h4 className={`text-base font-semibold ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
                   {t("media.video")}
                 </h4>
               </div>
 
               {!video ? (
-                <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-blue-400 hover:bg-slate-50/50 transition-all duration-300 relative">
+                <div className={`border-2 border-dashed rounded-lg p-6 text-center transition-all duration-300 relative ${isDarkMode ? "border-gray-600 hover:border-blue-400 hover:bg-gray-700/50" : "border-gray-300 hover:border-blue-400 hover:bg-gray-50"}`}>
                   <input
                     type="file"
                     accept="video/*"
@@ -1496,7 +1509,7 @@ export default function ListProductForm() {
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                   />
                   <VideoIcon />
-                  <p className="text-slate-600 mt-2">
+                  <p className={`text-sm mt-2 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
                     {t("media.uploadVideo")}
                   </p>
                 </div>
@@ -1520,43 +1533,43 @@ export default function ListProductForm() {
           </div>
 
           {/* Basic Information */}
-          <div className="bg-white/70 backdrop-blur-sm rounded-3xl shadow-xl border border-white/20 p-8 hover:shadow-2xl transition-all duration-500">
-            <h2 className="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-3">
-              <div className="w-8 h-8 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-lg flex items-center justify-center">
+          <div className={`backdrop-blur-sm rounded-lg shadow-lg border p-4 sm:p-6 transition-shadow ${isDarkMode ? "bg-gray-800/90 border-gray-700" : "bg-white/90 border-gray-200"}`}>
+            <h2 className={`text-lg sm:text-xl font-bold mb-4 flex items-center gap-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+              <div className="w-7 h-7 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">📝</span>
               </div>
               {t("sections.productDetails")}
             </h2>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div className="lg:col-span-2">
-                <label className="block text-sm font-semibold text-slate-700 mb-3">
+                <label className={`block text-sm font-semibold mb-2 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
                   {t("form.productTitle")}
                 </label>
                 <input
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white/50 backdrop-blur-sm"
+                  className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${isDarkMode ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400" : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"}`}
                   placeholder={t("form.productTitlePlaceholder")}
                 />
               </div>
 
               <div className="lg:col-span-2">
-                <label className="block text-sm font-semibold text-slate-700 mb-3">
+                <label className={`block text-sm font-semibold mb-2 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
                   {t("form.description")}
                 </label>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={4}
-                  className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white/50 backdrop-blur-sm resize-none"
+                  className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors resize-none ${isDarkMode ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400" : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"}`}
                   placeholder={t("form.descriptionPlaceholder")}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-3">
+                <label className={`block text-sm font-semibold mb-2 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
                   {t("form.price")}
                 </label>
                 <input
@@ -1564,28 +1577,28 @@ export default function ListProductForm() {
                   step="0.01"
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
-                  className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white/50 backdrop-blur-sm"
+                  className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${isDarkMode ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400" : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"}`}
                   placeholder={t("form.pricePlaceholder")}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-3">
+                <label className={`block text-sm font-semibold mb-2 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
                   {t("form.quantity")}
                 </label>
                 <input
                   type="number"
                   value={quantity}
                   onChange={(e) => setQuantity(e.target.value)}
-                  className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white/50 backdrop-blur-sm"
+                  className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${isDarkMode ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400" : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"}`}
                 />
               </div>
 
               <div className="lg:col-span-2">
-                <label className="block text-sm font-semibold text-slate-700 mb-3">
+                <label className={`block text-sm font-semibold mb-2 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
                   {t("form.condition.title")}
                 </label>
-                <div className="flex flex-wrap gap-4">
+                <div className="flex flex-wrap gap-3">
                   {[
                     { key: "Brand New", label: t("form.condition.brandNew") },
                     { key: "Used", label: t("form.condition.used") },
@@ -1604,10 +1617,12 @@ export default function ListProductForm() {
                         className="sr-only"
                       />
                       <div
-                        className={`px-6 py-3 rounded-xl border-2 transition-all duration-200 ${
+                        className={`px-4 py-2 rounded-lg border-2 transition-all duration-200 text-sm ${
                           condition === opt.key
-                            ? "border-blue-500 bg-blue-50 text-blue-700"
-                            : "border-slate-300 bg-white/50 text-slate-700 hover:border-blue-300 hover:bg-blue-50/50"
+                            ? "border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                            : isDarkMode
+                            ? "border-gray-600 bg-gray-700 text-gray-300 hover:border-blue-400"
+                            : "border-gray-300 bg-white text-gray-700 hover:border-blue-300"
                         }`}
                       >
                         {opt.label}
@@ -1618,10 +1633,10 @@ export default function ListProductForm() {
               </div>
 
               <div className="lg:col-span-2">
-                <label className="block text-sm font-semibold text-slate-700 mb-3">
+                <label className={`block text-sm font-semibold mb-2 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
                   {t("form.delivery.title")}
                 </label>
-                <div className="flex flex-wrap gap-4">
+                <div className="flex flex-wrap gap-3">
                   {[
                     {
                       key: "Fast Delivery",
@@ -1642,10 +1657,12 @@ export default function ListProductForm() {
                         className="sr-only"
                       />
                       <div
-                        className={`px-6 py-3 rounded-xl border-2 transition-all duration-200 ${
+                        className={`px-4 py-2 rounded-lg border-2 transition-all duration-200 text-sm ${
                           deliveryOption === opt.key
-                            ? "border-blue-500 bg-blue-50 text-blue-700"
-                            : "border-slate-300 bg-white/50 text-slate-700 hover:border-blue-300 hover:bg-blue-50/50"
+                            ? "border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                            : isDarkMode
+                            ? "border-gray-600 bg-gray-700 text-gray-300 hover:border-blue-400"
+                            : "border-gray-300 bg-white text-gray-700 hover:border-blue-300"
                         }`}
                       >
                         {opt.label}
@@ -1658,17 +1675,17 @@ export default function ListProductForm() {
           </div>
 
           {/* Category Selection */}
-          <div className="bg-white/70 backdrop-blur-sm rounded-3xl shadow-xl border border-white/20 p-8 hover:shadow-2xl transition-all duration-500">
-            <h2 className="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-3">
-              <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
+          <div className={`backdrop-blur-sm rounded-lg shadow-lg border p-4 sm:p-6 transition-shadow ${isDarkMode ? "bg-gray-800/90 border-gray-700" : "bg-white/90 border-gray-200"}`}>
+            <h2 className={`text-lg sm:text-xl font-bold mb-4 flex items-center gap-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+              <div className="w-7 h-7 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">🏷️</span>
               </div>
               {t("sections.categoryClassification")}
             </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-3">
+                <label className={`block text-sm font-semibold mb-2 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
                   {t("form.category")}
                 </label>
                 <select
@@ -1683,7 +1700,7 @@ export default function ListProductForm() {
                     setFlowCompleted(false);
                     setShowDynamicStep(false);
                   }}
-                  className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white/50 backdrop-blur-sm"
+                  className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${isDarkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"}`}
                 >
                   <option value="">{t("form.selectCategory")}</option>
                   {AllInOneCategoryData.kCategories.map((cat) => (
@@ -1696,7 +1713,7 @@ export default function ListProductForm() {
 
               {category && (
                 <div className="animate-fadeIn">
-                  <label className="block text-sm font-semibold text-slate-700 mb-3">
+                  <label className={`block text-sm font-semibold mb-2 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
                     {t("form.subcategory")}
                   </label>
                   <select
@@ -1710,7 +1727,7 @@ export default function ListProductForm() {
                       setFlowCompleted(false);
                       setShowDynamicStep(false);
                     }}
-                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white/50 backdrop-blur-sm"
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${isDarkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"}`}
                   >
                     <option value="">{t("form.selectSubcategory")}</option>
                     {(AllInOneCategoryData.kSubcategories[category] || []).map(
@@ -1726,7 +1743,7 @@ export default function ListProductForm() {
 
               {subcategory && (
                 <div className="animate-fadeIn">
-                  <label className="block text-sm font-semibold text-slate-700 mb-3">
+                  <label className={`block text-sm font-semibold mb-2 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
                     {t("form.subsubcategory")}
                   </label>
                   <select
@@ -1739,7 +1756,7 @@ export default function ListProductForm() {
                         newSubsubcategory
                       );
                     }}
-                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white/50 backdrop-blur-sm"
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${isDarkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"}`}
                   >
                     <option value="">{t("form.selectSubsubcategory")}</option>
                     {(
@@ -1761,9 +1778,9 @@ export default function ListProductForm() {
           {(brand ||
             Object.keys(attributes).length > 0 ||
             Object.keys(selectedColorImages).length > 0) && (
-            <div className="bg-white/70 backdrop-blur-sm rounded-3xl shadow-xl border border-white/20 p-8">
+            <div className={`backdrop-blur-sm rounded-lg shadow-lg border p-4 sm:p-6 ${isDarkMode ? "bg-gray-800/90 border-gray-700" : "bg-white/90 border-gray-200"}`}>
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-slate-800">
+                <h3 className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
                   {t("attributes.title")}
                 </h3>
 
@@ -1817,22 +1834,22 @@ export default function ListProductForm() {
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {brand && (
                   <div className="flex justify-between">
-                    <span className="font-medium text-slate-700">
+                    <span className={`font-medium text-sm ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
                       {t("attributes.brand", { fallback: "Brand" })}:
                     </span>
-                    <span className="text-slate-600">{brand}</span>
+                    <span className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>{brand}</span>
                   </div>
                 )}
 
                 {Object.entries(attributes).map(([key, value]) => (
                   <div key={key} className="flex justify-between">
-                    <span className="font-medium text-slate-700 capitalize">
+                    <span className={`font-medium text-sm capitalize ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
                       {getAttributeLabel(key)}:
                     </span>
-                    <span className="text-slate-600">
+                    <span className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
                       {getLocalizedAttributeValue(key, value)}
                     </span>
                   </div>
@@ -1840,10 +1857,10 @@ export default function ListProductForm() {
 
                 {Object.keys(selectedColorImages).length > 0 && (
                   <div className="flex justify-between md:col-span-2">
-                    <span className="font-medium text-slate-700">
+                    <span className={`font-medium text-sm ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
                       {t("attributes.colors", { fallback: "Colors" })}:
                     </span>
-                    <span className="text-slate-600">
+                    <span className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
                       {Object.keys(selectedColorImages)
                         .map((color) =>
                           tColor(`colors.${color}`, { fallback: color })
@@ -1855,8 +1872,8 @@ export default function ListProductForm() {
               </div>
 
               {/* Enhanced info section */}
-              <div className="mt-4 pt-4 border-t border-slate-200">
-                <p className="text-sm text-slate-500 text-center">
+              <div className={`mt-3 pt-3 border-t ${isDarkMode ? "border-gray-700" : "border-gray-200"}`}>
+                <p className={`text-xs text-center ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
                   {t("attributes.changeDetailsHint", {
                     fallback:
                       "Click 'Change Details' to update your product specifications",
@@ -1868,11 +1885,11 @@ export default function ListProductForm() {
 
           {/* Submit Button - Only show when flow is completed */}
           {flowCompleted && (
-            <div className="text-center pt-8">
+            <div className="text-center pt-4">
               <button
                 type="submit"
                 disabled={isLoading}
-                className="group relative px-12 py-4 bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 hover:from-blue-700 hover:via-purple-700 hover:to-indigo-700 text-white font-bold text-lg rounded-2xl shadow-xl hover:shadow-2xl transform hover:scale-[1.02] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="group relative px-8 py-3 bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 hover:from-blue-700 hover:via-purple-700 hover:to-indigo-700 text-white font-bold text-base rounded-lg shadow-lg hover:shadow-xl transform hover:scale-[1.01] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <span className="relative flex items-center gap-3">
                   {isLoading
@@ -1904,10 +1921,10 @@ export default function ListProductForm() {
         {/* Exit Modal */}
         {showExitModal && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-            <div className="bg-white rounded-3xl p-8 max-w-md mx-4 text-center shadow-2xl">
-              <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className={`rounded-2xl p-6 max-w-md mx-4 text-center shadow-2xl ${isDarkMode ? "bg-gray-800" : "bg-white"}`}>
+              <div className="w-14 h-14 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center mx-auto mb-3">
                 <svg
-                  className="w-8 h-8 text-amber-600"
+                  className="w-7 h-7 text-amber-600 dark:text-amber-400"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -1920,20 +1937,20 @@ export default function ListProductForm() {
                   />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-slate-800 mb-2">
+              <h3 className={`text-lg font-bold mb-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
                 {t("modal.exitTitle")}
               </h3>
-              <p className="text-slate-600 mb-6">{t("modal.exitMessage")}</p>
+              <p className={`text-sm mb-5 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>{t("modal.exitMessage")}</p>
               <div className="flex gap-3">
                 <button
                   onClick={handleExitCancel}
-                  className="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-colors font-medium"
+                  className={`flex-1 px-4 py-2.5 rounded-lg transition-colors font-medium text-sm ${isDarkMode ? "bg-gray-700 text-gray-200 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
                 >
                   {t("modal.cancel")}
                 </button>
                 <button
                   onClick={handleExitConfirm}
-                  className="flex-1 px-4 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors font-medium"
+                  className="flex-1 px-4 py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-medium text-sm"
                 >
                   {t("modal.confirmExit")}
                 </button>

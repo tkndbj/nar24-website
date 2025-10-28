@@ -19,6 +19,17 @@ export default function BrandStep({
   const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
   const [showManualInput, setShowManualInput] = useState(false);
   const [manualBrand, setManualBrand] = useState("");
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    const checkDarkMode = () => {
+      setIsDarkMode(document.documentElement.classList.contains("dark"));
+    };
+    checkDarkMode();
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, { attributes: true });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     // Use the single global brands list for all categories
@@ -77,16 +88,32 @@ export default function BrandStep({
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      {/* Enhanced App Bar with glassmorphism */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-b border-white/20 shadow-lg">
-        <div className="flex items-center px-6 py-4">
+    <div
+      className={`min-h-screen ${
+        isDarkMode
+          ? "bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900"
+          : "bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50"
+      }`}
+    >
+      {/* App Bar */}
+      <div
+        className={`fixed top-0 left-0 right-0 z-50 backdrop-blur-lg border-b ${
+          isDarkMode
+            ? "bg-gray-900/90 border-gray-700"
+            : "bg-white/90 border-gray-200"
+        }`}
+      >
+        <div className="flex items-center px-4 py-3">
           <button
             onClick={onCancel}
-            className="group p-3 mr-3 text-slate-600 hover:text-slate-800 hover:bg-white/50 rounded-2xl transition-all duration-300 hover:scale-105"
+            className={`p-2 mr-2 rounded-lg transition-colors ${
+              isDarkMode
+                ? "text-gray-300 hover:bg-gray-800"
+                : "text-gray-700 hover:bg-gray-100"
+            }`}
           >
             <svg
-              className="w-6 h-6 transform group-hover:-translate-x-1 transition-transform duration-300"
+              className="w-5 h-5"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -99,10 +126,10 @@ export default function BrandStep({
               />
             </svg>
           </button>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-lg">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
               <svg
-                className="w-6 h-6 text-white"
+                className="w-4 h-4 text-white"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -115,7 +142,11 @@ export default function BrandStep({
                 />
               </svg>
             </div>
-            <h1 className="text-xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
+            <h1
+              className={`text-lg font-bold ${
+                isDarkMode ? "text-white" : "text-gray-900"
+              }`}
+            >
               {t("title")}
             </h1>
           </div>
@@ -123,26 +154,34 @@ export default function BrandStep({
       </div>
 
       {/* Content with proper top spacing */}
-      <div className="pt-20 min-h-screen">
-        <div className="max-w-lg mx-auto px-4">
+      <div className="pt-16 min-h-screen">
+        <div className="max-w-lg mx-auto px-3">
           {/* Toggle Buttons */}
-          <div className="mb-6 flex bg-white/60 backdrop-blur-xl rounded-2xl p-1 shadow-lg">
+          <div
+            className={`mb-4 flex rounded-lg p-1 ${
+              isDarkMode ? "bg-gray-800" : "bg-white/80"
+            }`}
+          >
             <button
               onClick={() => setShowManualInput(false)}
-              className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all duration-300 ${
+              className={`flex-1 py-2 px-3 rounded-md font-medium transition-all text-sm ${
                 !showManualInput
-                  ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg"
-                  : "text-slate-600 hover:text-slate-800"
+                  ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white"
+                  : isDarkMode
+                  ? "text-gray-300"
+                  : "text-gray-600"
               }`}
             >
               {t("selectFromList") || "Select from List"}
             </button>
             <button
               onClick={() => setShowManualInput(true)}
-              className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all duration-300 ${
+              className={`flex-1 py-2 px-3 rounded-md font-medium transition-all text-sm ${
                 showManualInput
-                  ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg"
-                  : "text-slate-600 hover:text-slate-800"
+                  ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white"
+                  : isDarkMode
+                  ? "text-gray-300"
+                  : "text-gray-600"
               }`}
             >
               {t("enterManually") || "Enter Manually"}
@@ -151,11 +190,21 @@ export default function BrandStep({
 
           {showManualInput ? (
             /* Manual Input Section */
-            <div className="bg-white/60 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-6">
-              <h3 className="text-lg font-semibold text-slate-800 mb-4">
+            <div
+              className={`rounded-lg shadow-lg border p-4 ${
+                isDarkMode
+                  ? "bg-gray-800/90 border-gray-700"
+                  : "bg-white/90 border-gray-200"
+              }`}
+            >
+              <h3
+                className={`text-base font-semibold mb-3 ${
+                  isDarkMode ? "text-white" : "text-gray-900"
+                }`}
+              >
                 {t("enterBrandName") || "Enter Brand Name"}
               </h3>
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div className="relative">
                   <input
                     type="text"
@@ -165,16 +214,24 @@ export default function BrandStep({
                       t("brandNamePlaceholder") || "Type brand name here..."
                     }
                     maxLength={40}
-                    className="w-full px-4 py-4 bg-white/70 backdrop-blur-sm border border-white/30 rounded-2xl text-slate-900 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-transparent shadow-lg transition-all duration-300"
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors ${
+                      isDarkMode
+                        ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                        : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
+                    }`}
                   />
-                  <div className="absolute right-3 top-4 text-sm text-slate-400">
+                  <div
+                    className={`absolute right-3 top-3 text-xs ${
+                      isDarkMode ? "text-gray-400" : "text-gray-500"
+                    }`}
+                  >
                     {manualBrand.length}/40
                   </div>
                 </div>
                 <button
                   onClick={handleManualBrandSubmit}
                   disabled={!manualBrand.trim() || manualBrand.length > 40}
-                  className="w-full py-4 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:from-slate-300 disabled:to-slate-400 text-white font-semibold rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 disabled:cursor-not-allowed"
+                  className="w-full py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold rounded-lg transition-all disabled:cursor-not-allowed text-sm"
                 >
                   {t("confirmBrand") || "Confirm Brand"}
                 </button>
@@ -183,41 +240,48 @@ export default function BrandStep({
           ) : (
             /* Existing Brand List Section */
             <>
-              {/* Enhanced Search Bar */}
-              <div className="mb-8">
-                <div className="relative group">
-                  <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-3xl blur opacity-20 group-hover:opacity-30 transition-opacity duration-300"></div>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={searchController}
-                      onChange={(e) => setSearchController(e.target.value)}
-                      placeholder={t("searchBrand")}
-                      className="w-full px-6 py-4 pl-14 bg-white/70 backdrop-blur-sm border border-white/30 rounded-3xl text-slate-900 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-transparent shadow-xl hover:shadow-2xl transition-all duration-300"
-                    />
-                    <div className="absolute left-5 top-1/2 transform -translate-y-1/2">
-                      <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
-                        <svg
-                          className="w-4 h-4 text-white"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2.5}
-                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                          />
-                        </svg>
-                      </div>
-                    </div>
+              {/* Search Bar */}
+              <div className="mb-4">
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={searchController}
+                    onChange={(e) => setSearchController(e.target.value)}
+                    placeholder={t("searchBrand")}
+                    className={`w-full px-4 py-2.5 pl-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors ${
+                      isDarkMode
+                        ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                        : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
+                    }`}
+                  />
+                  <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
+                    <svg
+                      className={`w-4 h-4 ${
+                        isDarkMode ? "text-gray-400" : "text-gray-500"
+                      }`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                      />
+                    </svg>
                   </div>
                 </div>
               </div>
 
-              {/* Enhanced Brands List */}
-              <div className="bg-white/60 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
+              {/* Brands List */}
+              <div
+                className={`rounded-lg shadow-lg border overflow-hidden ${
+                  isDarkMode
+                    ? "bg-gray-800/90 border-gray-700"
+                    : "bg-white/90 border-gray-200"
+                }`}
+              >
                 <div className="max-h-[60vh] overflow-y-auto">
                   {filteredBrands.map((brand, index) => {
                     const isSelected = selectedBrand === brand;
@@ -226,32 +290,38 @@ export default function BrandStep({
                       <div key={brand} className="group">
                         <button
                           onClick={() => handleSelectBrand(brand)}
-                          className={`w-full flex items-center justify-between px-6 py-4 transition-all duration-300 ${
+                          className={`w-full flex items-center justify-between px-4 py-3 transition-all text-sm ${
                             isSelected
-                              ? "bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-l-4 border-purple-500"
-                              : "hover:bg-gradient-to-r hover:from-slate-50 hover:to-blue-50/50"
+                              ? "bg-purple-500/10 border-l-2 border-purple-500"
+                              : isDarkMode
+                              ? "hover:bg-gray-700"
+                              : "hover:bg-gray-50"
                           }`}
                         >
                           <span
-                            className={`text-left font-medium transition-colors duration-300 ${
+                            className={`text-left font-medium ${
                               isSelected
-                                ? "text-purple-700 font-semibold"
-                                : "text-slate-700 group-hover:text-slate-900"
+                                ? "text-purple-600 dark:text-purple-400 font-semibold"
+                                : isDarkMode
+                                ? "text-gray-200"
+                                : "text-gray-700"
                             }`}
                           >
                             {brand}
                           </span>
                           <div className="flex items-center">
                             <div
-                              className={`relative w-6 h-6 rounded-xl border-2 transition-all duration-300 ${
+                              className={`relative w-5 h-5 rounded-md border-2 transition-all ${
                                 isSelected
-                                  ? "bg-gradient-to-r from-purple-500 to-pink-500 border-purple-500 shadow-lg"
-                                  : "border-slate-300 group-hover:border-purple-400 bg-white"
+                                  ? "bg-gradient-to-r from-purple-500 to-pink-500 border-purple-500"
+                                  : isDarkMode
+                                  ? "border-gray-600 bg-gray-700"
+                                  : "border-gray-300 bg-white"
                               }`}
                             >
                               {isSelected && (
                                 <svg
-                                  className="w-4 h-4 text-white absolute inset-0 m-auto"
+                                  className="w-3 h-3 text-white absolute inset-0 m-auto"
                                   fill="currentColor"
                                   viewBox="0 0 20 20"
                                 >
@@ -266,7 +336,11 @@ export default function BrandStep({
                           </div>
                         </button>
                         {index < filteredBrands.length - 1 && (
-                          <div className="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
+                          <div
+                            className={`h-px ${
+                              isDarkMode ? "bg-gray-700" : "bg-gray-200"
+                            }`}
+                          />
                         )}
                       </div>
                     );
@@ -274,10 +348,16 @@ export default function BrandStep({
 
                   {filteredBrands.length === 0 &&
                     searchController.trim() !== "" && (
-                      <div className="p-12 text-center">
-                        <div className="w-20 h-20 bg-gradient-to-r from-slate-100 to-slate-200 rounded-3xl flex items-center justify-center mx-auto mb-4">
+                      <div className="p-8 text-center">
+                        <div
+                          className={`w-16 h-16 rounded-lg flex items-center justify-center mx-auto mb-3 ${
+                            isDarkMode ? "bg-gray-700" : "bg-gray-100"
+                          }`}
+                        >
                           <svg
-                            className="w-10 h-10 text-slate-400"
+                            className={`w-8 h-8 ${
+                              isDarkMode ? "text-gray-500" : "text-gray-400"
+                            }`}
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -290,15 +370,23 @@ export default function BrandStep({
                             />
                           </svg>
                         </div>
-                        <h3 className="text-lg font-semibold text-slate-700 mb-2">
+                        <h3
+                          className={`text-base font-semibold mb-2 ${
+                            isDarkMode ? "text-gray-200" : "text-gray-900"
+                          }`}
+                        >
                           {t("noBrandsFound")}
                         </h3>
-                        <p className="text-sm text-slate-500 mb-4">
+                        <p
+                          className={`text-sm mb-3 ${
+                            isDarkMode ? "text-gray-400" : "text-gray-600"
+                          }`}
+                        >
                           {t("tryDifferentSearch")}
                         </p>
                         <button
                           onClick={() => setShowManualInput(true)}
-                          className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-medium rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
+                          className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-medium rounded-lg text-sm"
                         >
                           {t("addNewBrand") || "Add New Brand"}
                         </button>
@@ -307,28 +395,6 @@ export default function BrandStep({
                 </div>
               </div>
             </>
-          )}
-
-          {/* Floating action hint */}
-          {selectedBrand && (
-            <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-2xl shadow-xl animate-bounce">
-              <div className="flex items-center gap-2">
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 13l4 4L19 7"
-                  />
-                </svg>
-                <span className="font-medium">Brand selected!</span>
-              </div>
-            </div>
           )}
         </div>
       </div>

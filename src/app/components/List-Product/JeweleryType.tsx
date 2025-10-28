@@ -24,6 +24,17 @@ export default function JeweleryTypeStep({
   ];
 
   const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    const checkDarkMode = () => {
+      setIsDarkMode(document.documentElement.classList.contains("dark"));
+    };
+    checkDarkMode();
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, { attributes: true });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     // Load from dynamic attributes if provided
@@ -131,13 +142,13 @@ export default function JeweleryTypeStep({
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className={`min-h-screen ${isDarkMode ? "bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900" : "bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50"}`}>
       {/* Enhanced App Bar with glassmorphism */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-200/50 shadow-lg">
-        <div className="flex items-center px-6 py-4">
+      <div className={`fixed top-0 left-0 right-0 z-50 backdrop-blur-xl border-b shadow-lg ${isDarkMode ? "bg-gray-900/90 border-gray-700" : "bg-white/80 border-gray-200/50"}`}>
+        <div className="flex items-center px-4 py-3">
           <button
             onClick={onCancel}
-            className="group p-3 mr-3 text-slate-600 hover:text-slate-800 hover:bg-gray-100/50 rounded-2xl transition-all duration-300 hover:scale-105"
+            className={`group p-2 mr-2 rounded-lg transition-all duration-300 hover:scale-105 ${isDarkMode ? "text-gray-300 hover:text-gray-100 hover:bg-gray-800" : "text-slate-600 hover:text-slate-800 hover:bg-gray-100/50"}`}
           >
             <svg
               className="w-6 h-6 transform group-hover:-translate-x-1 transition-transform duration-300"
@@ -153,10 +164,10 @@ export default function JeweleryTypeStep({
               />
             </svg>
           </button>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-r from-rose-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-lg">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-gradient-to-r from-rose-500 to-pink-500 rounded-lg flex items-center justify-center shadow-lg">
               <svg
-                className="w-6 h-6 text-white"
+                className="w-4 h-4 text-white"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -169,7 +180,7 @@ export default function JeweleryTypeStep({
                 />
               </svg>
             </div>
-            <h1 className="text-xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
+            <h1 className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
               {t("title")}
             </h1>
           </div>
@@ -177,37 +188,24 @@ export default function JeweleryTypeStep({
       </div>
 
       {/* Content with proper top spacing */}
-      <div className="pt-20 min-h-screen px-4 pb-8">
-        <div className="max-w-lg mx-auto">
-          {/* Header section */}
-          <div className="mb-8 text-center">
-            <div className="w-16 h-16 bg-gradient-to-r from-rose-100 to-pink-100 rounded-3xl flex items-center justify-center mx-auto mb-4">
-              <span className="text-3xl">💍</span>
-            </div>
-            <h2 className="text-xl font-bold text-slate-800 mb-2">
-              {t("selectJewelryType")}
-            </h2>
-            <p className="text-slate-600">
-              Choose the type of jewelry you&apos;re selling
-            </p>
-          </div>
-
+      <div className="pt-16 min-h-screen px-3 pb-6">
+        <div className="max-w-lg mx-auto space-y-4">
           {/* Jewelry Types Grid */}
-          <div className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-xl border border-gray-200/50 overflow-hidden mb-8">
-            <div className="p-6 border-b border-rose-100/50 bg-gradient-to-r from-rose-50/50 to-pink-50/50">
-              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-3">
-                <div className="w-8 h-8 bg-gradient-to-r from-rose-400 to-pink-400 rounded-xl flex items-center justify-center">
+          <div className={`backdrop-blur-xl rounded-lg shadow-lg border overflow-hidden ${isDarkMode ? "bg-gray-800/90 border-gray-700" : "bg-white/70 border-gray-200/50"}`}>
+            <div className={`p-4 border-b ${isDarkMode ? "border-gray-700 bg-gray-700/50" : "border-rose-100/50 bg-gradient-to-r from-rose-50/50 to-pink-50/50"}`}>
+              <h3 className={`text-base font-bold flex items-center gap-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                <div className="w-7 h-7 bg-gradient-to-r from-rose-400 to-pink-400 rounded-lg flex items-center justify-center">
                   <span className="text-white text-sm">💎</span>
                 </div>
                 Jewelry Categories
               </h3>
-              <p className="text-sm text-slate-600 mt-2">
+              <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
                 Select the jewelry type that best describes your item
               </p>
             </div>
-            
-            <div className="p-6">
-              <div className="grid grid-cols-2 gap-4">
+
+            <div className="p-3">
+              <div className="grid grid-cols-2 gap-3">
                 {typeKeys.map((type) => {
                   const isSelected = selectedType === type;
                   const typeInfo = getTypeInfo(type);
@@ -215,10 +213,10 @@ export default function JeweleryTypeStep({
                     <button
                       key={type}
                       onClick={() => setSelectedType(type)}
-                      className={`relative group p-4 rounded-2xl border-2 transition-all duration-300 transform hover:scale-105 ${
+                      className={`relative group p-3 rounded-lg border-2 transition-all duration-300 text-sm ${
                         isSelected
-                          ? `border-opacity-100 bg-gradient-to-r ${typeInfo.bgColor} shadow-lg`
-                          : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-md"
+                          ? `border-opacity-100 ${isDarkMode ? "bg-rose-900/20" : `bg-gradient-to-r ${typeInfo.bgColor}`} shadow-lg`
+                          : isDarkMode ? "border-gray-600 bg-gray-700 hover:border-rose-400" : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-md"
                       }`}
                     >
                       <div className="flex flex-col items-center gap-3">
@@ -237,13 +235,13 @@ export default function JeweleryTypeStep({
                           <span
                             className={`font-semibold transition-colors duration-300 ${
                               isSelected
-                                ? "text-slate-800"
-                                : "text-slate-700 group-hover:text-slate-800"
+                                ? isDarkMode ? "text-rose-400" : "text-rose-700"
+                                : isDarkMode ? "text-gray-200 group-hover:text-rose-400" : "text-gray-700 group-hover:text-rose-700"
                             }`}
                           >
                             {localizedType(type)}
                           </span>
-                          <p className="text-xs text-slate-500 mt-1">
+                          <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
                             {typeInfo.description}
                           </p>
                         </div>
@@ -299,11 +297,11 @@ export default function JeweleryTypeStep({
 
           {/* Selection Summary */}
           {selectedType && (
-            <div className="mt-6 p-4 bg-gradient-to-r from-rose-50 to-pink-50 rounded-2xl border border-rose-200">
-              <div className="flex items-center gap-3">
-                <div className={`w-8 h-8 bg-gradient-to-r ${getTypeInfo(selectedType).color} rounded-xl flex items-center justify-center`}>
+            <div className={`p-3 rounded-lg border ${isDarkMode ? "bg-rose-900/30 border-rose-800" : "bg-gradient-to-r from-rose-50 to-pink-50 border-rose-200"}`}>
+              <div className="flex items-center gap-2">
+                <div className={`w-6 h-6 bg-gradient-to-r ${getTypeInfo(selectedType).color} rounded-lg flex items-center justify-center`}>
                   <svg
-                    className="w-4 h-4 text-white"
+                    className="w-3 h-3 text-white"
                     fill="currentColor"
                     viewBox="0 0 20 20"
                   >
@@ -315,13 +313,10 @@ export default function JeweleryTypeStep({
                   </svg>
                 </div>
                 <div>
-                  <p className="font-medium text-rose-700">Selected Type</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-lg">{getTypeInfo(selectedType).icon}</span>
-                    <span className="text-sm text-rose-600">
-                      {localizedType(selectedType)} - {getTypeInfo(selectedType).description}
-                    </span>
-                  </div>
+                  <p className={`font-medium text-sm ${isDarkMode ? "text-rose-400" : "text-rose-700"}`}>Selected Type</p>
+                  <p className={`text-xs ${isDarkMode ? "text-rose-500" : "text-rose-600"}`}>
+                    {localizedType(selectedType)} - {getTypeInfo(selectedType).description}
+                  </p>
                 </div>
               </div>
             </div>

@@ -34,6 +34,17 @@ export default function ComputerComponentsStep({
   const [selectedComponent, setSelectedComponent] = useState<string | null>(
     null
   );
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    const checkDarkMode = () => {
+      setIsDarkMode(document.documentElement.classList.contains("dark"));
+    };
+    checkDarkMode();
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, { attributes: true });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     // Load from dynamic attributes if provided
@@ -104,13 +115,13 @@ export default function ComputerComponentsStep({
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className={`min-h-screen ${isDarkMode ? "bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900" : "bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50"}`}>
       {/* Enhanced App Bar with glassmorphism */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-200/50 shadow-lg">
-        <div className="flex items-center px-6 py-4">
+      <div className={`fixed top-0 left-0 right-0 z-50 backdrop-blur-xl border-b shadow-lg ${isDarkMode ? "bg-gray-900/90 border-gray-700" : "bg-white/80 border-gray-200/50"}`}>
+        <div className="flex items-center px-4 py-3">
           <button
             onClick={onCancel}
-            className="group p-3 mr-3 text-slate-600 hover:text-slate-800 hover:bg-gray-100/50 rounded-2xl transition-all duration-300 hover:scale-105"
+            className={`group p-2 mr-2 rounded-lg transition-all duration-300 hover:scale-105 ${isDarkMode ? "text-gray-300 hover:text-gray-100 hover:bg-gray-800" : "text-slate-600 hover:text-slate-800 hover:bg-gray-100/50"}`}
           >
             <svg
               className="w-6 h-6 transform group-hover:-translate-x-1 transition-transform duration-300"
@@ -126,10 +137,10 @@ export default function ComputerComponentsStep({
               />
             </svg>
           </button>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center shadow-lg">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center shadow-lg">
               <svg
-                className="w-6 h-6 text-white"
+                className="w-4 h-4 text-white"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -142,7 +153,7 @@ export default function ComputerComponentsStep({
                 />
               </svg>
             </div>
-            <h1 className="text-xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
+            <h1 className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
               {t("title")}
             </h1>
           </div>
@@ -150,67 +161,54 @@ export default function ComputerComponentsStep({
       </div>
 
       {/* Content with proper top spacing */}
-      <div className="pt-20 min-h-screen px-4 pb-8">
-        <div className="max-w-lg mx-auto">
-          {/* Header section */}
-          <div className="mb-8 text-center">
-            <div className="w-16 h-16 bg-gradient-to-r from-blue-100 to-cyan-100 rounded-3xl flex items-center justify-center mx-auto mb-4">
-              <span className="text-3xl">💻</span>
-            </div>
-            <h2 className="text-xl font-bold text-slate-800 mb-2">
-              {t("selectComponentType")}
-            </h2>
-            <p className="text-slate-600">
-              Choose the type of computer component you&apos;re selling
-            </p>
-          </div>
-
+      <div className="pt-16 min-h-screen px-3 pb-6">
+        <div className="max-w-lg mx-auto space-y-4">
           {/* Components Grid */}
-          <div className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-xl border border-gray-200/50 overflow-hidden mb-8">
-            <div className="p-6 space-y-3">
+          <div className={`backdrop-blur-xl rounded-lg shadow-lg border overflow-hidden ${isDarkMode ? "bg-gray-800/90 border-gray-700" : "bg-white/70 border-gray-200/50"}`}>
+            <div className="p-3 space-y-2">
               {componentKeys.map((component) => {
                 const isSelected = selectedComponent === component;
                 return (
                   <button
                     key={component}
                     onClick={() => setSelectedComponent(component)}
-                    className={`w-full group flex items-center justify-between p-4 rounded-2xl border-2 transition-all duration-300 transform hover:scale-[1.02] ${
+                    className={`w-full group flex items-center justify-between p-3 rounded-lg border-2 transition-all duration-300 text-sm ${
                       isSelected
-                        ? "border-blue-400 bg-gradient-to-r from-blue-50 to-cyan-50 shadow-lg"
-                        : "border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50/50"
+                        ? isDarkMode ? "border-blue-400 bg-blue-900/20 shadow-lg" : "border-blue-400 bg-gradient-to-r from-blue-50 to-cyan-50 shadow-lg"
+                        : isDarkMode ? "border-gray-600 bg-gray-700 hover:border-blue-400" : "border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50/50"
                     }`}
                   >
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3">
                       <div
-                        className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 ${
+                        className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-300 ${
                           isSelected
-                            ? "bg-gradient-to-r from-blue-400 to-cyan-400 shadow-lg scale-110"
-                            : "bg-gray-100 group-hover:bg-blue-100"
+                            ? "bg-gradient-to-r from-blue-400 to-cyan-400 shadow-lg"
+                            : isDarkMode ? "bg-gray-600 group-hover:bg-gray-500" : "bg-gray-100 group-hover:bg-blue-100"
                         }`}
                       >
-                        <span className="text-xl">
+                        <span className="text-lg">
                           {getComponentIcon(component)}
                         </span>
                       </div>
                       <span
                         className={`font-medium transition-colors duration-300 ${
                           isSelected
-                            ? "text-blue-700"
-                            : "text-slate-700 group-hover:text-blue-600"
+                            ? isDarkMode ? "text-blue-400" : "text-blue-700"
+                            : isDarkMode ? "text-gray-200 group-hover:text-blue-400" : "text-gray-700 group-hover:text-blue-600"
                         }`}
                       >
                         {localizedComponent(component)}
                       </span>
                     </div>
                     <div
-                      className={`w-6 h-6 rounded-full border-2 transition-all duration-300 ${
+                      className={`w-5 h-5 rounded-full border-2 transition-all duration-300 ${
                         isSelected
                           ? "bg-gradient-to-r from-blue-500 to-cyan-500 border-blue-500"
-                          : "border-gray-300 group-hover:border-blue-400"
+                          : isDarkMode ? "border-gray-500 group-hover:border-blue-400" : "border-gray-300 group-hover:border-blue-400"
                       } flex items-center justify-center`}
                     >
                       {isSelected && (
-                        <div className="w-2 h-2 bg-white rounded-full"></div>
+                        <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
                       )}
                     </div>
                   </button>
@@ -248,11 +246,11 @@ export default function ComputerComponentsStep({
 
           {/* Selection indicator */}
           {selectedComponent && (
-            <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-2xl border border-blue-200">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-gradient-to-r from-blue-400 to-cyan-400 rounded-xl flex items-center justify-center">
+            <div className={`p-3 rounded-lg border ${isDarkMode ? "bg-blue-900/30 border-blue-800" : "bg-gradient-to-r from-blue-50 to-cyan-50 border-blue-200"}`}>
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 bg-gradient-to-r from-blue-400 to-cyan-400 rounded-lg flex items-center justify-center">
                   <svg
-                    className="w-4 h-4 text-white"
+                    className="w-3 h-3 text-white"
                     fill="currentColor"
                     viewBox="0 0 20 20"
                   >
@@ -264,9 +262,9 @@ export default function ComputerComponentsStep({
                   </svg>
                 </div>
                 <div>
-                  <p className="font-medium text-blue-700">Selected Component</p>
-                  <p className="text-sm text-blue-600">
-                    {localizedComponent(selectedComponent)}
+                  <p className={`font-medium text-sm ${isDarkMode ? "text-blue-400" : "text-blue-700"}`}>Selected Component</p>
+                  <p className={`text-xs ${isDarkMode ? "text-blue-500" : "text-blue-600"}`}>
+                    {getComponentIcon(selectedComponent)} {localizedComponent(selectedComponent)}
                   </p>
                 </div>
               </div>
