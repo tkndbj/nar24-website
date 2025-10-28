@@ -71,6 +71,8 @@ export default function MyProductsPage() {
   );
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [, setDeletingProductId] = useState<string | null>(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<string | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [expandedProductId, setExpandedProductId] = useState<string | null>(
     null
@@ -173,6 +175,98 @@ export default function MyProductsPage() {
     return unsubscribe;
   };
 
+  // Confirmation Modal Component
+  const ConfirmDeleteModal = ({ productId }: { productId: string }) => (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div
+        className={`w-full max-w-md rounded-2xl p-6 shadow-2xl ${
+          isDarkMode ? "bg-gray-800" : "bg-white"
+        }`}
+      >
+        <div className="flex flex-col items-center space-y-4">
+          {/* Warning Icon */}
+          <div className="relative">
+            <div className="w-16 h-16 bg-gradient-to-r from-red-500 to-red-600 rounded-full flex items-center justify-center">
+              <Trash2 size={32} className="text-white" />
+            </div>
+          </div>
+
+          {/* Text */}
+          <div className="text-center space-y-2">
+            <h3
+              className={`text-xl font-bold ${
+                isDarkMode ? "text-white" : "text-gray-900"
+              }`}
+            >
+              {t("confirmDelete") || "Delete Product?"}
+            </h3>
+            <p
+              className={`text-sm ${
+                isDarkMode ? "text-gray-400" : "text-gray-600"
+              }`}
+            >
+              {t("confirmDeleteMessage") ||
+                "Are you sure you want to delete this product? This action cannot be undone."}
+            </p>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-3 w-full">
+            <button
+              onClick={() => {
+                setShowConfirmModal(false);
+                setProductToDelete(null);
+              }}
+              className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-all ${
+                isDarkMode
+                  ? "bg-gray-700 text-white hover:bg-gray-600"
+                  : "bg-gray-200 text-gray-900 hover:bg-gray-300"
+              }`}
+            >
+              {t("cancel") || "Cancel"}
+            </button>
+            <button
+              onClick={async () => {
+                setShowConfirmModal(false);
+                setDeletingProductId(productId);
+                setShowDeleteModal(true);
+
+                try {
+                  const functions = getFunctions(undefined, "europe-west3");
+                  const deleteProduct = httpsCallable(
+                    functions,
+                    "deleteProduct"
+                  );
+
+                  await deleteProduct({ productId });
+
+                  setShowDeleteModal(false);
+                  setDeletingProductId(null);
+                  setProductToDelete(null);
+
+                  // Success toast (you can customize this)
+                  alert(t("productDeleted") || "Product deleted successfully!");
+                } catch (error: unknown) {
+                  console.error("Error deleting product:", error);
+                  setShowDeleteModal(false);
+                  setDeletingProductId(null);
+                  alert(
+                    error instanceof Error
+                      ? error.message
+                      : t("deleteError") || "Error deleting product"
+                  );
+                }
+              }}
+              className="flex-1 px-4 py-3 rounded-xl font-semibold bg-gradient-to-r from-red-500 to-red-600 text-white hover:from-red-600 hover:to-red-700 transition-all shadow-lg hover:shadow-xl"
+            >
+              {t("delete") || "Delete"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   // Deleting Modal Component
   const DeletingModal = () => (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -218,40 +312,9 @@ export default function MyProductsPage() {
     </div>
   );
 
-  const handleDeleteProduct = async (productId: string) => {
-    if (
-      !confirm(
-        t("confirmDelete") || "Are you sure you want to delete this product?"
-      )
-    ) {
-      return;
-    }
-
-    setDeletingProductId(productId);
-    setShowDeleteModal(true);
-
-    try {
-      const functions = getFunctions(undefined, "europe-west3");
-      const deleteProduct = httpsCallable(functions, "deleteProduct");
-
-      await deleteProduct({ productId });
-
-      // Close modal after successful deletion
-      setShowDeleteModal(false);
-      setDeletingProductId(null);
-
-      // Show success message (optional - you can use a toast library)
-      alert(t("productDeleted") || "Product deleted successfully!");
-    } catch (error: unknown) {
-      console.error("Error deleting product:", error);
-      setShowDeleteModal(false);
-      setDeletingProductId(null);
-      alert(
-        error instanceof Error
-          ? error.message
-          : t("deleteError") || "Error deleting product"
-      );
-    }
+  const handleDeleteProduct = (productId: string) => {
+    setProductToDelete(productId);
+    setShowConfirmModal(true);
   };
 
   const clearDateRange = () => {
@@ -818,6 +881,11 @@ export default function MyProductsPage() {
 
         {/* Delete Modal */}
         {showDeleteModal && <DeletingModal />}
+
+        {/* Confirm Delete Modal */}
+        {showConfirmModal && productToDelete && (
+          <ConfirmDeleteModal productId={productToDelete} />
+        )}
       </div>
     </div>
   );
