@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import SecondHeader from "../../components/market_screen/SecondHeader";
 import ProductCard from "../../components/ProductCard";
 import { AllInOneCategoryData } from "../../../constants/productData";
@@ -71,7 +72,34 @@ const PRODUCTS_PER_PAGE = 20;
 const SCROLL_THRESHOLD = 1000;
 const DEBOUNCE_DELAY = 300;
 
+// Create a wrapper to convert useTranslations to AppLocalizations format
+interface AppLocalizations {
+  [key: string]: string;
+}
+
+const createAppLocalizations = (
+  t: (key: string) => string
+): AppLocalizations => {
+  return new Proxy(
+    {},
+    {
+      get: (target, prop: string) => {
+        try {
+          return t(prop);
+        } catch {
+          return prop; // fallback to the key itself if translation doesn't exist
+        }
+      },
+    }
+  ) as AppLocalizations;
+};
+
 export default function DynamicMarketPage() {
+  const t = useTranslations();
+
+  // Memoize l10n to prevent infinite re-renders
+  const l10n = useMemo(() => createAppLocalizations(t), [t]);
+
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -190,14 +218,43 @@ export default function DynamicMarketPage() {
         .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
         .join(" ");
 
-      let title = formattedCategory;
+      // Localize the main category
+      let localizedCategory = formattedCategory;
+      try {
+        // Check if it's a buyer category (Women, Men, etc.)
+        const buyerCategories = AllInOneCategoryData.kBuyerCategories;
+        if (buyerCategories && Array.isArray(buyerCategories)) {
+          const isBuyerCategory = buyerCategories.some(cat => cat.key === formattedCategory);
+          if (isBuyerCategory) {
+            localizedCategory = AllInOneCategoryData.localizeBuyerCategoryKey(formattedCategory, l10n);
+          }
+        }
+      } catch (error) {
+        console.warn("Failed to localize category:", error);
+        localizedCategory = formattedCategory;
+      }
+
+      let title = localizedCategory;
 
       if (subcategory) {
         const formattedSubcategory = subcategory
           .split("-")
           .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
           .join(" ");
-        title = `${formattedCategory} - ${formattedSubcategory}`;
+
+        // Localize the subcategory
+        let localizedSubcategory = formattedSubcategory;
+        try {
+          localizedSubcategory = AllInOneCategoryData.localizeBuyerSubcategoryKey(
+            formattedCategory,
+            formattedSubcategory,
+            l10n
+          );
+        } catch (error) {
+          console.warn("Failed to localize subcategory:", error);
+        }
+
+        title = `${localizedCategory} - ${localizedSubcategory}`;
       }
 
       if (subsubcategory) {
@@ -205,7 +262,28 @@ export default function DynamicMarketPage() {
           .split("-")
           .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
           .join(" ");
-        title = `${title} - ${formattedSubSubcategory}`;
+
+        // Localize the sub-subcategory if it's a Women/Men category
+        let localizedSubSubcategory = formattedSubSubcategory;
+        if (subcategory && (formattedCategory === "Women" || formattedCategory === "Men")) {
+          try {
+            const formattedSubcategory = subcategory
+              .split("-")
+              .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+              .join(" ");
+
+            localizedSubSubcategory = AllInOneCategoryData.localizeBuyerSubSubcategoryKey(
+              formattedCategory,
+              formattedSubcategory,
+              formattedSubSubcategory,
+              l10n
+            );
+          } catch (error) {
+            console.warn("Failed to localize sub-subcategory:", error);
+          }
+        }
+
+        title = `${title} - ${localizedSubSubcategory}`;
       }
 
       setCategoryTitle(title);
@@ -245,7 +323,7 @@ export default function DynamicMarketPage() {
       setMinPriceInput("");
       setMaxPriceInput("");
     }
-  }, [category, subcategory, subsubcategory]);
+  }, [category, subcategory, subsubcategory, l10n]);
 
   // Touch handlers for mobile drawer
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -270,10 +348,45 @@ export default function DynamicMarketPage() {
 
   const getLocalizedSubcategoryName = useCallback(
     (categoryKey: string, subcategoryKey: string): string => {
-      return subcategoryKey;
+      // For Women/Men categories, the subcategoryKey is actually a sub-subcategory
+      // So we need to find which buyer subcategory it belongs to
+      if (categoryKey === "Women" || categoryKey === "Men") {
+        // Try to find the parent subcategory
+        const buyerSubcategories = AllInOneCategoryData.kBuyerSubcategories[categoryKey] || [];
+
+        for (const buyerSub of buyerSubcategories) {
+          const subSubs = AllInOneCategoryData.kBuyerSubSubcategories[categoryKey]?.[buyerSub] || [];
+          if (subSubs.includes(subcategoryKey)) {
+            // Found it! Now localize it as a sub-subcategory
+            return AllInOneCategoryData.localizeBuyerSubSubcategoryKey(
+              categoryKey,
+              buyerSub,
+              subcategoryKey,
+              l10n
+            );
+          }
+        }
+      }
+
+      // For other categories, it's a regular subcategory
+      return AllInOneCategoryData.localizeBuyerSubcategoryKey(
+        categoryKey,
+        subcategoryKey,
+        l10n
+      );
     },
-    []
+    [l10n]
   );
+
+  // Get localized color name
+  const getLocalizedColorName = useCallback((colorName: string): string => {
+    const colorKey = `color${colorName.replace(/\s+/g, "")}`;
+    try {
+      return t(`DynamicMarket.${colorKey}`);
+    } catch {
+      return colorName;
+    }
+  }, [t]);
 
   // Optimized fetch function with abort controller
   const fetchProducts = useCallback(
@@ -613,7 +726,7 @@ export default function DynamicMarketPage() {
             <div className="lg:hidden p-4 border-b border-gray-200 dark:border-gray-700">
               <div className="flex items-center justify-between">
                 <h2 className={`font-semibold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-                  Filters
+                  {t("DynamicMarket.filters") || "Filters"}
                 </h2>
                 <button
                   onClick={() => setShowSidebar(false)}
@@ -632,7 +745,7 @@ export default function DynamicMarketPage() {
                   onClick={clearAllFilters}
                   className="w-full mb-3 py-1.5 text-xs text-orange-500 border border-orange-500 rounded hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
                 >
-                  Clear All Filters ({activeFiltersCount})
+                  {t("DynamicMarket.clearAllFilters") || "Clear All Filters"} ({activeFiltersCount})
                 </button>
               )}
 
@@ -651,7 +764,7 @@ export default function DynamicMarketPage() {
                       aria-expanded={expandedSections.subcategory}
                     >
                       <span className={`font-medium text-xs ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-                        Subcategories
+                        {t("DynamicMarket.subcategories") || "Subcategories"}
                       </span>
                       {expandedSections.subcategory ? (
                         <ChevronUp size={14} className="text-gray-400" />
@@ -677,8 +790,8 @@ export default function DynamicMarketPage() {
                             >
                               <input
                                 type="checkbox"
-                                checked={filters.subcategories.includes(localizedName)}
-                                onChange={() => toggleFilter("subcategories", localizedName)}
+                                checked={filters.subcategories.includes(sub)}
+                                onChange={() => toggleFilter("subcategories", sub)}
                                 className="w-3 h-3 text-orange-500 rounded border-gray-300 focus:ring-orange-500"
                               />
                               <span
@@ -709,7 +822,7 @@ export default function DynamicMarketPage() {
                     aria-expanded={expandedSections.brand}
                   >
                     <span className={`font-medium text-xs ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-                      Brands
+                      {t("DynamicMarket.brands") || "Brands"}
                     </span>
                     {expandedSections.brand ? (
                       <ChevronUp size={14} className="text-gray-400" />
@@ -727,7 +840,7 @@ export default function DynamicMarketPage() {
                         />
                         <input
                           type="text"
-                          placeholder="Search brands..."
+                          placeholder={t("DynamicMarket.searchBrands") || "Search brands..."}
                           value={brandSearch}
                           onChange={(e) => setBrandSearch(e.target.value)}
                           className={`
@@ -778,7 +891,7 @@ export default function DynamicMarketPage() {
                     aria-expanded={expandedSections.color}
                   >
                     <span className={`font-medium text-xs ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-                      Colors
+                      {t("DynamicMarket.colors") || "Colors"}
                     </span>
                     {expandedSections.color ? (
                       <ChevronUp size={14} className="text-gray-400" />
@@ -809,7 +922,7 @@ export default function DynamicMarketPage() {
                               isDarkMode ? "text-gray-300" : "text-gray-700"
                             } leading-tight`}
                           >
-                            {colorData.name}
+                            {getLocalizedColorName(colorData.name)}
                           </span>
                         </label>
                       ))}
@@ -830,7 +943,7 @@ export default function DynamicMarketPage() {
                     aria-expanded={expandedSections.price}
                   >
                     <span className={`font-medium text-xs ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-                      Price Range
+                      {t("DynamicMarket.priceRange") || "Price Range"}
                     </span>
                     {expandedSections.price ? (
                       <ChevronUp size={14} className="text-gray-400" />
@@ -844,7 +957,7 @@ export default function DynamicMarketPage() {
                       <div className="flex space-x-1.5">
                         <input
                           type="number"
-                          placeholder="Min"
+                          placeholder={t("DynamicMarket.min") || "Min"}
                           value={minPriceInput}
                           onChange={(e) => setMinPriceInput(e.target.value)}
                           className={`
@@ -860,7 +973,7 @@ export default function DynamicMarketPage() {
                         <span className="text-xs text-gray-500 self-center">-</span>
                         <input
                           type="number"
-                          placeholder="Max"
+                          placeholder={t("DynamicMarket.max") || "Max"}
                           value={maxPriceInput}
                           onChange={(e) => setMaxPriceInput(e.target.value)}
                           className={`
@@ -880,7 +993,7 @@ export default function DynamicMarketPage() {
                         onClick={setPriceFilter}
                         className="w-full py-1.5 bg-orange-500 text-white text-xs font-medium rounded hover:bg-orange-600 transition-colors"
                       >
-                        Apply Price Filter
+                        {t("DynamicMarket.applyPriceFilter") || "Apply Price Filter"}
                       </button>
 
                       {(filters.minPrice !== undefined || filters.maxPrice !== undefined) && (
@@ -905,8 +1018,8 @@ export default function DynamicMarketPage() {
                 </h1>
                 {products.length > 0 && (
                   <p className={`text-sm mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                    {products.length} products found
-                    {activeFiltersCount > 0 && ` (${activeFiltersCount} filters applied)`}
+                    {products.length} {t("DynamicMarket.products") || "products"}
+                    {activeFiltersCount > 0 && ` (${activeFiltersCount} ${t("DynamicMarket.filtersApplied") || "filters applied"})`}
                   </p>
                 )}
               </div>
@@ -981,7 +1094,7 @@ export default function DynamicMarketPage() {
             onClick={clearAllFilters}
             className="mt-4 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
           >
-            Clear All Filters
+            {t("DynamicMarket.clearAllFilters") || "Clear All Filters"}
           </button>
         )}
       </div>
