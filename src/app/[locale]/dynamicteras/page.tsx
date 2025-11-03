@@ -23,6 +23,9 @@ interface FilterState {
   brands: string[];
   minPrice?: number;
   maxPrice?: number;
+  buyerCategory?: string;
+  buyerSubcategory?: string;
+  buyerSubSubcategory?: string;
 }
 
 const availableColors = [
@@ -58,10 +61,33 @@ const availableColors = [
   { name: "Silver", color: "#C0C0C0" },
 ];
 
+// Create a wrapper to convert useTranslations to AppLocalizations format
+interface AppLocalizations {
+  [key: string]: string;
+}
+
+const createAppLocalizations = (
+  t: (key: string) => string
+): AppLocalizations => {
+  return new Proxy(
+    {},
+    {
+      get: (target, prop: string) => {
+        try {
+          return t(prop);
+        } catch {
+          return prop; // fallback to the key itself if translation doesn't exist
+        }
+      },
+    }
+  ) as AppLocalizations;
+};
+
 const DynamicMarketPage: React.FC = () => {
   const searchParams = useSearchParams();
   const router = useRouter();
   const t = useTranslations();
+  const l10n = createAppLocalizations(t);
 
   // Theme state - detect from system/localStorage
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -103,6 +129,9 @@ const DynamicMarketPage: React.FC = () => {
     brands: [],
     minPrice: undefined,
     maxPrice: undefined,
+    buyerCategory: undefined,
+    buyerSubcategory: undefined,
+    buyerSubSubcategory: undefined,
   });
 
   // Available subcategories based on selected category
@@ -112,6 +141,7 @@ const DynamicMarketPage: React.FC = () => {
 
   // Filter UI states
   const [expandedSections, setExpandedSections] = useState({
+    buyerCategory: true,
     subcategory: true,
     color: true,
     brand: true,
@@ -147,6 +177,9 @@ const DynamicMarketPage: React.FC = () => {
       brands: filters.brands.sort(),
       minPrice: filters.minPrice,
       maxPrice: filters.maxPrice,
+      buyerCategory: filters.buyerCategory,
+      buyerSubcategory: filters.buyerSubcategory,
+      buyerSubSubcategory: filters.buyerSubSubcategory,
     });
   }, [filters]);
 
@@ -191,6 +224,9 @@ const DynamicMarketPage: React.FC = () => {
         brands: [],
         minPrice: undefined,
         maxPrice: undefined,
+        buyerCategory: undefined,
+        buyerSubcategory: undefined,
+        buyerSubSubcategory: undefined,
       });
       setMinPriceInput("");
       setMaxPriceInput("");
@@ -276,6 +312,15 @@ const DynamicMarketPage: React.FC = () => {
         }
         if (filters.maxPrice !== undefined) {
           queryParams.set("maxPrice", filters.maxPrice.toString());
+        }
+        if (filters.buyerCategory) {
+          queryParams.set("filterBuyerCategory", filters.buyerCategory);
+        }
+        if (filters.buyerSubcategory) {
+          queryParams.set("filterBuyerSubcategory", filters.buyerSubcategory);
+        }
+        if (filters.buyerSubSubcategory) {
+          queryParams.set("filterBuyerSubSubcategory", filters.buyerSubSubcategory);
         }
 
         const response = await fetch(
@@ -424,6 +469,9 @@ const DynamicMarketPage: React.FC = () => {
       brands: [],
       minPrice: undefined,
       maxPrice: undefined,
+      buyerCategory: undefined,
+      buyerSubcategory: undefined,
+      buyerSubSubcategory: undefined,
     });
     setMinPriceInput("");
     setMaxPriceInput("");
@@ -485,7 +533,10 @@ const DynamicMarketPage: React.FC = () => {
       filters.subcategories.length +
       filters.colors.length +
       filters.brands.length +
-      (filters.minPrice !== undefined || filters.maxPrice !== undefined ? 1 : 0)
+      (filters.minPrice !== undefined || filters.maxPrice !== undefined ? 1 : 0) +
+      (filters.buyerCategory ? 1 : 0) +
+      (filters.buyerSubcategory ? 1 : 0) +
+      (filters.buyerSubSubcategory ? 1 : 0)
     );
   };
 
@@ -555,86 +606,178 @@ const DynamicMarketPage: React.FC = () => {
     brand.toLowerCase().includes(brandSearch.toLowerCase())
   );
 
-  // Show initial loading only on first load
-  if (isInitialLoading) {
+  // Get available buyer categories
+  const getAvailableBuyerCategories = () => {
+    return AllInOneCategoryData.kBuyerCategories.map((cat) => cat.key);
+  };
+
+  // Get available buyer subcategories based on selected category
+  const getAvailableBuyerSubcategories = () => {
+    if (!filters.buyerCategory) return [];
+    return AllInOneCategoryData.kBuyerSubcategories[filters.buyerCategory] || [];
+  };
+
+  // Get available buyer sub-subcategories based on selected category and subcategory
+  const getAvailableBuyerSubSubcategories = () => {
+    if (!filters.buyerCategory || !filters.buyerSubcategory) return [];
     return (
-      <div
-        className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
-      >
-        {/* Header */}
+      AllInOneCategoryData.kBuyerSubSubcategories[filters.buyerCategory]?.[
+        filters.buyerSubcategory
+      ] || []
+    );
+  };
+
+  // Localize buyer category name using AllInOneCategoryData
+  const getLocalizedBuyerCategoryName = (categoryKey: string): string => {
+    return AllInOneCategoryData.localizeBuyerCategoryKey(categoryKey, l10n);
+  };
+
+  // Localize buyer subcategory name using AllInOneCategoryData
+  const getLocalizedBuyerSubcategoryName = (
+    parentCategory: string,
+    subcategoryKey: string
+  ): string => {
+    return AllInOneCategoryData.localizeBuyerSubcategoryKey(
+      parentCategory,
+      subcategoryKey,
+      l10n
+    );
+  };
+
+  // Localize buyer sub-subcategory name using AllInOneCategoryData
+  const getLocalizedBuyerSubSubcategoryName = (
+    parentCategory: string,
+    parentSubcategory: string,
+    subSubcategoryKey: string
+  ): string => {
+    return AllInOneCategoryData.localizeBuyerSubSubcategoryKey(
+      parentCategory,
+      parentSubcategory,
+      subSubcategoryKey,
+      l10n
+    );
+  };
+
+  // Handle buyer category selection
+  const handleBuyerCategorySelect = (category: string) => {
+    if (filters.buyerCategory === category) {
+      // Deselect if clicking the same category
+      setFilters((prev) => ({
+        ...prev,
+        buyerCategory: undefined,
+        buyerSubcategory: undefined,
+        buyerSubSubcategory: undefined,
+      }));
+    } else {
+      setFilters((prev) => ({
+        ...prev,
+        buyerCategory: category,
+        buyerSubcategory: undefined,
+        buyerSubSubcategory: undefined,
+      }));
+    }
+  };
+
+  // Handle buyer subcategory selection
+  const handleBuyerSubcategorySelect = (subcategory: string) => {
+    if (filters.buyerSubcategory === subcategory) {
+      // Deselect if clicking the same subcategory
+      setFilters((prev) => ({
+        ...prev,
+        buyerSubcategory: undefined,
+        buyerSubSubcategory: undefined,
+      }));
+    } else {
+      setFilters((prev) => ({
+        ...prev,
+        buyerSubcategory: subcategory,
+        buyerSubSubcategory: undefined,
+      }));
+    }
+  };
+
+  // Handle buyer sub-subcategory selection
+  const handleBuyerSubSubcategorySelect = (subSubcategory: string) => {
+    if (filters.buyerSubSubcategory === subSubcategory) {
+      // Deselect if clicking the same sub-subcategory
+      setFilters((prev) => ({
+        ...prev,
+        buyerSubSubcategory: undefined,
+      }));
+    } else {
+      setFilters((prev) => ({
+        ...prev,
+        buyerSubSubcategory: subSubcategory,
+      }));
+    }
+  };
+
+  // Shimmer component for loading skeleton
+  const ProductCardSkeleton = () => (
+    <div className="w-full">
+      <div className={`rounded-lg overflow-hidden ${isDarkMode ? "bg-gray-800" : "bg-gray-200"}`}>
+        {/* Image skeleton with shimmer effect */}
         <div
-          className={`shadow-sm p-4 flex items-center gap-4 ${
-            isDarkMode
-              ? "bg-gray-800 border-gray-700"
-              : "bg-white border-gray-200"
-          }`}
+          className={`w-full relative overflow-hidden ${isDarkMode ? "bg-gray-700" : "bg-gray-300"}`}
+          style={{ height: "320px" }}
         >
-          <button
-            onClick={handleBack}
-            className={`p-2 rounded-lg transition-colors ${
-              isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"
-            }`}
+          <div
+            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"
+            style={{
+              backgroundSize: "200% 100%",
+            }}
+          />
+        </div>
+
+        {/* Content skeleton */}
+        <div className="p-3 space-y-2.5">
+          {/* Title lines */}
+          <div className="space-y-2">
+            <div
+              className={`h-3.5 rounded ${isDarkMode ? "bg-gray-700" : "bg-gray-300"} relative overflow-hidden`}
+              style={{ width: "85%" }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
+            </div>
+            <div
+              className={`h-3.5 rounded ${isDarkMode ? "bg-gray-700" : "bg-gray-300"} relative overflow-hidden`}
+              style={{ width: "60%" }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
+            </div>
+          </div>
+
+          {/* Price */}
+          <div
+            className={`h-5 rounded ${isDarkMode ? "bg-gray-700" : "bg-gray-300"} relative overflow-hidden`}
+            style={{ width: "45%" }}
           >
-            <ArrowLeft
-              size={24}
-              className={isDarkMode ? "text-gray-300" : "text-gray-600"}
-            />
-          </button>
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <div className="px-3 py-1 bg-gradient-to-r from-orange-500 to-pink-500 rounded-lg text-white text-sm font-bold shadow-md">
-                Vitrin
-              </div>
-              <span
-                className={`font-semibold ${
-                  isDarkMode ? "text-white" : "text-gray-900"
-                }`}
-              >
-                {urlParams.displayName}
-              </span>
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
+          </div>
+
+          {/* Rating and colors */}
+          <div className="flex items-center justify-between pt-1">
+            <div
+              className={`h-3 rounded ${isDarkMode ? "bg-gray-700" : "bg-gray-300"} relative overflow-hidden`}
+              style={{ width: "40%" }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
+            </div>
+            <div className="flex gap-1">
+              {[...Array(3)].map((_, i) => (
+                <div
+                  key={i}
+                  className={`w-4 h-4 rounded-full ${isDarkMode ? "bg-gray-700" : "bg-gray-300"} relative overflow-hidden`}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
+                </div>
+              ))}
             </div>
           </div>
         </div>
-
-        {/* Loading skeleton */}
-        <div className="p-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div
-                key={i}
-                className={`rounded-xl shadow-sm animate-pulse ${
-                  isDarkMode ? "bg-gray-800" : "bg-white"
-                }`}
-              >
-                <div
-                  className={`aspect-[3/4] rounded-t-xl ${
-                    isDarkMode ? "bg-gray-700" : "bg-gray-200"
-                  }`}
-                ></div>
-                <div className="p-3 space-y-2">
-                  <div
-                    className={`h-4 rounded ${
-                      isDarkMode ? "bg-gray-700" : "bg-gray-200"
-                    }`}
-                  ></div>
-                  <div
-                    className={`h-3 rounded w-3/4 ${
-                      isDarkMode ? "bg-gray-700" : "bg-gray-200"
-                    }`}
-                  ></div>
-                  <div
-                    className={`h-4 rounded w-1/2 ${
-                      isDarkMode ? "bg-gray-700" : "bg-gray-200"
-                    }`}
-                  ></div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
-    );
-  }
+    </div>
+  );
 
   return (
     <div
@@ -710,6 +853,186 @@ const DynamicMarketPage: React.FC = () => {
             )}
 
             <div className="space-y-4">
+              {/* Buyer Category Filter (hierarchical) */}
+              <div>
+                <button
+                  onClick={() =>
+                    setExpandedSections((prev) => ({
+                      ...prev,
+                      buyerCategory: !prev.buyerCategory,
+                    }))
+                  }
+                  className="w-full flex items-center justify-between text-left py-1.5"
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`font-medium text-xs ${
+                        isDarkMode ? "text-white" : "text-gray-900"
+                      }`}
+                    >
+                      {t("DynamicMarket.categoryFilter") || "Category Filter"}
+                    </span>
+                    {(filters.buyerCategory ||
+                      filters.buyerSubcategory ||
+                      filters.buyerSubSubcategory) && (
+                      <span className="bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full font-semibold">
+                        {(filters.buyerCategory ? 1 : 0) +
+                          (filters.buyerSubcategory ? 1 : 0) +
+                          (filters.buyerSubSubcategory ? 1 : 0)}
+                      </span>
+                    )}
+                  </div>
+                  {expandedSections.buyerCategory ? (
+                    <ChevronUp size={14} className="text-gray-400" />
+                  ) : (
+                    <ChevronDown size={14} className="text-gray-400" />
+                  )}
+                </button>
+
+                {expandedSections.buyerCategory && (
+                  <div className="mt-1.5 space-y-2">
+                    {/* Clear category filters button */}
+                    {(filters.buyerCategory ||
+                      filters.buyerSubcategory ||
+                      filters.buyerSubSubcategory) && (
+                      <button
+                        onClick={() => {
+                          setFilters((prev) => ({
+                            ...prev,
+                            buyerCategory: undefined,
+                            buyerSubcategory: undefined,
+                            buyerSubSubcategory: undefined,
+                          }));
+                        }}
+                        className="w-full text-left py-1 px-2 text-xs text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded transition-colors"
+                      >
+                        {t("DynamicMarket.clearCategoryFilters") || "Clear Category Filters"}
+                      </button>
+                    )}
+
+                    {/* Level 1: Buyer Categories */}
+                    <div className="space-y-1.5">
+                      <p
+                        className={`text-xs font-semibold ${
+                          isDarkMode ? "text-gray-400" : "text-gray-500"
+                        }`}
+                      >
+                        {t("DynamicMarket.selectCategory") || "Select Category"}
+                      </p>
+                      <div className="max-h-40 overflow-y-auto space-y-1">
+                        {getAvailableBuyerCategories().map((category) => {
+                          const isSelected = filters.buyerCategory === category;
+                          return (
+                            <button
+                              key={category}
+                              onClick={() => handleBuyerCategorySelect(category)}
+                              className={`w-full text-left px-2 py-1.5 text-xs rounded transition-colors ${
+                                isSelected
+                                  ? "bg-orange-500 text-white font-semibold"
+                                  : isDarkMode
+                                  ? "text-gray-300 hover:bg-gray-700"
+                                  : "text-gray-700 hover:bg-gray-100"
+                              }`}
+                            >
+                              {getLocalizedBuyerCategoryName(category)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Level 2: Buyer Subcategories (shown when a category is selected) */}
+                    {filters.buyerCategory &&
+                      getAvailableBuyerSubcategories().length > 0 && (
+                        <div className="space-y-1.5 pl-2 border-l-2 border-orange-500">
+                          <p
+                            className={`text-xs font-semibold ${
+                              isDarkMode ? "text-gray-400" : "text-gray-500"
+                            }`}
+                          >
+                            {t("DynamicMarket.selectSubcategory") || "Select Subcategory"}
+                          </p>
+                          <div className="max-h-40 overflow-y-auto space-y-1">
+                            {getAvailableBuyerSubcategories().map(
+                              (subcategory) => {
+                                const isSelected =
+                                  filters.buyerSubcategory === subcategory;
+                                return (
+                                  <button
+                                    key={subcategory}
+                                    onClick={() =>
+                                      handleBuyerSubcategorySelect(subcategory)
+                                    }
+                                    className={`w-full text-left px-2 py-1.5 text-xs rounded transition-colors ${
+                                      isSelected
+                                        ? "bg-orange-500 text-white font-semibold"
+                                        : isDarkMode
+                                        ? "text-gray-300 hover:bg-gray-700"
+                                        : "text-gray-700 hover:bg-gray-100"
+                                    }`}
+                                  >
+                                    {getLocalizedBuyerSubcategoryName(
+                                      filters.buyerCategory || "",
+                                      subcategory
+                                    )}
+                                  </button>
+                                );
+                              }
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                    {/* Level 3: Buyer Sub-subcategories (shown when a subcategory is selected) */}
+                    {filters.buyerCategory &&
+                      filters.buyerSubcategory &&
+                      getAvailableBuyerSubSubcategories().length > 0 && (
+                        <div className="space-y-1.5 pl-4 border-l-2 border-orange-500">
+                          <p
+                            className={`text-xs font-semibold ${
+                              isDarkMode ? "text-gray-400" : "text-gray-500"
+                            }`}
+                          >
+                            {t("DynamicMarket.selectSubSubcategory") || "Select Sub-subcategory"}
+                          </p>
+                          <div className="max-h-40 overflow-y-auto space-y-1">
+                            {getAvailableBuyerSubSubcategories().map(
+                              (subSubcategory) => {
+                                const isSelected =
+                                  filters.buyerSubSubcategory ===
+                                  subSubcategory;
+                                return (
+                                  <button
+                                    key={subSubcategory}
+                                    onClick={() =>
+                                      handleBuyerSubSubcategorySelect(
+                                        subSubcategory
+                                      )
+                                    }
+                                    className={`w-full text-left px-2 py-1.5 text-xs rounded transition-colors ${
+                                      isSelected
+                                        ? "bg-orange-500 text-white font-semibold"
+                                        : isDarkMode
+                                        ? "text-gray-300 hover:bg-gray-700"
+                                        : "text-gray-700 hover:bg-gray-100"
+                                    }`}
+                                  >
+                                    {getLocalizedBuyerSubSubcategoryName(
+                                      filters.buyerCategory || "",
+                                      filters.buyerSubcategory || "",
+                                      subSubcategory
+                                    )}
+                                  </button>
+                                );
+                              }
+                            )}
+                          </div>
+                        </div>
+                      )}
+                  </div>
+                )}
+              </div>
+
               {/* Categories Filter (only for Women/Men buyer categories) */}
               {shouldShowCategoriesFilter() &&
                 getAvailableSubSubcategories().length > 0 && (
@@ -1224,13 +1547,12 @@ const DynamicMarketPage: React.FC = () => {
         {/* Main Content - This is the only part that reloads when filters change */}
         <div className="flex-1 min-w-0">
           {/* Header - Static, doesn't reload */}
-          {/* Header - Static, doesn't reload */}
           <div
-            className={`shadow-md sticky top-0 z-10 backdrop-blur-xl ${
+            className={`sticky top-0 z-10 border-b ${
               isDarkMode
-                ? "bg-gray-800/95 border-gray-700"
-                : "bg-white/95 border-gray-200"
-            } border-b`}
+                ? "bg-gray-800 border-gray-700"
+                : "bg-white border-gray-200"
+            }`}
           >
             <div className="p-4 flex items-center gap-3">
               {/* Back button */}
@@ -1247,7 +1569,7 @@ const DynamicMarketPage: React.FC = () => {
               </button>
 
               {/* Nar24 Logo */}
-              <div className="px-3 py-1 bg-gradient-to-r from-purple-500 to-purple-700 rounded-lg text-white text-sm font-bold shadow-md flex-shrink-0">
+              <div className="px-3 py-1 bg-purple-600 rounded-lg text-white text-sm font-bold flex-shrink-0">
                 Vitrin
               </div>
 
@@ -1259,12 +1581,12 @@ const DynamicMarketPage: React.FC = () => {
                     onClick={() =>
                       handleFilterSelect(filter === "" ? null : filter)
                     }
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all duration-200 flex-shrink-0 ${
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
                       selectedFilter === (filter === "" ? null : filter)
-                        ? "bg-gradient-to-r from-orange-500 to-pink-500 text-white shadow-lg"
+                        ? "bg-orange-600 text-white"
                         : isDarkMode
                         ? "bg-gray-700 text-gray-300 hover:bg-gray-600 border border-gray-600"
-                        : "bg-white text-gray-700 hover:bg-gray-50 shadow-sm border border-gray-200"
+                        : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-200"
                     }`}
                   >
                     {getFilterButtonText(filter)}
@@ -1353,47 +1675,39 @@ const DynamicMarketPage: React.FC = () => {
 
           {/* Products Grid - This is the only part that shows loading when filters change */}
           <div className="p-4 relative">
-            {/* Loading overlay for products area only */}
-            {isProductsLoading && (
-              <div
-                className={`absolute inset-0 ${
-                  isDarkMode ? "bg-gray-900/80" : "bg-white/80"
-                } backdrop-blur-sm z-10 flex items-center justify-center`}
-              >
-                <div className="text-center">
-                  <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
-                  <p
-                    className={`mt-4 text-sm ${
-                      isDarkMode ? "text-gray-300" : "text-gray-600"
-                    }`}
-                  >
-                    {t("DynamicMarket.updatingProducts")}
-                  </p>
-                </div>
+            {/* Initial Loading - Show shimmer skeletons */}
+            {isInitialLoading && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <ProductCardSkeleton key={i} />
+                ))}
+              </div>
+            )}
+
+            {/* Subsequent loading - Show shimmer skeletons */}
+            {!isInitialLoading && isProductsLoading && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <ProductCardSkeleton key={i} />
+                ))}
               </div>
             )}
 
             {/* Boosted products first (only on default filter) */}
-            {selectedFilter === null && boostedProducts.length > 0 && (
+            {!isInitialLoading && selectedFilter === null && boostedProducts.length > 0 && (
               <div className="mb-8">
                 <div
                   className={`flex items-center gap-3 mb-4 ${
                     isDarkMode ? "text-white" : "text-gray-900"
                   }`}
                 >
-                  <div className="w-1 h-8 bg-gradient-to-b from-orange-500 to-pink-500 rounded-full"></div>
                   <h3 className="text-xl font-bold">
                     {t("DynamicMarket.featuredProducts")}
                   </h3>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {boostedProducts.map((product) => (
-                    <div
-                      key={`boosted-${product.id}`}
-                      className={`rounded-xl shadow-md transition-all duration-200 hover:shadow-lg hover:scale-105 ${
-                        isDarkMode ? "bg-gray-800" : "bg-white"
-                      }`}
-                    >
+                    <div key={`boosted-${product.id}`} className="w-full">
                       <ProductCard
                         product={product}
                         onTap={() => handleProductClick(product)}
@@ -1412,14 +1726,13 @@ const DynamicMarketPage: React.FC = () => {
             )}
 
             {/* Regular products */}
-            {products.length > 0 ? (
+            {!isInitialLoading && products.length > 0 ? (
               <div>
                 <div
                   className={`flex items-center gap-3 mb-4 ${
                     isDarkMode ? "text-white" : "text-gray-900"
                   }`}
                 >
-                  <div className="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full"></div>
                   <h3 className="text-xl font-bold">
                     {t("DynamicMarket.allProducts")}
                   </h3>
@@ -1447,12 +1760,7 @@ const DynamicMarketPage: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {products.map((product) => (
-                    <div
-                      key={product.id}
-                      className={`rounded-xl shadow-md transition-all duration-200 hover:shadow-lg hover:scale-105 ${
-                        isDarkMode ? "bg-gray-800" : "bg-white"
-                      }`}
-                    >
+                    <div key={product.id} className="w-full">
                       <ProductCard
                         product={product}
                         onTap={() => handleProductClick(product)}
@@ -1469,7 +1777,7 @@ const DynamicMarketPage: React.FC = () => {
                 </div>
               </div>
             ) : (
-              !isProductsLoading && (
+              !isInitialLoading && !isProductsLoading && (
                 <div className="text-center py-16">
                   <div
                     className={`mb-6 ${
@@ -1505,7 +1813,7 @@ const DynamicMarketPage: React.FC = () => {
             )}
 
             {/* Loading more indicator */}
-            {isLoadingMore && (
+            {!isInitialLoading && isLoadingMore && (
               <div className="text-center py-8">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
                 <p
@@ -1519,17 +1827,18 @@ const DynamicMarketPage: React.FC = () => {
             )}
 
             {/* Load more button */}
-            {hasMore &&
+            {!isInitialLoading &&
+              hasMore &&
               !isLoadingMore &&
               products.length > 0 &&
               !isProductsLoading && (
                 <div className="text-center py-8">
                   <button
                     onClick={handleLoadMore}
-                    className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 ${
+                    className={`px-6 py-3 rounded-lg font-medium transition-colors ${
                       isDarkMode
                         ? "bg-gray-700 hover:bg-gray-600 text-white border border-gray-600"
-                        : "bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 shadow-sm"
+                        : "bg-white hover:bg-gray-50 text-gray-700 border border-gray-200"
                     }`}
                   >
                     {t("DynamicMarket.loadMore")}
@@ -1542,6 +1851,21 @@ const DynamicMarketPage: React.FC = () => {
           <div className="h-20"></div>
         </div>
       </div>
+
+      <style jsx>{`
+        @keyframes shimmer {
+          0% {
+            transform: translateX(-100%);
+          }
+          100% {
+            transform: translateX(100%);
+          }
+        }
+
+        .animate-shimmer {
+          animation: shimmer 2s infinite;
+        }
+      `}</style>
     </div>
   );
 };

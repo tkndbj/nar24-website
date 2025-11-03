@@ -283,15 +283,15 @@ export default function DynamicMarketPage() {
         setLoading(false);
         return;
       }
-
+  
       // Abort previous request if exists
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
-
+  
       // Create new abort controller
       abortControllerRef.current = new AbortController();
-
+  
       try {
         if (!append) {
           setLoading(true);
@@ -299,16 +299,16 @@ export default function DynamicMarketPage() {
         } else {
           setLoadingMore(true);
         }
-
+  
         const params = new URLSearchParams({
           category,
           page: page.toString(),
           limit: PRODUCTS_PER_PAGE.toString(),
         });
-
+  
         if (subcategory) params.set("subcategory", subcategory);
         if (subsubcategory) params.set("subsubcategory", subsubcategory);
-
+  
         if (filters.subcategories.length > 0) {
           params.set("filterSubcategories", filters.subcategories.join(","));
         }
@@ -324,38 +324,42 @@ export default function DynamicMarketPage() {
         if (filters.maxPrice !== undefined) {
           params.set("maxPrice", filters.maxPrice.toString());
         }
-
+  
         params.set("sort", "date");
-
+  
         const response = await fetch(`/api/dynamicmarket?${params}`, {
           signal: abortControllerRef.current.signal,
         });
-
+  
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
-
+  
         const data: ProductsResponse = await response.json();
-
+  
         if (append) {
           setProducts((prev) => [...prev, ...data.products]);
         } else {
           setProducts(data.products);
         }
-
+  
         setHasMore(data.hasMore);
         setCurrentPage(page);
         
         if (isFirstLoadRef.current) {
           isFirstLoadRef.current = false;
         }
+        
+        // ✅ CRITICAL FIX: Set loading states AFTER products are updated
+        setLoading(false);
+        setLoadingMore(false);
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") {
           return; // Request was cancelled, don't update state
         }
         console.error("Error fetching products:", err);
         setError(err instanceof Error ? err.message : "Failed to fetch products");
-      } finally {
+        // ✅ Set loading states in catch block too
         setLoading(false);
         setLoadingMore(false);
       }
@@ -910,91 +914,92 @@ export default function DynamicMarketPage() {
 
             {/* Content */}
             <div className="px-4 pb-8">
-              {/* Loading state with shimmer skeletons */}
-              {loading && products.length === 0 && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6">
-                  {[...Array(8)].map((_, index) => (
-                    <ProductCardSkeleton key={index} />
-                  ))}
-                </div>
-              )}
+  {/* Loading state with shimmer skeletons - ONLY show when loading and no products */}
+  {loading && products.length === 0 && !error && (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6">
+      {[...Array(8)].map((_, index) => (
+        <ProductCardSkeleton key={index} />
+      ))}
+    </div>
+  )}
 
-              {/* Error state */}
-              {error && (
-                <div className="flex items-center justify-center py-12">
-                  <div className="text-center">
-                    <AlertCircle size={48} className="mx-auto mb-4 text-red-500" />
-                    <h2 className={`text-xl font-semibold mb-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-                      Error Loading Products
-                    </h2>
-                    <p className={`mb-4 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>{error}</p>
-                    <button
-                      onClick={() => fetchProducts(0, false)}
-                      className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
-                    >
-                      Try Again
-                    </button>
-                  </div>
-                </div>
-              )}
+  {/* Error state */}
+  {error && (
+    <div className="flex items-center justify-center py-12">
+      <div className="text-center">
+        <AlertCircle size={48} className="mx-auto mb-4 text-red-500" />
+        <h2 className={`text-xl font-semibold mb-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+          Error Loading Products
+        </h2>
+        <p className={`mb-4 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>{error}</p>
+        <button
+          onClick={() => fetchProducts(0, false)}
+          className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+        >
+          Try Again
+        </button>
+      </div>
+    </div>
+  )}
 
-              {/* Products grid */}
-              {!loading && products.length > 0 && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6">
-                  {products.map((product) => (
-                    <div key={product.id} className="w-full">
-                      <ProductCard
-                        product={product}
-                        onTap={() => handleProductClick(product.id)}
-                        onFavoriteToggle={handleFavoriteToggle}
-                        onAddToCart={handleAddToCart}
-                        onColorSelect={(color) => handleColorSelect(product.id, color)}
-                        showCartIcon={true}
-                        isFavorited={false}
-                        isInCart={false}
-                        portraitImageHeight={320}
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
+  {/* Products grid - show when we have products OR when still loading with existing products */}
+  {products.length > 0 && (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6">
+      {products.map((product) => (
+        <div key={product.id} className="w-full">
+          <ProductCard
+            product={product}
+            onTap={() => handleProductClick(product.id)}
+            onFavoriteToggle={handleFavoriteToggle}
+            onAddToCart={handleAddToCart}
+            onColorSelect={(color) => handleColorSelect(product.id, color)}
+            showCartIcon={true}
+            isFavorited={false}
+            isInCart={false}
+            portraitImageHeight={320}
+          />
+        </div>
+      ))}
+    </div>
+  )}
 
-              {/* No products state */}
-              {!loading && products.length === 0 && !error && (
-                <div className="flex items-center justify-center py-12">
-                  <div className="text-center">
-                    <div className={`text-6xl mb-4 ${isDarkMode ? "text-gray-600" : "text-gray-300"}`}>
-                      🛍️
-                    </div>
-                    <h2 className={`text-xl font-semibold mb-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-                      No Products Found
-                    </h2>
-                    <p className={`${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                      No products available with the current filters.
-                    </p>
-                    {activeFiltersCount > 0 && (
-                      <button
-                        onClick={clearAllFilters}
-                        className="mt-4 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
-                      >
-                        Clear All Filters
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
+  {/* No products state - ONLY show when NOT loading, no error, and truly no products */}
+  {!loading && !error && products.length === 0 && (
+    <div className="flex items-center justify-center py-12">
+      <div className="text-center">
+        <div className={`text-6xl mb-4 ${isDarkMode ? "text-gray-600" : "text-gray-300"}`}>
+          🛍️
+        </div>
+        <h2 className={`text-xl font-semibold mb-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+          No Products Found
+        </h2>
+        <p className={`${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+          No products available with the current filters.
+        </p>
+        {activeFiltersCount > 0 && (
+          <button
+            onClick={clearAllFilters}
+            className="mt-4 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+          >
+            Clear All Filters
+          </button>
+        )}
+      </div>
+    </div>
+  )}
 
-              {/* Loading more indicator */}
-              {loadingMore && (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 size={24} className="animate-spin text-orange-500" />
-                  <span className={`ml-3 text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                    Loading more products...
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
+  {/* Loading more indicator */}
+  {loadingMore && (
+    <div className="flex items-center justify-center py-8">
+      <Loader2 size={24} className="animate-spin text-orange-500" />
+      <span className={`ml-3 text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+        Loading more products...
+      </span>
+    </div>
+  )}
+</div>
+</div>
+
         </div>
       </div>
     </>

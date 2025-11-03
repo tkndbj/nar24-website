@@ -34,15 +34,22 @@ export async function GET(request: NextRequest) {
 
     // Dynamic filters from sidebar
     const filterSubcategories =
-      searchParams.get("filterSubcategories")?.split(",") || [];
-    const colors = searchParams.get("colors")?.split(",") || [];
-    const brands = searchParams.get("brands")?.split(",") || [];
+      searchParams.get("filterSubcategories")?.split(",").filter(Boolean) || [];
+    const colors = searchParams.get("colors")?.split(",").filter(Boolean) || [];
+    const brands = searchParams.get("brands")?.split(",").filter(Boolean) || [];
     const minPrice = searchParams.get("minPrice")
       ? parseFloat(searchParams.get("minPrice")!)
       : null;
     const maxPrice = searchParams.get("maxPrice")
       ? parseFloat(searchParams.get("maxPrice")!)
       : null;
+
+    // New hierarchical buyer category filters
+    const filterBuyerCategory = searchParams.get("filterBuyerCategory");
+    const filterBuyerSubcategory = searchParams.get("filterBuyerSubcategory");
+    const filterBuyerSubSubcategory = searchParams.get(
+      "filterBuyerSubSubcategory"
+    );
 
     console.log("🔍 Teras API Request params:", {
       category,
@@ -58,6 +65,9 @@ export async function GET(request: NextRequest) {
       brands,
       minPrice,
       maxPrice,
+      filterBuyerCategory,
+      filterBuyerSubcategory,
+      filterBuyerSubSubcategory,
     });
 
     // Convert URL-friendly category back to Firestore format
@@ -69,7 +79,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Build the main query for products collection
-    const q = buildProductsQuery({
+    const { q, error } = buildProductsQuery({
       category: firestoreCategory,
       subcategory,
       subsubcategory,
@@ -83,12 +93,50 @@ export async function GET(request: NextRequest) {
       minPrice,
       maxPrice,
       page,
+      filterBuyerCategory,
+      filterBuyerSubcategory,
+      filterBuyerSubSubcategory,
     });
+
+    if (error) {
+      console.error("❌ Error building query:", error);
+      return NextResponse.json(
+        {
+          error: "Failed to build query",
+          details: error,
+        },
+        { status: 500 }
+      );
+    }
 
     // Execute query
     console.log("🔍 Executing Firestore query on products collection...");
-    const snapshot = await getDocs(q);
-    console.log(`🔍 Query returned ${snapshot.size} documents`);
+    let snapshot;
+    try {
+      snapshot = await getDocs(q);
+      console.log(`🔍 Query returned ${snapshot.size} documents`);
+    } catch (firestoreError) {
+      console.error("❌ Firestore query execution failed:", firestoreError);
+      console.error("❌ Query details:", {
+        category: firestoreCategory,
+        subcategory,
+        subsubcategory,
+        buyerCategory,
+        filterBuyerCategory,
+        filterBuyerSubcategory,
+        filterBuyerSubSubcategory,
+      });
+
+      // Return a more helpful error message
+      return NextResponse.json(
+        {
+          error: "Database query failed",
+          details: firestoreError instanceof Error ? firestoreError.message : "Unknown Firestore error",
+          hint: "This might require a Firestore composite index. Check the Firebase console for index creation links.",
+        },
+        { status: 500 }
+      );
+    }
 
     const products: Product[] = [];
 
@@ -104,20 +152,29 @@ export async function GET(request: NextRequest) {
 
     // Fetch boosted products separately (only for default filter)
     let boostedProducts: Product[] = [];
-    if (!quickFilter && firestoreCategory) {
+    if (!quickFilter && (firestoreCategory || filterBuyerCategory)) {
       console.log("🔍 Fetching boosted products from products collection...");
-      boostedProducts = await fetchBoostedProductsFromProducts({
-        category: firestoreCategory,
-        subcategory,
-        subsubcategory,
-        buyerCategory,
-        dynamicBrands: brands,
-        dynamicColors: colors,
-        dynamicSubSubcategories: filterSubcategories,
-        minPrice,
-        maxPrice,
-      });
-      console.log(`🔍 Found ${boostedProducts.length} boosted products`);
+      try {
+        boostedProducts = await fetchBoostedProductsFromProducts({
+          category: firestoreCategory,
+          subcategory,
+          subsubcategory,
+          buyerCategory,
+          dynamicBrands: brands,
+          dynamicColors: colors,
+          dynamicSubSubcategories: filterSubcategories,
+          minPrice,
+          maxPrice,
+          filterBuyerCategory,
+          filterBuyerSubcategory,
+          filterBuyerSubSubcategory,
+        });
+        console.log(`🔍 Found ${boostedProducts.length} boosted products`);
+      } catch (boostedError) {
+        console.error("❌ Failed to fetch boosted products:", boostedError);
+        // Don't fail the whole request, just log the error and continue without boosted products
+        boostedProducts = [];
+      }
     }
 
     console.log("🔍 Teras API Response:", {
@@ -187,6 +244,9 @@ interface ProductsQueryParams {
   minPrice?: number | null;
   maxPrice?: number | null;
   page: number;
+  filterBuyerCategory?: string | null;
+  filterBuyerSubcategory?: string | null;
+  filterBuyerSubSubcategory?: string | null;
 }
 
 function buildProductsQuery({
@@ -202,169 +262,281 @@ function buildProductsQuery({
   minPrice,
   maxPrice,
   page,
-}: ProductsQueryParams): Query<DocumentData, DocumentData> {
-  const collectionRef: CollectionReference<DocumentData, DocumentData> =
-    collection(db, "products"); // Using products collection
-  const constraints: QueryConstraint[] = [];
+  filterBuyerCategory,
+  filterBuyerSubcategory,
+  filterBuyerSubSubcategory,
+}: ProductsQueryParams): { q: Query<DocumentData, DocumentData>; error?: string } {
+  try {
+    const collectionRef: CollectionReference<DocumentData, DocumentData> =
+      collection(db, "products");
+    const constraints: QueryConstraint[] = [];
 
-  console.log("🔍 Building products query with params:", {
-    category,
-    subcategory,
-    subsubcategory,
-    buyerCategory,
-    sortOption,
-    quickFilter,
-    page,
-  });
+    console.log("🔍 Building products query with params:", {
+      category,
+      subcategory,
+      subsubcategory,
+      buyerCategory,
+      sortOption,
+      quickFilter,
+      page,
+      filterBuyerCategory,
+      filterBuyerSubcategory,
+      filterBuyerSubSubcategory,
+    });
 
-  // ========== BASIC FILTERS ==========
-  if (category) {
-    constraints.push(where("category", "==", category));
-    console.log("🔍 Added category filter:", category);
-  }
+    // Determine which category to use (URL param takes precedence)
+    let effectiveCategory = category;
+    let effectiveGender: string | null = null;
 
-  if (subcategory) {
-    constraints.push(where("subcategory", "==", subcategory));
-    console.log("🔍 Added subcategory filter:", subcategory);
-  }
+    // ========== HIERARCHICAL BUYER CATEGORY FILTERING ==========
+    if (filterBuyerCategory) {
+      console.log("🔍 Processing filterBuyerCategory:", filterBuyerCategory);
 
-  if (subsubcategory) {
-    constraints.push(where("subsubcategory", "==", subsubcategory));
-    console.log("🔍 Added subsubcategory filter:", subsubcategory);
-  }
+      // Handle gender filtering for Women/Men
+      if (filterBuyerCategory === "Women" || filterBuyerCategory === "Men") {
+        effectiveGender = filterBuyerCategory;
+      }
 
-  // ========== GENDER FILTERING ==========
-  if (buyerCategory === "Women" || buyerCategory === "Men") {
-    constraints.push(where("gender", "in", [buyerCategory, "Unisex"]));
-    console.log("🔍 Added gender filter:", [buyerCategory, "Unisex"]);
-  }
+      // If filterBuyerSubcategory is set, map to product category
+      if (filterBuyerSubcategory) {
+        console.log(
+          "🔍 Processing filterBuyerSubcategory:",
+          filterBuyerSubcategory
+        );
 
-  // ========== DYNAMIC FILTERS ==========
-  if (dynamicSubSubcategories.length > 0) {
-    if (dynamicSubSubcategories.length <= 10) {
-      constraints.push(where("subsubcategory", "in", dynamicSubSubcategories));
-    } else {
-      constraints.push(
-        where("subsubcategory", "in", dynamicSubSubcategories.slice(0, 10))
+        // Map buyer subcategory to product category
+        const productCategoryMapping: Record<string, Record<string, string>> = {
+          Women: {
+            Fashion: "Clothing & Fashion",
+            Shoes: "Footwear",
+            Accessories: "Accessories",
+            Bags: "Bags & Luggage",
+            "Self Care": "Beauty & Personal Care",
+          },
+          Men: {
+            Fashion: "Clothing & Fashion",
+            Shoes: "Footwear",
+            Accessories: "Accessories",
+            Bags: "Bags & Luggage",
+            "Self Care": "Beauty & Personal Care",
+          },
+        };
+
+        const mappedCategory =
+          productCategoryMapping[filterBuyerCategory]?.[filterBuyerSubcategory];
+
+        // Use mapped category if URL category is not already set
+        if (mappedCategory && !category) {
+          effectiveCategory = mappedCategory;
+        }
+      } else if (
+        filterBuyerCategory !== "Women" &&
+        filterBuyerCategory !== "Men"
+      ) {
+        // For non-gendered categories, map directly
+        const directCategoryMap: Record<string, string> = {
+          "Mother & Child": "Mother & Child",
+          "Home & Furniture": "Home & Furniture",
+          Electronics: "Electronics",
+          "Books, Stationery & Hobby": "Books, Stationery & Hobby",
+          "Sports & Outdoor": "Sports & Outdoor",
+          "Tools & Hardware": "Tools & Hardware",
+          "Pet Supplies": "Pet Supplies",
+          Automotive: "Automotive",
+          "Health & Wellness": "Health & Wellness",
+        };
+
+        const mappedCategory = directCategoryMap[filterBuyerCategory];
+        if (mappedCategory && !category) {
+          effectiveCategory = mappedCategory;
+        }
+      }
+    }
+
+    // Apply gender filter from URL params if present
+    if (buyerCategory === "Women" || buyerCategory === "Men") {
+      effectiveGender = buyerCategory;
+    }
+
+    // ========== APPLY FILTERS ==========
+    // Category filter
+    if (effectiveCategory) {
+      constraints.push(where("category", "==", effectiveCategory));
+      console.log("🔍 Added category filter:", effectiveCategory);
+    }
+
+    // Gender filter (only add once)
+    if (effectiveGender) {
+      constraints.push(where("gender", "in", [effectiveGender, "Unisex"]));
+      console.log("🔍 Added gender filter:", [effectiveGender, "Unisex"]);
+    }
+
+    // Subcategory filter
+    let effectiveSubcategory = subcategory;
+
+    // For Women/Men buyer categories, buyerSubSubcategory maps to product subcategory
+    // This applies to all buyer subcategories: Fashion, Shoes, Accessories, Bags, Self Care
+    if (
+      filterBuyerCategory &&
+      (filterBuyerCategory === "Women" || filterBuyerCategory === "Men") &&
+      filterBuyerSubcategory &&
+      filterBuyerSubSubcategory &&
+      !subcategory
+    ) {
+      effectiveSubcategory = filterBuyerSubSubcategory;
+      console.log(
+        "🔍 Mapped buyerSubSubcategory to product subcategory:",
+        effectiveSubcategory
       );
     }
-    console.log(
-      "🔍 Added dynamic subsubcategories filter:",
-      dynamicSubSubcategories
-    );
-  }
 
-  if (dynamicBrands.length > 0) {
-    // Note: Adjust field name if different in products collection
-    const brandField = "brandModel"; // or "brand" if that's the field name
-    if (dynamicBrands.length <= 10) {
-      constraints.push(where(brandField, "in", dynamicBrands));
-    } else {
-      constraints.push(where(brandField, "in", dynamicBrands.slice(0, 10)));
+    if (effectiveSubcategory) {
+      constraints.push(where("subcategory", "==", effectiveSubcategory));
+      console.log("🔍 Added subcategory filter:", effectiveSubcategory);
     }
-    console.log("🔍 Added dynamic brands filter:", dynamicBrands);
-  }
 
-  if (dynamicColors.length > 0) {
-    // Note: Adjust field name if different in products collection
-    const colorField = "availableColors"; // or "colors" if that's the field name
-    if (dynamicColors.length <= 10) {
-      constraints.push(where(colorField, "array-contains-any", dynamicColors));
-    } else {
-      constraints.push(
-        where(colorField, "array-contains-any", dynamicColors.slice(0, 10))
-      );
+    // Subsubcategory filter (only if not already used for subcategory mapping)
+    let effectiveSubSubcategory = subsubcategory;
+
+    // Only use filterBuyerSubSubcategory for subsubcategory if not Women/Men buyer categories
+    if (
+      !effectiveSubSubcategory &&
+      filterBuyerSubSubcategory &&
+      !(
+        filterBuyerCategory &&
+        (filterBuyerCategory === "Women" || filterBuyerCategory === "Men") &&
+        filterBuyerSubcategory
+      )
+    ) {
+      effectiveSubSubcategory = filterBuyerSubSubcategory;
     }
-    console.log("🔍 Added dynamic colors filter:", dynamicColors);
-  }
 
-  if (minPrice !== null) {
-    constraints.push(where("price", ">=", minPrice));
-    console.log("🔍 Added minPrice filter:", minPrice);
-  }
-
-  if (maxPrice !== null) {
-    constraints.push(where("price", "<=", maxPrice));
-    console.log("🔍 Added maxPrice filter:", maxPrice);
-  }
-
-  // ========== QUICK FILTERS ==========
-  if (quickFilter) {
-    console.log("🔍 Adding quick filter:", quickFilter);
-    switch (quickFilter) {
-      case "deals":
-        // Check if products collection has discount field
-        constraints.push(where("discountPercentage", ">", 0));
-        break;
-      case "boosted":
-        // Check if products collection has boosted field
-        constraints.push(where("isBoosted", "==", true));
-        break;
-      case "trending":
-        // Adjust field name if different in products collection
-        constraints.push(where("dailyClickCount", ">=", 10));
-        break;
-      case "fiveStar":
-        // Adjust field name if different in products collection
-        constraints.push(where("averageRating", "==", 5));
-        break;
-      case "bestSellers":
-        // Don't add constraint here, handle in sorting
-        break;
+    if (effectiveSubSubcategory) {
+      constraints.push(where("subsubcategory", "==", effectiveSubSubcategory));
+      console.log("🔍 Added subsubcategory filter:", effectiveSubSubcategory);
     }
-  }
 
-  // ========== SORTING ==========
-  console.log("🔍 Adding sorting for option:", sortOption);
+    // ========== DYNAMIC FILTERS ==========
+    if (dynamicSubSubcategories.length > 0 && !effectiveSubSubcategory) {
+      if (dynamicSubSubcategories.length <= 10) {
+        constraints.push(where("subsubcategory", "in", dynamicSubSubcategories));
+        console.log(
+          "🔍 Added dynamic subsubcategories filter:",
+          dynamicSubSubcategories
+        );
+      } else {
+        constraints.push(
+          where("subsubcategory", "in", dynamicSubSubcategories.slice(0, 10))
+        );
+        console.log(
+          "🔍 Added dynamic subsubcategories filter (limited to 10):",
+          dynamicSubSubcategories.slice(0, 10)
+        );
+      }
+    }
 
-  if (quickFilter === "bestSellers") {
-    // For best sellers: try different approaches based on available fields
-    try {
-      constraints.push(orderBy("isBoosted", "desc"));
+    if (dynamicBrands.length > 0) {
+      // Note: Your Firestore doesn't have brandModel field, you might need to adjust this
+      // Based on your example, there's no brand field visible, so this might cause issues
+      const brandField = "brandModel";
+      if (dynamicBrands.length <= 10) {
+        constraints.push(where(brandField, "in", dynamicBrands));
+      } else {
+        constraints.push(where(brandField, "in", dynamicBrands.slice(0, 10)));
+      }
+      console.log("🔍 Added dynamic brands filter:", dynamicBrands);
+    }
+
+    if (dynamicColors.length > 0) {
+      if (dynamicColors.length <= 10) {
+        constraints.push(
+          where("availableColors", "array-contains-any", dynamicColors)
+        );
+      } else {
+        constraints.push(
+          where("availableColors", "array-contains-any", dynamicColors.slice(0, 10))
+        );
+      }
+      console.log("🔍 Added dynamic colors filter:", dynamicColors);
+    }
+
+    if (minPrice !== null) {
+      constraints.push(where("price", ">=", minPrice));
+      console.log("🔍 Added minPrice filter:", minPrice);
+    }
+
+    if (maxPrice !== null) {
+      constraints.push(where("price", "<=", maxPrice));
+      console.log("🔍 Added maxPrice filter:", maxPrice);
+    }
+
+    // ========== QUICK FILTERS ==========
+    if (quickFilter) {
+      console.log("🔍 Adding quick filter:", quickFilter);
+      switch (quickFilter) {
+        case "deals":
+          // Check if this field exists in your Firestore
+          constraints.push(where("discountPercentage", ">", 0));
+          break;
+        case "boosted":
+          constraints.push(where("isBoosted", "==", true));
+          break;
+        case "trending":
+          constraints.push(where("isTrending", "==", true));
+          break;
+        case "fiveStar":
+          constraints.push(where("averageRating", "==", 5));
+          break;
+        case "bestSellers":
+          // Don't add constraint here, handle in sorting
+          break;
+      }
+    }
+
+    // ========== SORTING ==========
+    console.log("🔍 Adding sorting for option:", sortOption);
+
+    // For complex queries with multiple where clauses, we need to be careful with orderBy
+    // Firestore requires composite indexes for certain combinations
+    if (quickFilter === "bestSellers") {
+      // Use purchaseCount if available
       constraints.push(orderBy("purchaseCount", "desc"));
-    } catch {
-      // Fallback if purchaseCount doesn't exist
-      constraints.push(orderBy("createdAt", "desc"));
-    }
-  } else {
-    switch (sortOption) {
-      case "alphabetical":
-        try {
+    } else {
+      switch (sortOption) {
+        case "alphabetical":
           constraints.push(orderBy("productName", "asc"));
-        } catch {
-          // Fallback if productName field is different
-          constraints.push(orderBy("name", "asc"));
-        }
-        break;
-      case "price_asc":
-        constraints.push(orderBy("price", "asc"));
-        break;
-      case "price_desc":
-        constraints.push(orderBy("price", "desc"));
-        break;
-      case "date":
-      default:
-        // Default sorting by date (most recent first)
-        try {
+          break;
+        case "price_asc":
+          constraints.push(orderBy("price", "asc"));
+          break;
+        case "price_desc":
+          constraints.push(orderBy("price", "desc"));
+          break;
+        case "date":
+        default:
+          // Use createdAt for date sorting - this exists in your Firestore
           constraints.push(orderBy("createdAt", "desc"));
-        } catch {
-          // Fallback if createdAt doesn't exist
-          try {
-            constraints.push(orderBy("dateAdded", "desc"));
-          } catch {
-            // Ultimate fallback
-            constraints.push(orderBy("timestamp", "desc"));
-          }
-        }
-        break;
+          break;
+      }
     }
+
+    // Add limit constraint
+    constraints.push(limit(LIMIT));
+
+    console.log(
+      "🔍 Final products query constraints count:",
+      constraints.length
+    );
+    
+    const q = query(collectionRef, ...constraints);
+    return { q };
+  } catch (error) {
+    console.error("❌ Error in buildProductsQuery:", error);
+    return {
+      q: query(collection(db, "products"), limit(LIMIT)),
+      error: error instanceof Error ? error.message : "Unknown error building query"
+    };
   }
-
-  // Add limit constraint
-  constraints.push(limit(LIMIT));
-
-  console.log("🔍 Final products query constraints count:", constraints.length);
-  return query(collectionRef, ...constraints);
 }
 
 async function fetchBoostedProductsFromProducts({
@@ -377,8 +549,11 @@ async function fetchBoostedProductsFromProducts({
   dynamicSubSubcategories,
   minPrice,
   maxPrice,
+  filterBuyerCategory,
+  filterBuyerSubcategory,
+  filterBuyerSubSubcategory,
 }: {
-  category: string;
+  category?: string | null;
   subcategory?: string | null;
   subsubcategory?: string | null;
   buyerCategory?: string | null;
@@ -387,70 +562,152 @@ async function fetchBoostedProductsFromProducts({
   dynamicSubSubcategories: string[];
   minPrice?: number | null;
   maxPrice?: number | null;
+  filterBuyerCategory?: string | null;
+  filterBuyerSubcategory?: string | null;
+  filterBuyerSubSubcategory?: string | null;
 }): Promise<Product[]> {
   try {
     const collectionRef = collection(db, "products");
-    const constraints: QueryConstraint[] = [
-      where("isBoosted", "==", true),
-      where("category", "==", category),
-    ];
+    const constraints: QueryConstraint[] = [where("isBoosted", "==", true)];
 
-    console.log("🔍 Building boosted products query with:", {
-      category,
-      subcategory,
-      subsubcategory,
-      buyerCategory,
-    });
+    // Determine effective category and gender
+    let effectiveCategory = category;
+    let effectiveGender: string | null = null;
 
-    // Add subcategory and subsubcategory filters if provided
-    if (subcategory) {
-      constraints.push(where("subcategory", "==", subcategory));
+    if (filterBuyerCategory) {
+      if (filterBuyerCategory === "Women" || filterBuyerCategory === "Men") {
+        effectiveGender = filterBuyerCategory;
+      }
+
+      if (filterBuyerSubcategory) {
+        const productCategoryMapping: Record<string, Record<string, string>> = {
+          Women: {
+            Fashion: "Clothing & Fashion",
+            Shoes: "Footwear",
+            Accessories: "Accessories",
+            Bags: "Bags & Luggage",
+            "Self Care": "Beauty & Personal Care",
+          },
+          Men: {
+            Fashion: "Clothing & Fashion",
+            Shoes: "Footwear",
+            Accessories: "Accessories",
+            Bags: "Bags & Luggage",
+            "Self Care": "Beauty & Personal Care",
+          },
+        };
+
+        const mappedCategory =
+          productCategoryMapping[filterBuyerCategory]?.[filterBuyerSubcategory];
+        if (mappedCategory && !category) {
+          effectiveCategory = mappedCategory;
+        }
+      } else if (
+        filterBuyerCategory !== "Women" &&
+        filterBuyerCategory !== "Men"
+      ) {
+        const directCategoryMap: Record<string, string> = {
+          "Mother & Child": "Mother & Child",
+          "Home & Furniture": "Home & Furniture",
+          Electronics: "Electronics",
+          "Books, Stationery & Hobby": "Books, Stationery & Hobby",
+          "Sports & Outdoor": "Sports & Outdoor",
+          "Tools & Hardware": "Tools & Hardware",
+          "Pet Supplies": "Pet Supplies",
+          Automotive: "Automotive",
+          "Health & Wellness": "Health & Wellness",
+        };
+
+        const mappedCategory = directCategoryMap[filterBuyerCategory];
+        if (mappedCategory && !category) {
+          effectiveCategory = mappedCategory;
+        }
+      }
     }
 
-    if (subsubcategory) {
-      constraints.push(where("subsubcategory", "==", subsubcategory));
-    }
-
-    // Add buyer category gender filtering for boosted products
     if (buyerCategory === "Women" || buyerCategory === "Men") {
-      constraints.push(where("gender", "in", [buyerCategory, "Unisex"]));
+      effectiveGender = buyerCategory;
     }
 
-    // Apply dynamic filters to boosted products as well
+    // Apply filters
+    if (effectiveCategory) {
+      constraints.push(where("category", "==", effectiveCategory));
+    }
+
+    if (effectiveGender) {
+      constraints.push(where("gender", "in", [effectiveGender, "Unisex"]));
+    }
+
+    // Subcategory mapping (same logic as main query)
+    let effectiveSubcategory = subcategory;
+
+    // For Women/Men buyer categories, buyerSubSubcategory maps to product subcategory
+    if (
+      filterBuyerCategory &&
+      (filterBuyerCategory === "Women" || filterBuyerCategory === "Men") &&
+      filterBuyerSubcategory &&
+      filterBuyerSubSubcategory &&
+      !subcategory
+    ) {
+      effectiveSubcategory = filterBuyerSubSubcategory;
+    }
+
+    if (effectiveSubcategory) {
+      constraints.push(where("subcategory", "==", effectiveSubcategory));
+    }
+
+    // Subsubcategory mapping
+    let effectiveSubSubcategory = subsubcategory;
+
+    // Only use filterBuyerSubSubcategory for subsubcategory if not Women/Men buyer categories
+    if (
+      !effectiveSubSubcategory &&
+      filterBuyerSubSubcategory &&
+      !(
+        filterBuyerCategory &&
+        (filterBuyerCategory === "Women" || filterBuyerCategory === "Men") &&
+        filterBuyerSubcategory
+      )
+    ) {
+      effectiveSubSubcategory = filterBuyerSubSubcategory;
+    }
+
+    if (effectiveSubSubcategory) {
+      constraints.push(where("subsubcategory", "==", effectiveSubSubcategory));
+    }
+
+    // Apply dynamic filters
+    if (dynamicSubSubcategories.length > 0 && !effectiveSubSubcategory) {
+      if (dynamicSubSubcategories.length <= 10) {
+        constraints.push(where("subsubcategory", "in", dynamicSubSubcategories));
+      } else {
+        constraints.push(
+          where("subsubcategory", "in", dynamicSubSubcategories.slice(0, 10))
+        );
+      }
+    }
+
     if (dynamicBrands.length > 0 && dynamicBrands.length <= 10) {
       constraints.push(where("brandModel", "in", dynamicBrands));
     }
+
     if (dynamicColors.length > 0 && dynamicColors.length <= 10) {
       constraints.push(
         where("availableColors", "array-contains-any", dynamicColors)
       );
     }
-    if (
-      dynamicSubSubcategories.length > 0 &&
-      dynamicSubSubcategories.length <= 10
-    ) {
-      constraints.push(where("subsubcategory", "in", dynamicSubSubcategories));
-    }
+
     if (minPrice !== null) {
       constraints.push(where("price", ">=", minPrice));
     }
+
     if (maxPrice !== null) {
       constraints.push(where("price", "<=", maxPrice));
     }
 
-    // Enhanced sorting for boosted products
-    try {
-      constraints.push(orderBy("createdAt", "desc"));
-      constraints.push(limit(20));
-    } catch {
-      // Fallback sorting
-      try {
-        constraints.push(orderBy("dateAdded", "desc"));
-        constraints.push(limit(20));
-      } catch {
-        constraints.push(limit(20));
-      }
-    }
+    // Sorting - use createdAt which exists in your Firestore
+    constraints.push(orderBy("createdAt", "desc"));
+    constraints.push(limit(20));
 
     const q = query(collectionRef, ...constraints);
     const snapshot = await getDocs(q);
