@@ -5,6 +5,7 @@ import {
   FunnelIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
+import { AllInOneCategoryData } from "@/constants/productData";
 
 interface SearchAndFilterProps {
   onSearch: (term: string) => void;
@@ -13,18 +14,66 @@ interface SearchAndFilterProps {
   isDarkMode: boolean;
 }
 
-const CATEGORIES = [
-  "Women",
-  "Men",
-  "Kids",
-  "Electronics",
-  "Home & Garden",
-  "Sports",
-  "Beauty",
-  "Books",
-  "Automotive",
-  "Jewelry",
-];
+// Get categories dynamically from productData - use product categories (non-buyer)
+const CATEGORIES = AllInOneCategoryData.kCategories.map((cat) => cat.key);
+
+// Helper function to get the translation key for any category
+const getCategoryTranslationKey = (category: string): string => {
+  switch (category) {
+    // Buyer categories
+    case "Women":
+      return "buyerCategoryWomen";
+    case "Men":
+      return "buyerCategoryMen";
+
+    // Product categories
+    case "Clothing & Fashion":
+      return "categoryClothingFashion";
+    case "Footwear":
+      return "categoryFootwear";
+    case "Accessories":
+      return "categoryAccessories";
+    case "Mother & Child":
+      return "categoryMotherChild";
+    case "Home & Furniture":
+      return "categoryHomeFurniture";
+    case "Beauty & Personal Care":
+      return "categoryBeautyPersonalCare";
+    case "Bags & Luggage":
+      return "categoryBagsLuggage";
+    case "Electronics":
+      return "categoryElectronics";
+    case "Sports & Outdoor":
+      return "categorySportsOutdoor";
+    case "Books, Stationery & Hobby":
+      return "categoryBooksStationeryHobby";
+    case "Tools & Hardware":
+      return "categoryToolsHardware";
+    case "Pet Supplies":
+      return "categoryPetSupplies";
+    case "Automotive":
+      return "categoryAutomotive";
+    case "Health & Wellness":
+      return "categoryHealthWellness";
+
+    // Legacy/alternative category names
+    case "Kids":
+      return "categoryMotherChild"; // Map Kids to Mother & Child
+    case "Beauty":
+      return "categoryBeautyPersonalCare";
+    case "Jewelry":
+      return "categoryAccessories"; // Jewelry is under Accessories
+    case "Home & Garden":
+      return "categoryHomeFurniture";
+    case "Sports":
+      return "categorySportsOutdoor";
+    case "Books":
+      return "categoryBooksStationeryHobby";
+
+    default:
+      return category;
+  }
+};
 
 export default function SearchAndFilter({
   onSearch,
@@ -35,6 +84,7 @@ export default function SearchAndFilter({
   const [searchTerm, setSearchTerm] = useState("");
   const [isFilterExpanded, setIsFilterExpanded] = useState(false);
   const t = useTranslations("shops");
+  const tRoot = useTranslations(); // For root-level category translations
 
   // Debounced search
   useEffect(() => {
@@ -163,7 +213,7 @@ export default function SearchAndFilter({
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
-                {category}
+                {tRoot(getCategoryTranslationKey(category))}
               </button>
             ))}
           </div>
@@ -199,7 +249,7 @@ export default function SearchAndFilter({
                   : "bg-green-100 text-green-800"
               }`}
             >
-              <span>{selectedCategory}</span>
+              <span>{tRoot(getCategoryTranslationKey(selectedCategory))}</span>
               <button
                 onClick={() => onCategoryFilter(null)}
                 className="ml-1 hover:opacity-70"

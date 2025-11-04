@@ -2,15 +2,15 @@ import React, { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { 
-  HeartIcon,   
+import {
+  HeartIcon,
   StarIcon,
   MapPinIcon,
   UsersIcon,
   EyeIcon,
   SparklesIcon
 } from "@heroicons/react/24/outline";
-import { 
+import {
   HeartIcon as HeartSolidIcon,
   StarIcon as StarSolidIcon
 } from "@heroicons/react/24/solid";
@@ -38,11 +38,69 @@ interface ShopCardProps {
   isDarkMode: boolean;
 }
 
+// Helper function to get the translation key for any category
+const getCategoryTranslationKey = (category: string): string => {
+  switch (category) {
+    // Buyer categories
+    case "Women":
+      return "buyerCategoryWomen";
+    case "Men":
+      return "buyerCategoryMen";
+
+    // Product categories
+    case "Clothing & Fashion":
+      return "categoryClothingFashion";
+    case "Footwear":
+      return "categoryFootwear";
+    case "Accessories":
+      return "categoryAccessories";
+    case "Mother & Child":
+      return "categoryMotherChild";
+    case "Home & Furniture":
+      return "categoryHomeFurniture";
+    case "Beauty & Personal Care":
+      return "categoryBeautyPersonalCare";
+    case "Bags & Luggage":
+      return "categoryBagsLuggage";
+    case "Electronics":
+      return "categoryElectronics";
+    case "Sports & Outdoor":
+      return "categorySportsOutdoor";
+    case "Books, Stationery & Hobby":
+      return "categoryBooksStationeryHobby";
+    case "Tools & Hardware":
+      return "categoryToolsHardware";
+    case "Pet Supplies":
+      return "categoryPetSupplies";
+    case "Automotive":
+      return "categoryAutomotive";
+    case "Health & Wellness":
+      return "categoryHealthWellness";
+
+    // Legacy/alternative category names
+    case "Kids":
+      return "categoryMotherChild"; // Map Kids to Mother & Child
+    case "Beauty":
+      return "categoryBeautyPersonalCare";
+    case "Jewelry":
+      return "categoryAccessories"; // Jewelry is under Accessories
+    case "Home & Garden":
+      return "categoryHomeFurniture";
+    case "Sports":
+      return "categorySportsOutdoor";
+    case "Books":
+      return "categoryBooksStationeryHobby";
+
+    default:
+      return category;
+  }
+};
+
 export default function ShopCard({ shop, isDarkMode }: ShopCardProps) {
   const [isFavorite, setIsFavorite] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const t = useTranslations("shops");
+  const t = useTranslations();
 
   const handleFavoriteToggle = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -98,7 +156,7 @@ export default function ShopCard({ shop, isDarkMode }: ShopCardProps) {
               <div className="absolute -inset-1 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full blur opacity-75 group-hover/badge:opacity-100 transition duration-300" />
               <div className="relative bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg">
                 <SparklesIcon className="w-3 h-3" />
-                <span>{t("boosted")}</span>
+                <span>{t("shops.boosted")}</span>
                 <div className="absolute -inset-1 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full opacity-0 group-hover/badge:opacity-30 blur transition duration-300" />
               </div>
             </div>
@@ -245,14 +303,14 @@ export default function ShopCard({ shop, isDarkMode }: ShopCardProps) {
                       : "bg-blue-100 text-blue-800 border border-blue-200"
                   } hover:scale-105`}
                 >
-                  {category}
+                  {t(getCategoryTranslationKey(category))}
                 </span>
               ))}
               {shop.categories.length > 2 && (
                 <span
                   className={`text-xs px-2 py-1 rounded-full ${
-                    isDarkMode 
-                      ? "text-gray-400 bg-gray-800/50" 
+                    isDarkMode
+                      ? "text-gray-400 bg-gray-800/50"
                       : "text-gray-500 bg-gray-100"
                   }`}
                 >

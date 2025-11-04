@@ -1286,7 +1286,11 @@
     "goBack": "Geri Dön",
     "products": "ürün",
     "anonymous": "Anonim",
-    "likes": "beğeni"
+    "likes": "beğeni",
+    "sortDateNewest": "Tarih (En Yeni)",
+    "sortAlphabetical": "Alfabetik (A-Z)",
+    "sortPriceLowHigh": "Fiyat: Düşükten Yükseğe",
+    "sortPriceHighLow": "Fiyat: Yüksekten Düşüğe"
   },
   "createShop": {
     "createYourShop": "Mağazanı Oluştur",

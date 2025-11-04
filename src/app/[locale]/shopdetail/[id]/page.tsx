@@ -1,6 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+  useTransition,
+} from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
@@ -16,6 +23,7 @@ import {
   startAfter,
   QueryDocumentSnapshot,
   DocumentData,
+  QueryConstraint,
 } from "firebase/firestore";
 import { db } from "../../../../lib/firebase";
 import SecondHeader from "@/app/components/market_screen/SecondHeader";
@@ -31,6 +39,7 @@ import {
   HeartIcon,
   ArrowLeftIcon,
   PhotoIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { HeartIcon as HeartSolidIcon } from "@heroicons/react/24/solid";
 
@@ -56,6 +65,7 @@ interface ShopData {
 }
 
 import { Product, ProductUtils } from "@/app/models/Product";
+import { AllInOneCategoryData } from "@/constants/productData";
 
 interface Collection {
   id: string;
@@ -89,10 +99,47 @@ type TabType =
   | "bestSellers"
   | "reviews";
 
+// Helper function to get the translation key for any category
+const getCategoryTranslationKey = (category: string): string => {
+  switch (category) {
+    case "Clothing & Fashion":
+      return "categoryClothingFashion";
+    case "Footwear":
+      return "categoryFootwear";
+    case "Accessories":
+      return "categoryAccessories";
+    case "Mother & Child":
+      return "categoryMotherChild";
+    case "Home & Furniture":
+      return "categoryHomeFurniture";
+    case "Beauty & Personal Care":
+      return "categoryBeautyPersonalCare";
+    case "Bags & Luggage":
+      return "categoryBagsLuggage";
+    case "Electronics":
+      return "categoryElectronics";
+    case "Sports & Outdoor":
+      return "categorySportsOutdoor";
+    case "Books, Stationery & Hobby":
+      return "categoryBooksStationeryHobby";
+    case "Tools & Hardware":
+      return "categoryToolsHardware";
+    case "Pet Supplies":
+      return "categoryPetSupplies";
+    case "Automotive":
+      return "categoryAutomotive";
+    case "Health & Wellness":
+      return "categoryHealthWellness";
+    default:
+      return category;
+  }
+};
+
 export default function ShopDetailPage() {
   const params = useParams();
   const router = useRouter();
   const t = useTranslations("shopDetail");
+  const tRoot = useTranslations(); // For root-level category translations
 
   const shopId = params.id as string;
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -107,18 +154,30 @@ export default function ShopDetailPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isFavorite, setIsFavorite] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const [lastProductDoc, setLastProductDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [lastProductDoc, setLastProductDoc] =
+    useState<QueryDocumentSnapshot<DocumentData> | null>(null);
   const [hasMoreProducts, setHasMoreProducts] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<Product[]>([]);
 
+  // Category filter and sorting states
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [showCategoryFilter, setShowCategoryFilter] = useState(false);
+  const [sortOption, setSortOption] = useState<string>("date"); // date, alphabetical, priceLowHigh, priceHighLow
+  const [showSortDropdown, setShowSortDropdown] = useState(false);
+
   const observerTarget = useRef<HTMLDivElement>(null);
   const isFetchingRef = useRef(false);
-  const lastProductDocRef = useRef<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const lastProductDocRef = useRef<QueryDocumentSnapshot<DocumentData> | null>(
+    null
+  );
   const currentTabRef = useRef<TabType>(activeTab);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const searchAbortRef = useRef<boolean>(false);
+  const sortDropdownRef = useRef<HTMLDivElement>(null);
+  const categoryFilterRef = useRef<HTMLDivElement>(null);
+  const [, startTransition] = useTransition();
 
   // Sync refs with state
   useEffect(() => {
@@ -172,6 +231,30 @@ export default function ShopDetailPage() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // Click outside handler for dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        sortDropdownRef.current &&
+        !sortDropdownRef.current.contains(event.target as Node)
+      ) {
+        setShowSortDropdown(false);
+      }
+      if (
+        categoryFilterRef.current &&
+        !categoryFilterRef.current.contains(event.target as Node)
+      ) {
+        setShowCategoryFilter(false);
+      }
+    };
+
+    if (showSortDropdown || showCategoryFilter) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [showSortDropdown, showCategoryFilter]);
+
   // Fetch shop data
   const fetchShopData = useCallback(async () => {
     if (!shopId) return;
@@ -206,7 +289,10 @@ export default function ShopDetailPage() {
 
   // Fetch products
   const fetchProducts = useCallback(
-    async (productType: "all" | "deals" | "bestSellers" = "all", loadMore = false) => {
+    async (
+      productType: "all" | "deals" | "bestSellers" = "all",
+      loadMore = false
+    ) => {
       if (!shopId) return;
       if (isFetchingRef.current) return; // Prevent duplicate requests
 
@@ -220,23 +306,50 @@ export default function ShopDetailPage() {
           setIsLoadingProducts(true);
         }
 
-        let productsQuery = query(
-          collection(db, "shop_products"),
-          where("shopId", "==", shopId),
-          orderBy("createdAt", "desc"),
-          limit(20)
-        );
+        // Build base query with category filter if selected
+        const constraints: QueryConstraint[] = [where("shopId", "==", shopId)];
+
+        // Add category filter
+        if (selectedCategory) {
+          constraints.push(where("category", "==", selectedCategory));
+        }
+
+        // Determine sort order
+        let sortField = "createdAt";
+        let sortDirection: "asc" | "desc" = "desc";
+
+        switch (sortOption) {
+          case "alphabetical":
+            sortField = "title";
+            sortDirection = "asc";
+            break;
+          case "priceLowHigh":
+            sortField = "price";
+            sortDirection = "asc";
+            break;
+          case "priceHighLow":
+            sortField = "price";
+            sortDirection = "desc";
+            break;
+          case "date":
+          default:
+            sortField = "createdAt";
+            sortDirection = "desc";
+            break;
+        }
+
+        constraints.push(orderBy(sortField, sortDirection));
+        constraints.push(limit(20));
 
         // Add cursor for pagination
         if (loadMore && lastProductDocRef.current) {
-          productsQuery = query(
-            collection(db, "shop_products"),
-            where("shopId", "==", shopId),
-            orderBy("createdAt", "desc"),
-            startAfter(lastProductDocRef.current),
-            limit(20)
-          );
+          constraints.push(startAfter(lastProductDocRef.current));
         }
+
+        const productsQuery = query(
+          collection(db, "shop_products"),
+          ...constraints
+        );
 
         const snapshot = await getDocs(productsQuery);
 
@@ -270,7 +383,10 @@ export default function ShopDetailPage() {
         }
 
         if (loadMore) {
-          setAllProducts((prev) => [...prev, ...fetchedProducts]);
+          // Use transition for smoother pagination updates
+          startTransition(() => {
+            setAllProducts((prev) => [...prev, ...fetchedProducts]);
+          });
         } else {
           setAllProducts(fetchedProducts);
         }
@@ -288,60 +404,69 @@ export default function ShopDetailPage() {
         setIsLoadingMore(false);
       }
     },
-    [shopId]
+    [shopId, selectedCategory, sortOption]
   );
 
   // Algolia search function
-  const performAlgoliaSearch = useCallback(async (query: string, currentShopId: string) => {
-    if (!query.trim()) {
-      setSearchResults([]);
-      setIsSearching(false);
-      return;
-    }
-
-    // Reset abort flag for new search
-    searchAbortRef.current = false;
-
-    try {
-      setIsSearching(true);
-
-      const algolia = AlgoliaServiceManager.getInstance();
-
-      // Search with shopId filter
-      const algoliaResults = await algolia.searchProducts(
-        query,
-        0, // page
-        100, // hitsPerPage - get more results for shop-specific search
-        "shop_products", // index name
-        undefined, // no filterType
-        "None" // sortOption
-      );
-
-      // Check if this search was aborted
-      if (searchAbortRef.current) {
-        console.log('🚫 Search aborted:', query);
+  const performAlgoliaSearch = useCallback(
+    async (query: string, currentShopId: string) => {
+      if (!query.trim()) {
+        setSearchResults([]);
+        setIsSearching(false);
         return;
       }
 
-      // Convert Algolia results to app's Product model and filter by shopId
-      const convertedResults: Product[] = algoliaResults
-        .map((algoliaProduct) => ProductUtils.fromAlgolia(algoliaProduct as unknown as Record<string, unknown>))
-        .filter((product) => product.shopId === currentShopId);
+      // Reset abort flag for new search
+      searchAbortRef.current = false;
 
-      console.log(`✅ Algolia search complete: ${convertedResults.length} products found for shop ${currentShopId}`);
-      setSearchResults(convertedResults);
-    } catch (error) {
-      console.error('❌ Algolia search error:', error);
-      // On error, show no results but don't crash
-      if (!searchAbortRef.current) {
-        setSearchResults([]);
+      try {
+        setIsSearching(true);
+
+        const algolia = AlgoliaServiceManager.getInstance();
+
+        // Search with shopId filter
+        const algoliaResults = await algolia.searchProducts(
+          query,
+          0, // page
+          100, // hitsPerPage - get more results for shop-specific search
+          "shop_products", // index name
+          undefined, // no filterType
+          "None" // sortOption
+        );
+
+        // Check if this search was aborted
+        if (searchAbortRef.current) {
+          console.log("🚫 Search aborted:", query);
+          return;
+        }
+
+        // Convert Algolia results to app's Product model and filter by shopId
+        const convertedResults: Product[] = algoliaResults
+          .map((algoliaProduct) =>
+            ProductUtils.fromAlgolia(
+              algoliaProduct as unknown as Record<string, unknown>
+            )
+          )
+          .filter((product) => product.shopId === currentShopId);
+
+        console.log(
+          `✅ Algolia search complete: ${convertedResults.length} products found for shop ${currentShopId}`
+        );
+        setSearchResults(convertedResults);
+      } catch (error) {
+        console.error("❌ Algolia search error:", error);
+        // On error, show no results but don't crash
+        if (!searchAbortRef.current) {
+          setSearchResults([]);
+        }
+      } finally {
+        if (!searchAbortRef.current) {
+          setIsSearching(false);
+        }
       }
-    } finally {
-      if (!searchAbortRef.current) {
-        setIsSearching(false);
-      }
-    }
-  }, []);
+    },
+    []
+  );
 
   // Debounced search effect
   useEffect(() => {
@@ -470,6 +595,42 @@ export default function ShopDetailPage() {
     setHasMoreProducts(true);
   };
 
+  // Handle category filter change
+  const handleCategoryFilter = (category: string | null) => {
+    setSelectedCategory(category);
+    setShowCategoryFilter(false);
+    // Reset pagination
+    setLastProductDoc(null);
+    lastProductDocRef.current = null;
+    setHasMoreProducts(true);
+  };
+
+  // Handle sort change
+  const handleSortChange = (sort: string) => {
+    setSortOption(sort);
+    setShowSortDropdown(false);
+    // Reset pagination
+    setLastProductDoc(null);
+    lastProductDocRef.current = null;
+    setHasMoreProducts(true);
+  };
+
+  // Refetch when category or sort changes
+  useEffect(() => {
+    if (
+      shopData &&
+      ["allProducts", "deals", "bestSellers"].includes(activeTab)
+    ) {
+      const productType =
+        activeTab === "allProducts"
+          ? "all"
+          : activeTab === "deals"
+          ? "deals"
+          : "bestSellers";
+      fetchProducts(productType);
+    }
+  }, [selectedCategory, sortOption, activeTab, shopData, fetchProducts]);
+
   // Load more products function
   const loadMoreProducts = useCallback(() => {
     if (isLoadingMore || !hasMoreProducts || isLoadingProducts) return;
@@ -483,22 +644,34 @@ export default function ShopDetailPage() {
           : "bestSellers";
       fetchProducts(productType, true);
     }
-  }, [activeTab, isLoadingMore, hasMoreProducts, isLoadingProducts, fetchProducts]);
+  }, [
+    activeTab,
+    isLoadingMore,
+    hasMoreProducts,
+    isLoadingProducts,
+    fetchProducts,
+  ]);
 
-  // Infinite scroll observer
+  // Infinite scroll observer with debouncing
   useEffect(() => {
     // Only set up observer if we're on a products tab and have products
     if (!["allProducts", "deals", "bestSellers"].includes(activeTab)) {
       return;
     }
 
+    let debounceTimer: NodeJS.Timeout;
+
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) {
-          loadMoreProducts();
+        if (entries[0].isIntersecting && hasMoreProducts && !isLoadingMore) {
+          // Debounce to prevent rapid-fire requests
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => {
+            loadMoreProducts();
+          }, 150);
         }
       },
-      { threshold: 0.1 }
+      { threshold: 0.1, rootMargin: "100px" }
     );
 
     const currentTarget = observerTarget.current;
@@ -507,11 +680,18 @@ export default function ShopDetailPage() {
     }
 
     return () => {
+      clearTimeout(debounceTimer);
       if (currentTarget) {
         observer.unobserve(currentTarget);
       }
     };
-  }, [loadMoreProducts, activeTab, allProducts.length]);
+  }, [
+    loadMoreProducts,
+    activeTab,
+    allProducts.length,
+    hasMoreProducts,
+    isLoadingMore,
+  ]);
 
   const handleFavoriteToggle = () => {
     setIsFavorite(!isFavorite);
@@ -742,14 +922,26 @@ export default function ShopDetailPage() {
       default: // Products tabs
         return (
           <div>
-            {(isLoadingProducts || isSearching) ? (
+            {isLoadingProducts || isSearching ? (
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 {Array.from({ length: 8 }).map((_, i) => (
                   <div key={i} className="animate-pulse">
-                    <div className={`h-48 rounded-t-lg ${isDarkMode ? "bg-gray-700" : "bg-gray-300"}`} />
+                    <div
+                      className={`h-48 rounded-t-lg ${
+                        isDarkMode ? "bg-gray-700" : "bg-gray-300"
+                      }`}
+                    />
                     <div className="p-3 space-y-2">
-                      <div className={`h-4 rounded ${isDarkMode ? "bg-gray-700" : "bg-gray-300"}`} />
-                      <div className={`h-4 rounded w-3/4 ${isDarkMode ? "bg-gray-700" : "bg-gray-300"}`} />
+                      <div
+                        className={`h-4 rounded ${
+                          isDarkMode ? "bg-gray-700" : "bg-gray-300"
+                        }`}
+                      />
+                      <div
+                        className={`h-4 rounded w-3/4 ${
+                          isDarkMode ? "bg-gray-700" : "bg-gray-300"
+                        }`}
+                      />
                     </div>
                   </div>
                 ))}
@@ -783,8 +975,36 @@ export default function ShopDetailPage() {
                   ))}
                 </div>
 
+                {/* Loading more indicator */}
+                {isLoadingMore && (
+                  <div className="flex justify-center items-center py-8">
+                    <div className="flex space-x-2">
+                      <div
+                        className={`w-2 h-2 rounded-full animate-bounce ${
+                          isDarkMode ? "bg-orange-400" : "bg-orange-500"
+                        }`}
+                        style={{ animationDelay: "0ms" }}
+                      />
+                      <div
+                        className={`w-2 h-2 rounded-full animate-bounce ${
+                          isDarkMode ? "bg-orange-400" : "bg-orange-500"
+                        }`}
+                        style={{ animationDelay: "150ms" }}
+                      />
+                      <div
+                        className={`w-2 h-2 rounded-full animate-bounce ${
+                          isDarkMode ? "bg-orange-400" : "bg-orange-500"
+                        }`}
+                        style={{ animationDelay: "300ms" }}
+                      />
+                    </div>
+                  </div>
+                )}
+
                 {/* Infinite scroll trigger - only show when not searching */}
-                {!searchQuery.trim() && hasMoreProducts && <div ref={observerTarget} className="h-10" />}
+                {!searchQuery.trim() && hasMoreProducts && !isLoadingMore && (
+                  <div ref={observerTarget} className="h-10" />
+                )}
               </>
             )}
           </div>
@@ -802,36 +1022,37 @@ export default function ShopDetailPage() {
           <div>
             {/* Header with Cover Image */}
             <div className="relative h-64 overflow-hidden bg-gradient-to-br from-orange-500 to-pink-500">
-  {shopData.coverImageUrls && shopData.coverImageUrls.length > 0 && (
-    <>
-      {/* Image */}
-      <Image
-        src={shopData.coverImageUrls[0]}
-        alt={`${shopData.name} cover`}
-        fill
-        sizes="100vw"
-        className="object-cover"
-        priority
-        unoptimized
-        onLoad={() => console.log("✅ Next Image loaded")}
-        onError={() => console.error("❌ Next Image failed")}
-      />
-      
-      {/* Overlay using pseudo-element approach */}
-      <div className="absolute inset-0 bg-black/30 pointer-events-none" />
-    </>
-  )}
+              {shopData.coverImageUrls &&
+                shopData.coverImageUrls.length > 0 && (
+                  <>
+                    {/* Image */}
+                    <Image
+                      src={shopData.coverImageUrls[0]}
+                      alt={`${shopData.name} cover`}
+                      fill
+                      sizes="100vw"
+                      className="object-cover"
+                      priority
+                      unoptimized
+                      onLoad={() => console.log("✅ Next Image loaded")}
+                      onError={() => console.error("❌ Next Image failed")}
+                    />
 
-  {/* Back Button */}
-  <button
-    onClick={handleBack}
-    className="absolute top-4 left-4 z-20 w-10 h-10 bg-black/50 rounded-full flex items-center justify-center text-white hover:bg-black/70 transition-all"
-  >
-    <ArrowLeftIcon className="w-6 h-6" />
-  </button>
+                    {/* Overlay using pseudo-element approach */}
+                    <div className="absolute inset-0 bg-black/30 pointer-events-none" />
+                  </>
+                )}
 
-  {/* Shop Info */}
-  <div className="absolute bottom-4 left-4 right-4 z-20">
+              {/* Back Button */}
+              <button
+                onClick={handleBack}
+                className="absolute top-4 left-4 z-20 w-10 h-10 bg-black/50 rounded-full flex items-center justify-center text-white hover:bg-black/70 transition-all"
+              >
+                <ArrowLeftIcon className="w-6 h-6" />
+              </button>
+
+              {/* Shop Info */}
+              <div className="absolute bottom-4 left-4 right-4 z-20">
                 <div className="flex items-end space-x-4">
                   {/* Profile Image */}
                   <div className="relative w-20 h-20 rounded-full border-4 border-white overflow-hidden shadow-lg">
@@ -860,12 +1081,15 @@ export default function ShopDetailPage() {
                       <div className="flex items-center space-x-1">
                         <UsersIcon className="w-4 h-4" />
                         <span>
-                          {formatNumber(shopData.followerCount)} {t("followers")}
+                          {formatNumber(shopData.followerCount)}{" "}
+                          {t("followers")}
                         </span>
                       </div>
                       <div className="flex items-center space-x-1">
                         <EyeIcon className="w-4 h-4" />
-                        <span>{formatNumber(shopData.clickCount)} {t("views")}</span>
+                        <span>
+                          {formatNumber(shopData.clickCount)} {t("views")}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -945,29 +1169,191 @@ export default function ShopDetailPage() {
 
             {/* Filter Row */}
             {["allProducts", "deals", "bestSellers"].includes(activeTab) && (
-              <div className="px-4 py-3 border-b border-gray-200">
-                <div className="flex space-x-3">
+              <div
+                className={`px-4 py-3 border-b ${
+                  isDarkMode ? "border-gray-700" : "border-gray-200"
+                }`}
+              >
+                <div className="flex space-x-3 relative">
+                  {/* Sort Button with Dropdown */}
+                  <div className="relative" ref={sortDropdownRef}>
+                    <button
+                      onClick={() => setShowSortDropdown(!showSortDropdown)}
+                      className={`flex items-center space-x-2 px-3 py-2 rounded-lg border ${
+                        isDarkMode
+                          ? "border-gray-700 text-gray-300 hover:bg-gray-800"
+                          : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                      }`}
+                    >
+                      <AdjustmentsHorizontalIcon className="w-4 h-4 text-orange-500" />
+                      <span>{t("sort")}</span>
+                    </button>
+
+                    {/* Sort Dropdown */}
+                    <div
+                      className={`absolute top-full left-0 mt-2 w-56 rounded-lg shadow-xl border z-50 transition-all duration-200 origin-top ${
+                        showSortDropdown
+                          ? "opacity-100 scale-y-100 pointer-events-auto"
+                          : "opacity-0 scale-y-95 pointer-events-none"
+                      } ${
+                        isDarkMode
+                          ? "bg-gray-800 border-gray-700"
+                          : "bg-white border-gray-200"
+                      }`}
+                    >
+                      <div className="p-2">
+                        <button
+                          onClick={() => handleSortChange("date")}
+                          className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                            sortOption === "date"
+                              ? "bg-orange-500 text-white"
+                              : isDarkMode
+                              ? "text-gray-300 hover:bg-gray-700"
+                              : "text-gray-700 hover:bg-gray-100"
+                          }`}
+                        >
+                          {t("sortDateNewest")}
+                        </button>
+                        <button
+                          onClick={() => handleSortChange("alphabetical")}
+                          className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                            sortOption === "alphabetical"
+                              ? "bg-orange-500 text-white"
+                              : isDarkMode
+                              ? "text-gray-300 hover:bg-gray-700"
+                              : "text-gray-700 hover:bg-gray-100"
+                          }`}
+                        >
+                          {t("sortAlphabetical")}
+                        </button>
+                        <button
+                          onClick={() => handleSortChange("priceLowHigh")}
+                          className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                            sortOption === "priceLowHigh"
+                              ? "bg-orange-500 text-white"
+                              : isDarkMode
+                              ? "text-gray-300 hover:bg-gray-700"
+                              : "text-gray-700 hover:bg-gray-100"
+                          }`}
+                        >
+                          {t("sortPriceLowHigh")}
+                        </button>
+                        <button
+                          onClick={() => handleSortChange("priceHighLow")}
+                          className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                            sortOption === "priceHighLow"
+                              ? "bg-orange-500 text-white"
+                              : isDarkMode
+                              ? "text-gray-300 hover:bg-gray-700"
+                              : "text-gray-700 hover:bg-gray-100"
+                          }`}
+                        >
+                          {t("sortPriceHighLow")}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Category Filter Button */}
                   <button
+                    onClick={() => setShowCategoryFilter(!showCategoryFilter)}
                     className={`flex items-center space-x-2 px-3 py-2 rounded-lg border ${
                       isDarkMode
                         ? "border-gray-700 text-gray-300 hover:bg-gray-800"
                         : "border-gray-300 text-gray-700 hover:bg-gray-50"
-                    }`}
-                  >
-                    <AdjustmentsHorizontalIcon className="w-4 h-4 text-orange-500" />
-                    <span>{t("sort")}</span>
-                  </button>
-                  <button
-                    className={`flex items-center space-x-2 px-3 py-2 rounded-lg border ${
-                      isDarkMode
-                        ? "border-gray-700 text-gray-300 hover:bg-gray-800"
-                        : "border-gray-300 text-gray-700 hover:bg-gray-50"
-                    }`}
+                    } ${selectedCategory ? "ring-2 ring-orange-500" : ""}`}
                   >
                     <FunnelIcon className="w-4 h-4 text-orange-500" />
                     <span>{t("filter")}</span>
+                    {selectedCategory && (
+                      <span className="ml-1 px-2 py-0.5 text-xs bg-orange-600 text-white rounded-full">
+                        1
+                      </span>
+                    )}
                   </button>
+
+                  {/* Clear Filters */}
+                  {selectedCategory && (
+                    <button
+                      onClick={() => handleCategoryFilter(null)}
+                      className={`text-sm px-3 py-2 rounded-lg transition-colors ${
+                        isDarkMode
+                          ? "text-gray-400 hover:text-white hover:bg-gray-800"
+                          : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                      }`}
+                    >
+                      Clear Filter
+                    </button>
+                  )}
                 </div>
+
+                {/* Category Filter Panel */}
+                <div
+                  className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                    showCategoryFilter
+                      ? "max-h-96 opacity-100 mt-3"
+                      : "max-h-0 opacity-0"
+                  }`}
+                >
+                  <div
+                    ref={categoryFilterRef}
+                    className={`p-4 rounded-lg border transform transition-transform duration-200 ${
+                      showCategoryFilter ? "scale-100" : "scale-95"
+                    } ${
+                      isDarkMode
+                        ? "bg-gray-800 border-gray-700"
+                        : "bg-white border-gray-200"
+                    }`}
+                  >
+                    <h3
+                      className={`font-semibold mb-3 ${
+                        isDarkMode ? "text-white" : "text-gray-900"
+                      }`}
+                    >
+                      {t("category")}
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {AllInOneCategoryData.kCategories.map((cat) => (
+                        <button
+                          key={cat.key}
+                          onClick={() => handleCategoryFilter(cat.key)}
+                          className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                            selectedCategory === cat.key
+                              ? "bg-orange-500 text-white"
+                              : isDarkMode
+                              ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                          }`}
+                        >
+                          {tRoot(getCategoryTranslationKey(cat.key))}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Active Category Filter Display */}
+                {selectedCategory && (
+                  <div className="mt-3 flex items-center gap-2">
+                    <div
+                      className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm ${
+                        isDarkMode
+                          ? "bg-orange-900/50 text-orange-300"
+                          : "bg-orange-100 text-orange-800"
+                      }`}
+                    >
+                      <span>
+                        {tRoot(getCategoryTranslationKey(selectedCategory))}
+                      </span>
+                      <button
+                        onClick={() => handleCategoryFilter(null)}
+                        className="ml-1 hover:opacity-70"
+                      >
+                        <XMarkIcon className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

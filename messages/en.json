@@ -1286,7 +1286,11 @@
     "goBack": "Go Back",
     "products": "products",
     "anonymous": "Anonymous",
-    "likes": "likes"
+    "likes": "likes",
+    "sortDateNewest": "Date (Newest First)",
+    "sortAlphabetical": "Alphabetical (A-Z)",
+    "sortPriceLowHigh": "Price: Low to High",
+    "sortPriceHighLow": "Price: High to Low"
   },
   "createShop": {
     "createYourShop": "Create Your Shop",

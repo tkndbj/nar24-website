@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useTransition, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import {
   collection,
@@ -57,11 +57,20 @@ export default function ShopsPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<Shop[]>([]);
 
+  // Use transition to prevent flickering
+  const [isPending, startTransition] = useTransition();
+
+  // Track if we're actively filtering to show shimmer
+  const [isFiltering, setIsFiltering] = useState(false);
+
   const t = useTranslations("shops");
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const searchAbortRef = useRef<boolean>(false);
+
+  // Track if a fetch is in progress to prevent concurrent requests
+  const isFetchingRef = useRef(false);
 
   const SHOPS_PER_PAGE = 20;
 
@@ -277,9 +286,19 @@ export default function ShopsPage() {
       isLoadMore = false,
       categoryFilter: string | null = null
     ) => {
+      // Prevent concurrent fetches using ref
+      if (isFetchingRef.current) {
+        return Promise.resolve();
+      }
+
+      isFetchingRef.current = true;
+
       try {
         if (!isLoadMore) {
-          setIsLoading(true);
+          // Only show full loading state if we have no shops yet
+          if (shops.length === 0) {
+            setIsLoading(true);
+          }
           setError(null);
         } else {
           setIsLoadingMore(true);
@@ -328,9 +347,17 @@ export default function ShopsPage() {
         })) as Shop[];
 
         if (isLoadMore) {
-          setShops((prev) => [...prev, ...newShops]);
+          // Deduplicate when adding more shops
+          setShops((prev) => {
+            const existingIds = new Set(prev.map(shop => shop.id));
+            const uniqueNewShops = newShops.filter(shop => !existingIds.has(shop.id));
+            return [...prev, ...uniqueNewShops];
+          });
         } else {
-          setShops(newShops);
+          // Use transition to prevent flickering
+          startTransition(() => {
+            setShops(newShops);
+          });
         }
 
         setLastDocument(snapshot.docs[snapshot.docs.length - 1] || null);
@@ -341,24 +368,43 @@ export default function ShopsPage() {
       } finally {
         setIsLoading(false);
         setIsLoadingMore(false);
+        isFetchingRef.current = false;
       }
     },
-    [lastDocument]
+    [lastDocument, shops.length, startTransition]
   );
+
+  // Track initial mount to prevent filter effect from running
+  const isInitialMount = useRef(true);
 
   // Initial load
   useEffect(() => {
-    fetchShops(false, selectedCategory);
+    fetchShops(false, null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Handle category filter changes (only for Firebase, Algolia handles it in search)
   useEffect(() => {
+    // Skip on initial mount
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
     if (!searchTerm.trim()) {
+      // Clear shops immediately to prevent duplicates
+      setShops([]);
       setLastDocument(null);
       setHasMore(true);
-      fetchShops(false, selectedCategory);
+      fetchShops(false, selectedCategory).finally(() => {
+        setIsFiltering(false);
+      });
+    } else {
+      // If searching, make sure to clear filtering state
+      setIsFiltering(false);
     }
-  }, [selectedCategory]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCategory, searchTerm]);
 
   // Intersection Observer for infinite scroll (only when not searching)
   useEffect(() => {
@@ -374,17 +420,19 @@ export default function ShopsPage() {
       observerRef.current.disconnect();
     }
 
+    const handleIntersection = (entries: IntersectionObserverEntry[]) => {
+      if (
+        entries[0].isIntersecting &&
+        hasMore &&
+        !isLoadingMore &&
+        !isLoading
+      ) {
+        fetchShops(true, selectedCategory);
+      }
+    };
+
     observerRef.current = new IntersectionObserver(
-      (entries) => {
-        if (
-          entries[0].isIntersecting &&
-          hasMore &&
-          !isLoadingMore &&
-          !isLoading
-        ) {
-          fetchShops(true, selectedCategory);
-        }
-      },
+      handleIntersection,
       { threshold: 0.1 }
     );
 
@@ -397,13 +445,13 @@ export default function ShopsPage() {
         observerRef.current.disconnect();
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     hasMore,
     isLoadingMore,
     isLoading,
     searchTerm,
     selectedCategory,
-    fetchShops,
   ]);
 
   const handleRefresh = async () => {
@@ -424,12 +472,31 @@ export default function ShopsPage() {
   };
 
   const handleCategoryFilter = (category: string | null) => {
-    setSelectedCategory(category);
+    setIsFiltering(true);
+    startTransition(() => {
+      setSelectedCategory(category);
+    });
   };
 
   const getGridCols = () => {
     return "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5";
   };
+
+  // Memoize the displayed shops to prevent unnecessary re-renders
+  // Also deduplicate as a safety measure
+  const displayedShops = useMemo(() => {
+    const shopsList = searchTerm.trim() ? searchResults : shops;
+
+    // Deduplicate by ID as a safety measure
+    const uniqueShops = shopsList.reduce((acc, shop) => {
+      if (!acc.some(s => s.id === shop.id)) {
+        acc.push(shop);
+      }
+      return acc;
+    }, [] as Shop[]);
+
+    return uniqueShops;
+  }, [searchTerm, searchResults, shops]);
 
   if (error && shops.length === 0) {
     return (
@@ -522,13 +589,13 @@ export default function ShopsPage() {
           </div>
 
           {/* Shops Grid */}
-          {(isLoading && shops.length === 0) || isSearching ? (
+          {(isLoading && shops.length === 0) || isSearching || isFiltering ? (
             <div className={`grid ${getGridCols()} gap-6`}>
               {Array.from({ length: 8 }).map((_, index) => (
                 <LoadingShopCard key={index} isDarkMode={isDarkMode} />
               ))}
             </div>
-          ) : (searchTerm.trim() ? searchResults : shops).length === 0 ? (
+          ) : displayedShops.length === 0 ? (
             <div className="text-center py-20">
               <div className={`text-6xl mb-6 ${
                 isDarkMode ? "text-gray-600" : "text-gray-400"
@@ -555,8 +622,22 @@ export default function ShopsPage() {
             </div>
           ) : (
             <>
-              <div className={`grid ${getGridCols()} gap-6`}>
-                {(searchTerm.trim() ? searchResults : shops).map((shop) => (
+              {/* Subtle loading indicator when filtering */}
+              {isPending && (
+                <div className="flex justify-center mb-4">
+                  <div className={`px-4 py-2 rounded-lg ${
+                    isDarkMode ? "bg-gray-800 text-gray-300" : "bg-gray-100 text-gray-600"
+                  }`}>
+                    <div className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                      <span className="text-sm">{t("loading")}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className={`grid ${getGridCols()} gap-6 ${isPending ? 'opacity-70 transition-opacity duration-200' : ''}`}>
+                {displayedShops.map((shop) => (
                   <ShopCard key={shop.id} shop={shop} isDarkMode={isDarkMode} />
                 ))}
               </div>
