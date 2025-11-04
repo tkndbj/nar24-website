@@ -12,6 +12,7 @@ import {
   Minus,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useCart } from "@/context/CartProvider";
 import { useFavorites } from "@/context/FavoritesProvider";
 import { useUser } from "@/context/UserProvider";
@@ -37,6 +38,8 @@ interface ProductCardProps {
   onAddToCart?: (productId: string) => void;
   isFavorited?: boolean;
   isInCart?: boolean;
+  isDarkMode?: boolean;
+  localization?: ReturnType<typeof useTranslations>;
 }
 
 const isFantasyProduct = (product: Product): boolean => {
@@ -354,6 +357,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   onColorSelect,
   onFavoriteToggle,
   onAddToCart,
+  isDarkMode: isDarkModeProp,
+  localization,
 }) => {
   const router = useRouter();
 
@@ -368,7 +373,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const { addToFavorites, isFavorite: isProductFavorite } = useFavorites();
   const { user } = useUser();
 
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkModeState, setIsDarkMode] = useState(false);
+  // Use prop value if provided, otherwise use state
+  const isDarkMode = isDarkModeProp !== undefined ? isDarkModeProp : isDarkModeState;
+
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [internalSelectedColor, setInternalSelectedColor] = useState<
     string | null
@@ -1230,6 +1238,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         isOpen={showCartOptionSelector}
         onClose={handleCartOptionSelectorClose}
         onConfirm={handleCartOptionSelectorConfirm}
+        isDarkMode={isDarkMode}
+        localization={localization}
       />
 
       <ProductOptionSelector
@@ -1237,6 +1247,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         isOpen={showFavoriteOptionSelector}
         onClose={handleFavoriteOptionSelectorClose}
         onConfirm={handleFavoriteOptionSelectorConfirm}
+        isDarkMode={isDarkMode}
+        localization={localization}
       />
     </>
   );

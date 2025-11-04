@@ -2027,7 +2027,8 @@
     "total": "Toplam",
     "viewCart": "Sepeti Görüntüle",
     "checkout": "Ödemeye Geç",
-    "save": "Kaydet"
+    "save": "Kaydet",
+    "noStock": "Stok Yok"
   },
   "FavoritesDrawer": {
     "title": "Favorilerim",

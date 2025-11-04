@@ -403,6 +403,40 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     return typeof item.sellerId === "string" ? item.sellerId : undefined;
   }, []);
 
+  // Get available stock for a cart item considering color selection
+  // This matches the exact logic from CartProvider.calculateCartTotals
+  const getAvailableStock = useCallback((item: Record<string, unknown>): number => {
+    const product = item.product;
+    if (!product || typeof product !== 'object') return 0;
+
+    const cartData = item.cartData;
+    if (!cartData || typeof cartData !== 'object') return 0;
+
+    const selectedColor = (cartData as Record<string, unknown>).selectedColor;
+
+    // EXACT Flutter/CartProvider logic:
+    // If selectedColor exists, is not empty, is not 'default', and colorQuantities has that color
+    if (
+      selectedColor != null &&
+      typeof selectedColor === 'string' &&
+      selectedColor !== "" &&
+      selectedColor !== "default" &&
+      (product as Record<string, unknown>).colorQuantities &&
+      typeof (product as Record<string, unknown>).colorQuantities === 'object' &&
+      Object.prototype.hasOwnProperty.call(
+        (product as Record<string, unknown>).colorQuantities,
+        selectedColor
+      )
+    ) {
+      const colorQuantities = (product as Record<string, unknown>).colorQuantities as Record<string, number>;
+      return colorQuantities[selectedColor] || 0;
+    } else {
+      // Use regular product quantity
+      const quantity = (product as Record<string, unknown>).quantity;
+      return typeof quantity === 'number' ? quantity : 0;
+    }
+  }, []);
+
   // Memoize cart items rendering with bundle integration
   const renderCartItems = useMemo(() => {
     return cartItems.map((item) => {
@@ -410,6 +444,10 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
       const attributesDisplay = formatItemAttributes(item);
       const showBundles = isShopProduct(item);
       const shopId = getShopId(item);
+
+      // Get available stock considering color selection
+      const availableStock = getAvailableStock(item);
+      const maxQuantity = availableStock > 0 ? Math.min(availableStock, 99) : 0;
 
       return (
         <div
@@ -448,15 +486,16 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
               currency={item.product?.currency || "TL"}
               averageRating={item.product?.averageRating || 0}
               quantity={item.quantity}
-              maxQuantityAllowed={99}
+              maxQuantityAllowed={maxQuantity}
               onQuantityChanged={
-                item.isOptimistic || isRemoving
+                item.isOptimistic || isRemoving || maxQuantity === 0
                   ? undefined
                   : (newQuantity) =>
                       handleQuantityChange(item.productId, newQuantity)
               }
               isDarkMode={isDarkMode}
               scaleFactor={0.9}
+              noStockText={t("noStock")}
             />
 
             {/* Display attributes in one line */}
@@ -533,6 +572,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     formatItemAttributes,
     isShopProduct,
     getShopId,
+    getAvailableStock,
     t,
   ]);
 

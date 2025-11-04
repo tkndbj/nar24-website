@@ -31,6 +31,8 @@ interface ProductCard3Props {
   quantity: number;
   onQuantityChanged?: (quantity: number) => void;
   isDarkMode?: boolean;
+  hideStockInfo?: boolean;
+  noStockText?: string;
   // Mock provider states for demo
   isFavorited?: boolean;
   isInCart?: boolean;
@@ -59,6 +61,8 @@ export const ProductCard3: React.FC<ProductCard3Props> = ({
   quantity,
   onQuantityChanged,
   isDarkMode = false,
+  hideStockInfo = false,
+  noStockText = "No Stock",
   isFavorited = false,
   isInCart = false,
   onAddToCart,
@@ -359,32 +363,34 @@ export const ProductCard3: React.FC<ProductCard3Props> = ({
           </div>
 
           {/* Quantity/Stock Section */}
-          {showQuantityLabelOnly ? (
-            // Payment screen: show only quantity label
-            <span
-              className="text-orange-500 font-bold"
-              style={{ fontSize: `${12 * effectiveScaleFactor}px` }}
-            >
-              ({quantity})
-            </span>
-          ) : canShowController ? (
-            // Normal cart: show quantity controller
-            <QuantityController />
-          ) : (
-            // No stock: show pink "No Stock" badge
-            <div
-              className="border border-pink-500 text-pink-500 font-semibold px-3 py-1 rounded-full"
-              style={{
-                fontSize: `${12 * effectiveScaleFactor}px`,
-                borderRadius: `${20 * effectiveScaleFactor}px`,
-                paddingLeft: `${12 * effectiveScaleFactor}px`,
-                paddingRight: `${12 * effectiveScaleFactor}px`,
-                paddingTop: `${4 * effectiveScaleFactor}px`,
-                paddingBottom: `${4 * effectiveScaleFactor}px`,
-              }}
-            >
-              No Stock
-            </div>
+          {!hideStockInfo && (
+            showQuantityLabelOnly ? (
+              // Payment screen: show only quantity label
+              <span
+                className="text-orange-500 font-bold"
+                style={{ fontSize: `${12 * effectiveScaleFactor}px` }}
+              >
+                ({quantity})
+              </span>
+            ) : canShowController ? (
+              // Normal cart: show quantity controller
+              <QuantityController />
+            ) : (
+              // No stock: show pink "No Stock" badge
+              <div
+                className="border border-pink-500 text-pink-500 font-semibold px-3 py-1 rounded-full"
+                style={{
+                  fontSize: `${12 * effectiveScaleFactor}px`,
+                  borderRadius: `${20 * effectiveScaleFactor}px`,
+                  paddingLeft: `${12 * effectiveScaleFactor}px`,
+                  paddingRight: `${12 * effectiveScaleFactor}px`,
+                  paddingTop: `${4 * effectiveScaleFactor}px`,
+                  paddingBottom: `${4 * effectiveScaleFactor}px`,
+                }}
+              >
+                {noStockText}
+              </div>
+            )
           )}
         </div>
       </div>

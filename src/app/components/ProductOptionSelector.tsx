@@ -111,8 +111,8 @@ const ColorThumb: React.FC<ColorThumbProps> = ({
 
       {/* Disabled overlay */}
       {disabled && (
-        <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center">
-          <span className="text-white text-xs font-bold text-center px-1">
+        <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+          <span className="text-white text-xs font-bold text-center px-1 bg-black/70 rounded px-2 py-1">
             {t("noStock")}
           </span>
         </div>
@@ -788,7 +788,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
             disabled={selectedQuantity <= 1}
             className={`p-2 rounded-full border transition-colors ${
               actualDarkMode
-                ? "border-gray-600 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                ? "border-gray-600 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed text-white"
                 : "border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
             }`}
           >
@@ -796,7 +796,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
           </button>
 
           <div className="px-4 py-2 border border-orange-500 rounded-lg min-w-[60px] text-center">
-            <span className="text-lg font-semibold">{selectedQuantity}</span>
+            <span className={`text-lg font-semibold ${actualDarkMode ? "text-white" : ""}`}>{selectedQuantity}</span>
           </div>
 
           <button
@@ -804,7 +804,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
             disabled={selectedQuantity >= maxAllowed}
             className={`p-2 rounded-full border transition-colors ${
               actualDarkMode
-                ? "border-gray-600 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                ? "border-gray-600 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed text-white"
                 : "border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
             }`}
           >

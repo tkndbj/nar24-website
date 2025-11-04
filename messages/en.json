@@ -1994,7 +1994,8 @@
     "total": "Total",
     "viewCart": "View Cart",
     "checkout": "Checkout",
-    "save": "Save"
+    "save": "Save",
+    "noStock": "No Stock"
   },
   "header": {
     "back": "Back",

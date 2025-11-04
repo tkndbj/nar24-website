@@ -1306,6 +1306,8 @@ const DynamicMarketPage: React.FC = () => {
               isFavorited={false}
               isInCart={false}
               portraitImageHeight={320}
+              isDarkMode={isDarkMode}
+              localization={t}
             />
           </div>
         ))}

@@ -336,6 +336,7 @@ const SearchResultsContent: React.FC = () => {
   const searchParams = useSearchParams();
   const router = useRouter();
   const t = useTranslations("searchResults");
+  const tRoot = useTranslations(); // Root translations for ProductOptionSelector
   const {
     filteredProducts,
     currentFilter,
@@ -1082,6 +1083,8 @@ const SearchResultsContent: React.FC = () => {
               onTap={() => handleProductTap(product)}
               showCartIcon={true}
               showExtraLabels={false}
+              isDarkMode={isDarkMode}
+              localization={tRoot}
             />
           ))}
         </div>

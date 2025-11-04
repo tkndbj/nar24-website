@@ -1151,6 +1151,7 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                               maxQuantityAllowed={0}
                               isDarkMode={isDarkMode}
                               scaleFactor={0.9}
+                              hideStockInfo={true}
                             />
                           )}
 
