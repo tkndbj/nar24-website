@@ -197,7 +197,7 @@ class AlgoliaServiceManager {
   private client: SearchClient;
   
   // Enhanced caching
-  private cache = new Map<string, CacheEntry<Product[] | Suggestion[] | CategorySuggestion[]>>();
+  private cache = new Map<string, CacheEntry<CacheableData>>();
   private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
   private readonly MAX_CACHE_SIZE = 100;
 
