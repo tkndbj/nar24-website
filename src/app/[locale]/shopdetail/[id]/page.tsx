@@ -202,7 +202,7 @@ export default function ShopDetailPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [shopId]);
+  }, [shopId, t]);
 
   // Fetch products
   const fetchProducts = useCallback(
@@ -814,7 +814,7 @@ export default function ShopDetailPage() {
         priority
         unoptimized
         onLoad={() => console.log("✅ Next Image loaded")}
-        onError={(e) => console.error("❌ Next Image failed")}
+        onError={() => console.error("❌ Next Image failed")}
       />
       
       {/* Overlay using pseudo-element approach */}

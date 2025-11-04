@@ -22,7 +22,7 @@ import {
 
 import { Product, ProductUtils } from "@/app/models/Product";
 import ShopCard from "@/app/components/shops/ShopCard";
-import { Timestamp, doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { Timestamp, doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 // Shop interface
