@@ -86,12 +86,10 @@ export default function ShopCard({ shop, isDarkMode }: ShopCardProps) {
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        {/* Glow Effect */}
-        <div className={`absolute inset-0 rounded-2xl transition-opacity duration-500 ${
-          shop.isBoosted 
-            ? "bg-gradient-to-r from-yellow-400/20 to-orange-500/20" 
-            : "bg-gradient-to-r from-blue-500/0 to-purple-500/0"
-        } ${isHovered ? "opacity-100" : "opacity-0"} blur-xl`} />
+        {/* Glow Effect - Only for boosted shops */}
+        {shop.isBoosted && (
+          <div className={`absolute inset-0 rounded-2xl transition-opacity duration-500 bg-gradient-to-r from-yellow-400/20 to-orange-500/20 ${isHovered ? "opacity-100" : "opacity-0"} blur-xl`} />
+        )}
 
         {/* Boosted Badge */}
         {shop.isBoosted && (
@@ -182,7 +180,6 @@ export default function ShopCard({ shop, isDarkMode }: ShopCardProps) {
         {/* Profile Image */}
         <div className="absolute top-28 left-4 z-10">
           <div className="relative group/profile">
-            <div className="absolute -inset-2 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full blur opacity-0 group-hover:opacity-75 transition duration-300" />
             <div className="relative w-20 h-20 rounded-full border-4 border-white dark:border-gray-700 overflow-hidden shadow-xl backdrop-blur-sm">
               {shop.profileImageUrl ? (
                 <Image
@@ -242,14 +239,13 @@ export default function ShopCard({ shop, isDarkMode }: ShopCardProps) {
               {shop.categories.slice(0, 2).map((category, index) => (
                 <span
                   key={index}
-                  className={`relative text-xs px-3 py-1.5 rounded-full font-medium transition-all duration-300 ${
+                  className={`text-xs px-3 py-1.5 rounded-full font-medium transition-all duration-300 ${
                     isDarkMode
                       ? "bg-blue-900/30 text-blue-300 border border-blue-700/30"
                       : "bg-blue-100 text-blue-800 border border-blue-200"
                   } hover:scale-105`}
                 >
-                  <span className="relative z-10">{category}</span>
-                  <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-400/0 to-purple-400/0 group-hover:from-blue-400/20 group-hover:to-purple-400/20 transition-all duration-300" />
+                  {category}
                 </span>
               ))}
               {shop.categories.length > 2 && (
@@ -307,14 +303,6 @@ export default function ShopCard({ shop, isDarkMode }: ShopCardProps) {
           </div>
         </div>
 
-        {/* Hover Effect Overlay */}
-        <div
-          className={`absolute inset-0 rounded-2xl transition-all duration-300 pointer-events-none ${
-            isDarkMode
-              ? "group-hover:bg-gradient-to-br group-hover:from-blue-500/5 group-hover:to-purple-500/5"
-              : "group-hover:bg-gradient-to-br group-hover:from-blue-500/5 group-hover:to-purple-500/5"
-          }`}
-        />
 
         {/* Shimmer Effect on Hover */}
         <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-12 pointer-events-none" />

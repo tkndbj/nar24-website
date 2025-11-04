@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
@@ -13,10 +13,14 @@ import {
   orderBy,
   limit,
   getDocs,
+  startAfter,
+  QueryDocumentSnapshot,
+  DocumentData,
 } from "firebase/firestore";
 import { db } from "../../../../lib/firebase";
 import SecondHeader from "@/app/components/market_screen/SecondHeader";
 import { ProductCard } from "@/app/components/ProductCard";
+import AlgoliaServiceManager from "@/lib/algolia";
 import {
   MagnifyingGlassIcon,
   AdjustmentsHorizontalIcon,
@@ -51,7 +55,7 @@ interface ShopData {
   };
 }
 
-import { Product } from "@/app/models/Product";
+import { Product, ProductUtils } from "@/app/models/Product";
 
 interface Collection {
   id: string;
@@ -93,7 +97,7 @@ export default function ShopDetailPage() {
   const shopId = params.id as string;
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [shopData, setShopData] = useState<ShopData | null>(null);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -103,8 +107,41 @@ export default function ShopDetailPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isFavorite, setIsFavorite] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [lastProductDoc, setLastProductDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [hasMoreProducts, setHasMoreProducts] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<Product[]>([]);
 
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const observerTarget = useRef<HTMLDivElement>(null);
+  const isFetchingRef = useRef(false);
+  const lastProductDocRef = useRef<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const currentTabRef = useRef<TabType>(activeTab);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const searchAbortRef = useRef<boolean>(false);
+
+  // Sync refs with state
+  useEffect(() => {
+    lastProductDocRef.current = lastProductDoc;
+  }, [lastProductDoc]);
+
+  useEffect(() => {
+    currentTabRef.current = activeTab;
+  }, [activeTab]);
+
+  // Cleanup on unmount or shopId change
+  useEffect(() => {
+    return () => {
+      isFetchingRef.current = false;
+      // Cleanup search timeout
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+        searchTimeoutRef.current = null;
+      }
+      // Abort ongoing search
+      searchAbortRef.current = true;
+    };
+  }, [shopId]);
 
   // Handle theme detection
   useEffect(() => {
@@ -128,16 +165,11 @@ export default function ShopDetailPage() {
   // Handle scroll for header effect
   useEffect(() => {
     const handleScroll = () => {
-      if (scrollRef.current) {
-        setIsScrolled(scrollRef.current.scrollTop > 50);
-      }
+      setIsScrolled(window.scrollY > 50);
     };
 
-    const scrollElement = scrollRef.current;
-    if (scrollElement) {
-      scrollElement.addEventListener("scroll", handleScroll);
-      return () => scrollElement.removeEventListener("scroll", handleScroll);
-    }
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   // Fetch shop data
@@ -151,7 +183,7 @@ export default function ShopDetailPage() {
       const shopDoc = await getDoc(doc(db, "shops", shopId));
 
       if (!shopDoc.exists()) {
-        setError("Shop not found");
+        setError(t("shopNotFound"));
         return;
       }
 
@@ -166,7 +198,7 @@ export default function ShopDetailPage() {
       }
     } catch (err) {
       console.error("Error fetching shop data:", err);
-      setError("Failed to load shop data");
+      setError(t("failedToLoad"));
     } finally {
       setIsLoading(false);
     }
@@ -174,33 +206,57 @@ export default function ShopDetailPage() {
 
   // Fetch products
   const fetchProducts = useCallback(
-    async (productType: "all" | "deals" | "bestSellers" = "all") => {
+    async (productType: "all" | "deals" | "bestSellers" = "all", loadMore = false) => {
       if (!shopId) return;
+      if (isFetchingRef.current) return; // Prevent duplicate requests
+
+      const fetchStartTab = currentTabRef.current;
+      isFetchingRef.current = true;
 
       try {
-        setIsLoadingProducts(true);
+        if (loadMore) {
+          setIsLoadingMore(true);
+        } else {
+          setIsLoadingProducts(true);
+        }
 
-        const productsQuery = query(
+        let productsQuery = query(
           collection(db, "shop_products"),
           where("shopId", "==", shopId),
           orderBy("createdAt", "desc"),
           limit(20)
         );
 
-        // Filter based on type
-        if (productType === "deals") {
-          // Would need a compound index for this query
-          // For now, we'll filter client-side
-        } else if (productType === "bestSellers") {
-          // Would need to order by purchaseCount or similar
-          // For now, we'll filter client-side
+        // Add cursor for pagination
+        if (loadMore && lastProductDocRef.current) {
+          productsQuery = query(
+            collection(db, "shop_products"),
+            where("shopId", "==", shopId),
+            orderBy("createdAt", "desc"),
+            startAfter(lastProductDocRef.current),
+            limit(20)
+          );
         }
 
         const snapshot = await getDocs(productsQuery);
+
+        // Check if tab changed during fetch - if so, discard results
+        if (fetchStartTab !== currentTabRef.current) {
+          return;
+        }
+
         let fetchedProducts = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         })) as Product[];
+
+        // Store last document for pagination
+        if (snapshot.docs.length > 0) {
+          setLastProductDoc(snapshot.docs[snapshot.docs.length - 1]);
+        }
+
+        // Check if there are more products
+        setHasMoreProducts(snapshot.docs.length === 20);
 
         // Client-side filtering for now
         if (productType === "deals") {
@@ -213,22 +269,123 @@ export default function ShopDetailPage() {
           );
         }
 
-        // Apply search filter
-        if (searchQuery.trim()) {
-          fetchedProducts = fetchedProducts.filter((p) =>
-            p.productName.toLowerCase().includes(searchQuery.toLowerCase())
-          );
+        if (loadMore) {
+          setAllProducts((prev) => [...prev, ...fetchedProducts]);
+        } else {
+          setAllProducts(fetchedProducts);
         }
-
-        setProducts(fetchedProducts);
       } catch (err) {
         console.error("Error fetching products:", err);
+        // Don't update hasMoreProducts on error, allow retry
+        // Show error in production via toast or error state if needed
+        if (loadMore) {
+          // On pagination error, allow user to retry
+          setHasMoreProducts(true);
+        }
       } finally {
+        isFetchingRef.current = false;
         setIsLoadingProducts(false);
+        setIsLoadingMore(false);
       }
     },
-    [shopId, searchQuery]
+    [shopId]
   );
+
+  // Algolia search function
+  const performAlgoliaSearch = useCallback(async (query: string, currentShopId: string) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    // Reset abort flag for new search
+    searchAbortRef.current = false;
+
+    try {
+      setIsSearching(true);
+
+      const algolia = AlgoliaServiceManager.getInstance();
+
+      // Search with shopId filter
+      const algoliaResults = await algolia.searchProducts(
+        query,
+        0, // page
+        100, // hitsPerPage - get more results for shop-specific search
+        "shop_products", // index name
+        undefined, // no filterType
+        "None" // sortOption
+      );
+
+      // Check if this search was aborted
+      if (searchAbortRef.current) {
+        console.log('🚫 Search aborted:', query);
+        return;
+      }
+
+      // Convert Algolia results to app's Product model and filter by shopId
+      const convertedResults: Product[] = algoliaResults
+        .map((algoliaProduct) => ProductUtils.fromAlgolia(algoliaProduct as unknown as Record<string, unknown>))
+        .filter((product) => product.shopId === currentShopId);
+
+      console.log(`✅ Algolia search complete: ${convertedResults.length} products found for shop ${currentShopId}`);
+      setSearchResults(convertedResults);
+    } catch (error) {
+      console.error('❌ Algolia search error:', error);
+      // On error, show no results but don't crash
+      if (!searchAbortRef.current) {
+        setSearchResults([]);
+      }
+    } finally {
+      if (!searchAbortRef.current) {
+        setIsSearching(false);
+      }
+    }
+  }, []);
+
+  // Debounced search effect
+  useEffect(() => {
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    // Abort any ongoing search
+    searchAbortRef.current = true;
+
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    // Set searching state immediately for better UX
+    setIsSearching(true);
+
+    // Debounce search by 300ms
+    searchTimeoutRef.current = setTimeout(() => {
+      if (shopId) {
+        performAlgoliaSearch(searchQuery, shopId);
+      }
+    }, 300);
+
+    // Cleanup
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchQuery, shopId, performAlgoliaSearch]);
+
+  // Determine which products to display
+  const products = useMemo(() => {
+    // If user is searching, show search results
+    if (searchQuery.trim()) {
+      return searchResults;
+    }
+    // Otherwise show regular products
+    return allProducts;
+  }, [searchQuery, searchResults, allProducts]);
 
   // Fetch collections
   const fetchCollections = useCallback(async () => {
@@ -307,7 +464,54 @@ export default function ShopDetailPage() {
 
   const handleTabChange = (tab: TabType) => {
     setActiveTab(tab);
+    // Reset pagination when changing tabs
+    setLastProductDoc(null);
+    lastProductDocRef.current = null;
+    setHasMoreProducts(true);
   };
+
+  // Load more products function
+  const loadMoreProducts = useCallback(() => {
+    if (isLoadingMore || !hasMoreProducts || isLoadingProducts) return;
+
+    if (["allProducts", "deals", "bestSellers"].includes(activeTab)) {
+      const productType =
+        activeTab === "allProducts"
+          ? "all"
+          : activeTab === "deals"
+          ? "deals"
+          : "bestSellers";
+      fetchProducts(productType, true);
+    }
+  }, [activeTab, isLoadingMore, hasMoreProducts, isLoadingProducts, fetchProducts]);
+
+  // Infinite scroll observer
+  useEffect(() => {
+    // Only set up observer if we're on a products tab and have products
+    if (!["allProducts", "deals", "bestSellers"].includes(activeTab)) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          loadMoreProducts();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const currentTarget = observerTarget.current;
+    if (currentTarget && allProducts.length > 0) {
+      observer.observe(currentTarget);
+    }
+
+    return () => {
+      if (currentTarget) {
+        observer.unobserve(currentTarget);
+      }
+    };
+  }, [loadMoreProducts, activeTab, allProducts.length]);
 
   const handleFavoriteToggle = () => {
     setIsFavorite(!isFavorite);
@@ -377,7 +581,7 @@ export default function ShopDetailPage() {
               onClick={() => router.back()}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
-              Go Back
+              {t("goBack")}
             </button>
           </div>
         </div>
@@ -455,7 +659,7 @@ export default function ShopDetailPage() {
                         isDarkMode ? "text-gray-400" : "text-gray-600"
                       }`}
                     >
-                      {collection.productIds.length} products
+                      {collection.productIds.length} {t("products")}
                     </p>
                   </div>
                 </div>
@@ -474,7 +678,7 @@ export default function ShopDetailPage() {
                     isDarkMode ? "text-gray-400" : "text-gray-600"
                   }`}
                 >
-                  No reviews yet
+                  {t("noReviewsYet")}
                 </p>
               </div>
             ) : (
@@ -519,14 +723,14 @@ export default function ShopDetailPage() {
                         isDarkMode ? "text-gray-400" : "text-gray-600"
                       }`}
                     >
-                      {review.userName || "Anonymous"}
+                      {review.userName || t("anonymous")}
                     </span>
                     <span
                       className={`text-xs ${
                         isDarkMode ? "text-gray-400" : "text-gray-600"
                       }`}
                     >
-                      {(review.likes || []).length} likes
+                      {(review.likes || []).length} {t("likes")}
                     </span>
                   </div>
                 </div>
@@ -538,14 +742,14 @@ export default function ShopDetailPage() {
       default: // Products tabs
         return (
           <div>
-            {isLoadingProducts ? (
+            {(isLoadingProducts || isSearching) ? (
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 {Array.from({ length: 8 }).map((_, i) => (
                   <div key={i} className="animate-pulse">
-                    <div className="bg-gray-300 h-48 rounded-t-lg" />
+                    <div className={`h-48 rounded-t-lg ${isDarkMode ? "bg-gray-700" : "bg-gray-300"}`} />
                     <div className="p-3 space-y-2">
-                      <div className="h-4 bg-gray-300 rounded" />
-                      <div className="h-4 bg-gray-300 rounded w-3/4" />
+                      <div className={`h-4 rounded ${isDarkMode ? "bg-gray-700" : "bg-gray-300"}`} />
+                      <div className={`h-4 rounded w-3/4 ${isDarkMode ? "bg-gray-700" : "bg-gray-300"}`} />
                     </div>
                   </div>
                 ))}
@@ -557,26 +761,31 @@ export default function ShopDetailPage() {
                     isDarkMode ? "text-gray-400" : "text-gray-600"
                   }`}
                 >
-                  No products found
+                  {t("noProductsFound")}
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-  {products.map((product) => (
-    <ProductCard
-      key={product.id}
-      product={product}
-      onTap={() => router.push(`/productdetail/${product.id}`)}
-      onFavoriteToggle={() => {}}
-      onAddToCart={() => {}}
-      onColorSelect={() => {}}
-      showCartIcon={true}
-      isFavorited={false}
-      isInCart={false}
-      portraitImageHeight={320}
-    />
-  ))}
-</div>
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  {products.map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      onTap={() => router.push(`/productdetail/${product.id}`)}
+                      onFavoriteToggle={() => {}}
+                      onAddToCart={() => {}}
+                      onColorSelect={() => {}}
+                      showCartIcon={true}
+                      isFavorited={false}
+                      isInCart={false}
+                      portraitImageHeight={320}
+                    />
+                  ))}
+                </div>
+
+                {/* Infinite scroll trigger - only show when not searching */}
+                {!searchQuery.trim() && hasMoreProducts && <div ref={observerTarget} className="h-10" />}
+              </>
             )}
           </div>
         );
@@ -590,37 +799,39 @@ export default function ShopDetailPage() {
         className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
       >
         <div className="max-w-6xl mx-auto">
-          <div ref={scrollRef} className="h-screen overflow-y-auto">
+          <div>
             {/* Header with Cover Image */}
-            <div className="relative h-64">
-              {shopData.coverImageUrls && shopData.coverImageUrls.length > 0 ? (
-                <img
-                  src={shopData.coverImageUrls[0]}
-                  alt={shopData.name}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    console.log(
-                      "Cover image failed to load:",
-                      shopData.coverImageUrls[0]
-                    );
-                    e.currentTarget.style.display = "none";
-                  }}
-                />
-              ) : null}
+            <div className="relative h-64 overflow-hidden bg-gradient-to-br from-orange-500 to-pink-500">
+  {shopData.coverImageUrls && shopData.coverImageUrls.length > 0 && (
+    <>
+      {/* Image */}
+      <Image
+        src={shopData.coverImageUrls[0]}
+        alt={`${shopData.name} cover`}
+        fill
+        sizes="100vw"
+        className="object-cover"
+        priority
+        unoptimized
+        onLoad={() => console.log("✅ Next Image loaded")}
+        onError={(e) => console.error("❌ Next Image failed")}
+      />
+      
+      {/* Overlay using pseudo-element approach */}
+      <div className="absolute inset-0 bg-black/30 pointer-events-none" />
+    </>
+  )}
 
-              {/* Overlay */}
-              <div className="absolute inset-0 bg-black bg-opacity-30" />
+  {/* Back Button */}
+  <button
+    onClick={handleBack}
+    className="absolute top-4 left-4 z-20 w-10 h-10 bg-black/50 rounded-full flex items-center justify-center text-white hover:bg-black/70 transition-all"
+  >
+    <ArrowLeftIcon className="w-6 h-6" />
+  </button>
 
-              {/* Back Button */}
-              <button
-                onClick={handleBack}
-                className="absolute top-4 left-4 w-10 h-10 bg-black bg-opacity-50 rounded-full flex items-center justify-center text-white hover:bg-opacity-70 transition-all"
-              >
-                <ArrowLeftIcon className="w-6 h-6" />
-              </button>
-
-              {/* Shop Info */}
-              <div className="absolute bottom-4 left-4 right-4">
+  {/* Shop Info */}
+  <div className="absolute bottom-4 left-4 right-4 z-20">
                 <div className="flex items-end space-x-4">
                   {/* Profile Image */}
                   <div className="relative w-20 h-20 rounded-full border-4 border-white overflow-hidden shadow-lg">
@@ -649,12 +860,12 @@ export default function ShopDetailPage() {
                       <div className="flex items-center space-x-1">
                         <UsersIcon className="w-4 h-4" />
                         <span>
-                          {formatNumber(shopData.followerCount)} followers
+                          {formatNumber(shopData.followerCount)} {t("followers")}
                         </span>
                       </div>
                       <div className="flex items-center space-x-1">
                         <EyeIcon className="w-4 h-4" />
-                        <span>{formatNumber(shopData.clickCount)} views</span>
+                        <span>{formatNumber(shopData.clickCount)} {t("views")}</span>
                       </div>
                     </div>
                   </div>
@@ -674,7 +885,7 @@ export default function ShopDetailPage() {
                       ) : (
                         <HeartIcon className="w-4 h-4" />
                       )}
-                      <span>{isFavorite ? "Following" : "Follow"}</span>
+                      <span>{isFavorite ? t("following") : t("follow")}</span>
                     </div>
                   </button>
                 </div>
@@ -693,7 +904,7 @@ export default function ShopDetailPage() {
                 <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search in store..."
+                  placeholder={t("searchInStore")}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className={`w-full pl-10 pr-4 py-3 rounded-full border ${
@@ -744,7 +955,7 @@ export default function ShopDetailPage() {
                     }`}
                   >
                     <AdjustmentsHorizontalIcon className="w-4 h-4 text-orange-500" />
-                    <span>Sort</span>
+                    <span>{t("sort")}</span>
                   </button>
                   <button
                     className={`flex items-center space-x-2 px-3 py-2 rounded-lg border ${
@@ -754,7 +965,7 @@ export default function ShopDetailPage() {
                     }`}
                   >
                     <FunnelIcon className="w-4 h-4 text-orange-500" />
-                    <span>Filter</span>
+                    <span>{t("filter")}</span>
                   </button>
                 </div>
               </div>

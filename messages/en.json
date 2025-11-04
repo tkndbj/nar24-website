@@ -2383,6 +2383,9 @@
     "productsFound": "{count} products found",
     "productFound": "{count} product found",
 
+    "relatedShops": "Related Shops",
+    "searchingShops": "Searching shops...",
+
     "all": "All",
     "deals": "Deals",
     "boosted": "Featured",

@@ -20,17 +20,15 @@ export interface Product {
   gender?: string;
   bundleIds: string[];
   bundlePrice?: number;
+  maxQuantity?: number;
   userId: string;
   discountThreshold?: number;
   rankingScore: number;
   promotionScore: number;
   campaign?: string;
-  campaignDiscount?: number;
-  campaignPrice?: number;
   ownerId: string;
   shopId?: string;
   ilanNo: string;
-  searchIndex: string[];
   createdAt: Date;
   sellerName: string;
   category: string;
@@ -135,6 +133,17 @@ export class ProductUtils {
 
   static safeDate(value: unknown): Date {
     if (value == null) return new Date();
+
+    // Handle Firestore Timestamp objects
+    if (
+      typeof value === "object" &&
+      value !== null &&
+      "toDate" in value &&
+      typeof (value as { toDate?: unknown }).toDate === "function"
+    ) {
+      return (value as { toDate: () => Date }).toDate();
+    }
+
     if (value instanceof Date) return value;
     if (typeof value === "number") return new Date(value);
     if (typeof value === "string") {
@@ -146,6 +155,17 @@ export class ProductUtils {
 
   static safeDateNullable(value: unknown): Date | undefined {
     if (value == null) return undefined;
+
+    // Handle Firestore Timestamp objects
+    if (
+      typeof value === "object" &&
+      value !== null &&
+      "toDate" in value &&
+      typeof (value as { toDate?: unknown }).toDate === "function"
+    ) {
+      return (value as { toDate: () => Date }).toDate();
+    }
+
     if (value instanceof Date) return value;
     if (typeof value === "number") return new Date(value);
     if (typeof value === "string") {
@@ -239,18 +259,9 @@ export class ProductUtils {
       rankingScore: ProductUtils.safeDouble(json.rankingScore),
       promotionScore: ProductUtils.safeDouble(json.promotionScore),
       campaign: ProductUtils.safeStringNullable(json.campaign),
-      campaignDiscount:
-        json.campaignDiscount != null
-          ? ProductUtils.safeDouble(json.campaignDiscount)
-          : undefined,
-      campaignPrice:
-        json.campaignPrice != null
-          ? ProductUtils.safeDouble(json.campaignPrice)
-          : undefined,
       ownerId: ProductUtils.safeString(json.ownerId),
       shopId: ProductUtils.safeStringNullable(json.shopId),
       ilanNo: ProductUtils.safeString(json.ilan_no ?? json.id, "N/A"),
-      searchIndex: ProductUtils.safeStringArray(json.searchIndex),
       createdAt: ProductUtils.safeDate(json.createdAt),
       sellerName: ProductUtils.safeString(json.sellerName, "Unknown"),
       category: ProductUtils.safeString(json.category, "Uncategorized"),
@@ -314,7 +325,6 @@ export class ProductUtils {
       ownerId: product.ownerId,
       shopId: product.shopId,
       ilan_no: product.ilanNo,
-      searchIndex: product.searchIndex,
       gender: product.gender,
       availableColors: product.availableColors,
       createdAt: product.createdAt.getTime(),
@@ -343,8 +353,6 @@ export class ProductUtils {
       paused: product.paused,
       promotionScore: product.promotionScore,
       campaign: product.campaign,
-      campaignDiscount: product.campaignDiscount,
-      campaignPrice: product.campaignPrice,
       campaignName: product.campaignName,
       colorImages: product.colorImages,
       videoUrl: product.videoUrl,

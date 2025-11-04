@@ -50,8 +50,25 @@ export interface Product {
   shopId?: string;
 }
 
+export interface Shop {
+  id: string;
+  name: string;
+  profileImageUrl: string;
+  coverImageUrls: string[];
+  address: string;
+  averageRating: number;
+  reviewCount: number;
+  followerCount: number;
+  clickCount: number;
+  categories: string[];
+  contactNo: string;
+  ownerId: string;
+  isBoosted: boolean;
+  createdAt: string;
+}
+
 // Define the types that can be cached - moved to top for proper scoping
-type CacheableData = Product[] | Suggestion[] | CategorySuggestion[];
+type CacheableData = Product[] | Suggestion[] | CategorySuggestion[] | Shop[];
 
 // Enhanced hit response interfaces
 interface AlgoliaProductHit {
@@ -101,6 +118,25 @@ interface AlgoliaSuggestionHit {
   objectID?: string;
   productName?: string;
   price?: string | number;
+}
+
+interface AlgoliaShopHit {
+  objectID?: string;
+  name?: string;
+  profileImageUrl?: string;
+  coverImageUrls?: string[] | string;
+  homeImageUrls?: string[] | string;
+  address?: string;
+  averageRating?: string | number;
+  reviewCount?: string | number;
+  followerCount?: string | number;
+  clickCount?: string | number;
+  categories?: string[];
+  contactNo?: string;
+  ownerId?: string;
+  isBoosted?: boolean;
+  createdAt?: string;
+  [key: string]: unknown; // Allow any additional fields
 }
 
 interface SearchParams {
@@ -533,7 +569,106 @@ class AlgoliaServiceManager {
       console.error("❌ Category search error:", error);
       return [];
     }
-  } 
+  }
+
+  /**
+   * Search for shops
+   */
+  async searchShops(
+    query: string,
+    hitsPerPage: number = 100,
+    page: number = 0
+  ): Promise<Shop[]> {
+    const cacheKey = this.getCacheKey('shops', query, page, hitsPerPage);
+
+    const cached = this.getFromCache<Shop[]>(cacheKey);
+    if (cached) {
+      console.log(`🎯 Shop cache hit for: ${cacheKey}`);
+      return cached;
+    }
+
+    try {
+      console.log(`🔍 Searching shops with query: "${query}"`);
+
+      const searchParams: SearchParams = {
+        query,
+        page,
+        hitsPerPage,
+        attributesToRetrieve: [
+          "objectID", "name", "profileImageUrl", "coverImageUrls", "homeImageUrls",
+          "address", "averageRating", "reviewCount", "followerCount", "clickCount",
+          "categories", "contactNo", "ownerId", "isBoosted", "createdAt"
+        ],
+        attributesToHighlight: ["name", "address"],
+        typoTolerance: true,
+        distinct: 0,
+        analytics: false,
+        clickAnalytics: false,
+        facets: []
+      };
+
+      const searchResult = await this.client.searchSingleIndex({
+        indexName: 'shops',
+        searchParams
+      });
+
+      console.log(`✅ Shops returned ${searchResult.hits.length} hits`);
+
+      // Debug: Log first hit to see what we're getting
+      if (searchResult.hits.length > 0) {
+        const firstHit = searchResult.hits[0] as AlgoliaShopHit;
+        console.log('🔍 First shop hit - ALL fields:', firstHit);
+        console.log('🔍 First shop hit - image fields:', {
+          objectID: firstHit.objectID,
+          name: firstHit.name,
+          coverImageUrls: firstHit.coverImageUrls,
+          homeImageUrls: firstHit.homeImageUrls,
+          profileImageUrl: firstHit.profileImageUrl,
+        });
+      }
+
+      const shops = searchResult.hits.map((hit: AlgoliaShopHit) => {
+        // Handle coverImageUrls - could be array, single string, or might need fallback to homeImageUrls
+        let coverUrls: string[] = [];
+
+        // Try coverImageUrls first
+        if (Array.isArray(hit.coverImageUrls) && hit.coverImageUrls.length > 0) {
+          coverUrls = hit.coverImageUrls;
+        } else if (typeof hit.coverImageUrls === 'string' && hit.coverImageUrls) {
+          coverUrls = [hit.coverImageUrls];
+        }
+        // Fallback to homeImageUrls if coverImageUrls is empty
+        else if (Array.isArray(hit.homeImageUrls) && hit.homeImageUrls.length > 0) {
+          coverUrls = hit.homeImageUrls;
+        } else if (typeof hit.homeImageUrls === 'string' && hit.homeImageUrls) {
+          coverUrls = [hit.homeImageUrls];
+        }
+
+        return {
+          id: hit.objectID || `unknown-shop-${Math.random().toString(36).substr(2, 9)}`,
+          name: hit.name || "Unknown Shop",
+          profileImageUrl: hit.profileImageUrl || "",
+          coverImageUrls: coverUrls,
+          address: hit.address || "",
+          averageRating: hit.averageRating ? (typeof hit.averageRating === 'string' ? parseFloat(hit.averageRating) : hit.averageRating) || 0 : 0,
+          reviewCount: hit.reviewCount ? (typeof hit.reviewCount === 'string' ? parseInt(hit.reviewCount) : hit.reviewCount) || 0 : 0,
+          followerCount: hit.followerCount ? (typeof hit.followerCount === 'string' ? parseInt(hit.followerCount) : hit.followerCount) || 0 : 0,
+          clickCount: hit.clickCount ? (typeof hit.clickCount === 'string' ? parseInt(hit.clickCount) : hit.clickCount) || 0 : 0,
+          categories: Array.isArray(hit.categories) ? hit.categories : [],
+          contactNo: hit.contactNo || "",
+          ownerId: hit.ownerId || "",
+          isBoosted: Boolean(hit.isBoosted),
+          createdAt: hit.createdAt || new Date().toISOString(),
+        };
+      });
+
+      this.setCache(cacheKey, shops);
+      return shops;
+    } catch (error) {
+      console.error("❌ Shop search error:", error);
+      return [];
+    }
+  }
 
   /**
    * Clear all cached data

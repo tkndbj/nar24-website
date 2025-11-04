@@ -13,6 +13,8 @@ import {
   DocumentData,
   where,
   Timestamp,
+  doc,
+  getDoc,
 } from "firebase/firestore";
 import { db } from "../../../lib/firebase";
 import SecondHeader from "../../components/market_screen/SecondHeader";
@@ -20,6 +22,7 @@ import ShopCard from "../../components/shops/ShopCard";
 import CreateShopButton from "../../components/shops/CreateShopButton";
 import SearchAndFilter from "../../components/shops/SearchAndFilter";
 import LoadingShopCard from "../../components/shops/LoadingShopCard";
+import AlgoliaServiceManager from "@/lib/algolia";
 
 interface Shop {
   id: string;
@@ -50,9 +53,15 @@ export default function ShopsPage() {
   const [lastDocument, setLastDocument] =
     useState<QueryDocumentSnapshot<DocumentData> | null>(null);
 
+  // Algolia search states
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<Shop[]>([]);
+
   const t = useTranslations("shops");
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const searchAbortRef = useRef<boolean>(false);
 
   const SHOPS_PER_PAGE = 20;
 
@@ -89,11 +98,183 @@ export default function ShopsPage() {
     return () => observer.disconnect();
   }, []);
 
-  // Fetch shops function
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+        searchTimeoutRef.current = null;
+      }
+      searchAbortRef.current = true;
+    };
+  }, []);
+
+  // Algolia search function with Firestore enrichment
+  const performAlgoliaSearch = useCallback(
+    async (query: string, categoryFilter: string | null = null) => {
+      if (!query.trim()) {
+        setSearchResults([]);
+        setIsSearching(false);
+        return;
+      }
+
+      searchAbortRef.current = false;
+
+      try {
+        setIsSearching(true);
+
+        const algolia = AlgoliaServiceManager.getInstance();
+
+        // Search shops index using dedicated method
+        const algoliaResults = await algolia.searchShops(
+          query,
+          100, // hitsPerPage
+          0 // page
+        );
+
+        // Check if search was aborted
+        if (searchAbortRef.current) {
+          console.log("🚫 Shop search aborted:", query);
+          return;
+        }
+
+        // Convert Algolia Shop results to component Shop interface
+        let shopResults: Shop[] = algoliaResults.map((result) => ({
+          id: result.id,
+          name: result.name,
+          profileImageUrl: result.profileImageUrl,
+          coverImageUrls: result.coverImageUrls,
+          address: result.address,
+          averageRating: result.averageRating,
+          reviewCount: result.reviewCount,
+          followerCount: result.followerCount,
+          clickCount: result.clickCount,
+          categories: result.categories,
+          contactNo: result.contactNo,
+          ownerId: result.ownerId,
+          isBoosted: result.isBoosted,
+          createdAt: result.createdAt
+            ? Timestamp.fromDate(new Date(result.createdAt))
+            : Timestamp.now(),
+        }));
+
+        // Enrich with Firestore data if cover images are missing
+        const shopsNeedingEnrichment = shopResults.filter(
+          (shop) => !shop.coverImageUrls || shop.coverImageUrls.length === 0
+        );
+
+        if (shopsNeedingEnrichment.length > 0) {
+          console.log(
+            `🔄 Enriching ${shopsNeedingEnrichment.length} shops with Firestore data...`
+          );
+
+          // Batch fetch from Firestore
+          const enrichmentPromises = shopsNeedingEnrichment.map(
+            async (shop) => {
+              try {
+                const shopDocRef = doc(db, "shops", shop.id);
+                const shopDocSnap = await getDoc(shopDocRef);
+
+                if (shopDocSnap.exists()) {
+                  const firestoreData = shopDocSnap.data();
+                  return {
+                    shopId: shop.id,
+                    coverImageUrls: firestoreData.coverImageUrls || [],
+                  };
+                }
+              } catch (err) {
+                console.error(`Failed to enrich shop ${shop.id}:`, err);
+              }
+              return null;
+            }
+          );
+
+          const enrichmentResults = await Promise.all(enrichmentPromises);
+
+          // Merge enriched data back into results
+          const enrichmentMap = new Map(
+            enrichmentResults
+              .filter((r) => r !== null)
+              .map((r) => [r!.shopId, r!.coverImageUrls])
+          );
+
+          shopResults = shopResults.map((shop) => ({
+            ...shop,
+            coverImageUrls: enrichmentMap.get(shop.id) || shop.coverImageUrls,
+          }));
+
+          console.log(
+            `✅ Enrichment complete: ${enrichmentMap.size} shops updated`
+          );
+        }
+
+        // Check if search was aborted during enrichment
+        if (searchAbortRef.current) {
+          console.log("🚫 Shop search aborted during enrichment:", query);
+          return;
+        }
+
+        // Filter by category if selected
+        const filteredResults = categoryFilter
+          ? shopResults.filter((shop) =>
+              shop.categories.includes(categoryFilter)
+            )
+          : shopResults;
+
+        console.log(
+          `✅ Algolia shop search complete: ${filteredResults.length} shops found`
+        );
+        setSearchResults(filteredResults);
+      } catch (error) {
+        console.error("❌ Algolia shop search error:", error);
+        if (!searchAbortRef.current) {
+          setSearchResults([]);
+        }
+      } finally {
+        if (!searchAbortRef.current) {
+          setIsSearching(false);
+        }
+      }
+    },
+    []
+  );
+
+  // Debounced search effect
+  useEffect(() => {
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    // Abort ongoing search
+    searchAbortRef.current = true;
+
+    if (!searchTerm.trim()) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    // Set searching state immediately
+    setIsSearching(true);
+
+    // Debounce search by 300ms
+    searchTimeoutRef.current = setTimeout(() => {
+      performAlgoliaSearch(searchTerm, selectedCategory);
+    }, 300);
+
+    // Cleanup
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchTerm, selectedCategory, performAlgoliaSearch]);
+
+  // Fetch shops function (Firebase - used only when not searching)
   const fetchShops = useCallback(
     async (
       isLoadMore = false,
-      searchQuery = "",
       categoryFilter: string | null = null
     ) => {
       try {
@@ -110,17 +291,6 @@ export default function ShopsPage() {
           limit(SHOPS_PER_PAGE)
         );
 
-        // Apply search filter
-        if (searchQuery.trim()) {
-          shopsQuery = query(
-            collection(db, "shops"),
-            where("name", ">=", searchQuery),
-            where("name", "<=", searchQuery + "\uf8ff"),
-            orderBy("name"),
-            limit(SHOPS_PER_PAGE)
-          );
-        }
-
         // Apply category filter
         if (categoryFilter) {
           shopsQuery = query(
@@ -133,12 +303,22 @@ export default function ShopsPage() {
 
         // Add pagination
         if (isLoadMore && lastDocument) {
-          shopsQuery = query(
-            collection(db, "shops"),
-            orderBy("createdAt", "desc"),
-            startAfter(lastDocument),
-            limit(SHOPS_PER_PAGE)
-          );
+          if (categoryFilter) {
+            shopsQuery = query(
+              collection(db, "shops"),
+              where("categories", "array-contains", categoryFilter),
+              orderBy("createdAt", "desc"),
+              startAfter(lastDocument),
+              limit(SHOPS_PER_PAGE)
+            );
+          } else {
+            shopsQuery = query(
+              collection(db, "shops"),
+              orderBy("createdAt", "desc"),
+              startAfter(lastDocument),
+              limit(SHOPS_PER_PAGE)
+            );
+          }
         }
 
         const snapshot = await getDocs(shopsQuery);
@@ -168,18 +348,28 @@ export default function ShopsPage() {
 
   // Initial load
   useEffect(() => {
-    fetchShops(false, searchTerm, selectedCategory);
+    fetchShops(false, selectedCategory);
   }, []);
 
-  // Handle search and filter changes
+  // Handle category filter changes (only for Firebase, Algolia handles it in search)
   useEffect(() => {
-    setLastDocument(null);
-    setHasMore(true);
-    fetchShops(false, searchTerm, selectedCategory);
-  }, [searchTerm, selectedCategory]);
+    if (!searchTerm.trim()) {
+      setLastDocument(null);
+      setHasMore(true);
+      fetchShops(false, selectedCategory);
+    }
+  }, [selectedCategory]);
 
-  // Intersection Observer for infinite scroll
+  // Intersection Observer for infinite scroll (only when not searching)
   useEffect(() => {
+    // Disable infinite scroll when searching with Algolia
+    if (searchTerm.trim()) {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+      return;
+    }
+
     if (observerRef.current) {
       observerRef.current.disconnect();
     }
@@ -192,7 +382,7 @@ export default function ShopsPage() {
           !isLoadingMore &&
           !isLoading
         ) {
-          fetchShops(true, searchTerm, selectedCategory);
+          fetchShops(true, selectedCategory);
         }
       },
       { threshold: 0.1 }
@@ -218,9 +408,15 @@ export default function ShopsPage() {
 
   const handleRefresh = async () => {
     setShops([]);
+    setSearchResults([]);
     setLastDocument(null);
     setHasMore(true);
-    await fetchShops(false, searchTerm, selectedCategory);
+
+    if (searchTerm.trim()) {
+      await performAlgoliaSearch(searchTerm, selectedCategory);
+    } else {
+      await fetchShops(false, selectedCategory);
+    }
   };
 
   const handleSearch = (term: string) => {
@@ -326,13 +522,13 @@ export default function ShopsPage() {
           </div>
 
           {/* Shops Grid */}
-          {isLoading && shops.length === 0 ? (
+          {(isLoading && shops.length === 0) || isSearching ? (
             <div className={`grid ${getGridCols()} gap-6`}>
               {Array.from({ length: 8 }).map((_, index) => (
                 <LoadingShopCard key={index} isDarkMode={isDarkMode} />
               ))}
             </div>
-          ) : shops.length === 0 ? (
+          ) : (searchTerm.trim() ? searchResults : shops).length === 0 ? (
             <div className="text-center py-20">
               <div className={`text-6xl mb-6 ${
                 isDarkMode ? "text-gray-600" : "text-gray-400"
@@ -360,24 +556,26 @@ export default function ShopsPage() {
           ) : (
             <>
               <div className={`grid ${getGridCols()} gap-6`}>
-                {shops.map((shop) => (
+                {(searchTerm.trim() ? searchResults : shops).map((shop) => (
                   <ShopCard key={shop.id} shop={shop} isDarkMode={isDarkMode} />
                 ))}
               </div>
 
-              {/* Load More Trigger */}
-              <div ref={loadMoreRef} className="mt-8">
-                {isLoadingMore && (
-                  <div className={`grid ${getGridCols()} gap-6`}>
-                    {Array.from({ length: 4 }).map((_, index) => (
-                      <LoadingShopCard key={`loading-${index}`} isDarkMode={isDarkMode} />
-                    ))}
-                  </div>
-                )}
-              </div>
+              {/* Load More Trigger - only for Firebase pagination */}
+              {!searchTerm.trim() && (
+                <div ref={loadMoreRef} className="mt-8">
+                  {isLoadingMore && (
+                    <div className={`grid ${getGridCols()} gap-6`}>
+                      {Array.from({ length: 4 }).map((_, index) => (
+                        <LoadingShopCard key={`loading-${index}`} isDarkMode={isDarkMode} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* End Message */}
-              {!hasMore && shops.length > 0 && (
+              {!hasMore && !searchTerm.trim() && shops.length > 0 && (
                 <div className="text-center py-12">
                   <div className={`inline-flex items-center gap-2 px-6 py-3 rounded-lg ${
                     isDarkMode

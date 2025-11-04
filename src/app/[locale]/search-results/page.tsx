@@ -12,84 +12,36 @@ import {
   WifiOff,
   Search,
 } from "lucide-react";
-import { ProductCard } from "@/app/components/ProductCard";
+import ProductCard from "@/app/components/ProductCard";
 import {
   SearchResultsProvider,
   useSearchResultsProvider,
   FilterType,
-  SortOption,  
+  SortOption,
 } from "@/context/SearchResultsProvider";
 
-import { Product } from "@/app/models/Product";
+import { Product, ProductUtils } from "@/app/models/Product";
+import ShopCard from "@/app/components/shops/ShopCard";
+import { Timestamp, doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
-// Import the Algolia Product type and create a converter function
-import { Product as AlgoliaProduct } from "@/lib/algolia";
-
-// Converter function from Algolia Product to Model Product
-const convertAlgoliaProduct = (algoliaProduct: AlgoliaProduct): Product => {
-  return {
-    id: algoliaProduct.id,
-    sourceCollection: algoliaProduct.collection,
-    productName: algoliaProduct.productName,
-    description: algoliaProduct.description,
-    price: algoliaProduct.price,
-    currency: algoliaProduct.currency,
-    condition: algoliaProduct.condition,
-    brandModel: algoliaProduct.brandModel,
-    imageUrls: algoliaProduct.imageUrls,
-    averageRating: algoliaProduct.averageRating,
-    reviewCount: algoliaProduct.reviewCount || 0,
-    originalPrice: algoliaProduct.originalPrice,
-    discountPercentage: algoliaProduct.discountPercentage,
-    colorQuantities: {},
-    boostClickCountAtStart: 0,
-    availableColors: [],
-    gender: undefined,
-    bundleIds: [],
-    bundlePrice: undefined,
-    userId: algoliaProduct.userId || '',
-    discountThreshold: undefined,
-    rankingScore: algoliaProduct.rankingScore || 0,
-    promotionScore: 0,
-    campaign: undefined,
-    campaignDiscount: undefined,
-    campaignPrice: undefined,
-    ownerId: algoliaProduct.userId || '',
-    shopId: algoliaProduct.shopId,
-    ilanNo: algoliaProduct.id,
-    searchIndex: [],
-    createdAt: algoliaProduct.createdAt ? new Date(algoliaProduct.createdAt) : new Date(),
-    sellerName: algoliaProduct.sellerName || 'Unknown',
-    category: algoliaProduct.category || 'Uncategorized',
-    subcategory: algoliaProduct.subcategory || '',
-    subsubcategory: algoliaProduct.subsubcategory || '',
-    quantity: algoliaProduct.quantity || 0,
-    bestSellerRank: undefined,
-    sold: false,
-    clickCount: algoliaProduct.clickCount || 0,
-    clickCountAtStart: 0,
-    favoritesCount: 0,
-    cartCount: 0,
-    purchaseCount: algoliaProduct.purchaseCount,
-    deliveryOption: algoliaProduct.deliveryOption || 'Self Delivery',
-    boostedImpressionCount: 0,
-    boostImpressionCountAtStart: 0,
-    isFeatured: false,
-    isTrending: false,
-    isBoosted: algoliaProduct.isBoosted,
-    boostStartTime: undefined,
-    boostEndTime: undefined,
-    dailyClickCount: algoliaProduct.dailyClickCount,
-    lastClickDate: undefined,
-    paused: false,
-    campaignName: algoliaProduct.campaignName,
-    colorImages: algoliaProduct.colorImages,
-    videoUrl: undefined,
-    attributes: {},
-    reference: undefined,
-  };
-};
-
+// Shop interface
+interface Shop {
+  id: string;
+  name: string;
+  profileImageUrl: string;
+  coverImageUrls: string[];
+  address: string;
+  averageRating: number;
+  reviewCount: number;
+  followerCount: number;
+  clickCount: number;
+  categories: string[];
+  contactNo: string;
+  ownerId: string;
+  isBoosted: boolean;
+  createdAt: Timestamp;
+}
 
 // Enhanced utility functions
 const throttle = <T extends (...args: unknown[]) => unknown>(
@@ -408,6 +360,10 @@ const SearchResultsContent: React.FC = () => {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
 
+  // Shop search state
+  const [shops, setShops] = useState<Shop[]>([]);
+  const [isLoadingShops, setIsLoadingShops] = useState(false);
+
   // Constants - Match Flutter exactly
   const filterTypes: FilterType[] = [
     "",
@@ -457,6 +413,107 @@ const SearchResultsContent: React.FC = () => {
   const checkConnectivity = useCallback((): boolean => {
     return navigator.onLine;
   }, []);
+
+  // Shop search function with Firestore enrichment
+  const searchShops = useCallback(async (searchQuery: string) => {
+    if (!searchQuery.trim()) {
+      setShops([]);
+      return;
+    }
+
+    setIsLoadingShops(true);
+
+    try {
+      console.log(`🏪 Searching shops for: "${searchQuery}"`);
+
+      const algoliaResults = await algoliaManager.searchShops(
+        searchQuery,
+        10, // Limit to 10 shops for performance
+        0
+      );
+
+      console.log(`✅ Algolia returned ${algoliaResults.length} shop results`);
+
+      // Convert and enrich with Firestore if needed
+      let shopResults: Shop[] = algoliaResults.map((result) => {
+        // Strip "shops_" prefix from Algolia objectID to get Firestore document ID
+        const firestoreId = result.id.startsWith("shops_")
+          ? result.id.substring(6)
+          : result.id;
+
+        return {
+          id: firestoreId,
+          name: result.name,
+          profileImageUrl: result.profileImageUrl,
+          coverImageUrls: result.coverImageUrls,
+          address: result.address,
+          averageRating: result.averageRating,
+          reviewCount: result.reviewCount,
+          followerCount: result.followerCount,
+          clickCount: result.clickCount,
+          categories: result.categories,
+          contactNo: result.contactNo,
+          ownerId: result.ownerId,
+          isBoosted: result.isBoosted,
+          createdAt: result.createdAt
+            ? Timestamp.fromDate(new Date(result.createdAt))
+            : Timestamp.now(),
+        };
+      });
+
+      // Enrich shops missing cover images
+      const shopsNeedingEnrichment = shopResults.filter(
+        (shop) => !shop.coverImageUrls || shop.coverImageUrls.length === 0
+      );
+
+      if (shopsNeedingEnrichment.length > 0) {
+        console.log(
+          `🔄 Enriching ${shopsNeedingEnrichment.length} shops with Firestore data`
+        );
+
+        const enrichmentPromises = shopsNeedingEnrichment.map(async (shop) => {
+          try {
+            const shopDocRef = doc(db, "shops", shop.id);
+            const shopDocSnap = await getDoc(shopDocRef);
+
+            if (shopDocSnap.exists()) {
+              const firestoreData = shopDocSnap.data();
+              return {
+                shopId: shop.id,
+                coverImageUrls: firestoreData.coverImageUrls || [],
+              };
+            }
+          } catch (err) {
+            console.error(`Failed to enrich shop ${shop.id}:`, err);
+          }
+          return null;
+        });
+
+        const enrichmentResults = await Promise.all(enrichmentPromises);
+
+        const enrichmentMap = new Map(
+          enrichmentResults
+            .filter((r) => r !== null)
+            .map((r) => [r!.shopId, r!.coverImageUrls])
+        );
+
+        shopResults = shopResults.map((shop) => ({
+          ...shop,
+          coverImageUrls: enrichmentMap.get(shop.id) || shop.coverImageUrls,
+        }));
+
+        console.log(`✅ Enrichment complete for ${enrichmentMap.size} shops`);
+      }
+
+      console.log(`✅ Setting ${shopResults.length} shops to state`);
+      setShops(shopResults);
+    } catch (error) {
+      console.error("❌ Shop search error:", error);
+      setShops([]);
+    } finally {
+      setIsLoadingShops(false);
+    }
+  }, [algoliaManager]);
 
   // Enhanced fetch results function that mirrors Flutter's searchOnly method
   const fetchResults = useCallback(
@@ -523,12 +580,14 @@ const SearchResultsContent: React.FC = () => {
           const algoliaResults = await algoliaManager.searchProducts(
             query,
             pageToFetch,
-            50,
+            20,
             "products",
             serverSideFilterType,
             sortOption === "None" ? "None" : sortOption
           );
-          results = algoliaResults.map(convertAlgoliaProduct);
+          results = algoliaResults.map((algoliaProduct) =>
+            ProductUtils.fromAlgolia(algoliaProduct as unknown as Record<string, unknown>)
+          );
           console.log(`✅ Products index returned ${results.length} results`);
         } catch (productError) {
           console.warn("❌ Products index failed:", productError);
@@ -539,12 +598,14 @@ const SearchResultsContent: React.FC = () => {
             const algoliaResults = await algoliaManager.searchProducts(
               query,
               pageToFetch,
-              50,
+              20,
               "shop_products",
               serverSideFilterType,
               sortOption === "None" ? "None" : sortOption
             );
-            results = algoliaResults.map(convertAlgoliaProduct);
+            results = algoliaResults.map((algoliaProduct) =>
+              ProductUtils.fromAlgolia(algoliaProduct as unknown as Record<string, unknown>)
+            );
             console.log(
               `✅ Shop_products index returned ${results.length} results`
             );
@@ -555,6 +616,59 @@ const SearchResultsContent: React.FC = () => {
             });
             throw new Error("All search indexes failed");
           }
+        }
+
+        // Enrich products that have color options (parallel enrichment)
+        const productsNeedingEnrichment = results.filter((product) => {
+          const hasColors =
+            (product.availableColors && product.availableColors.length > 0) ||
+            (product.colorImages && Object.keys(product.colorImages).length > 0);
+          return hasColors;
+        });
+
+        if (productsNeedingEnrichment.length > 0) {
+          console.log(
+            `🔄 Enriching ${productsNeedingEnrichment.length} products with options from Firestore...`
+          );
+
+          const enrichmentPromises = productsNeedingEnrichment.map(async (product) => {
+            try {
+              // Try products collection first
+              let productDoc = await getDoc(doc(db, "products", product.id));
+
+              // If not found, try shop_products collection
+              if (!productDoc.exists()) {
+                productDoc = await getDoc(doc(db, "shop_products", product.id));
+              }
+
+              if (productDoc.exists()) {
+                const firestoreData = { id: productDoc.id, ...productDoc.data() };
+                const enriched = ProductUtils.fromJson(firestoreData);
+                return { productId: product.id, enriched };
+              }
+            } catch (err) {
+              console.error(`Failed to enrich product ${product.id}:`, err);
+            }
+            return null;
+          });
+
+          const enrichmentResults = await Promise.all(enrichmentPromises);
+
+          // Create map of enriched products
+          const enrichmentMap = new Map(
+            enrichmentResults
+              .filter((r) => r !== null)
+              .map((r) => [r!.productId, r!.enriched])
+          );
+
+          // Merge enriched products back into results
+          results = results.map((product) =>
+            enrichmentMap.get(product.id) || product
+          );
+
+          console.log(
+            `✅ Enrichment complete: ${enrichmentMap.size} products updated`
+          );
         }
 
         if (reset) {
@@ -572,7 +686,7 @@ const SearchResultsContent: React.FC = () => {
           setCurrentPage(pageToFetch + 1);
         }
 
-        setHasMore(results.length === 50);
+        setHasMore(results.length === 20);
         setHasError(false);
         setIsNetworkError(false);
 
@@ -658,7 +772,9 @@ const SearchResultsContent: React.FC = () => {
       console.log(
         `🔄 Query changed from "${lastQueryRef.current}" to "${query}"`
       );
+      // Search both products and shops (each function manages its own abort flag)
       fetchResults(true);
+      searchShops(query);
     }
 
     return () => {
@@ -667,7 +783,8 @@ const SearchResultsContent: React.FC = () => {
         clearTimeout(loadMoreDebounceRef.current);
       }
     };
-  }, [query, fetchResults]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]); // Only depend on query to avoid race conditions
 
   // Enhanced filter change handler
   const handleFilterChange = useCallback(
@@ -905,6 +1022,48 @@ const SearchResultsContent: React.FC = () => {
               </span>
             )}
           </p>
+        </div>
+      )}
+
+      {/* Shops Section - Only show if shops found */}
+      {shops.length > 0 && (
+        <div className="px-4">
+          <h2
+            className={`text-lg font-semibold mb-4 ${
+              isDarkMode ? "text-white" : "text-gray-900"
+            }`}
+          >
+            {t("relatedShops")} ({shops.length})
+          </h2>
+          <div className="overflow-x-auto pb-4 -mx-4 px-4">
+            <div className="flex gap-4" style={{ minWidth: "min-content" }}>
+              {shops.map((shop) => (
+                <div
+                  key={shop.id}
+                  className="flex-shrink-0"
+                  style={{ width: "280px" }}
+                >
+                  <ShopCard shop={shop} isDarkMode={isDarkMode} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Loading shops indicator */}
+      {isLoadingShops && shops.length === 0 && (
+        <div className="px-4">
+          <div className="flex items-center gap-2">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-500" />
+            <span
+              className={`text-sm ${
+                isDarkMode ? "text-gray-400" : "text-gray-600"
+              }`}
+            >
+              {t("searchingShops")}
+            </span>
+          </div>
         </div>
       )}
 

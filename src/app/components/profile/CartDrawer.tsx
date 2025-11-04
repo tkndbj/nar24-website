@@ -102,31 +102,35 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   }, [isOpen]);
 
   useEffect(() => {
-    // Check if it's mobile (you can adjust the breakpoint as needed)
-    const isMobile = window.innerWidth < 768; // md breakpoint
+    if (isOpen) {
+      // Store current scroll position
+      const scrollY = window.scrollY;
 
-    if (isMobile && isOpen) {
       // Disable scrolling when drawer is open
       document.body.style.overflow = "hidden";
-      // Prevent scrolling on iOS Safari
       document.body.style.position = "fixed";
       document.body.style.width = "100%";
-    } else if (isMobile) {
-      // Re-enable scrolling when drawer is closed (only for mobile)
+      document.body.style.top = `-${scrollY}px`;
+    } else {
+      // Re-enable scrolling when drawer is closed
+      const scrollY = document.body.style.top;
       document.body.style.overflow = "";
       document.body.style.position = "";
       document.body.style.width = "";
+      document.body.style.top = "";
+
+      // Restore scroll position
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY || "0") * -1);
+      }
     }
 
     // Cleanup function to ensure scrolling is restored
     return () => {
-      // Only cleanup if it was mobile when the effect ran
-      const wasMobile = window.innerWidth < 768;
-      if (wasMobile) {
-        document.body.style.overflow = "";
-        document.body.style.position = "";
-        document.body.style.width = "";
-      }
+      document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.width = "";
+      document.body.style.top = "";
     };
   }, [isOpen]);
 
@@ -750,7 +754,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
             ) : (
               /* Cart Items */
               <div className="px-4 py-4">
-                <div className="space-y-4">
+                <div className="space-y-4 pb-32">
                   {renderCartItems}
 
                   {/* Load More Button */}

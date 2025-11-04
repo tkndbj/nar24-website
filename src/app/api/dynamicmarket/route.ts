@@ -1,71 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getFirestoreAdmin } from "@/lib/firebase-admin";
 import { QueryDocumentSnapshot } from "firebase-admin/firestore";
-
-// Product interface
-interface Product {
-  id: string;
-  productName: string;
-  price: number;
-  originalPrice?: number;
-  discountPercentage?: number;
-  currency: string;
-  imageUrls: string[];
-  colorImages: Record<string, string[]>;
-  description: string;
-  brandModel?: string;
-  condition: string;
-  quantity?: number;
-  averageRating: number;
-  isBoosted: boolean;
-  deliveryOption?: string;
-  campaignName?: string;
-  category?: string;
-  subcategory?: string;
-  subsubcategory?: string;
-  gender?: string;
-  availableColors?: string[];
-  createdAt?: FirebaseFirestore.Timestamp;
-  rankingScore?: number;
-  promotionScore?: number;
-}
+import { Product, ProductUtils } from "@/app/models/Product"; // ✅ Import both
 
 // Cache configuration
-const CACHE_DURATION = 60; // 60 seconds
+const CACHE_DURATION = 60;
 const MAX_FETCH_LIMIT = 200;
 const DEFAULT_PAGE_SIZE = 20;
 
-// Convert Firestore document to Product (optimized)
+// ✅ CLEAN: Convert Firestore document to Product using ProductUtils
 function documentToProduct(doc: QueryDocumentSnapshot): Product {
-  const data = doc.data();
-  
-  // Use object spread for better performance
-  return {
-    id: doc.id,
-    productName: data.productName ?? "",
-    price: data.price ?? 0,
-    originalPrice: data.originalPrice,
-    discountPercentage: data.discountPercentage,
-    currency: data.currency ?? "TL",
-    imageUrls: data.imageUrls ?? [],
-    colorImages: data.colorImages ?? {},
-    description: data.description ?? "",
-    brandModel: data.brandModel,
-    condition: data.condition ?? "New",
-    quantity: data.quantity,
-    averageRating: data.averageRating ?? 0,
-    isBoosted: data.isBoosted ?? false,
-    deliveryOption: data.deliveryOption,
-    campaignName: data.campaignName,
-    category: data.category,
-    subcategory: data.subcategory,
-    subsubcategory: data.subsubcategory,
-    gender: data.gender,
-    availableColors: data.availableColors,
-    createdAt: data.createdAt,
-    rankingScore: data.rankingScore,
-    promotionScore: data.promotionScore,
-  };
+  const data = { id: doc.id, ...doc.data() };
+  return ProductUtils.fromJson(data);
 }
 
 // Normalize string for comparison (case-insensitive and trim)
@@ -270,6 +216,8 @@ export async function GET(request: NextRequest) {
             .limit(MAX_FETCH_LIMIT);
 
           const snapshot = await genderQuery.get();
+          
+          // ✅ Use documentToProduct helper
           return snapshot.docs.map((doc: QueryDocumentSnapshot) =>
             documentToProduct(doc)
           );
@@ -330,6 +278,8 @@ export async function GET(request: NextRequest) {
           .limit(MAX_FETCH_LIMIT);
 
         const snapshot = await query.get();
+        
+        // ✅ Use documentToProduct helper
         allProducts = snapshot.docs.map((doc: QueryDocumentSnapshot) =>
           documentToProduct(doc)
         );

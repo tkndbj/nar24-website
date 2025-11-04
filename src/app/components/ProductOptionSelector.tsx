@@ -357,7 +357,11 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
   }, [product.attributes]);
 
   const hasColors = useMemo(() => {
-    return Object.keys(product.colorImages || {}).length > 0;
+    // ✅ Add defensive check
+    const colorImages = product.colorImages;
+    return colorImages != null && 
+           typeof colorImages === 'object' && 
+           Object.keys(colorImages).length > 0;
   }, [product.colorImages]);
 
   // Validate curtain dimensions
@@ -417,41 +421,32 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
   ]);
 
   const handleConfirm = useCallback(() => {
-    console.log("ProductOptionSelector - Confirm clicked", {
-      productId: product.id,
-      selectedColor,
-      selectedQuantity,
-      curtainWidth: isCurtain ? curtainWidth : undefined,
-      curtainHeight: isCurtain ? curtainHeight : undefined,
-      selections,
-    });
-
+   
+  
     const result: OptionSelectorResult = {
-      quantity: isCurtain ? 1 : selectedQuantity, // Curtains always quantity 1
-      ...selections, // Include all dynamic attribute selections
+      quantity: isCurtain ? 1 : selectedQuantity,
+      ...selections,
     };
-
-    // Handle curtain dimensions or quantity
+  
     if (isCurtain) {
       result.curtainWidth = parseFloat(curtainWidth.trim());
       result.curtainHeight = parseFloat(curtainHeight.trim());
     }
-
-    // Add color selection if applicable
+  
     if (selectedColor) {
       result.selectedColor = selectedColor;
-
-      // Add selected color image URL if color is selected
+  
+      // ✅ ADD SAFE ACCESS to colorImages
       if (selectedColor !== "default") {
-        const colorImages = product.colorImages[selectedColor];
-        if (colorImages && colorImages.length > 0) {
+        const colorImages = product.colorImages?.[selectedColor];
+        if (colorImages && Array.isArray(colorImages) && colorImages.length > 0) {
           result.selectedColorImage = colorImages[0];
         }
       } else if (product.imageUrls && product.imageUrls.length > 0) {
         result.selectedColorImage = product.imageUrls[0];
       }
     }
-
+  
     onConfirm(result);
   }, [
     isConfirmEnabled,
@@ -473,12 +468,6 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
       if (newQuantity >= 1 && newQuantity <= maxAllowed) {
         setSelectedQuantity(newQuantity);
 
-        console.log("ProductOptionSelector - Quantity changed:", {
-          productId: product.id,
-          oldQuantity: selectedQuantity,
-          newQuantity,
-          maxAllowed,
-        });
       }
     },
     [selectedQuantity, getMaxQuantityAllowed, product.id]
@@ -491,16 +480,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
       const adjustedQuantity = Math.max(1, maxAllowed);
       setSelectedQuantity(adjustedQuantity);
 
-      console.log(
-        "ProductOptionSelector - Quantity adjusted for color/stock:",
-        {
-          productId: product.id,
-          selectedColor,
-          oldQuantity: selectedQuantity,
-          newQuantity: adjustedQuantity,
-          maxAllowed,
-        }
-      );
+      
     }
   }, [
     selectedColor,
@@ -549,7 +529,13 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
 
   const renderColorSelector = useCallback(() => {
     if (!hasColors) return null;
-
+  
+    // ✅ CRITICAL FIX: Add defensive check for colorImages AND colorQuantities
+    const safeColorImages = product.colorImages || {};
+    const safeColorQuantities = product.colorQuantities || {};
+  
+  
+  
     return (
       <div className="mb-6">
         <h3 className="text-center text-orange-500 font-bold text-base mb-3">
@@ -569,42 +555,42 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
               isDarkMode={actualDarkMode}
               onSelect={() => {
                 setSelectedColor("default");
-                console.log("ProductOptionSelector - Color selected:", {
-                  productId: product.id,
-                  selectedColor: "default",
-                });
+                
               }}
               label={t("default")}
               t={t}
             />
           )}
+  
+          {/* Color options from colorImages - ✅ USE SAFE ACCESS */}
+          {Object.entries(safeColorImages).map(([colorKey, images]) => {
+  // ✅ Ensure images is an array with items
+  if (!images || !Array.isArray(images) || images.length === 0) {
+    return null;
+  }
 
-          {/* Color options from colorImages */}
-          {Object.entries(product.colorImages || {}).map(
-            ([colorKey, images]) => {
-              const qty = product.colorQuantities[colorKey] || 0;
-              return (
-                <ColorThumb
-                  key={colorKey}
-                  colorKey={colorKey}
-                  imageUrl={images[0]}
-                  isSelected={selectedColor === colorKey}
-                  disabled={qty === 0}
-                  isDarkMode={actualDarkMode}
-                  onSelect={() => {
-                    setSelectedColor(colorKey);
-                    console.log("ProductOptionSelector - Color selected:", {
-                      productId: product.id,
-                      selectedColor: colorKey,
-                      availableQty: qty,
-                    });
-                  }}
-                  label={colorKey}
-                  t={t}
-                />
-              );
-            }
-          )}
+  // ✅ FIX: Use safeColorQuantities instead of product.colorQuantities
+  const qty = safeColorQuantities[colorKey] || 0;
+  
+  
+            
+            return (
+              <ColorThumb
+                key={colorKey}
+                colorKey={colorKey}
+                imageUrl={images[0]}
+                isSelected={selectedColor === colorKey}
+                disabled={qty === 0}  // ✅ This should now correctly show qty=1 for "Gray"
+                isDarkMode={actualDarkMode}
+                onSelect={() => {
+                  setSelectedColor(colorKey);
+                 
+                }}
+                label={colorKey}
+                t={t}
+              />
+            );
+          })}
         </div>
       </div>
     );
@@ -642,12 +628,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
                     ...prev,
                     [attributeKey]: option,
                   }));
-                  console.log("ProductOptionSelector - Attribute selected:", {
-                    productId: product.id,
-                    attributeKey,
-                    option,
-                    allSelections: { ...selections, [attributeKey]: option },
-                  });
+                 
                 }}
               />
             ))}

@@ -47,8 +47,11 @@ const isFantasyProduct = (product: Product): boolean => {
 const hasSelectableOptions = (product: Product | null): boolean => {
   if (!product) return false;
 
-  // Check for colors
-  const hasColors = Object.keys(product.colorImages || {}).length > 0;
+  // Check for colors - ensure colorImages exists and is an object
+  const colorImages = product.colorImages;
+  const hasColors = colorImages != null && 
+                    typeof colorImages === 'object' && 
+                    Object.keys(colorImages).length > 0;
   if (hasColors) return true;
 
   // Check for selectable attributes (attributes with multiple options)
@@ -74,6 +77,7 @@ const hasSelectableOptions = (product: Product | null): boolean => {
 
   return selectableAttrs.length > 0;
 };
+
 
 // Enhanced image preloader hook
 const useImagePreloader = (urls: string[]) => {
@@ -389,25 +393,30 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const actualIsInCart = isProductInCart(product.id);
   const actualIsFavorite = isProductFavorite(product.id);
 
-  // Compute displayed colors (max 4, shuffled)
-  const displayedColors = useMemo(() => {
-    const availableColors = Object.keys(product.colorImages || {});
-    const shuffled = [...availableColors].sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, 4);
+  const safeColorImages = useMemo(() => {
+    return product.colorImages && typeof product.colorImages === 'object' 
+      ? product.colorImages 
+      : {};
   }, [product.colorImages]);
 
-  // Get current image URLs based on selected color
+  // ✅ MODIFY: Use safeColorImages instead of product.colorImages
+  const displayedColors = useMemo(() => {
+    const availableColors = Object.keys(safeColorImages);
+    const shuffled = [...availableColors].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, 4);
+  }, [safeColorImages]);
+
+  // ✅ MODIFY: Use safeColorImages
   const currentImageUrls = useMemo(() => {
     const colorToUse = internalSelectedColor || selectedColor;
-    const colorImages = product.colorImages || {};
-    if (colorToUse && colorImages[colorToUse]?.length) {
-      return colorImages[colorToUse];
+    if (colorToUse && safeColorImages[colorToUse]?.length) {
+      return safeColorImages[colorToUse];
     }
     return product.imageUrls || [];
   }, [
     internalSelectedColor,
     selectedColor,
-    product.colorImages,
+    safeColorImages,
     product.imageUrls,
   ]);
 
@@ -418,7 +427,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     if (onTap) {
       onTap();
     } else {
-      console.log("Navigating to:", `/productdetail/${product.id}`);
+      
       router.push(`/productdetail/${product.id}`);
     }
   }, [onTap, product.id, router]);
@@ -446,6 +455,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     setCurrentImageIndex(0);
     setImageError(false);
   }, [internalSelectedColor, selectedColor]);
+
+
 
   // Update internal selected color when prop changes
   useEffect(() => {
@@ -524,22 +535,27 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         router.push("/login");
         return;
       }
-
+  
       const productInCart = actualIsInCart;
-
-      // If product is in cart, remove it directly
+  
+      // If product is in cart, remove it directly (toggle off)
       if (productInCart) {
         await performCartRemoval();
         return;
       }
-
-      // Only show option selector when ADDING to cart (not removing)
-      if (!productInCart && hasSelectableOptions(product) && !selectedOptions) {
+  
+      // ✅ CRITICAL FIX: Check if product has selectable options
+      // Only show selector when ADDING and has options
+      const productHasOptions = hasSelectableOptions(product);
+     
+  
+      if (!productInCart && productHasOptions && !selectedOptions) {
+        
         setShowCartOptionSelector(true);
         return;
       }
-
-      // Perform cart addition
+  
+      // Perform cart addition with or without options
       await performCartOperation(selectedOptions);
     },
     [
@@ -895,7 +911,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         <div className="flex flex-col w-full">
           {/* Image Section */}
           <div
-            className="relative group h-[35vh] lg:h-[45vh]"
+            className="relative group h-[28vh] lg:h-[38vh]"
             style={imageHeight ? { height: imageHeight } : {}}
           >
             <div className="w-full h-full rounded-t-xl overflow-hidden bg-gray-200 relative">
@@ -1032,31 +1048,31 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
             {/* Color Options */}
             {displayedColors.length > 0 && (
-              <div className="absolute right-2 bottom-16 flex flex-col gap-1">
-                {displayedColors.map((color) => {
-                  const isSelected = internalSelectedColor === color;
-                  return (
-                    <button
-                      key={color}
-                      className={`w-5 h-5 rounded-full border-2 transition-all duration-200 ${
-                        isSelected
-                          ? "border-orange-500 scale-110"
-                          : "border-white hover:scale-105"
-                      }`}
-                      style={{ backgroundColor: getColorFromName(color) }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleColorSelect(color);
-                      }}
-                    >
-                      {isSelected && (
-                        <Check size={10} className="text-white m-auto" />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+  <div className="absolute right-2 bottom-16 flex flex-col gap-1">
+    {displayedColors.map((color) => {
+      const isSelected = internalSelectedColor === color;
+      return (
+        <button
+          key={color}
+          className={`w-5 h-5 rounded-full border-2 transition-all duration-200 ${
+            isSelected
+              ? "border-orange-500 scale-110"
+              : "border-white hover:scale-105"
+          }`}
+          style={{ backgroundColor: getColorFromName(color) }}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleColorSelect(color);
+          }}
+        >
+          {isSelected && (
+            <Check size={10} className="text-white m-auto" />
+          )}
+        </button>
+      );
+    })}
+  </div>
+)}
 
             {/* Campaign Badge */}
             {product.campaignName && (

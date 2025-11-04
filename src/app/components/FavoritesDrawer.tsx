@@ -155,25 +155,35 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
   }, [isOpen]);
 
   useEffect(() => {
-    const isMobile = window.innerWidth < 768;
+    if (isOpen) {
+      // Store current scroll position
+      const scrollY = window.scrollY;
 
-    if (isMobile && isOpen) {
+      // Disable scrolling when drawer is open
       document.body.style.overflow = "hidden";
       document.body.style.position = "fixed";
       document.body.style.width = "100%";
-    } else if (isMobile) {
+      document.body.style.top = `-${scrollY}px`;
+    } else {
+      // Re-enable scrolling when drawer is closed
+      const scrollY = document.body.style.top;
       document.body.style.overflow = "";
       document.body.style.position = "";
       document.body.style.width = "";
+      document.body.style.top = "";
+
+      // Restore scroll position
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY || "0") * -1);
+      }
     }
 
+    // Cleanup function to ensure scrolling is restored
     return () => {
-      const wasMobile = window.innerWidth < 768;
-      if (wasMobile) {
-        document.body.style.overflow = "";
-        document.body.style.position = "";
-        document.body.style.width = "";
-      }
+      document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.width = "";
+      document.body.style.top = "";
     };
   }, [isOpen]);
 

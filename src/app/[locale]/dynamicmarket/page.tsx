@@ -579,17 +579,7 @@ export default function DynamicMarketPage() {
     [router]
   );
 
-  const handleFavoriteToggle = useCallback((productId: string) => {
-    console.log("Toggle favorite for product:", productId);
-  }, []);
-
-  const handleAddToCart = useCallback((productId: string) => {
-    console.log("Add to cart product:", productId);
-  }, []);
-
-  const handleColorSelect = useCallback((productId: string, color: string) => {
-    console.log("Color selected for product:", productId, color);
-  }, []);
+  
 
   // Shimmer component for loading skeleton
   const ProductCardSkeleton = () => (
@@ -1063,9 +1053,6 @@ export default function DynamicMarketPage() {
           <ProductCard
             product={product}
             onTap={() => handleProductClick(product.id)}
-            onFavoriteToggle={handleFavoriteToggle}
-            onAddToCart={handleAddToCart}
-            onColorSelect={(color) => handleColorSelect(product.id, color)}
             showCartIcon={true}
             isFavorited={false}
             isInCart={false}
