@@ -223,10 +223,6 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                 <div className="relative" ref={languageMenuRef}>
                   <button
                     onClick={() => setShowLanguageMenu(!showLanguageMenu)}
-                    onTouchEnd={(e) => {
-                      e.preventDefault();
-                      setShowLanguageMenu(!showLanguageMenu);
-                    }}
                     className={iconButtonClass}
                     aria-label={t("header.languageSelection")}
                   >
@@ -234,21 +230,25 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                   </button>
 
                   {showLanguageMenu && (
-                    <div className={`
-                      absolute right-0 top-full mt-2 w-32
-                      ${isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}
-                      border rounded-lg shadow-xl backdrop-blur-xl z-50
-                      overflow-hidden
-                    `}>
+                    <div
+                      className={`
+                        absolute right-0 top-full mt-2 w-32
+                        ${isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}
+                        border rounded-lg shadow-xl backdrop-blur-xl z-50
+                        overflow-hidden
+                      `}
+                      onTouchStart={(e) => e.stopPropagation()}
+                      onTouchEnd={(e) => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <button
-                        onClick={() => switchLanguage("tr")}
-                        onTouchEnd={(e) => {
-                          e.preventDefault();
+                        onClick={(e) => {
+                          e.stopPropagation();
                           switchLanguage("tr");
                         }}
                         className={`
                           w-full flex items-center space-x-3 px-4 py-3 text-left
-                          hover:bg-gray-100 dark:hover:bg-gray-700
+                          active:bg-gray-200 dark:active:bg-gray-600
                           transition-colors duration-150
                           ${locale === "tr" ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400" : ""}
                         `}
@@ -259,14 +259,13 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                         </span>
                       </button>
                       <button
-                        onClick={() => switchLanguage("en")}
-                        onTouchEnd={(e) => {
-                          e.preventDefault();
+                        onClick={(e) => {
+                          e.stopPropagation();
                           switchLanguage("en");
                         }}
                         className={`
                           w-full flex items-center space-x-3 px-4 py-3 text-left
-                          hover:bg-gray-100 dark:hover:bg-gray-700
+                          active:bg-gray-200 dark:active:bg-gray-600
                           transition-colors duration-150
                           ${locale === "en" ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400" : ""}
                         `}
@@ -400,17 +399,26 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                 </button>
 
                 {showLanguageMenu && (
-                  <div className={`
-                    absolute right-0 top-full mt-2 w-32
-                    ${isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}
-                    border rounded-lg shadow-xl backdrop-blur-xl z-50
-                    overflow-hidden
-                  `}>
+                  <div
+                    className={`
+                      absolute right-0 top-full mt-2 w-32
+                      ${isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}
+                      border rounded-lg shadow-xl backdrop-blur-xl z-50
+                      overflow-hidden
+                    `}
+                    onTouchStart={(e) => e.stopPropagation()}
+                    onTouchEnd={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <button
-                      onClick={() => switchLanguage("tr")}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        switchLanguage("tr");
+                      }}
                       className={`
                         w-full flex items-center space-x-3 px-4 py-3 text-left
                         hover:bg-gray-100 dark:hover:bg-gray-700
+                        active:bg-gray-200 dark:active:bg-gray-600
                         transition-colors duration-150
                         ${locale === "tr" ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400" : ""}
                       `}
@@ -421,10 +429,14 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                       </span>
                     </button>
                     <button
-                      onClick={() => switchLanguage("en")}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        switchLanguage("en");
+                      }}
                       className={`
                         w-full flex items-center space-x-3 px-4 py-3 text-left
                         hover:bg-gray-100 dark:hover:bg-gray-700
+                        active:bg-gray-200 dark:active:bg-gray-600
                         transition-colors duration-150
                         ${locale === "en" ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400" : ""}
                       `}
