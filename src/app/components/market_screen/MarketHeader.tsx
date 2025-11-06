@@ -70,9 +70,9 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
     return () => observer.disconnect();
   }, []);
 
-  // ✅ OPTIMIZED: Click outside handler with proper cleanup (mobile + desktop)
+  // ✅ OPTIMIZED: Click outside handler with proper cleanup
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+    const handleClickOutside = (event: MouseEvent) => {
       if (
         languageMenuRef.current &&
         !languageMenuRef.current.contains(event.target as Node)
@@ -80,29 +80,21 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
         setShowLanguageMenu(false);
       }
     };
-
-    if (showLanguageMenu) {
-      document.addEventListener("mousedown", handleClickOutside);
-      document.addEventListener("touchstart", handleClickOutside);
-      return () => {
-        document.removeEventListener("mousedown", handleClickOutside);
-        document.removeEventListener("touchstart", handleClickOutside);
-      };
-    }
-  }, [showLanguageMenu]);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // ✅ OPTIMIZED: Simplified language switching
   const switchLanguage = useCallback((newLocale: string) => {
-    const pathWithoutLocale = pathname.startsWith(`/${locale}`)
-      ? pathname.substring(`/${locale}`.length) || "/"
-      : pathname;
-    
+    let pathWithoutLocale = pathname;
+    if (pathname.startsWith(`/${locale}`)) {
+      pathWithoutLocale = pathname.substring(`/${locale}`.length) || "/";
+    }
+
     const newPath = `/${newLocale}${pathWithoutLocale}`;
-    const queryString = window.location.search;
-    const finalPath = queryString ? `${newPath}${queryString}` : newPath;
-    
-    window.location.href = finalPath;
-  }, [pathname, locale]);
+    router.push(newPath);
+    setShowLanguageMenu(false);
+  }, [pathname, locale, router]);
 
   // ✅ SIMPLIFIED: Search handlers
   const handleSearchStateChange = useCallback((searching: boolean) => {
@@ -233,45 +225,53 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                     <div
                       className={`
                         absolute right-0 top-full mt-2 w-32
-                        ${isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}
-                        border rounded-lg shadow-xl backdrop-blur-xl z-50
+                        ${isDark ? "bg-gray-800" : "bg-white"}
+                        border ${isDark ? "border-gray-700" : "border-gray-200"}
+                        rounded-lg shadow-xl backdrop-blur-xl z-50
                         overflow-hidden
                       `}
-                      onTouchStart={(e) => e.stopPropagation()}
-                      onTouchEnd={(e) => e.stopPropagation()}
-                      onClick={(e) => e.stopPropagation()}
                     >
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          switchLanguage("tr");
-                        }}
+                        onClick={() => switchLanguage("tr")}
                         className={`
                           w-full flex items-center space-x-3 px-4 py-3 text-left
-                          active:bg-gray-200 dark:active:bg-gray-600
+                          hover:bg-gray-100 dark:hover:bg-gray-700
                           transition-colors duration-150
-                          ${locale === "tr" ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400" : ""}
+                          ${
+                            locale === "tr"
+                              ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                              : ""
+                          }
                         `}
                       >
                         <span className="text-lg">🇹🇷</span>
-                        <span className={`text-sm font-medium ${isDark ? "text-gray-200" : "text-gray-900"}`}>
+                        <span
+                          className={`text-sm font-medium ${
+                            isDark ? "text-gray-200" : "text-gray-900"
+                          }`}
+                        >
                           {t("header.turkish")}
                         </span>
                       </button>
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          switchLanguage("en");
-                        }}
+                        onClick={() => switchLanguage("en")}
                         className={`
                           w-full flex items-center space-x-3 px-4 py-3 text-left
-                          active:bg-gray-200 dark:active:bg-gray-600
+                          hover:bg-gray-100 dark:hover:bg-gray-700
                           transition-colors duration-150
-                          ${locale === "en" ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400" : ""}
+                          ${
+                            locale === "en"
+                              ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                              : ""
+                          }
                         `}
                       >
                         <span className="text-lg">🇺🇸</span>
-                        <span className={`text-sm font-medium ${isDark ? "text-gray-200" : "text-gray-900"}`}>
+                        <span
+                          className={`text-sm font-medium ${
+                            isDark ? "text-gray-200" : "text-gray-900"
+                          }`}
+                        >
                           {t("header.english")}
                         </span>
                       </button>
@@ -402,47 +402,53 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                   <div
                     className={`
                       absolute right-0 top-full mt-2 w-32
-                      ${isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}
-                      border rounded-lg shadow-xl backdrop-blur-xl z-50
+                      ${isDark ? "bg-gray-800" : "bg-white"}
+                      border ${isDark ? "border-gray-700" : "border-gray-200"}
+                      rounded-lg shadow-xl backdrop-blur-xl z-50
                       overflow-hidden
                     `}
-                    onTouchStart={(e) => e.stopPropagation()}
-                    onTouchEnd={(e) => e.stopPropagation()}
-                    onClick={(e) => e.stopPropagation()}
                   >
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        switchLanguage("tr");
-                      }}
+                      onClick={() => switchLanguage("tr")}
                       className={`
                         w-full flex items-center space-x-3 px-4 py-3 text-left
                         hover:bg-gray-100 dark:hover:bg-gray-700
-                        active:bg-gray-200 dark:active:bg-gray-600
                         transition-colors duration-150
-                        ${locale === "tr" ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400" : ""}
+                        ${
+                          locale === "tr"
+                            ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                            : ""
+                        }
                       `}
                     >
                       <span className="text-lg">🇹🇷</span>
-                      <span className={`text-sm font-medium ${isDark ? "text-gray-200" : "text-gray-900"}`}>
+                      <span
+                        className={`text-sm font-medium ${
+                          isDark ? "text-gray-200" : "text-gray-900"
+                        }`}
+                      >
                         {t("header.turkish")}
                       </span>
                     </button>
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        switchLanguage("en");
-                      }}
+                      onClick={() => switchLanguage("en")}
                       className={`
                         w-full flex items-center space-x-3 px-4 py-3 text-left
                         hover:bg-gray-100 dark:hover:bg-gray-700
-                        active:bg-gray-200 dark:active:bg-gray-600
                         transition-colors duration-150
-                        ${locale === "en" ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400" : ""}
+                        ${
+                          locale === "en"
+                            ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                            : ""
+                        }
                       `}
                     >
                       <span className="text-lg">🇺🇸</span>
-                      <span className={`text-sm font-medium ${isDark ? "text-gray-200" : "text-gray-900"}`}>
+                      <span
+                        className={`text-sm font-medium ${
+                          isDark ? "text-gray-200" : "text-gray-900"
+                        }`}
+                      >
                         {t("header.english")}
                       </span>
                     </button>
