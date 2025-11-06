@@ -50,8 +50,9 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
-  
-  const languageMenuRef = useRef<HTMLDivElement>(null);
+
+  const languageMenuRefMobile = useRef<HTMLDivElement>(null);
+  const languageMenuRefDesktop = useRef<HTMLDivElement>(null);
 
   // ✅ OPTIMIZED: Simplified theme detection without localStorage reads
   useEffect(() => {
@@ -73,10 +74,15 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
   // ✅ OPTIMIZED: Click outside handler with proper cleanup
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        languageMenuRef.current &&
-        !languageMenuRef.current.contains(event.target as Node)
-      ) {
+      const isMobileMenuClick =
+        languageMenuRefMobile.current &&
+        languageMenuRefMobile.current.contains(event.target as Node);
+
+      const isDesktopMenuClick =
+        languageMenuRefDesktop.current &&
+        languageMenuRefDesktop.current.contains(event.target as Node);
+
+      if (!isMobileMenuClick && !isDesktopMenuClick) {
         setShowLanguageMenu(false);
       }
     };
@@ -212,7 +218,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
               {/* Action Icons */}
               <div className="flex items-center gap-1">
                 {/* Language */}
-                <div className="relative" ref={languageMenuRef}>
+                <div className="relative" ref={languageMenuRefMobile}>
                   <button
                     onClick={() => setShowLanguageMenu(!showLanguageMenu)}
                     className={iconButtonClass}
@@ -389,7 +395,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
             {/* Action Icons - Desktop */}
             <div className="absolute right-4 z-10 flex items-center gap-2">
               {/* Language */}
-              <div className="relative" ref={languageMenuRef}>
+              <div className="relative" ref={languageMenuRefDesktop}>
                 <button
                   onClick={() => setShowLanguageMenu(!showLanguageMenu)}
                   className={iconButtonClass}
