@@ -70,9 +70,9 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
     return () => observer.disconnect();
   }, []);
 
-  // ✅ OPTIMIZED: Click outside handler with proper cleanup
+  // ✅ OPTIMIZED: Click outside handler with proper cleanup (mobile + desktop)
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       if (
         languageMenuRef.current &&
         !languageMenuRef.current.contains(event.target as Node)
@@ -83,7 +83,11 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
 
     if (showLanguageMenu) {
       document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
+      document.addEventListener("touchstart", handleClickOutside);
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+        document.removeEventListener("touchstart", handleClickOutside);
+      };
     }
   }, [showLanguageMenu]);
 
@@ -215,20 +219,14 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
 
               {/* Action Icons */}
               <div className="flex items-center gap-1">
-                {/* Notifications */}
-                <button
-                  onClick={() => setIsNotificationOpen(true)}
-                  className={iconButtonClass}
-                  aria-label={t("header.notifications")}
-                >
-                  <Bell size={18} />
-                  {NotificationBadge}
-                </button>
-
                 {/* Language */}
                 <div className="relative" ref={languageMenuRef}>
                   <button
                     onClick={() => setShowLanguageMenu(!showLanguageMenu)}
+                    onTouchEnd={(e) => {
+                      e.preventDefault();
+                      setShowLanguageMenu(!showLanguageMenu);
+                    }}
                     className={iconButtonClass}
                     aria-label={t("header.languageSelection")}
                   >
@@ -244,9 +242,13 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                     `}>
                       <button
                         onClick={() => switchLanguage("tr")}
+                        onTouchEnd={(e) => {
+                          e.preventDefault();
+                          switchLanguage("tr");
+                        }}
                         className={`
                           w-full flex items-center space-x-3 px-4 py-3 text-left
-                          hover:bg-gray-100 dark:hover:bg-gray-700 
+                          hover:bg-gray-100 dark:hover:bg-gray-700
                           transition-colors duration-150
                           ${locale === "tr" ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400" : ""}
                         `}
@@ -258,9 +260,13 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                       </button>
                       <button
                         onClick={() => switchLanguage("en")}
+                        onTouchEnd={(e) => {
+                          e.preventDefault();
+                          switchLanguage("en");
+                        }}
                         className={`
                           w-full flex items-center space-x-3 px-4 py-3 text-left
-                          hover:bg-gray-100 dark:hover:bg-gray-700 
+                          hover:bg-gray-100 dark:hover:bg-gray-700
                           transition-colors duration-150
                           ${locale === "en" ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400" : ""}
                         `}
@@ -273,6 +279,16 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                     </div>
                   )}
                 </div>
+
+                {/* Notifications */}
+                <button
+                  onClick={() => setIsNotificationOpen(true)}
+                  className={iconButtonClass}
+                  aria-label={t("header.notifications")}
+                >
+                  <Bell size={18} />
+                  {NotificationBadge}
+                </button>
 
                 {/* Favorites */}
                 <button
@@ -373,16 +389,6 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
 
             {/* Action Icons - Desktop */}
             <div className="absolute right-4 z-10 flex items-center gap-2">
-              {/* Notifications */}
-              <button
-                onClick={() => setIsNotificationOpen(true)}
-                className={iconButtonClass}
-                aria-label={t("header.notifications")}
-              >
-                <Bell size={20} />
-                {NotificationBadge}
-              </button>
-
               {/* Language */}
               <div className="relative" ref={languageMenuRef}>
                 <button
@@ -404,7 +410,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                       onClick={() => switchLanguage("tr")}
                       className={`
                         w-full flex items-center space-x-3 px-4 py-3 text-left
-                        hover:bg-gray-100 dark:hover:bg-gray-700 
+                        hover:bg-gray-100 dark:hover:bg-gray-700
                         transition-colors duration-150
                         ${locale === "tr" ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400" : ""}
                       `}
@@ -418,7 +424,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                       onClick={() => switchLanguage("en")}
                       className={`
                         w-full flex items-center space-x-3 px-4 py-3 text-left
-                        hover:bg-gray-100 dark:hover:bg-gray-700 
+                        hover:bg-gray-100 dark:hover:bg-gray-700
                         transition-colors duration-150
                         ${locale === "en" ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400" : ""}
                       `}
@@ -431,6 +437,16 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                   </div>
                 )}
               </div>
+
+              {/* Notifications */}
+              <button
+                onClick={() => setIsNotificationOpen(true)}
+                className={iconButtonClass}
+                aria-label={t("header.notifications")}
+              >
+                <Bell size={20} />
+                {NotificationBadge}
+              </button>
 
               {/* Favorites */}
               <button
