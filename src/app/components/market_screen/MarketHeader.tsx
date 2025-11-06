@@ -92,14 +92,19 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
 
   // ✅ OPTIMIZED: Simplified language switching
   const switchLanguage = useCallback((newLocale: string) => {
-    let pathWithoutLocale = pathname;
-    if (pathname.startsWith(`/${locale}`)) {
-      pathWithoutLocale = pathname.substring(`/${locale}`.length) || "/";
-    }
-
-    const newPath = `/${newLocale}${pathWithoutLocale}`;
-    router.push(newPath);
+    // Close the menu immediately FIRST
     setShowLanguageMenu(false);
+
+    // Small delay to ensure dropdown is fully closed before navigation
+    setTimeout(() => {
+      let pathWithoutLocale = pathname;
+      if (pathname.startsWith(`/${locale}`)) {
+        pathWithoutLocale = pathname.substring(`/${locale}`.length) || "/";
+      }
+
+      const newPath = `/${newLocale}${pathWithoutLocale}`;
+      router.push(newPath);
+    }, 50);
   }, [pathname, locale, router]);
 
   // ✅ SIMPLIFIED: Search handlers
