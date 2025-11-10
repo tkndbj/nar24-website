@@ -3,21 +3,24 @@
  * Matches Flutter's Debouncer class
  */
 
-type DebouncedFunction<T extends (...args: any[]) => any> = {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyFunction = (...args: any[]) => any;
+
+type DebouncedFunction<T extends AnyFunction> = {
     (...args: Parameters<T>): void;
     cancel: () => void;
     flush: () => void;
     pending: () => boolean;
   };
-  
+
   class Debouncer {
     private timers = new Map<string, NodeJS.Timeout>();
-    private pendingCalls = new Map<string, { fn: Function; args: any[] }>();
+    private pendingCalls = new Map<string, { fn: AnyFunction; args: unknown[] }>();
   
     /**
      * Create a debounced function
      */
-    debounce<T extends (...args: any[]) => any>(
+    debounce<T extends AnyFunction>(
       key: string,
       fn: T,
       delayMs: number
@@ -56,7 +59,7 @@ type DebouncedFunction<T extends (...args: any[]) => any> = {
     /**
      * Run a function after delay (simple version)
      */
-    run(key: string, fn: Function, delayMs: number): void {
+    run(key: string, fn: AnyFunction, delayMs: number): void {
       this.cancel(key);
   
       this.pendingCalls.set(key, { fn, args: [] });
@@ -142,7 +145,7 @@ type DebouncedFunction<T extends (...args: any[]) => any> = {
   /**
    * React hook for debouncing
    */
-  export function useDebounce<T extends (...args: any[]) => any>(
+  export function useDebounce<T extends AnyFunction>(
     fn: T,
     delayMs: number,
     key?: string

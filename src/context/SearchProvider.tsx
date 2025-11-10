@@ -7,7 +7,6 @@ import React, {
   ReactNode,
   useCallback,
   useRef,
-  useEffect,
 } from "react";
 import AlgoliaServiceManager, { Suggestion, CategorySuggestion } from "@/lib/algolia";
 import { circuitBreaker, CIRCUITS } from "@/app/utils/circuitBreaker";
@@ -50,9 +49,7 @@ export function SearchProvider({ children }: SearchProviderProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [hasNetworkError, setHasNetworkError] = useState(false);
-  
-  // Use ref instead of state for timeout - doesn't cause re-renders
-  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const algoliaManagerRef = useRef(AlgoliaServiceManager.getInstance());
 
  

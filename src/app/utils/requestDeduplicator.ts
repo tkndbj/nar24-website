@@ -11,7 +11,7 @@ type PendingRequest<T> = {
   
   class RequestDeduplicator {
     private static instance: RequestDeduplicator;
-    private pending = new Map<string, PendingRequest<any>>();
+    private pending = new Map<string, PendingRequest<unknown>>();
     private readonly STALE_REQUEST_TIMEOUT_MS = 30000; // 30 seconds
     private cleanupTimer: NodeJS.Timeout | null = null;
   
@@ -48,14 +48,14 @@ type PendingRequest<T> = {
       const existing = this.pending.get(key);
       if (existing) {
         const age = Date.now() - existing.timestamp;
-        
+
         // If request is too old, abort and restart
         if (age > timeout) {
           console.warn(`⏰ Request ${key} timed out, restarting`);
           existing.abortController?.abort();
           this.pending.delete(key);
         } else {
-          return existing.promise;
+          return existing.promise as Promise<T>;
         }
       }
   

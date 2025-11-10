@@ -19,7 +19,7 @@ interface CacheEntry<T> {
   
   class CacheManager {
     private static instance: CacheManager;
-    private caches = new Map<string, Map<string, CacheEntry<any>>>();
+    private caches = new Map<string, Map<string, CacheEntry<unknown>>>();
     private stats = new Map<string, CacheStats>();
     private cleanupTimer: NodeJS.Timeout | null = null;
     private nextCleanupNeeded: number | null = null;

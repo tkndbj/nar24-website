@@ -20,7 +20,7 @@ interface ImpressionData {
   interface DetailViewData {
     productId: string;
     collectionName: string;
-    viewData: Record<string, any>;
+    viewData: Record<string, unknown>;
     timestamp: number;
   }
 
@@ -292,7 +292,7 @@ interface ImpressionData {
     recordDetailView(
       productId: string,
       collectionName: string,
-      viewData: Record<string, any>
+      viewData: Record<string, unknown>
     ): void {
       if (this.isDisposed) return;
   

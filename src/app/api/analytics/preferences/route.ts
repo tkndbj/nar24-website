@@ -31,29 +31,29 @@ export async function POST(request: NextRequest) {
     // Update click counts
     if (categoryClicks && Object.keys(categoryClicks).length > 0) {
       const categoryRef = prefsRef.doc('categoryClicks');
-      const incrementData: Record<string, any> = {};
-      
+      const incrementData: Record<string, FieldValue> = {};
+
       for (const [key, value] of Object.entries(categoryClicks)) {
         incrementData[key] = FieldValue.increment(Number(value));
       }
-      
+
       batch.set(categoryRef, incrementData, { merge: true });
     }
 
     if (subcategoryClicks && Object.keys(subcategoryClicks).length > 0) {
       const subcategoryRef = prefsRef.doc('subcategoryClicks');
-      const incrementData: Record<string, any> = {};
-      
+      const incrementData: Record<string, FieldValue> = {};
+
       for (const [key, value] of Object.entries(subcategoryClicks)) {
         incrementData[key] = FieldValue.increment(Number(value));
       }
-      
+
       batch.set(subcategoryRef, incrementData, { merge: true });
     }
 
     if (subsubcategoryClicks && Object.keys(subsubcategoryClicks).length > 0) {
       const subsubcategoryRef = prefsRef.doc('subsubcategoryClicks');
-      const incrementData: Record<string, any> = {};
+      const incrementData: Record<string, FieldValue> = {};
       
       for (const [key, value] of Object.entries(subsubcategoryClicks)) {
         incrementData[key] = FieldValue.increment(Number(value));
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
 
     if (hasPurchaseData) {
       const purchaseRef = prefsRef.doc('purchases');
-      const purchaseData: Record<string, any> = {};
+      const purchaseData: Record<string, FieldValue> = {};
 
       if (purchaseCategories && purchaseCategories.length > 0) {
         purchaseData.categories = FieldValue.arrayUnion(...purchaseCategories);

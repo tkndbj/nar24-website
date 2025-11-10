@@ -3,6 +3,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getFirestoreAdmin } from "@/lib/firebase-admin";
 
+interface RelatedProduct {
+  id: string;
+  productName: string;
+  description: string;
+  price: number;
+  currency: string;
+  brandModel: string;
+  imageUrls: string[];
+  averageRating: number;
+  reviewCount: number;
+  shopId: string | null;
+  category: string;
+  subcategory: string;
+  promotionScore: number;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ productId: string }> }
@@ -78,10 +94,8 @@ export async function GET(
 async function batchFetchProducts(
   db: FirebaseFirestore.Firestore,
   productIds: string[]
-): Promise<any[]> {
+): Promise<RelatedProduct[]> {
   if (productIds.length === 0) return [];
-
-  const products: any[] = [];
 
   // Fetch in parallel from shop_products collection
   const fetchPromises = productIds.map(async (id) => {

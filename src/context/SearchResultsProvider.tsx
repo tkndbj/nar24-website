@@ -246,8 +246,8 @@ export function SearchResultsProvider({ children }: SearchResultsProviderProps) 
   const hasNoData = rawProducts.length === 0;
 
   // Development-only state logging
-  if (process.env.NODE_ENV === 'development') {
-    React.useEffect(() => {
+  React.useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
       console.log(`📊 SearchResultsProvider State:`, {
         rawProducts: rawProducts.length,
         filteredProducts: filteredProducts.length,
@@ -257,8 +257,8 @@ export function SearchResultsProvider({ children }: SearchResultsProviderProps) 
         isEmpty,
         hasNoData
       });
-    }, [rawProducts.length, filteredProducts.length, boostedProducts.length, currentFilter, sortOption, isEmpty, hasNoData]);
-  }
+    }
+  }, [rawProducts.length, filteredProducts.length, boostedProducts.length, currentFilter, sortOption, isEmpty, hasNoData]);
 
   const value: SearchResultsContextType = useMemo(() => ({
     rawProducts,

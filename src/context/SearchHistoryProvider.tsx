@@ -86,16 +86,21 @@ export const SearchHistoryProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // Initialize auth listener on mount
   useEffect(() => {
+    // Capture ref values for cleanup
+    const deletingRef = deletingEntries.current;
+    const optimisticRef = optimisticallyDeleted.current;
+
     initAuthListener();
-    
+
     return () => {
       // Cleanup on unmount
       historyUnsubscribe.current?.();
       authUnsubscribe.current?.();
-      deletingEntries.current.clear();
-      optimisticallyDeleted.current.clear();
+      deletingRef.clear();
+      optimisticRef.clear();
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // initAuthListener omitted - defined below
 
   const initAuthListener = useCallback(() => {
     // Check current user immediately when provider is created
@@ -127,7 +132,8 @@ export const SearchHistoryProvider: React.FC<{ children: React.ReactNode }> = ({
         }
       }
     });
-  }, [currentUserId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUserId]); // clearHistory, fetchSearchHistory, resetPagination omitted - defined below
 
   const resetPagination = useCallback(() => {
     lastDocument.current = null;
@@ -172,7 +178,8 @@ export const SearchHistoryProvider: React.FC<{ children: React.ReactNode }> = ({
         setIsLoadingHistory(false);
       }
     );
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // cleanupOptimisticDeletes, updateCombinedEntries omitted - defined below
 
   const loadMoreHistory = useCallback(async (): Promise<void> => {
     if (!currentUserId || !hasMoreHistory || !lastDocument.current) {
@@ -204,7 +211,8 @@ export const SearchHistoryProvider: React.FC<{ children: React.ReactNode }> = ({
       console.error('Error loading more search history:', error);
       setHasMoreHistory(false);
     }
-  }, [currentUserId, hasMoreHistory]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUserId, hasMoreHistory]); // updateCombinedEntries omitted - defined below
 
   const cleanupOptimisticDeletes = useCallback((existingDocIds: Set<string>) => {
     // Remove optimistically deleted items that are confirmed deleted from Firestore
@@ -226,7 +234,8 @@ export const SearchHistoryProvider: React.FC<{ children: React.ReactNode }> = ({
       allEntries.current = [entry, ...allEntries.current];
       updateCombinedEntries();
     }
-  }, [currentUserId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUserId]); // updateCombinedEntries omitted - defined below
 
   const updateCombinedEntries = useCallback(() => {
     // Filter out optimistically deleted entries
@@ -299,14 +308,15 @@ export const SearchHistoryProvider: React.FC<{ children: React.ReactNode }> = ({
       // and remove the placeholder
     } catch (error) {
       console.error('Error saving search term:', error);
-      
+
       // Step 3: Rollback - remove the placeholder entry on error
       await deleteEntry(placeholderId);
-      
+
       // Re-throw to let calling code handle the error
       throw error;
     }
-  }, [insertLocalEntry]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [insertLocalEntry]); // deleteEntry omitted - defined below
 
   const deleteEntry = useCallback(async (docId: string): Promise<void> => {
     // If already deleting, wait for that operation to complete
@@ -325,7 +335,8 @@ export const SearchHistoryProvider: React.FC<{ children: React.ReactNode }> = ({
     } finally {
       deletingEntries.current.delete(docId);
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // performDelete omitted - defined below
 
   const performDelete = useCallback(async (docId: string): Promise<void> => {
     try {
@@ -359,7 +370,8 @@ export const SearchHistoryProvider: React.FC<{ children: React.ReactNode }> = ({
 
       throw error;
     }
-  }, [updateCombinedEntries]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [updateCombinedEntries]); // deleteFromFirestore omitted - defined below
 
   const deleteFromFirestore = useCallback(async (docId: string): Promise<void> => {
     // Retry logic for network issues
@@ -388,7 +400,8 @@ export const SearchHistoryProvider: React.FC<{ children: React.ReactNode }> = ({
     if (currentUser) {
       await deleteAllForUser(currentUser.uid);
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // deleteAllForUser omitted - defined below
 
   const deleteAllForUser = useCallback(async (userId: string): Promise<void> => {
     try {

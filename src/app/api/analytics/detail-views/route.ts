@@ -2,6 +2,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirestoreAdmin } from '@/lib/firebase-admin';
 
+interface DetailView {
+  productId: string;
+  collectionName: string;
+  viewData: {
+    timestamp?: number;
+    [key: string]: unknown;
+  };
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { views } = await request.json();
@@ -15,7 +24,7 @@ export async function POST(request: NextRequest) {
 
     // Split into batches of 500 (Firestore limit)
     const BATCH_SIZE = 500;
-    const batches: any[][] = [];
+    const batches: DetailView[][] = [];
     
     for (let i = 0; i < views.length; i += BATCH_SIZE) {
       batches.push(views.slice(i, i + BATCH_SIZE));

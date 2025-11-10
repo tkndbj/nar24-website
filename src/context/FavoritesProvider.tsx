@@ -35,7 +35,6 @@ import { db } from "@/lib/firebase";
 import { useUser } from "./UserProvider";
 import { requestDeduplicator } from "@/app/utils/requestDeduplicator";
 import { cacheManager, CACHE_NAMES } from "@/app/utils/cacheManager";
-import { debouncer, DEBOUNCE_DELAYS } from "@/app/utils/debouncer";
 import { circuitBreaker, CIRCUITS } from "@/app/utils/circuitBreaker";
 // Types
 interface FavoriteBasket {
@@ -202,7 +201,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         const productsSnapshot = await circuitBreaker.execute(
           CIRCUITS.FIREBASE_PRODUCTS,
           () => getDoc(productsDoc),
-          async () => ({ exists: () => false } as any) // Fallback
+          async () => ({ exists: () => false, data: () => undefined } as unknown as Awaited<ReturnType<typeof getDoc>>)
         );
 
         if (productsSnapshot.exists()) {
@@ -214,7 +213,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         const shopSnapshot = await circuitBreaker.execute(
           CIRCUITS.FIREBASE_SHOP_PRODUCTS,
           () => getDoc(shopProductsDoc),
-          async () => ({ exists: () => false } as any) // Fallback
+          async () => ({ exists: () => false, data: () => undefined } as unknown as Awaited<ReturnType<typeof getDoc>>)
         );
 
         if (shopSnapshot.exists()) {
@@ -277,6 +276,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   );
 
   // Subscribe to all favorites (global)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const subscribeToGlobalFavorites = useCallback((userId: string) => {
     if (unsubscribeGlobalFavoritesRef.current) {
       unsubscribeGlobalFavoritesRef.current();
@@ -299,7 +299,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
       defaultUnsubscribe();
       basketsUnsubscribe();
     };
-  }, []);
+  }, []); // loadAllFavorites intentionally omitted to avoid circular dependency
 
   // Subscribe to favorite baskets
   const subscribeToBaskets = useCallback((userId: string) => {
@@ -697,7 +697,8 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         return `Failed to remove favorites: ${error}`;
       }
     },
-    [user, showSuccessToast, showErrorToast]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [user, showSuccessToast, showErrorToast] // removeMultipleBatch omitted - defined below
   );
 
   // Helper function to remove a batch of favorites
@@ -846,7 +847,8 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         return `Failed to transfer favorites: ${error}`;
       }
     },
-    [user, showSuccessToast, showErrorToast]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [user, showSuccessToast, showErrorToast] // transferBatch omitted - defined below
   );
 
   // Helper function to transfer a batch
@@ -933,7 +935,8 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         return `Failed to move favorites: ${error}`;
       }
     },
-    [user, selectedBasketId, showSuccessToast, showErrorToast]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [user, selectedBasketId, showSuccessToast, showErrorToast] // moveFromBasketBatch omitted - defined below
   );
 
   // Helper function to move from basket batch

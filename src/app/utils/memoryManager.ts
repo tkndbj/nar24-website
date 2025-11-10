@@ -7,6 +7,21 @@
 import { cacheManager } from './cacheManager';
 import { analyticsBatcher } from './analyticsBatcher';
 
+// Type definitions for Chrome-specific performance APIs
+interface PerformanceMemory {
+  usedJSHeapSize: number;
+  jsHeapSizeLimit: number;
+  totalJSHeapSize: number;
+}
+
+interface PerformanceWithMemory extends Performance {
+  memory?: PerformanceMemory;
+}
+
+interface WindowWithGC extends Window {
+  gc?: () => void;
+}
+
 class MemoryManager {
   private static instance: MemoryManager;
   private checkInterval: NodeJS.Timeout | null = null;
@@ -63,7 +78,9 @@ class MemoryManager {
     try {
       // Use Performance API if available
       if ('memory' in performance) {
-        const memory = (performance as any).memory;
+        const memory = (performance as PerformanceWithMemory).memory;
+        if (!memory) return;
+
         const usedMB = memory.usedJSHeapSize / 1024 / 1024;
         const limitMB = memory.jsHeapSizeLimit / 1024 / 1024;
         const percentUsed = (usedMB / limitMB) * 100;
@@ -103,7 +120,7 @@ class MemoryManager {
 
       // 5. Force garbage collection if available (only in Chrome with flag)
       if (typeof window !== 'undefined' && 'gc' in window) {
-        (window as any).gc();
+        (window as WindowWithGC).gc?.();
         console.log('🗑️ Forced garbage collection');
       }
 
@@ -194,7 +211,9 @@ class MemoryManager {
 
     try {
       if ('memory' in performance) {
-        const memory = (performance as any).memory;
+        const memory = (performance as PerformanceWithMemory).memory;
+        if (!memory) return null;
+
         const usedMB = memory.usedJSHeapSize / 1024 / 1024;
         const limitMB = memory.jsHeapSizeLimit / 1024 / 1024;
         return (usedMB / limitMB) * 100;

@@ -237,7 +237,8 @@ export const PersonalizedRecommendationsProvider: React.FC<{ children: React.Rea
       console.error('Error in generic recommendations:', e);
       return getFallbackRecommendations(limit);
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // getFallbackRecommendations omitted - defined below
 
   // ✅ MATCHES FLUTTER: Fallback recommendations
   const getFallbackRecommendations = useCallback(async (limit: number): Promise<Product[]> => {
