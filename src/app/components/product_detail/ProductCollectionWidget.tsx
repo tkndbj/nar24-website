@@ -228,13 +228,23 @@ const ProductCollectionWidget: React.FC<ProductCollectionWidgetProps> = ({
           }),
         });
 
+        // ✅ Handle 404 gracefully - it just means no collection exists
+        if (response.status === 404) {
+          // This is normal - product is not in any collection
+          setCollectionData(null);
+          setLoading(false);
+          return;
+        }
+
         if (!response.ok) {
+          // Only throw for actual errors (500, network issues, etc.)
           throw new Error(t("failedToFetchCollection"));
         }
 
         const data = await response.json();
         setCollectionData(data);
       } catch (err) {
+        // Only log actual errors, not 404s
         console.error("Error fetching product collection:", err);
         setError(err instanceof Error ? err.message : t("failedToLoadCollection"));
       } finally {

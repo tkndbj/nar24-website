@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import NextImage from "next/image";
 import {
   getFirestore,
   collection,
@@ -363,15 +364,19 @@ export default function MarketBannerGrid() {
                     {imageErrors.has(banner.id) ? (
                       <ErrorCard isDarkMode={isDarkMode} />
                     ) : (
-                      <img
-                        src={banner.url}
-                        alt={`Banner ${banner.id}`}
-                        className="w-full h-40 object-cover"
-                        onLoad={() => handleImageLoad(banner.id)}
-                        onError={() => handleImageError(banner.id)}
-                        onLoadStart={() => handleImageLoadStart(banner.id)}
-                        loading="lazy"
-                      />
+                      <div className="relative w-full h-40">
+                        <NextImage
+                          src={banner.url}
+                          alt={`Banner ${banner.id}`}
+                          fill
+                          className="object-cover"
+                          onLoad={() => handleImageLoad(banner.id)}
+                          onError={() => handleImageError(banner.id)}
+                          loading="lazy"
+                          sizes="(max-width: 1024px) 100vw, 50vw"
+                          quality={85}
+                        />
+                      </div>
                     )}
                   </div>
                 </div>

@@ -936,7 +936,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
             <Suspense fallback={<div className="h-40 animate-pulse bg-gray-200 rounded-lg" />}>
               <ProductQuestionsWidget
                 productId={product.id}
-                sellerId={product.shopId || product.userId}
+                sellerId={product.userId}
+                shopId={product.shopId}
                 isShop={!!product.shopId}
                 isDarkMode={isDarkMode}
                 localization={localization}

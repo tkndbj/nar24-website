@@ -25,6 +25,7 @@ interface SellerInfo {
 interface ProductQuestionsWidgetProps {
   productId: string;
   sellerId: string;
+  shopId?: string;
   isShop: boolean;
   isLoading?: boolean;
   isDarkMode?: boolean;
@@ -207,6 +208,7 @@ const LoadingSkeleton: React.FC<{ isDarkMode?: boolean }> = ({
 const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
   productId,
   sellerId,
+  shopId,
   isShop,
   isLoading = false,
   isDarkMode = false,
@@ -287,7 +289,7 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
 
         const [questionsResponse, sellerResponse] = await Promise.all([
           fetch(`/api/questions/${productId}?isShop=${isShop}&limit=5`),
-          fetch(`/api/seller/${sellerId}${isShop ? `?shopId=${sellerId}` : ""}`),
+          fetch(`/api/seller/${sellerId}${isShop && shopId ? `?shopId=${shopId}` : ""}`),
         ]);
 
         if (questionsResponse.ok) {
@@ -310,7 +312,7 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
     };
 
     fetchData();
-  }, [productId, sellerId, isShop]);
+  }, [productId, sellerId, shopId, isShop]);
 
   const handleViewAllQuestions = useCallback(() => {
     router.push(`/all-questions?productId=${productId}&sellerId=${sellerId}&isShop=${isShop}`);
