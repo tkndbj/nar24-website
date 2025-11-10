@@ -19,6 +19,9 @@ import {
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import TwoFactorService from "@/services/TwoFactorService";
+import { cacheManager } from "@/app/utils/cacheManager";
+import { requestDeduplicator } from "@/app/utils/requestDeduplicator";
+import { debouncer } from "@/app/utils/debouncer";
 
 interface ProfileData {
   displayName?: string;
@@ -201,6 +204,12 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         setProfileData(null);
         setIsAdmin(false);
         setPending2FA(false);
+        
+        // ✅ NEW: Clear all caches on logout
+        cacheManager.clearAll();
+        requestDeduplicator.cancelAll();
+        debouncer.cancelAll();
+        console.log('🧹 Cleared all caches and pending operations on logout');
       }
 
       setIsLoading(false);
@@ -224,7 +233,13 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     if (!currentUser) return;
 
     try {
-      await updateDoc(doc(db, "users", currentUser.uid), updates);
+      await debouncer.debounce(
+        'update-profile',
+        async () => {
+          await updateDoc(doc(db, "users", currentUser.uid), updates);
+        },
+        300 // 300ms debounce
+      )();
 
       const updatedProfileData = { ...(profileData || {}), ...updates };
       setProfileData(updatedProfileData);

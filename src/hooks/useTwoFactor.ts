@@ -108,10 +108,17 @@ export function useTwoFactor(): UseTwoFactorReturn {
     // In most cases, you'll navigate to the verification screen instead
     navigateTo2FA(type);
     return new Promise((resolve) => {
+      let isResolved = false;
+
       // Listen for navigation events to determine success/failure
       const checkSuccess = () => {
+        if (isResolved) return; // Prevent multiple resolutions
+
         const currentPath = window.location.pathname;
         if (!currentPath.includes("two-factor-verification")) {
+          isResolved = true;
+          clearInterval(interval);
+          clearTimeout(timeout);
           resolve(!currentPath.includes("login")); // Success if not back to login
         }
       };
@@ -119,10 +126,13 @@ export function useTwoFactor(): UseTwoFactorReturn {
       // Set up listeners
       const interval = setInterval(checkSuccess, 1000);
 
-      // Timeout after 5 minutes
-      setTimeout(() => {
-        clearInterval(interval);
-        resolve(false);
+      // Timeout after 5 minutes - ensure cleanup
+      const timeout = setTimeout(() => {
+        if (!isResolved) {
+          isResolved = true;
+          clearInterval(interval);
+          resolve(false);
+        }
       }, 5 * 60 * 1000);
     });
   };

@@ -292,21 +292,21 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
   // ✅ OPTIMIZED: Analytics recording - fire and forget, no await
   const recordDetailView = useCallback((product: Product) => {
-    // Don't block rendering for analytics
-    fetch("/api/analytics/detail-view", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        productId: product.id,
-        category: product.category,
-        subcategory: product.subcategory,
-        brand: product.brandModel,
-        price: product.price,
-      }),
-      // Use keepalive to ensure request completes even if user navigates away
-      keepalive: true,
+    // Use analyticsBatcher for efficient batching
+    import('@/app/utils/analyticsBatcher').then(({ analyticsBatcher }) => {
+      analyticsBatcher.recordDetailView(
+        product.id,
+        product.shopId ? 'shop_products' : 'products',
+        {
+          viewedAt: new Date().toISOString(),
+          category: product.category,
+          subcategory: product.subcategory,
+          subsubcategory: product.subsubcategory,
+          brand: product.brandModel,
+          price: product.price,
+          timestamp: Date.now(),
+        }
+      );
     }).catch((error) => {
       console.error("Error recording detail view:", error);
     });

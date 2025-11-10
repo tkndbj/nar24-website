@@ -35,6 +35,10 @@ import {
 } from "firebase/firestore";
 import { User } from "firebase/auth";
 import { ProductUtils, Product } from "@/app/models/Product";
+import { requestDeduplicator } from "@/app/utils/requestDeduplicator";
+import { cacheManager, CACHE_NAMES } from "@/app/utils/cacheManager";
+import { debouncer, DEBOUNCE_DELAYS } from "@/app/utils/debouncer";
+import { circuitBreaker, CIRCUITS } from "@/app/utils/circuitBreaker";
 
 // Types
 interface CartUser {
@@ -268,17 +272,22 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     }
   }, []);
 
-  // Fetch active bundle for product - matching Flutter
+  // Fetch active bundle for product - matching Flutter with circuit breaker
   const fetchActiveBundleForProduct = useCallback(
     async (productId: string): Promise<BundleData | null> => {
       try {
-        const snapshot = await getDocs(
-          query(
-            collection(db, "bundles"),
-            where("productId", "==", productId),
-            where("isActive", "==", true),
-            limit(1)
-          )
+        // Wrap with circuit breaker for resilience
+        const snapshot = await circuitBreaker.execute(
+          CIRCUITS.FIREBASE_PRODUCTS,
+          () => getDocs(
+            query(
+              collection(db, "bundles"),
+              where("productId", "==", productId),
+              where("isActive", "==", true),
+              limit(1)
+            )
+          ),
+          async () => ({ docs: [], empty: true } as any) // Fallback
         );
 
         if (snapshot.empty) return null;
@@ -322,7 +331,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     []
   );
 
-  // Get product document references - matching Flutter implementation
+  // Get product document references - matching Flutter implementation with circuit breaker
   const getProductDocument = useCallback(
     async (
       productIds: string[]
@@ -333,31 +342,39 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         for (let i = 0; i < productIds.length; i += 10) {
           const batch = productIds.slice(i, i + 10);
 
-          // Try shop_products first
-          const shopSnapshot = await getDocs(
-            query(
-              collection(db, "shop_products"),
-              where(documentId(), "in", batch)
-            )
+          // Try shop_products first - with circuit breaker protection
+          const shopSnapshot = await circuitBreaker.execute(
+            CIRCUITS.FIREBASE_SHOP_PRODUCTS,
+            () => getDocs(
+              query(
+                collection(db, "shop_products"),
+                where(documentId(), "in", batch)
+              )
+            ),
+            async () => ({ docs: [], empty: true } as any) // Fallback
           );
 
           const foundInShop = new Set<string>();
-          shopSnapshot.docs.forEach((doc) => {
+          shopSnapshot.docs.forEach((doc: any) => {
             result[doc.id] = doc.ref;
             foundInShop.add(doc.id);
           });
 
-          // Check remaining IDs in products collection
+          // Check remaining IDs in products collection - with circuit breaker protection
           const remainingIds = batch.filter((id) => !foundInShop.has(id));
           if (remainingIds.length > 0) {
-            const productsSnapshot = await getDocs(
-              query(
-                collection(db, "products"),
-                where(documentId(), "in", remainingIds)
-              )
+            const productsSnapshot = await circuitBreaker.execute(
+              CIRCUITS.FIREBASE_PRODUCTS,
+              () => getDocs(
+                query(
+                  collection(db, "products"),
+                  where(documentId(), "in", remainingIds)
+                )
+              ),
+              async () => ({ docs: [], empty: true } as any) // Fallback
             );
 
-            productsSnapshot.docs.forEach((doc) => {
+            productsSnapshot.docs.forEach((doc: any) => {
               result[doc.id] = doc.ref;
             });
           }
@@ -391,41 +408,61 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       try {
         for (let i = 0; i < productIds.length; i += 10) {
           const chunk = productIds.slice(i, i + 10);
-
-          const snapshot = await getDocs(
-            query(
-              collection(db, "shop_products"),
-              where(documentId(), "in", chunk)
-            )
-          );
-
-          snapshot.docs.forEach((doc) => {
-            if (!result[doc.id]) {
-              try {
-                // CRITICAL: Use your existing ProductUtils.fromJson with proper doc data
-                const docData = doc.data();
-                const productJson = {
-                  ...docData,
-                  id: doc.id,
-                  // Add reference info for sourceCollection detection
-                  reference: {
-                    id: doc.id,
-                    path: doc.ref.path,
-                    parent: {
-                      id: doc.ref.parent.id,
-                    },
-                  },
-                };
-
-                result[doc.id] = ProductUtils.fromJson(productJson);
-              } catch (error) {
-                if (process.env.NODE_ENV === 'development') {
-                  console.error(`Error parsing product ${doc.id}:`, error);
-                }
-                result[doc.id] = null;
-              }
+          
+          // ✅ Check cache first
+          const uncachedIds: string[] = [];
+          chunk.forEach(id => {
+            const cached = cacheManager.get<Product>(CACHE_NAMES.PRODUCTS, id);
+            if (cached) {
+              result[id] = cached;
+            } else {
+              uncachedIds.push(id);
             }
           });
+          
+          // Only fetch uncached products - with circuit breaker protection
+          if (uncachedIds.length > 0) {
+            const snapshot = await circuitBreaker.execute(
+              CIRCUITS.FIREBASE_SHOP_PRODUCTS,
+              () => getDocs(
+                query(
+                  collection(db, "shop_products"),
+                  where(documentId(), "in", uncachedIds)
+                )
+              ),
+              async () => ({ docs: [], empty: true } as any) // Fallback
+            );
+      
+            snapshot.docs.forEach((doc: any) => {
+              if (!result[doc.id]) {
+                try {
+                  const docData = doc.data();
+                  const productJson = {
+                    ...docData,
+                    id: doc.id,
+                    reference: {
+                      id: doc.id,
+                      path: doc.ref.path,
+                      parent: {
+                        id: doc.ref.parent.id,
+                      },
+                    },
+                  };
+      
+                  const product = ProductUtils.fromJson(productJson);
+                  result[doc.id] = product;
+                  
+                  // ✅ Cache for 5 minutes
+                  cacheManager.set(CACHE_NAMES.PRODUCTS, doc.id, product, 5 * 60 * 1000);
+                } catch (error) {
+                  if (process.env.NODE_ENV === 'development') {
+                    console.error(`Error parsing product ${doc.id}:`, error);
+                  }
+                  result[doc.id] = null;
+                }
+              }
+            });
+          }
         }
       } catch (error) {
         if (process.env.NODE_ENV === 'development') {
@@ -457,7 +494,13 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   
         if (shopId) {
           try {
-            const shopDoc = await getDoc(doc(db, "shops", shopId));
+            // Wrap with circuit breaker for resilience
+            const shopDoc = await circuitBreaker.execute(
+              CIRCUITS.FIREBASE_SHOP_PRODUCTS,
+              () => getDoc(doc(db, "shops", shopId)),
+              async () => ({ exists: () => false } as any) // Fallback
+            );
+
             if (shopDoc.exists()) {
               const shopData = shopDoc.data();
               sellerName = shopData?.name || "Unknown Shop";
@@ -481,12 +524,18 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   
         if (ownerId) {
           try {
-            const userDoc = await getDoc(doc(db, "users", ownerId));
+            // Wrap with circuit breaker for resilience
+            const userDoc = await circuitBreaker.execute(
+              CIRCUITS.FIREBASE_PRODUCTS,
+              () => getDoc(doc(db, "users", ownerId)),
+              async () => ({ exists: () => false } as any) // Fallback
+            );
+
             if (userDoc.exists()) {
               const userData = userDoc.data();
               const sellerInfo = userData?.sellerInfo;
-              sellerName = sellerInfo?.name || 
-                           userData?.displayName || 
+              sellerName = sellerInfo?.name ||
+                           userData?.displayName ||
                            "Unknown Seller";
               sellerContactNo = sellerInfo?.phone || null;
             } else {
@@ -792,12 +841,18 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           return `Cannot set quantity to ${newQuantity}. Maximum allowed: ${salePrefs.maxQuantity}`;
         }
 
-        await writeBatch(db)
-          .update(doc(db, "users", user.uid, "cart", productId), {
-            quantity: newQuantity,
-            updatedAt: serverTimestamp(),
-          })
-          .commit();
+        await debouncer.debounce(
+          `cart-qty-${productId}`,
+          async () => {
+            await writeBatch(db)
+              .update(doc(db, "users", user.uid, "cart", productId), {
+                quantity: newQuantity,
+                updatedAt: serverTimestamp(),
+              })
+              .commit();
+          },
+          DEBOUNCE_DELAYS.CART // 500ms
+        )();
 
         // Update UI
         if (isInitialized) {
@@ -826,8 +881,10 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       attributes?: CartAttributes
     ): Promise<string> => {
       const operationId = `${productId}_${Date.now()}`;
-  
-      if (!user) return "Please log in";
+      return requestDeduplicator.deduplicate(
+        `cart-add-${productId}`,
+        async () => {
+          if (!user) return "Please log in";
       if (!productId.trim()) return "Invalid product ID";
       if (quantity < 1) return "Quantity must be at least 1";
       if (operationIdsRef.current.has(productId))
@@ -1015,7 +1072,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           }
         }, 5000);
       }
-    },
+    }
+  );
+  },  
     [
       user,
       cartProductIds,
@@ -1034,7 +1093,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   const removeFromCart = useCallback(
     async (productId: string): Promise<string> => {
       const operationId = `remove_${productId}_${Date.now()}`;
-
+      return requestDeduplicator.deduplicate(
+        `cart-remove-${productId}`,
+        async () => {
       if (!user) return "Please log in";
       if (!productId.trim()) return "Invalid product ID";
       if (operationIdsRef.current.has(productId))
@@ -1099,7 +1160,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           }
         }, 5000);
       }
-    },
+    }
+  );
+  },
     [
       user,
       cartProductIds,

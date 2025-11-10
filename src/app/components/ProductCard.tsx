@@ -1,4 +1,7 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+// components/ProductCard.tsx
+"use client";
+
+import React, { useState, useEffect, useMemo, useCallback, memo } from "react";
 import Image from "next/image";
 import {
   Heart,
@@ -17,9 +20,8 @@ import { useCart } from "@/context/CartProvider";
 import { useFavorites } from "@/context/FavoritesProvider";
 import { useUser } from "@/context/UserProvider";
 import ProductOptionSelector from "@/app/components/ProductOptionSelector";
-
-// Import the complete Product type from your models
 import { Product } from "@/app/models/Product";
+import { analyticsBatcher } from "@/app/utils/analyticsBatcher";
 
 interface ProductCardProps {
   product: Product;
@@ -42,22 +44,20 @@ interface ProductCardProps {
   localization?: ReturnType<typeof useTranslations>;
 }
 
+// ✅ Memoized helper functions
 const isFantasyProduct = (product: Product): boolean => {
   return product.subsubcategory?.toLowerCase() === "fantasy";
 };
 
-// Enhanced helper function to check if product has selectable options
 const hasSelectableOptions = (product: Product | null): boolean => {
   if (!product) return false;
 
-  // Check for colors - ensure colorImages exists and is an object
   const colorImages = product.colorImages;
   const hasColors = colorImages != null && 
                     typeof colorImages === 'object' && 
                     Object.keys(colorImages).length > 0;
   if (hasColors) return true;
 
-  // Check for selectable attributes (attributes with multiple options)
   const selectableAttrs = Object.entries(product.attributes || {}).filter(
     ([, value]) => {
       let options: string[] = [];
@@ -73,7 +73,6 @@ const hasSelectableOptions = (product: Product | null): boolean => {
           .filter((item) => item !== "");
       }
 
-      // Only include attributes with multiple options
       return options.length > 1;
     }
   );
@@ -81,8 +80,45 @@ const hasSelectableOptions = (product: Product | null): boolean => {
   return selectableAttrs.length > 0;
 };
 
+// ✅ Static color map (computed once)
+const COLOR_MAP: Record<string, string> = {
+  blue: "#2196F3",
+  orange: "#FF9800",
+  yellow: "#FFEB3B",
+  black: "#000000",
+  brown: "#795548",
+  "dark blue": "#00008B",
+  gray: "#9E9E9E",
+  pink: "#E91E63",
+  red: "#F44336",
+  white: "#FFFFFF",
+  green: "#4CAF50",
+  purple: "#9C27B0",
+  teal: "#009688",
+  lime: "#CDDC39",
+  cyan: "#00BCD4",
+  magenta: "#FF00FF",
+  indigo: "#3F51B5",
+  amber: "#FFC107",
+  "deep orange": "#FF5722",
+  "light blue": "#03A9F4",
+  "deep purple": "#673AB7",
+  "light green": "#8BC34A",
+  "dark gray": "#444444",
+  beige: "#F5F5DC",
+  turquoise: "#40E0D0",
+  violet: "#EE82EE",
+  olive: "#808000",
+  maroon: "#800000",
+  navy: "#000080",
+  silver: "#C0C0C0",
+};
 
-// Enhanced image preloader hook
+const getColorFromName = (colorName: string): string => {
+  return COLOR_MAP[colorName.toLowerCase()] || "#9E9E9E";
+};
+
+// ✅ Enhanced image preloader with caching
 const useImagePreloader = (urls: string[]) => {
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
@@ -122,55 +158,14 @@ const useImagePreloader = (urls: string[]) => {
   return { loadedImages, failedImages };
 };
 
-// Color mapping function
-const getColorFromName = (colorName: string): string => {
-  const colorMap: Record<string, string> = {
-    blue: "#2196F3",
-    orange: "#FF9800",
-    yellow: "#FFEB3B",
-    black: "#000000",
-    brown: "#795548",
-    "dark blue": "#00008B",
-    gray: "#9E9E9E",
-    pink: "#E91E63",
-    red: "#F44336",
-    white: "#FFFFFF",
-    green: "#4CAF50",
-    purple: "#9C27B0",
-    teal: "#009688",
-    lime: "#CDDC39",
-    cyan: "#00BCD4",
-    magenta: "#FF00FF",
-    indigo: "#3F51B5",
-    amber: "#FFC107",
-    "deep orange": "#FF5722",
-    "light blue": "#03A9F4",
-    "deep purple": "#673AB7",
-    "light green": "#8BC34A",
-    "dark gray": "#444444",
-    beige: "#F5F5DC",
-    turquoise: "#40E0D0",
-    violet: "#EE82EE",
-    olive: "#808000",
-    maroon: "#800000",
-    navy: "#000080",
-    silver: "#C0C0C0",
-  };
-  return colorMap[colorName.toLowerCase()] || "#9E9E9E";
-};
-
-// Optimized rotating text component
+// ✅ Optimized rotating text component
 interface RotatingTextProps {
   children: React.ReactNode[];
   duration?: number;
   className?: string;
 }
 
-const RotatingText: React.FC<RotatingTextProps> = ({
-  children,
-  duration = 1500,
-  className = "",
-}) => {
+const RotatingText = memo<RotatingTextProps>(({ children, duration = 1500, className = "" }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
@@ -184,21 +179,15 @@ const RotatingText: React.FC<RotatingTextProps> = ({
   }, [children.length, duration]);
 
   if (children.length === 0) return null;
-  if (children.length === 1)
-    return <div className={className}>{children[0]}</div>;
+  if (children.length === 1) return <div className={className}>{children[0]}</div>;
 
   return (
-    <div
-      className={`relative overflow-hidden ${className}`}
-      style={{ height: "16px" }}
-    >
+    <div className={`relative overflow-hidden ${className}`} style={{ height: "16px" }}>
       {children.map((child, index) => (
         <div
           key={index}
           className={`absolute w-full h-4 flex items-center transition-all duration-500 ease-in-out ${
-            index === currentIndex
-              ? "opacity-100 translate-y-0"
-              : "opacity-0 translate-y-4"
+            index === currentIndex ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
           }`}
           style={{ lineHeight: "16px" }}
         >
@@ -207,20 +196,17 @@ const RotatingText: React.FC<RotatingTextProps> = ({
       ))}
     </div>
   );
-};
+});
+RotatingText.displayName = "RotatingText";
 
-// Optimized rotating banner component
+// ✅ Optimized rotating banner
 interface RotatingBannerProps {
   children: React.ReactNode[];
   duration?: number;
   height?: number;
 }
 
-const RotatingBanner: React.FC<RotatingBannerProps> = ({
-  children,
-  duration = 2000,
-  height = 20,
-}) => {
+const RotatingBanner = memo<RotatingBannerProps>(({ children, duration = 2000, height = 20 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
@@ -242,9 +228,7 @@ const RotatingBanner: React.FC<RotatingBannerProps> = ({
         <div
           key={index}
           className={`absolute w-full transition-all duration-500 ease-in-out ${
-            index === currentIndex
-              ? "opacity-100 translate-y-0"
-              : "opacity-0 translate-y-full"
+            index === currentIndex ? "opacity-100 translate-y-0" : "opacity-0 translate-y-full"
           }`}
           style={{ height }}
         >
@@ -253,15 +237,11 @@ const RotatingBanner: React.FC<RotatingBannerProps> = ({
       ))}
     </div>
   );
-};
+});
+RotatingBanner.displayName = "RotatingBanner";
 
-// Star rating component
-interface StarRatingProps {
-  rating: number;
-  size?: number;
-}
-
-const StarRating: React.FC<StarRatingProps> = ({ rating, size = 14 }) => {
+// ✅ Star rating component
+const StarRating = memo<{ rating: number; size?: number }>(({ rating, size = 14 }) => {
   const fullStars = Math.floor(rating);
   const hasHalfStar = rating - fullStars >= 0.5;
   const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
@@ -269,45 +249,38 @@ const StarRating: React.FC<StarRatingProps> = ({ rating, size = 14 }) => {
   return (
     <div className="flex items-center">
       {Array.from({ length: fullStars }, (_, i) => (
-        <Star
-          key={`full-${i}`}
-          size={size}
-          className="fill-amber-400 text-amber-400"
-        />
+        <Star key={`full-${i}`} size={size} className="fill-amber-400 text-amber-400" />
       ))}
-      {hasHalfStar && (
-        <StarHalf size={size} className="fill-amber-400 text-amber-400" />
-      )}
+      {hasHalfStar && <StarHalf size={size} className="fill-amber-400 text-amber-400" />}
       {Array.from({ length: emptyStars }, (_, i) => (
         <Star key={`empty-${i}`} size={size} className="text-amber-400" />
       ))}
     </div>
   );
-};
+});
+StarRating.displayName = "StarRating";
 
-// Extra label component
-interface ExtraLabelProps {
-  text: string;
-  gradientColors: string[];
-}
+// ✅ Extra label component
+const ExtraLabel = memo<{ text: string; gradientColors: string[] }>(
+  ({ text, gradientColors }) => {
+    const gradientStyle = {
+      background: `linear-gradient(to right, ${gradientColors.join(", ")})`,
+    };
 
-const ExtraLabel: React.FC<ExtraLabelProps> = ({ text, gradientColors }) => {
-  const gradientStyle = {
-    background: `linear-gradient(to right, ${gradientColors.join(", ")})`,
-  };
+    return (
+      <div
+        className="px-2 py-1 rounded text-white text-xs font-medium"
+        style={gradientStyle}
+      >
+        {text}
+      </div>
+    );
+  }
+);
+ExtraLabel.displayName = "ExtraLabel";
 
-  return (
-    <div
-      className="px-2 py-1 rounded text-white text-xs font-medium"
-      style={gradientStyle}
-    >
-      {text}
-    </div>
-  );
-};
-
-// Logo placeholder component - FIXED VERSION
-const LogoPlaceholder: React.FC<{ size?: number }> = ({ size = 120 }) => {
+// ✅ Logo placeholder component
+const LogoPlaceholder = memo<{ size?: number }>(({ size = 120 }) => {
   const [imageError, setImageError] = useState(false);
 
   if (imageError) {
@@ -342,9 +315,12 @@ const LogoPlaceholder: React.FC<{ size?: number }> = ({ size = 120 }) => {
       />
     </div>
   );
-};
+});
+LogoPlaceholder.displayName = "LogoPlaceholder";
 
-export const ProductCard: React.FC<ProductCardProps> = ({
+// ============= MAIN PRODUCT CARD COMPONENT =============
+
+const ProductCardComponent: React.FC<ProductCardProps> = ({
   product,
   scaleFactor = 1.0,
   internalScaleFactor = 1.0,
@@ -374,20 +350,18 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const { user } = useUser();
 
   const [isDarkModeState, setIsDarkMode] = useState(false);
-  // Use prop value if provided, otherwise use state
   const isDarkMode = isDarkModeProp !== undefined ? isDarkModeProp : isDarkModeState;
 
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [internalSelectedColor, setInternalSelectedColor] = useState<
-    string | null
-  >(selectedColor || null);
+  const [internalSelectedColor, setInternalSelectedColor] = useState<string | null>(
+    selectedColor || null
+  );
   const [isHovered, setIsHovered] = useState(false);
   const [imageError, setImageError] = useState(false);
 
   // Option selector states
   const [showCartOptionSelector, setShowCartOptionSelector] = useState(false);
-  const [showFavoriteOptionSelector, setShowFavoriteOptionSelector] =
-    useState(false);
+  const [showFavoriteOptionSelector, setShowFavoriteOptionSelector] = useState(false);
 
   // Animation states
   const [cartButtonState, setCartButtonState] = useState<
@@ -401,45 +375,73 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const actualIsInCart = isProductInCart(product.id);
   const actualIsFavorite = isProductFavorite(product.id);
 
+  // ✅ Safe color images extraction
   const safeColorImages = useMemo(() => {
     return product.colorImages && typeof product.colorImages === 'object' 
       ? product.colorImages 
       : {};
   }, [product.colorImages]);
 
-  // ✅ MODIFY: Use safeColorImages instead of product.colorImages
+  // ✅ Displayed colors (max 4, shuffled)
   const displayedColors = useMemo(() => {
     const availableColors = Object.keys(safeColorImages);
     const shuffled = [...availableColors].sort(() => Math.random() - 0.5);
     return shuffled.slice(0, 4);
   }, [safeColorImages]);
 
-  // ✅ MODIFY: Use safeColorImages
+  // ✅ Current image URLs based on selected color
   const currentImageUrls = useMemo(() => {
     const colorToUse = internalSelectedColor || selectedColor;
     if (colorToUse && safeColorImages[colorToUse]?.length) {
       return safeColorImages[colorToUse];
     }
     return product.imageUrls || [];
-  }, [
-    internalSelectedColor,
-    selectedColor,
-    safeColorImages,
-    product.imageUrls,
-  ]);
+  }, [internalSelectedColor, selectedColor, safeColorImages, product.imageUrls]);
 
   // Preload all images
   const { loadedImages, failedImages } = useImagePreloader(currentImageUrls);
 
+  // ✅ CRITICAL: Throttled navigation (500ms cooldown)
+  const [lastNavigationTime, setLastNavigationTime] = useState<number>(0);
+  const NAVIGATION_THROTTLE = 500;
+
+  // ✅ Handle card click with analytics tracking
   const handleCardClick = useCallback(() => {
+    const now = Date.now();
+
+    // Throttle rapid taps (same as Flutter)
+    if (now - lastNavigationTime < NAVIGATION_THROTTLE) {
+      return;
+    }
+
+    setLastNavigationTime(now);
+
+    // Record click analytics
+    analyticsBatcher.recordClick(product.id, product.shopId);
+    analyticsBatcher.recordProductClick(
+      product.category,
+      product.subcategory,
+      product.subsubcategory
+    );
+
     if (onTap) {
       onTap();
     } else {
-      
+      // Navigate with slide transition
       router.push(`/productdetail/${product.id}`);
     }
-  }, [onTap, product.id, router]);
+  }, [
+    onTap,
+    product.id,
+    product.shopId,
+    product.category,
+    product.subcategory,
+    product.subsubcategory,
+    router,
+    lastNavigationTime,
+  ]);
 
+  // ✅ Check theme changes
   useEffect(() => {
     const checkTheme = () => {
       if (typeof document !== "undefined") {
@@ -458,27 +460,23 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     return () => observer.disconnect();
   }, []);
 
-  // Reset image index when color changes with faster transition
+  // Reset image index when color changes
   useEffect(() => {
     setCurrentImageIndex(0);
     setImageError(false);
   }, [internalSelectedColor, selectedColor]);
-
-
 
   // Update internal selected color when prop changes
   useEffect(() => {
     setInternalSelectedColor(selectedColor || null);
   }, [selectedColor]);
 
-  // Separated cart operation logic
+  // ✅ Cart operations with proper batching
   const performCartOperation = useCallback(
     async (selectedOptions?: { quantity?: number; [key: string]: unknown }) => {
       try {
-        // Set loading state immediately
         setCartButtonState("adding");
 
-        // Extract quantity from selectedOptions if provided
         let quantityToAdd = 1;
         const attributesToAdd = selectedOptions;
 
@@ -486,14 +484,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           quantityToAdd = selectedOptions.quantity;
         }
 
-        // Call the cart function with the correct quantity
-        const result = await addToCart(
-          product.id,
-          quantityToAdd,
-          attributesToAdd
-        );
+        const result = await addToCart(product.id, quantityToAdd, attributesToAdd);
 
-        // Set success state based on result
         if (result.includes("Added") || result.includes("Updated")) {
           setCartButtonState("added");
           setTimeout(() => setCartButtonState("idle"), 1500);
@@ -501,7 +493,6 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           setCartButtonState("idle");
         }
 
-        // Call prop callback if provided
         if (onAddToCart) {
           onAddToCart(product.id);
         }
@@ -513,7 +504,6 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     [product, addToCart, onAddToCart]
   );
 
-  // Add this new function to handle removal:
   const performCartRemoval = useCallback(async () => {
     try {
       setCartButtonState("removing");
@@ -527,7 +517,6 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         setCartButtonState("idle");
       }
 
-      // Call prop callback if provided
       if (onAddToCart) {
         onAddToCart(product.id);
       }
@@ -543,58 +532,41 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         router.push("/login");
         return;
       }
-  
+
       const productInCart = actualIsInCart;
-  
-      // If product is in cart, remove it directly (toggle off)
+
       if (productInCart) {
         await performCartRemoval();
         return;
       }
-  
-      // ✅ CRITICAL FIX: Check if product has selectable options
-      // Only show selector when ADDING and has options
+
       const productHasOptions = hasSelectableOptions(product);
-     
-  
+
       if (!productInCart && productHasOptions && !selectedOptions) {
-        
         setShowCartOptionSelector(true);
         return;
       }
-  
-      // Perform cart addition with or without options
+
       await performCartOperation(selectedOptions);
     },
-    [
-      user,
-      product,
-      actualIsInCart,
-      router,
-      performCartRemoval,
-      performCartOperation,
-      setShowCartOptionSelector,
-    ]
+    [user, product, actualIsInCart, router, performCartRemoval, performCartOperation]
   );
 
-  // Enhanced favorite functionality
+  // ✅ Favorite operations
   const handleToggleFavorite = useCallback(async () => {
     if (!user) {
       router.push("/login");
       return;
     }
 
-    // Only show option selector when ADDING to favorites (not removing)
     if (!actualIsFavorite && hasSelectableOptions(product)) {
       setShowFavoriteOptionSelector(true);
       return;
     }
 
-    // Direct favorite toggle for products without options OR when removing from favorites
     await performFavoriteToggle();
   }, [user, actualIsFavorite, product, router]);
 
-  // Separated favorite toggle logic
   const performFavoriteToggle = useCallback(
     async (selectedOptions?: {
       selectedColor?: string;
@@ -607,7 +579,6 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
         setFavoriteButtonState(wasInFavorites ? "removing" : "adding");
 
-        // Pass selected options if available
         const result = await addToFavorites(product.id, selectedOptions);
 
         if (result.includes("Added")) {
@@ -620,7 +591,6 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           setFavoriteButtonState("idle");
         }, 2000);
 
-        // Call prop callback if provided
         if (onFavoriteToggle) {
           onFavoriteToggle(product.id);
         }
@@ -663,7 +633,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     setShowFavoriteOptionSelector(false);
   }, []);
 
-  // Get cart button content
+  // ✅ Get cart button content
   const getCartButtonContent = useCallback(() => {
     const isOptimisticAdd = isOptimisticallyAdding(product.id);
     const isOptimisticRemove = isOptimisticallyRemoving(product.id);
@@ -709,7 +679,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
     return {
       icon: <ShoppingCart size={16} />,
-      className: isDarkMode ? "text-white" : "text-gray-800", // White in dark mode
+      className: isDarkMode ? "text-white" : "text-gray-800",
     };
   }, [
     cartButtonState,
@@ -720,7 +690,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     isDarkMode,
   ]);
 
-  // Get favorite button content
+  // ✅ Get favorite button content
   const getFavoriteButtonContent = useCallback(() => {
     if (favoriteButtonState === "adding") {
       return {
@@ -751,9 +721,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       icon: (
         <Heart
           size={12}
-          className={
-            actualIsFavorite ? "fill-red-500 text-red-500" : "text-gray-500"
-          }
+          className={actualIsFavorite ? "fill-red-500 text-red-500" : "text-gray-500"}
         />
       ),
       className: "",
@@ -765,7 +733,6 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     const isOptimisticAdd = isOptimisticallyAdding(product.id);
     const isOptimisticRemove = isOptimisticallyRemoving(product.id);
 
-    // Only reset if we're in a loading state but no optimistic operations are happening
     if (
       (cartButtonState === "adding" || cartButtonState === "removing") &&
       !isOptimisticAdd &&
@@ -773,12 +740,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     ) {
       setCartButtonState("idle");
     }
-  }, [
-    product.id,
-    isOptimisticallyAdding,
-    isOptimisticallyRemoving,
-    cartButtonState,
-  ]);
+  }, [product.id, isOptimisticallyAdding, isOptimisticallyRemoving, cartButtonState]);
 
   const effectiveScaleFactor = scaleFactor;
   const finalInternalScaleFactor =
@@ -793,7 +755,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     ? `${portraitImageHeight * effectiveScaleFactor}px`
     : undefined;
 
-  // Build rotating children for description area
+  // ✅ Build rotating children for description area
   const rotatingChildren = useMemo(() => {
     const children: React.ReactNode[] = [];
     const quantity = product.quantity ?? 1;
@@ -808,10 +770,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
     if (quantity <= 5 && quantity > 0) {
       children.push(
-        <span
-          key="stock"
-          className="text-emerald-600 text-xs font-bold truncate"
-        >
+        <span key="stock" className="text-emerald-600 text-xs font-bold truncate">
           Only {quantity} left
         </span>
       );
@@ -820,7 +779,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     return children;
   }, [product.brandModel, product.quantity]);
 
-  // Build banner children
+  // ✅ Build banner children
   const bannerChildren = useMemo(() => {
     const children: React.ReactNode[] = [];
 
@@ -861,7 +820,6 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const handleNextImage = (e: React.MouseEvent) => {
     e.stopPropagation();
 
-    // Don't allow navigation for fantasy products
     if (isFantasyProduct(product)) return;
 
     setCurrentImageIndex((prev) =>
@@ -872,7 +830,6 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const handlePrevImage = (e: React.MouseEvent) => {
     e.stopPropagation();
 
-    // Don't allow navigation for fantasy products
     if (isFantasyProduct(product)) return;
 
     setCurrentImageIndex((prev) =>
@@ -880,7 +837,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     );
   };
 
-  // Determine active dot for pagination (max 3 dots)
+  // ✅ Determine active dot for pagination (max 3 dots)
   const getActiveDotIndex = () => {
     const imageCount = currentImageUrls.length;
     if (imageCount <= 3) {
@@ -925,7 +882,6 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             <div className="w-full h-full rounded-t-xl overflow-hidden bg-gray-200 relative">
               {currentImageUrls.length > 0 ? (
                 <div className="relative w-full h-full">
-                  {/* Image with smooth transition */}
                   <div className="relative w-full h-full">
                     {isImageLoaded && !imageError ? (
                       <Image
@@ -948,28 +904,27 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                     )}
                   </div>
 
-                  {/* Navigation buttons - hide for fantasy products, show on hover for others */}
-                  {currentImageUrls.length > 1 &&
-                    !isFantasyProduct(product) && (
-                      <>
-                        <button
-                          className={`absolute left-2 top-1/2 transform -translate-y-1/2 w-8 h-8 bg-black bg-opacity-50 rounded-full flex items-center justify-center text-white transition-opacity duration-150 ${
-                            isHovered ? "opacity-100" : "opacity-0"
-                          }`}
-                          onClick={handlePrevImage}
-                        >
-                          <ChevronLeft size={16} />
-                        </button>
-                        <button
-                          className={`absolute right-2 top-1/2 transform -translate-y-1/2 w-8 h-8 bg-black bg-opacity-50 rounded-full flex items-center justify-center text-white transition-opacity duration-150 ${
-                            isHovered ? "opacity-100" : "opacity-0"
-                          }`}
-                          onClick={handleNextImage}
-                        >
-                          <ChevronRight size={16} />
-                        </button>
-                      </>
-                    )}
+                  {/* Navigation buttons */}
+                  {currentImageUrls.length > 1 && !isFantasyProduct(product) && (
+                    <>
+                      <button
+                        className={`absolute left-2 top-1/2 transform -translate-y-1/2 w-8 h-8 bg-black bg-opacity-50 rounded-full flex items-center justify-center text-white transition-opacity duration-150 ${
+                          isHovered ? "opacity-100" : "opacity-0"
+                        }`}
+                        onClick={handlePrevImage}
+                      >
+                        <ChevronLeft size={16} />
+                      </button>
+                      <button
+                        className={`absolute right-2 top-1/2 transform -translate-y-1/2 w-8 h-8 bg-black bg-opacity-50 rounded-full flex items-center justify-center text-white transition-opacity duration-150 ${
+                          isHovered ? "opacity-100" : "opacity-0"
+                        }`}
+                        onClick={handleNextImage}
+                      >
+                        <ChevronRight size={16} />
+                      </button>
+                    </>
+                  )}
 
                   {/* Blur overlay for fantasy products */}
                   {isFantasyProduct(product) && (
@@ -1015,14 +970,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             <div className="absolute top-2 right-2 flex items-center gap-2">
               {showExtraLabels && (
                 <>
-                  <ExtraLabel
-                    text="Nar24"
-                    gradientColors={["#FF9800", "#E91E63"]}
-                  />
-                  <ExtraLabel
-                    text="Vitrin"
-                    gradientColors={["#9C27B0", "#E91E63"]}
-                  />
+                  <ExtraLabel text="Nar24" gradientColors={["#FF9800", "#E91E63"]} />
+                  <ExtraLabel text="Vitrin" gradientColors={["#9C27B0", "#E91E63"]} />
                 </>
               )}
 
@@ -1037,8 +986,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               >
                 <span
                   className={`transition-all duration-300 ${
-                    favoriteButtonState === "added" ||
-                    favoriteButtonState === "removed"
+                    favoriteButtonState === "added" || favoriteButtonState === "removed"
                       ? "animate-pulse"
                       : ""
                   } ${favoriteButtonContent.className}`}
@@ -1046,9 +994,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                   {favoriteButtonContent.icon}
                 </span>
 
-                {/* Success animation overlay */}
-                {(favoriteButtonState === "added" ||
-                  favoriteButtonState === "removed") && (
+                {(favoriteButtonState === "added" || favoriteButtonState === "removed") && (
                   <div className="absolute inset-0 bg-green-500/10 animate-pulse rounded-full" />
                 )}
               </button>
@@ -1056,31 +1002,29 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
             {/* Color Options */}
             {displayedColors.length > 0 && (
-  <div className="absolute right-2 bottom-16 flex flex-col gap-1">
-    {displayedColors.map((color) => {
-      const isSelected = internalSelectedColor === color;
-      return (
-        <button
-          key={color}
-          className={`w-5 h-5 rounded-full border-2 transition-all duration-200 ${
-            isSelected
-              ? "border-orange-500 scale-110"
-              : "border-white hover:scale-105"
-          }`}
-          style={{ backgroundColor: getColorFromName(color) }}
-          onClick={(e) => {
-            e.stopPropagation();
-            handleColorSelect(color);
-          }}
-        >
-          {isSelected && (
-            <Check size={10} className="text-white m-auto" />
-          )}
-        </button>
-      );
-    })}
-  </div>
-)}
+              <div className="absolute right-2 bottom-16 flex flex-col gap-1">
+                {displayedColors.map((color) => {
+                  const isSelected = internalSelectedColor === color;
+                  return (
+                    <button
+                      key={color}
+                      className={`w-5 h-5 rounded-full border-2 transition-all duration-200 ${
+                        isSelected
+                          ? "border-orange-500 scale-110"
+                          : "border-white hover:scale-105"
+                      }`}
+                      style={{ backgroundColor: getColorFromName(color) }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleColorSelect(color);
+                      }}
+                    >
+                      {isSelected && <Check size={10} className="text-white m-auto" />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Campaign Badge */}
             {product.campaignName && (
@@ -1211,8 +1155,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 >
                   <span
                     className={`transition-all duration-300 ${
-                      cartButtonState === "added" ||
-                      cartButtonState === "removed"
+                      cartButtonState === "added" || cartButtonState === "removed"
                         ? "animate-pulse"
                         : ""
                     } ${cartButtonContent.className}`}
@@ -1220,9 +1163,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                     {cartButtonContent.icon}
                   </span>
 
-                  {/* Success animation overlay */}
-                  {(cartButtonState === "added" ||
-                    cartButtonState === "removed") && (
+                  {(cartButtonState === "added" || cartButtonState === "removed") && (
                     <div className="absolute inset-0 bg-green-500/10 animate-pulse rounded-full" />
                   )}
                 </button>
@@ -1254,4 +1195,6 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   );
 };
 
+// ✅ Export memoized version for performance
+export const ProductCard = memo(ProductCardComponent);
 export default ProductCard;

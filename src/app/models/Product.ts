@@ -57,6 +57,9 @@ export interface Product {
   colorImages: Record<string, string[]>;
   videoUrl?: string;
   attributes: Record<string, unknown>;
+  relatedProductIds?: string[];
+  relatedLastUpdated?: Date;   // When Cloud Function last updated related products
+  relatedCount?: number;  
   // Add reference property for Firestore document reference
   reference?: {
     id: string;
@@ -299,6 +302,9 @@ export class ProductUtils {
       videoUrl: ProductUtils.safeStringNullable(json.videoUrl),
       attributes,
       reference: ProductUtils.safeReference(json.reference),
+      relatedProductIds: ProductUtils.safeStringArray(json.relatedProductIds),
+      relatedLastUpdated: ProductUtils.safeDateNullable(json.relatedLastUpdated),
+      relatedCount: json.relatedCount != null ? ProductUtils.safeInt(json.relatedCount) : undefined,
     };
   }
 
@@ -358,6 +364,9 @@ export class ProductUtils {
       videoUrl: product.videoUrl,
       attributes: product.attributes,
       reference: product.reference,
+      relatedProductIds: product.relatedProductIds,
+      relatedLastUpdated: product.relatedLastUpdated?.getTime(),
+    relatedCount: product.relatedCount,
     };
 
     // Remove null/undefined values

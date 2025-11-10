@@ -12,6 +12,8 @@ import { SearchHistoryProvider } from "@/context/SearchHistoryProvider";
 import ConditionalFooter from "../components/ConditionalFooter";
 import CookieConsent from "../components/CookieConsent";
 import { PersonalizedRecommendationsProvider } from "@/context/PersonalizedRecommendationsProvider";
+import { AppInitializer } from '@/app/components/AppInitializer';
+import { AnalyticsInitializer } from '@/app/components/AnalyticsInitializer'; // ✅ NEW
 import { db } from "@/lib/firebase";
 
 // Inner component that has access to user context
@@ -55,9 +57,21 @@ export default function LayoutWrapper({
       locale={locale}
       timeZone={timeZone}
     >
-      <UserProvider>
-        <AppProviders>{children}</AppProviders>
-      </UserProvider>
+      {/* ✅ Step 1: Initialize memory manager (no user context needed) */}
+      <AppInitializer>
+        
+        {/* ✅ Step 2: Provide user context */}
+        <UserProvider>
+          
+          {/* ✅ Step 3: Initialize analytics (needs user context) */}
+          <AnalyticsInitializer>
+            
+            {/* ✅ Step 4: Other providers */}
+            <AppProviders>{children}</AppProviders>
+            
+          </AnalyticsInitializer>
+        </UserProvider>
+      </AppInitializer>
     </NextIntlClientProvider>
   );
 }
