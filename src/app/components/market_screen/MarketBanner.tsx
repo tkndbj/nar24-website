@@ -307,10 +307,6 @@ export default function MarketBannerGrid() {
     });
   }, []);
 
-  const handleImageLoadStart = useCallback((imageId: string) => {
-    setLoadingImages((prev) => new Set(prev).add(imageId));
-  }, []);
-
   // Error state (matches Flutter: empty + error)
   if (error && banners.length === 0) {
     return (
