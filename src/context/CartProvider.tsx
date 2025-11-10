@@ -24,6 +24,7 @@ import {
   where,
   DocumentSnapshot,
   QuerySnapshot,
+  QueryDocumentSnapshot,
   runTransaction,
   getDoc,
   getDocs,
@@ -287,7 +288,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
               limit(1)
             )
           ),
-          async () => ({ docs: [], empty: true } as any) // Fallback
+          async () => ({ docs: [], empty: true } as unknown as QuerySnapshot) // Fallback
         );
 
         if (snapshot.empty) return null;
@@ -351,11 +352,11 @@ export const CartProvider: React.FC<CartProviderProps> = ({
                 where(documentId(), "in", batch)
               )
             ),
-            async () => ({ docs: [], empty: true } as any) // Fallback
+            async () => ({ docs: [], empty: true } as unknown as QuerySnapshot) // Fallback
           );
 
           const foundInShop = new Set<string>();
-          shopSnapshot.docs.forEach((doc: any) => {
+          shopSnapshot.docs.forEach((doc: QueryDocumentSnapshot) => {
             result[doc.id] = doc.ref;
             foundInShop.add(doc.id);
           });
@@ -371,10 +372,10 @@ export const CartProvider: React.FC<CartProviderProps> = ({
                   where(documentId(), "in", remainingIds)
                 )
               ),
-              async () => ({ docs: [], empty: true } as any) // Fallback
+              async () => ({ docs: [], empty: true } as unknown as QuerySnapshot) // Fallback
             );
 
-            productsSnapshot.docs.forEach((doc: any) => {
+            productsSnapshot.docs.forEach((doc: QueryDocumentSnapshot) => {
               result[doc.id] = doc.ref;
             });
           }
@@ -430,10 +431,10 @@ export const CartProvider: React.FC<CartProviderProps> = ({
                   where(documentId(), "in", uncachedIds)
                 )
               ),
-              async () => ({ docs: [], empty: true } as any) // Fallback
+              async () => ({ docs: [], empty: true } as unknown as QuerySnapshot) // Fallback
             );
-      
-            snapshot.docs.forEach((doc: any) => {
+
+            snapshot.docs.forEach((doc: QueryDocumentSnapshot) => {
               if (!result[doc.id]) {
                 try {
                   const docData = doc.data();
@@ -498,7 +499,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
             const shopDoc = await circuitBreaker.execute(
               CIRCUITS.FIREBASE_SHOP_PRODUCTS,
               () => getDoc(doc(db, "shops", shopId)),
-              async () => ({ exists: () => false } as any) // Fallback
+              async () => ({ exists: () => false, data: () => undefined } as unknown as DocumentSnapshot) // Fallback
             );
 
             if (shopDoc.exists()) {
@@ -528,7 +529,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
             const userDoc = await circuitBreaker.execute(
               CIRCUITS.FIREBASE_PRODUCTS,
               () => getDoc(doc(db, "users", ownerId)),
-              async () => ({ exists: () => false } as any) // Fallback
+              async () => ({ exists: () => false, data: () => undefined } as unknown as DocumentSnapshot) // Fallback
             );
 
             if (userDoc.exists()) {
@@ -635,6 +636,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
       optimisticTimersRef.current.set(productId, timeout);
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [isInitialized, fetchProductDetailsBatch, clearOptimisticState]
   );
 
@@ -1637,6 +1639,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
       await processCartItemsFromDocs(snapshot.docs);
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [user, db]
   );
 
@@ -1834,6 +1837,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
   // Cleanup on unmount
   useEffect(() => {
+    const optimisticTimers = optimisticTimersRef.current;
     return () => {
       if (unsubscribeCartRef.current) {
         unsubscribeCartRef.current();
@@ -1841,7 +1845,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       if (batchUpdateTimerRef.current) {
         clearTimeout(batchUpdateTimerRef.current);
       }
-      optimisticTimersRef.current.forEach((timer) => clearTimeout(timer));
+      optimisticTimers.forEach((timer) => clearTimeout(timer));
     };
   }, []);
 

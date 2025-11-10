@@ -34,7 +34,7 @@ import {
 import { db } from "@/lib/firebase";
 import { useUser } from "./UserProvider";
 import { requestDeduplicator } from "@/app/utils/requestDeduplicator";
-import { cacheManager, CACHE_NAMES } from "@/app/utils/cacheManager";
+import { cacheManager } from "@/app/utils/cacheManager";
 import { circuitBreaker, CIRCUITS } from "@/app/utils/circuitBreaker";
 // Types
 interface FavoriteBasket {
@@ -276,7 +276,6 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   );
 
   // Subscribe to all favorites (global)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const subscribeToGlobalFavorites = useCallback((userId: string) => {
     if (unsubscribeGlobalFavoritesRef.current) {
       unsubscribeGlobalFavoritesRef.current();
@@ -299,6 +298,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
       defaultUnsubscribe();
       basketsUnsubscribe();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // loadAllFavorites intentionally omitted to avoid circular dependency
 
   // Subscribe to favorite baskets
