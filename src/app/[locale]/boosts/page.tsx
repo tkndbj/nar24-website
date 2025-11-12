@@ -902,11 +902,20 @@ export default function BoostPage() {
 
                   // Reset initial loading state when modal opens
                   setIsInitialLoading(true);
+                  setTimeout(() => {
+                    setIsInitialLoading(false);
+                  }, 2500); // 1500ms form delay + 1000ms buffer
                 }
               }}
               className="w-full h-full border-0"
               title="Payment Gateway"
               sandbox="allow-forms allow-scripts allow-same-origin allow-top-navigation"
+              onLoad={() => {
+                // Also hide loading when iframe content loads
+                setTimeout(() => {
+                  setIsInitialLoading(false);
+                }, 500);
+              }}
             />
 
             {/* Loading Overlay */}
