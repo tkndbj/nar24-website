@@ -1129,30 +1129,41 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                           )}
 
                           {product && (
-                            <ProductCard3
-                              imageUrl={
-                                item.selectedColorImage ||
-                                product.imageUrls?.[0] ||
-                                "https://via.placeholder.com/200"
-                              }
-                              colorImages={product.colorImages || {}}
-                              selectedColor={item.selectedColor}
-                              selectedColorImage={item.selectedColorImage}
-                              productName={product.productName || "Product"}
-                              brandModel={
-                                product.brandModel ||
-                                product.sellerName ||
-                                "Brand"
-                              }
-                              price={product.price || 0}
-                              currency={product.currency || "TL"}
-                              averageRating={product.averageRating || 0}
-                              quantity={item.quantity}
-                              maxQuantityAllowed={0}
-                              isDarkMode={isDarkMode}
-                              scaleFactor={0.9}
-                              hideStockInfo={true}
-                            />
+                            <div
+                              onClick={() => {
+                                onClose();
+                                router.push(`/productdetail/${item.productId}`);
+                              }}
+                              className="cursor-pointer"
+                            >
+                              {product.brandModel && (
+                                <div className="mb-1 pl-10 pr-1">
+                                  <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+                                    {product.brandModel}
+                                  </span>
+                                </div>
+                              )}
+                              <ProductCard3
+                                imageUrl={
+                                  item.selectedColorImage ||
+                                  product.imageUrls?.[0] ||
+                                  "https://via.placeholder.com/200"
+                                }
+                                colorImages={product.colorImages || {}}
+                                selectedColor={item.selectedColor}
+                                selectedColorImage={item.selectedColorImage}
+                                productName={product.productName || "Product"}
+                                brandModel=""
+                                price={product.price || 0}
+                                currency={product.currency || "TL"}
+                                averageRating={product.averageRating || 0}
+                                quantity={item.quantity}
+                                maxQuantityAllowed={0}
+                                isDarkMode={isDarkMode}
+                                scaleFactor={0.9}
+                                hideStockInfo={true}
+                              />
+                            </div>
                           )}
 
                           {/* Loading state */}

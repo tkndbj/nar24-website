@@ -472,31 +472,46 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
               ${item.isOptimistic ? "border-dashed" : ""}
             `}
           >
-            <ProductCard3
-              imageUrl={item.product?.imageUrls?.[0] || ""}
-              colorImages={item.product?.colorImages || {}}
-              selectedColorImage={
-                typeof item.selectedColorImage === "string"
-                  ? item.selectedColorImage
-                  : undefined
-              }
-              productName={item.product?.productName || t("loadingProduct")}
-              brandModel={item.product?.brandModel || item.sellerName}
-              price={item.product?.price || 0}
-              currency={item.product?.currency || "TL"}
-              averageRating={item.product?.averageRating || 0}
-              quantity={item.quantity}
-              maxQuantityAllowed={maxQuantity}
-              onQuantityChanged={
-                item.isOptimistic || isRemoving || maxQuantity === 0
-                  ? undefined
-                  : (newQuantity) =>
-                      handleQuantityChange(item.productId, newQuantity)
-              }
-              isDarkMode={isDarkMode}
-              scaleFactor={0.9}
-              noStockText={t("noStock")}
-            />
+            <div
+              onClick={() => {
+                onClose();
+                router.push(`/productdetail/${item.productId}`);
+              }}
+              className="cursor-pointer"
+            >
+              {item.product?.brandModel && (
+                <div className="mb-1 px-1">
+                  <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+                    {item.product.brandModel}
+                  </span>
+                </div>
+              )}
+              <ProductCard3
+                imageUrl={item.product?.imageUrls?.[0] || ""}
+                colorImages={item.product?.colorImages || {}}
+                selectedColorImage={
+                  typeof item.selectedColorImage === "string"
+                    ? item.selectedColorImage
+                    : undefined
+                }
+                productName={item.product?.productName || t("loadingProduct")}
+                brandModel=""
+                price={item.product?.price || 0}
+                currency={item.product?.currency || "TL"}
+                averageRating={item.product?.averageRating || 0}
+                quantity={item.quantity}
+                maxQuantityAllowed={maxQuantity}
+                onQuantityChanged={
+                  item.isOptimistic || isRemoving || maxQuantity === 0
+                    ? undefined
+                    : (newQuantity) =>
+                        handleQuantityChange(item.productId, newQuantity)
+                }
+                isDarkMode={isDarkMode}
+                scaleFactor={0.9}
+                noStockText={t("noStock")}
+              />
+            </div>
 
             {/* Display attributes in one line */}
             {attributesDisplay && (
