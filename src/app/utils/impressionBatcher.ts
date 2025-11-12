@@ -1,10 +1,6 @@
 // app/utils/impressionBatcher.ts
 
-interface UserDemographics {
-    gender?: string;
-    age?: number;
-  }
-  
+ 
   // NEW: Track per-page impressions
   interface PageImpressionData {
     pageUrl: string;
