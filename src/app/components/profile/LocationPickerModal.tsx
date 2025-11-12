@@ -9,7 +9,7 @@ interface LocationPickerModalProps {
   onLocationSelect: (lat: number, lng: number) => void;
   initialLocation?: { lat: number; lng: number } | null;
   isDarkMode?: boolean;
-  localization?: any;
+  localization?: (key: string) => string;
 }
 
 export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
