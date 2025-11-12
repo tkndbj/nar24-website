@@ -97,6 +97,7 @@ export default function BoostPage() {
   const [paymentData, setPaymentData] = useState<PaymentData | null>(null);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [statusCheckInterval, setStatusCheckInterval] = useState<NodeJS.Timeout | null>(null);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
 
   // Check dark mode
   useEffect(() => {
@@ -139,6 +140,19 @@ export default function BoostPage() {
       }
     };
   }, [statusCheckInterval]);
+
+  // Listen for messages from payment iframe
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'PAYMENT_FORM_SUBMITTED') {
+        // Hide the loading overlay once the form is submitted and 3D secure page loads
+        setIsInitialLoading(false);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
 
   // Fetch main product if productId is provided
   const fetchMainProduct = async () => {
@@ -457,12 +471,14 @@ export default function BoostPage() {
       setShowPaymentModal(false);
       setPaymentData(null);
       setPaymentError(null);
+      setIsInitialLoading(true);
     }
   };
 
   // Retry payment
   const handleRetryPayment = () => {
     setPaymentError(null);
+    setIsInitialLoading(true);
     if (paymentData) {
       // Reload iframe
       const iframe = document.getElementById(
@@ -864,7 +880,13 @@ export default function BoostPage() {
                           .join("\n")}
                       </form>
                       <script>
-                        setTimeout(() => document.getElementById('paymentForm').submit(), 1500);
+                        setTimeout(() => {
+                          document.getElementById('paymentForm').submit();
+                          // Notify parent that form has been submitted
+                          setTimeout(() => {
+                            window.parent.postMessage({ type: 'PAYMENT_FORM_SUBMITTED' }, '*');
+                          }, 200);
+                        }, 1500);
                       </script>
                     </body>
                     </html>
@@ -877,6 +899,9 @@ export default function BoostPage() {
                     doc.write(formHtml);
                     doc.close();
                   }
+
+                  // Reset initial loading state when modal opens
+                  setIsInitialLoading(true);
                 }
               }}
               className="w-full h-full border-0"
@@ -885,11 +910,11 @@ export default function BoostPage() {
             />
 
             {/* Loading Overlay */}
+            {isInitialLoading && !paymentError && (
             <div
               className={`absolute inset-0 flex items-center justify-center pointer-events-none ${
                 isDarkMode ? "bg-gray-900/50" : "bg-white/50"
               }`}
-              style={{ display: paymentError ? "none" : "flex" }}
             >
               <div className="text-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
@@ -902,6 +927,7 @@ export default function BoostPage() {
                 </p>
               </div>
             </div>
+            )}
           </div>
 
           {/* Footer Info */}
