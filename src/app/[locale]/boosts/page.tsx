@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   ArrowLeft,
   Package,
@@ -712,214 +712,91 @@ export default function BoostPage() {
     </div>
   );
 
-  // Payment Modal Component
-  const PaymentModal = () => {
-    if (!paymentData) return null;
+ // Payment Modal Component
+const PaymentModal = () => {
+  if (!paymentData) return null;
 
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div
+        className={`w-full max-w-4xl h-[90vh] rounded-2xl overflow-hidden shadow-2xl flex flex-col ${
+          isDarkMode ? "bg-gray-900" : "bg-white"
+        }`}
+      >
+        {/* Header */}
         <div
-          className={`w-full max-w-4xl h-[90vh] rounded-2xl overflow-hidden shadow-2xl flex flex-col ${
-            isDarkMode ? "bg-gray-900" : "bg-white"
+          className={`flex items-center justify-between px-6 py-4 border-b ${
+            isDarkMode ? "border-gray-700" : "border-gray-200"
           }`}
         >
-          {/* Header */}
-          <div
-            className={`flex items-center justify-between px-6 py-4 border-b ${
-              isDarkMode ? "border-gray-700" : "border-gray-200"
-            }`}
-          >
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
-                <Lock size={20} className="text-green-600" />
-              </div>
-              <div>
-                <h3
-                  className={`text-lg font-bold ${
-                    isDarkMode ? "text-white" : "text-gray-900"
-                  }`}
-                >
-                  {t("securePayment") || "Secure Boost Payment"}
-                </h3>
-                <p
-                  className={`text-xs ${
-                    isDarkMode ? "text-gray-400" : "text-gray-500"
-                  }`}
-                >
-                  {t("orderNumber") || "Order"}: {paymentData.orderNumber}
-                </p>
-              </div>
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+              <Lock size={20} className="text-green-600" />
             </div>
-
-            <button
-              onClick={handleClosePaymentModal}
-              className={`p-2 rounded-lg transition-colors ${
-                isDarkMode
-                  ? "hover:bg-gray-800 text-gray-400"
-                  : "hover:bg-gray-100 text-gray-600"
-              }`}
-            >
-              <X size={24} />
-            </button>
+            <div>
+              <h3
+                className={`text-lg font-bold ${
+                  isDarkMode ? "text-white" : "text-gray-900"
+                }`}
+              >
+                {t("securePayment") || "Secure Boost Payment"}
+              </h3>
+              <p
+                className={`text-xs ${
+                  isDarkMode ? "text-gray-400" : "text-gray-500"
+                }`}
+              >
+                {t("orderNumber") || "Order"}: {paymentData.orderNumber}
+              </p>
+            </div>
           </div>
 
-          {/* Payment Error */}
-          {paymentError && (
-            <div className="mx-6 mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-              <div className="flex items-start space-x-3">
-                <AlertCircle size={20} className="text-red-600 mt-0.5" />
-                <div className="flex-1">
-                  <h4 className="text-sm font-semibold text-red-900 dark:text-red-200 mb-1">
-                    {t("paymentError") || "Payment Error"}
-                  </h4>
-                  <p className="text-sm text-red-700 dark:text-red-300">
-                    {paymentError}
-                  </p>
-                </div>
-                <button
-                  onClick={handleRetryPayment}
-                  className="flex items-center space-x-1 px-3 py-1 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors"
-                >
-                  <RefreshCw size={14} />
-                  <span>{t("retry") || "Retry"}</span>
-                </button>
+          <button
+            onClick={handleClosePaymentModal}
+            className={`p-2 rounded-lg transition-colors ${
+              isDarkMode
+                ? "hover:bg-gray-800 text-gray-400"
+                : "hover:bg-gray-100 text-gray-600"
+            }`}
+          >
+            <X size={24} />
+          </button>
+        </div>
+
+        {/* Payment Error */}
+        {paymentError && (
+          <div className="mx-6 mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+            <div className="flex items-start space-x-3">
+              <AlertCircle size={20} className="text-red-600 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="text-sm font-semibold text-red-900 dark:text-red-200 mb-1">
+                  {t("paymentError") || "Payment Error"}
+                </h4>
+                <p className="text-sm text-red-700 dark:text-red-300">
+                  {paymentError}
+                </p>
               </div>
+              <button
+                onClick={handleRetryPayment}
+                className="flex items-center space-x-1 px-3 py-1 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors"
+              >
+                <RefreshCw size={14} />
+                <span>{t("retry") || "Retry"}</span>
+              </button>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* IFrame Container */}
-          <div className="flex-1 relative">
-            <iframe
-              id="payment-iframe"
-              ref={(iframe) => {
-                if (iframe && paymentData) {
-                  // Create form HTML
-                  const formHtml = `
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                      <meta charset="UTF-8">
-                      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                      <title>${t("securePayment") || "Secure Payment"}</title>
-                      <style>
-                        body {
-                          margin: 0;
-                          padding: 0;
-                          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                          background: linear-gradient(135deg, #10B981 0%, #059669 100%);
-                          min-height: 100vh;
-                          display: flex;
-                          align-items: center;
-                          justify-content: center;
-                        }
-                        .loading-container {
-                          text-align: center;
-                          color: white;
-                          padding: 40px;
-                        }
-                        .spinner {
-                          width: 50px;
-                          height: 50px;
-                          margin: 0 auto 20px;
-                          border: 4px solid rgba(255, 255, 255, 0.3);
-                          border-top-color: white;
-                          border-radius: 50%;
-                          animation: spin 1s linear infinite;
-                        }
-                        @keyframes spin {
-                          to { transform: rotate(360deg); }
-                        }
-                        .loading-text {
-                          font-size: 18px;
-                          font-weight: 500;
-                          margin: 0;
-                        }
-                        .secure-badge {
-                          display: inline-flex;
-                          align-items: center;
-                          gap: 8px;
-                          background: rgba(255, 255, 255, 0.2);
-                          padding: 8px 16px;
-                          border-radius: 20px;
-                          margin-top: 20px;
-                          font-size: 14px;
-                        }
-                        .boost-badge {
-                          display: inline-block;
-                          background: rgba(255, 255, 255, 0.15);
-                          padding: 6px 14px;
-                          border-radius: 16px;
-                          margin-top: 12px;
-                          font-size: 13px;
-                          font-weight: 600;
-                        }
-                      </style>
-                    </head>
-                    <body>
-                      <div class="loading-container">
-                        <div class="spinner"></div>
-                        <p class="loading-text">${
-                          t("loadingPaymentPage") ||
-                          "Loading secure payment page..."
-                        }</p>
-                        <div class="boost-badge">🚀 ${
-                          t("boostPackage") || "Boost Package"
-                        }</div>
-                        <div class="secure-badge">
-                          🔒 ${t("secureConnection") || "Secure Connection"}
-                        </div>
-                      </div>
-                      <form id="paymentForm" method="post" action="${
-                        paymentData.gatewayUrl
-                      }">
-                        ${Object.entries(paymentData.paymentParams)
-                          .map(
-                            ([key, value]) =>
-                              `<input type="hidden" name="${key}" value="${value}">`
-                          )
-                          .join("\n")}
-                      </form>
-                      <script>
-                        setTimeout(() => {
-                          document.getElementById('paymentForm').submit();
-                          // Notify parent that form has been submitted
-                          setTimeout(() => {
-                            window.parent.postMessage({ type: 'PAYMENT_FORM_SUBMITTED' }, '*');
-                          }, 200);
-                        }, 1500);
-                      </script>
-                    </body>
-                    </html>
-                  `;
+        {/* IFrame Container */}
+        <div className="flex-1 relative">
+          <PaymentIframe
+            paymentData={paymentData}
+            onLoadComplete={() => setIsInitialLoading(false)}
+            t={t}
+          />
 
-                  // Write to iframe
-                  const doc = iframe.contentDocument || iframe.contentWindow?.document;
-                  if (doc) {
-                    doc.open();
-                    doc.write(formHtml);
-                    doc.close();
-                  }
-
-                  // Reset initial loading state when modal opens
-                  setIsInitialLoading(true);
-                  setTimeout(() => {
-                    setIsInitialLoading(false);
-                  }, 2500); // 1500ms form delay + 1000ms buffer
-                }
-              }}
-              className="w-full h-full border-0"
-              title="Payment Gateway"
-              sandbox="allow-forms allow-scripts allow-same-origin allow-top-navigation"
-              onLoad={() => {
-                // Also hide loading when iframe content loads
-                setTimeout(() => {
-                  setIsInitialLoading(false);
-                }, 500);
-              }}
-            />
-
-            {/* Loading Overlay */}
-            {isInitialLoading && !paymentError && (
+          {/* Loading Overlay */}
+          {isInitialLoading && !paymentError && (
             <div
               className={`absolute inset-0 flex items-center justify-center pointer-events-none ${
                 isDarkMode ? "bg-gray-900/50" : "bg-white/50"
@@ -936,64 +813,196 @@ export default function BoostPage() {
                 </p>
               </div>
             </div>
-            )}
-          </div>
+          )}
+        </div>
 
-          {/* Footer Info */}
-          <div
-            className={`px-6 py-4 border-t ${
-              isDarkMode
-                ? "bg-gray-800 border-gray-700"
-                : "bg-gray-50 border-gray-200"
-            }`}
-          >
-            <div className="flex items-center justify-between text-sm">
-              <div className="flex items-center space-x-4">
-                <div>
-                  <span
-                    className={isDarkMode ? "text-gray-400" : "text-gray-600"}
-                  >
-                    {t("items") || "Items"}:
-                  </span>
-                  <span
-                    className={`ml-2 font-semibold ${
-                      isDarkMode ? "text-white" : "text-gray-900"
-                    }`}
-                  >
-                    {paymentData.itemCount}
-                  </span>
-                </div>
-                <div>
-                  <span
-                    className={isDarkMode ? "text-gray-400" : "text-gray-600"}
-                  >
-                    {t("duration") || "Duration"}:
-                  </span>
-                  <span
-                    className={`ml-2 font-semibold ${
-                      isDarkMode ? "text-white" : "text-gray-900"
-                    }`}
-                  >
-                    {boostDuration} {t("minutes") || "min"}
-                  </span>
-                </div>
+        {/* Footer Info */}
+        <div
+          className={`px-6 py-4 border-t ${
+            isDarkMode
+              ? "bg-gray-800 border-gray-700"
+              : "bg-gray-50 border-gray-200"
+          }`}
+        >
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center space-x-4">
+              <div>
+                <span
+                  className={isDarkMode ? "text-gray-400" : "text-gray-600"}
+                >
+                  {t("items") || "Items"}:
+                </span>
+                <span
+                  className={`ml-2 font-semibold ${
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  }`}
+                >
+                  {paymentData.itemCount}
+                </span>
               </div>
               <div>
                 <span
                   className={isDarkMode ? "text-gray-400" : "text-gray-600"}
                 >
-                  {t("total") || "Total"}:
+                  {t("duration") || "Duration"}:
                 </span>
-                <span className="ml-2 font-bold text-green-600 text-lg">
-                  {paymentData.totalPrice.toFixed(2)} TL
+                <span
+                  className={`ml-2 font-semibold ${
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  }`}
+                >
+                  {boostDuration} {t("minutes") || "min"}
                 </span>
               </div>
+            </div>
+            <div>
+              <span
+                className={isDarkMode ? "text-gray-400" : "text-gray-600"}
+              >
+                {t("total") || "Total"}:
+              </span>
+              <span className="ml-2 font-bold text-green-600 text-lg">
+                {paymentData.totalPrice.toFixed(2)} TL
+              </span>
             </div>
           </div>
         </div>
       </div>
-    );
-  };
+    </div>
+  );
+};
+
+// Separate PaymentIframe Component to prevent re-renders
+const PaymentIframe = React.memo(({ 
+  paymentData, 
+  onLoadComplete,
+  t 
+}: { 
+  paymentData: PaymentData; 
+  onLoadComplete: () => void;
+  t: (key: string) => string;
+}) => {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const initializedRef = useRef(false);
+
+  useEffect(() => {
+    if (!iframeRef.current || initializedRef.current) return;
+
+    const iframe = iframeRef.current;
+    const formHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>${t("securePayment") || "Secure Payment"}</title>
+        <style>
+          body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+          .loading-container {
+            text-align: center;
+            color: white;
+            padding: 40px;
+          }
+          .spinner {
+            width: 50px;
+            height: 50px;
+            margin: 0 auto 20px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+          }
+          @keyframes spin {
+            to { transform: rotate(360deg); }
+          }
+          .loading-text {
+            font-size: 18px;
+            font-weight: 500;
+            margin: 0;
+          }
+          .secure-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 8px 16px;
+            border-radius: 20px;
+            margin-top: 20px;
+            font-size: 14px;
+          }
+          .boost-badge {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.15);
+            padding: 6px 14px;
+            border-radius: 16px;
+            margin-top: 12px;
+            font-size: 13px;
+            font-weight: 600;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="loading-container">
+          <div class="spinner"></div>
+          <p class="loading-text">${
+            t("loadingPaymentPage") || "Loading secure payment page..."
+          }</p>
+          <div class="boost-badge">🚀 ${t("boostPackage") || "Boost Package"}</div>
+          <div class="secure-badge">
+            🔒 ${t("secureConnection") || "Secure Connection"}
+          </div>
+        </div>
+        <form id="paymentForm" method="post" action="${paymentData.gatewayUrl}">
+          ${Object.entries(paymentData.paymentParams)
+            .map(([key, value]) => `<input type="hidden" name="${key}" value="${value}">`)
+            .join("\n")}
+        </form>
+        <script>
+          setTimeout(() => {
+            document.getElementById('paymentForm').submit();
+          }, 1500);
+        </script>
+      </body>
+      </html>
+    `;
+
+    const doc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (doc) {
+      doc.open();
+      doc.write(formHtml);
+      doc.close();
+      initializedRef.current = true;
+    }
+
+    // Hide loading after timeout
+    const timer = setTimeout(() => {
+      onLoadComplete();
+    }, 2500);
+
+    return () => clearTimeout(timer);
+  }, [paymentData, onLoadComplete, t]);
+
+  return (
+    <iframe
+      ref={iframeRef}
+      id="payment-iframe"
+      className="w-full h-full border-0"
+      title="Payment Gateway"
+      sandbox="allow-forms allow-scripts allow-same-origin allow-top-navigation"
+    />
+  );
+});
+
+PaymentIframe.displayName = 'PaymentIframe';
 
   if (!user) return null;
 
