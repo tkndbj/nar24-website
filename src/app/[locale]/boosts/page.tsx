@@ -427,11 +427,12 @@ export default function BoostPage() {
         // Start status polling
         startStatusPolling(data.orderNumber);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
       console.error("Error initializing payment:", error);
       alert(
         `${t("errorOccurred") || "Error"}: ${
-          error.message || "Failed to initialize payment"
+          errorMessage
         }`
       );
     } finally {
