@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import { impressionBatcher } from '@/app/utils/impressionBatcher';
 import {
   ArrowLeft,
   Filter,
@@ -182,6 +183,29 @@ const DynamicMarketPage: React.FC = () => {
       buyerSubSubcategory: filters.buyerSubSubcategory,
     });
   }, [filters]);
+
+  useEffect(() => {
+    return () => {
+      console.log('🧹 DynamicMarketPage: Flushing impressions on unmount');
+      impressionBatcher.flush();
+    };
+  }, []);
+
+  // ✅ Flush when tab becomes hidden (user switches tabs)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        console.log('👁️ DynamicMarketPage: Tab hidden, flushing impressions');
+        impressionBatcher.flush();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
 
   // Set available subcategories based on URL params
   useEffect(() => {
@@ -1693,40 +1717,8 @@ const DynamicMarketPage: React.FC = () => {
               </div>
             )}
 
-            {/* Boosted products first (only on default filter) */}
-            {!isInitialLoading && selectedFilter === null && boostedProducts.length > 0 && (
-              <div className="mb-8">
-                <div
-                  className={`flex items-center gap-3 mb-4 ${
-                    isDarkMode ? "text-white" : "text-gray-900"
-                  }`}
-                >
-                  <h3 className="text-xl font-bold">
-                    {t("DynamicMarket.featuredProducts")}
-                  </h3>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {boostedProducts.map((product) => (
-                    <div key={`boosted-${product.id}`} className="w-full">
-                      <ProductCard
-                        product={product}
-                        onTap={() => handleProductClick(product)}
-                        onFavoriteToggle={() => {}}
-                        onAddToCart={() => {}}
-                        onColorSelect={() => {}}
-                        showCartIcon={true}
-                        isFavorited={false}
-                        isInCart={false}
-                        portraitImageHeight={320}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Regular products */}
-            {!isInitialLoading && products.length > 0 ? (
+            {/* All products (boosted + regular) */}
+            {!isInitialLoading && (boostedProducts.length > 0 || products.length > 0) ? (
               <div>
                 <div
                   className={`flex items-center gap-3 mb-4 ${
@@ -1743,7 +1735,7 @@ const DynamicMarketPage: React.FC = () => {
                         : "bg-gray-100 text-gray-600"
                     }`}
                   >
-                    {products.length} {t("DynamicMarket.products")}
+                    {boostedProducts.length + products.length} {t("DynamicMarket.products")}
                   </span>
                   {getActiveFiltersCount() > 0 && (
                     <span
@@ -1759,6 +1751,23 @@ const DynamicMarketPage: React.FC = () => {
                   )}
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {/* Boosted products first */}
+                  {boostedProducts.map((product) => (
+                    <div key={`boosted-${product.id}`} className="w-full">
+                      <ProductCard
+                        product={product}
+                        onTap={() => handleProductClick(product)}
+                        onFavoriteToggle={() => {}}
+                        onAddToCart={() => {}}
+                        onColorSelect={() => {}}
+                        showCartIcon={true}
+                        isFavorited={false}
+                        isInCart={false}
+                        portraitImageHeight={320}
+                      />
+                    </div>
+                  ))}
+                  {/* Regular products after */}
                   {products.map((product) => (
                     <div key={product.id} className="w-full">
                       <ProductCard

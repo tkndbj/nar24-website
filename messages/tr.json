@@ -1,17 +1,14 @@
 {
   "buyerCategoryWomen": "Kadın",
   "buyerCategoryMen": "Erkek",
-
   "buyerSubcategoryFashion": "Moda",
   "buyerSubcategoryShoes": "Ayakkabı",
   "buyerSubcategoryAccessories": "Aksesuarlar",
   "buyerSubcategoryBags": "Çanta & Bavul",
   "buyerSubcategorySelfCare": "Kişisel Bakım",
-
   "genderFilterWomen": "Women's",
   "genderFilterMen": "Men's",
   "genderFilterUnisex": "Unisex",
-
   "categoryClothingFashion": "Giyim ve Moda",
   "categoryFootwear": "Ayakkabı",
   "categoryAccessories": "Aksesuarlar",
@@ -26,7 +23,6 @@
   "categoryPetSupplies": "Evcil Hayvan Malzemeleri",
   "categoryAutomotive": "Otomotiv",
   "categoryHealthWellness": "Sağlık ve Zindelik",
-
   "subcategoryDresses": "Elbiseler",
   "subcategoryTopsShirts": "Üst Giyim",
   "subcategoryBottoms": "Alt Giyim",
@@ -36,7 +32,6 @@
   "subcategoryActivewear": "Spor Giyim",
   "subcategorySuitsFormal": "Takım ve Resmi Giyim",
   "subcategoryTraditionalCultural": "Geleneksel ve Kültürel Giyim",
-
   "subcategorySneakersAthletic": "Spor Ayakkabı",
   "subcategoryCasualShoes": "Günlük Ayakkabı",
   "subcategoryFormalShoes": "Resmi Ayakkabı",
@@ -44,7 +39,6 @@
   "subcategorySandalsFlipFlops": "Sandalet ve Terlik",
   "subcategorySlippers": "Ev Terlikleri",
   "subcategorySpecializedFootwear": "Özel Amaçlı Ayakkabı",
-
   "subcategoryJewelry": "Mücevher",
   "subcategoryWatches": "Saatler",
   "subcategoryBelts": "Kemerler",
@@ -54,7 +48,6 @@
   "subcategoryGloves": "Eldivenler",
   "subcategoryHairAccessories": "Saç Aksesuarları",
   "subcategoryOtherAccessories": "Diğer Aksesuarlar",
-
   "subcategoryBabyClothing": "Bebek Giyim",
   "subcategoryKidsClothing": "Çocuk Giyim",
   "subcategoryKidsFootwear": "Çocuk Ayakkabı",
@@ -65,7 +58,6 @@
   "subcategoryFeedingNursing": "Beslenme ve Emzirme",
   "subcategorySafetySecurity": "Güvenlik",
   "subcategoryEducational": "Eğitici",
-
   "subcategoryLivingRoomFurniture": "Oturma Odası Mobilyası",
   "subcategoryBedroomFurniture": "Yatak Odası Mobilyası",
   "subcategoryKitchenDining": "Mutfak ve Yemek Odası",
@@ -75,7 +67,6 @@
   "subcategoryStorageOrganization": "Saklama ve Organizasyon",
   "subcategoryTextilesSoftFurnishing": "Tekstil ve Yumuşak Mobilya",
   "subcategoryGardenOutdoor": "Bahçe ve Outdoor",
-
   "subcategorySkincare": "Cilt Bakımı",
   "subcategoryMakeup": "Makyaj",
   "subcategoryHaircare": "Saç Bakımı",
@@ -85,7 +76,6 @@
   "subcategoryBodyCare": "Vücut Bakımı",
   "subcategoryOralCare": "Ağız Bakımı",
   "subcategoryBeautyToolsAccessories": "Güzellik Araçları ve Aksesuarları",
-
   "subcategoryHandbags": "El Çantaları",
   "subcategoryBackpacks": "Sırt Çantaları",
   "subcategoryTravelLuggage": "Seyahat Bavulları",
@@ -93,7 +83,6 @@
   "subcategorySportsGymBags": "Spor ve Jimnastik Çantaları",
   "subcategoryWalletsSmallAccessories": "Cüzdan ve Küçük Aksesuarlar",
   "subcategorySpecialtyBags": "Özel Amaçlı Çantalar",
-
   "subcategorySmartphonesAccessories": "Akıllı Telefon ve Aksesuarları",
   "subcategoryComputersLaptops": "Bilgisayar ve Laptop",
   "subcategoryTVsHomeEntertainment": "TV ve Ev Eğlence Sistemleri",
@@ -104,7 +93,6 @@
   "subcategoryWearableTech": "Giyilebilir Teknoloji",
   "subcategoryHomeAppliances": "Ev Aletleri",
   "subcategoryPersonalCareElectronics": "Kişisel Bakım Elektroniği",
-
   "subcategoryFitnessExercise": "Fitness ve Egzersiz",
   "subcategorySports": "Sporlar",
   "subcategoryWaterSports": "Su Sporları",
@@ -114,7 +102,6 @@
   "subcategoryRunningAthletics": "Koşu ve Atletizm",
   "subcategorySportsAccessories": "Spor Aksesuarları",
   "subcategorySportswear": "Spor Giyim",
-
   "subcategoryBooksLiterature": "Kitap ve Edebiyat",
   "subcategoryOfficeSchoolSupplies": "Ofis ve Okul Malzemeleri",
   "subcategoryArtCraftSupplies": "Sanat ve El Sanatları Malzemeleri",
@@ -123,7 +110,6 @@
   "subcategoryEducationalMaterials": "Eğitim Materyalleri",
   "subcategoryHobbiesCollections": "Hobiler ve Koleksiyonlar",
   "subcategoryMusicalInstruments": "Müzik Aletleri",
-
   "subcategoryHandTools": "El Aletleri",
   "subcategoryPowerTools": "Elektrikli Aletler",
   "subcategoryHardwareFasteners": "Hırdavat ve Bağlantı Elemanları",
@@ -133,7 +119,6 @@
   "subcategorySafetyEquipment": "Güvenlik Ekipmanları",
   "subcategoryMeasuringTools": "Ölçüm Aletleri",
   "subcategoryToolStorage": "Alet Saklama",
-
   "subcategoryDogSupplies": "Köpek Malzemeleri",
   "subcategoryCatSupplies": "Kedi Malzemeleri",
   "subcategoryBirdSupplies": "Kuş Malzemeleri",
@@ -143,7 +128,6 @@
   "subcategoryPetCareHealth": "Evcil Hayvan Bakımı ve Sağlığı",
   "subcategoryPetAccessories": "Evcil Hayvan Aksesuarları",
   "subcategoryPetTraining": "Evcil Hayvan Eğitimi",
-
   "subcategoryCarPartsComponents": "Araba Parçaları ve Bileşenleri",
   "subcategoryCarElectronics": "Araba Elektroniği",
   "subcategoryCarCareMaintenance": "Araba Bakımı ve Onarımı",
@@ -152,7 +136,6 @@
   "subcategoryExteriorAccessories": "Dış Aksesuar",
   "subcategoryToolsEquipment": "Araçlar ve Ekipmanlar",
   "subcategoryMotorcycleParts": "Motosiklet Parçaları",
-
   "subcategoryVitaminsSupplements": "Vitamin ve Takviyeler",
   "subcategoryMedicalEquipment": "Tıbbi Cihazlar",
   "subcategoryFirstAidSafety": "İlk Yardım ve Güvenlik",
@@ -161,7 +144,6 @@
   "subcategoryMobilityDailyLiving": "Mobilite ve Günlük Yaşam",
   "subcategoryAlternativeMedicine": "Alternatif Tıp",
   "subcategoryPersonalCare": "Kişisel Bakım",
-
   "subSubcategoryCasualDresses": "Günlük Elbiseler",
   "subSubcategoryFormalDresses": "Resmi Elbiseler",
   "subSubcategoryEveningGowns": "Gece Elbiseleri",
@@ -172,7 +154,6 @@
   "subSubcategoryWeddingDresses": "Gelinlikler",
   "subSubcategorySundresses": "Yazlık Elbiseler",
   "subSubcategoryFantasy": "Fantezi Giyim",
-
   "subSubcategoryTShirts": "Tişörtler",
   "subSubcategoryShirts": "Gömlekler",
   "subSubcategoryBlouses": "Bluzlar",
@@ -182,7 +163,6 @@
   "subSubcategoryTunics": "Tunikler",
   "subSubcategoryHoodies": "Kapüşonlular",
   "subSubcategorySweatshirts": "Sweatshirtler",
-
   "subSubcategoryJeans": "Kotlar",
   "subSubcategoryPants": "Pantolonlar",
   "subSubcategoryShorts": "Şortlar",
@@ -191,7 +171,6 @@
   "subSubcategoryJoggers": "Eşofman Altları",
   "subSubcategoryCapris": "Kapri",
   "subSubcategoryCulottes": "Bol Pantolonlar",
-
   "subSubcategoryJackets": "Ceketler",
   "subSubcategoryCoats": "Paltolar",
   "subSubcategoryBlazers": "Blazerlar",
@@ -201,7 +180,6 @@
   "subSubcategoryParkas": "Parkalar",
   "subSubcategoryTrenchCoats": "Trençkotlar",
   "subSubcategoryWindbreakers": "Rüzgarlıklar",
-
   "subSubcategoryBras": "Sütyenler",
   "subSubcategoryPanties": "Külotlar",
   "subSubcategoryBoxers": "Boxer",
@@ -213,14 +191,12 @@
   "subSubcategoryRobes": "Sabahlıklar",
   "subSubcategorySocks": "Çoraplar",
   "subSubcategoryTights": "Külotlu Çoraplar",
-
   "subSubcategoryBikinis": "Bikiniler",
   "subSubcategoryOnePieceSwimsuits": "Tek Parça Mayolar",
   "subSubcategorySwimShorts": "Mayo Şortu",
   "subSubcategoryBoardshorts": "Sörf Şortu",
   "subSubcategoryCoverUps": "Pareo",
   "subSubcategoryRashguards": "Rashguard",
-
   "subSubcategorySportsBras": "Spor Sütyenleri",
   "subSubcategoryAthleticTops": "Spor Üstleri",
   "subSubcategoryAthleticBottoms": "Spor Altları",
@@ -228,7 +204,6 @@
   "subSubcategoryYogaWear": "Yoga Giyimi",
   "subSubcategoryRunningGear": "Koşu Giyimi",
   "subSubcategoryGymWear": "Jimnastik Giyimi",
-
   "subSubcategoryBusinessSuits": "İş Takımları",
   "subSubcategoryTuxedos": "Smokinler",
   "subSubcategoryFormalShirts": "Resmi Gömlekler",
@@ -236,12 +211,10 @@
   "subSubcategoryWaistcoats": "Yelekler",
   "subSubcategoryBowTies": "Papyonlar",
   "subSubcategoryCufflinks": "Kol Düğmeleri",
-
   "subSubcategoryEthnicWear": "Etnik Giyim",
   "subSubcategoryCulturalCostumes": "Kültürel Kostümler",
   "subSubcategoryTraditionalDresses": "Geleneksel Elbiseler",
   "subSubcategoryCeremonialClothing": "Tören Giysileri",
-
   "subSubcategoryRunningShoes": "Koşu Ayakkabıları",
   "subSubcategoryBasketballShoes": "Basketbol Ayakkabıları",
   "subSubcategoryTrainingShoes": "Antrenman Ayakkabıları",
@@ -249,14 +222,12 @@
   "subSubcategorySkateboardShoes": "Kaykay Ayakkabıları",
   "subSubcategoryTennisShoes": "Tenis Ayakkabıları",
   "subSubcategoryWalkingShoes": "Yürüyüş Ayakkabıları",
-
   "subSubcategoryLoafers": "Loaferlar",
   "subSubcategoryBoatShoes": "Tekne Ayakkabıları",
   "subSubcategoryCanvasShoes": "Kanvas Ayakkabılar",
   "subSubcategorySlipOnShoes": "Bağcıksız Ayakkabılar",
   "subSubcategoryEspadrilles": "Espadril",
   "subSubcategoryMoccasins": "Mokasenler",
-
   "subSubcategoryDressShoes": "Klasik Ayakkabılar",
   "subSubcategoryOxfordShoes": "Oxford Ayakkabılar",
   "subSubcategoryDerbyShoes": "Derby Ayakkabılar",
@@ -264,7 +235,6 @@
   "subSubcategoryPumps": "Topuklu Ayakkabılar",
   "subSubcategoryHighHeels": "Yüksek Topuklu",
   "subSubcategoryFlats": "Babet",
-
   "subSubcategoryAnkleBoots": "Bot",
   "subSubcategoryKneeHighBoots": "Diz Üstü Çizmeler",
   "subSubcategoryCombatBoots": "Savaş Botları",
@@ -273,25 +243,21 @@
   "subSubcategoryHikingBoots": "Trekking Botları",
   "subSubcategoryRainBoots": "Yağmur Çizmeleri",
   "subSubcategorySnowBoots": "Kar Çizmeleri",
-
   "subSubcategoryFlipFlops": "Parmak Arası Terlikler",
   "subSubcategoryFlatSandals": "Düz Sandaletler",
   "subSubcategoryHeeledSandals": "Topuklu Sandaletler",
   "subSubcategorySportSandals": "Spor Sandaletleri",
   "subSubcategorySlides": "Terlikler",
   "subSubcategoryGladiatorSandals": "Gladyatör Sandaletleri",
-
   "subSubcategoryHouseSlippers": "Ev Terlikleri",
   "subSubcategoryBedroomSlippers": "Yatak Odası Terlikleri",
   "subSubcategoryMoccasinSlippers": "Mokasine Terlikler",
   "subSubcategorySlipperBoots": "Terlik Botlar",
-
   "subSubcategorySafetyShoes": "Güvenlik Ayakkabıları",
   "subSubcategoryMedicalShoes": "Medikal Ayakkabılar",
   "subSubcategoryDanceShoes": "Dans Ayakkabıları",
   "subSubcategoryCleats": "Kramponlar",
   "subSubcategoryClimbingShoes": "Tırmanış Ayakkabıları",
-
   "subSubcategoryNecklaces": "Kolyeler",
   "subSubcategoryEarrings": "Küpeler",
   "subSubcategoryRings": "Yüzükler",
@@ -300,7 +266,6 @@
   "subSubcategoryBrooches": "Broşlar",
   "subSubcategoryJewelrySets": "Mücevher Setleri",
   "subSubcategoryBodyJewelry": "Vücut Mücevherleri",
-
   "subSubcategoryAnalogWatches": "Analog Saatler",
   "subSubcategoryDigitalWatches": "Dijital Saatler",
   "subSubcategorySmartwatches": "Akıllı Saatler",
@@ -308,14 +273,12 @@
   "subSubcategoryLuxuryWatches": "Lüks Saatler",
   "subSubcategoryFashionWatches": "Moda Saatleri",
   "subSubcategoryKidsWatches": "Çocuk Saatleri",
-
   "subSubcategoryLeatherBelts": "Deri Kemerler",
   "subSubcategoryFabricBelts": "Kumaş Kemerler",
   "subSubcategoryChainBelts": "Zincir Kemerler",
   "subSubcategoryDressBelts": "Resmi Kemerler",
   "subSubcategoryCasualBelts": "Günlük Kemerler",
   "subSubcategoryDesignerBelts": "Tasarımcı Kemerler",
-
   "subSubcategoryBaseballCaps": "Beyzbol Şapkaları",
   "subSubcategoryBeanies": "Bereler",
   "subSubcategoryFedoras": "Fötr Şapkalar",
@@ -323,39 +286,33 @@
   "subSubcategoryBucketHats": "Bucket Şapkalar",
   "subSubcategoryBerets": "Fransız Bereleri",
   "subSubcategorySnapbacks": "Snapback Şapkalar",
-
   "subSubcategorySilkScarves": "İpek Atkılar",
   "subSubcategoryWinterScarves": "Kış Atkıları",
   "subSubcategoryShawls": "Şallar",
   "subSubcategoryPashminas": "Paşminalar",
   "subSubcategoryBandanas": "Bandanalar",
   "subSubcategoryWraps": "Örtüler",
-
   "subSubcategorySunglasses": "Güneş Gözlükleri",
   "subSubcategoryReadingGlasses": "Okuma Gözlükleri",
   "subSubcategoryBlueLightGlasses": "Mavi Işık Gözlükleri",
   "subSubcategorySafetyGlasses": "Koruyucu Gözlükler",
   "subSubcategoryFashionGlasses": "Moda Gözlükleri",
-
   "subSubcategoryWinterGloves": "Kış Eldivenleri",
   "subSubcategoryDressGloves": "Resmi Eldivenler",
   "subSubcategoryWorkGloves": "İş Eldivenleri",
   "subSubcategorySportsGloves": "Spor Eldivenleri",
   "subSubcategoryTouchscreenGloves": "Dokunmatik Eldivenler",
-
   "subSubcategoryHairClips": "Saç Tokaları",
   "subSubcategoryHeadbands": "Saç Bantları",
   "subSubcategoryHairTies": "Saç Lastiği",
   "subSubcategoryBobbyPins": "Saç Tokası",
   "subSubcategoryHairScarves": "Saç Atkıları",
   "subSubcategoryHairJewelry": "Saç Mücevherleri",
-
   "subSubcategoryKeychains": "Anahtarlıklar",
   "subSubcategoryPhoneCases": "Telefon Kılıfları",
   "subSubcategoryWallets": "Cüzdanlar",
   "subSubcategoryPurseAccessories": "Çanta Aksesuarları",
   "subSubcategoryPinsBadges": "Rozetler ve Rozet",
-
   "subSubcategoryBodysuits": "Body",
   "subSubcategoryRompers": "Tulum",
   "subSubcategoryBabySets": "Bebek Takımları",
@@ -363,7 +320,6 @@
   "subSubcategoryBabySocks": "Bebek Çorapları",
   "subSubcategoryBabyHats": "Bebek Şapkaları",
   "subSubcategoryBabyMittens": "Bebek Eldivenleri",
-
   "subSubcategoryKidsTShirts": "Çocuk Tişörtleri",
   "subSubcategoryKidsPants": "Çocuk Pantolonları",
   "subSubcategoryKidsDresses": "Çocuk Elbiseleri",
@@ -371,7 +327,6 @@
   "subSubcategoryKidsJackets": "Çocuk Ceketleri",
   "subSubcategoryKidsPajamas": "Çocuk Pijamaları",
   "subSubcategorySchoolUniforms": "Okul Üniformaları",
-
   "subSubcategoryKidsSneakers": "Çocuk Spor Ayakkabı",
   "subSubcategoryKidsSandals": "Çocuk Sandaletleri",
   "subSubcategoryKidsBoots": "Çocuk Botları",
@@ -379,7 +334,6 @@
   "subSubcategorySportsShoes": "Spor Ayakkabıları",
   "subSubcategoryKidsRainBoots": "Çocuk Yağmur Çizmeleri",
   "subSubcategoryKidsSlippers": "Çocuk Terlikleri",
-
   "subSubcategoryEducationalToys": "Eğitici Oyuncaklar",
   "subSubcategoryPlushToys": "Peluş Oyuncaklar",
   "subSubcategoryBuildingBlocks": "Yapı Blokları",
@@ -388,44 +342,37 @@
   "subSubcategoryBoardGames": "Masa Oyunları",
   "subSubcategoryElectronicToys": "Elektronik Oyuncaklar",
   "subSubcategoryOutdoorPlay": "Outdoor Oyuncak",
-
   "subSubcategoryDiapers": "Bezler",
   "subSubcategoryBabyWipes": "Bebek Mendilleri",
   "subSubcategoryBabySkincare": "Bebek Cilt Bakımı",
   "subSubcategoryBabyBathProducts": "Bebek Banyo Ürünleri",
   "subSubcategoryBabyHealth": "Bebek Sağlığı",
   "subSubcategoryBabyMonitors": "Bebek Monitörleri",
-
   "subSubcategoryMaternityClothing": "Hamile Giyim",
   "subSubcategoryNursingBras": "Emzirme Sütyenleri",
   "subSubcategoryMaternityAccessories": "Hamilelik Aksesuarları",
   "subSubcategoryPregnancySupport": "Hamilelik Desteği",
-
   "subSubcategoryStrollers": "Bebek Arabaları",
   "subSubcategoryCarSeats": "Oto Koltukları",
   "subSubcategoryTravelSystems": "Seyahat Sistemleri",
   "subSubcategoryBoosterSeats": "Yükseltici Koltuklar",
   "subSubcategoryStrollerAccessories": "Bebek Arabası Aksesuarları",
-
   "subSubcategoryBabyBottles": "Biberon",
   "subSubcategoryBreastPumps": "Göğüs Pompaları",
   "subSubcategoryPacifiers": "Emzikler",
   "subSubcategoryHighChairs": "Mama Sandalyeleri",
   "subSubcategoryFeedingAccessories": "Beslenme Aksesuarları",
   "subSubcategoryBabyFood": "Bebek Maması",
-
   "subSubcategoryBabyGates": "Bebek Bariyerleri",
   "subSubcategoryOutletCovers": "Priz Koruyucuları",
   "subSubcategoryCabinetLocks": "Dolap Kilitleri",
   "subSubcategoryCornerGuards": "Köşe Koruyucuları",
   "subSubcategorySafetyBabyMonitors": "Güvenlik Bebek Monitörleri",
-
   "subSubcategoryLearningToys": "Öğrenme Oyuncakları",
   "subSubcategoryEducationalBooks": "Eğitim Kitapları",
   "subSubcategoryFlashCards": "Flash Kartlar",
   "subSubcategoryScienceKits": "Bilim Setleri",
   "subSubcategoryEducationalMusicalInstruments": "Eğitici Müzik Aletleri",
-
   "subSubcategorySofas": "Koltuk Takımları",
   "subSubcategoryArmchairs": "Berjerler",
   "subSubcategoryCoffeeTables": "Sehpalar",
@@ -434,7 +381,6 @@
   "subSubcategorySideTables": "Yan Sehpalar",
   "subSubcategoryOttoman": "Puflar",
   "subSubcategoryRecliners": "Dinlenme Koltukları",
-
   "subSubcategoryBeds": "Yatak",
   "subSubcategoryMattresses": "Yatak",
   "subSubcategoryWardrobes": "Dolaplar",
@@ -443,7 +389,6 @@
   "subSubcategoryMirrors": "Aynalar",
   "subSubcategoryBedFrames": "Yatak Çerçeveleri",
   "subSubcategoryHeadboards": "Başlıklar",
-
   "subSubcategoryDiningTables": "Yemek Masaları",
   "subSubcategoryDiningChairs": "Yemek Sandalyeleri",
   "subSubcategoryBarStools": "Bar Tabureleri",
@@ -453,7 +398,6 @@
   "subSubcategoryGlassware": "Cam Eşyalar",
   "subSubcategoryKitchenAppliances": "Mutfak Aletleri",
   "subSubcategoryUtensils": "Mutfak Gereçleri",
-
   "subSubcategoryBathroomVanities": "Banyo Dolabı",
   "subSubcategoryShowerCurtains": "Duş Perdeleri",
   "subSubcategoryBathMats": "Banyo Paspasları",
@@ -461,7 +405,6 @@
   "subSubcategoryBathroomStorage": "Banyo Saklama",
   "subSubcategoryBathroomMirrors": "Banyo Aynaları",
   "subSubcategoryBathroomAccessories": "Banyo Aksesuarları",
-
   "subSubcategoryWallArt": "Duvar Sanatı",
   "subSubcategoryDecorativeObjects": "Dekoratif Objeler",
   "subSubcategoryCandles": "Mumlar",
@@ -470,7 +413,6 @@
   "subSubcategoryClocks": "Saatler",
   "subSubcategoryArtificialPlants": "Yapay Bitkiler",
   "subSubcategorySculptures": "Heykeller",
-
   "subSubcategoryCeilingLights": "Avize",
   "subSubcategoryTableLamps": "Masa Lambaları",
   "subSubcategoryFloorLamps": "Yer Lambaları",
@@ -479,7 +421,6 @@
   "subSubcategoryChandelier": "Kristal Avizeler",
   "subSubcategoryStringLights": "Dekoratif Işıklar",
   "subSubcategoryNightLights": "Gece Lambaları",
-
   "subSubcategoryShelvingUnits": "Raf Sistemleri",
   "subSubcategoryStorageBoxes": "Saklama Kutuları",
   "subSubcategoryBaskets": "Sepetler",
@@ -487,7 +428,6 @@
   "subSubcategoryClosetOrganizers": "Dolap Organizerleri",
   "subSubcategoryDrawerOrganizers": "Çekmece Organizerleri",
   "subSubcategoryStorageBins": "Saklama Kasaları",
-
   "subSubcategoryCurtains": "Perdeler",
   "subSubcategoryBlinds": "Jaluziler",
   "subSubcategoryRugs": "Halılar",
@@ -496,7 +436,6 @@
   "subSubcategoryBedLinens": "Yatak Çarşafları",
   "subSubcategoryTowels": "Havlular",
   "subSubcategoryBlankets": "Örtüler",
-
   "subSubcategoryGardenFurniture": "Bahçe Mobilyaları",
   "subSubcategoryPlantPots": "Saksılar",
   "subSubcategoryGardenTools": "Bahçe Aletleri",
@@ -504,7 +443,6 @@
   "subSubcategoryBBQGrills": "Barbekü ve Izgara",
   "subSubcategoryUmbrellas": "Şemsiyeler",
   "subSubcategoryGardenDecor": "Bahçe Dekorasyonu",
-
   "subSubcategoryCleaners": "Temizleyiciler",
   "subSubcategoryMoisturizers": "Nemlendiriciler",
   "subSubcategorySerums": "Serumlar",
@@ -514,7 +452,6 @@
   "subSubcategoryEyeCreams": "Göz Kremleri",
   "subSubcategoryAntiAging": "Yaşlanma Karşıtı",
   "subSubcategoryAcneTreatment": "Akne Tedavisi",
-
   "subSubcategoryFoundation": "Fondöten",
   "subSubcategoryConcealer": "Kapatıcı",
   "subSubcategoryPowder": "Pudra",
@@ -527,7 +464,6 @@
   "subSubcategoryLipstick": "Ruj",
   "subSubcategoryLipGloss": "Dudak Parlatıcısı",
   "subSubcategoryMakeupBrushes": "Makyaj Fırçaları",
-
   "subSubcategoryShampoo": "Şampuan",
   "subSubcategoryConditioner": "Saç Kremi",
   "subSubcategoryHairMasks": "Saç Maskeleri",
@@ -535,14 +471,12 @@
   "subSubcategoryStylingProducts": "Şekillendirici Ürünler",
   "subSubcategoryHairColor": "Saç Boyası",
   "subSubcategoryHairTools": "Saç Araçları",
-
   "subSubcategoryPerfumes": "Parfümler",
   "subSubcategoryEauDeToilette": "Eau de Toilette",
   "subSubcategoryBodySprays": "Vücut Spreyleri",
   "subSubcategoryDeodorants": "Deodorantlar",
   "subSubcategoryColognes": "Kolonya",
   "subSubcategoryEssentialOils": "Esansiyel Yağlar",
-
   "subSubcategoryBodyWash": "Vücut Şampuanı",
   "subSubcategorySoap": "Sabun",
   "subSubcategoryPersonalHygieneShampoo": "Kişisel Hijyen Şampuanı",
@@ -550,14 +484,12 @@
   "subSubcategoryFeminineCare": "Kadın Hijyeni",
   "subSubcategoryMensGrooming": "Erkek Bakımı",
   "subSubcategoryIntimateCare": "İntim Bakım",
-
   "subSubcategoryNailPolish": "Oje",
   "subSubcategoryNailTools": "Tırnak Araçları",
   "subSubcategoryNailTreatments": "Tırnak Bakımı",
   "subSubcategoryNailArt": "Nail Art",
   "subSubcategoryCuticleCare": "Kütikül Bakımı",
   "subSubcategoryNailFiles": "Tırnak Törpüleri",
-
   "subSubcategoryBodyLotions": "Vücut Losyonları",
   "subSubcategoryBodyOils": "Vücut Yağları",
   "subSubcategoryBodyScrubs": "Vücut Peelingleri",
@@ -565,14 +497,12 @@
   "subSubcategoryFootCare": "Ayak Bakımı",
   "subSubcategoryBathProducts": "Banyo Ürünleri",
   "subSubcategoryMassageOils": "Masaj Yağları",
-
   "subSubcategoryToothbrushes": "Diş Fırçaları",
   "subSubcategoryToothpaste": "Diş Macunu",
   "subSubcategoryMouthwash": "Ağız Çalkalama Suyu",
   "subSubcategoryDentalFloss": "Diş İpi",
   "subSubcategoryTeethWhitening": "Diş Beyazlatma",
   "subSubcategoryOralHealth": "Ağız Sağlığı",
-
   "subSubcategoryBeautyMakeupBrushes": "Güzellik Makyaj Fırçaları",
   "subSubcategoryBeautySponges": "Güzellik Süngerleri",
   "subSubcategoryHairBrushes": "Saç Fırçaları",
@@ -580,7 +510,6 @@
   "subSubcategoryTweezers": "Cımbızlar",
   "subSubcategoryNailClippers": "Tırnak Makasları",
   "subSubcategoryBeautyCases": "Güzellik Çantaları",
-
   "subSubcategoryToteBags": "Alışveriş Çantaları",
   "subSubcategoryShoulderBags": "Omuz Çantaları",
   "subSubcategoryCrossbodyBags": "Çapraz Çantalar",
@@ -588,47 +517,40 @@
   "subSubcategoryEveningBags": "Gece Çantaları",
   "subSubcategorySatchels": "Askılı Çantalar",
   "subSubcategoryHoboBags": "Hobo Çantalar",
-
   "subSubcategorySchoolBackpacks": "Okul Sırt Çantaları",
   "subSubcategoryTravelBackpacks": "Seyahat Sırt Çantaları",
   "subSubcategoryLaptopBackpacks": "Laptop Sırt Çantaları",
   "subSubcategoryHikingBackpacks": "Trekking Sırt Çantaları",
   "subSubcategoryCasualBackpacks": "Günlük Sırt Çantaları",
   "subSubcategoryKidsBackpacks": "Çocuk Sırt Çantaları",
-
   "subSubcategorySuitcases": "Bavullar",
   "subSubcategoryCarryOnBags": "Kabin Çantaları",
   "subSubcategoryTravelDuffelBags": "Seyahat Spor Çantaları",
   "subSubcategoryLuggageSets": "Bavul Setleri",
   "subSubcategoryGarmentBags": "Takım Çantaları",
   "subSubcategoryTravelAccessories": "Seyahat Aksesuarları",
-
   "subSubcategoryBriefcases": "Evrak Çantaları",
   "subSubcategoryLaptopBags": "Laptop Çantaları",
   "subSubcategoryMessengerBags": "Postacı Çantaları",
   "subSubcategoryPortfolioBags": "Portföy Çantalar",
   "subSubcategoryBusinessTotes": "İş Çantaları",
-
   "subSubcategoryGymBags": "Spor Salonu Çantaları",
   "subSubcategorySportsDuffelBags": "Spor Çantaları",
   "subSubcategoryEquipmentBags": "Ekipman Çantaları",
   "subSubcategoryYogaBags": "Yoga Çantaları",
   "subSubcategorySwimmingBags": "Yüzme Çantaları",
-
   "subSubcategoryWalletsSmall": "Cüzdanlar",
   "subSubcategoryCardHolders": "Kart Kılıfları",
   "subSubcategoryCoinPurses": "Bozuk Para Cüzdanları",
   "subSubcategoryKeyCases": "Anahtar Kılıfları",
   "subSubcategoryPhoneCasesSmall": "Telefon Kılıfları",
   "subSubcategoryPassportHolders": "Pasaport Kılıfları",
-
   "subSubcategoryCameraBags": "Kamera Çantaları",
   "subSubcategoryDiaperBags": "Bebek Çantaları",
   "subSubcategoryLunchBags": "Beslenme Çantaları",
   "subSubcategoryToolBags": "Alet Çantaları",
   "subSubcategoryCosmeticBags": "Kozmetik Çantaları",
   "subSubcategoryBeachBags": "Plaj Çantaları",
-
   "subSubcategorySmartphones": "Akıllı Telefonlar",
   "subSubcategoryPhoneCasesElectronics": "Telefon Kılıfları",
   "subSubcategoryScreenProtectors": "Ekran Koruyucuları",
@@ -636,7 +558,6 @@
   "subSubcategoryPowerBanks": "Power Bank",
   "subSubcategoryPhoneStands": "Telefon Standları",
   "subSubcategoryWirelessChargers": "Kablosuz Şarj Cihazları",
-
   "subSubcategoryLaptops": "Laptop'lar",
   "subSubcategoryDesktopComputers": "Masaüstü Bilgisayarlar",
   "subSubcategoryTablets": "Tabletler",
@@ -645,7 +566,6 @@
   "subSubcategoryMice": "Fare",
   "subSubcategoryLaptopAccessories": "Laptop Aksesuarları",
   "subSubcategoryComputerComponents": "Bilgisayar Bileşenleri",
-
   "subSubcategorySmartTVs": "Akıllı TV'ler",
   "subSubcategoryProjectors": "Projektörler",
   "subSubcategoryStreamingDevices": "Streaming Cihazları",
@@ -655,7 +575,6 @@
   "subSubcategoryRemoteControls": "Uzaktan Kumandalar",
   "subSubcategoryTVAntennas": "TV Antenleri",
   "subSubcategoryMediaPlayers": "Medya Oynatıcıları",
-
   "subSubcategoryHeadphones": "Kulaklıklar",
   "subSubcategoryEarbuds": "Kulaklık",
   "subSubcategorySpeakers": "Hoparlörler",
@@ -665,7 +584,6 @@
   "subSubcategoryAmplifiers": "Amfiler",
   "subSubcategoryTurntables": "Pikap",
   "subSubcategoryAudioCables": "Ses Kabloları",
-
   "subSubcategoryGamingConsoles": "Oyun Konsolları",
   "subSubcategoryVideoGames": "Video Oyunları",
   "subSubcategoryGamingControllers": "Oyun Kumandaları",
@@ -673,7 +591,6 @@
   "subSubcategoryGamingChairs": "Oyun Koltukları",
   "subSubcategoryVRHeadsets": "VR Gözlükleri",
   "subSubcategoryGamingAccessories": "Oyun Aksesuarları",
-
   "subSubcategorySmartSpeakers": "Akıllı Hoparlörler",
   "subSubcategorySmartLights": "Akıllı Aydınlatma",
   "subSubcategorySmartPlugs": "Akıllı Prizler",
@@ -681,7 +598,6 @@
   "subSubcategorySmartThermostats": "Akıllı Termostatlar",
   "subSubcategorySmartLocks": "Akıllı Kilitler",
   "subSubcategoryHomeAutomation": "Ev Otomasyonu",
-
   "subSubcategoryDigitalCameras": "Dijital Kameralar",
   "subSubcategoryDSLRCameras": "DSLR Kameralar",
   "subSubcategoryActionCameras": "Aksiyon Kameraları",
@@ -689,27 +605,23 @@
   "subSubcategoryTripods": "Tripodlar",
   "subSubcategoryCameraAccessories": "Kamera Aksesuarları",
   "subSubcategoryPhotographyEquipment": "Fotoğrafçılık Ekipmanları",
-
   "subSubcategorySmartwatchesWearable": "Akıllı Saatler",
   "subSubcategoryFitnessTrackers": "Fitness Takipçileri",
   "subSubcategorySmartGlasses": "Akıllı Gözlükler",
   "subSubcategoryHealthMonitors": "Sağlık Monitörleri",
   "subSubcategoryWearableAccessories": "Giyilebilir Aksesuarlar",
-
   "subSubcategoryKitchenAppliancesElectronics": "Mutfak Aletleri",
   "subSubcategoryLaundryAppliances": "Çamaşır Makineleri",
   "subSubcategoryCleaningAppliances": "Temizlik Aletleri",
   "subSubcategoryAirConditioning": "Klima",
   "subSubcategoryHeating": "Isıtma",
   "subSubcategorySmallAppliances": "Küçük Ev Aletleri",
-
   "subSubcategoryHairDryers": "Saç Kurutma Makineleri",
   "subSubcategoryHairStraighteners": "Saç Düzleştiricileri",
   "subSubcategoryElectricShavers": "Elektrikli Tıraş Makineleri",
   "subSubcategoryElectricToothbrushes": "Elektrikli Diş Fırçaları",
   "subSubcategoryBeautyDevices": "Güzellik Cihazları",
   "subSubcategoryPersonalHealthMonitors": "Kişisel Sağlık Monitörleri",
-
   "subSubcategoryCardioEquipment": "Kardiyo Ekipmanları",
   "subSubcategoryStrengthTraining": "Güç Antrenmanı",
   "subSubcategoryYogaEquipment": "Yoga Ekipmanları",
@@ -717,7 +629,6 @@
   "subSubcategoryHomeGym": "Ev Jimnastiği",
   "subSubcategoryExerciseAccessories": "Egzersiz Aksesuarları",
   "subSubcategoryRecoveryEquipment": "Toparlanma Ekipmanları",
-
   "subSubcategoryFootball": "Futbol",
   "subSubcategoryBasketball": "Basketbol",
   "subSubcategoryBaseball": "Beyzbol",
@@ -728,7 +639,6 @@
   "subSubcategoryGolf": "Golf",
   "subSubcategoryTableTennis": "Masa Tenisi",
   "subSubcategoryBadminton": "Badminton",
-
   "subSubcategorySwimming": "Yüzme",
   "subSubcategorySurfing": "Sörf",
   "subSubcategoryKayaking": "Kano",
@@ -737,7 +647,6 @@
   "subSubcategoryFishing": "Balıkçılık",
   "subSubcategoryBoating": "Teknecilik",
   "subSubcategoryWaterSafety": "Su Güvenliği",
-
   "subSubcategoryCampingGear": "Kamp Malzemeleri",
   "subSubcategoryHikingEquipment": "Trekking Ekipmanları",
   "subSubcategoryBackpacking": "Sırt Çantalı Seyahat",
@@ -745,42 +654,36 @@
   "subSubcategoryOutdoorClothing": "Outdoor Giyim",
   "subSubcategoryNavigation": "Navigasyon",
   "subSubcategorySurvivalGear": "Hayatta Kalma Ekipmanları",
-
   "subSubcategorySkiing": "Kayak",
   "subSubcategorySnowboarding": "Snowboard",
   "subSubcategoryIceSkating": "Buz Pateni",
   "subSubcategoryWinterClothing": "Kış Giyim",
   "subSubcategorySnowEquipment": "Kar Ekipmanları",
   "subSubcategoryWinterAccessories": "Kış Aksesuarları",
-
   "subSubcategoryBicycles": "Bisikletler",
   "subSubcategoryBikeAccessories": "Bisiklet Aksesuarları",
   "subSubcategoryCyclingApparel": "Bisiklet Giyim",
   "subSubcategoryBikeMaintenance": "Bisiklet Bakımı",
   "subSubcategoryBikeSafety": "Bisiklet Güvenliği",
   "subSubcategoryEBikes": "Elektrikli Bisikletler",
-
   "subSubcategoryRunningShoesAthletics": "Koşu Ayakkabıları",
   "subSubcategoryRunningApparel": "Koşu Giyim",
   "subSubcategoryTrackField": "Atletizm",
   "subSubcategoryMarathonGear": "Maraton Ekipmanları",
   "subSubcategoryRunningAccessories": "Koşu Aksesuarları",
   "subSubcategoryPerformanceMonitoring": "Performans Takibi",
-
   "subSubcategorySportsBags": "Spor Çantaları",
   "subSubcategoryProtectiveGear": "Koruyucu Ekipmanlar",
   "subSubcategorySportsNutrition": "Spor Beslenmesi",
   "subSubcategoryHydration": "Hidrasyon",
   "subSubcategorySportsTechnology": "Spor Teknolojisi",
   "subSubcategoryFanGear": "Taraftar Ürünleri",
-
   "subSubcategoryAthleticTopsWear": "Spor Üstleri",
   "subSubcategoryAthleticBottomsWear": "Spor Altları",
   "subSubcategorySportsBrasWear": "Spor Sütyenleri",
   "subSubcategoryAthleticShoes": "Spor Ayakkabıları",
   "subSubcategorySportsAccessoriesWear": "Spor Aksesuarları",
   "subSubcategoryTeamJerseys": "Takım Formaları",
-
   "subSubcategoryFictionBooks": "Kurgu Kitapları",
   "subSubcategoryNonFictionBooks": "Kurgu Dışı Kitaplar",
   "subSubcategoryEducationalBooksLiterature": "Eğitim Kitapları",
@@ -789,7 +692,6 @@
   "subSubcategoryMagazines": "Dergiler",
   "subSubcategoryComics": "Çizgi Romanlar",
   "subSubcategoryEBooks": "E-Kitaplar",
-
   "subSubcategoryNotebooks": "Defterler",
   "subSubcategoryBinders": "Klasörler",
   "subSubcategoryFolders": "Dosyalar",
@@ -798,7 +700,6 @@
   "subSubcategoryLabels": "Etiketler",
   "subSubcategoryStaplers": "Zımba Makineleri",
   "subSubcategoryOrganizers": "Organizer'lar",
-
   "subSubcategoryDrawingSupplies": "Çizim Malzemeleri",
   "subSubcategoryPaintingSupplies": "Boyama Malzemeleri",
   "subSubcategoryCraftMaterials": "El Sanatları Malzemeleri",
@@ -806,7 +707,6 @@
   "subSubcategorySewingSupplies": "Dikiş Malzemeleri",
   "subSubcategoryJewelryMaking": "Mücevher Yapımı",
   "subSubcategoryModelBuilding": "Model Yapımı",
-
   "subSubcategoryPens": "Kalemler",
   "subSubcategoryPencils": "Kurşun Kalemler",
   "subSubcategoryMarkers": "Keçeli Kalemler",
@@ -814,7 +714,6 @@
   "subSubcategoryFountainPens": "Dolma Kalemler",
   "subSubcategoryMechanicalPencils": "Mekanik Kurşun Kalemler",
   "subSubcategoryErasers": "Silgiler",
-
   "subSubcategoryCopyPaper": "Fotokopi Kağıdı",
   "subSubcategorySpecialtyPaper": "Özel Kağıtlar",
   "subSubcategoryCardstock": "Karton",
@@ -822,28 +721,24 @@
   "subSubcategoryStickyNotes": "Yapışkan Notlar",
   "subSubcategoryIndexCards": "Fişler",
   "subSubcategoryConstructionPaper": "Renkli Karton",
-
   "subSubcategoryLearningGames": "Öğrenme Oyunları",
   "subSubcategoryFlashCardsEducational": "Eğitim Kartları",
   "subSubcategoryEducationalToysStationery": "Eğitici Oyuncaklar",
   "subSubcategoryScienceKitsStationery": "Bilim Setleri",
   "subSubcategoryMathTools": "Matematik Araçları",
   "subSubcategoryLanguageLearning": "Dil Öğrenimi",
-
   "subSubcategoryBoardGamesHobby": "Masa Oyunları",
   "subSubcategoryPuzzlesHobby": "Yapbozlar",
   "subSubcategoryTradingCards": "Koleksiyon Kartları",
   "subSubcategoryCollectibles": "Koleksiyon Eşyaları",
   "subSubcategoryModelKits": "Model Setleri",
   "subSubcategoryGamingAccessoriesHobby": "Oyun Aksesuarları",
-
   "subSubcategoryStringInstruments": "Telli Çalgılar",
   "subSubcategoryWindInstruments": "Nefesli Çalgılar",
   "subSubcategoryPercussion": "Vurmalı Çalgılar",
   "subSubcategoryElectronicInstruments": "Elektronik Çalgılar",
   "subSubcategoryMusicAccessories": "Müzik Aksesuarları",
   "subSubcategorySheetMusic": "Nota Kitapları",
-
   "subSubcategoryHammers": "Çekiçler",
   "subSubcategoryScrewdrivers": "Tornavidalar",
   "subSubcategoryWrenches": "İngiliz Anahtarları",
@@ -852,7 +747,6 @@
   "subSubcategoryChisels": "Keski",
   "subSubcategoryUtilityKnives": "Maket Bıçakları",
   "subSubcategoryHandToolSets": "El Aleti Setleri",
-
   "subSubcategoryDrills": "Matkap",
   "subSubcategoryPowerSaws": "Elektrikli Testere",
   "subSubcategorySanders": "Zımpara Makineleri",
@@ -861,7 +755,6 @@
   "subSubcategoryNailGuns": "Çivi Tabancaları",
   "subSubcategoryImpactDrivers": "Darbe Vidalama Makineleri",
   "subSubcategoryMultiTools": "Çok Amaçlı Aletler",
-
   "subSubcategoryScrews": "Vidalar",
   "subSubcategoryBoltsNuts": "Civata ve Somunlar",
   "subSubcategoryNails": "Çiviler",
@@ -870,14 +763,12 @@
   "subSubcategoryHinges": "Menteşeler",
   "subSubcategoryHandlesKnobs": "Kulp ve Topuzlar",
   "subSubcategoryChains": "Zincirler",
-
   "subSubcategoryWireCable": "Kablo ve Tel",
   "subSubcategoryOutletsSwitches": "Priz ve Anahtarlar",
   "subSubcategoryCircuitBreakers": "Sigorta",
   "subSubcategoryLightFixtures": "Aydınlatma Armatürleri",
   "subSubcategoryElectricalTools": "Elektrik Aletleri",
   "subSubcategoryExtensionCords": "Uzatma Kabloları",
-
   "subSubcategoryPipesFittings": "Boru ve Bağlantı Parçaları",
   "subSubcategoryValves": "Vanalar",
   "subSubcategoryFaucets": "Musluklar",
@@ -885,7 +776,6 @@
   "subSubcategoryDrainCleaners": "Gider Temizleyicileri",
   "subSubcategoryPipeTools": "Boru Aletleri",
   "subSubcategorySealants": "Sızdırmazlık Malzemeleri",
-
   "subSubcategoryLumber": "Kereste",
   "subSubcategoryDrywall": "Alçıpan",
   "subSubcategoryInsulation": "Yalıtım",
@@ -893,7 +783,6 @@
   "subSubcategoryFlooring": "Döşeme",
   "subSubcategoryConcrete": "Beton",
   "subSubcategoryPaint": "Boya",
-
   "subSubcategoryWorkGlovesSafety": "İş Eldivenleri",
   "subSubcategorySafetyGlassesSafety": "Güvenlik Gözlükleri",
   "subSubcategoryHardHats": "Baret",
@@ -901,7 +790,6 @@
   "subSubcategoryRespirators": "Solunum Koruyucuları",
   "subSubcategorySafetyVests": "Güvenlik Yelekleri",
   "subSubcategoryFirstAidKitsSafety": "İlk Yardım Setleri",
-
   "subSubcategoryTapeMeasures": "Şerit Metre",
   "subSubcategoryLevels": "Teraziler",
   "subSubcategorySquares": "Gönyeler",
@@ -909,13 +797,11 @@
   "subSubcategoryRulers": "Cetveller",
   "subSubcategoryLaserLevels": "Lazer Teraziler",
   "subSubcategoryMarkingTools": "İşaretleme Aletleri",
-
   "subSubcategoryToolBoxes": "Alet Kutuları",
   "subSubcategoryToolBagsStorage": "Alet Çantaları",
   "subSubcategoryToolChests": "Alet Dolabı",
   "subSubcategoryWorkshopStorage": "Atölye Saklama",
   "subSubcategoryToolOrganizers": "Alet Organizerleri",
-
   "subSubcategoryDogFood": "Köpek Maması",
   "subSubcategoryDogToys": "Köpek Oyuncakları",
   "subSubcategoryDogBeds": "Köpek Yatakları",
@@ -924,7 +810,6 @@
   "subSubcategoryDogGrooming": "Köpek Bakımı",
   "subSubcategoryDogTraining": "Köpek Eğitimi",
   "subSubcategoryDogHealthCare": "Köpek Sağlık Bakımı",
-
   "subSubcategoryCatFood": "Kedi Maması",
   "subSubcategoryCatToys": "Kedi Oyuncakları",
   "subSubcategoryCatBeds": "Kedi Yatakları",
@@ -933,7 +818,6 @@
   "subSubcategoryCatGrooming": "Kedi Bakımı",
   "subSubcategoryCatCarriers": "Kedi Taşıma Çantaları",
   "subSubcategoryCatHealthCare": "Kedi Sağlık Bakımı",
-
   "subSubcategoryBirdFood": "Kuş Yemi",
   "subSubcategoryBirdCages": "Kuş Kafesleri",
   "subSubcategoryBirdToys": "Kuş Oyuncakları",
@@ -941,7 +825,6 @@
   "subSubcategoryBirdHouses": "Kuş Evleri",
   "subSubcategoryBirdHealthCare": "Kuş Sağlık Bakımı",
   "subSubcategoryBirdAccessories": "Kuş Aksesuarları",
-
   "subSubcategoryFishFood": "Balık Yemi",
   "subSubcategoryAquariumTanks": "Akvaryum Tankları",
   "subSubcategoryAquariumFilters": "Akvaryum Filtreleri",
@@ -949,41 +832,35 @@
   "subSubcategoryWaterTreatment": "Su Arıtma",
   "subSubcategoryAquariumLighting": "Akvaryum Aydınlatması",
   "subSubcategoryFishHealthCare": "Balık Sağlık Bakımı",
-
   "subSubcategorySmallAnimalFood": "Küçük Hayvan Yemi",
   "subSubcategoryCagesHabitats": "Kafes ve Yaşam Alanları",
   "subSubcategorySmallAnimalToys": "Küçük Hayvan Oyuncakları",
   "subSubcategoryBedding": "Yatak Malzemeleri",
   "subSubcategoryWaterBottles": "Su Şişeleri",
   "subSubcategoryExerciseEquipmentPet": "Egzersiz Ekipmanları",
-
   "subSubcategoryDryFood": "Kuru Mama",
   "subSubcategoryWetFood": "Yaş Mama",
   "subSubcategoryTreatsSnacks": "Ödül ve Atıştırmalık",
   "subSubcategorySupplementsPet": "Takviyeler",
   "subSubcategorySpecialDietFood": "Özel Diyet Maması",
   "subSubcategoryOrganicFood": "Organik Mama",
-
   "subSubcategoryFleaTickControl": "Pire ve Kene Kontrolü",
   "subSubcategoryVitaminsSupplementsPet": "Vitamin ve Takviyeler",
   "subSubcategoryFirstAidPet": "İlk Yardım",
   "subSubcategoryDentalCarePet": "Diş Bakımı",
   "subSubcategorySkinCoatCare": "Deri ve Tüy Bakımı",
   "subSubcategoryHealthMonitoringPet": "Sağlık Takibi",
-
   "subSubcategoryPetCarriers": "Evcil Hayvan Taşıma Çantaları",
   "subSubcategoryPetStrollers": "Evcil Hayvan Arabaları",
   "subSubcategoryPetGates": "Evcil Hayvan Bariyerleri",
   "subSubcategoryTravelAccessoriesPet": "Seyahat Aksesuarları",
   "subSubcategoryPetIDTags": "Evcil Hayvan Kimlik Etiketleri",
   "subSubcategoryCleanupSupplies": "Temizlik Malzemeleri",
-
   "subSubcategoryTrainingTreats": "Eğitim Ödülleri",
   "subSubcategoryTrainingTools": "Eğitim Araçları",
   "subSubcategoryClickers": "Kliker",
   "subSubcategoryTrainingPads": "Eğitim Pedleri",
   "subSubcategoryBehavioralAids": "Davranış Yardımcıları",
-
   "subSubcategoryEngineParts": "Motor Parçaları",
   "subSubcategoryBrakeParts": "Fren Parçaları",
   "subSubcategorySuspensionParts": "Süspansiyon Parçaları",
@@ -992,14 +869,12 @@
   "subSubcategoryBodyParts": "Kaporta Parçaları",
   "subSubcategoryInteriorAccessoriesAuto": "İç Aksesuar",
   "subSubcategoryExteriorAccessories": "Dış Aksesuar",
-
   "subSubcategoryCarWashProducts": "Araba Yıkama Ürünleri",
   "subSubcategoryWaxPolish": "Cila ve Parlatıcı",
   "subSubcategoryInteriorCleaners": "İç Temizleyiciler",
   "subSubcategoryEngineCleaners": "Motor Temizleyicileri",
   "subSubcategoryTireCare": "Lastik Bakımı",
   "subSubcategoryGlassCleaners": "Cam Temizleyicileri",
-
   "subSubcategorySummerTires": "Yaz Lastikleri",
   "subSubcategoryWinterTires": "Kış Lastikleri",
   "subSubcategoryAllSeasonTires": "Dört Mevsim Lastikleri",
@@ -1007,41 +882,35 @@
   "subSubcategoryAlloyWheels": "Alaşım Jantlar",
   "subSubcategorySteelWheels": "Çelik Jantlar",
   "subSubcategoryWheelAccessories": "Jant Aksesuarları",
-
   "subSubcategoryCarStereos": "Araba Teyipleri",
   "subSubcategoryGPSNavigation": "GPS Navigasyon",
   "subSubcategoryDashCameras": "Araç Kameraları",
   "subSubcategoryCarAlarms": "Araba Alarmları",
   "subSubcategoryCarSpeakers": "Araba Hoparlörleri",
   "subSubcategoryCarAmplifiers": "Araba Amfileri",
-
   "subSubcategoryMotorcycleEngines": "Motosiklet Motorları",
   "subSubcategoryMotorcycleBrakes": "Motosiklet Frenleri",
   "subSubcategoryMotorcycleTires": "Motosiklet Lastikleri",
   "subSubcategoryMotorcycleLights": "Motosiklet Işıkları",
   "subSubcategoryMotorcycleExhaust": "Motosiklet Egzozu",
   "subSubcategoryMotorcycleBodyParts": "Motosiklet Kaporta Parçaları",
-
   "subSubcategoryMotorcycleHelmets": "Motosiklet Kaskları",
   "subSubcategoryMotorcycleGloves": "Motosiklet Eldivenleri",
   "subSubcategoryMotorcycleJackets": "Motosiklet Ceketleri",
   "subSubcategoryMotorcycleBoots": "Motosiklet Botları",
   "subSubcategoryMotorcycleBags": "Motosiklet Çantaları",
   "subSubcategoryMotorcycleTools": "Motosiklet Aletleri",
-
   "subSubcategoryHandToolsAuto": "El Aletleri",
   "subSubcategoryPowerToolsAuto": "Elektrikli Aletler",
   "subSubcategoryDiagnosticTools": "Teşhis Aletleri",
   "subSubcategoryLiftingEquipment": "Kaldırma Ekipmanları",
   "subSubcategoryMeasuringToolsAuto": "Ölçüm Aletleri",
-
   "subSubcategoryEngineOil": "Motor Yağı",
   "subSubcategoryTransmissionFluid": "Şanzıman Yağı",
   "subSubcategoryBrakeFluid": "Fren Hidroliği",
   "subSubcategoryCoolant": "Antifriz",
   "subSubcategoryPowerSteeringFluid": "Direksiyon Hidroliği",
   "subSubcategoryWindshieldWasherFluid": "Cam Suyu",
-
   "subSubcategoryMultivitamins": "Multivitaminler",
   "subSubcategoryVitaminC": "C Vitamini",
   "subSubcategoryVitaminD": "D Vitamini",
@@ -1050,21 +919,18 @@
   "subSubcategoryOmega3": "Omega-3",
   "subSubcategoryProteinSupplements": "Protein Takviyeleri",
   "subSubcategoryProbiotics": "Probiyotikler",
-
   "subSubcategoryBloodPressureMonitors": "Tansiyon Aletleri",
   "subSubcategoryThermometers": "Termometreler",
   "subSubcategoryGlucoseMeters": "Şeker Ölçüm Cihazları",
   "subSubcategoryPulseOximeters": "Nabız Oksimetreleri",
   "subSubcategoryNebulizers": "Nebülizörler",
   "subSubcategoryStethoscopes": "Stetoskoplar",
-
   "subSubcategoryBandages": "Bandajlar",
   "subSubcategoryAntiseptics": "Antiseptikler",
   "subSubcategoryPainRelief": "Ağrı Kesiciler",
   "subSubcategoryWoundCare": "Yara Bakımı",
   "subSubcategoryFirstAidKits": "İlk Yardım Setleri",
   "subSubcategoryEmergencySupplies": "Acil Durum Malzemeleri",
-
   "subSubcategoryWeightManagement": "Kilo Kontrolü",
   "subSubcategoryDigestiveHealth": "Sindirim Sağlığı",
   "subSubcategoryHeartHealth": "Kalp Sağlığı",
@@ -1072,35 +938,28 @@
   "subSubcategoryMentalHealth": "Ruh Sağlığı",
   "subSubcategorySleepAids": "Uyku Yardımcıları",
   "subSubcategoryEnergyBoosters": "Enerji Artırıcılar",
-
   "subSubcategoryWheelchairs": "Tekerlekli Sandalyeler",
   "subSubcategoryWalkers": "Yürütecler",
   "subSubcategoryCrutches": "Koltuk Değnekleri",
   "subSubcategoryCanes": "Bastonlar",
   "subSubcategoryMobilityScooters": "Mobilite Scooter'ları",
   "subSubcategoryBathSafety": "Banyo Güvenliği",
-
   "subSubcategoryHerbalRemedies": "Bitkisel İlaçlar",
-  "subSubcategoryEssentialOils": "Esansiyel Yağlar",
   "subSubcategoryAromatherapy": "Aromaterapi",
   "subSubcategoryHomeopathy": "Homeopati",
   "subSubcategoryTraditionalMedicine": "Geleneksel Tıp",
   "subSubcategoryNaturalSupplements": "Doğal Takviyeler",
-
   "subSubcategoryProteinPowders": "Protein Tozları",
   "subSubcategoryPreWorkout": "Antrenman Öncesi",
   "subSubcategoryPostWorkout": "Antrenman Sonrası",
   "subSubcategoryFatBurners": "Yağ Yakıcılar",
   "subSubcategoryMealReplacements": "Öğün Yerine Geçen Ürünler",
-  "subSubcategorySportsNutrition": "Spor Beslenmesi",
   "subSubcategoryHealthySnacks": "Sağlıklı Atıştırmalıklar",
-
   "subSubcategoryContraceptives": "Doğum Kontrol Yöntemleri",
   "subSubcategoryPregnancyTests": "Hamilelik Testleri",
   "subSubcategoryFertilityProducts": "Doğurganlık Ürünleri",
   "subSubcategoryPersonalLubricants": "Kişisel Kayganlaştırıcılar",
   "subSubcategoryEnhancementProducts": "Güçlendirici Ürünler",
-
   "whiteGoodRefrigerator": "Buzdolabı",
   "whiteGoodWashingMachine": "Çamaşır Makinesi",
   "whiteGoodDishwasher": "Bulaşık Makinesi",
@@ -1109,7 +968,6 @@
   "pleaseSelectWhiteGood": "Lütfen bir beyaz eşya seçin",
   "selectWhiteGood": "Beyaz Eşya Seç",
   "selectWhiteGoodType": "Beyaz eşya türünü seçin",
-
   "@_COMPUTER_COMPONENTS": {},
   "computerComponentCPU": "İşlemci (CPU)",
   "computerComponentGPU": "Ekran Kartı (GPU)",
@@ -1132,7 +990,6 @@
   "pleaseSelectComputerComponent": "Lütfen bir bilgisayar bileşeni seçin",
   "selectComputerComponent": "Bilgisayar Bileşeni Seç",
   "selectComputerComponentType": "Bilgisayar bileşeni türünü seçin",
-
   "@_CONSOLE_BRANDS": {},
   "consoleBrandPlayStation": "PlayStation",
   "consoleBrandXbox": "Xbox",
@@ -1140,7 +997,6 @@
   "consoleBrandPC": "PC Oyun",
   "consoleBrandMobile": "Mobil Oyun",
   "consoleBrandRetro": "Retro Oyun",
-
   "@_PLAYSTATION_VARIANTS": {},
   "consoleVariantPS5": "PlayStation 5",
   "consoleVariantPS5Digital": "PlayStation 5 Digital Edition",
@@ -1154,7 +1010,6 @@
   "consoleVariantPS1": "PlayStation 1",
   "consoleVariantPSP": "PlayStation Portable (PSP)",
   "consoleVariantPSVita": "PlayStation Vita",
-
   "@_XBOX_VARIANTS": {},
   "consoleVariantXboxSeriesX": "Xbox Series X",
   "consoleVariantXboxSeriesS": "Xbox Series S",
@@ -1163,7 +1018,6 @@
   "consoleVariantXboxOne": "Xbox One",
   "consoleVariantXbox360": "Xbox 360",
   "consoleVariantXboxOriginal": "Xbox Original",
-
   "@_NINTENDO_VARIANTS": {},
   "consoleVariantSwitchOLED": "Nintendo Switch OLED",
   "consoleVariantSwitchStandard": "Nintendo Switch",
@@ -1182,27 +1036,22 @@
   "consoleVariantGameBoyAdvance": "Game Boy Advance",
   "consoleVariantGameBoyColor": "Game Boy Color",
   "consoleVariantGameBoy": "Game Boy",
-
   "consoleVariantSteamDeck": "Steam Deck",
   "consoleVariantGamingPC": "Oyun Bilgisayarı",
   "consoleVariantGamingLaptop": "Oyun Dizüstü",
   "consoleVariantMiniPC": "Mini PC",
-
   "consoleVariantiOS": "iOS (iPhone/iPad)",
   "consoleVariantAndroid": "Android",
-
   "consoleVariantAtari2600": "Atari 2600",
   "consoleVariantSegaGenesis": "Sega Genesis",
   "consoleVariantSegaDreamcast": "Sega Dreamcast",
   "consoleVariantNeoGeo": "Neo Geo",
   "consoleVariantArcadeCabinet": "Atari Makinesi",
-
   "pleaseSelectConsoleBrand": "Lütfen bir konsol markası seçin",
   "pleaseSelectConsoleVariant": "Lütfen bir konsol modeli seçin",
   "selectConsole": "Oyun Konsolu Seç",
   "selectConsoleBrand": "Konsol markasını seçin",
   "selectConsoleVariant": "Konsol modelini seçin",
-
   "kitchenApplianceMicrowave": "Mikrodalga Fırın",
   "kitchenApplianceCoffeeMachine": "Kahve Makinesi",
   "kitchenApplianceBlender": "Blender",
@@ -1722,6 +1571,7 @@
     "minutes": "dakika",
     "totalPriceLabel": "Toplam Fiyat",
     "items": "ürün",
+    "retry": "Tekrar Dene",
     "completePayment": "Ödemeyi Tamamla",
     "preparingPayment": "Ödeme hazırlanıyor...",
     "boostInfoTitle": "Yükseltme Bilgileri",
@@ -3354,11 +3204,9 @@
     "selectConsoleVariant": "Konsol Varyantı",
     "selectKitchenAppliance": "Mutfak Aleti",
     "selectWhiteGood": "Beyaz Eşya",
-
     "clothingGenderWomen": "Kadın",
     "clothingGenderMen": "Erkek",
     "clothingGenderUnisex": "Unisex",
-
     "clothingSizeXXS": "XXS",
     "clothingSizeXS": "XS",
     "clothingSizeS": "S",
@@ -3368,12 +3216,10 @@
     "clothingSizeXXL": "XXL",
     "clothingSize3XL": "3XL",
     "clothingSize4XL": "4XL",
-
     "clothingFitSlim": "Dar",
     "clothingFitRegular": "Normal",
     "clothingFitLoose": "Bol",
     "clothingFitOversized": "Oversize",
-
     "clothingTypeCotton": "Pamuk",
     "clothingTypePolyester": "Polyester",
     "clothingTypeNylon": "Naylon",
@@ -3382,7 +3228,6 @@
     "clothingTypeLinen": "Keten",
     "clothingTypeDenim": "Kot",
     "clothingTypeLeather": "Deri",
-
     "jewelryTypeNecklace": "Kolye",
     "jewelryTypeEarring": "Küpe",
     "jewelryTypePiercing": "Piercing",
@@ -3391,14 +3236,12 @@
     "jewelryTypeAnklet": "Halhal",
     "jewelryTypeNoseRing": "Burun Piercingi",
     "jewelryTypeSet": "Set",
-
     "jewelryMaterialIron": "Demir",
     "jewelryMaterialSteel": "Çelik",
     "jewelryMaterialGold": "Altın",
     "jewelryMaterialSilver": "Gümüş",
     "jewelryMaterialDiamond": "Elmas",
     "jewelryMaterialCopper": "Bakır",
-
     "computerComponentCPU": "İşlemci",
     "computerComponentGPU": "Ekran Kartı",
     "computerComponentRAM": "RAM",
@@ -3413,14 +3256,12 @@
     "computerComponentSoundCard": "Ses Kartı",
     "computerComponentWebcam": "Web Kamerası",
     "computerComponentHeadset": "Kulaklık",
-
     "consoleBrandPlayStation": "PlayStation",
     "consoleBrandXbox": "Xbox",
     "consoleBrandNintendo": "Nintendo",
     "consoleBrandPC": "PC",
     "consoleBrandMobile": "Mobil",
     "consoleBrandRetro": "Retro",
-
     "consoleVariantPS5": "PS5",
     "consoleVariantPS5Digital": "PS5 Digital",
     "consoleVariantPS5Slim": "PS5 Slim",
@@ -3468,7 +3309,6 @@
     "consoleVariantSegaDreamcast": "Sega Dreamcast",
     "consoleVariantNeoGeo": "Neo Geo",
     "consoleVariantArcadeCabinet": "Arcade Kabineti",
-
     "kitchenApplianceMicrowave": "Mikrodalga",
     "kitchenApplianceCoffeeMachine": "Kahve Makinesi",
     "kitchenApplianceBlender": "Blender",
@@ -3500,13 +3340,11 @@
     "kitchenApplianceKnifeSharpener": "Bıçak Bileme Makinesi",
     "kitchenApplianceScale": "Terazi",
     "kitchenApplianceTimer": "Zamanlayıcı",
-
     "whiteGoodRefrigerator": "Buzdolabı",
     "whiteGoodWashingMachine": "Çamaşır Makinesi",
     "whiteGoodDishwasher": "Bulaşık Makinesi",
     "whiteGoodDryer": "Kurutma Makinesi",
     "whiteGoodFreezer": "Dondurucu",
-
     "colorBlue": "Mavi",
     "colorOrange": "Turuncu",
     "colorYellow": "Sarı",
@@ -4341,5 +4179,8 @@
         "description": "Paketiniz başarıyla teslim edildi. Alışveriş yaptığınız için teşekkürler!"
       }
     }
+  },
+  "ProductCard": {
+    "featured": "Öne Çıkan"
   }
 }

@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, memo } from "react";
+import { BoostedVisibilityWrapper } from '@/app/components/BoostedVisibilityWrapper';
 import Image from "next/image";
 import {
   Heart,
@@ -337,6 +338,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
   localization,
 }) => {
   const router = useRouter();
+  const t = useTranslations();
 
   // Cart, favorites, and user hooks
   const {
@@ -864,9 +866,10 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
   const isProcessingFavorite =
     favoriteButtonState === "adding" || favoriteButtonState === "removing";
 
-  return (
-    <>
-      <div
+  const isBoosted = product.isBoosted === true;
+
+  const cardContent = (
+    <div
         className="w-full cursor-pointer transition-transform duration-200 hover:scale-105"
         onClick={handleCardClick}
         onMouseEnter={() => setIsHovered(true)}
@@ -1039,7 +1042,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
             {product.isBoosted && (
               <div className="absolute bottom-8 left-2">
                 <div className="px-2 py-1 rounded-lg text-white text-xs font-bold bg-gray-600 bg-opacity-80">
-                  Featured
+                  {t("ProductCard.featured")}
                 </div>
               </div>
             )}
@@ -1173,6 +1176,14 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
         </div>
       </div>
 
+  )
+            if (isBoosted) {
+  return (
+    <>
+      <BoostedVisibilityWrapper productId={product.id} enabled={true}>
+        {cardContent}
+      </BoostedVisibilityWrapper>
+
       {/* Option Selector Modals */}
       <ProductOptionSelector
         product={product}
@@ -1193,6 +1204,31 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
       />
     </>
   );
+}
+return (
+  <>
+    {cardContent}
+
+    {/* Option Selector Modals */}
+    <ProductOptionSelector
+      product={product}
+      isOpen={showCartOptionSelector}
+      onClose={handleCartOptionSelectorClose}
+      onConfirm={handleCartOptionSelectorConfirm}
+      isDarkMode={isDarkMode}
+      localization={localization}
+    />
+
+    <ProductOptionSelector
+      product={product}
+      isOpen={showFavoriteOptionSelector}
+      onClose={handleFavoriteOptionSelectorClose}
+      onConfirm={handleFavoriteOptionSelectorConfirm}
+      isDarkMode={isDarkMode}
+      localization={localization}
+    />
+  </>
+);
 };
 
 // ✅ Export memoized version for performance

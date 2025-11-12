@@ -4,6 +4,7 @@ import AlgoliaServiceManager from "@/lib/algolia";
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { impressionBatcher } from '@/app/utils/impressionBatcher';
 import {
   ChevronLeft,
   SortAsc,
@@ -390,6 +391,29 @@ const SearchResultsContent: React.FC = () => {
   const loadMoreDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const fetchInitialCompleteRef = useRef(false);
   const lastQueryRef = useRef<string>("");
+
+  useEffect(() => {
+    return () => {
+      console.log('🧹 DynamicMarketPage: Flushing impressions on unmount');
+      impressionBatcher.flush();
+    };
+  }, []);
+
+  // ✅ Flush when tab becomes hidden (user switches tabs)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        console.log('👁️ DynamicMarketPage: Tab hidden, flushing impressions');
+        impressionBatcher.flush();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
 
   // Theme detection
   useEffect(() => {

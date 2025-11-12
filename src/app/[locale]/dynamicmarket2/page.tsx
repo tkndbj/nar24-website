@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import { impressionBatcher } from '@/app/utils/impressionBatcher';
 import {
   ArrowLeft,
   Filter,
@@ -130,6 +131,29 @@ const DynamicMarketPage: React.FC = () => {
       maxPrice: filters.maxPrice,
     });
   }, [filters]);
+
+  useEffect(() => {
+    return () => {
+      console.log('🧹 DynamicMarketPage: Flushing impressions on unmount');
+      impressionBatcher.flush();
+    };
+  }, []);
+
+  // ✅ Flush when tab becomes hidden (user switches tabs)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        console.log('👁️ DynamicMarketPage: Tab hidden, flushing impressions');
+        impressionBatcher.flush();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
 
   // Set available subcategories
   useEffect(() => {

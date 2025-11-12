@@ -7,6 +7,7 @@ import SecondHeader from "../../components/market_screen/SecondHeader";
 import ProductCard from "../../components/ProductCard";
 import { AllInOneCategoryData } from "../../../constants/productData";
 import { globalBrands } from "../../../constants/brands";
+import { impressionBatcher } from '@/app/utils/impressionBatcher';
 import {
   Loader2,
   AlertCircle,
@@ -166,6 +167,29 @@ export default function DynamicMarketPage() {
       (filters.minPrice !== undefined || filters.maxPrice !== undefined ? 1 : 0)
     );
   }, [filters]);
+
+  useEffect(() => {
+    return () => {
+      console.log('🧹 DynamicMarketPage: Flushing impressions on unmount');
+      impressionBatcher.flush();
+    };
+  }, []);
+
+  // ✅ Flush when tab becomes hidden (user switches tabs)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        console.log('👁️ DynamicMarketPage: Tab hidden, flushing impressions');
+        impressionBatcher.flush();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
 
   // Theme detection
   useEffect(() => {

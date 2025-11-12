@@ -1,17 +1,14 @@
 {
   "buyerCategoryWomen": "Women",
   "buyerCategoryMen": "Men",
-
   "buyerSubcategoryFashion": "Fashion",
   "buyerSubcategoryShoes": "Shoes",
   "buyerSubcategoryAccessories": "Accessories",
   "buyerSubcategoryBags": "Bags & Luggages",
   "buyerSubcategorySelfCare": "Self Care",
-
   "genderFilterWomen": "Women's",
   "genderFilterMen": "Men's",
   "genderFilterUnisex": "Unisex",
-
   "categoryClothingFashion": "Clothing & Fashion",
   "categoryFootwear": "Footwear",
   "categoryAccessories": "Accessories",
@@ -26,7 +23,6 @@
   "categoryPetSupplies": "Pet Supplies",
   "categoryAutomotive": "Automotive",
   "categoryHealthWellness": "Health & Wellness",
-
   "subcategoryDresses": "Dresses",
   "subcategoryTopsShirts": "Tops & Shirts",
   "subcategoryBottoms": "Bottoms",
@@ -36,7 +32,6 @@
   "subcategoryActivewear": "Sportwear",
   "subcategorySuitsFormal": "Suits & Formal",
   "subcategoryTraditionalCultural": "Traditional & Cultural",
-
   "subcategorySneakersAthletic": "Sneakers & Athletic",
   "subcategoryCasualShoes": "Casual Shoes",
   "subcategoryFormalShoes": "Formal Shoes",
@@ -44,7 +39,6 @@
   "subcategorySandalsFlipFlops": "Sandals & Flip-Flops",
   "subcategorySlippers": "Slippers",
   "subcategorySpecializedFootwear": "Specialized Footwear",
-
   "subcategoryJewelry": "Jewelry",
   "subcategoryWatches": "Watches",
   "subcategoryBelts": "Belts",
@@ -54,7 +48,6 @@
   "subcategoryGloves": "Gloves",
   "subcategoryHairAccessories": "Hair Accessories",
   "subcategoryOtherAccessories": "Other Accessories",
-
   "subcategoryBabyClothing": "Baby Clothing",
   "subcategoryKidsClothing": "Kids Clothing",
   "subcategoryKidsFootwear": "Kids Footwear",
@@ -65,7 +58,6 @@
   "subcategoryFeedingNursing": "Feeding & Nursing",
   "subcategorySafetySecurity": "Safety & Security",
   "subcategoryEducational": "Educational",
-
   "subcategoryLivingRoomFurniture": "Living Room Furniture",
   "subcategoryBedroomFurniture": "Bedroom Furniture",
   "subcategoryKitchenDining": "Kitchen & Dining",
@@ -75,7 +67,6 @@
   "subcategoryStorageOrganization": "Storage & Organization",
   "subcategoryTextilesSoftFurnishing": "Textiles & Soft Furnishing",
   "subcategoryGardenOutdoor": "Garden & Outdoor",
-
   "subcategorySkincare": "Skincare",
   "subcategoryMakeup": "Makeup",
   "subcategoryHaircare": "Haircare",
@@ -85,7 +76,6 @@
   "subcategoryBodyCare": "Body Care",
   "subcategoryOralCare": "Oral Care",
   "subcategoryBeautyToolsAccessories": "Beauty Tools & Accessories",
-
   "subcategoryHandbags": "Handbags",
   "subcategoryBackpacks": "Backpacks",
   "subcategoryTravelLuggage": "Travel Luggage",
@@ -93,7 +83,6 @@
   "subcategorySportsGymBags": "Sports & Gym Bags",
   "subcategoryWalletsSmallAccessories": "Wallets & Small Accessories",
   "subcategorySpecialtyBags": "Specialty Bags",
-
   "subcategorySmartphonesAccessories": "Smartphones & Accessories",
   "subcategoryComputersLaptops": "Computers & Laptops",
   "subcategoryTVsHomeEntertainment": "TVs & Home Entertainment",
@@ -104,7 +93,6 @@
   "subcategoryWearableTech": "Wearable Tech",
   "subcategoryHomeAppliances": "Home Appliances",
   "subcategoryPersonalCareElectronics": "Personal Care Electronics",
-
   "subcategoryFitnessExercise": "Fitness & Exercise",
   "subcategorySports": "Sports",
   "subcategoryWaterSports": "Water Sports",
@@ -114,7 +102,6 @@
   "subcategoryRunningAthletics": "Running & Athletics",
   "subcategorySportsAccessories": "Sports Accessories",
   "subcategorySportswear": "Sportswear",
-
   "subcategoryBooksLiterature": "Books & Literature",
   "subcategoryOfficeSchoolSupplies": "Office & School Supplies",
   "subcategoryArtCraftSupplies": "Art & Craft Supplies",
@@ -123,7 +110,6 @@
   "subcategoryEducationalMaterials": "Educational Materials",
   "subcategoryHobbiesCollections": "Hobbies & Collections",
   "subcategoryMusicalInstruments": "Musical Instruments",
-
   "subcategoryHandTools": "Hand Tools",
   "subcategoryPowerTools": "Power Tools",
   "subcategoryHardwareFasteners": "Hardware & Fasteners",
@@ -133,7 +119,6 @@
   "subcategorySafetyEquipment": "Safety Equipment",
   "subcategoryMeasuringTools": "Measuring Tools",
   "subcategoryToolStorage": "Tool Storage",
-
   "subcategoryDogSupplies": "Dog Supplies",
   "subcategoryCatSupplies": "Cat Supplies",
   "subcategoryBirdSupplies": "Bird Supplies",
@@ -143,7 +128,6 @@
   "subcategoryPetCareHealth": "Pet Care & Health",
   "subcategoryPetAccessories": "Pet Accessories",
   "subcategoryPetTraining": "Pet Training",
-
   "subcategoryCarPartsComponents": "Car Parts & Components",
   "subcategoryCarElectronics": "Car Electronics",
   "subcategoryCarCareMaintenance": "Car Care & Maintenance",
@@ -152,7 +136,6 @@
   "subcategoryExteriorAccessories": "Exterior Accessories",
   "subcategoryToolsEquipment": "Tools & Equipment",
   "subcategoryMotorcycleParts": "Motorcycle Parts",
-
   "subcategoryVitaminsSupplements": "Vitamins & Supplements",
   "subcategoryMedicalEquipment": "Medical Equipment",
   "subcategoryFirstAidSafety": "First Aid & Safety",
@@ -161,7 +144,6 @@
   "subcategoryMobilityDailyLiving": "Mobility & Daily Living",
   "subcategoryAlternativeMedicine": "Alternative Medicine",
   "subcategoryPersonalCare": "Personal Care",
-
   "subSubcategoryCasualDresses": "Casual Dresses",
   "subSubcategoryFormalDresses": "Formal Dresses",
   "subSubcategoryEveningGowns": "Evening Gowns",
@@ -171,7 +153,6 @@
   "subSubcategoryMidiDresses": "Midi Dresses",
   "subSubcategoryWeddingDresses": "Wedding Dresses",
   "subSubcategorySundresses": "Sundresses",
-
   "subSubcategoryTShirts": "T-Shirts",
   "subSubcategoryShirts": "Shirts",
   "subSubcategoryBlouses": "Blouses",
@@ -181,7 +162,6 @@
   "subSubcategoryTunics": "Tunics",
   "subSubcategoryHoodies": "Hoodies",
   "subSubcategorySweatshirts": "Sweatshirts",
-
   "subSubcategoryJeans": "Jeans",
   "subSubcategoryPants": "Pants",
   "subSubcategoryShorts": "Shorts",
@@ -190,7 +170,6 @@
   "subSubcategoryJoggers": "Joggers",
   "subSubcategoryCapris": "Capris",
   "subSubcategoryCulottes": "Culottes",
-
   "subSubcategoryJackets": "Jackets",
   "subSubcategoryCoats": "Coats",
   "subSubcategoryBlazers": "Blazers",
@@ -200,7 +179,6 @@
   "subSubcategoryParkas": "Parkas",
   "subSubcategoryTrenchCoats": "Trench Coats",
   "subSubcategoryWindbreakers": "Windbreakers",
-
   "subSubcategoryBras": "Bras",
   "subSubcategoryPanties": "Panties",
   "subSubcategoryBoxers": "Boxers",
@@ -212,14 +190,12 @@
   "subSubcategoryRobes": "Robes",
   "subSubcategorySocks": "Socks",
   "subSubcategoryTights": "Tights",
-
   "subSubcategoryBikinis": "Bikinis",
   "subSubcategoryOnePieceSwimsuits": "One-Piece Swimsuits",
   "subSubcategorySwimShorts": "Swim Shorts",
   "subSubcategoryBoardshorts": "Boardshorts",
   "subSubcategoryCoverUps": "Cover-Ups",
   "subSubcategoryRashguards": "Rashguards",
-
   "subSubcategorySportsBras": "Sports Bras",
   "subSubcategoryAthleticTops": "Athletic Tops",
   "subSubcategoryAthleticBottoms": "Athletic Bottoms",
@@ -227,7 +203,6 @@
   "subSubcategoryYogaWear": "Yoga Wear",
   "subSubcategoryRunningGear": "Running Gear",
   "subSubcategoryGymWear": "Gym Wear",
-
   "subSubcategoryBusinessSuits": "Business Suits",
   "subSubcategoryTuxedos": "Tuxedos",
   "subSubcategoryFormalShirts": "Formal Shirts",
@@ -235,12 +210,10 @@
   "subSubcategoryWaistcoats": "Waistcoats",
   "subSubcategoryBowTies": "Bow Ties",
   "subSubcategoryCufflinks": "Cufflinks",
-
   "subSubcategoryEthnicWear": "Ethnic Wear",
   "subSubcategoryCulturalCostumes": "Cultural Costumes",
   "subSubcategoryTraditionalDresses": "Traditional Dresses",
   "subSubcategoryCeremonialClothing": "Ceremonial Clothing",
-
   "subSubcategoryRunningShoes": "Running Shoes",
   "subSubcategoryBasketballShoes": "Basketball Shoes",
   "subSubcategoryTrainingShoes": "Training Shoes",
@@ -248,14 +221,12 @@
   "subSubcategorySkateboardShoes": "Skateboard Shoes",
   "subSubcategoryTennisShoes": "Tennis Shoes",
   "subSubcategoryWalkingShoes": "Walking Shoes",
-
   "subSubcategoryLoafers": "Loafers",
   "subSubcategoryBoatShoes": "Boat Shoes",
   "subSubcategoryCanvasShoes": "Canvas Shoes",
   "subSubcategorySlipOnShoes": "Slip-On Shoes",
   "subSubcategoryEspadrilles": "Espadrilles",
   "subSubcategoryMoccasins": "Moccasins",
-
   "subSubcategoryDressShoes": "Dress Shoes",
   "subSubcategoryOxfordShoes": "Oxford Shoes",
   "subSubcategoryDerbyShoes": "Derby Shoes",
@@ -263,7 +234,6 @@
   "subSubcategoryPumps": "Pumps",
   "subSubcategoryHighHeels": "High Heels",
   "subSubcategoryFlats": "Flats",
-
   "subSubcategoryAnkleBoots": "Ankle Boots",
   "subSubcategoryKneeHighBoots": "Knee-High Boots",
   "subSubcategoryCombatBoots": "Combat Boots",
@@ -272,25 +242,21 @@
   "subSubcategoryHikingBoots": "Hiking Boots",
   "subSubcategoryRainBoots": "Rain Boots",
   "subSubcategorySnowBoots": "Snow Boots",
-
   "subSubcategoryFlipFlops": "Flip-Flops",
   "subSubcategoryFlatSandals": "Flat Sandals",
   "subSubcategoryHeeledSandals": "Heeled Sandals",
   "subSubcategorySportSandals": "Sport Sandals",
   "subSubcategorySlides": "Slides",
   "subSubcategoryGladiatorSandals": "Gladiator Sandals",
-
   "subSubcategoryHouseSlippers": "House Slippers",
   "subSubcategoryBedroomSlippers": "Bedroom Slippers",
   "subSubcategoryMoccasinSlippers": "Moccasin Slippers",
   "subSubcategorySlipperBoots": "Slipper Boots",
-
   "subSubcategorySafetyShoes": "Safety Shoes",
   "subSubcategoryMedicalShoes": "Medical Shoes",
   "subSubcategoryDanceShoes": "Dance Shoes",
   "subSubcategoryCleats": "Cleats",
   "subSubcategoryClimbingShoes": "Climbing Shoes",
-
   "subSubcategoryNecklaces": "Necklaces",
   "subSubcategoryEarrings": "Earrings",
   "subSubcategoryRings": "Rings",
@@ -299,7 +265,6 @@
   "subSubcategoryBrooches": "Brooches",
   "subSubcategoryJewelrySets": "Jewelry Sets",
   "subSubcategoryBodyJewelry": "Body Jewelry",
-
   "subSubcategoryAnalogWatches": "Analog Watches",
   "subSubcategoryDigitalWatches": "Digital Watches",
   "subSubcategorySmartwatches": "Smartwatches",
@@ -307,14 +272,12 @@
   "subSubcategoryLuxuryWatches": "Luxury Watches",
   "subSubcategoryFashionWatches": "Fashion Watches",
   "subSubcategoryKidsWatches": "Kids Watches",
-
   "subSubcategoryLeatherBelts": "Leather Belts",
   "subSubcategoryFabricBelts": "Fabric Belts",
   "subSubcategoryChainBelts": "Chain Belts",
   "subSubcategoryDressBelts": "Dress Belts",
   "subSubcategoryCasualBelts": "Casual Belts",
   "subSubcategoryDesignerBelts": "Designer Belts",
-
   "subSubcategoryBaseballCaps": "Baseball Caps",
   "subSubcategoryBeanies": "Beanies",
   "subSubcategoryFedoras": "Fedoras",
@@ -323,39 +286,33 @@
   "subSubcategoryBerets": "Berets",
   "subSubcategorySnapbacks": "Snapbacks",
   "subSubcategoryFantasy": "Fantasy Wear",
-
   "subSubcategorySilkScarves": "Silk Scarves",
   "subSubcategoryWinterScarves": "Winter Scarves",
   "subSubcategoryShawls": "Shawls",
   "subSubcategoryPashminas": "Pashminas",
   "subSubcategoryBandanas": "Bandanas",
   "subSubcategoryWraps": "Wraps",
-
   "subSubcategorySunglasses": "Sunglasses",
   "subSubcategoryReadingGlasses": "Reading Glasses",
   "subSubcategoryBlueLightGlasses": "Blue Light Glasses",
   "subSubcategorySafetyGlasses": "Safety Glasses",
   "subSubcategoryFashionGlasses": "Fashion Glasses",
-
   "subSubcategoryWinterGloves": "Winter Gloves",
   "subSubcategoryDressGloves": "Dress Gloves",
   "subSubcategoryWorkGloves": "Work Gloves",
   "subSubcategorySportsGloves": "Sports Gloves",
   "subSubcategoryTouchscreenGloves": "Touchscreen Gloves",
-
   "subSubcategoryHairClips": "Hair Clips",
   "subSubcategoryHeadbands": "Headbands",
   "subSubcategoryHairTies": "Hair Ties",
   "subSubcategoryBobbyPins": "Bobby Pins",
   "subSubcategoryHairScarves": "Hair Scarves",
   "subSubcategoryHairJewelry": "Hair Jewelry",
-
   "subSubcategoryKeychains": "Keychains",
   "subSubcategoryPhoneCases": "Phone Cases",
   "subSubcategoryWallets": "Wallets",
   "subSubcategoryPurseAccessories": "Purse Accessories",
   "subSubcategoryPinsBadges": "Pins & Badges",
-
   "subSubcategoryBodysuits": "Bodysuits",
   "subSubcategoryRompers": "Rompers",
   "subSubcategoryBabySets": "Baby Sets",
@@ -363,7 +320,6 @@
   "subSubcategoryBabySocks": "Baby Socks",
   "subSubcategoryBabyHats": "Baby Hats",
   "subSubcategoryBabyMittens": "Baby Mittens",
-
   "subSubcategoryKidsTShirts": "Kids T-Shirts",
   "subSubcategoryKidsPants": "Kids Pants",
   "subSubcategoryKidsDresses": "Kids Dresses",
@@ -371,7 +327,6 @@
   "subSubcategoryKidsJackets": "Kids Jackets",
   "subSubcategoryKidsPajamas": "Kids Pajamas",
   "subSubcategorySchoolUniforms": "School Uniforms",
-
   "subSubcategoryKidsSneakers": "Kids Sneakers",
   "subSubcategoryKidsSandals": "Kids Sandals",
   "subSubcategoryKidsBoots": "Kids Boots",
@@ -379,7 +334,6 @@
   "subSubcategorySportsShoes": "Sports Shoes",
   "subSubcategoryKidsRainBoots": "Rain Boots",
   "subSubcategoryKidsSlippers": "Kids Slippers",
-
   "subSubcategoryEducationalToys": "Educational Toys",
   "subSubcategoryPlushToys": "Plush Toys",
   "subSubcategoryBuildingBlocks": "Building Blocks",
@@ -388,44 +342,37 @@
   "subSubcategoryBoardGames": "Board Games",
   "subSubcategoryElectronicToys": "Electronic Toys",
   "subSubcategoryOutdoorPlay": "Outdoor Play",
-
   "subSubcategoryDiapers": "Diapers",
   "subSubcategoryBabyWipes": "Baby Wipes",
   "subSubcategoryBabySkincare": "Baby Skincare",
   "subSubcategoryBabyBathProducts": "Baby Bath Products",
   "subSubcategoryBabyHealth": "Baby Health",
   "subSubcategoryBabyMonitors": "Baby Monitors",
-
   "subSubcategoryMaternityClothing": "Maternity Clothing",
   "subSubcategoryNursingBras": "Nursing Bras",
   "subSubcategoryMaternityAccessories": "Maternity Accessories",
   "subSubcategoryPregnancySupport": "Pregnancy Support",
-
   "subSubcategoryStrollers": "Strollers",
   "subSubcategoryCarSeats": "Car Seats",
   "subSubcategoryTravelSystems": "Travel Systems",
   "subSubcategoryBoosterSeats": "Booster Seats",
   "subSubcategoryStrollerAccessories": "Stroller Accessories",
-
   "subSubcategoryBabyBottles": "Baby Bottles",
   "subSubcategoryBreastPumps": "Breast Pumps",
   "subSubcategoryPacifiers": "Pacifiers",
   "subSubcategoryHighChairs": "High Chairs",
   "subSubcategoryFeedingAccessories": "Feeding Accessories",
   "subSubcategoryBabyFood": "Baby Food",
-
   "subSubcategoryBabyGates": "Baby Gates",
   "subSubcategoryOutletCovers": "Outlet Covers",
   "subSubcategoryCabinetLocks": "Cabinet Locks",
   "subSubcategoryCornerGuards": "Corner Guards",
   "subSubcategorySafetyBabyMonitors": "Baby Monitors",
-
   "subSubcategoryLearningToys": "Learning Toys",
   "subSubcategoryEducationalBooks": "Educational Books",
   "subSubcategoryFlashCards": "Flash Cards",
   "subSubcategoryScienceKits": "Science Kits",
   "subSubcategoryEducationalMusicalInstruments": "Musical Instruments",
-
   "subSubcategorySofas": "Sofas",
   "subSubcategoryArmchairs": "Armchairs",
   "subSubcategoryCoffeeTables": "Coffee Tables",
@@ -434,7 +381,6 @@
   "subSubcategorySideTables": "Side Tables",
   "subSubcategoryOttoman": "Ottoman",
   "subSubcategoryRecliners": "Recliners",
-
   "subSubcategoryBeds": "Beds",
   "subSubcategoryMattresses": "Mattresses",
   "subSubcategoryWardrobes": "Wardrobes",
@@ -443,7 +389,6 @@
   "subSubcategoryMirrors": "Mirrors",
   "subSubcategoryBedFrames": "Bed Frames",
   "subSubcategoryHeadboards": "Headboards",
-
   "subSubcategoryDiningTables": "Dining Tables",
   "subSubcategoryDiningChairs": "Dining Chairs",
   "subSubcategoryBarStools": "Bar Stools",
@@ -453,7 +398,6 @@
   "subSubcategoryGlassware": "Glassware",
   "subSubcategoryKitchenAppliances": "Kitchen Appliances",
   "subSubcategoryUtensils": "Utensils",
-
   "subSubcategoryBathroomVanities": "Bathroom Vanities",
   "subSubcategoryShowerCurtains": "Shower Curtains",
   "subSubcategoryBathMats": "Bath Mats",
@@ -461,7 +405,6 @@
   "subSubcategoryBathroomStorage": "Bathroom Storage",
   "subSubcategoryBathroomMirrors": "Mirrors",
   "subSubcategoryBathroomAccessories": "Accessories",
-
   "subSubcategoryWallArt": "Wall Art",
   "subSubcategoryDecorativeObjects": "Decorative Objects",
   "subSubcategoryCandles": "Candles",
@@ -470,7 +413,6 @@
   "subSubcategoryClocks": "Clocks",
   "subSubcategoryArtificialPlants": "Artificial Plants",
   "subSubcategorySculptures": "Sculptures",
-
   "subSubcategoryCeilingLights": "Ceiling Lights",
   "subSubcategoryTableLamps": "Table Lamps",
   "subSubcategoryFloorLamps": "Floor Lamps",
@@ -479,7 +421,6 @@
   "subSubcategoryChandelier": "Chandelier",
   "subSubcategoryStringLights": "String Lights",
   "subSubcategoryNightLights": "Night Lights",
-
   "subSubcategoryShelvingUnits": "Shelving Units",
   "subSubcategoryStorageBoxes": "Storage Boxes",
   "subSubcategoryBaskets": "Baskets",
@@ -487,7 +428,6 @@
   "subSubcategoryClosetOrganizers": "Closet Organizers",
   "subSubcategoryDrawerOrganizers": "Drawer Organizers",
   "subSubcategoryStorageBins": "Storage Bins",
-
   "subSubcategoryCurtains": "Curtains",
   "subSubcategoryBlinds": "Blinds",
   "subSubcategoryRugs": "Rugs",
@@ -496,7 +436,6 @@
   "subSubcategoryBedLinens": "Bed Linens",
   "subSubcategoryTowels": "Towels",
   "subSubcategoryBlankets": "Blankets",
-
   "subSubcategoryGardenFurniture": "Garden Furniture",
   "subSubcategoryPlantPots": "Plant Pots",
   "subSubcategoryGardenTools": "Garden Tools",
@@ -504,7 +443,6 @@
   "subSubcategoryBBQGrills": "BBQ & Grills",
   "subSubcategoryUmbrellas": "Umbrellas",
   "subSubcategoryGardenDecor": "Garden Decor",
-
   "subSubcategoryCleaners": "Cleansers",
   "subSubcategoryMoisturizers": "Moisturizers",
   "subSubcategorySerums": "Serums",
@@ -514,7 +452,6 @@
   "subSubcategoryEyeCreams": "Eye Creams",
   "subSubcategoryAntiAging": "Anti-Aging",
   "subSubcategoryAcneTreatment": "Acne Treatment",
-
   "subSubcategoryFoundation": "Foundation",
   "subSubcategoryConcealer": "Concealer",
   "subSubcategoryPowder": "Powder",
@@ -527,7 +464,6 @@
   "subSubcategoryLipstick": "Lipstick",
   "subSubcategoryLipGloss": "Lip Gloss",
   "subSubcategoryMakeupBrushes": "Makeup Brushes",
-
   "subSubcategoryShampoo": "Shampoo",
   "subSubcategoryConditioner": "Conditioner",
   "subSubcategoryHairMasks": "Hair Masks",
@@ -535,14 +471,12 @@
   "subSubcategoryStylingProducts": "Styling Products",
   "subSubcategoryHairColor": "Hair Color",
   "subSubcategoryHairTools": "Hair Tools",
-
   "subSubcategoryPerfumes": "Perfumes",
   "subSubcategoryEauDeToilette": "Eau de Toilette",
   "subSubcategoryBodySprays": "Body Sprays",
   "subSubcategoryDeodorants": "Deodorants",
   "subSubcategoryColognes": "Cologne",
   "subSubcategoryEssentialOils": "Essential Oils",
-
   "subSubcategoryBodyWash": "Body Wash",
   "subSubcategorySoap": "Soap",
   "subSubcategoryPersonalHygieneShampoo": "Shampoo",
@@ -550,14 +484,12 @@
   "subSubcategoryFeminineCare": "Feminine Care",
   "subSubcategoryMensGrooming": "Men's Grooming",
   "subSubcategoryIntimateCare": "Intimate Care",
-
   "subSubcategoryNailPolish": "Nail Polish",
   "subSubcategoryNailTools": "Nail Tools",
   "subSubcategoryNailTreatments": "Nail Treatments",
   "subSubcategoryNailArt": "Nail Art",
   "subSubcategoryCuticleCare": "Cuticle Care",
   "subSubcategoryNailFiles": "Nail Files",
-
   "subSubcategoryBodyLotions": "Body Lotions",
   "subSubcategoryBodyOils": "Body Oils",
   "subSubcategoryBodyScrubs": "Body Scrubs",
@@ -565,14 +497,12 @@
   "subSubcategoryFootCare": "Foot Care",
   "subSubcategoryBathProducts": "Bath Products",
   "subSubcategoryMassageOils": "Massage Oils",
-
   "subSubcategoryToothbrushes": "Toothbrushes",
   "subSubcategoryToothpaste": "Toothpaste",
   "subSubcategoryMouthwash": "Mouthwash",
   "subSubcategoryDentalFloss": "Dental Floss",
   "subSubcategoryTeethWhitening": "Teeth Whitening",
   "subSubcategoryOralHealth": "Oral Health",
-
   "subSubcategoryBeautyMakeupBrushes": "Makeup Brushes",
   "subSubcategoryBeautySponges": "Beauty Sponges",
   "subSubcategoryHairBrushes": "Hair Brushes",
@@ -580,7 +510,6 @@
   "subSubcategoryTweezers": "Tweezers",
   "subSubcategoryNailClippers": "Nail Clippers",
   "subSubcategoryBeautyCases": "Beauty Cases",
-
   "subSubcategoryToteBags": "Tote Bags",
   "subSubcategoryShoulderBags": "Shoulder Bags",
   "subSubcategoryCrossbodyBags": "Crossbody Bags",
@@ -588,47 +517,40 @@
   "subSubcategoryEveningBags": "Evening Bags",
   "subSubcategorySatchels": "Satchels",
   "subSubcategoryHoboBags": "Hobo Bags",
-
   "subSubcategorySchoolBackpacks": "School Backpacks",
   "subSubcategoryTravelBackpacks": "Travel Backpacks",
   "subSubcategoryLaptopBackpacks": "Laptop Backpacks",
   "subSubcategoryHikingBackpacks": "Hiking Backpacks",
   "subSubcategoryCasualBackpacks": "Casual Backpacks",
   "subSubcategoryKidsBackpacks": "Kids Backpacks",
-
   "subSubcategorySuitcases": "Suitcases",
   "subSubcategoryCarryOnBags": "Carry-On Bags",
   "subSubcategoryTravelDuffelBags": "Travel Duffel Bags",
   "subSubcategoryLuggageSets": "Luggage Sets",
   "subSubcategoryGarmentBags": "Garment Bags",
   "subSubcategoryTravelAccessories": "Travel Accessories",
-
   "subSubcategoryBriefcases": "Briefcases",
   "subSubcategoryLaptopBags": "Laptop Bags",
   "subSubcategoryMessengerBags": "Messenger Bags",
   "subSubcategoryPortfolioBags": "Portfolio Bags",
   "subSubcategoryBusinessTotes": "Business Totes",
-
   "subSubcategoryGymBags": "Gym Bags",
   "subSubcategorySportsDuffelBags": "Sports Duffel Bags",
   "subSubcategoryEquipmentBags": "Equipment Bags",
   "subSubcategoryYogaBags": "Yoga Bags",
   "subSubcategorySwimmingBags": "Swimming Bags",
-
   "subSubcategoryWalletsSmall": "Wallets",
   "subSubcategoryCardHolders": "Card Holders",
   "subSubcategoryCoinPurses": "Coin Purses",
   "subSubcategoryKeyCases": "Key Cases",
   "subSubcategoryPhoneCasesSmall": "Phone Cases",
   "subSubcategoryPassportHolders": "Passport Holders",
-
   "subSubcategoryCameraBags": "Camera Bags",
   "subSubcategoryDiaperBags": "Diaper Bags",
   "subSubcategoryLunchBags": "Lunch Bags",
   "subSubcategoryToolBags": "Tool Bags",
   "subSubcategoryCosmeticBags": "Cosmetic Bags",
   "subSubcategoryBeachBags": "Beach Bags",
-
   "subSubcategorySmartphones": "Smartphones",
   "subSubcategoryPhoneCasesElectronics": "Phone Cases",
   "subSubcategoryScreenProtectors": "Screen Protectors",
@@ -636,7 +558,6 @@
   "subSubcategoryPowerBanks": "Power Banks",
   "subSubcategoryPhoneStands": "Phone Stands",
   "subSubcategoryWirelessChargers": "Wireless Chargers",
-
   "subSubcategoryLaptops": "Laptops",
   "subSubcategoryDesktopComputers": "Desktop Computers",
   "subSubcategoryTablets": "Tablets",
@@ -645,7 +566,6 @@
   "subSubcategoryMice": "Mice",
   "subSubcategoryLaptopAccessories": "Laptop Accessories",
   "subSubcategoryComputerComponents": "Computer Components",
-
   "subSubcategorySmartTVs": "Smart TVs",
   "subSubcategoryProjectors": "Projectors",
   "subSubcategoryStreamingDevices": "Streaming Devices",
@@ -655,7 +575,6 @@
   "subSubcategoryRemoteControls": "Remote Controls",
   "subSubcategoryTVAntennas": "TV Antennas",
   "subSubcategoryMediaPlayers": "Media Players",
-
   "subSubcategoryHeadphones": "Headphones",
   "subSubcategoryEarbuds": "Earbuds",
   "subSubcategorySpeakers": "Speakers",
@@ -665,7 +584,6 @@
   "subSubcategoryAmplifiers": "Amplifiers",
   "subSubcategoryTurntables": "Turntables",
   "subSubcategoryAudioCables": "Audio Cables",
-
   "subSubcategoryGamingConsoles": "Gaming Consoles",
   "subSubcategoryVideoGames": "Video Games",
   "subSubcategoryGamingControllers": "Gaming Controllers",
@@ -673,7 +591,6 @@
   "subSubcategoryGamingChairs": "Gaming Chairs",
   "subSubcategoryVRHeadsets": "VR Headsets",
   "subSubcategoryGamingAccessories": "Gaming Accessories",
-
   "subSubcategorySmartSpeakers": "Smart Speakers",
   "subSubcategorySmartLights": "Smart Lights",
   "subSubcategorySmartPlugs": "Smart Plugs",
@@ -681,7 +598,6 @@
   "subSubcategorySmartThermostats": "Smart Thermostats",
   "subSubcategorySmartLocks": "Smart Locks",
   "subSubcategoryHomeAutomation": "Home Automation",
-
   "subSubcategoryDigitalCameras": "Digital Cameras",
   "subSubcategoryDSLRCameras": "DSLR Cameras",
   "subSubcategoryActionCameras": "Action Cameras",
@@ -689,27 +605,23 @@
   "subSubcategoryTripods": "Tripods",
   "subSubcategoryCameraAccessories": "Camera Accessories",
   "subSubcategoryPhotographyEquipment": "Photography Equipment",
-
   "subSubcategorySmartwatchesWearable": "Smartwatches",
   "subSubcategoryFitnessTrackers": "Fitness Trackers",
   "subSubcategorySmartGlasses": "Smart Glasses",
   "subSubcategoryHealthMonitors": "Health Monitors",
   "subSubcategoryWearableAccessories": "Wearable Accessories",
-
   "subSubcategoryKitchenAppliancesElectronics": "Kitchen Appliances",
   "subSubcategoryLaundryAppliances": "Laundry Appliances",
   "subSubcategoryCleaningAppliances": "Cleaning Appliances",
   "subSubcategoryAirConditioning": "Air Conditioning",
   "subSubcategoryHeating": "Heating",
   "subSubcategorySmallAppliances": "Small Appliances",
-
   "subSubcategoryHairDryers": "Hair Dryers",
   "subSubcategoryHairStraighteners": "Hair Straighteners",
   "subSubcategoryElectricShavers": "Electric Shavers",
   "subSubcategoryElectricToothbrushes": "Toothbrushes",
   "subSubcategoryBeautyDevices": "Beauty Devices",
   "subSubcategoryPersonalHealthMonitors": "Health Monitors",
-
   "subSubcategoryCardioEquipment": "Cardio Equipment",
   "subSubcategoryStrengthTraining": "Strength Training",
   "subSubcategoryYogaEquipment": "Yoga Equipment",
@@ -717,7 +629,6 @@
   "subSubcategoryHomeGym": "Home Gym",
   "subSubcategoryExerciseAccessories": "Exercise Accessories",
   "subSubcategoryRecoveryEquipment": "Recovery Equipment",
-
   "subSubcategoryFootball": "Football",
   "subSubcategoryBasketball": "Basketball",
   "subSubcategoryBaseball": "Baseball",
@@ -728,7 +639,6 @@
   "subSubcategoryGolf": "Golf",
   "subSubcategoryTableTennis": "Table Tennis",
   "subSubcategoryBadminton": "Badminton",
-
   "subSubcategorySwimming": "Swimming",
   "subSubcategorySurfing": "Surfing",
   "subSubcategoryKayaking": "Kayaking",
@@ -737,7 +647,6 @@
   "subSubcategoryFishing": "Fishing",
   "subSubcategoryBoating": "Boating",
   "subSubcategoryWaterSafety": "Water Safety",
-
   "subSubcategoryCampingGear": "Camping Gear",
   "subSubcategoryHikingEquipment": "Hiking Equipment",
   "subSubcategoryBackpacking": "Backpacking",
@@ -745,42 +654,36 @@
   "subSubcategoryOutdoorClothing": "Outdoor Clothing",
   "subSubcategoryNavigation": "Navigation",
   "subSubcategorySurvivalGear": "Survival Gear",
-
   "subSubcategorySkiing": "Skiing",
   "subSubcategorySnowboarding": "Snowboarding",
   "subSubcategoryIceSkating": "Ice Skating",
   "subSubcategoryWinterClothing": "Winter Clothing",
   "subSubcategorySnowEquipment": "Snow Equipment",
   "subSubcategoryWinterAccessories": "Winter Accessories",
-
   "subSubcategoryBicycles": "Bicycles",
   "subSubcategoryBikeAccessories": "Bike Accessories",
   "subSubcategoryCyclingApparel": "Cycling Apparel",
   "subSubcategoryBikeMaintenance": "Bike Maintenance",
   "subSubcategoryBikeSafety": "Bike Safety",
   "subSubcategoryEBikes": "E-Bikes",
-
   "subSubcategoryRunningShoesAthletics": "Running Shoes",
   "subSubcategoryRunningApparel": "Running Apparel",
   "subSubcategoryTrackField": "Track & Field",
   "subSubcategoryMarathonGear": "Marathon Gear",
   "subSubcategoryRunningAccessories": "Running Accessories",
   "subSubcategoryPerformanceMonitoring": "Performance Monitoring",
-
   "subSubcategorySportsBags": "Sports Bags",
   "subSubcategoryProtectiveGear": "Protective Gear",
   "subSubcategorySportsNutrition": "Sports Nutrition",
   "subSubcategoryHydration": "Hydration",
   "subSubcategorySportsTechnology": "Sports Technology",
   "subSubcategoryFanGear": "Fan Gear",
-
   "subSubcategoryAthleticTopsWear": "Athletic Tops",
   "subSubcategoryAthleticBottomsWear": "Athletic Bottoms",
   "subSubcategorySportsBrasWear": "Sports Bras",
   "subSubcategoryAthleticShoes": "Athletic Shoes",
   "subSubcategorySportsAccessoriesWear": "Sports Accessories",
   "subSubcategoryTeamJerseys": "Team Jerseys",
-
   "subSubcategoryFictionBooks": "Fiction Books",
   "subSubcategoryNonFictionBooks": "Non-Fiction Books",
   "subSubcategoryEducationalBooksLiterature": "Educational Books",
@@ -789,7 +692,6 @@
   "subSubcategoryMagazines": "Magazines",
   "subSubcategoryComics": "Comics",
   "subSubcategoryEBooks": "E-Books",
-
   "subSubcategoryNotebooks": "Notebooks",
   "subSubcategoryBinders": "Binders",
   "subSubcategoryFolders": "Folders",
@@ -798,7 +700,6 @@
   "subSubcategoryLabels": "Labels",
   "subSubcategoryStaplers": "Staplers",
   "subSubcategoryOrganizers": "Organizers",
-
   "subSubcategoryDrawingSupplies": "Drawing Supplies",
   "subSubcategoryPaintingSupplies": "Painting Supplies",
   "subSubcategoryCraftMaterials": "Craft Materials",
@@ -806,7 +707,6 @@
   "subSubcategorySewingSupplies": "Sewing Supplies",
   "subSubcategoryJewelryMaking": "Jewelry Making",
   "subSubcategoryModelBuilding": "Model Building",
-
   "subSubcategoryPens": "Pens",
   "subSubcategoryPencils": "Pencils",
   "subSubcategoryMarkers": "Markers",
@@ -814,7 +714,6 @@
   "subSubcategoryFountainPens": "Fountain Pens",
   "subSubcategoryMechanicalPencils": "Mechanical Pencils",
   "subSubcategoryErasers": "Erasers",
-
   "subSubcategoryCopyPaper": "Copy Paper",
   "subSubcategorySpecialtyPaper": "Specialty Paper",
   "subSubcategoryCardstock": "Cardstock",
@@ -822,28 +721,24 @@
   "subSubcategoryStickyNotes": "Sticky Notes",
   "subSubcategoryIndexCards": "Index Cards",
   "subSubcategoryConstructionPaper": "Construction Paper",
-
   "subSubcategoryLearningGames": "Learning Games",
   "subSubcategoryFlashCardsEducational": "Flash Cards",
   "subSubcategoryEducationalToysStationery": "Educational Toys",
   "subSubcategoryScienceKitsStationery": "Science Kits",
   "subSubcategoryMathTools": "Math Tools",
   "subSubcategoryLanguageLearning": "Language Learning",
-
   "subSubcategoryBoardGamesHobby": "Board Games",
   "subSubcategoryPuzzlesHobby": "Puzzles",
   "subSubcategoryTradingCards": "Trading Cards",
   "subSubcategoryCollectibles": "Collectibles",
   "subSubcategoryModelKits": "Model Kits",
   "subSubcategoryGamingAccessoriesHobby": "Gaming Accessories",
-
   "subSubcategoryStringInstruments": "String Instruments",
   "subSubcategoryWindInstruments": "Wind Instruments",
   "subSubcategoryPercussion": "Percussion",
   "subSubcategoryElectronicInstruments": "Electronic Instruments",
   "subSubcategoryMusicAccessories": "Music Accessories",
   "subSubcategorySheetMusic": "Sheet Music",
-
   "subSubcategoryHammers": "Hammers",
   "subSubcategoryScrewdrivers": "Screwdrivers",
   "subSubcategoryWrenches": "Wrenches",
@@ -852,7 +747,6 @@
   "subSubcategoryChisels": "Chisels",
   "subSubcategoryUtilityKnives": "Utility Knives",
   "subSubcategoryHandToolSets": "Hand Tool Sets",
-
   "subSubcategoryDrills": "Drills",
   "subSubcategoryPowerSaws": "Saws",
   "subSubcategorySanders": "Sanders",
@@ -861,7 +755,6 @@
   "subSubcategoryNailGuns": "Nail Guns",
   "subSubcategoryImpactDrivers": "Impact Drivers",
   "subSubcategoryMultiTools": "Multi-Tools",
-
   "subSubcategoryScrews": "Screws",
   "subSubcategoryBoltsNuts": "Bolts & Nuts",
   "subSubcategoryNails": "Nails",
@@ -870,14 +763,12 @@
   "subSubcategoryHinges": "Hinges",
   "subSubcategoryHandlesKnobs": "Handles & Knobs",
   "subSubcategoryChains": "Chains",
-
   "subSubcategoryWireCable": "Wire & Cable",
   "subSubcategoryOutletsSwitches": "Outlets & Switches",
   "subSubcategoryCircuitBreakers": "Circuit Breakers",
   "subSubcategoryLightFixtures": "Light Fixtures",
   "subSubcategoryElectricalTools": "Electrical Tools",
   "subSubcategoryExtensionCords": "Extension Cords",
-
   "subSubcategoryPipesFittings": "Pipes & Fittings",
   "subSubcategoryValves": "Valves",
   "subSubcategoryFaucets": "Faucets",
@@ -885,7 +776,6 @@
   "subSubcategoryDrainCleaners": "Drain Cleaners",
   "subSubcategoryPipeTools": "Pipe Tools",
   "subSubcategorySealants": "Sealants",
-
   "subSubcategoryLumber": "Lumber",
   "subSubcategoryDrywall": "Drywall",
   "subSubcategoryInsulation": "Insulation",
@@ -893,7 +783,6 @@
   "subSubcategoryFlooring": "Flooring",
   "subSubcategoryConcrete": "Concrete",
   "subSubcategoryPaint": "Paint",
-
   "subSubcategoryWorkGlovesSafety": "Work Gloves",
   "subSubcategorySafetyGlassesSafety": "Safety Glasses",
   "subSubcategoryHardHats": "Hard Hats",
@@ -901,7 +790,6 @@
   "subSubcategoryRespirators": "Respirators",
   "subSubcategorySafetyVests": "Safety Vests",
   "subSubcategoryFirstAidKitsSafety": "First Aid Kits",
-
   "subSubcategoryTapeMeasures": "Tape Measures",
   "subSubcategoryLevels": "Levels",
   "subSubcategorySquares": "Squares",
@@ -909,13 +797,11 @@
   "subSubcategoryRulers": "Rulers",
   "subSubcategoryLaserLevels": "Laser Levels",
   "subSubcategoryMarkingTools": "Marking Tools",
-
   "subSubcategoryToolBoxes": "Tool Boxes",
   "subSubcategoryToolBagsStorage": "Tool Bags",
   "subSubcategoryToolChests": "Tool Chests",
   "subSubcategoryWorkshopStorage": "Workshop Storage",
   "subSubcategoryToolOrganizers": "Tool Organizers",
-
   "subSubcategoryDogFood": "Dog Food",
   "subSubcategoryDogToys": "Dog Toys",
   "subSubcategoryDogBeds": "Dog Beds",
@@ -924,7 +810,6 @@
   "subSubcategoryDogGrooming": "Dog Grooming",
   "subSubcategoryDogTraining": "Dog Training",
   "subSubcategoryDogHealthCare": "Dog Health Care",
-
   "subSubcategoryCatFood": "Cat Food",
   "subSubcategoryCatToys": "Cat Toys",
   "subSubcategoryCatBeds": "Cat Beds",
@@ -933,7 +818,6 @@
   "subSubcategoryCatGrooming": "Cat Grooming",
   "subSubcategoryCatCarriers": "Cat Carriers",
   "subSubcategoryCatHealthCare": "Cat Health Care",
-
   "subSubcategoryBirdFood": "Bird Food",
   "subSubcategoryBirdCages": "Bird Cages",
   "subSubcategoryBirdToys": "Bird Toys",
@@ -941,7 +825,6 @@
   "subSubcategoryBirdHouses": "Bird Houses",
   "subSubcategoryBirdHealthCare": "Bird Health Care",
   "subSubcategoryBirdAccessories": "Bird Accessories",
-
   "subSubcategoryFishFood": "Fish Food",
   "subSubcategoryAquariumTanks": "Aquarium Tanks",
   "subSubcategoryAquariumFilters": "Aquarium Filters",
@@ -949,41 +832,35 @@
   "subSubcategoryWaterTreatment": "Water Treatment",
   "subSubcategoryAquariumLighting": "Aquarium Lighting",
   "subSubcategoryFishHealthCare": "Fish Health Care",
-
   "subSubcategorySmallAnimalFood": "Small Animal Food",
   "subSubcategoryCagesHabitats": "Cages & Habitats",
   "subSubcategorySmallAnimalToys": "Small Animal Toys",
   "subSubcategoryBedding": "Bedding",
   "subSubcategoryWaterBottles": "Water Bottles",
   "subSubcategoryExerciseEquipmentPet": "Exercise Equipment",
-
   "subSubcategoryDryFood": "Dry Food",
   "subSubcategoryWetFood": "Wet Food",
   "subSubcategoryTreatsSnacks": "Treats & Snacks",
   "subSubcategorySupplementsPet": "Supplements",
   "subSubcategorySpecialDietFood": "Special Diet Food",
   "subSubcategoryOrganicFood": "Organic Food",
-
   "subSubcategoryFleaTickControl": "Flea & Tick Control",
   "subSubcategoryVitaminsSupplementsPet": "Vitamins & Supplements",
   "subSubcategoryFirstAidPet": "First Aid",
   "subSubcategoryDentalCarePet": "Dental Care",
   "subSubcategorySkinCoatCare": "Skin & Coat Care",
   "subSubcategoryHealthMonitoringPet": "Health Monitoring",
-
   "subSubcategoryPetCarriers": "Pet Carriers",
   "subSubcategoryPetStrollers": "Pet Strollers",
   "subSubcategoryPetGates": "Pet Gates",
   "subSubcategoryTravelAccessoriesPet": "Travel Accessories",
   "subSubcategoryPetIDTags": "Pet ID Tags",
   "subSubcategoryCleanupSupplies": "Cleanup Supplies",
-
   "subSubcategoryTrainingTreats": "Training Treats",
   "subSubcategoryTrainingTools": "Training Tools",
   "subSubcategoryClickers": "Clickers",
   "subSubcategoryTrainingPads": "Training Pads",
   "subSubcategoryBehavioralAids": "Behavioral Aids",
-
   "subSubcategoryEngineParts": "Engine Parts",
   "subSubcategoryBrakeParts": "Brake Parts",
   "subSubcategorySuspensionParts": "Suspension Parts",
@@ -992,14 +869,12 @@
   "subSubcategoryBodyParts": "Body Parts",
   "subSubcategoryInteriorAccessoriesAuto": "Interior Accessories",
   "subSubcategoryExteriorAccessories": "Exterior Accessories",
-
   "subSubcategoryCarWashProducts": "Car Wash Products",
   "subSubcategoryWaxPolish": "Wax & Polish",
   "subSubcategoryInteriorCleaners": "Interior Cleaners",
   "subSubcategoryEngineCleaners": "Engine Cleaners",
   "subSubcategoryTireCare": "Tire Care",
   "subSubcategoryGlassCleaners": "Glass Cleaners",
-
   "subSubcategorySummerTires": "Summer Tires",
   "subSubcategoryWinterTires": "Winter Tires",
   "subSubcategoryAllSeasonTires": "All-Season Tires",
@@ -1007,41 +882,35 @@
   "subSubcategoryAlloyWheels": "Alloy Wheels",
   "subSubcategorySteelWheels": "Steel Wheels",
   "subSubcategoryWheelAccessories": "Wheel Accessories",
-
   "subSubcategoryCarStereos": "Car Stereos",
   "subSubcategoryGPSNavigation": "GPS Navigation",
   "subSubcategoryDashCameras": "Dash Cameras",
   "subSubcategoryCarAlarms": "Car Alarms",
   "subSubcategoryCarSpeakers": "Car Speakers",
   "subSubcategoryCarAmplifiers": "Car Amplifiers",
-
   "subSubcategoryMotorcycleEngines": "Motorcycle Engines",
   "subSubcategoryMotorcycleBrakes": "Motorcycle Brakes",
   "subSubcategoryMotorcycleTires": "Motorcycle Tires",
   "subSubcategoryMotorcycleLights": "Motorcycle Lights",
   "subSubcategoryMotorcycleExhaust": "Motorcycle Exhaust",
   "subSubcategoryMotorcycleBodyParts": "Motorcycle Body Parts",
-
   "subSubcategoryMotorcycleHelmets": "Motorcycle Helmets",
   "subSubcategoryMotorcycleGloves": "Motorcycle Gloves",
   "subSubcategoryMotorcycleJackets": "Motorcycle Jackets",
   "subSubcategoryMotorcycleBoots": "Motorcycle Boots",
   "subSubcategoryMotorcycleBags": "Motorcycle Bags",
   "subSubcategoryMotorcycleTools": "Motorcycle Tools",
-
   "subSubcategoryHandToolsAuto": "Hand Tools",
   "subSubcategoryPowerToolsAuto": "Power Tools",
   "subSubcategoryDiagnosticTools": "Diagnostic Tools",
   "subSubcategoryLiftingEquipment": "Lifting Equipment",
   "subSubcategoryMeasuringToolsAuto": "Measuring Tools",
-
   "subSubcategoryEngineOil": "Engine Oil",
   "subSubcategoryTransmissionFluid": "Transmission Fluid",
   "subSubcategoryBrakeFluid": "Brake Fluid",
   "subSubcategoryCoolant": "Coolant",
   "subSubcategoryPowerSteeringFluid": "Power Steering Fluid",
   "subSubcategoryWindshieldWasherFluid": "Windshield Washer Fluid",
-
   "subSubcategoryMultivitamins": "Multivitamins",
   "subSubcategoryVitaminC": "Vitamin C",
   "subSubcategoryVitaminD": "Vitamin D",
@@ -1050,21 +919,18 @@
   "subSubcategoryOmega3": "Omega-3",
   "subSubcategoryProteinSupplements": "Protein Supplements",
   "subSubcategoryProbiotics": "Probiotics",
-
   "subSubcategoryBloodPressureMonitors": "Blood Pressure Monitors",
   "subSubcategoryThermometers": "Thermometers",
   "subSubcategoryGlucoseMeters": "Glucose Meters",
   "subSubcategoryPulseOximeters": "Pulse Oximeters",
   "subSubcategoryNebulizers": "Nebulizers",
   "subSubcategoryStethoscopes": "Stethoscopes",
-
   "subSubcategoryBandages": "Bandages",
   "subSubcategoryAntiseptics": "Antiseptics",
   "subSubcategoryPainRelief": "Pain Relief",
   "subSubcategoryWoundCare": "Wound Care",
   "subSubcategoryFirstAidKits": "First Aid Kits",
   "subSubcategoryEmergencySupplies": "Emergency Supplies",
-
   "subSubcategoryWeightManagement": "Weight Management",
   "subSubcategoryDigestiveHealth": "Digestive Health",
   "subSubcategoryHeartHealth": "Heart Health",
@@ -1072,35 +938,28 @@
   "subSubcategoryMentalHealth": "Mental Health",
   "subSubcategorySleepAids": "Sleep Aids",
   "subSubcategoryEnergyBoosters": "Energy Boosters",
-
   "subSubcategoryWheelchairs": "Wheelchairs",
   "subSubcategoryWalkers": "Walkers",
   "subSubcategoryCrutches": "Crutches",
   "subSubcategoryCanes": "Canes",
   "subSubcategoryMobilityScooters": "Mobility Scooters",
   "subSubcategoryBathSafety": "Bath Safety",
-
   "subSubcategoryHerbalRemedies": "Herbal Remedies",
-  "subSubcategoryEssentialOils": "Essential Oils",
   "subSubcategoryAromatherapy": "Aromatherapy",
   "subSubcategoryHomeopathy": "Homeopathy",
   "subSubcategoryTraditionalMedicine": "Traditional Medicine",
   "subSubcategoryNaturalSupplements": "Natural Supplements",
-
   "subSubcategoryProteinPowders": "Protein Powders",
   "subSubcategoryPreWorkout": "Pre-Workout",
   "subSubcategoryPostWorkout": "Post-Workout",
   "subSubcategoryFatBurners": "Fat Burners",
   "subSubcategoryMealReplacements": "Meal Replacements",
-  "subSubcategorySportsNutrition": "Sports Nutrition",
   "subSubcategoryHealthySnacks": "Healthy Snacks",
-
   "subSubcategoryContraceptives": "Contraceptives",
   "subSubcategoryPregnancyTests": "Pregnancy Tests",
   "subSubcategoryFertilityProducts": "Fertility Products",
   "subSubcategoryPersonalLubricants": "Personal Lubricants",
   "subSubcategoryEnhancementProducts": "Enhancement Products",
-
   "whiteGoodRefrigerator": "Refrigerator",
   "whiteGoodWashingMachine": "Washing Machine",
   "whiteGoodDishwasher": "Dishwasher",
@@ -1109,7 +968,6 @@
   "pleaseSelectWhiteGood": "Please select a white good appliance",
   "selectWhiteGood": "Select White Good",
   "selectWhiteGoodType": "Select the type of white good appliance",
-
   "@_COMPUTER_COMPONENTS": {},
   "computerComponentCPU": "CPU (Processor)",
   "computerComponentGPU": "GPU (Graphics Card)",
@@ -1132,7 +990,6 @@
   "pleaseSelectComputerComponent": "Please select a computer component",
   "selectComputerComponent": "Select Computer Component",
   "selectComputerComponentType": "Select the type of computer component",
-
   "@_CONSOLE_BRANDS": {},
   "consoleBrandPlayStation": "PlayStation",
   "consoleBrandXbox": "Xbox",
@@ -1140,7 +997,6 @@
   "consoleBrandPC": "PC Gaming",
   "consoleBrandMobile": "Mobile Gaming",
   "consoleBrandRetro": "Retro Gaming",
-
   "@_PLAYSTATION_VARIANTS": {},
   "consoleVariantPS5": "PlayStation 5",
   "consoleVariantPS5Digital": "PlayStation 5 Digital Edition",
@@ -1154,7 +1010,6 @@
   "consoleVariantPS1": "PlayStation 1",
   "consoleVariantPSP": "PlayStation Portable (PSP)",
   "consoleVariantPSVita": "PlayStation Vita",
-
   "@_XBOX_VARIANTS": {},
   "consoleVariantXboxSeriesX": "Xbox Series X",
   "consoleVariantXboxSeriesS": "Xbox Series S",
@@ -1163,7 +1018,6 @@
   "consoleVariantXboxOne": "Xbox One",
   "consoleVariantXbox360": "Xbox 360",
   "consoleVariantXboxOriginal": "Xbox Original",
-
   "@_NINTENDO_VARIANTS": {},
   "consoleVariantSwitchOLED": "Nintendo Switch OLED",
   "consoleVariantSwitchStandard": "Nintendo Switch",
@@ -1182,27 +1036,22 @@
   "consoleVariantGameBoyAdvance": "Game Boy Advance",
   "consoleVariantGameBoyColor": "Game Boy Color",
   "consoleVariantGameBoy": "Game Boy",
-
   "consoleVariantSteamDeck": "Steam Deck",
   "consoleVariantGamingPC": "Gaming PC",
   "consoleVariantGamingLaptop": "Gaming Laptop",
   "consoleVariantMiniPC": "Mini PC",
-
   "consoleVariantiOS": "iOS (iPhone/iPad)",
   "consoleVariantAndroid": "Android",
-
   "consoleVariantAtari2600": "Atari 2600",
   "consoleVariantSegaGenesis": "Sega Genesis",
   "consoleVariantSegaDreamcast": "Sega Dreamcast",
   "consoleVariantNeoGeo": "Neo Geo",
   "consoleVariantArcadeCabinet": "Arcade Cabinet",
-
   "pleaseSelectConsoleBrand": "Please select a console brand",
   "pleaseSelectConsoleVariant": "Please select a console variant",
   "selectConsole": "Select Gaming Console",
   "selectConsoleBrand": "Select the console brand",
   "selectConsoleVariant": "Select the console variant",
-
   "kitchenApplianceMicrowave": "Microwave",
   "kitchenApplianceCoffeeMachine": "Coffee Machine",
   "kitchenApplianceBlender": "Blender",
@@ -1720,6 +1569,7 @@
     "primaryItem": "Primary Item",
     "preparingPayment": "Preparing payment...",
     "boostInfoTitle": "Boost Info",
+    "retry": "Retry",
     "boostInfoDescription": "Boost your products to reach a wider audience and make them stand out.",
     "perItemPerMinute": "Per Item Per Minute",
     "selectBoostDuration": "Select Boost Duration",
@@ -2006,7 +1856,6 @@
     "loadMore": "Load More",
     "endOfResults": "You've reached the end"
   },
-
   "CartDrawer": {
     "title": "My Cart",
     "itemsCount": "items",
@@ -2415,58 +2264,48 @@
     "resendCode": "Resend Code",
     "checkSpam": "Check your spam folder if you don't see the email"
   },
-
   "searchResults": {
     "title": "Search Results",
     "back": "Back",
-
     "searchingFor": "Searching for",
     "resultsFor": "Results for",
     "productsFound": "{count} products found",
     "productFound": "{count} product found",
-
     "relatedShops": "Related Shops",
     "searchingShops": "Searching shops...",
-
     "all": "All",
     "deals": "Deals",
     "boosted": "Featured",
     "trending": "Trending",
     "fiveStar": "5 Stars",
     "bestSellers": "Best Sellers",
-
     "sortBy": "Sort by",
     "none": "Relevance",
     "alphabetical": "A-Z",
     "date": "Newest",
     "priceLowToHigh": "Price: Low to High",
     "priceHighToLow": "Price: High to Low",
-
     "searchFailed": "Search Failed",
     "searchFailedTryAgain": "Search failed. Please try again.",
     "noInternet": "No internet connection. Please check your network and try again.",
     "connectionError": "Connection Error",
     "retry": "Retry",
     "tryAgain": "Try Again",
-
     "noProductsFound": "No Products Found",
     "noResultsFor": "No results for",
     "noResultsMessage": "We couldn't find any products matching your search. Try adjusting your search terms or browse our categories.",
     "tryDifferentKeywords": "Try different keywords or browse categories",
-
     "loading": "Loading...",
     "loadingMore": "Loading more...",
     "loadMore": "Load More",
     "refreshing": "Refreshing...",
     "pullToRefresh": "Pull to refresh",
-
     "addToCart": "Add to Cart",
     "addedToCart": "Added to Cart",
     "addToFavorites": "Add to Favorites",
     "removeFromFavorites": "Remove from Favorites",
     "viewProduct": "View Product",
     "quickView": "Quick View",
-
     "price": "Price",
     "originalPrice": "Original Price",
     "discount": "Discount",
@@ -2477,19 +2316,16 @@
     "lowStock": "Only {count} left",
     "fastDelivery": "Fast Delivery",
     "freeShipping": "Free Shipping",
-
     "showingResults": "Showing {count} results",
     "filteredBy": "Filtered by: {filter}",
     "sortedBy": "Sorted by: {sort}",
     "clearFilters": "Clear Filters",
     "applyFilters": "Apply Filters",
-
     "searchResultsDescription": "Search results for {query}",
     "filterButton": "Filter products",
     "sortButton": "Sort products",
     "productCard": "Product card for {productName}",
     "priceRange": "Price range: {min} to {max}",
-
     "networkError": "Network error occurred",
     "serverError": "Server error occurred",
     "timeoutError": "Request timed out",
@@ -3356,11 +3192,9 @@
     "selectConsoleVariant": "Console Variant",
     "selectKitchenAppliance": "Kitchen Appliance",
     "selectWhiteGood": "White Good",
-
     "clothingGenderWomen": "Women",
     "clothingGenderMen": "Men",
     "clothingGenderUnisex": "Unisex",
-
     "clothingSizeXXS": "XXS",
     "clothingSizeXS": "XS",
     "clothingSizeS": "S",
@@ -3370,12 +3204,10 @@
     "clothingSizeXXL": "XXL",
     "clothingSize3XL": "3XL",
     "clothingSize4XL": "4XL",
-
     "clothingFitSlim": "Slim",
     "clothingFitRegular": "Regular",
     "clothingFitLoose": "Loose",
     "clothingFitOversized": "Oversized",
-
     "clothingTypeCotton": "Cotton",
     "clothingTypePolyester": "Polyester",
     "clothingTypeNylon": "Nylon",
@@ -3384,7 +3216,6 @@
     "clothingTypeLinen": "Linen",
     "clothingTypeDenim": "Denim",
     "clothingTypeLeather": "Leather",
-
     "jewelryTypeNecklace": "Necklace",
     "jewelryTypeEarring": "Earring",
     "jewelryTypePiercing": "Piercing",
@@ -3393,14 +3224,12 @@
     "jewelryTypeAnklet": "Anklet",
     "jewelryTypeNoseRing": "Nose Ring",
     "jewelryTypeSet": "Set",
-
     "jewelryMaterialIron": "Iron",
     "jewelryMaterialSteel": "Steel",
     "jewelryMaterialGold": "Gold",
     "jewelryMaterialSilver": "Silver",
     "jewelryMaterialDiamond": "Diamond",
     "jewelryMaterialCopper": "Copper",
-
     "computerComponentCPU": "CPU",
     "computerComponentGPU": "GPU",
     "computerComponentRAM": "RAM",
@@ -3415,14 +3244,12 @@
     "computerComponentSoundCard": "Sound Card",
     "computerComponentWebcam": "Webcam",
     "computerComponentHeadset": "Headset",
-
     "consoleBrandPlayStation": "PlayStation",
     "consoleBrandXbox": "Xbox",
     "consoleBrandNintendo": "Nintendo",
     "consoleBrandPC": "PC",
     "consoleBrandMobile": "Mobile",
     "consoleBrandRetro": "Retro",
-
     "consoleVariantPS5": "PS5",
     "consoleVariantPS5Digital": "PS5 Digital",
     "consoleVariantPS5Slim": "PS5 Slim",
@@ -3470,7 +3297,6 @@
     "consoleVariantSegaDreamcast": "Sega Dreamcast",
     "consoleVariantNeoGeo": "Neo Geo",
     "consoleVariantArcadeCabinet": "Arcade Cabinet",
-
     "kitchenApplianceMicrowave": "Microwave",
     "kitchenApplianceCoffeeMachine": "Coffee Machine",
     "kitchenApplianceBlender": "Blender",
@@ -3502,13 +3328,11 @@
     "kitchenApplianceKnifeSharpener": "Knife Sharpener",
     "kitchenApplianceScale": "Scale",
     "kitchenApplianceTimer": "Timer",
-
     "whiteGoodRefrigerator": "Refrigerator",
     "whiteGoodWashingMachine": "Washing Machine",
     "whiteGoodDishwasher": "Dishwasher",
     "whiteGoodDryer": "Dryer",
     "whiteGoodFreezer": "Freezer",
-
     "colorBlue": "Blue",
     "colorOrange": "Orange",
     "colorYellow": "Yellow",
@@ -4343,5 +4167,8 @@
         "description": "Your package has been successfully delivered. Thank you for shopping with us!"
       }
     }
+  },
+  "ProductCard": {
+    "featured": "Featured"
   }
 }

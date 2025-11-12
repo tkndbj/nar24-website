@@ -1020,7 +1020,7 @@ PaymentIframe.displayName = 'PaymentIframe';
             : "bg-white border-gray-200"
         }`}
       >
-        <div className="px-4 sm:px-6 lg:px-8 py-4">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <button
@@ -1306,48 +1306,44 @@ PaymentIframe.displayName = 'PaymentIframe';
               </div>
             </div>
           </div>
-
-          {/* Bottom Action Bar */}
-          <div
-            className={`sticky bottom-0 border-t p-4 ${
-              isDarkMode
-                ? "bg-gray-900 border-gray-700"
-                : "bg-white border-gray-200"
-            }`}
-          >
-            <div className="max-w-4xl mx-auto">
-              <button
-                onClick={proceedToPayment}
-                disabled={submitting || getTotalItemsCount() === 0}
-                className="
-              w-full flex items-center justify-center space-x-2 py-4 px-6 
-              bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl 
-              font-bold text-lg shadow-lg hover:from-green-600 hover:to-green-700 
-              disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200
-              hover:shadow-xl active:scale-[0.98]
-            "
-              >
-                {submitting ? (
-                  <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    <span>{t("preparingPayment") || "Preparing..."}</span>
-                  </>
-                ) : (
-                  <>
-                    <CreditCard size={20} />
-                    <span>{t("completePayment") || "Complete Payment"}</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
         </>
+      )}
+
+      {/* Bottom Action Bar - Attached before Footer */}
+      {hasProductsToBoost() && (
+        <div className="pt-6">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <button
+              onClick={proceedToPayment}
+              disabled={submitting || getTotalItemsCount() === 0}
+              className="
+                w-full flex items-center justify-center space-x-2 py-4 px-6
+                bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl
+                font-bold text-lg shadow-lg hover:from-green-600 hover:to-green-700
+                disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200
+                hover:shadow-xl active:scale-[0.98]
+              "
+            >
+              {submitting ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                  <span>{t("preparingPayment") || "Preparing..."}</span>
+                </>
+              ) : (
+                <>
+                  <CreditCard size={20} />
+                  <span>{t("completePayment") || "Complete Payment"}</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Payment Modal */}
       {showPaymentModal && <PaymentModal />}
 
-      
+
     </div>
   );
 }

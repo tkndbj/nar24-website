@@ -4,12 +4,7 @@
  * Mimics Flutter's ImpressionBatcher with React-specific optimizations
  */
 
-interface ImpressionData {
-    productId: string;
-    timestamp: number;
-    userGender?: string;
-    userAge?: number;
-  }
+
   
   interface ClickData {
     productId: string;
@@ -69,13 +64,8 @@ interface ImpressionData {
   }
   
   class AnalyticsBatcher {
-    private static instance: AnalyticsBatcher;
+    private static instance: AnalyticsBatcher;   
     
-    // Impression tracking
-    private impressionBuffer: Map<string, ImpressionData> = new Map();
-    private impressionFlushTimer: NodeJS.Timeout | null = null;
-    private readonly IMPRESSION_FLUSH_INTERVAL = 30000; // 30 seconds
-    private readonly MAX_IMPRESSION_BATCH_SIZE = 100;
     
     // Click tracking
     private clickBuffer: Map<string, ClickData> = new Map();
@@ -122,83 +112,8 @@ interface ImpressionData {
   
     setCurrentUserId(userId: string | null) {
       this.currentUserId = userId;
-    }
-  
-    // ============= IMPRESSION TRACKING =============
+    } 
     
-    recordImpression(
-      productId: string, 
-      userGender?: string, 
-      userAge?: number
-    ): void {
-      if (this.isDisposed) return;
-  
-      this.impressionBuffer.set(productId, {
-        productId,
-        timestamp: Date.now(),
-        userGender,
-        userAge,
-      });
-  
-      // Auto-flush if buffer is full
-      if (this.impressionBuffer.size >= this.MAX_IMPRESSION_BATCH_SIZE) {
-        this.flushImpressions();
-      } else {
-        this.scheduleImpressionFlush();
-      }
-    }
-  
-    private scheduleImpressionFlush(): void {
-      if (this.impressionFlushTimer) return;
-      
-      this.impressionFlushTimer = setTimeout(() => {
-        this.flushImpressions();
-      }, this.IMPRESSION_FLUSH_INTERVAL);
-    }
-  
-    async flushImpressions(): Promise<void> {
-      if (this.impressionBuffer.size === 0) return;
-  
-      const impressionsToFlush = Array.from(this.impressionBuffer.values());
-      this.impressionBuffer.clear();
-  
-      if (this.impressionFlushTimer) {
-        clearTimeout(this.impressionFlushTimer);
-        this.impressionFlushTimer = null;
-      }
-  
-      try {
-        const productIds = impressionsToFlush.map(imp => imp.productId);
-        const sampleImpression = impressionsToFlush[0];
-  
-        const response = await RetryHelper.fetchWithRetry(
-          '/api/analytics/impressions',
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              productIds,
-              userGender: sampleImpression.userGender,
-              userAge: sampleImpression.userAge,
-            }),
-          },
-          3 // max 3 retries
-        );
-  
-        if (!response.ok) throw new Error('Failed to flush impressions');
-        
-        console.log(`✅ Flushed ${productIds.length} impressions`);
-      } catch (error) {
-        console.error('❌ Error flushing impressions:', error);
-        
-        // Re-add failed impressions (with limits to prevent memory issues)
-        if (this.impressionBuffer.size < this.MAX_IMPRESSION_BATCH_SIZE * 2) {
-          impressionsToFlush.forEach(imp => {
-            this.impressionBuffer.set(imp.productId, imp);
-          });
-        }
-      }
-    }
   
     // ============= CLICK TRACKING =============
     
@@ -525,7 +440,7 @@ interface ImpressionData {
   
     async flushAll(): Promise<void> {
       await Promise.all([
-        this.flushImpressions(),
+        
         this.flushClicks(),
         this.flushDetailViews(),
         this.flushPreferences(),
@@ -533,14 +448,7 @@ interface ImpressionData {
     }
   
     private flushAllWithBeacon(): void {
-      // Use sendBeacon for unload - it's guaranteed to send
-      if (this.impressionBuffer.size > 0) {
-        const data = Array.from(this.impressionBuffer.values());
-        navigator.sendBeacon(
-          '/api/analytics/impressions',
-          JSON.stringify({ productIds: data.map(d => d.productId) })
-        );
-      }
+     
   
       if (this.clickBuffer.size > 0) {
         const clicks: Record<string, number> = {};
@@ -565,13 +473,13 @@ interface ImpressionData {
       this.flushAllWithBeacon();
       
       // Clear all timers
-      if (this.impressionFlushTimer) clearTimeout(this.impressionFlushTimer);
+      
       if (this.clickFlushTimer) clearTimeout(this.clickFlushTimer);
       if (this.detailViewFlushTimer) clearTimeout(this.detailViewFlushTimer);
       if (this.preferenceFlushTimer) clearTimeout(this.preferenceFlushTimer);
       
       // Clear all buffers
-      this.impressionBuffer.clear();
+      
       this.clickBuffer.clear();
       this.detailViewBuffer.clear();
       this.lastClickTime.clear();
