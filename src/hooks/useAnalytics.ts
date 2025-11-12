@@ -30,58 +30,11 @@ export function useAnalytics() {
   }, []);
 
   return {
-    recordImpression: analyticsBatcher.recordImpression.bind(analyticsBatcher),
+    
     recordClick: analyticsBatcher.recordClick.bind(analyticsBatcher),
     recordDetailView: analyticsBatcher.recordDetailView.bind(analyticsBatcher),
     recordProductClick: analyticsBatcher.recordProductClick.bind(analyticsBatcher),
     recordPurchase: analyticsBatcher.recordPurchase.bind(analyticsBatcher),
     flushAll: analyticsBatcher.flushAll.bind(analyticsBatcher),
   };
-}
-
-/**
- * Hook for intersection observer-based impression tracking
- * Use this on product list pages to track when products become visible
- */
-export function useImpressionTracking(
-  elementRef: React.RefObject<HTMLElement>,
-  productId: string,
-  options?: {
-    threshold?: number;
-    userGender?: string;
-    userAge?: number;
-  }
-) {
-  useEffect(() => {
-    const element = elementRef.current;
-    if (!element) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            // Record impression when product is visible
-            analyticsBatcher.recordImpression(
-              productId,
-              options?.userGender,
-              options?.userAge
-            );
-
-            // Unobserve after recording (only track once)
-            observer.unobserve(entry.target);
-          }
-        });
-      },
-      {
-        threshold: options?.threshold || 0.5, // 50% visible by default
-        rootMargin: '0px',
-      }
-    );
-
-    observer.observe(element);
-
-    return () => {
-      observer.disconnect();
-    };
-  }, [productId, elementRef, options?.threshold, options?.userGender, options?.userAge]);
 }
