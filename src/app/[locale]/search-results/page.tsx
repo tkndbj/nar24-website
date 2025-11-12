@@ -168,8 +168,7 @@ const EmptyState: React.FC<{ isDarkMode: boolean; query: string }> = ({
               isDarkMode ? "text-gray-400" : "text-gray-600"
             }`}
           >
-            We couldn&apos;t find any products matching &quot;{query}&quot;. Try
-            adjusting your search terms or removing filters.
+            {t("noProductsFoundMessage", { query }) || `We couldn't find any products matching "${query}". Try adjusting your search terms or removing filters.`}
           </p>
         </div>
       </div>
@@ -542,7 +541,7 @@ const SearchResultsContent: React.FC = () => {
 
   // Enhanced fetch results function that mirrors Flutter's searchOnly method
   const fetchResults = useCallback(
-    async (reset: boolean = false) => {
+    async (reset: boolean = false, filterOverride?: FilterType) => {
       if (!query.trim()) {
         console.log("❌ Empty query, skipping search");
         return;
@@ -553,10 +552,13 @@ const SearchResultsContent: React.FC = () => {
         return;
       }
 
+      // Use filterOverride if provided, otherwise use currentFilter
+      const activeFilter = filterOverride !== undefined ? filterOverride : currentFilter;
+
       console.log(
         `🔍 Fetching results for "${query}", reset: ${reset}, page: ${
           reset ? 0 : currentPage
-        }`
+        }, filter: "${activeFilter}"`
       );
 
       // Connectivity check
@@ -594,7 +596,7 @@ const SearchResultsContent: React.FC = () => {
         );
 
         // Search with current filter applied server-side when possible
-        const serverSideFilterType = currentFilter || undefined;
+        const serverSideFilterType = activeFilter || undefined;
 
         // Try products index first with enhanced error handling
         let results: Product[] = [];
@@ -824,8 +826,9 @@ const SearchResultsContent: React.FC = () => {
       setHasMore(true);
 
       // Fetch new results with the filter applied server-side when possible
+      // Pass the new filter directly to avoid stale state issues
       if (query.trim()) {
-        fetchResults(true);
+        fetchResults(true, filter);
       }
     },
     [currentFilter, setFilter, query, fetchResults]
@@ -1124,7 +1127,7 @@ const SearchResultsContent: React.FC = () => {
                 isDarkMode ? "text-gray-400" : "text-gray-600"
               }`}
             >
-              Loading more products...
+              {t("loadingMoreProducts") || "Loading more products..."}
             </span>
           </div>
         </div>
@@ -1144,19 +1147,6 @@ const SearchResultsContent: React.FC = () => {
             </button>
           </div>
         )}
-
-      {/* End of results indicator */}
-      {!hasMore && !isEmpty && fetchInitialCompleteRef.current && (
-        <div className="flex justify-center py-8">
-          <p
-            className={`text-sm ${
-              isDarkMode ? "text-gray-400" : "text-gray-600"
-            }`}
-          >
-            You&apos;ve reached the end of the results
-          </p>
-        </div>
-      )}
     </div>
   );
 };
