@@ -1385,6 +1385,8 @@
     "editSellerInfo": "Satıcı Bilgisini Düzenle",
     "newSellerInfo": "Yeni Satıcı Bilgisi",
     "ibanOwnerName": "IBAN Sahibinin Adı",
+    "location": "Konum",
+    "pinLocationOnMap": "Haritada konum işaretle",
     "ibanOwnerSurname": "IBAN Sahibinin Soyadı",
     "phoneNumber": "Telefon Numarası",
     "region": "Bölge",
@@ -1406,6 +1408,20 @@
     "edit": "Düzenle",
     "delete": "Sil",
     "deleting": "Siliniyor..."
+  },
+  "LocationPicker": {
+    "geolocationNotSupported": "Coğrafi konum tarayıcınız tarafından desteklenmiyor",
+    "locationError": "Konum alınamadı",
+    "permissionDenied": "Konum izni reddedildi",
+    "positionUnavailable": "Konum bilgisi mevcut değil",
+    "timeout": "Konum isteği zaman aşımına uğradı",
+    "selectLocation": "Konum Seçin",
+    "tapOrDragMarker": "Haritaya dokunun veya işaretçiyi sürükleyin",
+    "mapError": "Harita Hatası",
+    "loadingMap": "Harita yükleniyor...",
+    "getCurrentLocation": "Mevcut Konumu Al",
+    "cancel": "İptal",
+    "done": "Tamam"
   },
   "SavedAddressesDrawer": {
     "title": "Kayıtlı Adresler",

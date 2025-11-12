@@ -1386,6 +1386,8 @@
     "newSellerInfo": "New Seller Info",
     "ibanOwnerName": "IBAN Owner Name",
     "ibanOwnerSurname": "IBAN Owner Surname",
+    "location": "Location",
+    "pinLocationOnMap": "Pin location on map",
     "phoneNumber": "Phone Number",
     "region": "Region",
     "selectRegion": "Select Region",
@@ -1406,6 +1408,20 @@
     "edit": "Edit",
     "delete": "Delete",
     "deleting": "Deleting..."
+  },
+  "LocationPicker": {
+    "geolocationNotSupported": "Geolocation is not supported by your browser",
+    "locationError": "Failed to get location",
+    "permissionDenied": "Location permission denied",
+    "positionUnavailable": "Location information unavailable",
+    "timeout": "Location request timed out",
+    "selectLocation": "Select Location",
+    "tapOrDragMarker": "Tap on map or drag marker",
+    "mapError": "Map Error",
+    "loadingMap": "Loading map...",
+    "getCurrentLocation": "Get Current Location",
+    "cancel": "Cancel",
+    "done": "Done"
   },
   "SavedAddressesDrawer": {
     "title": "Saved Addresses",
