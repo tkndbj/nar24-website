@@ -48,9 +48,9 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
         }
 
         const defaultCenter = initialLocation || {
-          lat: 39.9334,
-          lng: 32.8597,
-        }; // Ankara, Turkey
+          lat: 35.1856,
+          lng: 33.3823,
+        }; // Nicosia, North Cyprus
 
         // Create map
         const map = new google.maps.Map(mapContainerRef.current!, {
