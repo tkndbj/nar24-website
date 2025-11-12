@@ -1,26 +1,27 @@
-// app/api/user/demographics/route.ts
-
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
 import { initializeFirebaseAdmin } from '@/lib/firebase-admin';
 
 initializeFirebaseAdmin();
 
 export async function GET(request: NextRequest) {
   try {
-    // Get auth token from request
+    // Get Firebase ID token from cookie or header
     const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    const cookieToken = request.cookies.get('__session')?.value;
+    
+    const token = authHeader?.replace('Bearer ', '') || cookieToken;
+    
+    if (!token) {
+      // No auth token - return empty demographics
+      return NextResponse.json({
+        gender: null,
+        age: null,
+      }, { status: 200 });
     }
 
-    const token = authHeader.substring(7);
-    
-    // Verify token
+    // Verify Firebase token
     const decodedToken = await getAuth().verifyIdToken(token);
     const userId = decodedToken.uid;
 
@@ -29,29 +30,45 @@ export async function GET(request: NextRequest) {
     const userDoc = await db.collection('users').doc(userId).get();
 
     if (!userDoc.exists) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({
+        gender: null,
+        age: null,
+      }, { status: 200 });
     }
 
     const userData = userDoc.data();
 
-    // Return only demographics data
+    // Calculate age
+    let age: number | null = null;
+    if (userData?.birthDate) {
+      try {
+        const birthDate = userData.birthDate._seconds 
+          ? new Date(userData.birthDate._seconds * 1000)
+          : new Date(userData.birthDate);
+        
+        const today = new Date();
+        age = today.getFullYear() - birthDate.getFullYear();
+        const monthDiff = today.getMonth() - birthDate.getMonth();
+        
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+          age--;
+        }
+      } catch (error) {
+        console.warn('Error calculating age:', error);
+      }
+    }
+
     return NextResponse.json({
       gender: userData?.gender || null,
-      birthDate: userData?.birthDate?._seconds 
-        ? new Date(userData.birthDate._seconds * 1000).toISOString()
-        : null,
+      age: age,
     });
 
   } catch (error) {
     console.error('Error fetching demographics:', error);
     
-    // Return empty demographics instead of error (graceful degradation)
     return NextResponse.json({
       gender: null,
-      birthDate: null,
-    });
+      age: null,
+    }, { status: 200 });
   }
 }

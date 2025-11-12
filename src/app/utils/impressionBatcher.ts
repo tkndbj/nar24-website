@@ -1,8 +1,14 @@
 // app/utils/impressionBatcher.ts
 
-  interface UserDemographics {
+interface UserDemographics {
     gender?: string;
     age?: number;
+  }
+  
+  // NEW: Track per-page impressions
+  interface PageImpressionData {
+    pageUrl: string;
+    timestamp: number;
   }
   
   class ImpressionBatcherClass {
@@ -10,29 +16,30 @@
     
     // Buffers
     private impressionBuffer: Map<string, number> = new Map();
-    private sessionImpressions: Set<string> = new Set();
     
     // Timers
     private batchTimer: NodeJS.Timeout | null = null;
-    private sessionCleanupTimer: NodeJS.Timeout | null = null;
+    private cleanupTimer: NodeJS.Timeout | null = null;
     
-    // Tracking
-    private lastImpressionTime: Map<string, number> = new Map();
+    // NEW: Track impressions per page per product
+    private pageImpressions: Map<string, PageImpressionData[]> = new Map();
     
-    // Configuration (matching Flutter)
+    // User tracking
+    private currentUserId: string | null = null;
+    
+    // Configuration
     private readonly BATCH_INTERVAL = 30000; // 30 seconds
-    private readonly SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+    private readonly IMPRESSION_COOLDOWN = 60 * 60 * 1000; // 1 HOUR
+    private readonly MAX_IMPRESSIONS_PER_HOUR = 4; // Max 4 impressions per product per hour
     private readonly MAX_BATCH_SIZE = 100;
-    private readonly IMPRESSION_COOLDOWN = 5 * 60 * 1000; // 5 minutes
     private readonly MAX_RETRIES = 3;
     
     // Retry mechanism
     private retryCount = 0;
     private isDisposed = false;
     
-    // Session storage keys
-    private readonly SESSION_KEY = 'impression_session';
-    private readonly SESSION_CLEAR_KEY = 'last_session_clear';
+    // LocalStorage key prefix
+    private readonly PAGE_IMPRESSIONS_PREFIX = 'page_impressions_';
   
     private constructor() {
       this.initialize();
@@ -48,15 +55,14 @@
     private initialize(): void {
       if (typeof window === 'undefined') return;
   
-      this.loadSessionCache();
-      this.startSessionCleanup();
+      this.startCleanupTimer();
   
       // Flush on page unload
       window.addEventListener('beforeunload', () => {
         this.flush();
       });
   
-      // Flush on visibility change (tab switching)
+      // Flush on visibility change
       document.addEventListener('visibilitychange', () => {
         if (document.hidden) {
           this.flush();
@@ -64,83 +70,187 @@
       });
     }
   
-    private loadSessionCache(): void {
-      try {
-        const cached = sessionStorage.getItem(this.SESSION_KEY);
-        if (cached) {
-          const ids = JSON.parse(cached) as string[];
-          ids.forEach(id => this.sessionImpressions.add(id));
-        }
+    /**
+     * Set the current user ID
+     */
+    public setUserId(userId: string | null): void {
+      if (this.currentUserId === userId) return;
+      
+      console.log(`👤 ImpressionBatcher: User changed from ${this.currentUserId} to ${userId}`);
+      
+      // Clear in-memory data when user changes
+      this.pageImpressions.clear();
+      
+      this.currentUserId = userId;
+      
+      // Load data for new user
+      if (userId) {
+        this.loadPageImpressions();
+      }
+    }
   
-        // Check if session needs clearing
-        const lastClear = parseInt(sessionStorage.getItem(this.SESSION_CLEAR_KEY) || '0');
+    /**
+     * Get the storage key for current user
+     */
+    private getStorageKey(): string {
+      const userId = this.currentUserId || 'anonymous';
+      return `${this.PAGE_IMPRESSIONS_PREFIX}${userId}`;
+    }
+  
+    /**
+     * Get current page identifier (path without query params)
+     */
+    private getCurrentPageKey(): string {
+      if (typeof window === 'undefined') return 'unknown';
+      return window.location.pathname; // e.g., "/search" or "/category/electronics"
+    }
+  
+    /**
+     * Load page impressions from localStorage
+     */
+    private loadPageImpressions(): void {
+      try {
+        const storageKey = this.getStorageKey();
+        const stored = localStorage.getItem(storageKey);
+        
+        if (stored) {
+          const data = JSON.parse(stored) as Record<string, PageImpressionData[]>;
+          const now = Date.now();
+          let expiredCount = 0;
+          
+          // Clean expired impressions and load into memory
+          Object.entries(data).forEach(([productId, pages]) => {
+            const validPages = pages.filter(page => {
+              const age = now - page.timestamp;
+              if (age < this.IMPRESSION_COOLDOWN) {
+                return true;
+              } else {
+                expiredCount++;
+                return false;
+              }
+            });
+            
+            if (validPages.length > 0) {
+              this.pageImpressions.set(productId, validPages);
+            }
+          });
+          
+          console.log(`📊 Loaded ${this.pageImpressions.size} products with impressions for user ${this.currentUserId} (${expiredCount} expired)`);
+        }
+      } catch (e) {
+        console.error('Error loading page impressions:', e);
+      }
+    }
+  
+    /**
+     * Persist page impressions to localStorage
+     */
+    private persistPageImpressions(): void {
+      try {
+        const storageKey = this.getStorageKey();
+        const data: Record<string, PageImpressionData[]> = {};
+        
+        this.pageImpressions.forEach((pages, productId) => {
+          data[productId] = pages;
+        });
+        
+        localStorage.setItem(storageKey, JSON.stringify(data));
+      } catch (e) {
+        console.error('Error persisting page impressions:', e);
+      }
+    }
+  
+    /**
+     * Start cleanup timer
+     */
+    private startCleanupTimer(): void {
+      if (this.cleanupTimer) {
+        clearInterval(this.cleanupTimer);
+      }
+      
+      // Clean up every 10 minutes
+      this.cleanupTimer = setInterval(() => {
         const now = Date.now();
-  
-        if (now - lastClear > this.SESSION_DURATION) {
-          this.clearSessionCache();
+        let cleaned = 0;
+        
+        this.pageImpressions.forEach((pages, productId) => {
+          const validPages = pages.filter(page => {
+            const age = now - page.timestamp;
+            if (age < this.IMPRESSION_COOLDOWN) {
+              return true;
+            } else {
+              cleaned++;
+              return false;
+            }
+          });
+          
+          if (validPages.length === 0) {
+            this.pageImpressions.delete(productId);
+          } else {
+            this.pageImpressions.set(productId, validPages);
+          }
+        });
+        
+        if (cleaned > 0) {
+          console.log(`🧹 Cleaned ${cleaned} expired page impressions for user ${this.currentUserId}`);
+          this.persistPageImpressions();
         }
-      } catch (e) {
-        console.error('Error loading session cache:', e);
-      }
-    }
-  
-    private clearSessionCache(): void {
-      try {
-        sessionStorage.removeItem(this.SESSION_KEY);
-        sessionStorage.setItem(this.SESSION_CLEAR_KEY, Date.now().toString());
-        this.sessionImpressions.clear();
-        this.lastImpressionTime.clear();
-      } catch (e) {
-        console.error('Error clearing session cache:', e);
-      }
-    }
-  
-    private persistSessionCache(): void {
-      try {
-        const ids = Array.from(this.sessionImpressions);
-        sessionStorage.setItem(this.SESSION_KEY, JSON.stringify(ids));
-      } catch (e) {
-        console.error('Error persisting session cache:', e);
-      }
-    }
-  
-    private startSessionCleanup(): void {
-      if (this.sessionCleanupTimer) {
-        clearInterval(this.sessionCleanupTimer);
-      }
-  
-      this.sessionCleanupTimer = setInterval(() => {
-        this.clearSessionCache();
-      }, this.SESSION_DURATION);
+      }, 10 * 60 * 1000);
     }
   
     /**
      * Add an impression to the buffer
+     * Allows up to 4 impressions per product per hour (one per unique page)
      */
     public addImpression(productId: string): void {
-      // Check cooldown period
-      const lastTime = this.lastImpressionTime.get(productId);
-      if (lastTime) {
-        const timeSince = Date.now() - lastTime;
-        if (timeSince < this.IMPRESSION_COOLDOWN) {
-          return; // Still in cooldown
-        }
+      const now = Date.now();
+      const currentPage = this.getCurrentPageKey();
+      
+      // Get existing page impressions for this product
+      const existingPages = this.pageImpressions.get(productId) || [];
+      
+      // Clean old impressions (> 1 hour)
+      const validPages = existingPages.filter(page => {
+        const age = now - page.timestamp;
+        return age < this.IMPRESSION_COOLDOWN;
+      });
+      
+      // Check if already recorded on THIS PAGE within the cooldown
+      const alreadyRecordedOnThisPage = validPages.some(page => {
+        return page.pageUrl === currentPage;
+      });
+      
+      if (alreadyRecordedOnThisPage) {
+        console.log(`⏳ Product ${productId} already recorded on page ${currentPage} for user ${this.currentUserId || 'anonymous'}`);
+        return;
+      }
+      
+      // Check if we've reached the max impressions per hour (4 different pages)
+      if (validPages.length >= this.MAX_IMPRESSIONS_PER_HOUR) {
+        const oldestImpression = validPages[0];
+        const remainingMs = this.IMPRESSION_COOLDOWN - (now - oldestImpression.timestamp);
+        const remainingMinutes = Math.ceil(remainingMs / 60000);
+        
+        console.log(`⚠️ Product ${productId} has reached max impressions (${this.MAX_IMPRESSIONS_PER_HOUR}) for user ${this.currentUserId || 'anonymous'}. Wait ${remainingMinutes}m for oldest to expire.`);
+        return;
       }
   
-      // Check if already tracked in this session
-      if (this.sessionImpressions.has(productId)) {
-        return; // Already counted in this session
-      }
-  
-      // Add to buffer
+      // Record new impression
+      validPages.push({
+        pageUrl: currentPage,
+        timestamp: now,
+      });
+      
+      this.pageImpressions.set(productId, validPages);
+      
+      // Add to buffer for sending
       const currentCount = this.impressionBuffer.get(productId) || 0;
       this.impressionBuffer.set(productId, currentCount + 1);
       
-      this.sessionImpressions.add(productId);
-      this.lastImpressionTime.set(productId, Date.now());
-  
-      // Persist session cache
-      this.persistSessionCache();
+      // Persist to localStorage
+      this.persistPageImpressions();
+      
+      console.log(`✅ Recorded impression #${validPages.length} for product ${productId} on page ${currentPage} by user ${this.currentUserId || 'anonymous'} (${this.MAX_IMPRESSIONS_PER_HOUR - validPages.length} remaining in this hour)`);
   
       // Schedule batch send
       this.scheduleBatch();
@@ -162,41 +272,39 @@
       }, this.BATCH_INTERVAL);
     }
   
-    private async getUserDemographics(): Promise<UserDemographics> {
+    /**
+     * Get user demographics
+     */
+    private async getUserDemographics(): Promise<{ gender?: string; age?: number }> {
       try {
-        // Try to get from localStorage first (set during login)
-        const cached = localStorage.getItem('user_demographics');
-        if (cached) {
-          return JSON.parse(cached);
+        const response = await fetch('/api/analytics/user/demographics');
+        
+        if (response.status === 404 || response.status === 401) {
+          console.log('ℹ️ User demographics not available (not logged in or not set)');
+          return {};
+        }
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch demographics: ${response.status}`);
         }
   
-        // Fallback: fetch from API if user is logged in
-        const response = await fetch('/api/user/demographics');
-        if (response.ok) {
-          const data = await response.json();
-          
-          // Calculate age if birthDate exists
-          let age: number | undefined;
-          if (data.birthDate) {
-            const birthDate = new Date(data.birthDate);
-            const today = new Date();
-            age = today.getFullYear() - birthDate.getFullYear();
-            const monthDiff = today.getMonth() - birthDate.getMonth();
-            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-              age--;
-            }
-          }
-  
-          return {
-            gender: data.gender,
-            age: age
-          };
+        const data = await response.json();
+        
+        const demographics: { gender?: string; age?: number } = {};
+        
+        if (data.gender) {
+          demographics.gender = data.gender;
         }
-      } catch (e) {
-        console.error('Error getting user demographics:', e);
+        
+        if (data.age) {
+          demographics.age = data.age;
+        }
+        
+        return demographics;
+      } catch (error) {
+        console.error('⚠️ Error fetching user demographics:', error);
+        return {};
       }
-  
-      return {}; // Return empty if not available
     }
   
     private async sendBatch(): Promise<void> {
@@ -204,16 +312,13 @@
         return;
       }
   
-      // Create copy and clear buffer
       const idsToSend = Array.from(this.impressionBuffer.keys());
       const bufferCopy = new Map(this.impressionBuffer);
       this.impressionBuffer.clear();
   
       try {
-        // Get user demographics at send time (like Flutter)
         const demographics = await this.getUserDemographics();
   
-        // Send to backend
         const response = await fetch('/api/analytics/impressions', {
           method: 'POST',
           headers: {
@@ -232,30 +337,31 @@
         }
   
         const totalViews = Array.from(bufferCopy.values()).reduce((a, b) => a + b, 0);
+        
+        const genderStr = demographics.gender || 'not specified';
+        const ageStr = demographics.age ? demographics.age.toString() : 'not specified';
+        
         console.log(
-          `📊 Sent batch of ${idsToSend.length} impressions (${totalViews} total views) - Gender: ${demographics.gender || 'unknown'}, Age: ${demographics.age || 'unknown'}`
+          `📊 Sent batch of ${idsToSend.length} impressions (${totalViews} total views) from user ${this.currentUserId || 'anonymous'} - Gender: ${genderStr}, Age: ${ageStr}`
         );
         
-        this.retryCount = 0; // Reset on success
+        this.retryCount = 0;
       } catch (e) {
         console.error('❌ Error sending impression batch:', e);
   
-        // Retry with exponential backoff
         if (this.retryCount < this.MAX_RETRIES) {
           this.retryCount++;
-          const delay = 2000 * this.retryCount; // 2s, 4s, 6s
+          const delay = 2000 * this.retryCount;
   
           console.log(
             `🔄 Retrying impression batch in ${delay / 1000}s (attempt ${this.retryCount}/${this.MAX_RETRIES})`
           );
   
-          // Re-add failed impressions to buffer
           bufferCopy.forEach((count, id) => {
             const current = this.impressionBuffer.get(id) || 0;
             this.impressionBuffer.set(id, current + count);
           });
   
-          // Schedule retry
           setTimeout(() => {
             if (!this.isDisposed) {
               this.sendBatch();
@@ -268,9 +374,6 @@
       }
     }
   
-    /**
-     * Manually flush all pending impressions
-     */
     public async flush(): Promise<void> {
       if (this.batchTimer) {
         clearTimeout(this.batchTimer);
@@ -279,9 +382,6 @@
       await this.sendBatch();
     }
   
-    /**
-     * Clean up resources
-     */
     public dispose(): void {
       this.isDisposed = true;
   
@@ -289,17 +389,46 @@
         clearTimeout(this.batchTimer);
         this.batchTimer = null;
       }
-  
-      if (this.sessionCleanupTimer) {
-        clearInterval(this.sessionCleanupTimer);
-        this.sessionCleanupTimer = null;
+      
+      if (this.cleanupTimer) {
+        clearInterval(this.cleanupTimer);
+        this.cleanupTimer = null;
       }
   
       this.impressionBuffer.clear();
-      this.sessionImpressions.clear();
-      this.lastImpressionTime.clear();
+      this.pageImpressions.clear();
+    }
+    
+    /**
+     * Debug: Get impression status for a product
+     */
+    public getImpressionStatus(productId: string): { 
+      impressionCount: number;
+      pages: string[];
+      remainingSlots: number;
+      oldestImpressionAge: number | null;
+      userId: string | null;
+    } {
+      const pages = this.pageImpressions.get(productId) || [];
+      const now = Date.now();
+      
+      const validPages = pages.filter(page => {
+        const age = now - page.timestamp;
+        return age < this.IMPRESSION_COOLDOWN;
+      });
+      
+      const oldestAge = validPages.length > 0 
+        ? now - validPages[0].timestamp 
+        : null;
+      
+      return {
+        impressionCount: validPages.length,
+        pages: validPages.map(p => p.pageUrl),
+        remainingSlots: this.MAX_IMPRESSIONS_PER_HOUR - validPages.length,
+        oldestImpressionAge: oldestAge,
+        userId: this.currentUserId,
+      };
     }
   }
   
-  // Export singleton instance
   export const impressionBatcher = ImpressionBatcherClass.getInstance();

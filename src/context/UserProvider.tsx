@@ -22,7 +22,7 @@ import TwoFactorService from "@/services/TwoFactorService";
 import { cacheManager } from "@/app/utils/cacheManager";
 import { requestDeduplicator } from "@/app/utils/requestDeduplicator";
 import { debouncer } from "@/app/utils/debouncer";
-
+import { impressionBatcher } from "@/app/utils/impressionBatcher";
 interface ProfileData {
   displayName?: string;
   email?: string;
@@ -217,6 +217,22 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
     return () => unsubscribe();
   }, [check2FARequirement]);
+
+  useEffect(() => {
+    if (user) {
+      // User is logged in and past 2FA
+      impressionBatcher.setUserId(user.uid);
+      console.log(`👤 ImpressionBatcher: Synced with user ${user.uid}`);
+    } else if (internalFirebaseUser && pending2FA) {
+      // User is in 2FA state, use internal user
+      impressionBatcher.setUserId(internalFirebaseUser.uid);
+      console.log(`👤 ImpressionBatcher: Synced with pending 2FA user ${internalFirebaseUser.uid}`);
+    } else {
+      // No user logged in
+      impressionBatcher.setUserId(null);
+      console.log('👤 ImpressionBatcher: Synced with anonymous user');
+    }
+  }, [user, internalFirebaseUser, pending2FA]);
 
   // Refresh user
   const refreshUser = useCallback(async () => {
