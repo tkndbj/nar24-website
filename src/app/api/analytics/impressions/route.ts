@@ -9,7 +9,7 @@ initializeFirebaseAdmin();
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { productIds, userGender, userAge, timestamp } = body;
+    const { productIds, userGender, userAge } = body;
 
     // Validation
     if (!Array.isArray(productIds) || productIds.length === 0) {
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
 }
 
 // Optional: GET endpoint to check status
-export async function GET(request: NextRequest) {
+export async function GET() {
   return NextResponse.json({
     status: 'ok',
     service: 'impression-tracking',

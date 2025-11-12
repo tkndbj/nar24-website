@@ -1,10 +1,5 @@
 // app/utils/impressionBatcher.ts
 
-interface ImpressionData {
-    productId: string;
-    timestamp: number;
-  }
-  
   interface UserDemographics {
     gender?: string;
     age?: number;
