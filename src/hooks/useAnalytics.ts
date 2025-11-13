@@ -1,9 +1,9 @@
 // hooks/useAnalytics.ts
 "use client";
 
-import { useEffect } from 'react';
-import { analyticsBatcher } from '@/app/utils/analyticsBatcher';
-import { useUser } from '@/context/UserProvider';
+import { useEffect } from "react";
+import { analyticsBatcher } from "@/app/utils/analyticsBatcher";
+import { useUser } from "@/context/UserProvider";
 
 /**
  * Hook to initialize and manage analytics batcher
@@ -30,11 +30,7 @@ export function useAnalytics() {
   }, []);
 
   return {
-    
     recordClick: analyticsBatcher.recordClick.bind(analyticsBatcher),
-    recordDetailView: analyticsBatcher.recordDetailView.bind(analyticsBatcher),
-    recordProductClick: analyticsBatcher.recordProductClick.bind(analyticsBatcher),
-    recordPurchase: analyticsBatcher.recordPurchase.bind(analyticsBatcher),
     flushAll: analyticsBatcher.flushAll.bind(analyticsBatcher),
   };
 }

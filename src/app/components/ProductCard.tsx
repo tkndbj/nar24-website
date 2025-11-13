@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, memo } from "react";
-import { BoostedVisibilityWrapper } from '@/app/components/BoostedVisibilityWrapper';
+import { BoostedVisibilityWrapper } from "@/app/components/BoostedVisibilityWrapper";
 import Image from "next/image";
 import {
   Heart,
@@ -54,9 +54,10 @@ const hasSelectableOptions = (product: Product | null): boolean => {
   if (!product) return false;
 
   const colorImages = product.colorImages;
-  const hasColors = colorImages != null && 
-                    typeof colorImages === 'object' && 
-                    Object.keys(colorImages).length > 0;
+  const hasColors =
+    colorImages != null &&
+    typeof colorImages === "object" &&
+    Object.keys(colorImages).length > 0;
   if (hasColors) return true;
 
   const selectableAttrs = Object.entries(product.attributes || {}).filter(
@@ -166,38 +167,46 @@ interface RotatingTextProps {
   className?: string;
 }
 
-const RotatingText = memo<RotatingTextProps>(({ children, duration = 1500, className = "" }) => {
-  const [currentIndex, setCurrentIndex] = useState(0);
+const RotatingText = memo<RotatingTextProps>(
+  ({ children, duration = 1500, className = "" }) => {
+    const [currentIndex, setCurrentIndex] = useState(0);
 
-  useEffect(() => {
-    if (children.length <= 1) return;
+    useEffect(() => {
+      if (children.length <= 1) return;
 
-    const timer = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % children.length);
-    }, duration);
+      const timer = setInterval(() => {
+        setCurrentIndex((prev) => (prev + 1) % children.length);
+      }, duration);
 
-    return () => clearInterval(timer);
-  }, [children.length, duration]);
+      return () => clearInterval(timer);
+    }, [children.length, duration]);
 
-  if (children.length === 0) return null;
-  if (children.length === 1) return <div className={className}>{children[0]}</div>;
+    if (children.length === 0) return null;
+    if (children.length === 1)
+      return <div className={className}>{children[0]}</div>;
 
-  return (
-    <div className={`relative overflow-hidden ${className}`} style={{ height: "16px" }}>
-      {children.map((child, index) => (
-        <div
-          key={index}
-          className={`absolute w-full h-4 flex items-center transition-all duration-500 ease-in-out ${
-            index === currentIndex ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-          }`}
-          style={{ lineHeight: "16px" }}
-        >
-          {child}
-        </div>
-      ))}
-    </div>
-  );
-});
+    return (
+      <div
+        className={`relative overflow-hidden ${className}`}
+        style={{ height: "16px" }}
+      >
+        {children.map((child, index) => (
+          <div
+            key={index}
+            className={`absolute w-full h-4 flex items-center transition-all duration-500 ease-in-out ${
+              index === currentIndex
+                ? "opacity-100 translate-y-0"
+                : "opacity-0 translate-y-4"
+            }`}
+            style={{ lineHeight: "16px" }}
+          >
+            {child}
+          </div>
+        ))}
+      </div>
+    );
+  }
+);
 RotatingText.displayName = "RotatingText";
 
 // ✅ Optimized rotating banner
@@ -207,58 +216,71 @@ interface RotatingBannerProps {
   height?: number;
 }
 
-const RotatingBanner = memo<RotatingBannerProps>(({ children, duration = 2000, height = 20 }) => {
-  const [currentIndex, setCurrentIndex] = useState(0);
+const RotatingBanner = memo<RotatingBannerProps>(
+  ({ children, duration = 2000, height = 20 }) => {
+    const [currentIndex, setCurrentIndex] = useState(0);
 
-  useEffect(() => {
-    if (children.length <= 1) return;
+    useEffect(() => {
+      if (children.length <= 1) return;
 
-    const timer = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % children.length);
-    }, duration);
+      const timer = setInterval(() => {
+        setCurrentIndex((prev) => (prev + 1) % children.length);
+      }, duration);
 
-    return () => clearInterval(timer);
-  }, [children.length, duration]);
+      return () => clearInterval(timer);
+    }, [children.length, duration]);
 
-  if (children.length === 0) return null;
-  if (children.length === 1) return <div style={{ height }}>{children[0]}</div>;
+    if (children.length === 0) return null;
+    if (children.length === 1)
+      return <div style={{ height }}>{children[0]}</div>;
 
-  return (
-    <div style={{ height }} className="relative overflow-hidden">
-      {children.map((child, index) => (
-        <div
-          key={index}
-          className={`absolute w-full transition-all duration-500 ease-in-out ${
-            index === currentIndex ? "opacity-100 translate-y-0" : "opacity-0 translate-y-full"
-          }`}
-          style={{ height }}
-        >
-          {child}
-        </div>
-      ))}
-    </div>
-  );
-});
+    return (
+      <div style={{ height }} className="relative overflow-hidden">
+        {children.map((child, index) => (
+          <div
+            key={index}
+            className={`absolute w-full transition-all duration-500 ease-in-out ${
+              index === currentIndex
+                ? "opacity-100 translate-y-0"
+                : "opacity-0 translate-y-full"
+            }`}
+            style={{ height }}
+          >
+            {child}
+          </div>
+        ))}
+      </div>
+    );
+  }
+);
 RotatingBanner.displayName = "RotatingBanner";
 
 // ✅ Star rating component
-const StarRating = memo<{ rating: number; size?: number }>(({ rating, size = 14 }) => {
-  const fullStars = Math.floor(rating);
-  const hasHalfStar = rating - fullStars >= 0.5;
-  const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+const StarRating = memo<{ rating: number; size?: number }>(
+  ({ rating, size = 14 }) => {
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating - fullStars >= 0.5;
+    const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
 
-  return (
-    <div className="flex items-center">
-      {Array.from({ length: fullStars }, (_, i) => (
-        <Star key={`full-${i}`} size={size} className="fill-amber-400 text-amber-400" />
-      ))}
-      {hasHalfStar && <StarHalf size={size} className="fill-amber-400 text-amber-400" />}
-      {Array.from({ length: emptyStars }, (_, i) => (
-        <Star key={`empty-${i}`} size={size} className="text-amber-400" />
-      ))}
-    </div>
-  );
-});
+    return (
+      <div className="flex items-center">
+        {Array.from({ length: fullStars }, (_, i) => (
+          <Star
+            key={`full-${i}`}
+            size={size}
+            className="fill-amber-400 text-amber-400"
+          />
+        ))}
+        {hasHalfStar && (
+          <StarHalf size={size} className="fill-amber-400 text-amber-400" />
+        )}
+        {Array.from({ length: emptyStars }, (_, i) => (
+          <Star key={`empty-${i}`} size={size} className="text-amber-400" />
+        ))}
+      </div>
+    );
+  }
+);
 StarRating.displayName = "StarRating";
 
 // ✅ Extra label component
@@ -352,18 +374,20 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
   const { user } = useUser();
 
   const [isDarkModeState, setIsDarkMode] = useState(false);
-  const isDarkMode = isDarkModeProp !== undefined ? isDarkModeProp : isDarkModeState;
+  const isDarkMode =
+    isDarkModeProp !== undefined ? isDarkModeProp : isDarkModeState;
 
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [internalSelectedColor, setInternalSelectedColor] = useState<string | null>(
-    selectedColor || null
-  );
+  const [internalSelectedColor, setInternalSelectedColor] = useState<
+    string | null
+  >(selectedColor || null);
   const [isHovered, setIsHovered] = useState(false);
   const [imageError, setImageError] = useState(false);
 
   // Option selector states
   const [showCartOptionSelector, setShowCartOptionSelector] = useState(false);
-  const [showFavoriteOptionSelector, setShowFavoriteOptionSelector] = useState(false);
+  const [showFavoriteOptionSelector, setShowFavoriteOptionSelector] =
+    useState(false);
 
   // Animation states
   const [cartButtonState, setCartButtonState] = useState<
@@ -379,8 +403,8 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
 
   // ✅ Safe color images extraction
   const safeColorImages = useMemo(() => {
-    return product.colorImages && typeof product.colorImages === 'object' 
-      ? product.colorImages 
+    return product.colorImages && typeof product.colorImages === "object"
+      ? product.colorImages
       : {};
   }, [product.colorImages]);
 
@@ -398,7 +422,12 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
       return safeColorImages[colorToUse];
     }
     return product.imageUrls || [];
-  }, [internalSelectedColor, selectedColor, safeColorImages, product.imageUrls]);
+  }, [
+    internalSelectedColor,
+    selectedColor,
+    safeColorImages,
+    product.imageUrls,
+  ]);
 
   // Preload all images
   const { loadedImages, failedImages } = useImagePreloader(currentImageUrls);
@@ -420,11 +449,6 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
 
     // Record click analytics
     analyticsBatcher.recordClick(product.id, product.shopId);
-    analyticsBatcher.recordProductClick(
-      product.category,
-      product.subcategory,
-      product.subsubcategory
-    );
 
     if (onTap) {
       onTap();
@@ -432,16 +456,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
       // Navigate with slide transition
       router.push(`/productdetail/${product.id}`);
     }
-  }, [
-    onTap,
-    product.id,
-    product.shopId,
-    product.category,
-    product.subcategory,
-    product.subsubcategory,
-    router,
-    lastNavigationTime,
-  ]);
+  }, [onTap, product.id, product.shopId, router, lastNavigationTime]);
 
   // ✅ Check theme changes
   useEffect(() => {
@@ -486,7 +501,11 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
           quantityToAdd = selectedOptions.quantity;
         }
 
-        const result = await addToCart(product.id, quantityToAdd, attributesToAdd);
+        const result = await addToCart(
+          product.id,
+          quantityToAdd,
+          attributesToAdd
+        );
 
         if (result.includes("Added") || result.includes("Updated")) {
           setCartButtonState("added");
@@ -551,7 +570,14 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
 
       await performCartOperation(selectedOptions);
     },
-    [user, product, actualIsInCart, router, performCartRemoval, performCartOperation]
+    [
+      user,
+      product,
+      actualIsInCart,
+      router,
+      performCartRemoval,
+      performCartOperation,
+    ]
   );
 
   // ✅ Favorite operations
@@ -723,7 +749,9 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
       icon: (
         <Heart
           size={12}
-          className={actualIsFavorite ? "fill-red-500 text-red-500" : "text-gray-500"}
+          className={
+            actualIsFavorite ? "fill-red-500 text-red-500" : "text-gray-500"
+          }
         />
       ),
       className: "",
@@ -742,7 +770,12 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
     ) {
       setCartButtonState("idle");
     }
-  }, [product.id, isOptimisticallyAdding, isOptimisticallyRemoving, cartButtonState]);
+  }, [
+    product.id,
+    isOptimisticallyAdding,
+    isOptimisticallyRemoving,
+    cartButtonState,
+  ]);
 
   const effectiveScaleFactor = scaleFactor;
   const finalInternalScaleFactor =
@@ -772,7 +805,10 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
 
     if (quantity <= 5 && quantity > 0) {
       children.push(
-        <span key="stock" className="text-emerald-600 text-xs font-bold truncate">
+        <span
+          key="stock"
+          className="text-emerald-600 text-xs font-bold truncate"
+        >
           Only {quantity} left
         </span>
       );
@@ -870,319 +906,354 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
 
   const cardContent = (
     <div
-        className="w-full cursor-pointer transition-transform duration-200 hover:scale-105"
-        onClick={handleCardClick}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        style={{ transform: `scale(${effectiveScaleFactor})` }}
-      >
-        <div className="flex flex-col w-full">
-          {/* Image Section */}
-          <div
-            className="relative group h-[28vh] lg:h-[38vh]"
-            style={imageHeight ? { height: imageHeight } : {}}
-          >
-            <div className="w-full h-full rounded-t-xl overflow-hidden bg-gray-200 relative">
-              {currentImageUrls.length > 0 ? (
+      className="w-full cursor-pointer transition-transform duration-200 hover:scale-105"
+      onClick={handleCardClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      style={{ transform: `scale(${effectiveScaleFactor})` }}
+    >
+      <div className="flex flex-col w-full">
+        {/* Image Section */}
+        <div
+          className="relative group h-[28vh] lg:h-[38vh]"
+          style={imageHeight ? { height: imageHeight } : {}}
+        >
+          <div className="w-full h-full rounded-t-xl overflow-hidden bg-gray-200 relative">
+            {currentImageUrls.length > 0 ? (
+              <div className="relative w-full h-full">
                 <div className="relative w-full h-full">
-                  <div className="relative w-full h-full">
-                    {isImageLoaded && !imageError ? (
-                      <Image
-                        src={currentImageUrl}
-                        alt={product.productName}
-                        fill
-                        className="object-cover transition-opacity duration-300"
-                        onError={() => setImageError(true)}
-                        sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
-                        priority={currentImageIndex === 0}
-                      />
-                    ) : isImageFailed || imageError ? (
-                      <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                        <ImageOff size={32} className="text-gray-400" />
-                      </div>
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                        <LogoPlaceholder size={80} />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Navigation buttons */}
-                  {currentImageUrls.length > 1 && !isFantasyProduct(product) && (
-                    <>
-                      <button
-                        className={`absolute left-2 top-1/2 transform -translate-y-1/2 w-8 h-8 bg-black bg-opacity-50 rounded-full flex items-center justify-center text-white transition-opacity duration-150 ${
-                          isHovered ? "opacity-100" : "opacity-0"
-                        }`}
-                        onClick={handlePrevImage}
-                      >
-                        <ChevronLeft size={16} />
-                      </button>
-                      <button
-                        className={`absolute right-2 top-1/2 transform -translate-y-1/2 w-8 h-8 bg-black bg-opacity-50 rounded-full flex items-center justify-center text-white transition-opacity duration-150 ${
-                          isHovered ? "opacity-100" : "opacity-0"
-                        }`}
-                        onClick={handleNextImage}
-                      >
-                        <ChevronRight size={16} />
-                      </button>
-                    </>
-                  )}
-
-                  {/* Blur overlay for fantasy products */}
-                  {isFantasyProduct(product) && (
-                    <div
-                      className="absolute inset-0 backdrop-blur-[15px] bg-black/10"
-                      style={{
-                        backdropFilter: "blur(15px)",
-                        WebkitBackdropFilter: "blur(15px)",
-                      }}
+                  {isImageLoaded && !imageError ? (
+                    <Image
+                      src={currentImageUrl}
+                      alt={product.productName}
+                      fill
+                      className="object-cover transition-opacity duration-300"
+                      onError={() => setImageError(true)}
+                      sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
+                      priority={currentImageIndex === 0}
                     />
-                  )}
-
-                  {/* +18 Label for fantasy products */}
-                  {isFantasyProduct(product) && (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div
-                        className="px-6 py-3 bg-red-600/90 rounded-xl border-2 border-white"
-                        style={{
-                          boxShadow: "0 4px 6px rgba(0, 0, 0, 0.3)",
-                        }}
-                      >
-                        <span
-                          className="text-white font-bold"
-                          style={{
-                            fontSize: "32px",
-                            letterSpacing: "2px",
-                          }}
-                        >
-                          +18
-                        </span>
-                      </div>
+                  ) : isImageFailed || imageError ? (
+                    <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                      <ImageOff size={32} className="text-gray-400" />
+                    </div>
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                      <LogoPlaceholder size={80} />
                     </div>
                   )}
                 </div>
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <LogoPlaceholder size={80} />
-                </div>
-              )}
-            </div>
 
-            {/* Top Right Icons */}
-            <div className="absolute top-2 right-2 flex items-center gap-2">
-              {showExtraLabels && (
-                <>
-                  <ExtraLabel text="Nar24" gradientColors={["#FF9800", "#E91E63"]} />
-                  <ExtraLabel text="Vitrin" gradientColors={["#9C27B0", "#E91E63"]} />
-                </>
-              )}
-
-              {/* Favorite Icon */}
-              <button
-                className="w-7 h-7 bg-white bg-opacity-90 rounded-full flex items-center justify-center shadow-sm hover:bg-opacity-100 transition-all relative overflow-hidden"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleToggleFavorite();
-                }}
-                disabled={isProcessingFavorite}
-              >
-                <span
-                  className={`transition-all duration-300 ${
-                    favoriteButtonState === "added" || favoriteButtonState === "removed"
-                      ? "animate-pulse"
-                      : ""
-                  } ${favoriteButtonContent.className}`}
-                >
-                  {favoriteButtonContent.icon}
-                </span>
-
-                {(favoriteButtonState === "added" || favoriteButtonState === "removed") && (
-                  <div className="absolute inset-0 bg-green-500/10 animate-pulse rounded-full" />
-                )}
-              </button>
-            </div>
-
-            {/* Color Options */}
-            {displayedColors.length > 0 && (
-              <div className="absolute right-2 bottom-16 flex flex-col gap-1">
-                {displayedColors.map((color) => {
-                  const isSelected = internalSelectedColor === color;
-                  return (
+                {/* Navigation buttons */}
+                {currentImageUrls.length > 1 && !isFantasyProduct(product) && (
+                  <>
                     <button
-                      key={color}
-                      className={`w-5 h-5 rounded-full border-2 transition-all duration-200 ${
-                        isSelected
-                          ? "border-orange-500 scale-110"
-                          : "border-white hover:scale-105"
+                      className={`absolute left-2 top-1/2 transform -translate-y-1/2 w-8 h-8 bg-black bg-opacity-50 rounded-full flex items-center justify-center text-white transition-opacity duration-150 ${
+                        isHovered ? "opacity-100" : "opacity-0"
                       }`}
-                      style={{ backgroundColor: getColorFromName(color) }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleColorSelect(color);
+                      onClick={handlePrevImage}
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+                    <button
+                      className={`absolute right-2 top-1/2 transform -translate-y-1/2 w-8 h-8 bg-black bg-opacity-50 rounded-full flex items-center justify-center text-white transition-opacity duration-150 ${
+                        isHovered ? "opacity-100" : "opacity-0"
+                      }`}
+                      onClick={handleNextImage}
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </>
+                )}
+
+                {/* Blur overlay for fantasy products */}
+                {isFantasyProduct(product) && (
+                  <div
+                    className="absolute inset-0 backdrop-blur-[15px] bg-black/10"
+                    style={{
+                      backdropFilter: "blur(15px)",
+                      WebkitBackdropFilter: "blur(15px)",
+                    }}
+                  />
+                )}
+
+                {/* +18 Label for fantasy products */}
+                {isFantasyProduct(product) && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div
+                      className="px-6 py-3 bg-red-600/90 rounded-xl border-2 border-white"
+                      style={{
+                        boxShadow: "0 4px 6px rgba(0, 0, 0, 0.3)",
                       }}
                     >
-                      {isSelected && <Check size={10} className="text-white m-auto" />}
-                    </button>
-                  );
-                })}
+                      <span
+                        className="text-white font-bold"
+                        style={{
+                          fontSize: "32px",
+                          letterSpacing: "2px",
+                        }}
+                      >
+                        +18
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-
-            {/* Campaign Badge */}
-            {product.campaignName && (
-              <div className="absolute bottom-12 left-2">
-                <div className="px-2 py-1 rounded-lg text-white text-xs font-bold bg-gradient-to-r from-orange-500 to-pink-500">
-                  {product.campaignName}
-                </div>
-              </div>
-            )}
-
-            {/* Featured Badge */}
-            {product.isBoosted && (
-              <div className="absolute bottom-8 left-2">
-                <div className="px-2 py-1 rounded-lg text-white text-xs font-bold bg-gray-600 bg-opacity-80">
-                  {t("ProductCard.featured")}
-                </div>
-              </div>
-            )}
-
-            {/* Image Dots */}
-            {currentImageUrls.length > 1 && (
-              <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2">
-                <div className="px-2 py-1 bg-gray-600 bg-opacity-80 rounded-full flex gap-1">
-                  {Array.from(
-                    { length: Math.min(currentImageUrls.length, 3) },
-                    (_, i) => {
-                      const isActive = i === getActiveDotIndex();
-                      return (
-                        <div
-                          key={i}
-                          className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
-                            isActive
-                              ? "bg-orange-500 scale-125"
-                              : "bg-white bg-opacity-60"
-                          }`}
-                        />
-                      );
-                    }
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Bottom Banner */}
-            {bannerChildren.length > 0 && (
-              <div className="absolute bottom-0 left-0 right-0">
-                <RotatingBanner height={20} duration={2000}>
-                  {bannerChildren}
-                </RotatingBanner>
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <LogoPlaceholder size={80} />
               </div>
             )}
           </div>
 
-          {/* Content Section */}
-          <div className="p-2">
-            {/* Product Name */}
-            <h3
-              className={`font-semibold truncate mb-1 ${
-                isDarkMode ? "text-white" : "text-gray-900"
-              }`}
-              style={{ fontSize: `${14 * textScaleFactor}px` }}
-            >
-              {product.productName}
-            </h3>
-
-            {/* Rotating Description */}
-            {rotatingChildren.length > 0 && (
-              <RotatingText duration={1500}>{rotatingChildren}</RotatingText>
+          {/* Top Right Icons */}
+          <div className="absolute top-2 right-2 flex items-center gap-2">
+            {showExtraLabels && (
+              <>
+                <ExtraLabel
+                  text="Nar24"
+                  gradientColors={["#FF9800", "#E91E63"]}
+                />
+                <ExtraLabel
+                  text="Vitrin"
+                  gradientColors={["#9C27B0", "#E91E63"]}
+                />
+              </>
             )}
 
-            <div className="h-1" />
+            {/* Favorite Icon */}
+            <button
+              className="w-7 h-7 bg-white bg-opacity-90 rounded-full flex items-center justify-center shadow-sm hover:bg-opacity-100 transition-all relative overflow-hidden"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleToggleFavorite();
+              }}
+              disabled={isProcessingFavorite}
+            >
+              <span
+                className={`transition-all duration-300 ${
+                  favoriteButtonState === "added" ||
+                  favoriteButtonState === "removed"
+                    ? "animate-pulse"
+                    : ""
+                } ${favoriteButtonContent.className}`}
+              >
+                {favoriteButtonContent.icon}
+              </span>
 
-            {/* Rating Row */}
-            <div className="flex items-center justify-between mb-1">
-              <div className="flex items-center gap-1">
-                <StarRating
-                  rating={product.averageRating}
-                  size={12 * effectiveScaleFactor}
-                />
-                <span
-                  className="text-gray-500"
-                  style={{ fontSize: `${10 * textScaleFactor}px` }}
-                >
-                  {product.averageRating.toFixed(1)}
-                </span>
+              {(favoriteButtonState === "added" ||
+                favoriteButtonState === "removed") && (
+                <div className="absolute inset-0 bg-green-500/10 animate-pulse rounded-full" />
+              )}
+            </button>
+          </div>
+
+          {/* Color Options */}
+          {displayedColors.length > 0 && (
+            <div className="absolute right-2 bottom-16 flex flex-col gap-1">
+              {displayedColors.map((color) => {
+                const isSelected = internalSelectedColor === color;
+                return (
+                  <button
+                    key={color}
+                    className={`w-5 h-5 rounded-full border-2 transition-all duration-200 ${
+                      isSelected
+                        ? "border-orange-500 scale-110"
+                        : "border-white hover:scale-105"
+                    }`}
+                    style={{ backgroundColor: getColorFromName(color) }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleColorSelect(color);
+                    }}
+                  >
+                    {isSelected && (
+                      <Check size={10} className="text-white m-auto" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Campaign Badge */}
+          {product.campaignName && (
+            <div className="absolute bottom-12 left-2">
+              <div className="px-2 py-1 rounded-lg text-white text-xs font-bold bg-gradient-to-r from-orange-500 to-pink-500">
+                {product.campaignName}
               </div>
             </div>
+          )}
 
-            <div className="h-1" />
+          {/* Featured Badge */}
+          {product.isBoosted && (
+            <div className="absolute bottom-8 left-2">
+              <div className="px-2 py-1 rounded-lg text-white text-xs font-bold bg-gray-600 bg-opacity-80">
+                {t("ProductCard.featured")}
+              </div>
+            </div>
+          )}
 
-            {/* Price Row */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 flex-1">
-                {hasDiscount ? (
-                  <>
-                    <span
-                      className="font-semibold text-orange-500"
-                      style={{ fontSize: `${14 * textScaleFactor}px` }}
-                    >
-                      {product.price.toFixed(0)} {product.currency}
-                    </span>
-                    <span
-                      className="text-emerald-600 font-bold"
-                      style={{ fontSize: `${12 * textScaleFactor}px` }}
-                    >
-                      %{product.discountPercentage}
-                    </span>
-                  </>
-                ) : (
+          {/* Image Dots */}
+          {currentImageUrls.length > 1 && (
+            <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2">
+              <div className="px-2 py-1 bg-gray-600 bg-opacity-80 rounded-full flex gap-1">
+                {Array.from(
+                  { length: Math.min(currentImageUrls.length, 3) },
+                  (_, i) => {
+                    const isActive = i === getActiveDotIndex();
+                    return (
+                      <div
+                        key={i}
+                        className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
+                          isActive
+                            ? "bg-orange-500 scale-125"
+                            : "bg-white bg-opacity-60"
+                        }`}
+                      />
+                    );
+                  }
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Bottom Banner */}
+          {bannerChildren.length > 0 && (
+            <div className="absolute bottom-0 left-0 right-0">
+              <RotatingBanner height={20} duration={2000}>
+                {bannerChildren}
+              </RotatingBanner>
+            </div>
+          )}
+        </div>
+
+        {/* Content Section */}
+        <div className="p-2">
+          {/* Product Name */}
+          <h3
+            className={`font-semibold truncate mb-1 ${
+              isDarkMode ? "text-white" : "text-gray-900"
+            }`}
+            style={{ fontSize: `${14 * textScaleFactor}px` }}
+          >
+            {product.productName}
+          </h3>
+
+          {/* Rotating Description */}
+          {rotatingChildren.length > 0 && (
+            <RotatingText duration={1500}>{rotatingChildren}</RotatingText>
+          )}
+
+          <div className="h-1" />
+
+          {/* Rating Row */}
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-1">
+              <StarRating
+                rating={product.averageRating}
+                size={12 * effectiveScaleFactor}
+              />
+              <span
+                className="text-gray-500"
+                style={{ fontSize: `${10 * textScaleFactor}px` }}
+              >
+                {product.averageRating.toFixed(1)}
+              </span>
+            </div>
+          </div>
+
+          <div className="h-1" />
+
+          {/* Price Row */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 flex-1">
+              {hasDiscount ? (
+                <>
                   <span
                     className="font-semibold text-orange-500"
                     style={{ fontSize: `${14 * textScaleFactor}px` }}
                   >
                     {product.price.toFixed(0)} {product.currency}
                   </span>
-                )}
-              </div>
-
-              {/* Cart Icon */}
-              {showCartIcon && (
-                <button
-                  className="w-6 h-6 flex items-center justify-center transform -translate-y-1 transition-all hover:scale-110 relative overflow-hidden"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleAddToCart();
-                  }}
-                  disabled={isProcessingCart}
-                >
                   <span
-                    className={`transition-all duration-300 ${
-                      cartButtonState === "added" || cartButtonState === "removed"
-                        ? "animate-pulse"
-                        : ""
-                    } ${cartButtonContent.className}`}
+                    className="text-emerald-600 font-bold"
+                    style={{ fontSize: `${12 * textScaleFactor}px` }}
                   >
-                    {cartButtonContent.icon}
+                    %{product.discountPercentage}
                   </span>
-
-                  {(cartButtonState === "added" || cartButtonState === "removed") && (
-                    <div className="absolute inset-0 bg-green-500/10 animate-pulse rounded-full" />
-                  )}
-                </button>
+                </>
+              ) : (
+                <span
+                  className="font-semibold text-orange-500"
+                  style={{ fontSize: `${14 * textScaleFactor}px` }}
+                >
+                  {product.price.toFixed(0)} {product.currency}
+                </span>
               )}
             </div>
+
+            {/* Cart Icon */}
+            {showCartIcon && (
+              <button
+                className="w-6 h-6 flex items-center justify-center transform -translate-y-1 transition-all hover:scale-110 relative overflow-hidden"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleAddToCart();
+                }}
+                disabled={isProcessingCart}
+              >
+                <span
+                  className={`transition-all duration-300 ${
+                    cartButtonState === "added" || cartButtonState === "removed"
+                      ? "animate-pulse"
+                      : ""
+                  } ${cartButtonContent.className}`}
+                >
+                  {cartButtonContent.icon}
+                </span>
+
+                {(cartButtonState === "added" ||
+                  cartButtonState === "removed") && (
+                  <div className="absolute inset-0 bg-green-500/10 animate-pulse rounded-full" />
+                )}
+              </button>
+            )}
           </div>
         </div>
       </div>
+    </div>
+  );
+  if (isBoosted) {
+    return (
+      <>
+        <BoostedVisibilityWrapper productId={product.id} enabled={true}>
+          {cardContent}
+        </BoostedVisibilityWrapper>
 
-  )
-            if (isBoosted) {
+        {/* Option Selector Modals */}
+        <ProductOptionSelector
+          product={product}
+          isOpen={showCartOptionSelector}
+          onClose={handleCartOptionSelectorClose}
+          onConfirm={handleCartOptionSelectorConfirm}
+          isDarkMode={isDarkMode}
+          localization={localization}
+        />
+
+        <ProductOptionSelector
+          product={product}
+          isOpen={showFavoriteOptionSelector}
+          onClose={handleFavoriteOptionSelectorClose}
+          onConfirm={handleFavoriteOptionSelectorConfirm}
+          isDarkMode={isDarkMode}
+          localization={localization}
+        />
+      </>
+    );
+  }
   return (
     <>
-      <BoostedVisibilityWrapper productId={product.id} enabled={true}>
-        {cardContent}
-      </BoostedVisibilityWrapper>
+      {cardContent}
 
       {/* Option Selector Modals */}
       <ProductOptionSelector
@@ -1204,31 +1275,6 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
       />
     </>
   );
-}
-return (
-  <>
-    {cardContent}
-
-    {/* Option Selector Modals */}
-    <ProductOptionSelector
-      product={product}
-      isOpen={showCartOptionSelector}
-      onClose={handleCartOptionSelectorClose}
-      onConfirm={handleCartOptionSelectorConfirm}
-      isDarkMode={isDarkMode}
-      localization={localization}
-    />
-
-    <ProductOptionSelector
-      product={product}
-      isOpen={showFavoriteOptionSelector}
-      onClose={handleFavoriteOptionSelectorClose}
-      onConfirm={handleFavoriteOptionSelectorConfirm}
-      isDarkMode={isDarkMode}
-      localization={localization}
-    />
-  </>
-);
 };
 
 // ✅ Export memoized version for performance
