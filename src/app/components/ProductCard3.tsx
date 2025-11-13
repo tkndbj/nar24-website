@@ -289,7 +289,7 @@ export const ProductCard3: React.FC<ProductCard3Props> = ({
         }}
       >
         {/* Product Title (Brand + Name) */}
-        <div className="flex items-start min-h-0">
+        <div className="flex items-start min-h-0 min-w-0 overflow-hidden">
           <span
             className="font-semibold text-blue-500 flex-shrink-0"
             style={{
@@ -300,7 +300,7 @@ export const ProductCard3: React.FC<ProductCard3Props> = ({
             {brandModel}{" "}
           </span>
           <span
-            className="font-semibold truncate flex-1"
+            className="font-semibold truncate flex-1 min-w-0"
             style={{
               fontSize: `${14 * effectiveScaleFactor}px`,
               color: textColor,

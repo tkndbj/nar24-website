@@ -428,34 +428,36 @@ export default function DynamicHorizontalList({ keyPrefix = '' }: DynamicHorizon
   if (!isClient) {
     return (
       <div className="w-full">
-        {Array.from({ length: 2 }, (_, index) => (
-          <div
-            key={index}
-            className="w-full my-2 lg:mx-0 lg:px-6"
-            style={{ height: `${rowHeight}px` }}
-          >
-            <div className="relative w-full rounded-none lg:rounded-t-3xl overflow-visible">
-              <div
-                className="absolute inset-0 rounded-none lg:rounded-t-3xl"
-                style={{
-                  height: `${rowHeight * 0.6}px`,
-                  background: `linear-gradient(to right, #f97316, #ec4899)`,
-                  maskImage: `linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%)`,
-                  WebkitMaskImage: `linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%)`,
-                }}
-              />
-              <div className="relative py-3">
-                <div className="px-0 lg:px-2 mb-2">
-                  <div className="flex justify-between items-center">
-                    <div className="h-5 bg-white bg-opacity-30 rounded animate-pulse w-48" />
-                    <div className="h-4 bg-white bg-opacity-30 rounded animate-pulse w-16" />
+        <div className="max-w-6xl mx-auto">
+          {Array.from({ length: 2 }, (_, index) => (
+            <div
+              key={index}
+              className="w-full my-2 lg:mx-0 lg:px-6"
+              style={{ height: `${rowHeight}px` }}
+            >
+              <div className="relative w-full rounded-none lg:rounded-t-3xl overflow-visible">
+                <div
+                  className="absolute inset-0 rounded-none lg:rounded-t-3xl"
+                  style={{
+                    height: `${rowHeight * 0.6}px`,
+                    background: `linear-gradient(to right, #f97316, #ec4899)`,
+                    maskImage: `linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%)`,
+                    WebkitMaskImage: `linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%)`,
+                  }}
+                />
+                <div className="relative py-3">
+                  <div className="px-0 lg:px-2 mb-2">
+                    <div className="flex justify-between items-center">
+                      <div className="h-5 bg-white bg-opacity-30 rounded animate-pulse w-48" />
+                      <div className="h-4 bg-white bg-opacity-30 rounded animate-pulse w-16" />
+                    </div>
                   </div>
+                  <ShimmerList height={rowHeight - 60} count={5} />
                 </div>
-                <ShimmerList height={rowHeight - 60} count={5} />
               </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     );
   }
@@ -464,34 +466,36 @@ export default function DynamicHorizontalList({ keyPrefix = '' }: DynamicHorizon
   if (loading) {
     return (
       <div className="w-full">
-        {Array.from({ length: 2 }, (_, index) => (
-          <div
-            key={index}
-            className="w-full my-2 lg:mx-0 lg:px-6"
-            style={{ height: `${rowHeight}px` }}
-          >
-            <div className="relative w-full rounded-none lg:rounded-t-3xl overflow-visible">
-              <div
-                className="absolute inset-0 rounded-none lg:rounded-t-3xl"
-                style={{
-                  height: `${rowHeight * 0.6}px`,
-                  background: `linear-gradient(to right, #f97316, #ec4899)`,
-                  maskImage: `linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%)`,
-                  WebkitMaskImage: `linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%)`,
-                }}
-              />
-              <div className="relative py-3">
-                <div className="px-0 lg:px-2 mb-2">
-                  <div className="flex justify-between items-center">
-                    <div className="h-5 bg-white bg-opacity-30 rounded animate-pulse w-48" />
-                    <div className="h-4 bg-white bg-opacity-30 rounded animate-pulse w-16" />
+        <div className="max-w-6xl mx-auto">
+          {Array.from({ length: 2 }, (_, index) => (
+            <div
+              key={index}
+              className="w-full my-2 lg:mx-0 lg:px-6"
+              style={{ height: `${rowHeight}px` }}
+            >
+              <div className="relative w-full rounded-none lg:rounded-t-3xl overflow-visible">
+                <div
+                  className="absolute inset-0 rounded-none lg:rounded-t-3xl"
+                  style={{
+                    height: `${rowHeight * 0.6}px`,
+                    background: `linear-gradient(to right, #f97316, #ec4899)`,
+                    maskImage: `linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%)`,
+                    WebkitMaskImage: `linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%)`,
+                  }}
+                />
+                <div className="relative py-3">
+                  <div className="px-0 lg:px-2 mb-2">
+                    <div className="flex justify-between items-center">
+                      <div className="h-5 bg-white bg-opacity-30 rounded animate-pulse w-48" />
+                      <div className="h-4 bg-white bg-opacity-30 rounded animate-pulse w-16" />
+                    </div>
                   </div>
+                  <ShimmerList height={rowHeight - 60} count={5} />
                 </div>
-                <ShimmerList height={rowHeight - 60} count={5} />
               </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     );
   }
@@ -512,18 +516,20 @@ export default function DynamicHorizontalList({ keyPrefix = '' }: DynamicHorizon
   // Render dynamic lists
   return (
     <div className="w-full">
-      {dynamicLists.map((listData, index) => (
-        <div key={`${keyPrefix}${listData.id}`}>
-          <DynamicList
-            listData={listData}
-            portraitImageHeight={portraitImageHeight}
-            rowHeight={rowHeight}
-            keyPrefix={keyPrefix}
-          />
-          {/* Add spacing between lists except after the last one */}
-          {index < dynamicLists.length - 1 && <div className="h-3" />}
-        </div>
-      ))}
+      <div className="max-w-6xl mx-auto">
+        {dynamicLists.map((listData, index) => (
+          <div key={`${keyPrefix}${listData.id}`}>
+            <DynamicList
+              listData={listData}
+              portraitImageHeight={portraitImageHeight}
+              rowHeight={rowHeight}
+              keyPrefix={keyPrefix}
+            />
+            {/* Add spacing between lists except after the last one */}
+            {index < dynamicLists.length - 1 && <div className="h-3" />}
+          </div>
+        ))}
+      </div>
     </div>
   );
 };

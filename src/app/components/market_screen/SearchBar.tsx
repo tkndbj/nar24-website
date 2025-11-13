@@ -406,7 +406,7 @@ export default function SearchBar({
                         data-search-action="category-suggestion"
                         className={`
                           w-full flex items-center space-x-3 p-2 rounded-lg
-                          hover:bg-gray-100 dark:hover:bg-gray-700
+                          ${isDark ? "hover:bg-gray-700" : "hover:bg-gray-100"}
                           transition-colors duration-150
                         `}
                       >
@@ -450,7 +450,7 @@ export default function SearchBar({
                         data-search-action="product-suggestion"
                         className={`
                           w-full flex items-center space-x-3 p-2 rounded-lg
-                          hover:bg-gray-100 dark:hover:bg-gray-700
+                          ${isDark ? "hover:bg-gray-700" : "hover:bg-gray-100"}
                           transition-colors duration-150
                         `}
                       >
@@ -509,7 +509,7 @@ export default function SearchBar({
                   {paginatedEntries.map((entry) => (
                     <div
                       key={entry.id}
-                      className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-150 group"
+                      className={`flex items-center space-x-3 p-2 rounded-lg ${isDark ? "hover:bg-gray-700" : "hover:bg-gray-100"} transition-colors duration-150 group`}
                     >
                       <button
                         onClick={() => handleHistoryItemClick(entry.searchTerm)}
@@ -527,7 +527,7 @@ export default function SearchBar({
                         onClick={(e) => handleDeleteHistoryItem(e, entry.id)}
                         disabled={isDeletingEntry(entry.id)}
                         className={`
-                          p-1 rounded-full transition-all duration-200 hover:bg-red-100 dark:hover:bg-red-900/30 flex-shrink-0
+                          p-1 rounded-full transition-all duration-200 ${isDark ? "hover:bg-red-900/30" : "hover:bg-red-100"} flex-shrink-0
                           ${isDeletingEntry(entry.id)
                             ? 'opacity-50 cursor-not-allowed'
                             : 'opacity-0 group-hover:opacity-100 cursor-pointer pointer-events-none group-hover:pointer-events-auto'

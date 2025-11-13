@@ -915,7 +915,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
       <div className="flex flex-col w-full">
         {/* Image Section */}
         <div
-          className="relative group h-[28vh] lg:h-[38vh]"
+          className="relative group h-[28vh] md:h-[38vh]"
           style={imageHeight ? { height: imageHeight } : {}}
         >
           <div className="w-full h-full rounded-t-xl overflow-hidden bg-gray-200 relative">

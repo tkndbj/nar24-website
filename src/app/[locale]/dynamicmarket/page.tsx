@@ -703,7 +703,14 @@ export default function DynamicMarketPage() {
     <>
       <SecondHeader />
 
-      <div className={`min-h-screen w-full ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}>
+      <div
+        className={`min-h-screen w-full ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
+        style={{
+          transform: 'translateZ(0)',
+          backfaceVisibility: 'hidden',
+          WebkitFontSmoothing: 'antialiased'
+        }}
+      >
         <div className="flex max-w-7xl mx-auto">
           {/* Mobile Filter Button */}
           <div className="lg:hidden fixed bottom-4 right-4 z-50">

@@ -277,6 +277,11 @@ export default function ReceiptsPage() {
   return (
     <div
       className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
+      style={{
+        transform: 'translateZ(0)',
+        backfaceVisibility: 'hidden',
+        WebkitFontSmoothing: 'antialiased'
+      }}
     >
       {/* Header */}
       <div

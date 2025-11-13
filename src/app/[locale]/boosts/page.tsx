@@ -78,7 +78,12 @@ export default function BoostPage() {
   const t = useTranslations("Boosts");
 
   // State
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    if (typeof document !== 'undefined') {
+      return document.documentElement.classList.contains('dark');
+    }
+    return false;
+  });
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
@@ -638,34 +643,158 @@ export default function BoostPage() {
 
   // Loading Skeleton
   const LoadingSkeleton = () => (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div className="space-y-6 p-6">
-        {/* Main product skeleton */}
+    <div className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}>
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="space-y-6">
+        {/* Info Banner Skeleton */}
         <div
-          className={`animate-pulse rounded-xl h-48 ${
-            isDarkMode ? "bg-gray-800" : "bg-gray-200"
+          className={`rounded-xl border overflow-hidden relative h-32 ${
+            isDarkMode
+              ? "bg-gray-800 border-gray-700"
+              : "bg-gray-200 border-gray-200"
           }`}
-        />
-
-        {/* Additional products skeleton */}
-        <div className="space-y-3">
-          {[...Array(3)].map((_, i) => (
-            <div
-              key={i}
-              className={`animate-pulse rounded-lg h-16 ${
-                isDarkMode ? "bg-gray-800" : "bg-gray-200"
-              }`}
-            />
-          ))}
+        >
+          <div
+            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"
+            style={{
+              backgroundSize: "200% 100%",
+            }}
+          />
         </div>
 
-        {/* Controls skeleton */}
+        {/* Main Product Skeleton */}
+        <div>
+          <div
+            className={`h-4 w-32 rounded mb-3 relative overflow-hidden ${
+              isDarkMode ? "bg-gray-700" : "bg-gray-300"
+            }`}
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
+          </div>
+          <div
+            className={`rounded-xl border overflow-hidden relative h-64 ${
+              isDarkMode
+                ? "bg-gray-800 border-gray-700"
+                : "bg-gray-200 border-gray-200"
+            }`}
+          >
+            <div
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"
+              style={{
+                backgroundSize: "200% 100%",
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Additional Products Skeleton */}
         <div
-          className={`animate-pulse rounded-xl h-32 ${
-            isDarkMode ? "bg-gray-800" : "bg-gray-200"
+          className={`rounded-xl border p-6 ${
+            isDarkMode
+              ? "bg-gray-800 border-gray-700"
+              : "bg-white border-gray-200"
           }`}
-        />
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div
+              className={`h-6 w-32 rounded relative overflow-hidden ${
+                isDarkMode ? "bg-gray-700" : "bg-gray-300"
+              }`}
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
+            </div>
+            <div
+              className={`h-6 w-16 rounded-full relative overflow-hidden ${
+                isDarkMode ? "bg-gray-700" : "bg-gray-300"
+              }`}
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
+            </div>
+          </div>
+          <div className="space-y-3">
+            {[...Array(3)].map((_, i) => (
+              <div
+                key={i}
+                className={`rounded-lg h-20 relative overflow-hidden ${
+                  isDarkMode ? "bg-gray-700" : "bg-gray-200"
+                }`}
+              >
+                <div
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"
+                  style={{
+                    backgroundSize: "200% 100%",
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Duration Selection Skeleton */}
+        <div
+          className={`rounded-xl border p-6 ${
+            isDarkMode
+              ? "bg-gray-800 border-gray-700"
+              : "bg-white border-gray-200"
+          }`}
+        >
+          <div
+            className={`h-6 w-48 rounded mb-6 relative overflow-hidden ${
+              isDarkMode ? "bg-gray-700" : "bg-gray-300"
+            }`}
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
+          </div>
+          <div
+            className={`h-3 rounded-full mb-4 relative overflow-hidden ${
+              isDarkMode ? "bg-gray-700" : "bg-gray-300"
+            }`}
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
+          </div>
+          <div
+            className={`h-12 w-32 rounded-2xl mx-auto relative overflow-hidden ${
+              isDarkMode ? "bg-gray-700" : "bg-gray-300"
+            }`}
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
+          </div>
+        </div>
+
+        {/* Price Section Skeleton */}
+        <div
+          className={`rounded-xl border p-6 relative overflow-hidden ${
+            isDarkMode
+              ? "bg-gray-800 border-gray-700"
+              : "bg-gray-200 border-gray-200"
+          }`}
+        >
+          <div
+            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"
+            style={{
+              backgroundSize: "200% 100%",
+            }}
+          />
+          <div className="text-center space-y-3 relative z-10">
+            <div
+              className={`h-4 w-24 rounded mx-auto ${
+                isDarkMode ? "bg-gray-700" : "bg-gray-300"
+              }`}
+            />
+            <div
+              className={`h-12 w-40 rounded mx-auto ${
+                isDarkMode ? "bg-gray-700" : "bg-gray-300"
+              }`}
+            />
+            <div
+              className={`h-3 w-32 rounded mx-auto ${
+                isDarkMode ? "bg-gray-700" : "bg-gray-300"
+              }`}
+            />
+          </div>
+        </div>
       </div>
+    </div>
     </div>
   );
 

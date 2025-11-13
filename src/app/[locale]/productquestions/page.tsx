@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   MessageSquare,
   Inbox,
@@ -13,6 +13,7 @@ import {
   RefreshCw,
   X,
   Send,
+  ArrowLeft,
 } from "lucide-react";
 import { useUser } from "@/context/UserProvider";
 import { useRouter } from "next/navigation";
@@ -100,9 +101,8 @@ export default function ProductQuestionsPage() {
     useState<ProductQuestion | null>(null);
   const [answerText, setAnswerText] = useState("");
 
-  // Refs for infinite scroll
-  const askedScrollRef = useRef<HTMLDivElement>(null);
-  const receivedScrollRef = useRef<HTMLDivElement>(null);
+  // Refs for preventing duplicate loads
+  const isLoadingMoreRef = useRef(false);
 
   // Check dark mode
   useEffect(() => {
@@ -130,26 +130,41 @@ export default function ProductQuestionsPage() {
     }
   }, [user, filters]);
 
-  // Infinite scroll handlers
-  const handleAskedScroll = useCallback(() => {
-    const container = askedScrollRef.current;
-    if (!container || askedLoading || !askedHasMore) return;
+  // Window scroll handler for infinite loading
+  useEffect(() => {
+    const handleScroll = () => {
+      // Check if we're near the bottom (200px threshold)
+      const scrollPosition = window.innerHeight + window.scrollY;
+      const threshold = document.documentElement.scrollHeight - 200;
 
-    const { scrollTop, scrollHeight, clientHeight } = container;
-    if (scrollHeight - scrollTop <= clientHeight + 100) {
-      loadAskedQuestions(false);
-    }
-  }, [askedLoading, askedHasMore]);
+      if (scrollPosition >= threshold) {
+        if (
+          activeTab === "asked" &&
+          askedHasMore &&
+          !askedLoading &&
+          !isLoadingMoreRef.current
+        ) {
+          isLoadingMoreRef.current = true;
+          loadAskedQuestions(false).finally(() => {
+            isLoadingMoreRef.current = false;
+          });
+        } else if (
+          activeTab === "received" &&
+          receivedHasMore &&
+          !receivedLoading &&
+          !isLoadingMoreRef.current
+        ) {
+          isLoadingMoreRef.current = true;
+          loadReceivedQuestions(false).finally(() => {
+            isLoadingMoreRef.current = false;
+          });
+        }
+      }
+    };
 
-  const handleReceivedScroll = useCallback(() => {
-    const container = receivedScrollRef.current;
-    if (!container || receivedLoading || !receivedHasMore) return;
-
-    const { scrollTop, scrollHeight, clientHeight } = container;
-    if (scrollHeight - scrollTop <= clientHeight + 100) {
-      loadReceivedQuestions(false);
-    }
-  }, [receivedLoading, receivedHasMore]);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [activeTab, askedHasMore, askedLoading, receivedHasMore, receivedLoading]);
 
   // Load asked questions
   const loadAskedQuestions = async (reset = false) => {
@@ -361,6 +376,7 @@ export default function ProductQuestionsPage() {
     setReceivedLastDoc(null);
     setAskedHasMore(true);
     setReceivedHasMore(true);
+    isLoadingMoreRef.current = false;
   };
 
   // Get active filters count
@@ -634,6 +650,11 @@ export default function ProductQuestionsPage() {
   return (
     <div
       className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
+      style={{
+        transform: "translateZ(0)",
+        backfaceVisibility: "hidden",
+        WebkitFontSmoothing: "antialiased",
+      }}
     >
       {/* Header */}
       <div
@@ -648,14 +669,29 @@ export default function ProductQuestionsPage() {
       >
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
-            <h1
-              className={`
-              text-xl font-bold
-              ${isDarkMode ? "text-white" : "text-gray-900"}
-            `}
-            >
-              {t("title") || "Product Questions"}
-            </h1>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => router.back()}
+                className={`
+                  p-2 rounded-lg transition-colors
+                  ${
+                    isDarkMode
+                      ? "hover:bg-gray-800 text-gray-400 hover:text-white"
+                      : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
+                  }
+                `}
+              >
+                <ArrowLeft size={20} />
+              </button>
+              <h1
+                className={`
+                text-xl font-bold
+                ${isDarkMode ? "text-white" : "text-gray-900"}
+              `}
+              >
+                {t("title") || "Product Questions"}
+              </h1>
+            </div>
           </div>
 
           {/* Tab Bar */}
@@ -742,7 +778,7 @@ export default function ProductQuestionsPage() {
       </div>
 
       {/* Content */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 pb-16">
         {currentQuestions.length === 0 && !currentLoading ? (
           <div className="flex flex-col items-center justify-center py-16">
             <div
@@ -777,13 +813,7 @@ export default function ProductQuestionsPage() {
             </p>
           </div>
         ) : (
-          <div
-            ref={activeTab === "asked" ? askedScrollRef : receivedScrollRef}
-            onScroll={
-              activeTab === "asked" ? handleAskedScroll : handleReceivedScroll
-            }
-            className="space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto"
-          >
+          <div className="space-y-4">
             {currentQuestions.map((question) => (
               <QuestionCard
                 key={question.id}
@@ -791,14 +821,28 @@ export default function ProductQuestionsPage() {
                 isAskedTab={activeTab === "asked"}
               />
             ))}
-
-            {currentLoading && (
-              <div className="flex justify-center py-4">
-                <RefreshCw size={24} className="animate-spin text-green-500" />
-              </div>
-            )}
           </div>
         )}
+
+        {/* Loading indicator at bottom */}
+        {currentLoading && (
+          <div className="flex justify-center py-8">
+            <RefreshCw size={24} className="animate-spin text-green-500" />
+          </div>
+        )}
+
+        {activeTab === "received" &&
+          receivedQuestions.length > 0 &&
+          !receivedHasMore &&
+          !receivedLoading && (
+            <div className="flex justify-center py-8">
+              <p
+                className={`text-sm ${
+                  isDarkMode ? "text-gray-400" : "text-gray-600"
+                }`}
+              ></p>
+            </div>
+          )}
       </div>
 
       {/* Answer Modal */}

@@ -452,9 +452,9 @@ export default function CreateShopPage() {
     return (
       <div className="flex flex-col items-center">
         {title && (
-          <div className="text-center mb-2 sm:mb-4">
+          <div className="text-center mb-2 sm:mb-3">
             <h3
-              className={`text-base sm:text-lg font-semibold ${
+              className={`text-sm sm:text-base font-semibold ${
                 isDarkMode ? "text-white" : "text-gray-900"
               }`}
             >
@@ -462,7 +462,7 @@ export default function CreateShopPage() {
             </h3>
             {subtitle && (
               <p
-                className={`text-xs sm:text-sm mt-1 ${
+                className={`text-xs mt-0.5 ${
                   isDarkMode ? "text-gray-400" : "text-gray-600"
                 }`}
               >
@@ -538,37 +538,37 @@ export default function CreateShopPage() {
       <div
         className={`min-h-screen transition-colors duration-300 ${
           isDarkMode
-            ? "bg-gradient-to-br from-gray-900 via-gray-900 to-blue-900/20"
+            ? "bg-gray-900"
             : "bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/20"
         }`}
       >
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
           {/* Header */}
           <div
-            className={`p-6 sm:p-8 rounded-2xl mb-6 sm:mb-8 backdrop-blur-lg shadow-lg border transition-all duration-300 ${
+            className={`p-4 sm:p-5 rounded-xl mb-4 sm:mb-5 backdrop-blur-lg shadow-lg border transition-all duration-300 ${
               isDarkMode
                 ? "bg-gradient-to-br from-gray-800/90 to-blue-900/30 border-gray-700"
                 : "bg-gradient-to-br from-white to-blue-50/50 border-gray-200"
             }`}
           >
-            <div className="flex items-center space-x-4 sm:space-x-6">
+            <div className="flex items-center space-x-3 sm:space-x-4">
               <div className="relative">
-                <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl overflow-hidden shadow-md ring-2 ring-blue-500/20">
+                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl overflow-hidden shadow-md ring-2 ring-blue-500/20">
                   <Image
                     src="/images/shopbubble.png"
                     alt="Shop"
-                    width={80}
-                    height={80}
+                    width={64}
+                    height={64}
                     className="object-cover"
                   />
                 </div>
-                <div className="absolute -bottom-1 -right-1 w-5 h-5 sm:w-6 sm:h-6 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg">
-                  <PlusIcon className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
+                <div className="absolute -bottom-1 -right-1 w-4 h-4 sm:w-5 sm:h-5 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg">
+                  <PlusIcon className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-white" />
                 </div>
               </div>
               <div className="flex-1">
                 <h1
-                  className={`text-2xl sm:text-3xl font-bold mb-1 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent ${
+                  className={`text-xl sm:text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent ${
                     isDarkMode ? "" : ""
                   }`}
                 >
@@ -579,19 +579,19 @@ export default function CreateShopPage() {
           </div>
 
           {/* Form Content */}
-          <div className="grid lg:grid-cols-2 gap-6 sm:gap-8">
+          <div className="grid lg:grid-cols-2 gap-4 sm:gap-5">
             {/* Left Column - Basic Info */}
-            <div className="space-y-5 sm:space-y-6">
+            <div className="space-y-3 sm:space-y-4">
               {/* Shop Name */}
               <div
-                className={`p-5 sm:p-6 rounded-xl backdrop-blur-lg shadow-md border transition-all duration-300 ${
+                className={`p-4 sm:p-5 rounded-xl backdrop-blur-lg shadow-md border transition-all duration-300 ${
                   isDarkMode
                     ? "bg-gray-800/90 border-gray-700"
                     : "bg-white border-gray-200"
                 }`}
               >
                 <label
-                  className={`block text-base sm:text-lg font-semibold mb-3 ${
+                  className={`block text-sm sm:text-base font-semibold mb-2 ${
                     isDarkMode ? "text-white" : "text-gray-900"
                   }`}
                 >
@@ -602,7 +602,7 @@ export default function CreateShopPage() {
                   value={shopName}
                   onChange={(e) => setShopName(e.target.value)}
                   placeholder={t("enterShopName")}
-                  className={`w-full p-3 sm:p-4 border-0 outline-none rounded-lg text-sm sm:text-base transition-all duration-300 focus:ring-2 focus:ring-blue-500 ${
+                  className={`w-full p-2.5 sm:p-3 border-0 outline-none rounded-lg text-sm transition-all duration-300 focus:ring-2 focus:ring-blue-500 ${
                     isDarkMode
                       ? "bg-gray-700/80 text-white placeholder-gray-400"
                       : "bg-gray-50 text-gray-900 placeholder-gray-500"
@@ -612,14 +612,14 @@ export default function CreateShopPage() {
 
               {/* Email */}
               <div
-                className={`p-5 sm:p-6 rounded-xl backdrop-blur-lg shadow-md border transition-all duration-300 ${
+                className={`p-4 sm:p-5 rounded-xl backdrop-blur-lg shadow-md border transition-all duration-300 ${
                   isDarkMode
                     ? "bg-gray-800/90 border-gray-700"
                     : "bg-white border-gray-200"
                 }`}
               >
                 <label
-                  className={`block text-base sm:text-lg font-semibold mb-3 ${
+                  className={`block text-sm sm:text-base font-semibold mb-2 ${
                     isDarkMode ? "text-white" : "text-gray-900"
                   }`}
                 >
@@ -630,7 +630,7 @@ export default function CreateShopPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder={t("enterEmail")}
-                  className={`w-full p-3 sm:p-4 border-0 outline-none rounded-lg text-sm sm:text-base transition-all duration-300 focus:ring-2 focus:ring-blue-500 ${
+                  className={`w-full p-2.5 sm:p-3 border-0 outline-none rounded-lg text-sm transition-all duration-300 focus:ring-2 focus:ring-blue-500 ${
                     isDarkMode
                       ? "bg-gray-700/80 text-white placeholder-gray-400"
                       : "bg-gray-50 text-gray-900 placeholder-gray-500"
@@ -640,14 +640,14 @@ export default function CreateShopPage() {
 
               {/* Contact Number */}
               <div
-                className={`p-5 sm:p-6 rounded-xl backdrop-blur-lg shadow-md border transition-all duration-300 ${
+                className={`p-4 sm:p-5 rounded-xl backdrop-blur-lg shadow-md border transition-all duration-300 ${
                   isDarkMode
                     ? "bg-gray-800/90 border-gray-700"
                     : "bg-white border-gray-200"
                 }`}
               >
                 <label
-                  className={`block text-base sm:text-lg font-semibold mb-3 ${
+                  className={`block text-sm sm:text-base font-semibold mb-2 ${
                     isDarkMode ? "text-white" : "text-gray-900"
                   }`}
                 >
@@ -658,7 +658,7 @@ export default function CreateShopPage() {
                   value={contactNo}
                   onChange={(e) => setContactNo(e.target.value)}
                   placeholder={t("enterContactNo")}
-                  className={`w-full p-3 sm:p-4 border-0 outline-none rounded-lg text-sm sm:text-base transition-all duration-300 focus:ring-2 focus:ring-blue-500 ${
+                  className={`w-full p-2.5 sm:p-3 border-0 outline-none rounded-lg text-sm transition-all duration-300 focus:ring-2 focus:ring-blue-500 ${
                     isDarkMode
                       ? "bg-gray-700/80 text-white placeholder-gray-400"
                       : "bg-gray-50 text-gray-900 placeholder-gray-500"
@@ -668,14 +668,14 @@ export default function CreateShopPage() {
 
               {/* Address */}
               <div
-                className={`p-5 sm:p-6 rounded-xl backdrop-blur-lg shadow-md border transition-all duration-300 ${
+                className={`p-4 sm:p-5 rounded-xl backdrop-blur-lg shadow-md border transition-all duration-300 ${
                   isDarkMode
                     ? "bg-gray-800/90 border-gray-700"
                     : "bg-white border-gray-200"
                 }`}
               >
                 <label
-                  className={`block text-base sm:text-lg font-semibold mb-3 ${
+                  className={`block text-sm sm:text-base font-semibold mb-2 ${
                     isDarkMode ? "text-white" : "text-gray-900"
                   }`}
                 >
@@ -685,8 +685,8 @@ export default function CreateShopPage() {
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   placeholder={t("enterAddress")}
-                  rows={3}
-                  className={`w-full p-3 sm:p-4 border-0 outline-none rounded-lg text-sm sm:text-base resize-none transition-all duration-300 focus:ring-2 focus:ring-blue-500 ${
+                  rows={2}
+                  className={`w-full p-2.5 sm:p-3 border-0 outline-none rounded-lg text-sm resize-none transition-all duration-300 focus:ring-2 focus:ring-blue-500 ${
                     isDarkMode
                       ? "bg-gray-700/80 text-white placeholder-gray-400"
                       : "bg-gray-50 text-gray-900 placeholder-gray-500"
@@ -696,14 +696,14 @@ export default function CreateShopPage() {
 
               {/* Pin Location Button */}
               <div
-                className={`p-5 sm:p-6 rounded-xl backdrop-blur-lg shadow-md border transition-all duration-300 ${
+                className={`p-4 sm:p-5 rounded-xl backdrop-blur-lg shadow-md border transition-all duration-300 ${
                   isDarkMode
                     ? "bg-gray-800/90 border-gray-700"
                     : "bg-white border-gray-200"
                 }`}
               >
                 <label
-                  className={`block text-base sm:text-lg font-semibold mb-3 ${
+                  className={`block text-sm sm:text-base font-semibold mb-2 ${
                     isDarkMode ? "text-white" : "text-gray-900"
                   }`}
                 >
@@ -712,27 +712,27 @@ export default function CreateShopPage() {
                 <button
                   type="button"
                   onClick={() => setShowMapModal(true)}
-                  className={`w-full p-3 sm:p-4 rounded-lg flex items-center justify-between transition-all duration-300 hover:scale-[1.01] ${
+                  className={`w-full p-2.5 sm:p-3 rounded-lg flex items-center justify-between transition-all duration-300 hover:scale-[1.01] ${
                     isDarkMode
                       ? "bg-gray-700/80 text-white hover:bg-gray-600/80"
                       : "bg-gray-50 text-gray-900 hover:bg-gray-100"
                   }`}
                 >
-                  <div className="flex items-center space-x-3">
-                    <MapPinIcon className="w-5 h-5" />
-                    <span className="text-sm sm:text-base">
+                  <div className="flex items-center space-x-2">
+                    <MapPinIcon className="w-4 h-4" />
+                    <span className="text-sm">
                       {coordinates.latitude && coordinates.longitude
                         ? t("locationPinned")
                         : t("pinShopLocation")}
                     </span>
                   </div>
                   {coordinates.latitude && coordinates.longitude && (
-                    <CheckIcon className="w-5 h-5 text-green-500" />
+                    <CheckIcon className="w-4 h-4 text-green-500" />
                   )}
                 </button>
                 {coordinates.latitude && coordinates.longitude && (
                   <p
-                    className={`text-xs sm:text-sm mt-2 text-center ${
+                    className={`text-xs mt-1.5 text-center ${
                       isDarkMode ? "text-gray-400" : "text-gray-600"
                     }`}
                   >
@@ -744,14 +744,14 @@ export default function CreateShopPage() {
 
               {/* Categories */}
               <div
-                className={`p-5 sm:p-6 rounded-xl backdrop-blur-lg shadow-md border transition-all duration-300 ${
+                className={`p-4 sm:p-5 rounded-xl backdrop-blur-lg shadow-md border transition-all duration-300 ${
                   isDarkMode
                     ? "bg-gray-800/90 border-gray-700"
                     : "bg-white border-gray-200"
                 }`}
               >
                 <label
-                  className={`block text-base sm:text-lg font-semibold mb-3 ${
+                  className={`block text-sm sm:text-base font-semibold mb-2 ${
                     isDarkMode ? "text-white" : "text-gray-900"
                   }`}
                 >
@@ -759,7 +759,7 @@ export default function CreateShopPage() {
                 </label>
                 <button
                   onClick={() => setShowCategoryModal(true)}
-                  className={`w-full p-3 sm:p-4 rounded-lg text-left text-sm sm:text-base flex items-center justify-between transition-all duration-300 hover:scale-[1.01] ${
+                  className={`w-full p-2.5 sm:p-3 rounded-lg text-left text-sm flex items-center justify-between transition-all duration-300 hover:scale-[1.01] ${
                     isDarkMode
                       ? "bg-gray-700/80 text-white hover:bg-gray-600/80"
                       : "bg-gray-50 text-gray-900 hover:bg-gray-100"
@@ -776,21 +776,21 @@ export default function CreateShopPage() {
                   </span>
                   <div className="flex items-center space-x-2">
                     {selectedCategories.length > 0 && (
-                      <span className="bg-gradient-to-r from-blue-500 to-purple-600 text-white text-xs px-2 py-1 rounded-full">
+                      <span className="bg-gradient-to-r from-blue-500 to-purple-600 text-white text-xs px-2 py-0.5 rounded-full">
                         {selectedCategories.length}
                       </span>
                     )}
-                    <ChevronRightIcon className="w-5 h-5" />
+                    <ChevronRightIcon className="w-4 h-4" />
                   </div>
                 </button>
               </div>
             </div>
 
             {/* Right Column - Images */}
-            <div className="space-y-5 sm:space-y-6">
+            <div className="space-y-3 sm:space-y-4">
               {/* Tax Certificate */}
               <div
-                className={`p-5 sm:p-6 rounded-xl backdrop-blur-lg shadow-md border transition-all duration-300 ${
+                className={`p-4 sm:p-5 rounded-xl backdrop-blur-lg shadow-md border transition-all duration-300 ${
                   isDarkMode
                     ? "bg-gray-800/90 border-gray-700"
                     : "bg-white border-gray-200"
@@ -802,7 +802,7 @@ export default function CreateShopPage() {
                   onSelect={() => taxInputRef.current?.click()}
                   onRemove={() => removeImage("tax")}
                   icon={DocumentTextIcon}
-                  size={window.innerWidth < 640 ? 110 : 150}
+                  size={window.innerWidth < 640 ? 100 : 130}
                 />
                 <input
                   ref={taxInputRef}
@@ -815,7 +815,7 @@ export default function CreateShopPage() {
 
               {/* Profile Image */}
               <div
-                className={`p-5 sm:p-6 rounded-xl backdrop-blur-lg shadow-md border transition-all duration-300 ${
+                className={`p-4 sm:p-5 rounded-xl backdrop-blur-lg shadow-md border transition-all duration-300 ${
                   isDarkMode
                     ? "bg-gray-800/90 border-gray-700"
                     : "bg-white border-gray-200"
@@ -826,7 +826,7 @@ export default function CreateShopPage() {
                   preview={profileImagePreview}
                   onSelect={() => profileInputRef.current?.click()}
                   onRemove={() => removeImage("profile")}
-                  size={window.innerWidth < 640 ? 110 : 150}
+                  size={window.innerWidth < 640 ? 100 : 130}
                 />
                 <input
                   ref={profileInputRef}
@@ -839,29 +839,29 @@ export default function CreateShopPage() {
 
               {/* Cover Images */}
               <div
-                className={`p-5 sm:p-6 rounded-xl backdrop-blur-lg shadow-md border transition-all duration-300 ${
+                className={`p-4 sm:p-5 rounded-xl backdrop-blur-lg shadow-md border transition-all duration-300 ${
                   isDarkMode
                     ? "bg-gray-800/90 border-gray-700"
                     : "bg-white border-gray-200"
                 }`}
               >
-                <div className="text-center mb-4 sm:mb-6">
+                <div className="text-center mb-3 sm:mb-4">
                   <h3
-                    className={`text-base sm:text-lg font-semibold ${
+                    className={`text-sm sm:text-base font-semibold ${
                       isDarkMode ? "text-white" : "text-gray-900"
                     }`}
                   >
                     {t("uploadCoverImage")}
                   </h3>
                 </div>
-                <div className="flex space-x-3 sm:space-x-4 justify-center">
+                <div className="flex space-x-2 sm:space-x-3 justify-center">
                   {coverImages.map((_, index) => (
                     <div key={index}>
                       <ImagePicker
                         preview={coverImagePreviews[index]}
                         onSelect={() => coverInputRefs[index].current?.click()}
                         onRemove={() => removeImage("cover", index)}
-                        size={window.innerWidth < 640 ? 80 : 110}
+                        size={window.innerWidth < 640 ? 70 : 95}
                       />
                       <input
                         ref={coverInputRefs[index]}
@@ -878,27 +878,27 @@ export default function CreateShopPage() {
           </div>
 
           {/* Seller Agreement Checkbox */}
-          <div className="mt-8 sm:mt-10 flex justify-center">
+          <div className="mt-4 sm:mt-6 flex justify-center">
             <div
-              className={`p-5 sm:p-6 rounded-xl backdrop-blur-lg shadow-md border transition-all duration-300 w-full max-w-2xl ${
+              className={`p-4 sm:p-5 rounded-xl backdrop-blur-lg shadow-md border transition-all duration-300 w-full max-w-2xl ${
                 isDarkMode
                   ? "bg-gray-800/90 border-gray-700"
                   : "bg-white border-gray-200"
               }`}
             >
-              <div className="flex items-start space-x-3 sm:space-x-4">
-                <div className="flex items-center h-6">
+              <div className="flex items-start space-x-2.5 sm:space-x-3">
+                <div className="flex items-center h-5">
                   <input
                     type="checkbox"
                     id="agreement"
                     checked={acceptedAgreement}
                     onChange={(e) => setAcceptedAgreement(e.target.checked)}
-                    className="w-5 h-5 rounded border-2 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer transition-all duration-200"
+                    className="w-4 h-4 rounded border-2 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer transition-all duration-200"
                   />
                 </div>
                 <label
                   htmlFor="agreement"
-                  className={`text-sm sm:text-base cursor-pointer select-none ${
+                  className={`text-sm cursor-pointer select-none ${
                     isDarkMode ? "text-gray-300" : "text-gray-700"
                   }`}
                 >
@@ -919,15 +919,15 @@ export default function CreateShopPage() {
           </div>
 
           {/* Submit Button */}
-          <div className="mt-6 sm:mt-8 flex justify-center">
+          <div className="mt-4 sm:mt-6 flex justify-center">
             <button
               onClick={handleSubmit}
               disabled={isSubmitting}
-              className="px-10 sm:px-16 py-3.5 sm:py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-400 text-white font-semibold rounded-xl transition-all duration-300 transform hover:scale-105 disabled:scale-100 shadow-lg text-base sm:text-lg min-w-[180px] sm:min-w-[220px]"
+              className="px-8 sm:px-12 py-2.5 sm:py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-400 text-white font-semibold rounded-xl transition-all duration-300 transform hover:scale-105 disabled:scale-100 shadow-lg text-sm sm:text-base min-w-[160px] sm:min-w-[200px]"
             >
               {isSubmitting ? (
-                <div className="flex items-center space-x-3">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
                   <span>{t("submitting")}</span>
                 </div>
               ) : (

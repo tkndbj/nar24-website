@@ -12,6 +12,7 @@ import {
   ShoppingBag,
   RefreshCw,
   Camera,
+  ArrowLeft,
 } from "lucide-react";
 import { useUser } from "@/context/UserProvider";
 import { useRouter } from "next/navigation";
@@ -120,10 +121,9 @@ export default function ReviewsPage() {
   const [reviewType, setReviewType] = useState<"product" | "seller">("product");
 
   // Refs
-  const pendingScrollRef = useRef<HTMLDivElement>(null);
-  const myReviewsScrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const prevFilters = useRef(filters);
+  const isLoadingMoreRef = useRef(false);
 
   // Check dark mode
   useEffect(() => {
@@ -174,6 +174,48 @@ export default function ReviewsPage() {
     }
   }, [activeTab]);
 
+  // Window scroll handler for infinite loading
+  useEffect(() => {
+    const handleScroll = () => {
+      // Check if we're near the bottom (200px threshold)
+      const scrollPosition = window.innerHeight + window.scrollY;
+      const threshold = document.documentElement.scrollHeight - 200;
+
+      if (scrollPosition >= threshold) {
+        if (
+          activeTab === "pending" &&
+          pendingHasMore &&
+          !pendingLoading &&
+          !isLoadingMoreRef.current
+        ) {
+          isLoadingMoreRef.current = true;
+          loadPendingReviews(false).finally(() => {
+            isLoadingMoreRef.current = false;
+          });
+        } else if (
+          activeTab === "myReviews" &&
+          myReviewsHasMore &&
+          !myReviewsLoading &&
+          !isLoadingMoreRef.current
+        ) {
+          isLoadingMoreRef.current = true;
+          loadMyReviews(false).finally(() => {
+            isLoadingMoreRef.current = false;
+          });
+        }
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [
+    activeTab,
+    pendingHasMore,
+    pendingLoading,
+    myReviewsHasMore,
+    myReviewsLoading,
+  ]);
+
   // Helper function to reset pagination state
   const resetPaginationState = () => {
     setPendingReviews([]);
@@ -182,35 +224,14 @@ export default function ReviewsPage() {
     setMyReviewsLastDoc(null);
     setPendingHasMore(true);
     setMyReviewsHasMore(true);
+    isLoadingMoreRef.current = false;
   };
-
-  // Infinite scroll handlers
-  const handlePendingScroll = useCallback(() => {
-    const container = pendingScrollRef.current;
-    if (!container || pendingLoading || !pendingHasMore) return;
-
-    const { scrollTop, scrollHeight, clientHeight } = container;
-    if (scrollHeight - scrollTop <= clientHeight + 200) {
-      // 200px threshold like Flutter
-      loadPendingReviews(false);
-    }
-  }, [pendingLoading, pendingHasMore]);
-
-  const handleMyReviewsScroll = useCallback(() => {
-    const container = myReviewsScrollRef.current;
-    if (!container || myReviewsLoading || !myReviewsHasMore) return;
-
-    const { scrollTop, scrollHeight, clientHeight } = container;
-    if (scrollHeight - scrollTop <= clientHeight + 200) {
-      // 200px threshold like Flutter
-      loadMyReviews(false);
-    }
-  }, [myReviewsLoading, myReviewsHasMore]);
 
   // Load pending reviews (optimized like Flutter)
   const loadPendingReviews = useCallback(
     async (reset = false) => {
-      if (!user || pendingLoading) return;
+      if (!user) return;
+      if (pendingLoading) return;
       if (!reset && !pendingHasMore) return; // Prevent unnecessary calls
 
       setPendingLoading(true);
@@ -308,7 +329,8 @@ export default function ReviewsPage() {
   // Load my reviews (optimized like Flutter)
   const loadMyReviews = useCallback(
     async (reset = false) => {
-      if (!user || myReviewsLoading) return;
+      if (!user) return;
+      if (myReviewsLoading) return;
       if (!reset && !myReviewsHasMore) return; // Prevent unnecessary calls
 
       setMyReviewsLoading(true);
@@ -661,6 +683,11 @@ export default function ReviewsPage() {
   return (
     <div
       className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
+      style={{
+        transform: "translateZ(0)",
+        backfaceVisibility: "hidden",
+        WebkitFontSmoothing: "antialiased",
+      }}
     >
       {/* Header */}
       <div
@@ -675,14 +702,29 @@ export default function ReviewsPage() {
       >
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
-            <h1
-              className={`
-              text-xl font-bold
-              ${isDarkMode ? "text-white" : "text-gray-900"}
-            `}
-            >
-              {t("title") || "My Reviews"}
-            </h1>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => router.back()}
+                className={`
+                  p-2 rounded-lg transition-colors
+                  ${
+                    isDarkMode
+                      ? "hover:bg-gray-800 text-gray-400 hover:text-white"
+                      : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
+                  }
+                `}
+              >
+                <ArrowLeft size={20} />
+              </button>
+              <h1
+                className={`
+                text-xl font-bold
+                ${isDarkMode ? "text-white" : "text-gray-900"}
+              `}
+              >
+                {t("title") || "My Reviews"}
+              </h1>
+            </div>
             <button
               className={`
                 p-2 rounded-lg transition-colors
@@ -810,7 +852,7 @@ export default function ReviewsPage() {
       </div>
 
       {/* Content */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 pb-16">
         {activeTab === "pending" ? (
           // Pending Reviews Tab
           pendingReviews.length === 0 && !pendingLoading ? (
@@ -845,11 +887,7 @@ export default function ReviewsPage() {
               </p>
             </div>
           ) : (
-            <div
-              ref={pendingScrollRef}
-              onScroll={handlePendingScroll}
-              className="space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto"
-            >
+            <div className="space-y-4">
               {pendingReviews.map((review, index) => (
                 <div
                   key={`pending-${review.id}-${index}`} // More unique key
@@ -899,15 +937,6 @@ export default function ReviewsPage() {
                   </div>
                 </div>
               ))}
-
-              {pendingLoading && (
-                <div className="flex justify-center py-4">
-                  <RefreshCw
-                    size={24}
-                    className="animate-spin text-green-500"
-                  />
-                </div>
-              )}
             </div>
           )
         ) : // My Reviews Tab
@@ -943,11 +972,7 @@ export default function ReviewsPage() {
             </p>
           </div>
         ) : (
-          <div
-            ref={myReviewsScrollRef}
-            onScroll={handleMyReviewsScroll}
-            className="space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto"
-          >
+          <div className="space-y-4">
             {filteredMyReviews.map((review, index) => (
               <div
                 key={`myreview-${review.id}-${index}`} // More unique key
@@ -1090,14 +1115,28 @@ export default function ReviewsPage() {
                 </div>
               </div>
             ))}
-
-            {myReviewsLoading && (
-              <div className="flex justify-center py-4">
-                <RefreshCw size={24} className="animate-spin text-green-500" />
-              </div>
-            )}
           </div>
         )}
+
+        {/* Loading indicator at bottom */}
+        {(pendingLoading || myReviewsLoading) && (
+          <div className="flex justify-center py-8">
+            <RefreshCw size={24} className="animate-spin text-green-500" />
+          </div>
+        )}
+
+        {activeTab === "myReviews" &&
+          filteredMyReviews.length > 0 &&
+          !myReviewsHasMore &&
+          !myReviewsLoading && (
+            <div className="flex justify-center py-8">
+              <p
+                className={`text-sm ${
+                  isDarkMode ? "text-gray-400" : "text-gray-600"
+                }`}
+              ></p>
+            </div>
+          )}
       </div>
 
       {/* Review Modal */}

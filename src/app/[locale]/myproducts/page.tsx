@@ -61,7 +61,12 @@ export default function MyProductsPage() {
   const t = useTranslations("MyProducts");
 
   // State
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    if (typeof document !== 'undefined') {
+      return document.documentElement.classList.contains('dark');
+    }
+    return false;
+  });
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
@@ -399,7 +404,7 @@ export default function MyProductsPage() {
         <div className="relative">
           <div
             className="flex p-3 sm:p-4 cursor-pointer"
-            onClick={() => router.push(`/product/${product.id}`)}
+            onClick={() => router.push(`/productdetail/${product.id}`)}
           >
             {/* Product Image */}
             <div className="relative w-14 h-14 sm:w-20 sm:h-20 flex-shrink-0 mr-3 sm:mr-4">
@@ -461,8 +466,8 @@ export default function MyProductsPage() {
               )}
 
               <div className="space-y-1.5">
-                <div className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                  <span className="text-sm sm:text-base font-bold">
+                <div className={isDarkMode ? "" : "bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent"}>
+                  <span className={`text-sm sm:text-base font-bold ${isDarkMode ? "text-blue-300" : ""}`}>
                     {product.price.toFixed(2)} {product.currency}
                   </span>
                 </div>
@@ -650,22 +655,26 @@ export default function MyProductsPage() {
 
   // Loading skeleton
   const LoadingSkeleton = () => (
-    <div className="space-y-2 sm:space-y-3 p-3 sm:p-4">
-      {[...Array(5)].map((_, i) => (
-        <div
-          key={i}
-          className={`animate-pulse rounded-lg h-20 sm:h-24 ${
-            isDarkMode ? "bg-gray-800" : "bg-gray-200"
-          }`}
-        />
-      ))}
+    <div className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}>
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 lg:px-6">
+        <div className="space-y-2 sm:space-y-3 p-3 sm:p-4">
+          {[...Array(5)].map((_, i) => (
+            <div
+              key={i}
+              className={`animate-pulse rounded-lg h-20 sm:h-24 ${
+                isDarkMode ? "bg-gray-800" : "bg-gray-200"
+              }`}
+            />
+          ))}
+        </div>
+      </div>
     </div>
   );
 
   // Not logged in state
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-2 sm:p-4 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-900 dark:to-gray-800">
+      <div className={`min-h-screen flex items-center justify-center p-2 sm:p-4 ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}>
         <div className="text-center bg-white dark:bg-gray-800 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-2xl border border-gray-200 dark:border-gray-700 mx-4 max-w-sm sm:max-w-none">
           <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 sm:mb-6 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl sm:rounded-2xl flex items-center justify-center">
             <Package size={32} className="sm:size-10 text-white" />
@@ -693,16 +702,21 @@ export default function MyProductsPage() {
     <div
       className={`min-h-screen ${
         isDarkMode
-          ? "bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900"
-          : "bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50"
+          ? "bg-gray-900"
+          : "bg-gray-50"
       }`}
+      style={{
+        transform: 'translateZ(0)',
+        backfaceVisibility: 'hidden',
+        WebkitFontSmoothing: 'antialiased'
+      }}
     >
       {/* Header */}
       <div
-        className={`sticky top-0 z-10 border-b backdrop-blur-lg ${
+        className={`sticky top-0 z-10 border-b ${
           isDarkMode
-            ? "bg-gray-900/90 border-gray-700"
-            : "bg-white/90 border-gray-200"
+            ? "bg-gray-800 border-gray-700"
+            : "bg-white border-gray-200"
         }`}
       >
         <div className="max-w-6xl mx-auto px-3 sm:px-4 lg:px-6 py-2 sm:py-3">

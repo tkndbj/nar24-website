@@ -227,6 +227,11 @@ export default function AccountSettingsPage() {
         className={`min-h-screen flex items-center justify-center ${
           isDarkMode ? "bg-gray-900" : "bg-gray-50"
         }`}
+        style={{
+          transform: 'translateZ(0)',
+          backfaceVisibility: 'hidden',
+          WebkitFontSmoothing: 'antialiased'
+        }}
       >
         <div className="text-center">
           <h1
@@ -252,6 +257,11 @@ export default function AccountSettingsPage() {
       className={`min-h-screen ${
         isDarkMode ? "bg-gray-900" : "bg-gray-50"
       }`}
+      style={{
+        transform: 'translateZ(0)',
+        backfaceVisibility: 'hidden',
+        WebkitFontSmoothing: 'antialiased'
+      }}
     >
       {/* Header */}
       <div

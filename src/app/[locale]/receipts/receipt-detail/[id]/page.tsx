@@ -266,6 +266,13 @@ export default function ReceiptDetailPage() {
           "selectedColorImage",
           "productImage",
           "finalPrice",
+          "ourComission",
+          "sellerContactNo",
+          "unitPrice",
+          "calculatedTotal",
+          "currency",
+          "calculatedUnitPrice",
+          "isBundleItem",
         ];
         if (!systemFields.includes(key)) {
           formattedAttrs.push(`${key}: ${value}`);

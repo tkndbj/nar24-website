@@ -639,7 +639,7 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
         {/* Header */}
         <div
           className={`
-            flex-shrink-0 border-b px-6 py-4
+            flex-shrink-0 border-b px-6 py-4 relative z-10
             ${
               isDarkMode
                 ? "bg-gray-900 border-gray-700"
@@ -761,7 +761,7 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                 {showBasketSelector && (
                   <div
                     className={`
-                      absolute top-full left-0 right-0 mt-1 border rounded-lg shadow-lg z-20
+                      absolute top-full left-0 right-0 mt-1 border rounded-lg shadow-lg z-50
                       ${
                         isDarkMode
                           ? "bg-gray-800 border-gray-600"
@@ -774,13 +774,15 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                     <button
                       onClick={() => handleBasketSelect(null)}
                       className={`
-                        w-full flex items-center space-x-2 px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700
+                        w-full flex items-center space-x-2 px-3 py-2 text-left
                         ${
                           !selectedBasketId
-                            ? "bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400"
+                            ? isDarkMode
+                              ? "bg-orange-900/30 text-orange-400"
+                              : "bg-orange-50 text-orange-600"
                             : isDarkMode
-                            ? "text-gray-300"
-                            : "text-gray-700"
+                            ? "text-gray-300 hover:bg-gray-700"
+                            : "text-gray-700 hover:bg-gray-100"
                         }
                       `}
                     >
@@ -794,13 +796,15 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                         <button
                           onClick={() => handleBasketSelect(basket.id)}
                           className={`
-                            flex-1 flex items-center space-x-2 px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700
+                            flex-1 flex items-center space-x-2 px-3 py-2 text-left
                             ${
                               selectedBasketId === basket.id
-                                ? "bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400"
+                                ? isDarkMode
+                                  ? "bg-orange-900/30 text-orange-400"
+                                  : "bg-orange-50 text-orange-600"
                                 : isDarkMode
-                                ? "text-gray-300"
-                                : "text-gray-700"
+                                ? "text-gray-300 hover:bg-gray-700"
+                                : "text-gray-700 hover:bg-gray-100"
                             }
                           `}
                         >
@@ -835,7 +839,7 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                         w-full flex items-center space-x-2 px-3 py-2 text-left border-t
                         ${
                           isDarkMode
-                            ? "border-gray-600 text-blue-400 hover:bg-gray-700"
+                            ? "border-gray-600 text-blue-300 hover:bg-gray-700"
                             : "border-gray-200 text-blue-600 hover:bg-gray-50"
                         }
                       `}
@@ -951,7 +955,7 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
         )}
 
         {/* Content - Main scrollable area */}
-        <div className="flex-1 overflow-y-auto min-h-0">
+        <div className="flex-1 overflow-y-auto min-h-0 relative z-0">
           {/* Not Authenticated State */}
           {!user ? (
             <div className="flex flex-col items-center justify-center h-full px-6 py-12">
@@ -1138,7 +1142,7 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                             >
                               {product.brandModel && (
                                 <div className="mb-1 pl-10 pr-1">
-                                  <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+                                  <span className={`text-sm font-semibold ${isDarkMode ? "text-blue-200" : "text-blue-600"}`}>
                                     {product.brandModel}
                                   </span>
                                 </div>

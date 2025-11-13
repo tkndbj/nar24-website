@@ -70,7 +70,7 @@ const LoadingShimmer: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => {
       {Array.from({ length: 12 }, (_, i) => (
         <div key={i} className="space-y-3">
           <div
-            className={`aspect-[3/4] lg:aspect-[3/5] rounded-lg ${shimmerClass}`}
+            className={`aspect-[3/4] md:aspect-[3/5] rounded-lg ${shimmerClass}`}
           />
           <div className={`h-4 w-3/4 rounded ${shimmerClass}`} />
           <div className={`h-3 w-1/2 rounded ${shimmerClass}`} />
@@ -1178,6 +1178,11 @@ export default function SearchResultsPage() {
     <SearchResultsProvider>
       <div
         className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
+        style={{
+          transform: 'translateZ(0)',
+          backfaceVisibility: 'hidden',
+          WebkitFontSmoothing: 'antialiased'
+        }}
       >
         <div className="pb-8">
           <div className="max-w-6xl mx-auto">

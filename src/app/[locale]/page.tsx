@@ -13,7 +13,11 @@ const AdsBanner = lazy(() => import("../components/market_screen/MarketTopAdsBan
 
 // ✅ OPTIMIZED: Simple loading fallback component
 const ComponentLoader = ({ isDark }: { isDark: boolean }) => (
-  <div className={`w-full h-40 rounded-lg animate-pulse ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
+  <div className="w-full">
+    <div className="max-w-6xl mx-auto px-4">
+      <div className={`w-full h-40 rounded-lg animate-pulse ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
+    </div>
+  </div>
 );
 
 export default function Home() {
@@ -131,17 +135,7 @@ export default function Home() {
               <div
                 className={`w-full ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
               >
-                {/* Mobile: full width */}
-                <div className="block lg:hidden">
-                  <DynamicHorizontalList keyPrefix="mobile-" />
-                </div>
-
-                {/* Desktop: centered layout */}
-                <div className="hidden lg:block">
-                  <div className="max-w-6xl mx-auto px-4">
-                    <DynamicHorizontalList keyPrefix="desktop-" />
-                  </div>
-                </div>
+                <DynamicHorizontalList keyPrefix="main-" />
               </div>
             </Suspense>
           )}

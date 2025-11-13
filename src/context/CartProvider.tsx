@@ -280,14 +280,15 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         // Wrap with circuit breaker for resilience
         const snapshot = await circuitBreaker.execute(
           CIRCUITS.FIREBASE_PRODUCTS,
-          () => getDocs(
-            query(
-              collection(db, "bundles"),
-              where("productId", "==", productId),
-              where("isActive", "==", true),
-              limit(1)
-            )
-          ),
+          () =>
+            getDocs(
+              query(
+                collection(db, "bundles"),
+                where("productId", "==", productId),
+                where("isActive", "==", true),
+                limit(1)
+              )
+            ),
           async () => ({ docs: [], empty: true } as unknown as QuerySnapshot) // Fallback
         );
 
@@ -302,7 +303,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           isBundle: true,
         };
       } catch (error) {
-        if (process.env.NODE_ENV === 'development') {
+        if (process.env.NODE_ENV === "development") {
           console.error("Error fetching bundle:", error);
         }
         return null;
@@ -315,7 +316,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     (product: Product): SalePreferences | null => {
       // Build map only if there are sale preferences
       const salePrefs: SalePreferences = {};
-  
+
       if (product.maxQuantity != null) {
         salePrefs.maxQuantity = product.maxQuantity;
       }
@@ -325,7 +326,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       if (product.discountPercentage != null) {
         salePrefs.discountPercentage = product.discountPercentage;
       }
-  
+
       // Return null if empty, otherwise return the map
       return Object.keys(salePrefs).length === 0 ? null : salePrefs;
     },
@@ -346,12 +347,13 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           // Try shop_products first - with circuit breaker protection
           const shopSnapshot = await circuitBreaker.execute(
             CIRCUITS.FIREBASE_SHOP_PRODUCTS,
-            () => getDocs(
-              query(
-                collection(db, "shop_products"),
-                where(documentId(), "in", batch)
-              )
-            ),
+            () =>
+              getDocs(
+                query(
+                  collection(db, "shop_products"),
+                  where(documentId(), "in", batch)
+                )
+              ),
             async () => ({ docs: [], empty: true } as unknown as QuerySnapshot) // Fallback
           );
 
@@ -366,13 +368,15 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           if (remainingIds.length > 0) {
             const productsSnapshot = await circuitBreaker.execute(
               CIRCUITS.FIREBASE_PRODUCTS,
-              () => getDocs(
-                query(
-                  collection(db, "products"),
-                  where(documentId(), "in", remainingIds)
-                )
-              ),
-              async () => ({ docs: [], empty: true } as unknown as QuerySnapshot) // Fallback
+              () =>
+                getDocs(
+                  query(
+                    collection(db, "products"),
+                    where(documentId(), "in", remainingIds)
+                  )
+                ),
+              async () =>
+                ({ docs: [], empty: true } as unknown as QuerySnapshot) // Fallback
             );
 
             productsSnapshot.docs.forEach((doc: QueryDocumentSnapshot) => {
@@ -388,7 +392,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           });
         }
       } catch (error) {
-        if (process.env.NODE_ENV === 'development') {
+        if (process.env.NODE_ENV === "development") {
           console.error("Error fetching product documents:", error);
         }
         productIds.forEach((productId) => {
@@ -409,10 +413,10 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       try {
         for (let i = 0; i < productIds.length; i += 10) {
           const chunk = productIds.slice(i, i + 10);
-          
+
           // ✅ Check cache first
           const uncachedIds: string[] = [];
-          chunk.forEach(id => {
+          chunk.forEach((id) => {
             const cached = cacheManager.get<Product>(CACHE_NAMES.PRODUCTS, id);
             if (cached) {
               result[id] = cached;
@@ -420,18 +424,20 @@ export const CartProvider: React.FC<CartProviderProps> = ({
               uncachedIds.push(id);
             }
           });
-          
+
           // Only fetch uncached products - with circuit breaker protection
           if (uncachedIds.length > 0) {
             const snapshot = await circuitBreaker.execute(
               CIRCUITS.FIREBASE_SHOP_PRODUCTS,
-              () => getDocs(
-                query(
-                  collection(db, "shop_products"),
-                  where(documentId(), "in", uncachedIds)
-                )
-              ),
-              async () => ({ docs: [], empty: true } as unknown as QuerySnapshot) // Fallback
+              () =>
+                getDocs(
+                  query(
+                    collection(db, "shop_products"),
+                    where(documentId(), "in", uncachedIds)
+                  )
+                ),
+              async () =>
+                ({ docs: [], empty: true } as unknown as QuerySnapshot) // Fallback
             );
 
             snapshot.docs.forEach((doc: QueryDocumentSnapshot) => {
@@ -449,14 +455,19 @@ export const CartProvider: React.FC<CartProviderProps> = ({
                       },
                     },
                   };
-      
+
                   const product = ProductUtils.fromJson(productJson);
                   result[doc.id] = product;
-                  
+
                   // ✅ Cache for 5 minutes
-                  cacheManager.set(CACHE_NAMES.PRODUCTS, doc.id, product, 5 * 60 * 1000);
+                  cacheManager.set(
+                    CACHE_NAMES.PRODUCTS,
+                    doc.id,
+                    product,
+                    5 * 60 * 1000
+                  );
                 } catch (error) {
-                  if (process.env.NODE_ENV === 'development') {
+                  if (process.env.NODE_ENV === "development") {
                     console.error(`Error parsing product ${doc.id}:`, error);
                   }
                   result[doc.id] = null;
@@ -466,7 +477,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           }
         }
       } catch (error) {
-        if (process.env.NODE_ENV === 'development') {
+        if (process.env.NODE_ENV === "development") {
           console.error("Error fetching product details:", error);
         }
       }
@@ -480,26 +491,30 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   const fetchSellerInfo = useCallback(
     async (
       prodRef: DocumentReference,
-      productData: Product  // ✅ Changed from ProductDocumentData to Product
+      productData: Product // ✅ Changed from ProductDocumentData to Product
     ): Promise<SellerInfo> => {
       const parent = prodRef.parent.id;
       let sellerId: string;
       let sellerName: string;
       let isShop: boolean;
       let sellerContactNo: string | null = null;
-  
+
       if (parent === "shop_products") {
         const shopId = productData.shopId || productData.ownerId;
         sellerId = shopId || "unknown";
         isShop = true;
-  
+
         if (shopId) {
           try {
             // Wrap with circuit breaker for resilience
             const shopDoc = await circuitBreaker.execute(
               CIRCUITS.FIREBASE_SHOP_PRODUCTS,
               () => getDoc(doc(db, "shops", shopId)),
-              async () => ({ exists: () => false, data: () => undefined } as unknown as DocumentSnapshot) // Fallback
+              async () =>
+                ({
+                  exists: () => false,
+                  data: () => undefined,
+                } as unknown as DocumentSnapshot) // Fallback
             );
 
             if (shopDoc.exists()) {
@@ -510,7 +525,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
               sellerName = productData.sellerName || "Unknown Shop";
             }
           } catch (error) {
-            if (process.env.NODE_ENV === 'development') {
+            if (process.env.NODE_ENV === "development") {
               console.error("Error fetching shop info:", error);
             }
             sellerName = productData.sellerName || "Unknown Shop";
@@ -522,28 +537,31 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         const ownerId = productData.ownerId;
         sellerId = ownerId || "unknown";
         isShop = false;
-  
+
         if (ownerId) {
           try {
             // Wrap with circuit breaker for resilience
             const userDoc = await circuitBreaker.execute(
               CIRCUITS.FIREBASE_PRODUCTS,
               () => getDoc(doc(db, "users", ownerId)),
-              async () => ({ exists: () => false, data: () => undefined } as unknown as DocumentSnapshot) // Fallback
+              async () =>
+                ({
+                  exists: () => false,
+                  data: () => undefined,
+                } as unknown as DocumentSnapshot) // Fallback
             );
 
             if (userDoc.exists()) {
               const userData = userDoc.data();
               const sellerInfo = userData?.sellerInfo;
-              sellerName = sellerInfo?.name ||
-                           userData?.displayName ||
-                           "Unknown Seller";
+              sellerName =
+                sellerInfo?.name || userData?.displayName || "Unknown Seller";
               sellerContactNo = sellerInfo?.phone || null;
             } else {
               sellerName = productData.sellerName || "Unknown Seller";
             }
           } catch (error) {
-            if (process.env.NODE_ENV === 'development') {
+            if (process.env.NODE_ENV === "development") {
               console.error("Error fetching user info:", error);
             }
             sellerName = productData.sellerName || "Unknown Seller";
@@ -552,7 +570,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           sellerName = "Unknown Seller";
         }
       }
-  
+
       return { sellerId, sellerName, isShop, sellerContactNo };
     },
     [db]
@@ -572,7 +590,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         optimisticAddsRef.current.add(productId);
 
         // Update cart IDs immediately - use functional update to avoid race conditions
-        setCartProductIds(prev => {
+        setCartProductIds((prev) => {
           const newIds = new Set(prev);
           newIds.add(productId);
           setCartCount(newIds.size);
@@ -607,14 +625,14 @@ export const CartProvider: React.FC<CartProviderProps> = ({
             optimisticItemsRef.current.set(productId, optimisticItem);
 
             // Add to UI immediately - use functional update to avoid race conditions
-            setCartItems(prevItems => [optimisticItem, ...prevItems]);
+            setCartItems((prevItems) => [optimisticItem, ...prevItems]);
           }
         }
       } else {
         optimisticRemovesRef.current.add(productId);
 
         // Remove from IDs immediately - use functional update to avoid race conditions
-        setCartProductIds(prev => {
+        setCartProductIds((prev) => {
           const newIds = new Set(prev);
           newIds.delete(productId);
           setCartCount(newIds.size);
@@ -623,7 +641,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
         // Remove from UI immediately - use functional update to avoid race conditions
         if (isInitialized) {
-          setCartItems(prevItems =>
+          setCartItems((prevItems) =>
             prevItems.filter((item) => item.productId !== productId)
           );
         }
@@ -694,7 +712,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       return undefined;
     },
     []
-  );  
+  );
 
   // Update cart items from snapshot - matching Flutter implementation
   const updateCartItemsFromSnapshot = useCallback(
@@ -706,50 +724,49 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
       const productIds = snapshot.docs.map((doc) => doc.id);
       const productDetails = await fetchProductDetailsBatch(productIds);
-      
 
       const updatedItems: CartItem[] = [];
 
-    for (const cartDoc of snapshot.docs) {
-      const cartData = cartDoc.data() as CartData;
-      const productDetail = productDetails[cartDoc.id];
-      
-      // ✅ NEW: Extract from product instead of fetching
-      const salePreferences = productDetail 
-        ? extractSalePreferences(productDetail) 
-        : null;
+      for (const cartDoc of snapshot.docs) {
+        const cartData = cartDoc.data() as CartData;
+        const productDetail = productDetails[cartDoc.id];
 
-      if (productDetail) {
-        const quantity = cartData.quantity || 1;
+        // ✅ NEW: Extract from product instead of fetching
+        const salePreferences = productDetail
+          ? extractSalePreferences(productDetail)
+          : null;
 
-        const dynamicAttributes: Record<string, unknown> = {};
-        Object.entries(cartData).forEach(([key, value]) => {
-          if (!isSystemField(key)) {
-            dynamicAttributes[key] = value;
-          }
-        });
+        if (productDetail) {
+          const quantity = cartData.quantity || 1;
 
-        const selectedColorImage = resolveColorImage(
-          productDetail,
-          cartData.selectedColor as string
-        );
+          const dynamicAttributes: Record<string, unknown> = {};
+          Object.entries(cartData).forEach(([key, value]) => {
+            if (!isSystemField(key)) {
+              dynamicAttributes[key] = value;
+            }
+          });
 
-        updatedItems.push({
-          cartData,
-          product: productDetail,
-          productId: cartDoc.id,
-          isOptimistic: false,
-          quantity,
-          salePreferences, // ✅ Now using extracted preferences
-          selectedColorImage,
-          sellerName: cartData.sellerName,
-          sellerId: cartData.sellerId,
-          isShop: cartData.isShop,
-          sellerContactNo: cartData.sellerContactNo as string | null,
-          ...dynamicAttributes,
-        });
+          const selectedColorImage = resolveColorImage(
+            productDetail,
+            cartData.selectedColor as string
+          );
+
+          updatedItems.push({
+            cartData,
+            product: productDetail,
+            productId: cartDoc.id,
+            isOptimistic: false,
+            quantity,
+            salePreferences, // ✅ Now using extracted preferences
+            selectedColorImage,
+            sellerName: cartData.sellerName,
+            sellerId: cartData.sellerId,
+            isShop: cartData.isShop,
+            sellerContactNo: cartData.sellerContactNo as string | null,
+            ...dynamicAttributes,
+          });
+        }
       }
-    }
 
       // Sort by addedAt
       updatedItems.sort((a, b) => {
@@ -768,8 +785,13 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
       setCartItems(updatedItems);
     },
-    [fetchProductDetailsBatch, extractSalePreferences, isSystemField, resolveColorImage]
-  ); 
+    [
+      fetchProductDetailsBatch,
+      extractSalePreferences,
+      isSystemField,
+      resolveColorImage,
+    ]
+  );
 
   // Process cart snapshot - reconcile with optimistic updates
   const processCartSnapshot = useCallback(
@@ -827,8 +849,13 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         updateCartItemsFromSnapshot(snapshot);
       }
     },
-    [isSystemField, isInitialized, clearOptimisticState, updateCartItemsFromSnapshot]
-  );   
+    [
+      isSystemField,
+      isInitialized,
+      clearOptimisticState,
+      updateCartItemsFromSnapshot,
+    ]
+  );
 
   const updateQuantity = useCallback(
     async (productId: string, newQuantity: number): Promise<string> => {
@@ -836,7 +863,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       if (newQuantity < 1) return "Quantity must be at least 1";
 
       try {
-        const cartItem = cartItems.find(item => item.productId === productId);
+        const cartItem = cartItems.find((item) => item.productId === productId);
         const salePrefs = cartItem?.salePreferences;
 
         if (salePrefs?.maxQuantity && newQuantity > salePrefs.maxQuantity) {
@@ -875,6 +902,25 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     [user, db, isInitialized, cartItems]
   );
 
+  const updateShopMetricsSafely = async (
+    shopId: string,
+    metricField: string
+  ): Promise<void> => {
+    try {
+      await writeBatch(db)
+        .update(doc(db, "shops", shopId), {
+          [`metrics.${metricField}`]: increment(1),
+          "metrics.lastUpdated": serverTimestamp(),
+        })
+        .commit();
+    } catch (error) {
+      // Silently fail - metrics are non-critical
+      if (process.env.NODE_ENV === "development") {
+        console.error(`Metrics update failed for shop ${shopId}:`, error);
+      }
+    }
+  };
+
   // Main cart operations - matching Flutter implementation
   const addToCart = useCallback(
     async (
@@ -887,196 +933,215 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         `cart-add-${productId}`,
         async () => {
           if (!user) return "Please log in";
-      if (!productId.trim()) return "Invalid product ID";
-      if (quantity < 1) return "Quantity must be at least 1";
-      if (operationIdsRef.current.has(productId))
-        return "Operation in progress";
-  
-      operationIdsRef.current.set(productId, operationId);
-  
-      try {
-        const isCurrentlyInCart = cartProductIds.has(productId);
-  
-        // Get product document reference
-        const prodRef = await getProductDocument([productId]);
-        if (!prodRef[productId]) {
-          return "Product not found";
-        }
-  
-        // Fetch product data
-        const prodSnapshot = await getDoc(prodRef[productId]!);
-        if (!prodSnapshot.exists()) {
-          return "Product not found";
-        }
-        
-        // ✅ Use ProductUtils.fromJson to parse as Product
-        const productData = ProductUtils.fromJson({
-          ...prodSnapshot.data(),
-          id: prodSnapshot.id,
-          reference: {
-            id: prodSnapshot.id,
-            path: prodSnapshot.ref.path,
-            parent: {
-              id: prodSnapshot.ref.parent.id,
-            },
-          },
-        });
-  
-        // ✅ Now extract sale preferences directly from Product
-        const salePrefs: SalePreferences | null = (() => {
-          const prefs: SalePreferences = {};
-          if (productData.maxQuantity != null) prefs.maxQuantity = productData.maxQuantity;
-          if (productData.discountThreshold != null) prefs.discountThreshold = productData.discountThreshold;
-          if (productData.discountPercentage != null) prefs.discountPercentage = productData.discountPercentage;
-          return Object.keys(prefs).length === 0 ? null : prefs;
-        })();
-  
-        if (salePrefs?.maxQuantity) {
-          if (isCurrentlyInCart) {
-            const currentCartItem = cartItemsCacheRef.current[productId];
-            const currentQuantity = currentCartItem?.quantity || 0;
-            const totalQuantity = currentQuantity + quantity;
-  
-            if (totalQuantity > salePrefs.maxQuantity) {
-              return `Cannot add more. Maximum allowed: ${salePrefs.maxQuantity}`;
+          if (!productId.trim()) return "Invalid product ID";
+          if (quantity < 1) return "Quantity must be at least 1";
+          if (operationIdsRef.current.has(productId))
+            return "Operation in progress";
+
+          operationIdsRef.current.set(productId, operationId);
+
+          try {
+            const isCurrentlyInCart = cartProductIds.has(productId);
+
+            // Get product document reference
+            const prodRef = await getProductDocument([productId]);
+            if (!prodRef[productId]) {
+              return "Product not found";
             }
-            return await updateQuantity(productId, totalQuantity);
-          } else {
-            if (quantity > salePrefs.maxQuantity) {
-              return `Cannot add ${quantity}. Maximum allowed: ${salePrefs.maxQuantity}`;
+
+            // Fetch product data
+            const prodSnapshot = await getDoc(prodRef[productId]!);
+            if (!prodSnapshot.exists()) {
+              return "Product not found";
             }
-          }
-        }
-  
-        // Apply optimistic update immediately
-        await applyOptimisticUpdate(productId, true, quantity, attributes);
-  
-        // Fetch bundle info and seller details
-        const bundleData = await fetchActiveBundleForProduct(productId);
-        const sellerInfo = await fetchSellerInfo(
-          prodRef[productId]!,
-          productData  // ✅ Now passing Product type
-        );
-  
-        // Run transaction
-        const result = await runTransaction(db, async (transaction) => {
-          const cartRef = doc(db, "users", user.uid, "cart", productId);
-          const prodSnap = await transaction.get(prodRef[productId]!);
-  
-          if (!prodSnap.exists()) return "Product not found";
-          
-          // ✅ Parse as Product in transaction too
-          const txProductData = ProductUtils.fromJson({
-            ...prodSnap.data(),
-            id: prodSnap.id,
-            reference: {
-              id: prodSnap.id,
-              path: prodSnap.ref.path,
-              parent: {
-                id: prodSnap.ref.parent.id,
+
+            // ✅ Use ProductUtils.fromJson to parse as Product
+            const productData = ProductUtils.fromJson({
+              ...prodSnapshot.data(),
+              id: prodSnapshot.id,
+              reference: {
+                id: prodSnapshot.id,
+                path: prodSnapshot.ref.path,
+                parent: {
+                  id: prodSnapshot.ref.parent.id,
+                },
               },
-            },
-          });
-  
-          const cartSnap = await transaction.get(cartRef);
-  
-          if (cartSnap.exists()) {
-            // Update existing item quantity
-            const existingData = cartSnap.data();
-            const newQuantity = (existingData?.quantity || 0) + quantity;
-  
-            if (salePrefs?.maxQuantity && newQuantity > salePrefs.maxQuantity) {
-              return `Cannot add more. Maximum allowed: ${salePrefs.maxQuantity}`;
-            }
-  
-            transaction.update(cartRef, {
-              quantity: newQuantity,
-              updatedAt: serverTimestamp(),
             });
-  
-            return "Updated cart quantity";
-          } else {
-            // Add new item to cart
-            const unitPrice =
-              bundleData?.bundlePrice ?? txProductData.price ?? 0;
-  
-            // Get commission rate
-            let commissionRate = 0.0;
-            if (sellerInfo.isShop) {
-              const shopId = txProductData.shopId ?? txProductData.ownerId;
-              if (shopId) {
-                try {
-                  const shopDoc = await getDoc(doc(db, "shops", shopId));
-                  if (shopDoc.exists()) {
-                    commissionRate = shopDoc.data()?.ourComission || 0.0;
-                  }
-                } catch (error) {
-                  if (process.env.NODE_ENV === 'development') {
-                    console.error("Error fetching shop commission:", error);
-                  }
+
+            // ✅ Now extract sale preferences directly from Product
+            const salePrefs: SalePreferences | null = (() => {
+              const prefs: SalePreferences = {};
+              if (productData.maxQuantity != null)
+                prefs.maxQuantity = productData.maxQuantity;
+              if (productData.discountThreshold != null)
+                prefs.discountThreshold = productData.discountThreshold;
+              if (productData.discountPercentage != null)
+                prefs.discountPercentage = productData.discountPercentage;
+              return Object.keys(prefs).length === 0 ? null : prefs;
+            })();
+
+            if (salePrefs?.maxQuantity) {
+              if (isCurrentlyInCart) {
+                const currentCartItem = cartItemsCacheRef.current[productId];
+                const currentQuantity = currentCartItem?.quantity || 0;
+                const totalQuantity = currentQuantity + quantity;
+
+                if (totalQuantity > salePrefs.maxQuantity) {
+                  return `Cannot add more. Maximum allowed: ${salePrefs.maxQuantity}`;
+                }
+                return await updateQuantity(productId, totalQuantity);
+              } else {
+                if (quantity > salePrefs.maxQuantity) {
+                  return `Cannot add ${quantity}. Maximum allowed: ${salePrefs.maxQuantity}`;
                 }
               }
-            } else {
-              commissionRate = 10.0;
             }
-  
-            const cartData: Record<string, unknown> = {
-              addedAt: serverTimestamp(),
-              updatedAt: serverTimestamp(),
-              quantity,
-              unitPrice,
-              currency: txProductData.currency || "TL",
-              ourComission: commissionRate,
-              sellerId: sellerInfo.sellerId,
-              sellerName: sellerInfo.sellerName,
-              isShop: sellerInfo.isShop,
-              sellerContactNo: sellerInfo.sellerContactNo,
-            };
-  
-            if (bundleData) {
-              cartData.isBundle = true;
-              if (bundleData.bundleId) {
-                cartData.bundleId = bundleData.bundleId;
-              }
-            }
-  
-            if (attributes) {
-              Object.entries(attributes).forEach(([k, v]) => {
-                if (v !== undefined && v !== null) {
-                  cartData[k] = v;
-                }
+
+            // Apply optimistic update immediately
+            await applyOptimisticUpdate(productId, true, quantity, attributes);
+
+            // Fetch bundle info and seller details
+            const bundleData = await fetchActiveBundleForProduct(productId);
+            const sellerInfo = await fetchSellerInfo(
+              prodRef[productId]!,
+              productData // ✅ Now passing Product type
+            );
+
+            // Run transaction
+            const result = await runTransaction(db, async (transaction) => {
+              const cartRef = doc(db, "users", user.uid, "cart", productId);
+              const prodSnap = await transaction.get(prodRef[productId]!);
+
+              if (!prodSnap.exists()) return "Product not found";
+
+              // ✅ Parse as Product in transaction too
+              const txProductData = ProductUtils.fromJson({
+                ...prodSnap.data(),
+                id: prodSnap.id,
+                reference: {
+                  id: prodSnap.id,
+                  path: prodSnap.ref.path,
+                  parent: {
+                    id: prodSnap.ref.parent.id,
+                  },
+                },
               });
-            }
-  
-            transaction.set(cartRef, cartData);
-  
-            transaction.update(prodRef[productId]!, {
-              cartCount: increment(1),
-              metricsUpdatedAt: serverTimestamp(),
+
+              const cartSnap = await transaction.get(cartRef);
+
+              if (cartSnap.exists()) {
+                // Update existing item quantity
+                const existingData = cartSnap.data();
+                const newQuantity = (existingData?.quantity || 0) + quantity;
+
+                if (
+                  salePrefs?.maxQuantity &&
+                  newQuantity > salePrefs.maxQuantity
+                ) {
+                  return `Cannot add more. Maximum allowed: ${salePrefs.maxQuantity}`;
+                }
+
+                transaction.update(cartRef, {
+                  quantity: newQuantity,
+                  updatedAt: serverTimestamp(),
+                });
+
+                return "Updated cart quantity";
+              } else {
+                // Add new item to cart
+                const unitPrice =
+                  bundleData?.bundlePrice ?? txProductData.price ?? 0;
+
+                // Get commission rate
+                let commissionRate = 0.0;
+                if (sellerInfo.isShop) {
+                  const shopId = txProductData.shopId ?? txProductData.ownerId;
+                  if (shopId) {
+                    try {
+                      const shopDoc = await getDoc(doc(db, "shops", shopId));
+                      if (shopDoc.exists()) {
+                        commissionRate = shopDoc.data()?.ourComission || 0.0;
+                      }
+                    } catch (error) {
+                      if (process.env.NODE_ENV === "development") {
+                        console.error("Error fetching shop commission:", error);
+                      }
+                    }
+                  }
+                } else {
+                  commissionRate = 10.0;
+                }
+
+                const cartData: Record<string, unknown> = {
+                  addedAt: serverTimestamp(),
+                  updatedAt: serverTimestamp(),
+                  quantity,
+                  unitPrice,
+                  currency: txProductData.currency || "TL",
+                  ourComission: commissionRate,
+                  sellerId: sellerInfo.sellerId,
+                  sellerName: sellerInfo.sellerName,
+                  isShop: sellerInfo.isShop,
+                  sellerContactNo: sellerInfo.sellerContactNo,
+                };
+
+                if (bundleData) {
+                  cartData.isBundle = true;
+                  if (bundleData.bundleId) {
+                    cartData.bundleId = bundleData.bundleId;
+                  }
+                }
+
+                if (attributes) {
+                  Object.entries(attributes).forEach(([k, v]) => {
+                    if (v !== undefined && v !== null) {
+                      cartData[k] = v;
+                    }
+                  });
+                }
+
+                transaction.set(cartRef, cartData);
+
+                transaction.update(prodRef[productId]!, {
+                  cartCount: increment(1),
+                  metricsUpdatedAt: serverTimestamp(),
+                });
+
+                return "Added to cart";
+              }
             });
-  
-            return "Added to cart";
+
+            clearOptimisticState(productId);
+            // ✅ Fire-and-forget metrics update (matching Flutter implementation)
+            if (result === "Added to cart") {
+              const shopId = productData.shopId ?? productData.ownerId;
+              if (shopId) {
+                updateShopMetricsSafely(shopId, "totalCartAdditions").catch(
+                  (error) => {
+                    if (process.env.NODE_ENV === "development") {
+                      console.error("Failed to update shop metrics:", error);
+                    }
+                  }
+                );
+              }
+            }
+            return result;
+          } catch (error) {
+            if (process.env.NODE_ENV === "development") {
+              console.error("Cart operation error:", error);
+            }
+            rollbackOptimisticUpdate(productId, true);
+            return `Failed to update cart: ${error}`;
+          } finally {
+            setTimeout(() => {
+              if (operationIdsRef.current.get(productId) === operationId) {
+                operationIdsRef.current.delete(productId);
+              }
+            }, 5000);
           }
-        });
-  
-        clearOptimisticState(productId);
-        return result;
-      } catch (error) {
-        if (process.env.NODE_ENV === 'development') {
-          console.error("Cart operation error:", error);
         }
-        rollbackOptimisticUpdate(productId, true);
-        return `Failed to update cart: ${error}`;
-      } finally {
-        setTimeout(() => {
-          if (operationIdsRef.current.get(productId) === operationId) {
-            operationIdsRef.current.delete(productId);
-          }
-        }, 5000);
-      }
-    }
-  );
-  },  
+      );
+    },
     [
       user,
       cartProductIds,
@@ -1098,73 +1163,73 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       return requestDeduplicator.deduplicate(
         `cart-remove-${productId}`,
         async () => {
-      if (!user) return "Please log in";
-      if (!productId.trim()) return "Invalid product ID";
-      if (operationIdsRef.current.has(productId))
-        return "Operation in progress";
+          if (!user) return "Please log in";
+          if (!productId.trim()) return "Invalid product ID";
+          if (operationIdsRef.current.has(productId))
+            return "Operation in progress";
 
-      operationIdsRef.current.set(productId, operationId);
+          operationIdsRef.current.set(productId, operationId);
 
-      try {
-        const isCurrentlyInCart = cartProductIds.has(productId);
+          try {
+            const isCurrentlyInCart = cartProductIds.has(productId);
 
-        if (!isCurrentlyInCart) {
-          return "Item not in cart";
-        }
+            if (!isCurrentlyInCart) {
+              return "Item not in cart";
+            }
 
-        // Get product document reference for metrics update
-        const prodRef = await getProductDocument([productId]);
-        if (!prodRef[productId]) {
-          return "Product not found";
-        }
+            // Get product document reference for metrics update
+            const prodRef = await getProductDocument([productId]);
+            if (!prodRef[productId]) {
+              return "Product not found";
+            }
 
-        // Apply optimistic removal immediately
-        await applyOptimisticUpdate(productId, false, 0);
+            // Apply optimistic removal immediately
+            await applyOptimisticUpdate(productId, false, 0);
 
-        // Run transaction to remove from cart
-        const result = await runTransaction(db, async (transaction) => {
-          const cartRef = doc(db, "users", user.uid, "cart", productId);
-          const cartSnap = await transaction.get(cartRef);
+            // Run transaction to remove from cart
+            const result = await runTransaction(db, async (transaction) => {
+              const cartRef = doc(db, "users", user.uid, "cart", productId);
+              const cartSnap = await transaction.get(cartRef);
 
-          if (!cartSnap.exists()) {
-            return "Item not in cart";
-          }
+              if (!cartSnap.exists()) {
+                return "Item not in cart";
+              }
 
-          // Delete from cart
-          transaction.delete(cartRef);
+              // Delete from cart
+              transaction.delete(cartRef);
 
-          // Update product metrics
-          if (prodRef[productId]) {
-            transaction.update(prodRef[productId]!, {
-              cartCount: increment(-1),
-              metricsUpdatedAt: serverTimestamp(),
+              // Update product metrics
+              if (prodRef[productId]) {
+                transaction.update(prodRef[productId]!, {
+                  cartCount: increment(-1),
+                  metricsUpdatedAt: serverTimestamp(),
+                });
+              }
+
+              return "Removed from cart";
             });
+
+            // Clear optimistic state on success
+            clearOptimisticState(productId);
+
+            return result;
+          } catch (error) {
+            if (process.env.NODE_ENV === "development") {
+              console.error("Remove from cart error:", error);
+            }
+            // Rollback optimistic removal
+            rollbackOptimisticUpdate(productId, false);
+            return `Failed to remove from cart: ${error}`;
+          } finally {
+            setTimeout(() => {
+              if (operationIdsRef.current.get(productId) === operationId) {
+                operationIdsRef.current.delete(productId);
+              }
+            }, 5000);
           }
-
-          return "Removed from cart";
-        });
-
-        // Clear optimistic state on success
-        clearOptimisticState(productId);
-
-        return result;
-      } catch (error) {
-        if (process.env.NODE_ENV === 'development') {
-          console.error("Remove from cart error:", error);
         }
-        // Rollback optimistic removal
-        rollbackOptimisticUpdate(productId, false);
-        return `Failed to remove from cart: ${error}`;
-      } finally {
-        setTimeout(() => {
-          if (operationIdsRef.current.get(productId) === operationId) {
-            operationIdsRef.current.delete(productId);
-          }
-        }, 5000);
-      }
-    }
-  );
-  },
+      );
+    },
     [
       user,
       cartProductIds,
@@ -1271,17 +1336,17 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       errors: Record<string, string>;
     }> => {
       const errors: Record<string, string> = {};
-  
+
       for (let i = 0; i < selectedProductIds.length; i += 10) {
         const batch = selectedProductIds.slice(i, i + 10);
-  
+
         const snapshot = await getDocs(
           query(
             collection(db, "shop_products"),
             where(documentId(), "in", batch)
           )
         );
-  
+
         // ✅ Use Product type
         const productDataMap: Record<string, Product> = {};
         snapshot.docs.forEach((doc) => {
@@ -1297,17 +1362,17 @@ export const CartProvider: React.FC<CartProviderProps> = ({
             },
           });
         });
-  
+
         for (const productId of batch) {
           const productData = productDataMap[productId];
           if (!productData) {
             errors[productId] = "Product no longer available";
             continue;
           }
-  
+
           const paused = productData.paused || false;
           const quantity = productData.quantity || 0;
-  
+
           if (paused) {
             errors[productId] = "Product is currently unavailable";
           } else if (quantity <= 0) {
@@ -1315,7 +1380,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           }
         }
       }
-  
+
       return {
         isValid: Object.keys(errors).length === 0,
         errors,
@@ -1597,7 +1662,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           items,
         };
       } catch (error) {
-        if (process.env.NODE_ENV === 'development') {
+        if (process.env.NODE_ENV === "development") {
           console.error("Error calculating cart totals:", error);
         }
         return { subtotal: 0, total: 0, currency: "TL", items: [] };
@@ -1648,54 +1713,53 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     async (cartDocs: DocumentSnapshot[]): Promise<void> => {
       const productIds = cartDocs.map((doc) => doc.id);
       const productDetails = await fetchProductDetailsBatch(productIds);
-      
 
       const existingItems = new Map<string, CartItem>();
-    cartItems
-      .filter((item) => !item.isOptimistic)
-      .forEach((item) => existingItems.set(item.productId, item));
+      cartItems
+        .filter((item) => !item.isOptimistic)
+        .forEach((item) => existingItems.set(item.productId, item));
 
-    for (const cartDoc of cartDocs) {
-      const data = cartDoc.data();
-      if (!data) continue;
+      for (const cartDoc of cartDocs) {
+        const data = cartDoc.data();
+        if (!data) continue;
 
-      const cartData = data as CartData;
-      const productDetail = productDetails[cartDoc.id];
-      
-      // ✅ NEW: Extract from product
-      const salePreferences = productDetail 
-        ? extractSalePreferences(productDetail) 
-        : null;
+        const cartData = data as CartData;
+        const productDetail = productDetails[cartDoc.id];
 
-      if (productDetail) {
-        const quantity = cartData.quantity || 1;
+        // ✅ NEW: Extract from product
+        const salePreferences = productDetail
+          ? extractSalePreferences(productDetail)
+          : null;
 
-        const dynamicAttributes: Record<string, unknown> = {};
-        Object.entries(cartData).forEach(([key, value]) => {
-          if (!isSystemField(key)) {
-            dynamicAttributes[key] = value;
-          }
-        });
+        if (productDetail) {
+          const quantity = cartData.quantity || 1;
 
-        existingItems.set(cartDoc.id, {
-          cartData,
-          product: productDetail,
-          productId: cartDoc.id,
-          isOptimistic: false,
-          quantity,
-          salePreferences, // ✅ Now using extracted preferences
-          selectedColorImage: resolveColorImage(
-            productDetail,
-            cartData.selectedColor as string
-          ),
-          sellerName: cartData.sellerName,
-          sellerId: cartData.sellerId,
-          isShop: cartData.isShop,
-          sellerContactNo: cartData.sellerContactNo as string | null,
-          ...dynamicAttributes,
-        });
+          const dynamicAttributes: Record<string, unknown> = {};
+          Object.entries(cartData).forEach(([key, value]) => {
+            if (!isSystemField(key)) {
+              dynamicAttributes[key] = value;
+            }
+          });
+
+          existingItems.set(cartDoc.id, {
+            cartData,
+            product: productDetail,
+            productId: cartDoc.id,
+            isOptimistic: false,
+            quantity,
+            salePreferences, // ✅ Now using extracted preferences
+            selectedColorImage: resolveColorImage(
+              productDetail,
+              cartData.selectedColor as string
+            ),
+            sellerName: cartData.sellerName,
+            sellerId: cartData.sellerId,
+            isShop: cartData.isShop,
+            sellerContactNo: cartData.sellerContactNo as string | null,
+            ...dynamicAttributes,
+          });
+        }
       }
-    }
 
       const sortedItems = Array.from(existingItems.values()).sort((a, b) => {
         const aTime = a.cartData.addedAt as Timestamp;
@@ -1730,7 +1794,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       await loadCartPage(0);
       setIsInitialized(true);
     } catch (error) {
-      if (process.env.NODE_ENV === 'development') {
+      if (process.env.NODE_ENV === "development") {
         console.error("Error initializing cart:", error);
       }
     } finally {
@@ -1745,7 +1809,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     try {
       await loadCartPage(currentPageRef.current + 1);
     } catch (error) {
-      if (process.env.NODE_ENV === 'development') {
+      if (process.env.NODE_ENV === "development") {
         console.error("Error loading more cart items:", error);
       }
     } finally {
@@ -1809,7 +1873,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           processCartSnapshot(snapshot);
         },
         (error) => {
-          if (process.env.NODE_ENV === 'development') {
+          if (process.env.NODE_ENV === "development") {
             console.error("Cart subscription error:", error);
           }
           if (retryCountRef.current < MAX_RETRIES) {

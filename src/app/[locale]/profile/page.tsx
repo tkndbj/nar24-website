@@ -291,29 +291,34 @@ export default function ProfilePage() {
 
   return (
     <div
-      className={`min-h-screen py-4 md:py-8 ${
+      className={`min-h-screen py-3 md:py-5 ${
         isDarkMode ? "bg-gray-900" : "bg-gray-50"
       }`}
+      style={{
+        transform: 'translateZ(0)',
+        backfaceVisibility: 'hidden',
+        WebkitFontSmoothing: 'antialiased'
+      }}
     >
       <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
         {/* Header Card */}
         <div
-          className={`rounded-2xl md:rounded-3xl shadow-xl overflow-hidden mb-4 md:mb-8 ${
+          className={`rounded-2xl md:rounded-3xl shadow-xl overflow-hidden mb-3 md:mb-5 ${
             isDarkMode ? "bg-gray-800" : "bg-white"
           }`}
         >
           {/* Cover Section */}
-          <div className="h-24 md:h-40 bg-gradient-to-r from-orange-500 via-pink-500 to-purple-500 relative">
+          <div className="h-20 md:h-32 bg-gradient-to-r from-orange-500 via-pink-500 to-purple-500 relative">
             <div className="absolute inset-0 bg-black/10"></div>
           </div>
 
           {/* Profile Section */}
-          <div className="relative px-4 md:px-8 pb-4 md:pb-8">
+          <div className="relative px-4 md:px-6 pb-3 md:pb-5">
             {/* Profile Image */}
-            <div className="flex items-end justify-between -mt-12 md:-mt-20 mb-4 md:mb-8">
+            <div className="flex items-end justify-between -mt-10 md:-mt-16 mb-3 md:mb-5">
               <div className="relative">
                 <div
-                  className={`w-24 h-24 md:w-40 md:h-40 rounded-full p-2 md:p-3 shadow-2xl ${
+                  className={`w-20 h-20 md:w-32 md:h-32 rounded-full p-2 shadow-2xl ${
                     isDarkMode ? "bg-gray-800" : "bg-white"
                   }`}
                 >
@@ -331,7 +336,7 @@ export default function ProfilePage() {
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <User className="w-8 h-8 md:w-16 md:h-16 text-gray-400" />
+                        <User className="w-7 h-7 md:w-14 md:h-14 text-gray-400" />
                       </div>
                     )}
                   </div>
@@ -342,12 +347,12 @@ export default function ProfilePage() {
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isUploadingImage}
-                    className="absolute bottom-1 md:bottom-3 right-1 md:right-3 w-8 h-8 md:w-12 md:h-12 bg-orange-500 hover:bg-orange-600 rounded-full flex items-center justify-center shadow-lg transition-colors disabled:opacity-50"
+                    className="absolute bottom-0 md:bottom-1 right-0 md:right-1 w-7 h-7 md:w-10 md:h-10 bg-orange-500 hover:bg-orange-600 rounded-full flex items-center justify-center shadow-lg transition-colors disabled:opacity-50"
                   >
                     {isUploadingImage ? (
-                      <div className="animate-spin rounded-full h-4 w-4 md:h-6 md:w-6 border-2 border-white border-t-transparent" />
+                      <div className="animate-spin rounded-full h-3.5 w-3.5 md:h-5 md:w-5 border-2 border-white border-t-transparent" />
                     ) : (
-                      <Camera className="w-4 h-4 md:w-6 md:h-6 text-white" />
+                      <Camera className="w-3.5 h-3.5 md:w-5 md:h-5 text-white" />
                     )}
                   </button>
                 )}
@@ -362,10 +367,10 @@ export default function ProfilePage() {
               </div>
 
               {/* Theme Toggle and Login Button */}
-              <div className="flex items-center gap-2 mt-12 md:mt-20">
+              <div className="flex items-center gap-2 mt-10 md:mt-16">
                 <button
                   onClick={toggleTheme}
-                  className={`p-2 md:p-3 rounded-full transition-colors ${
+                  className={`p-2 rounded-full transition-colors ${
                     isDarkMode
                       ? "bg-gray-700 hover:bg-gray-600"
                       : "bg-gray-100 hover:bg-gray-200"
@@ -381,7 +386,7 @@ export default function ProfilePage() {
                 {user && (
                   <button
                     onClick={() => router.push("/notifications")}
-                    className={`p-2 md:p-3 rounded-full transition-colors relative ${
+                    className={`p-2 rounded-full transition-colors relative ${
                       isDarkMode
                         ? "bg-gray-700 hover:bg-gray-600"
                         : "bg-gray-100 hover:bg-gray-200"
@@ -399,7 +404,7 @@ export default function ProfilePage() {
                 {!user && (
                   <button
                     onClick={() => router.push("/login")}
-                    className="px-4 py-2 md:px-6 md:py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-md font-medium transition-colors text-sm md:text-base"
+                    className="px-4 py-2 md:px-5 md:py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-md font-medium transition-colors text-sm"
                   >
                     {t("ProfilePage.login")}
                   </button>
@@ -408,10 +413,10 @@ export default function ProfilePage() {
             </div>
 
             {/* User Info */}
-            <div className="space-y-2 md:space-y-4">
+            <div className="space-y-1.5 md:space-y-3">
               <div>
                 <h1
-                  className={`text-xl md:text-3xl font-bold ${
+                  className={`text-lg md:text-2xl font-bold ${
                     isDarkMode ? "text-white" : "text-gray-900"
                   }`}
                 >
@@ -420,7 +425,7 @@ export default function ProfilePage() {
                     : t("ProfilePage.notLoggedIn")}
                 </h1>
                 {user && (
-                  <div className="flex items-center gap-3 mt-1 md:mt-2">
+                  <div className="flex items-center gap-3 mt-1">
                     <div
                       className={`flex items-center gap-2 ${
                         isDarkMode ? "text-gray-400" : "text-gray-600"
@@ -448,7 +453,7 @@ export default function ProfilePage() {
 
               {/* User Stats */}
               {user && (
-                <div className="flex items-center gap-6 pt-2 md:pt-4">
+                <div className="flex items-center gap-6 pt-1.5 md:pt-3">
                   {profileData?.location && (
                     <div
                       className={`flex items-center gap-2 ${
@@ -468,21 +473,21 @@ export default function ProfilePage() {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mb-4 md:mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3 mb-3 md:mb-5">
           {quickActionButtons.map((button, index) => (
             <button
               key={index}
               onClick={() => handleNavigation(button.path, button.action)}
-              className={`group p-3 md:p-4 rounded-xl md:rounded-2xl shadow-md hover:shadow-lg transition-all duration-200 border flex items-center gap-2 md:gap-3 ${
+              className={`group p-2.5 md:p-3 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 border flex items-center gap-2 ${
                 isDarkMode
                   ? "bg-gray-800 border-gray-700"
                   : "bg-white border-gray-100"
               }`}
             >
               <div
-                className={`w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-gradient-to-r ${button.gradient} flex items-center justify-center group-hover:scale-110 transition-transform flex-shrink-0`}
+                className={`w-8 h-8 md:w-9 md:h-9 rounded-lg bg-gradient-to-r ${button.gradient} flex items-center justify-center group-hover:scale-110 transition-transform flex-shrink-0`}
               >
-                <button.icon className="w-4 h-4 md:w-5 md:h-5 text-white" />
+                <button.icon className="w-4 h-4 text-white" />
               </div>
               <p
                 className={`text-xs md:text-sm font-medium text-left leading-tight ${
@@ -496,14 +501,14 @@ export default function ProfilePage() {
         </div>
 
         {/* Main Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6 mb-4 md:mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 md:gap-4 mb-3 md:mb-5">
           {mainActionButtons.map((button, index) => (
             <button
               key={index}
               onClick={() =>
                 handleNavigation(button.path, undefined, button.isExternal)
               }
-              className={`group p-4 md:p-6 rounded-xl md:rounded-2xl shadow-md hover:shadow-lg transition-all duration-200 text-left ${
+              className={`group p-3 md:p-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 text-left ${
                 button.featured
                   ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white"
                   : isDarkMode
@@ -512,16 +517,16 @@ export default function ProfilePage() {
               }`}
             >
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3 md:gap-4">
+                <div className="flex items-center gap-2.5 md:gap-3">
                   <div
-                    className={`w-10 h-10 md:w-12 md:h-12 rounded-lg md:rounded-xl flex items-center justify-center ${
+                    className={`w-9 h-9 md:w-11 md:h-11 rounded-lg flex items-center justify-center ${
                       button.featured
                         ? "bg-white/20"
                         : "bg-gradient-to-r from-orange-500 to-pink-500"
                     }`}
                   >
                     <button.icon
-                      className={`w-5 h-5 md:w-6 md:h-6 ${
+                      className={`w-4 h-4 md:w-5 md:h-5 ${
                         button.featured ? "text-white" : "text-white"
                       }`}
                     />
@@ -539,7 +544,7 @@ export default function ProfilePage() {
                       {button.label}
                     </h3>
                     <p
-                      className={`text-xs md:text-sm ${
+                      className={`text-xs ${
                         button.featured
                           ? "text-white/80"
                           : isDarkMode
@@ -568,17 +573,17 @@ export default function ProfilePage() {
         {/* Additional Actions for Authenticated Users */}
         {user && (
           <div
-            className={`rounded-xl md:rounded-2xl shadow-md p-4 md:p-6 border mb-4 md:mb-8 ${
+            className={`rounded-xl shadow-md p-3 md:p-4 border mb-3 md:mb-5 ${
               isDarkMode
                 ? "bg-gray-800 border-gray-700"
                 : "bg-white border-gray-100"
             }`}
           >
-            <div className="space-y-3 md:space-y-4">
+            <div className="space-y-2 md:space-y-2.5">
               {/* Pickup Points */}
               <button
                 onClick={() => handleNavigation("/pickup-points")}
-                className={`w-full flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-lg md:rounded-xl transition-colors text-left ${
+                className={`w-full flex items-center gap-2.5 md:gap-3 p-2.5 md:p-3 rounded-lg transition-colors text-left ${
                   isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"
                 }`}
               >
@@ -610,7 +615,7 @@ export default function ProfilePage() {
               {/* My Receipts */}
               <button
                 onClick={() => handleNavigation("/receipts")}
-                className={`w-full flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-lg md:rounded-xl transition-colors text-left ${
+                className={`w-full flex items-center gap-2.5 md:gap-3 p-2.5 md:p-3 rounded-lg transition-colors text-left ${
                   isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"
                 }`}
               >
@@ -642,7 +647,7 @@ export default function ProfilePage() {
               {/* Refund Form */}
               <button
                 onClick={() => handleNavigation("/refundform")}
-                className={`w-full flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-lg md:rounded-xl transition-colors text-left ${
+                className={`w-full flex items-center gap-2.5 md:gap-3 p-2.5 md:p-3 rounded-lg transition-colors text-left ${
                   isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"
                 }`}
               >
@@ -674,7 +679,7 @@ export default function ProfilePage() {
               {/* Become a Seller */}
               <button
                 onClick={() => handleNavigation("/createshop")}
-                className={`w-full flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-lg md:rounded-xl transition-colors text-left ${
+                className={`w-full flex items-center gap-2.5 md:gap-3 p-2.5 md:p-3 rounded-lg transition-colors text-left ${
                   isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"
                 }`}
               >
@@ -706,7 +711,7 @@ export default function ProfilePage() {
               {/* Account Settings */}
               <button
                 onClick={() => handleNavigation("/account-settings")}
-                className={`w-full flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-lg md:rounded-xl transition-colors text-left ${
+                className={`w-full flex items-center gap-2.5 md:gap-3 p-2.5 md:p-3 rounded-lg transition-colors text-left ${
                   isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"
                 }`}
               >
@@ -738,7 +743,7 @@ export default function ProfilePage() {
               {/* Support and FAQ */}
               <button
                 onClick={() => handleNavigation("/support-and-faq")}
-                className={`w-full flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-lg md:rounded-xl transition-colors text-left ${
+                className={`w-full flex items-center gap-2.5 md:gap-3 p-2.5 md:p-3 rounded-lg transition-colors text-left ${
                   isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"
                 }`}
               >
@@ -771,7 +776,7 @@ export default function ProfilePage() {
               <button
                 onClick={handleLogout}
                 disabled={isLoggingOut}
-                className={`w-full flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-lg md:rounded-xl transition-colors text-left disabled:opacity-50 ${
+                className={`w-full flex items-center gap-2.5 md:gap-3 p-2.5 md:p-3 rounded-lg transition-colors text-left disabled:opacity-50 ${
                   isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"
                 }`}
               >
@@ -797,28 +802,28 @@ export default function ProfilePage() {
         {/* Unauthenticated State Message */}
         {!user && (
           <div
-            className={`rounded-xl md:rounded-2xl shadow-md p-4 md:p-6 border text-center ${
+            className={`rounded-xl shadow-md p-4 border text-center ${
               isDarkMode
                 ? "bg-gray-800 border-gray-700"
                 : "bg-white border-gray-100"
             }`}
           >
-            <div className="space-y-3 md:space-y-4">
+            <div className="space-y-3">
               <User
-                className={`w-12 h-12 md:w-16 md:h-16 mx-auto ${
+                className={`w-12 h-12 md:w-14 md:h-14 mx-auto ${
                   isDarkMode ? "text-gray-600" : "text-gray-400"
                 }`}
               />
               <div>
                 <h3
-                  className={`text-lg md:text-xl font-semibold mb-2 ${
+                  className={`text-base md:text-lg font-semibold mb-1.5 ${
                     isDarkMode ? "text-white" : "text-gray-900"
                   }`}
                 >
                   {t("ProfilePage.loginToAccess")}
                 </h3>
                 <p
-                  className={`text-sm md:text-base mb-4 ${
+                  className={`text-sm mb-3 ${
                     isDarkMode ? "text-gray-400" : "text-gray-600"
                   }`}
                 >
@@ -826,7 +831,7 @@ export default function ProfilePage() {
                 </p>
                 <button
                   onClick={() => router.push("/login")}
-                  className="w-full px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium transition-colors"
+                  className="w-full px-6 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium transition-colors text-sm"
                 >
                   {t("ProfilePage.login")}
                 </button>

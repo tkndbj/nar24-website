@@ -201,7 +201,11 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         const productsSnapshot = await circuitBreaker.execute(
           CIRCUITS.FIREBASE_PRODUCTS,
           () => getDoc(productsDoc),
-          async () => ({ exists: () => false, data: () => undefined } as unknown as Awaited<ReturnType<typeof getDoc>>)
+          async () =>
+            ({
+              exists: () => false,
+              data: () => undefined,
+            } as unknown as Awaited<ReturnType<typeof getDoc>>)
         );
 
         if (productsSnapshot.exists()) {
@@ -213,7 +217,11 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         const shopSnapshot = await circuitBreaker.execute(
           CIRCUITS.FIREBASE_SHOP_PRODUCTS,
           () => getDoc(shopProductsDoc),
-          async () => ({ exists: () => false, data: () => undefined } as unknown as Awaited<ReturnType<typeof getDoc>>)
+          async () =>
+            ({
+              exists: () => false,
+              data: () => undefined,
+            } as unknown as Awaited<ReturnType<typeof getDoc>>)
         );
 
         if (shopSnapshot.exists()) {
@@ -222,7 +230,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
         return null;
       } catch (error) {
-        if (process.env.NODE_ENV === 'development') {
+        if (process.env.NODE_ENV === "development") {
           console.error("Error finding product document:", error);
         }
         return null;
@@ -266,7 +274,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
           setFavoriteCount(ids.size);
         },
         (error) => {
-          if (process.env.NODE_ENV === 'development') {
+          if (process.env.NODE_ENV === "development") {
             console.error("Favorites subscription error:", error);
           }
         }
@@ -300,6 +308,25 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // loadAllFavorites intentionally omitted to avoid circular dependency
+
+  const updateShopMetricsSafely = async (
+    shopId: string,
+    metricField: string
+  ): Promise<void> => {
+    try {
+      await writeBatch(db)
+        .update(doc(db, "shops", shopId), {
+          [`metrics.${metricField}`]: increment(1),
+          "metrics.lastUpdated": serverTimestamp(),
+        })
+        .commit();
+    } catch (error) {
+      // Silently fail - metrics are non-critical
+      if (process.env.NODE_ENV === "development") {
+        console.error(`Metrics update failed for shop ${shopId}:`, error);
+      }
+    }
+  };
 
   // Subscribe to favorite baskets
   const subscribeToBaskets = useCallback((userId: string) => {
@@ -341,7 +368,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         setFavoriteBaskets(baskets);
       },
       (error) => {
-        if (process.env.NODE_ENV === 'development') {
+        if (process.env.NODE_ENV === "development") {
           console.error("Baskets subscription error:", error);
         }
       }
@@ -388,7 +415,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
       lastCacheUpdateRef.current = new Date();
     } catch (error) {
-      if (process.env.NODE_ENV === 'development') {
+      if (process.env.NODE_ENV === "development") {
         console.error("Error loading all favorites:", error);
       }
     } finally {
@@ -399,7 +426,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   // Toast notifications (you can replace with your preferred toast library)
   const showSuccessToast = useCallback((message: string) => {
     // Replace with your preferred toast implementation
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV === "development") {
       console.log("Success:", message);
     }
     // Example: toast.success(message);
@@ -407,7 +434,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
   const showErrorToast = useCallback((message: string) => {
     // Replace with your preferred toast implementation
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV === "development") {
       console.error("Error:", message);
     }
     // Example: toast.error(message);
@@ -436,10 +463,10 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
   const isSystemField = (key: string): boolean => {
     const systemFields = new Set([
-      'addedAt',
-      'updatedAt',
-      'productId',
-      'quantity',
+      "addedAt",
+      "updatedAt",
+      "productId",
+      "quantity",
     ]);
     return systemFields.has(key);
   };
@@ -452,7 +479,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
     ): Promise<string> => {
       if (!user) return "Please log in";
       if (!productId) return "Invalid product ID";
-  
+
       const favCollection = selectedBasketId
         ? collection(
             db,
@@ -463,116 +490,153 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
             "favorites"
           )
         : collection(db, "users", user.uid, "favorites");
-  
-        try {
-          return await requestDeduplicator.deduplicate(
-            `favorite-toggle-${productId}`,
-            async () => {
-              return await runTransaction(db, async (transaction) => {
-                // Check if already exists
-                const existingQuery = query(
-                  favCollection,
-                  where("productId", "==", productId),
-                  limit(1)
-                );
-                const existing = await getDocs(existingQuery);
-        
-                // Get product reference and data
-                const productRef = await getProductDocument(productId);
-                if (!productRef) return "Product not found";
-        
-                const productSnap = await transaction.get(productRef);
-                if (!productSnap.exists()) return "Product not found";
-        
-                if (existing.docs.length > 0) {
-                  // Remove existing favorite
-                  transaction.delete(existing.docs[0].ref);
-                  transaction.update(productRef, {
-                    favoritesCount: increment(-1),
-                    metricsUpdatedAt: serverTimestamp(),
-                  });
-        
-                  // Update local state immediately
-                  setAllFavoriteProductIds((prev) => {
+
+      try {
+        const result = await requestDeduplicator.deduplicate(
+          `favorite-toggle-${productId}`,
+          async () => {
+            return await runTransaction(db, async (transaction) => {
+              // Check if already exists
+              const existingQuery = query(
+                favCollection,
+                where("productId", "==", productId),
+                limit(1)
+              );
+              const existing = await getDocs(existingQuery);
+
+              // Get product reference and data
+              const productRef = await getProductDocument(productId);
+              if (!productRef) return "Product not found";
+
+              const productSnap = await transaction.get(productRef);
+              if (!productSnap.exists()) return "Product not found";
+
+              if (existing.docs.length > 0) {
+                // Remove existing favorite
+                transaction.delete(existing.docs[0].ref);
+                transaction.update(productRef, {
+                  favoritesCount: increment(-1),
+                  metricsUpdatedAt: serverTimestamp(),
+                });
+
+                // Update local state immediately
+                setAllFavoriteProductIds((prev) => {
+                  const newSet = new Set(prev);
+                  newSet.delete(productId);
+                  return newSet;
+                });
+
+                if (!selectedBasketId) {
+                  setFavoriteProductIds((prev) => {
                     const newSet = new Set(prev);
                     newSet.delete(productId);
                     return newSet;
                   });
-        
-                  if (!selectedBasketId) {
-                    setFavoriteProductIds((prev) => {
-                      const newSet = new Set(prev);
-                      newSet.delete(productId);
-                      return newSet;
-                    });
-                  }
-        
-                  // Clear cache
-                  basketFavoriteCacheRef.current = {};
-                  basketNameCacheRef.current = {};
-        
-                  showDebouncedRemoveToast();
-                  return "Removed from favorites";
-                } else {
-                  // 🚀 NEW: Get product data and its attributes
-                  const productData = productSnap.data() as ProductDocumentData;
-        
-                  // Add new favorite with dynamic attributes
-                  const favoriteData: Record<string, unknown> = {
-                    productId,
-                    addedAt: serverTimestamp(),
-                    quantity: attributes.quantity || 1,
-                  };
-        
-                  // 🚀 NEW: Add product's dynamic attributes from Firestore
-                  if (productData.attributes) {
-                    Object.entries(productData.attributes).forEach(([key, value]) => {
+                }
+
+                // Clear cache
+                basketFavoriteCacheRef.current = {};
+                basketNameCacheRef.current = {};
+
+                showDebouncedRemoveToast();
+                return "Removed from favorites";
+              } else {
+                // 🚀 NEW: Get product data and its attributes
+                const productData = productSnap.data() as ProductDocumentData;
+
+                // Add new favorite with dynamic attributes
+                const favoriteData: Record<string, unknown> = {
+                  productId,
+                  addedAt: serverTimestamp(),
+                  quantity: attributes.quantity || 1,
+                };
+
+                // 🚀 NEW: Add product's dynamic attributes from Firestore
+                if (productData.attributes) {
+                  Object.entries(productData.attributes).forEach(
+                    ([key, value]) => {
                       if (!isSystemField(key)) {
                         favoriteData[key] = value;
                       }
-                    });
+                    }
+                  );
+                }
+
+                // 🚀 NEW: Override with any UI-selected attributes
+                Object.entries(attributes).forEach(([key, value]) => {
+                  if (
+                    !isSystemField(key) &&
+                    value !== undefined &&
+                    value !== null
+                  ) {
+                    favoriteData[key] = value;
                   }
-        
-                  // 🚀 NEW: Override with any UI-selected attributes
-                  Object.entries(attributes).forEach(([key, value]) => {
-                    if (!isSystemField(key) && value !== undefined && value !== null) {
-                      favoriteData[key] = value;
+                });
+
+                const newFavRef = doc(favCollection);
+                transaction.set(newFavRef, favoriteData);
+                transaction.update(productRef, {
+                  favoritesCount: increment(1),
+                  metricsUpdatedAt: serverTimestamp(),
+                });
+
+                // Update local state immediately
+                setAllFavoriteProductIds(
+                  (prev) => new Set([...prev, productId])
+                );
+
+                if (!selectedBasketId) {
+                  setFavoriteProductIds(
+                    (prev) => new Set([...prev, productId])
+                  );
+                }
+
+                // Clear cache
+                basketFavoriteCacheRef.current = {};
+                basketNameCacheRef.current = {};
+
+                showSuccessToast("Added to favorites");
+                return "Added to favorites";
+              }
+            }); // ✅ Close runTransaction
+          }, // ✅ Close async arrow function
+          { timeout: 15000 }
+        ); // ✅ Close deduplicate
+
+        // ✅ Fire-and-forget metrics update AFTER getting result
+        if (result === "Added to favorites") {
+          const productRef = await getProductDocument(productId);
+          if (productRef) {
+            const productSnap = await getDoc(productRef);
+            if (productSnap.exists()) {
+              const productData = productSnap.data() as ProductDocumentData;
+              const isShopProduct = productRef.path.includes("shop_products");
+
+              if (isShopProduct) {
+                const shopId = productData.shopId ?? productData.ownerId;
+                if (shopId) {
+                  updateShopMetricsSafely(
+                    shopId,
+                    "totalFavoriteAdditions"
+                  ).catch((error) => {
+                    if (process.env.NODE_ENV === "development") {
+                      console.error("Failed to update shop metrics:", error);
                     }
                   });
-        
-                  const newFavRef = doc(favCollection);
-                  transaction.set(newFavRef, favoriteData);
-                  transaction.update(productRef, {
-                    favoritesCount: increment(1),
-                    metricsUpdatedAt: serverTimestamp(),
-                  });
-        
-                  // Update local state immediately
-                  setAllFavoriteProductIds((prev) => new Set([...prev, productId]));
-        
-                  if (!selectedBasketId) {
-                    setFavoriteProductIds((prev) => new Set([...prev, productId]));
-                  }
-        
-                  // Clear cache
-                  basketFavoriteCacheRef.current = {};
-                  basketNameCacheRef.current = {};
-        
-                  showSuccessToast("Added to favorites");
-                  return "Added to favorites";
                 }
-              });  // ✅ Close runTransaction
-            },  // ✅ Close async arrow function
-            { timeout: 15000 }
-          );  // ✅ Close deduplicate
-        } catch (error) {
-          if (process.env.NODE_ENV === 'development') {
-            console.error("Error in add/remove favorite:", error);
+              }
+            }
           }
-          showErrorToast("Failed to update favorites");
-          return `Failed to update favorites: ${error}`;
         }
 
+        return result;
+      } catch (error) {
+        if (process.env.NODE_ENV === "development") {
+          console.error("Error in add/remove favorite:", error);
+        }
+        showErrorToast("Failed to update favorites");
+        return `Failed to update favorites: ${error}`;
+      }
     },
     [
       user,
@@ -583,7 +647,6 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
       showDebouncedRemoveToast,
     ]
   );
-  
 
   // Remove from favorites (alias for addToFavorites for toggle behavior)
   const removeFromFavorites = useCallback(
@@ -664,7 +727,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         showSuccessToast("Removed from all favorites");
         return "Removed from all favorites";
       } catch (error) {
-        if (process.env.NODE_ENV === 'development') {
+        if (process.env.NODE_ENV === "development") {
           console.error("Error globally removing favorite:", error);
         }
         showErrorToast("Failed to remove from favorites");
@@ -690,7 +753,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         showSuccessToast("Products removed from favorites");
         return "Products removed from favorites";
       } catch (error) {
-        if (process.env.NODE_ENV === 'development') {
+        if (process.env.NODE_ENV === "development") {
           console.error("Error removing multiple favorites:", error);
         }
         showErrorToast("Failed to remove favorites");
@@ -773,7 +836,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         showSuccessToast("Basket created successfully");
         return "Basket created successfully";
       } catch (error) {
-        if (process.env.NODE_ENV === 'development') {
+        if (process.env.NODE_ENV === "development") {
           console.error("Error creating basket:", error);
         }
         showErrorToast("Failed to create basket");
@@ -805,7 +868,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         showDebouncedBasketDeletionToast();
         return "Basket deleted successfully";
       } catch (error) {
-        if (process.env.NODE_ENV === 'development') {
+        if (process.env.NODE_ENV === "development") {
           console.error("Error deleting basket:", error);
         }
         showErrorToast("Failed to delete basket");
@@ -840,7 +903,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         showSuccessToast("Products transferred to basket");
         return "Products transferred to basket";
       } catch (error) {
-        if (process.env.NODE_ENV === 'development') {
+        if (process.env.NODE_ENV === "development") {
           console.error("Error transferring favorites:", error);
         }
         showErrorToast("Failed to transfer favorites");
@@ -855,7 +918,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   const transferBatch = useCallback(
     async (productIds: string[], basketId: string) => {
       if (!user) return;
-  
+
       const defaultFavs = collection(db, "users", user.uid, "favorites");
       const basketFavs = collection(
         db,
@@ -865,44 +928,44 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         basketId,
         "favorites"
       );
-  
+
       const batch = writeBatch(db);
-  
+
       try {
         for (const chunk of chunkArray(productIds, FIRESTORE_IN_LIMIT)) {
           const snap = await getDocs(
             query(defaultFavs, where("productId", "in", chunk))
           );
-  
+
           snap.docs.forEach((docSnap) => {
             const data = docSnap.data();
-  
+
             // Delete from default favorites
             batch.delete(docSnap.ref);
-  
+
             // 🚀 NEW: Build transfer data with all non-system attributes
             const transferData: Record<string, unknown> = {
               productId: data.productId,
               addedAt: serverTimestamp(),
               quantity: (data.quantity as number) || 1,
             };
-  
+
             // 🚀 NEW: Copy all non-system attributes dynamically
             Object.entries(data).forEach(([key, value]) => {
-              if (!isSystemField(key) && key !== 'productId' && value != null) {
+              if (!isSystemField(key) && key !== "productId" && value != null) {
                 transferData[key] = value;
               }
             });
-  
+
             // Add to basket
             const newBasketRef = doc(basketFavs);
             batch.set(newBasketRef, transferData);
           });
         }
-  
+
         await batch.commit();
       } catch (error) {
-        if (process.env.NODE_ENV === 'development') {
+        if (process.env.NODE_ENV === "development") {
           console.error("Error in transferBatch:", error);
         }
         throw error;
@@ -928,7 +991,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         showSuccessToast("Products moved to default favorites");
         return "Products moved to default favorites";
       } catch (error) {
-        if (process.env.NODE_ENV === 'development') {
+        if (process.env.NODE_ENV === "development") {
           console.error("Error moving favorites:", error);
         }
         showErrorToast("Failed to move favorites");
@@ -943,7 +1006,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   const moveFromBasketBatch = useCallback(
     async (productIds: string[], basketId: string) => {
       if (!user) return;
-  
+
       const basketFavs = collection(
         db,
         "users",
@@ -953,44 +1016,44 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         "favorites"
       );
       const defaultFavs = collection(db, "users", user.uid, "favorites");
-  
+
       const batch = writeBatch(db);
-  
+
       try {
         for (const chunk of chunkArray(productIds, FIRESTORE_IN_LIMIT)) {
           const snap = await getDocs(
             query(basketFavs, where("productId", "in", chunk))
           );
-  
+
           snap.docs.forEach((docSnap) => {
             const data = docSnap.data();
-  
+
             // Delete from basket
             batch.delete(docSnap.ref);
-  
+
             // 🚀 NEW: Build transfer data with all non-system attributes
             const transferData: Record<string, unknown> = {
               productId: data.productId,
               addedAt: serverTimestamp(),
               quantity: (data.quantity as number) || 1,
             };
-  
+
             // 🚀 NEW: Copy all non-system attributes dynamically
             Object.entries(data).forEach(([key, value]) => {
-              if (!isSystemField(key) && key !== 'productId' && value != null) {
+              if (!isSystemField(key) && key !== "productId" && value != null) {
                 transferData[key] = value;
               }
             });
-  
+
             // Add to default favorites
             const newDefaultRef = doc(defaultFavs);
             batch.set(newDefaultRef, transferData);
           });
         }
-  
+
         await batch.commit();
       } catch (error) {
-        if (process.env.NODE_ENV === 'development') {
+        if (process.env.NODE_ENV === "development") {
           console.error("Error in moveFromBasketBatch:", error);
         }
         throw error;
@@ -1003,11 +1066,14 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   const isFavoritedInBasket = useCallback(
     async (productId: string): Promise<boolean> => {
       // Check cache first
-      const cachedCheck = cacheManager.get<boolean>('favorite_basket_check', productId);
+      const cachedCheck = cacheManager.get<boolean>(
+        "favorite_basket_check",
+        productId
+      );
       if (cachedCheck !== null) {
         return cachedCheck;
       }
-      
+
       // Then check ref cache
       if (basketFavoriteCacheRef.current[productId] !== undefined) {
         return basketFavoriteCacheRef.current[productId];
@@ -1038,18 +1104,18 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
         const isFavorited = results.some((snap) => !snap.empty);
 
-// ✅ Cache in both local ref AND cacheManager
-basketFavoriteCacheRef.current[productId] = isFavorited;
-cacheManager.set(
-  'favorite_basket_check',
-  productId,
-  isFavorited,
-  2 * 60 * 1000 // 2 minutes
-);
+        // ✅ Cache in both local ref AND cacheManager
+        basketFavoriteCacheRef.current[productId] = isFavorited;
+        cacheManager.set(
+          "favorite_basket_check",
+          productId,
+          isFavorited,
+          2 * 60 * 1000 // 2 minutes
+        );
 
-return isFavorited;
+        return isFavorited;
       } catch (error) {
-        if (process.env.NODE_ENV === 'development') {
+        if (process.env.NODE_ENV === "development") {
           console.error("Error checking basket favorite:", error);
         }
         return false;
@@ -1097,7 +1163,7 @@ return isFavorited;
 
         return basketName;
       } catch (error) {
-        if (process.env.NODE_ENV === 'development') {
+        if (process.env.NODE_ENV === "development") {
           console.error("Error getting basket name:", error);
         }
         return null;

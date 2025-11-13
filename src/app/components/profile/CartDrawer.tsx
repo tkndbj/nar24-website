@@ -481,7 +481,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
             >
               {item.product?.brandModel && (
                 <div className="mb-1 px-1">
-                  <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+                  <span className={`text-sm font-semibold ${isDarkMode ? "text-blue-200" : "text-blue-600"}`}>
                     {item.product.brandModel}
                   </span>
                 </div>
