@@ -149,63 +149,57 @@ LoadingSkeleton.displayName = "LoadingSkeleton";
 const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   const router = useRouter();
   const localization = useTranslations();
-  const { getProduct } = useProductCache();
+  const { getProduct, setProduct: setProductCache } = useProductCache();
   const [productId, setProductId] = useState<string>("");  
   const [error, setError] = useState<string | null>(null);
   const [product, setProduct] = useState<Product | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   
   useEffect(() => {
+    let mounted = true;
+
     params.then((resolvedParams) => {
-      setProductId(resolvedParams.productId);
-    });
-  }, [params]);
-
-  // ✅ Load from in-memory cache FIRST, then sessionStorage, then fetch
-  useEffect(() => {
-    if (!productId) return;
-
-    // ✅ PRIORITY 1: Check in-memory cache (INSTANT - like Flutter!)
-    const cachedProduct = getProduct(productId);
-    if (cachedProduct) {
-      console.log('✅ Loaded from in-memory cache (instant!)');
-      setProduct(cachedProduct);
-      setIsLoading(false);
+      if (!mounted) return;
       
-      // Fetch fresh data in background
-      fetchFreshData(productId);
-      return;
-    }
-
-    // ✅ PRIORITY 2: Check sessionStorage (fast, but slower than memory)
-    const sessionCached = sessionStorage.getItem(`product_${productId}`);
-    const timestamp = sessionStorage.getItem(`product_${productId}_timestamp`);
-
-    if (sessionCached && timestamp) {
-      const age = Date.now() - parseInt(timestamp);
-      const MAX_AGE = 5 * 60 * 1000;
-
-      if (age < MAX_AGE) {
-        try {
-          console.log('✅ Loaded from sessionStorage');
-          const cachedProduct = JSON.parse(sessionCached);
-          const parsedProduct = ProductUtils.fromJson(cachedProduct);
-          setProduct(parsedProduct);
-          setIsLoading(false);
-
-          // Fetch fresh data in background
-          fetchFreshData(productId);
-          return;
-        } catch (e) {
-          console.error('Error parsing cached product:', e);
-        }
+      const id = resolvedParams.productId;
+      setProductId(id);
+      
+      // ✅ Synchronous cache check
+      const cached = getProduct(id);
+      if (cached) {
+        console.log('✅ INSTANT: In-memory cache');
+        setProduct(cached);
+        setIsLoading(false);
+        fetchFreshData(id);
+        return;
       }
-    }
 
-    // ✅ PRIORITY 3: No cache - fetch from API
-    console.log('❌ No cache - fetching from API');
-    fetchProduct(productId);
-  }, [productId, getProduct]);
+      // ✅ Synchronous sessionStorage check
+      try {
+        const stored = sessionStorage.getItem(`product_${id}`);
+        const time = sessionStorage.getItem(`product_${id}_timestamp`);
+        
+        if (stored && time && (Date.now() - parseInt(time)) < 300000) {
+          console.log('✅ FAST: sessionStorage');
+          const parsed = ProductUtils.fromJson(JSON.parse(stored));
+          setProduct(parsed);
+          setIsLoading(false);
+          setProductCache(id, parsed);
+          fetchFreshData(id);
+          return;
+        }
+      } catch (e) {
+        console.error('Cache error:', e);
+      }
+
+      // ✅ Network fallback
+      console.log('⏳ SLOW: Network fetch');
+      fetchProduct(id);
+    });
+
+    return () => { mounted = false; };
+  }, [params, getProduct, setProductCache]);
+
 
 
 
@@ -263,45 +257,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
   // ✅ NEW: Track if user has scrolled down to lazy load components
   const [hasScrolled, setHasScrolled] = useState(false);
-
-  // Resolve params
-  useEffect(() => {
-    params.then((resolvedParams) => {
-      setProductId(resolvedParams.productId);
-    });
-  }, [params]);
-
-  useEffect(() => {
-    if (!productId) return;
-
-    // Try to get from sessionStorage
-    const cached = sessionStorage.getItem(`product_${productId}`);
-    const timestamp = sessionStorage.getItem(`product_${productId}_timestamp`);
-
-    if (cached && timestamp) {
-      const age = Date.now() - parseInt(timestamp);
-      const MAX_AGE = 5 * 60 * 1000; // 5 minutes
-
-      if (age < MAX_AGE) {
-        try {
-          const cachedProduct = JSON.parse(cached);
-          const parsedProduct = ProductUtils.fromJson(cachedProduct);
-          setProduct(parsedProduct);
-          setIsLoading(false);
-
-          // ✅ Fetch fresh data in background
-          fetchFreshData(productId);
-          return;
-        } catch (e) {
-          console.error('Error parsing cached product:', e);
-        }
-      }
-    }
-
-    // No cache or expired - fetch normally
-    fetchProduct(productId);
-  }, [productId]);
-
 
   // ✅ OPTIMIZED: Dark mode detection with debouncing
   useEffect(() => {
