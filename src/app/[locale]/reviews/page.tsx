@@ -603,7 +603,7 @@ export default function ReviewsPage() {
             : "bg-white border-gray-200 hover:border-gray-300"
         }
       `}
-      onClick={() => router.push(`/product/${review.productId}`)}
+      onClick={() => router.push(`/productdetail/${review.productId}`)}
     >
       <div className="flex space-x-3">
         <div className="relative w-16 h-16 flex-shrink-0">
@@ -630,8 +630,7 @@ export default function ReviewsPage() {
               ${isDarkMode ? "text-green-400" : "text-green-600"}
             `}
             >
-              {review.currency === "TRY" ? "₺" : "$"}
-              {review.productPrice.toLocaleString()}
+              ₺{review.productPrice.toLocaleString()}
             </span>
           </div>
         </div>
@@ -996,7 +995,7 @@ export default function ReviewsPage() {
                             : "bg-gray-50 border-gray-200 hover:border-gray-300"
                         }
                       `}
-                    onClick={() => router.push(`/product/${review.productId}`)}
+                    onClick={() => router.push(`/productdetail/${review.productId}`)}
                   >
                     <div className="flex space-x-3">
                       <div className="relative w-16 h-16 flex-shrink-0">
@@ -1018,19 +1017,20 @@ export default function ReviewsPage() {
                         >
                           {review.productName}
                         </h4>
-                        <div className="flex items-center space-x-2 mt-1">
-                          <span
-                            className={`
-                              font-bold text-sm
-                              ${
-                                isDarkMode ? "text-green-400" : "text-green-600"
-                              }
-                            `}
-                          >
-                            {review.currency === "TRY" ? "₺" : "$"}
-                            {review.productPrice?.toLocaleString()}
-                          </span>
-                        </div>
+                        {review.productPrice && (
+                          <div className="flex items-center space-x-2 mt-1">
+                            <span
+                              className={`
+                                font-bold text-sm
+                                ${
+                                  isDarkMode ? "text-green-400" : "text-green-600"
+                                }
+                              `}
+                            >
+                              ₺{review.productPrice.toLocaleString()}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

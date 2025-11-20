@@ -19,7 +19,7 @@ const LoadingSkeleton: React.FC<{
   cardCount: number;
   isDarkMode?: boolean;
 }> = ({ cardCount, isDarkMode = false }) => (
-  <div className="flex gap-2 overflow-hidden">
+  <div className="flex overflow-hidden" style={{ gap: "0px" }}>
     {Array.from({ length: cardCount }).map((_, i) => (
       <div
         key={i}
@@ -118,7 +118,7 @@ const ProductDetailRelatedProducts: React.FC<
         listViewHeight: 450,
         cardWidth: 240,
         cardCount: 6,
-        gap: 8,
+        gap: 0,
       };
     }
 
@@ -129,7 +129,7 @@ const ProductDetailRelatedProducts: React.FC<
       listViewHeight: mobile ? 380 : 450,
       cardWidth: mobile ? 200 : 240,
       cardCount: mobile ? 3 : 6,
-      gap: mobile ? 8 : 10,
+      gap: 0,
     };
   }, []);
 
@@ -283,11 +283,7 @@ const ProductDetailRelatedProducts: React.FC<
   return (
     <div
       ref={containerRef}
-      className={`rounded-none sm:rounded-2xl -mx-3 px-3 py-2 sm:mx-0 sm:px-6 sm:py-3 border-0 sm:border sm:shadow-sm ${
-        isDarkMode
-          ? "bg-gray-800 sm:border-gray-700"
-          : "bg-white sm:border-gray-200"
-      }`}
+      className="py-2 sm:py-3"
     >
       <div className="space-y-2 sm:space-y-3">
         {/* Header */}
@@ -335,11 +331,34 @@ const ProductDetailRelatedProducts: React.FC<
         </div>
 
         {/* Products container */}
-        <div className="relative group">
+        <div className="relative">
+          {/* Left Smokey Fade Effect */}
+          {!isMobile && canScrollLeft && (
+            <div
+              className={`absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r ${
+                isDarkMode
+                  ? "from-gray-900 via-gray-900/80 to-transparent"
+                  : "from-gray-50 via-gray-50/80 to-transparent"
+              } pointer-events-none z-10`}
+            />
+          )}
+
+          {/* Right Smokey Fade Effect */}
+          {!isMobile && canScrollRight && (
+            <div
+              className={`absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l ${
+                isDarkMode
+                  ? "from-gray-900 via-gray-900/80 to-transparent"
+                  : "from-gray-50 via-gray-50/80 to-transparent"
+              } pointer-events-none z-10`}
+            />
+          )}
+
+          {/* Left Arrow - Always Visible */}
           {!isMobile && canScrollLeft && (
             <button
               onClick={scrollLeft}
-              className={`absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 shadow-xl rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-110 ${
+              className={`absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 shadow-xl rounded-full flex items-center justify-center transition-all hover:scale-110 ${
                 isDarkMode
                   ? "bg-gray-700 text-gray-300 hover:text-orange-400 border border-gray-600"
                   : "bg-white text-gray-600 hover:text-orange-600 border border-gray-200"
@@ -349,10 +368,11 @@ const ProductDetailRelatedProducts: React.FC<
             </button>
           )}
 
+          {/* Right Arrow - Always Visible */}
           {!isMobile && canScrollRight && (
             <button
               onClick={scrollRight}
-              className={`absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 shadow-xl rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-110 ${
+              className={`absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 shadow-xl rounded-full flex items-center justify-center transition-all hover:scale-110 ${
                 isDarkMode
                   ? "bg-gray-700 text-gray-300 hover:text-orange-400 border border-gray-600"
                   : "bg-white text-gray-600 hover:text-orange-600 border border-gray-200"
@@ -368,21 +388,23 @@ const ProductDetailRelatedProducts: React.FC<
             ) : relatedProducts.length > 0 ? (
               <div
                 ref={scrollContainerRef}
-                className="flex gap-2 overflow-x-auto h-full scroll-smooth [&::-webkit-scrollbar]:hidden items-start"
+                className="flex overflow-x-auto h-full scroll-smooth [&::-webkit-scrollbar]:hidden items-start"
                 style={{
                   scrollbarWidth: "none",
                   msOverflowStyle: "none",
                   paddingBottom: "0",
                   paddingLeft: isMobile ? "4px" : "0",
+                  gap: "0px",
                 }}
               >
                 {relatedProducts.map((product, index) => (
                   <div
                     key={`${product.id}-${index}`}
-                    className="flex-shrink-0 flex items-start"
+                    className="flex-shrink-0"
                     style={{
                       width: `${cardWidth}px`,
                       minWidth: `${cardWidth}px`,
+                      marginRight: index < relatedProducts.length - 1 ? "-20px" : "0px",
                     }}
                   >
                     <ProductCard

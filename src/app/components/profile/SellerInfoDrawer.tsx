@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import {
   X,
   User,
@@ -85,27 +86,33 @@ export const SellerInfoDrawer: React.FC<SellerInfoDrawerProps> = ({
     }
   }, [isOpen]);
 
-  // Scroll lock for mobile
+  // Scroll lock - matches FavoritesDrawer pattern
   useEffect(() => {
-    const isMobile = window.innerWidth < 768;
-
-    if (isMobile && isOpen) {
+    if (isOpen) {
+      // Disable body scroll
+      const scrollY = window.scrollY;
       document.body.style.overflow = "hidden";
       document.body.style.position = "fixed";
       document.body.style.width = "100%";
-    } else if (isMobile) {
+      document.body.style.top = `-${scrollY}px`;
+    } else {
+      // Re-enable body scroll
+      const scrollY = document.body.style.top;
       document.body.style.overflow = "";
       document.body.style.position = "";
       document.body.style.width = "";
+      document.body.style.top = "";
+
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY || "0") * -1);
+      }
     }
 
     return () => {
-      const wasMobile = window.innerWidth < 768;
-      if (wasMobile) {
-        document.body.style.overflow = "";
-        document.body.style.position = "";
-        document.body.style.width = "";
-      }
+      document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.width = "";
+      document.body.style.top = "";
     };
   }, [isOpen]);
 
@@ -423,11 +430,11 @@ export const SellerInfoDrawer: React.FC<SellerInfoDrawerProps> = ({
     resetForm();
   };
 
-  if (!shouldRender) return null;
-
   const l = localization || ((key: string) => key.split(".").pop() || key);
 
-  return (
+  if (!shouldRender) return null;
+
+  const drawerContent = (
     <>
       <div className="fixed inset-0 z-50 overflow-hidden">
         {/* Backdrop */}
@@ -441,11 +448,11 @@ export const SellerInfoDrawer: React.FC<SellerInfoDrawerProps> = ({
         {/* Drawer */}
         <div
           className={`
-            absolute right-0 top-0 h-full w-full max-w-md transform transition-transform duration-300 ease-out
-            ${isDarkMode ? "bg-gray-900" : "bg-white"}
-            shadow-2xl flex flex-col
-            ${isAnimating ? "translate-x-0" : "translate-x-full"}
-          `}
+              absolute right-0 top-0 h-full w-full max-w-md transform transition-transform duration-300 ease-out
+              ${isDarkMode ? "bg-gray-900" : "bg-white"}
+              shadow-2xl flex flex-col
+              ${isAnimating ? "translate-x-0" : "translate-x-full"}
+            `}
         >
           {/* Header */}
           <div
@@ -845,7 +852,16 @@ export const SellerInfoDrawer: React.FC<SellerInfoDrawerProps> = ({
 
       {/* Add/Edit Seller Info Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-6">
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] p-6"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            overflow: "hidden",
+          }}
+          onClick={handleCloseModal}
+        >
           <div
             className={`
               w-full max-w-sm rounded-xl p-6
@@ -1005,7 +1021,9 @@ export const SellerInfoDrawer: React.FC<SellerInfoDrawerProps> = ({
                     }
                   >
                     {formData.latitude !== null && formData.longitude !== null
-                      ? `${formData.latitude.toFixed(4)}, ${formData.longitude.toFixed(4)}`
+                      ? `${formData.latitude.toFixed(
+                          4
+                        )}, ${formData.longitude.toFixed(4)}`
                       : l("SellerInfoDrawer.pinLocationOnMap") ||
                         "Pin location on map"}
                   </span>
@@ -1121,9 +1139,7 @@ export const SellerInfoDrawer: React.FC<SellerInfoDrawerProps> = ({
                 {isSaving ? (
                   <>
                     <RefreshCw size={16} className="animate-spin" />
-                    <span>
-                      {l("SellerInfoDrawer.saving") || "Saving..."}
-                    </span>
+                    <span>{l("SellerInfoDrawer.saving") || "Saving..."}</span>
                   </>
                 ) : (
                   <span>{l("SellerInfoDrawer.save") || "Save"}</span>
@@ -1151,4 +1167,8 @@ export const SellerInfoDrawer: React.FC<SellerInfoDrawerProps> = ({
       )}
     </>
   );
+
+  return typeof window !== "undefined"
+    ? createPortal(drawerContent, document.body)
+    : null;
 };

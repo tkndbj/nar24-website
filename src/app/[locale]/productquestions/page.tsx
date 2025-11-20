@@ -412,7 +412,7 @@ export default function ProductQuestionsPage() {
             : "bg-white border-gray-200 hover:border-gray-300"
         }
       `}
-      onClick={() => router.push(`/product/${question.productId}`)}
+      onClick={() => router.push(`/productdetail/${question.productId}`)}
     >
       <div className="flex space-x-3">
         <div className="relative w-16 h-16 flex-shrink-0">

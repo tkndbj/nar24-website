@@ -44,9 +44,9 @@ const CollectionProductCard: React.FC<CollectionProductCardProps> = ({
 
   return (
     <div
-      className={`group flex min-w-72 w-72 h-28 border rounded-2xl md:rounded-2xl rounded-lg overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-lg hover:scale-[1.02] ${
-        isDarkMode 
-          ? "bg-gradient-to-br from-gray-800 to-gray-850 border-gray-700 hover:border-orange-500" 
+      className={`group flex min-w-72 w-72 h-28 border rounded-2xl md:rounded-2xl rounded-lg overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-lg ${
+        isDarkMode
+          ? "bg-gradient-to-br from-gray-800 to-gray-850 border-gray-700 hover:border-orange-500"
           : "bg-gradient-to-br from-white to-gray-50 border-gray-200 hover:border-orange-300"
       }`}
       onClick={() => onProductClick(product.id)}
@@ -60,7 +60,7 @@ const CollectionProductCard: React.FC<CollectionProductCardProps> = ({
             src={product.imageUrls[0]}
             alt={product.productName}
             fill
-            className="object-cover group-hover:scale-110 transition-transform duration-300"
+            className="object-cover transition-transform duration-300"
             onError={() => setImageError(true)}
           />
         ) : (

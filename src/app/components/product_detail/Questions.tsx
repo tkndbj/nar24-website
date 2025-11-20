@@ -58,9 +58,9 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
   const isLongAnswer = question.answerText.length > 120;
 
   return (
-    <div className={`group min-w-80 w-80 rounded-2xl sm:rounded-2xl rounded-none p-4 sm:p-5 border transition-all duration-300 hover:shadow-lg hover:scale-[1.02] ${
-      isDarkMode 
-        ? "bg-gradient-to-br from-gray-800 to-gray-850 border-gray-700 hover:border-orange-500" 
+    <div className={`group min-w-80 w-80 rounded-2xl sm:rounded-2xl rounded-none p-4 sm:p-5 border transition-all duration-300 hover:shadow-lg ${
+      isDarkMode
+        ? "bg-gradient-to-br from-gray-800 to-gray-850 border-gray-700 hover:border-orange-500"
         : "bg-gradient-to-br from-white to-gray-50 border-gray-200 hover:border-orange-300"
     }`}>
       {/* Header with date and asker */}

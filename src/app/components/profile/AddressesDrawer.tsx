@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   X,
   MapPin,
@@ -134,32 +135,33 @@ export const SavedAddressesDrawer: React.FC<SavedAddressesDrawerProps> = ({
     }
   }, [isOpen]);
 
+  // Scroll lock - matches SellerInfoDrawer pattern
   useEffect(() => {
-    // Check if it's mobile (you can adjust the breakpoint as needed)
-    const isMobile = window.innerWidth < 768; // md breakpoint
-    
-    if (isMobile && isOpen) {
-      // Disable scrolling when drawer is open
-      document.body.style.overflow = 'hidden';
-      // Prevent scrolling on iOS Safari
-      document.body.style.position = 'fixed';
-      document.body.style.width = '100%';
-    } else if (isMobile) {
-      // Re-enable scrolling when drawer is closed (only for mobile)
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.width = '';
-    }
-  
-    // Cleanup function to ensure scrolling is restored
-    return () => {
-      // Only cleanup if it was mobile when the effect ran
-      const wasMobile = window.innerWidth < 768;
-      if (wasMobile) {
-        document.body.style.overflow = '';
-        document.body.style.position = '';
-        document.body.style.width = '';
+    if (isOpen) {
+      // Disable body scroll
+      const scrollY = window.scrollY;
+      document.body.style.overflow = "hidden";
+      document.body.style.position = "fixed";
+      document.body.style.width = "100%";
+      document.body.style.top = `-${scrollY}px`;
+    } else {
+      // Re-enable body scroll
+      const scrollY = document.body.style.top;
+      document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.width = "";
+      document.body.style.top = "";
+
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY || "0") * -1);
       }
+    }
+
+    return () => {
+      document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.width = "";
+      document.body.style.top = "";
     };
   }, [isOpen]);
 
@@ -437,11 +439,11 @@ export const SavedAddressesDrawer: React.FC<SavedAddressesDrawerProps> = ({
     return `${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}`;
   };
 
-  if (!shouldRender) return null;
-
   const l = localization || ((key: string) => key.split(".").pop() || key);
 
-  return (
+  if (!shouldRender) return null;
+
+  const drawerContent = (
     <div className="fixed inset-0 z-50 overflow-hidden">
       {/* Backdrop */}
       <div
@@ -1187,6 +1189,10 @@ export const SavedAddressesDrawer: React.FC<SavedAddressesDrawerProps> = ({
       )}
     </div>
   );
+
+  return typeof window !== 'undefined'
+    ? createPortal(drawerContent, document.body)
+    : null;
 };
 
 // Modern Location Picker Modal with AdvancedMarkerElement
