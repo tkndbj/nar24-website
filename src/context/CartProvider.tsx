@@ -16,23 +16,18 @@ import {
   onSnapshot,
   writeBatch,
   serverTimestamp,
-
   query,
   orderBy,
   limit,
   startAfter,
-
   DocumentSnapshot,
   QuerySnapshot,
   QueryDocumentSnapshot,
   DocumentChange,
-
   getDoc,
   getDocs,
   Timestamp,
-
   FieldValue,
-
   Firestore,
   deleteDoc,
   updateDoc,
@@ -42,6 +37,7 @@ import { User } from "firebase/auth";
 import { ProductUtils, Product } from "@/app/models/Product";
 import RedisService from "@/services/redis_service";
 import { httpsCallable, Functions } from "firebase/functions";
+import metricsEventService from "@/services/cartfavoritesmetricsEventService";
 
 // ============================================================================
 // TYPES - Matching Flutter implementation
@@ -188,7 +184,9 @@ interface CartContextType {
     warnings: Record<string, ValidationMessage>;
     validatedItems: ValidatedCartItem[];
   }>;
-  updateCartCacheFromValidation: (validatedItems: ValidatedCartItem[]) => Promise<boolean>;
+  updateCartCacheFromValidation: (
+    validatedItems: ValidatedCartItem[]
+  ) => Promise<boolean>;
   refresh: () => Promise<void>;
   enableLiveUpdates: () => void;
   disableLiveUpdates: () => void;
@@ -278,15 +276,13 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   const unsubscribeCartRef = useRef<(() => void) | null>(null);
 
   // Rate limiters
-  const addToCartLimiterRef = useRef(
-    new RateLimiter(ADD_TO_CART_COOLDOWN)
-  );
-  const quantityLimiterRef = useRef(
-    new RateLimiter(QUANTITY_UPDATE_COOLDOWN)
-  );
+  const addToCartLimiterRef = useRef(new RateLimiter(ADD_TO_CART_COOLDOWN));
+  const quantityLimiterRef = useRef(new RateLimiter(QUANTITY_UPDATE_COOLDOWN));
 
   // Optimistic updates tracking
-  const optimisticCacheRef = useRef<Map<string, OptimisticCacheEntry>>(new Map());
+  const optimisticCacheRef = useRef<Map<string, OptimisticCacheEntry>>(
+    new Map()
+  );
   const optimisticTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
   // Concurrency control
@@ -302,6 +298,36 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   // HELPER FUNCTIONS
   // ========================================================================
 
+  const getProductShopId = useCallback(
+    async (productId: string): Promise<string | null> => {
+      try {
+        // Try shop_products collection first
+        const shopProductDoc = await getDoc(
+          doc(db, "shop_products", productId)
+        );
+
+        if (shopProductDoc.exists()) {
+          const data = shopProductDoc.data();
+          return (data?.shopId as string) || null;
+        }
+
+        // Try products collection
+        const productDoc = await getDoc(doc(db, "products", productId));
+
+        if (productDoc.exists()) {
+          const data = productDoc.data();
+          return (data?.shopId as string) || null;
+        }
+
+        return null;
+      } catch (error) {
+        console.warn("⚠️ Failed to get product shopId:", error);
+        return null;
+      }
+    },
+    [db]
+  );
+
   const clearOptimisticUpdate = useCallback((productId: string) => {
     optimisticCacheRef.current.delete(productId);
     const timer = optimisticTimeoutsRef.current.get(productId);
@@ -311,163 +337,171 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     }
   }, []);
 
-  const hasRequiredFields = useCallback((cartData: FirestoreCartData): boolean => {
-    const required = [
-      "productId",
-      "productName",
-      "unitPrice",
-      "availableStock",
-      "sellerName",
-      "sellerId",
-    ];
+  const hasRequiredFields = useCallback(
+    (cartData: FirestoreCartData): boolean => {
+      const required = [
+        "productId",
+        "productName",
+        "unitPrice",
+        "availableStock",
+        "sellerName",
+        "sellerId",
+      ];
 
-    for (const field of required) {
-      if (!cartData[field]) return false;
-    }
-
-    const productName = cartData.productName;
-    if (!productName || productName === "Unknown Product") return false;
-
-    const sellerName = cartData.sellerName;
-    if (!sellerName || sellerName === "Unknown") return false;
-
-    return true;
-  }, []);
-
-  const buildProductFromCartData = useCallback((cartData: FirestoreCartData): Product => {
-    // Safe getters matching Flutter implementation
-    const safeGet = <T,>(key: string, defaultValue: T): T => {
-      const value = cartData[key];
-      if (value === null || value === undefined) return defaultValue;
-
-      if (typeof defaultValue === "number") {
-        if (typeof value === "number") return value as T;
-        if (typeof value === "string") {
-          const parsed =
-            defaultValue % 1 === 0 ? parseInt(value) : parseFloat(value);
-          return (isNaN(parsed) ? defaultValue : parsed) as T;
-        }
+      for (const field of required) {
+        if (!cartData[field]) return false;
       }
 
-      if (typeof defaultValue === "string") return String(value) as T;
-      if (typeof defaultValue === "boolean") {
-        if (typeof value === "boolean") return value as T;
-        return (String(value).toLowerCase() === "true") as T;
-      }
+      const productName = cartData.productName;
+      if (!productName || productName === "Unknown Product") return false;
 
-      return value as T;
-    };
+      const sellerName = cartData.sellerName;
+      if (!sellerName || sellerName === "Unknown") return false;
 
-    const safeStringList = (key: string): string[] => {
-      const value = cartData[key];
-      if (!value) return [];
-      if (Array.isArray(value)) return value.map((e) => String(e));
-      if (typeof value === "string" && value) return [value];
-      return [];
-    };
+      return true;
+    },
+    []
+  );
 
-    const safeColorImages = (key: string): Record<string, string[]> => {
-      const value = cartData[key];
-      if (!value || typeof value !== "object") return {};
+  const buildProductFromCartData = useCallback(
+    (cartData: FirestoreCartData): Product => {
+      // Safe getters matching Flutter implementation
+      const safeGet = <T,>(key: string, defaultValue: T): T => {
+        const value = cartData[key];
+        if (value === null || value === undefined) return defaultValue;
 
-      const result: Record<string, string[]> = {};
-      Object.entries(value).forEach(([k, v]) => {
-        if (Array.isArray(v)) {
-          result[k] = v.map((e) => String(e));
-        } else if (typeof v === "string" && v) {
-          result[k] = [v];
-        }
-      });
-      return result;
-    };
-
-    const safeColorQuantities = (key: string): Record<string, number> => {
-      const value = cartData[key];
-      if (!value || typeof value !== "object") return {};
-
-      const result: Record<string, number> = {};
-      Object.entries(value).forEach(([k, v]) => {
-        if (typeof v === "number") {
-          result[k] = v;
-        } else if (typeof v === "string") {
-          result[k] = parseInt(v) || 0;
-        }
-      });
-      return result;
-    };
-
-    const safeBundleData = (key: string): BundleDataItem[] | undefined => {
-      const value = cartData[key];
-      if (!value || !Array.isArray(value)) return undefined;
-
-      try {
-        return value.map((item): BundleDataItem => {
-          if (typeof item === "object" && item !== null) {
-            return item as BundleDataItem;
+        if (typeof defaultValue === "number") {
+          if (typeof value === "number") return value as T;
+          if (typeof value === "string") {
+            const parsed =
+              defaultValue % 1 === 0 ? parseInt(value) : parseFloat(value);
+            return (isNaN(parsed) ? defaultValue : parsed) as T;
           }
-          return {};
+        }
+
+        if (typeof defaultValue === "string") return String(value) as T;
+        if (typeof defaultValue === "boolean") {
+          if (typeof value === "boolean") return value as T;
+          return (String(value).toLowerCase() === "true") as T;
+        }
+
+        return value as T;
+      };
+
+      const safeStringList = (key: string): string[] => {
+        const value = cartData[key];
+        if (!value) return [];
+        if (Array.isArray(value)) return value.map((e) => String(e));
+        if (typeof value === "string" && value) return [value];
+        return [];
+      };
+
+      const safeColorImages = (key: string): Record<string, string[]> => {
+        const value = cartData[key];
+        if (!value || typeof value !== "object") return {};
+
+        const result: Record<string, string[]> = {};
+        Object.entries(value).forEach(([k, v]) => {
+          if (Array.isArray(v)) {
+            result[k] = v.map((e) => String(e));
+          } else if (typeof v === "string" && v) {
+            result[k] = [v];
+          }
         });
-      } catch {
-        return undefined;
-      }
-    };
+        return result;
+      };
 
-    const safeTimestamp = (key: string): Timestamp => {
-      const value = cartData[key];
-      if (value instanceof Timestamp) return value;
-      if (typeof value === "number")
-        return Timestamp.fromMillis(value);
-      if (typeof value === "string") {
+      const safeColorQuantities = (key: string): Record<string, number> => {
+        const value = cartData[key];
+        if (!value || typeof value !== "object") return {};
+
+        const result: Record<string, number> = {};
+        Object.entries(value).forEach(([k, v]) => {
+          if (typeof v === "number") {
+            result[k] = v;
+          } else if (typeof v === "string") {
+            result[k] = parseInt(v) || 0;
+          }
+        });
+        return result;
+      };
+
+      const safeBundleData = (key: string): BundleDataItem[] | undefined => {
+        const value = cartData[key];
+        if (!value || !Array.isArray(value)) return undefined;
+
         try {
-          return Timestamp.fromDate(new Date(value));
-        } catch {}
-      }
-      return Timestamp.now();
-    };
+          return value.map((item): BundleDataItem => {
+            if (typeof item === "object" && item !== null) {
+              return item as BundleDataItem;
+            }
+            return {};
+          });
+        } catch {
+          return undefined;
+        }
+      };
 
-    // Build Product object
-    const imageUrls = safeStringList("allImages");
-    return ProductUtils.fromJson({
-      id: safeGet("productId", ""),
-      productName: safeGet("productName", "Unknown Product"),
-      description: safeGet("description", ""),
-      price: safeGet("unitPrice", 0),
-      currency: safeGet("currency", "TL"),
-      originalPrice: cartData.originalPrice ?? undefined,
-      discountPercentage: cartData.discountPercentage ?? undefined,
-      condition: safeGet("condition", "Brand New"),
-      brandModel: safeGet("brandModel", ""),
-      category: safeGet("category", "Uncategorized"),
-      subcategory: safeGet("subcategory", ""),
-      subsubcategory: safeGet("subsubcategory", ""),
-      imageUrls: imageUrls.length > 0 ? imageUrls : [safeGet("productImage", "")],
-      colorImages: safeColorImages("colorImages"),
-      videoUrl: cartData.videoUrl ?? undefined,
-      quantity: safeGet("availableStock", 0),
-      colorQuantities: safeColorQuantities("colorQuantities"),
-      averageRating: safeGet("averageRating", 0),
-      reviewCount: safeGet("reviewCount", 0),
-      maxQuantity: cartData.maxQuantity ?? undefined,
-      discountThreshold: cartData.discountThreshold ?? undefined,
-      bulkDiscountPercentage: cartData.bulkDiscountPercentage ?? undefined,
-      bundleIds: safeStringList("bundleIds"),
-      bundleData: safeBundleData("bundleData") ?? safeBundleData("cachedBundleData"),
-      userId: safeGet("sellerId", ""),
-      ownerId: safeGet("sellerId", ""),
-      shopId: cartData.isShop === true ? safeGet("sellerId", undefined) : undefined,
-      sellerName: safeGet("sellerName", "Unknown"),
-      ilanNo: safeGet("ilanNo", "N/A"),
-      createdAt: safeTimestamp("createdAt"),
-      deliveryOption: safeGet("deliveryOption", "Self Delivery"),
-      availableColors: safeStringList("availableColors"),
-      attributes: cartData.attributes ?? {},
-      reference: {
+      const safeTimestamp = (key: string): Timestamp => {
+        const value = cartData[key];
+        if (value instanceof Timestamp) return value;
+        if (typeof value === "number") return Timestamp.fromMillis(value);
+        if (typeof value === "string") {
+          try {
+            return Timestamp.fromDate(new Date(value));
+          } catch {}
+        }
+        return Timestamp.now();
+      };
+
+      // Build Product object
+      const imageUrls = safeStringList("allImages");
+      return ProductUtils.fromJson({
         id: safeGet("productId", ""),
-        path: `shop_products/${safeGet("productId", "")}`,
-        parent: { id: "shop_products" },
-      },
-    });
-  }, []);
+        productName: safeGet("productName", "Unknown Product"),
+        description: safeGet("description", ""),
+        price: safeGet("unitPrice", 0),
+        currency: safeGet("currency", "TL"),
+        originalPrice: cartData.originalPrice ?? undefined,
+        discountPercentage: cartData.discountPercentage ?? undefined,
+        condition: safeGet("condition", "Brand New"),
+        brandModel: safeGet("brandModel", ""),
+        category: safeGet("category", "Uncategorized"),
+        subcategory: safeGet("subcategory", ""),
+        subsubcategory: safeGet("subsubcategory", ""),
+        imageUrls:
+          imageUrls.length > 0 ? imageUrls : [safeGet("productImage", "")],
+        colorImages: safeColorImages("colorImages"),
+        videoUrl: cartData.videoUrl ?? undefined,
+        quantity: safeGet("availableStock", 0),
+        colorQuantities: safeColorQuantities("colorQuantities"),
+        averageRating: safeGet("averageRating", 0),
+        reviewCount: safeGet("reviewCount", 0),
+        maxQuantity: cartData.maxQuantity ?? undefined,
+        discountThreshold: cartData.discountThreshold ?? undefined,
+        bulkDiscountPercentage: cartData.bulkDiscountPercentage ?? undefined,
+        bundleIds: safeStringList("bundleIds"),
+        bundleData:
+          safeBundleData("bundleData") ?? safeBundleData("cachedBundleData"),
+        userId: safeGet("sellerId", ""),
+        ownerId: safeGet("sellerId", ""),
+        shopId:
+          cartData.isShop === true ? safeGet("sellerId", undefined) : undefined,
+        sellerName: safeGet("sellerName", "Unknown"),
+        ilanNo: safeGet("ilanNo", "N/A"),
+        createdAt: safeTimestamp("createdAt"),
+        deliveryOption: safeGet("deliveryOption", "Self Delivery"),
+        availableColors: safeStringList("availableColors"),
+        attributes: cartData.attributes ?? {},
+        reference: {
+          id: safeGet("productId", ""),
+          path: `shop_products/${safeGet("productId", "")}`,
+          parent: { id: "shop_products" },
+        },
+      });
+    },
+    []
+  );
 
   const extractSalePreferences = useCallback(
     (data: FirestoreCartData): SalePreferences | null => {
@@ -476,11 +510,18 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       if (data.maxQuantity !== undefined && data.maxQuantity !== null) {
         salePrefs.maxQuantity = data.maxQuantity as number;
       }
-      if (data.discountThreshold !== undefined && data.discountThreshold !== null) {
+      if (
+        data.discountThreshold !== undefined &&
+        data.discountThreshold !== null
+      ) {
         salePrefs.discountThreshold = data.discountThreshold as number;
       }
-      if (data.bulkDiscountPercentage !== undefined && data.bulkDiscountPercentage !== null) {
-        salePrefs.bulkDiscountPercentage = data.bulkDiscountPercentage as number;
+      if (
+        data.bulkDiscountPercentage !== undefined &&
+        data.bulkDiscountPercentage !== null
+      ) {
+        salePrefs.bulkDiscountPercentage =
+          data.bulkDiscountPercentage as number;
       }
 
       return Object.keys(salePrefs).length === 0 ? null : salePrefs;
@@ -501,7 +542,11 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   );
 
   const createCartItem = useCallback(
-    (productId: string, cartData: FirestoreCartData, product: Product): CartItem => {
+    (
+      productId: string,
+      cartData: FirestoreCartData,
+      product: Product
+    ): CartItem => {
       const salePreferences = extractSalePreferences(cartData);
 
       return {
@@ -509,7 +554,10 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         productId,
         quantity: (cartData.quantity as number) ?? 1,
         salePreferences,
-        selectedColorImage: resolveColorImage(product, cartData.selectedColor as string | undefined),
+        selectedColorImage: resolveColorImage(
+          product,
+          cartData.selectedColor as string | undefined
+        ),
         sellerName: (cartData.sellerName as string) ?? "Unknown",
         sellerId: (cartData.sellerId as string) ?? "unknown",
         isShop: (cartData.isShop as boolean) ?? false,
@@ -580,14 +628,14 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         const productId = change.doc.id;
         const cartData = change.doc.data();
 
-        if (
-          change.type === "added" ||
-          change.type === "modified"
-        ) {
+        if (change.type === "added" || change.type === "modified") {
           if (cartData && hasRequiredFields(cartData)) {
             try {
               const product = buildProductFromCartData(cartData);
-              itemsMap.set(productId, createCartItem(productId, cartData, product));
+              itemsMap.set(
+                productId,
+                createCartItem(productId, cartData, product)
+              );
               clearOptimisticUpdate(productId);
             } catch (error) {
               console.error(`Failed to process ${productId}:`, error);
@@ -633,7 +681,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         return;
       }
 
-      console.log(`🔥 Real-time update: ${snapshot.docChanges().length} changes`);
+      console.log(
+        `🔥 Real-time update: ${snapshot.docChanges().length} changes`
+      );
 
       updateCartIds(snapshot.docs);
 
@@ -776,7 +826,8 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       let extractedBundlePrice: number | undefined;
       if (product.bundleData && product.bundleData.length > 0) {
         const bundlePrice = product.bundleData[0]?.bundlePrice;
-        extractedBundlePrice = typeof bundlePrice === 'number' ? bundlePrice : undefined;
+        extractedBundlePrice =
+          typeof bundlePrice === "number" ? bundlePrice : undefined;
       }
 
       return {
@@ -839,7 +890,11 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   }, [user, cartProductIds]);
 
   const applyOptimisticAdd = useCallback(
-    (productId: string, productData: Record<string, unknown>, quantity: number) => {
+    (
+      productId: string,
+      productData: Record<string, unknown>,
+      quantity: number
+    ) => {
       clearOptimisticUpdate(productId);
 
       // Remove ALL existing items with this productId
@@ -926,22 +981,30 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         return "Please wait before adding again";
       }
 
-      const productData = buildProductDataForCart(product, selectedColor, attributes);
+      const productData = buildProductDataForCart(
+        product,
+        selectedColor,
+        attributes
+      );
 
       try {
         // Optimistic update
         applyOptimisticAdd(product.id, productData, quantity);
 
         // Write to Firestore
-        await setDoc(
-          doc(db, "users", user.uid, "cart", product.id),
-          {
-            ...productData,
-            quantity,
-            addedAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-          }
-        );
+        await setDoc(doc(db, "users", user.uid, "cart", product.id), {
+          ...productData,
+          quantity,
+          addedAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+
+        // ✅ ADD METRICS LOGGING (NEW)
+        const shopId = await getProductShopId(product.id);
+        metricsEventService.logCartAdded({
+          productId: product.id,
+          shopId,
+        });
 
         console.log("✅ Added to cart:", product.id);
 
@@ -965,6 +1028,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       applyOptimisticAdd,
       rollbackOptimisticUpdate,
       backgroundRefreshTotals,
+      getProductShopId, // ✅ ADD THIS DEPENDENCY
     ]
   );
 
@@ -1018,7 +1082,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       setCartCount(newIds.size);
 
       // Remove from items list
-      setCartItems((items) => items.filter((item) => item.productId !== productId));
+      setCartItems((items) =>
+        items.filter((item) => item.productId !== productId)
+      );
 
       // Set timeout
       const timeout = setTimeout(() => {
@@ -1043,7 +1109,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       // Force refresh from Firestore
       if (user) {
         try {
-          const docSnap = await getDoc(doc(db, "users", user.uid, "cart", productId));
+          const docSnap = await getDoc(
+            doc(db, "users", user.uid, "cart", productId)
+          );
           if (docSnap.exists()) {
             const newIds = new Set(cartProductIds);
             newIds.add(productId);
@@ -1065,7 +1133,16 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       try {
         applyOptimisticRemove(productId);
 
+        // ✅ GET SHOP ID BEFORE DELETION (NEW)
+        const shopId = await getProductShopId(productId);
+
         await deleteDoc(doc(db, "users", user.uid, "cart", productId));
+
+        // ✅ ADD METRICS LOGGING (NEW)
+        metricsEventService.logCartRemoved({
+          productId,
+          shopId,
+        });
 
         // Background refresh totals
         backgroundRefreshTotals();
@@ -1077,7 +1154,14 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         return "Failed to remove from cart";
       }
     },
-    [user, db, applyOptimisticRemove, rollbackOptimisticRemove, backgroundRefreshTotals]
+    [
+      user,
+      db,
+      applyOptimisticRemove,
+      rollbackOptimisticRemove,
+      backgroundRefreshTotals,
+      getProductShopId, // ✅ ADD THIS DEPENDENCY
+    ]
   );
 
   // ========================================================================
@@ -1184,15 +1268,27 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       if (productIds.length === 0) return "No items selected";
 
       try {
-        // Optimistic removal
+        // ✅ STEP 1: Get all shopIds BEFORE deletion (NEW)
+        const shopIds: Record<string, string | null> = {};
+        for (const productId of productIds) {
+          shopIds[productId] = await getProductShopId(productId);
+        }
+
+        // STEP 2: Optimistic removal
         productIds.forEach((productId) => applyOptimisticRemove(productId));
 
-        // Batch delete from Firestore
+        // STEP 3: Batch delete from Firestore
         const batch = writeBatch(db);
         productIds.forEach((productId) => {
           batch.delete(doc(db, "users", user.uid, "cart", productId));
         });
         await batch.commit();
+
+        // ✅ STEP 4: Log batch metrics (NEW)
+        metricsEventService.logBatchCartRemovals({
+          productIds,
+          shopIds,
+        });
 
         console.log(`✅ Removed ${productIds.length} items`);
         redisRef.current.invalidateCartTotals(user.uid);
@@ -1206,7 +1302,13 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         return "Failed to remove products";
       }
     },
-    [user, db, applyOptimisticRemove, backgroundRefreshTotals]
+    [
+      user,
+      db,
+      applyOptimisticRemove,
+      backgroundRefreshTotals,
+      getProductShopId, // ✅ ADD THIS DEPENDENCY
+    ]
   );
 
   // ========================================================================
@@ -1250,7 +1352,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     if (!map || typeof map !== "object" || Array.isArray(map)) {
       return {};
     }
-    
+
     const result: Record<string, unknown> = {};
     Object.entries(map as Record<string, unknown>).forEach(([key, value]) => {
       if (value && typeof value === "object" && !Array.isArray(value)) {
@@ -1282,8 +1384,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       }
 
       const productsToCalculate =
-        selectedProductIds ??
-        cartItems.map((item) => item.productId);
+        selectedProductIds ?? cartItems.map((item) => item.productId);
 
       if (productsToCalculate.length === 0) {
         return { total: 0, items: [], currency: "TL" };
@@ -1307,7 +1408,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       const cacheKey = productsToCalculate.join(",");
       if (pendingFetchesRef.current.has(`totals_${cacheKey}`)) {
         console.log("⏳ Waiting for existing totals calculation...");
-        const result = await pendingFetchesRef.current.get(`totals_${cacheKey}`);
+        const result = await pendingFetchesRef.current.get(
+          `totals_${cacheKey}`
+        );
         return result as CartTotals;
       }
 
@@ -1335,7 +1438,10 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           const totals: CartTotals = {
             total: (totalsData.total as number) ?? 0,
             currency: (totalsData.currency as string) ?? "TL",
-            items: (Array.isArray(totalsData.items) ? totalsData.items : []).map((item): CartItemTotal => {
+            items: (Array.isArray(totalsData.items)
+              ? totalsData.items
+              : []
+            ).map((item): CartItemTotal => {
               const itemData = item as Record<string, unknown>;
               return {
                 productId: (itemData.productId as string) ?? "",
@@ -1354,7 +1460,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({
             totalsData
           );
 
-          console.log(`✅ Total calculated: ${totals.total} ${totals.currency}`);
+          console.log(
+            `✅ Total calculated: ${totals.total} ${totals.currency}`
+          );
           return totals;
         } catch (error) {
           console.error("❌ Cloud Function error:", error);
@@ -1400,7 +1508,8 @@ export const CartProvider: React.FC<CartProviderProps> = ({
               cachedBundlePrice: cartData.cachedBundlePrice,
               cachedDiscountPercentage: cartData.cachedDiscountPercentage,
               cachedDiscountThreshold: cartData.cachedDiscountThreshold,
-              cachedBulkDiscountPercentage: cartData.cachedBulkDiscountPercentage,
+              cachedBulkDiscountPercentage:
+                cartData.cachedBulkDiscountPercentage,
               cachedMaxQuantity: cartData.cachedMaxQuantity,
             };
           });
@@ -1464,7 +1573,10 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           },
         }));
 
-        const updateCartCacheFunction = httpsCallable(functions, "updateCartCache");
+        const updateCartCacheFunction = httpsCallable(
+          functions,
+          "updateCartCache"
+        );
 
         const result = await updateCartCacheFunction({
           productUpdates: updates,
@@ -1472,7 +1584,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
         const data = deepConvertMap(result.data);
 
-        console.log(`✅ Cache updated: ${(data.updated as number)} items`);
+        console.log(`✅ Cache updated: ${data.updated as number} items`);
 
         return (data.success as boolean) === true;
       } catch (error) {

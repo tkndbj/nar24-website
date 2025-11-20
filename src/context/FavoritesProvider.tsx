@@ -19,7 +19,6 @@ import {
   onSnapshot,
   writeBatch,
   serverTimestamp,
-  increment,
   query,
   where,
   limit as firestoreLimit,
@@ -38,7 +37,7 @@ import {
 import { db } from "@/lib/firebase";
 import { useUser } from "./UserProvider";
 import redisService from "@/services/redis_service";
-
+import metricsEventService from "@/services/cartfavoritesmetricsEventService";
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -290,6 +289,36 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
     // TODO: Implement toast notification
   }, []);
 
+  const getProductShopId = useCallback(
+    async (productId: string): Promise<string | null> => {
+      try {
+        // Try products collection first
+        const productDoc = await getDoc(doc(db, "products", productId));
+
+        if (productDoc.exists()) {
+          const data = productDoc.data();
+          return (data?.shopId as string) || null;
+        }
+
+        // Try shop_products collection
+        const shopProductDoc = await getDoc(
+          doc(db, "shop_products", productId)
+        );
+
+        if (shopProductDoc.exists()) {
+          const data = shopProductDoc.data();
+          return (data?.shopId as string) || null;
+        }
+
+        return null;
+      } catch (error) {
+        console.warn("⚠️ Failed to get product shopId:", error);
+        return null;
+      }
+    },
+    []
+  );
+
   const showErrorToast = useCallback((message: string) => {
     console.error("❌", message);
     // TODO: Implement toast notification
@@ -303,30 +332,6 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
       showSuccessToast("Removed from favorites");
     }, 500);
   }, [showSuccessToast]);
-
-  // ========================================================================
-  // PRODUCT DOCUMENT HELPERS
-  // ========================================================================
-
-  const getProductDocument = useCallback(
-    async (productId: string): Promise<DocumentSnapshot | null> => {
-      try {
-        const productsDoc = await getDoc(doc(db, "products", productId));
-        if (productsDoc.exists()) return productsDoc;
-
-        const shopProductsDoc = await getDoc(
-          doc(db, "shop_products", productId)
-        );
-        if (shopProductsDoc.exists()) return shopProductsDoc;
-
-        return null;
-      } catch (error) {
-        console.error("Error finding product document:", error);
-        return null;
-      }
-    },
-    []
-  );
 
   // ========================================================================
   // INITIALIZATION & DATA LOADING
@@ -464,6 +469,10 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   // ADD/REMOVE FAVORITES
   // ========================================================================
 
+  // ========================================================================
+  // ADD/REMOVE FAVORITES
+  // ========================================================================
+
   const addToFavorites = useCallback(
     async (
       productId: string,
@@ -528,16 +537,12 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
             // STEP 2: Delete from Firestore
             await deleteDoc(existingSnap.docs[0].ref);
 
-            // STEP 3: Update product counter
-            const productDoc = await getProductDocument(productId);
-            if (productDoc) {
-              const batch = writeBatch(db);
-              batch.update(productDoc.ref, {
-                favoritesCount: increment(-1),
-                metricsUpdatedAt: serverTimestamp(),
-              });
-              await batch.commit();
-            }
+            // ✅ STEP 3: Get shopId and log metrics
+            const shopId = await getProductShopId(productId);
+            metricsEventService.logFavoriteRemoved({
+              productId,
+              shopId,
+            });
 
             // STEP 4: Invalidate cache
             await redisService.invalidateFavorites(user.uid);
@@ -575,16 +580,12 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
             await addDoc(collection(db, collectionPath), favoriteData);
 
-            // STEP 3: Update product counter
-            const productDoc = await getProductDocument(productId);
-            if (productDoc) {
-              const batch = writeBatch(db);
-              batch.update(productDoc.ref, {
-                favoritesCount: increment(1),
-                metricsUpdatedAt: serverTimestamp(),
-              });
-              await batch.commit();
-            }
+            // ✅ STEP 3: Get shopId and log metrics
+            const shopId = await getProductShopId(productId);
+            metricsEventService.logFavoriteAdded({
+              productId,
+              shopId,
+            });
 
             // STEP 4: Invalidate cache
             await redisService.invalidateFavorites(user.uid);
@@ -627,7 +628,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
     [
       user,
       favoriteIds,
-      getProductDocument,
+      getProductShopId, // ✅ CORRECT
       isSystemField,
       showSuccessToast,
       showErrorToast,
@@ -648,7 +649,13 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
       const previousIds = new Set(favoriteIds);
 
       try {
-        // Optimistic removal
+        // ✅ STEP 1: Get all shopIds BEFORE removal (NEW)
+        const shopIds: Record<string, string | null> = {};
+        for (const productId of productIds) {
+          shopIds[productId] = await getProductShopId(productId);
+        }
+
+        // STEP 2: Optimistic removal
         const newIds = new Set(favoriteIds);
         productIds.forEach((id) => newIds.delete(id));
         setFavoriteIds(newIds);
@@ -660,7 +667,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
           Array.from(paginatedFavoritesMap.current.values())
         );
 
-        // Batch delete from Firestore
+        // STEP 3: Batch delete from Firestore
         const basketId = selectedBasketIdRef.current;
         const collectionPath = basketId
           ? `users/${user.uid}/favorite_baskets/${basketId}/favorites`
@@ -672,7 +679,13 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
           await removeMultipleBatch(chunk, collectionPath);
         }
 
-        // Invalidate cache
+        // ✅ STEP 4: Log batch metrics (NEW)
+        metricsEventService.logBatchFavoriteRemovals({
+          productIds,
+          shopIds,
+        });
+
+        // STEP 5: Invalidate cache
         await redisService.invalidateFavorites(user.uid);
 
         return "Products removed from favorites";
@@ -686,7 +699,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         return "Error removing favorites";
       }
     },
-    [user, favoriteIds]
+    [user, favoriteIds, getProductShopId]
   );
 
   const removeMultipleBatch = useCallback(
@@ -707,20 +720,10 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         });
       }
 
-      // Update product counters
-      for (const productId of productIds) {
-        const productDoc = await getProductDocument(productId);
-        if (productDoc) {
-          batch.update(productDoc.ref, {
-            favoritesCount: increment(-1),
-            metricsUpdatedAt: serverTimestamp(),
-          });
-        }
-      }
-
+      // ✅ ONLY delete favorites - metrics handled by Cloud Functions
       await batch.commit();
     },
-    [user, getProductDocument]
+    [user] // ✅ REMOVE getProductDocument dependency
   );
 
   const removeGloballyFromFavorites = useCallback(
@@ -738,9 +741,12 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
       setPaginatedFavorites(Array.from(paginatedFavoritesMap.current.values()));
 
       try {
+        // ✅ STEP 1: Get shopId BEFORE removal (NEW)
+        const shopId = await getProductShopId(productId);
+
         const batch = writeBatch(db);
 
-        // Remove from default favorites
+        // STEP 2: Remove from default favorites
         const defaultFavsSnap = await getDocs(
           query(
             collection(db, `users/${user.uid}/favorites`),
@@ -752,7 +758,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
           batch.delete(doc.ref);
         });
 
-        // Remove from all baskets
+        // STEP 3: Remove from all baskets
         const basketsSnapshot = await getDocs(
           collection(db, `users/${user.uid}/favorite_baskets`)
         );
@@ -770,18 +776,15 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
           });
         }
 
-        // Update product counter
-        const productDoc = await getProductDocument(productId);
-        if (productDoc) {
-          batch.update(productDoc.ref, {
-            favoritesCount: increment(-1),
-            metricsUpdatedAt: serverTimestamp(),
-          });
-        }
-
         await batch.commit();
 
-        // Invalidate cache
+        // ✅ STEP 4: Log metrics (NEW)
+        metricsEventService.logFavoriteRemoved({
+          productId,
+          shopId,
+        });
+
+        // STEP 5: Invalidate cache
         await redisService.invalidateFavorites(user.uid);
 
         console.log("✅ Removed", productId, "from all favorites");
@@ -796,7 +799,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         return "Error removing from favorites";
       }
     },
-    [user, favoriteIds, getProductDocument]
+    [user, favoriteIds, getProductShopId] // ✅ ADD getProductShopId
   );
 
   // ========================================================================

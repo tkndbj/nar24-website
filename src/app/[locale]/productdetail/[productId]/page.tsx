@@ -30,7 +30,7 @@ import ProductOptionSelector from "@/app/components/ProductOptionSelector";
 import { useCart } from "@/context/CartProvider";
 import { useUser } from "@/context/UserProvider";
 import { Product, ProductUtils } from "@/app/models/Product";
-import { useProductCache } from '@/context/ProductCacheProvider';
+import { useProductCache } from "@/context/ProductCacheProvider";
 
 // ✅ LAZY LOAD: Heavy components that aren't immediately visible
 const ProductCollectionWidget = lazy(
@@ -150,24 +150,24 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   const router = useRouter();
   const localization = useTranslations();
   const { getProduct, setProduct: setProductCache } = useProductCache();
-  const [productId, setProductId] = useState<string>("");  
+  const [productId, setProductId] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [product, setProduct] = useState<Product | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   useEffect(() => {
     let mounted = true;
 
     params.then((resolvedParams) => {
       if (!mounted) return;
-      
+
       const id = resolvedParams.productId;
       setProductId(id);
-      
+
       // ✅ Synchronous cache check
       const cached = getProduct(id);
       if (cached) {
-        console.log('✅ INSTANT: In-memory cache');
+        console.log("✅ INSTANT: In-memory cache");
         setProduct(cached);
         setIsLoading(false);
         fetchFreshData(id);
@@ -178,9 +178,9 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
       try {
         const stored = sessionStorage.getItem(`product_${id}`);
         const time = sessionStorage.getItem(`product_${id}_timestamp`);
-        
-        if (stored && time && (Date.now() - parseInt(time)) < 300000) {
-          console.log('✅ FAST: sessionStorage');
+
+        if (stored && time && Date.now() - parseInt(time) < 300000) {
+          console.log("✅ FAST: sessionStorage");
           const parsed = ProductUtils.fromJson(JSON.parse(stored));
           setProduct(parsed);
           setIsLoading(false);
@@ -189,19 +189,18 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           return;
         }
       } catch (e) {
-        console.error('Cache error:', e);
+        console.error("Cache error:", e);
       }
 
       // ✅ Network fallback
-      console.log('⏳ SLOW: Network fetch');
+      console.log("⏳ SLOW: Network fetch");
       fetchProduct(id);
     });
 
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [params, getProduct, setProductCache]);
-
-
-
 
   // ✅ OPTIMIZED: Translation function with better caching
   const t = useCallback(
@@ -230,11 +229,10 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
   // Cart and user hooks
   const {
-    addToCart,
-    isInCart,
-    isOptimisticallyAdding,
-    isOptimisticallyRemoving,
+    addProductToCart,
     removeFromCart,
+    cartProductIds,
+    cartItems, // ✅ ADD THIS
   } = useCart();
   const { user } = useUser();
 
@@ -248,7 +246,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
   // UI states
   const [isDarkMode, setIsDarkMode] = useState(false);
-  
+
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showFullScreenViewer, setShowFullScreenViewer] = useState(false);
   const [showVideoModal, setShowVideoModal] = useState(false);
@@ -257,6 +255,33 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
   // ✅ NEW: Track if user has scrolled down to lazy load components
   const [hasScrolled, setHasScrolled] = useState(false);
+
+  const isInCart = useCallback(
+    (productId: string): boolean => {
+      return cartProductIds.has(productId);
+    },
+    [cartProductIds]
+  );
+
+  const isOptimisticallyAdding = useCallback(
+    (productId: string): boolean => {
+      return cartItems.some(
+        (item) => item.productId === productId && item.isOptimistic === true
+      );
+    },
+    [cartItems]
+  );
+
+  const isOptimisticallyRemoving = useCallback(
+    (productId: string): boolean => {
+      // Check if product was just removed but listener hasn't caught up yet
+      return cartItems.some(
+        (item) =>
+          item.productId === productId && item.cartData?._deleted === true
+      );
+    },
+    [cartItems]
+  );
 
   // ✅ OPTIMIZED: Dark mode detection with debouncing
   useEffect(() => {
@@ -321,51 +346,54 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     }
   }, [productId]);
 
-  const fetchProduct = useCallback(async (id: string) => {
-    const abortController = new AbortController();
+  const fetchProduct = useCallback(
+    async (id: string) => {
+      const abortController = new AbortController();
 
-    try {
-      setIsLoading(true);
-      setError(null);
+      try {
+        setIsLoading(true);
+        setError(null);
 
-      const response = await fetch(`/api/products/${id}`, {
-        signal: abortController.signal,
-      });
+        const response = await fetch(`/api/products/${id}`, {
+          signal: abortController.signal,
+        });
 
-      if (!response.ok) {
-        throw new Error(t("productNotFound"));
+        if (!response.ok) {
+          throw new Error(t("productNotFound"));
+        }
+
+        const productData = await response.json();
+        const parsedProduct = ProductUtils.fromJson(productData);
+        setProduct(parsedProduct);
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") {
+          return;
+        }
+        console.error("Error fetching product:", err);
+        setError(err instanceof Error ? err.message : t("failedToLoadProduct"));
+      } finally {
+        setIsLoading(false);
       }
 
-      const productData = await response.json();
-      const parsedProduct = ProductUtils.fromJson(productData);
-      setProduct(parsedProduct);
-    } catch (err) {
-      if (err instanceof Error && err.name === "AbortError") {
-        return;
-      }
-      console.error("Error fetching product:", err);
-      setError(err instanceof Error ? err.message : t("failedToLoadProduct"));
-    } finally {
-      setIsLoading(false);
-    }
-
-    return () => {
-      abortController.abort();
-    };
-  }, [t]);
+      return () => {
+        abortController.abort();
+      };
+    },
+    [t]
+  );
 
   const fetchFreshData = useCallback(async (id: string) => {
     try {
       const response = await fetch(`/api/products/${id}`);
-      
+
       if (response.ok) {
         const productData = await response.json();
         const freshProduct = ProductUtils.fromJson(productData);
-        
+
         // Update if data changed
-        setProduct(prevProduct => {
+        setProduct((prevProduct) => {
           if (!prevProduct) return freshProduct;
-          
+
           // Compare prices, stock, etc. - update if different
           if (
             prevProduct.price !== freshProduct.price ||
@@ -373,22 +401,19 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           ) {
             return freshProduct;
           }
-          
+
           return prevProduct;
         });
 
         // Update cache
+        sessionStorage.setItem(`product_${id}`, JSON.stringify(productData));
         sessionStorage.setItem(
-          `product_${id}`, 
-          JSON.stringify(productData)
-        );
-        sessionStorage.setItem(
-          `product_${id}_timestamp`, 
+          `product_${id}_timestamp`,
           Date.now().toString()
         );
       }
     } catch (error) {
-      console.error('Error fetching fresh data:', error);
+      console.error("Error fetching fresh data:", error);
     }
   }, []);
 
@@ -451,14 +476,14 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         setCartButtonState("adding");
 
         let quantityToAdd = 1;
-        const attributesToAdd: Record<string, unknown> = {}; // ✅ CHANGED
+        const attributesToAdd: Record<string, unknown> = {};
 
         if (selectedOptions) {
           if (typeof selectedOptions.quantity === "number") {
             quantityToAdd = selectedOptions.quantity;
           }
 
-          // ✅ ADD THIS - Copy all attributes EXCEPT quantity
+          // Copy all attributes EXCEPT quantity
           Object.entries(selectedOptions).forEach(([key, value]) => {
             if (key !== "quantity") {
               attributesToAdd[key] = value;
@@ -466,13 +491,21 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           });
         }
 
-        const result = await addToCart(
-          product.id,
+        // ✅ FIX: Extract selectedColor separately
+        const selectedColor = attributesToAdd.selectedColor as
+          | string
+          | undefined;
+        delete attributesToAdd.selectedColor;
+
+        // ✅ FIX: Use addProductToCart (not addToCart)
+        const result = await addProductToCart(
+          product,
           quantityToAdd,
-          attributesToAdd // Now only has selectedColor, selectedColorImage, selectedMetres
+          selectedColor,
+          attributesToAdd
         );
 
-        if (result.includes("Added") || result.includes("Updated")) {
+        if (result.includes("Added") || result.includes("cart")) {
           setCartButtonState("added");
           setTimeout(() => setCartButtonState("idle"), 1500);
         } else {
@@ -483,7 +516,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         setCartButtonState("idle");
       }
     },
-    [product, addToCart]
+    [product, addProductToCart]
   );
 
   const performCartRemoval = useCallback(async () => {
@@ -515,7 +548,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
       if (!product) return;
 
-      const productInCart = isInCart(product.id);
+      const productInCart = cartProductIds.has(product.id); // ✅ Use directly
 
       if (productInCart) {
         await performCartRemoval();
@@ -529,7 +562,14 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
       await performCartAddition(selectedOptions);
     },
-    [user, product, isInCart, router, performCartRemoval, performCartAddition]
+    [
+      user,
+      product,
+      cartProductIds,
+      router,
+      performCartRemoval,
+      performCartAddition,
+    ] // ✅ FIXED
   );
 
   const handleCartOptionSelectorConfirm = useCallback(
@@ -553,15 +593,16 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     if (!product) return;
 
     try {
-      if (!isInCart(product.id)) {
-        await addToCart(product.id, 1);
+      if (!cartProductIds.has(product.id)) {
+        // ✅ Use directly
+        await addProductToCart(product, 1); // ✅ FIXED
       }
 
       router.push(`/checkout?productId=${product.id}&quantity=1`);
     } catch (error) {
       console.error("Error with buy now:", error);
     }
-  }, [user, product, isInCart, addToCart, router]);
+  }, [user, product, cartProductIds, addProductToCart, router]);
 
   // Get current cart button content
   const cartButtonContent = useMemo(() => {

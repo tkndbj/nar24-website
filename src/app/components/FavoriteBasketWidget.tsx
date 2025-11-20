@@ -288,16 +288,6 @@ export const FavoriteBasketWidget: React.FC<FavoriteBasketWidgetProps> = ({
           </div>
         </div>
       )}
-
-      <style jsx>{`
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-      `}</style>
     </>
   );
 };
