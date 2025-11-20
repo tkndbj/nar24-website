@@ -1,7 +1,14 @@
 // components/ProductCard.tsx
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback, memo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  memo,
+  useRef,
+} from "react";
 import { BoostedVisibilityWrapper } from "@/app/components/BoostedVisibilityWrapper";
 import Image from "next/image";
 import {
@@ -46,42 +53,9 @@ interface ProductCardProps {
   localization?: ReturnType<typeof useTranslations>;
 }
 
-// ✅ Memoized helper functions
-const isFantasyProduct = (product: Product): boolean => {
-  return product.subsubcategory?.toLowerCase() === "fantasy";
-};
-
-const hasSelectableOptions = (product: Product | null): boolean => {
-  if (!product) return false;
-
-  const colorImages = product.colorImages;
-  const hasColors =
-    colorImages != null &&
-    typeof colorImages === "object" &&
-    Object.keys(colorImages).length > 0;
-  if (hasColors) return true;
-
-  const selectableAttrs = Object.entries(product.attributes || {}).filter(
-    ([, value]) => {
-      let options: string[] = [];
-
-      if (Array.isArray(value)) {
-        options = value
-          .map((item) => item.toString())
-          .filter((item) => item.trim() !== "");
-      } else if (typeof value === "string" && value.trim() !== "") {
-        options = value
-          .split(",")
-          .map((item) => item.trim())
-          .filter((item) => item !== "");
-      }
-
-      return options.length > 1;
-    }
-  );
-
-  return selectableAttrs.length > 0;
-};
+// ✅ Static constants for performance
+const NAVIGATION_THROTTLE = 500;
+const JADE_GREEN = "#00A86B";
 
 // ✅ Static color map (computed once)
 const COLOR_MAP: Record<string, string> = {
@@ -117,8 +91,46 @@ const COLOR_MAP: Record<string, string> = {
   silver: "#C0C0C0",
 };
 
+// ✅ Memoized helper functions
+const isFantasyProduct = (product: Product): boolean => {
+  return product.subsubcategory?.toLowerCase() === "fantasy";
+};
+
 const getColorFromName = (colorName: string): string => {
   return COLOR_MAP[colorName.toLowerCase()] || "#9E9E9E";
+};
+
+// ✅ Check if product has selectable options (for cart ONLY)
+const hasSelectableOptionsForCart = (product: Product | null): boolean => {
+  if (!product) return false;
+
+  const colorImages = product.colorImages;
+  const hasColors =
+    colorImages != null &&
+    typeof colorImages === "object" &&
+    Object.keys(colorImages).length > 0;
+  if (hasColors) return true;
+
+  const selectableAttrs = Object.entries(product.attributes || {}).filter(
+    ([, value]) => {
+      let options: string[] = [];
+
+      if (Array.isArray(value)) {
+        options = value
+          .map((item) => item.toString())
+          .filter((item) => item.trim() !== "");
+      } else if (typeof value === "string" && value.trim() !== "") {
+        options = value
+          .split(",")
+          .map((item) => item.trim())
+          .filter((item) => item !== "");
+      }
+
+      return options.length > 1;
+    }
+  );
+
+  return selectableAttrs.length > 0;
 };
 
 // ✅ Enhanced image preloader with caching
@@ -365,12 +377,12 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
   const t = useTranslations();
 
   // Cart, favorites, and user hooks
+  const { addProductToCart, removeFromCart, cartProductIds } = useCart();
   const {
-    addProductToCart, // ✅ Changed from addToCart
-    removeFromCart,
-    cartProductIds, // ✅ Use this to check if in cart
-  } = useCart();
-  const { addToFavorites, isFavorite: isProductFavorite } = useFavorites();
+    addToFavorites,
+    removeMultipleFromFavorites,
+    isFavorite: isProductFavorite,
+  } = useFavorites();
   const { user } = useUser();
 
   const isProductInCart = useCallback(
@@ -389,10 +401,8 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
   const [isHovered, setIsHovered] = useState(false);
   const [imageError, setImageError] = useState(false);
 
-  // Option selector states
+  // ✅ CRITICAL: Only show selector for CART operations, not favorites
   const [showCartOptionSelector, setShowCartOptionSelector] = useState(false);
-  const [showFavoriteOptionSelector, setShowFavoriteOptionSelector] =
-    useState(false);
 
   // Animation states
   const [cartButtonState, setCartButtonState] = useState<
@@ -406,6 +416,9 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
   const actualIsInCart = isProductInCart(product.id);
   const actualIsFavorite = isProductFavorite(product.id);
 
+  // ✅ Navigation throttling (matches Flutter implementation)
+  const lastNavigationTimeRef = useRef<number>(0);
+
   // ✅ Safe color images extraction
   const safeColorImages = useMemo(() => {
     return product.colorImages && typeof product.colorImages === "object"
@@ -413,9 +426,12 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
       : {};
   }, [product.colorImages]);
 
-  // ✅ Displayed colors (max 4, shuffled)
+  // ✅ Displayed colors (max 4, shuffled) - matches Flutter
   const displayedColors = useMemo(() => {
     const availableColors = Object.keys(safeColorImages);
+    if (availableColors.length === 0) return [];
+
+    // Shuffle and take 4 (matches Flutter's Random().shuffle())
     const shuffled = [...availableColors].sort(() => Math.random() - 0.5);
     return shuffled.slice(0, 4);
   }, [safeColorImages]);
@@ -437,31 +453,26 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
   // Preload all images
   const { loadedImages, failedImages } = useImagePreloader(currentImageUrls);
 
-  // ✅ CRITICAL: Throttled navigation (500ms cooldown)
-  const [lastNavigationTime, setLastNavigationTime] = useState<number>(0);
-  const NAVIGATION_THROTTLE = 500;
-
+  // ✅ Cache product on mount (matches Flutter's ProductDetailProvider pattern)
   useEffect(() => {
     setProduct(product.id, product);
   }, [product, setProduct]);
 
+  // ✅ CRITICAL: Throttled navigation (matches Flutter's 500ms throttle)
   const handleCardClick = useCallback(() => {
     const now = Date.now();
 
     // Throttle rapid taps
-    if (now - lastNavigationTime < NAVIGATION_THROTTLE) {
+    if (now - lastNavigationTimeRef.current < NAVIGATION_THROTTLE) {
       return;
     }
 
-    setLastNavigationTime(now);
+    lastNavigationTimeRef.current = now;
 
-    // Record click analytics
+    // Record click analytics (matches Flutter's market.incrementClickCount)
     analyticsBatcher.recordClick(product.id, product.shopId);
 
-    // ✅ Cache is already set by useEffect above
-    // No need to do anything here!
-
-    // ✅ Precache hero image
+    // ✅ Precache hero image (matches Flutter's precacheImage)
     if (product.imageUrls.length > 0) {
       const img = new window.Image();
       img.src = product.imageUrls[0];
@@ -473,7 +484,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
     } else {
       router.push(`/productdetail/${product.id}`);
     }
-  }, [product, router, lastNavigationTime, onTap]);
+  }, [product, router, onTap]);
 
   // ✅ Check theme changes
   useEffect(() => {
@@ -494,7 +505,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
     return () => observer.disconnect();
   }, []);
 
-  // Reset image index when color changes
+  // Reset image index when color changes (matches Flutter's didUpdateWidget)
   useEffect(() => {
     setCurrentImageIndex(0);
     setImageError(false);
@@ -505,7 +516,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
     setInternalSelectedColor(selectedColor || null);
   }, [selectedColor]);
 
-  // ✅ Cart operations with proper batching
+  // ✅ CART OPERATIONS (matches Flutter implementation)
   const performCartOperation = useCallback(
     async (selectedOptions?: { quantity?: number; [key: string]: unknown }) => {
       try {
@@ -520,12 +531,10 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
             quantityToAdd = selectedOptions.quantity;
           }
 
-          // Extract selectedColor separately
           if (typeof selectedOptions.selectedColor === "string") {
             selectedColor = selectedOptions.selectedColor;
           }
 
-          // Extract other attributes
           Object.entries(selectedOptions).forEach(([key, value]) => {
             if (key !== "quantity" && key !== "selectedColor") {
               attributes[key] = value;
@@ -533,9 +542,8 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
           });
         }
 
-        // ✅ Use addProductToCart with Product object
         const result = await addProductToCart(
-          product, // Pass the entire product object
+          product,
           quantityToAdd,
           selectedColor,
           attributes
@@ -595,7 +603,8 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
         return;
       }
 
-      const productHasOptions = hasSelectableOptions(product);
+      // ✅ Show selector ONLY for cart if product has options
+      const productHasOptions = hasSelectableOptionsForCart(product);
 
       if (!productInCart && productHasOptions && !selectedOptions) {
         setShowCartOptionSelector(true);
@@ -614,57 +623,62 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
     ]
   );
 
-  // ✅ Favorite operations
+  // ✅ FAVORITE OPERATIONS (matches Flutter - NO selector, direct add)
   const handleToggleFavorite = useCallback(async () => {
     if (!user) {
       router.push("/login");
       return;
     }
 
-    if (!actualIsFavorite && hasSelectableOptions(product)) {
-      setShowFavoriteOptionSelector(true);
-      return;
-    }
+    try {
+      const wasInFavorites = actualIsFavorite;
 
-    await performFavoriteToggle();
-  }, [user, actualIsFavorite, product, router]);
+      setFavoriteButtonState(wasInFavorites ? "removing" : "adding");
 
-  const performFavoriteToggle = useCallback(
-    async (selectedOptions?: {
-      selectedColor?: string;
-      selectedColorImage?: string;
-      quantity: number;
-      [key: string]: unknown;
-    }) => {
-      try {
-        const wasInFavorites = actualIsFavorite;
+      let result: string;
 
-        setFavoriteButtonState(wasInFavorites ? "removing" : "adding");
-
-        const result = await addToFavorites(product.id, selectedOptions);
-
-        if (result.includes("Added")) {
-          setFavoriteButtonState("added");
-        } else if (result.includes("Removed")) {
-          setFavoriteButtonState("removed");
-        }
-
-        setTimeout(() => {
-          setFavoriteButtonState("idle");
-        }, 2000);
-
-        if (onFavoriteToggle) {
-          onFavoriteToggle(product.id);
-        }
-      } catch (error) {
-        console.error("Error with favorite operation:", error);
-        setFavoriteButtonState("idle");
+      if (wasInFavorites) {
+        // Remove from favorites
+        result = await removeMultipleFromFavorites([product.id]);
+      } else {
+        // ✅ CRITICAL: Add directly WITHOUT selector (matches Flutter)
+        result = await addToFavorites(product.id, {
+          quantity: 1,
+          ...(product.imageUrls.length > 0 && {
+            selectedColorImage: product.imageUrls[0],
+          }),
+          // selectedColor and selectedColorImage will be undefined if not set
+        });
       }
-    },
-    [product, actualIsFavorite, addToFavorites, onFavoriteToggle]
-  );
 
-  // Handle option selector confirmations
+      if (result.includes("Added")) {
+        setFavoriteButtonState("added");
+      } else if (result.includes("Removed")) {
+        setFavoriteButtonState("removed");
+      }
+
+      setTimeout(() => {
+        setFavoriteButtonState("idle");
+      }, 2000);
+
+      if (onFavoriteToggle) {
+        onFavoriteToggle(product.id);
+      }
+    } catch (error) {
+      console.error("Error with favorite operation:", error);
+      setFavoriteButtonState("idle");
+    }
+  }, [
+    user,
+    product,
+    actualIsFavorite,
+    router,
+    addToFavorites,
+    removeMultipleFromFavorites,
+    onFavoriteToggle,
+  ]);
+
+  // Handle cart option selector confirmations
   const handleCartOptionSelectorConfirm = useCallback(
     async (selectedOptions: { quantity?: number; [key: string]: unknown }) => {
       setShowCartOptionSelector(false);
@@ -673,29 +687,11 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
     [performCartOperation]
   );
 
-  const handleFavoriteOptionSelectorConfirm = useCallback(
-    async (selectedOptions: {
-      selectedColor?: string;
-      selectedColorImage?: string;
-      quantity: number;
-      [key: string]: unknown;
-    }) => {
-      setShowFavoriteOptionSelector(false);
-      await performFavoriteToggle(selectedOptions);
-    },
-    [performFavoriteToggle]
-  );
-
-  // Handle option selector closes
   const handleCartOptionSelectorClose = useCallback(() => {
     setShowCartOptionSelector(false);
   }, []);
 
-  const handleFavoriteOptionSelectorClose = useCallback(() => {
-    setShowFavoriteOptionSelector(false);
-  }, []);
-
-  // ✅ Get cart button content
+  // ✅ Get cart button content (matches Flutter states)
   const getCartButtonContent = useCallback(() => {
     if (cartButtonState === "adding") {
       return {
@@ -715,14 +711,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
       };
     }
 
-    if (cartButtonState === "added") {
-      return {
-        icon: <Check size={16} />,
-        className: "text-green-500",
-      };
-    }
-
-    if (cartButtonState === "removed") {
+    if (cartButtonState === "added" || cartButtonState === "removed") {
       return {
         icon: <Check size={16} />,
         className: "text-green-500",
@@ -742,23 +731,17 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
     };
   }, [cartButtonState, actualIsInCart, isDarkMode]);
 
-  // ✅ Get favorite button content
+  // ✅ Get favorite button content (matches Flutter states)
   const getFavoriteButtonContent = useCallback(() => {
-    if (favoriteButtonState === "adding") {
+    if (
+      favoriteButtonState === "adding" ||
+      favoriteButtonState === "removing"
+    ) {
       return {
         icon: (
           <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
         ),
         className: isDarkMode ? "text-pink-400" : "text-pink-600",
-      };
-    }
-
-    if (favoriteButtonState === "removing") {
-      return {
-        icon: (
-          <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-        ),
-        className: isDarkMode ? "text-gray-400" : "text-gray-600",
       };
     }
 
@@ -795,7 +778,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
     ? `${portraitImageHeight * effectiveScaleFactor}px`
     : undefined;
 
-  // ✅ Build rotating children for description area
+  // ✅ Build rotating children for description area (matches Flutter)
   const rotatingChildren = useMemo(() => {
     const children: React.ReactNode[] = [];
     const quantity = product.quantity ?? 1;
@@ -812,17 +795,18 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
       children.push(
         <span
           key="stock"
-          className="text-emerald-600 text-xs font-bold truncate"
+          className="font-bold truncate"
+          style={{ color: JADE_GREEN, fontSize: "12px" }}
         >
-          Only {quantity} left
+          {t("ProductCard.onlyLeft", { quantity })}
         </span>
       );
     }
 
     return children;
-  }, [product.brandModel, product.quantity]);
+  }, [product.brandModel, product.quantity, t]);
 
-  // ✅ Build banner children
+  // ✅ Build banner children (matches Flutter)
   const bannerChildren = useMemo(() => {
     const children: React.ReactNode[] = [];
 
@@ -832,7 +816,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
           key="delivery"
           className="w-full h-full bg-orange-500 flex items-center justify-center text-white text-xs font-medium"
         >
-          Fast Delivery
+          {t("ProductCard.fastDelivery")}
         </div>
       );
     }
@@ -841,47 +825,50 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
       children.push(
         <div
           key="discount"
-          className="w-full h-full bg-emerald-600 flex items-center justify-center text-white text-xs font-medium"
+          className="w-full h-full flex items-center justify-center text-white text-xs font-medium"
+          style={{ backgroundColor: JADE_GREEN }}
         >
-          {product.discountPercentage}% OFF
+          {t("ProductCard.discount")}
         </div>
       );
     }
 
     return children;
-  }, [hasFastDelivery, hasDiscountBanner, product.discountPercentage]);
+  }, [hasFastDelivery, hasDiscountBanner, t]);
 
+  // ✅ Color selection handler (matches Flutter)
   const handleColorSelect = useCallback(
     (color: string) => {
       const newColor = internalSelectedColor === color ? null : color;
       setInternalSelectedColor(newColor);
+      setCurrentImageIndex(0);
       onColorSelect?.(newColor || "");
     },
     [internalSelectedColor, onColorSelect]
   );
 
-  const handleNextImage = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleNextImage = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setCurrentImageIndex((prev) =>
+        prev === currentImageUrls.length - 1 ? 0 : prev + 1
+      );
+    },
+    [currentImageUrls.length]
+  );
 
-    if (isFantasyProduct(product)) return;
+  const handlePrevImage = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setCurrentImageIndex((prev) =>
+        prev === 0 ? currentImageUrls.length - 1 : prev - 1
+      );
+    },
+    [currentImageUrls.length]
+  );
 
-    setCurrentImageIndex((prev) =>
-      prev === currentImageUrls.length - 1 ? 0 : prev + 1
-    );
-  };
-
-  const handlePrevImage = (e: React.MouseEvent) => {
-    e.stopPropagation();
-
-    if (isFantasyProduct(product)) return;
-
-    setCurrentImageIndex((prev) =>
-      prev === 0 ? currentImageUrls.length - 1 : prev - 1
-    );
-  };
-
-  // ✅ Determine active dot for pagination (max 3 dots)
-  const getActiveDotIndex = () => {
+  // ✅ Determine active dot for pagination (matches Flutter logic)
+  const getActiveDotIndex = useCallback(() => {
     const imageCount = currentImageUrls.length;
     if (imageCount <= 3) {
       return Math.min(currentImageIndex, imageCount - 1);
@@ -889,7 +876,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
     if (currentImageIndex === 0) return 0;
     if (currentImageIndex === imageCount - 1) return 2;
     return 1;
-  };
+  }, [currentImageUrls.length, currentImageIndex]);
 
   const currentImageUrl = currentImageUrls[currentImageIndex];
   const isImageLoaded = currentImageUrl && loadedImages.has(currentImageUrl);
@@ -905,6 +892,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
     favoriteButtonState === "adding" || favoriteButtonState === "removing";
 
   const isBoosted = product.isBoosted === true;
+  const isFantasy = isFantasyProduct(product);
 
   const cardContent = (
     <div
@@ -946,7 +934,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
                 </div>
 
                 {/* Navigation buttons */}
-                {currentImageUrls.length > 1 && !isFantasyProduct(product) && (
+                {currentImageUrls.length > 1 && !isFantasy && (
                   <>
                     <button
                       className={`absolute left-2 top-1/2 transform -translate-y-1/2 w-8 h-8 bg-black bg-opacity-50 rounded-full flex items-center justify-center text-white transition-opacity duration-150 ${
@@ -968,7 +956,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
                 )}
 
                 {/* Blur overlay for fantasy products */}
-                {isFantasyProduct(product) && (
+                {isFantasy && (
                   <div
                     className="absolute inset-0 backdrop-blur-[15px] bg-black/10"
                     style={{
@@ -979,7 +967,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
                 )}
 
                 {/* +18 Label for fantasy products */}
-                {isFantasyProduct(product) && (
+                {isFantasy && (
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div
                       className="px-6 py-3 bg-red-600/90 rounded-xl border-2 border-white"
@@ -1096,7 +1084,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
           )}
 
           {/* Image Dots */}
-          {currentImageUrls.length > 1 && (
+          {currentImageUrls.length > 1 && !isFantasy && (
             <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2">
               <div className="px-2 py-1 bg-gray-600 bg-opacity-80 rounded-full flex gap-1">
                 {Array.from(
@@ -1178,8 +1166,11 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
                     {product.price.toFixed(0)} {product.currency}
                   </span>
                   <span
-                    className="text-emerald-600 font-bold"
-                    style={{ fontSize: `${12 * textScaleFactor}px` }}
+                    className="font-bold"
+                    style={{
+                      fontSize: `${12 * textScaleFactor}px`,
+                      color: JADE_GREEN,
+                    }}
                   >
                     %{product.discountPercentage}
                   </span>
@@ -1225,6 +1216,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
       </div>
     </div>
   );
+
   if (isBoosted) {
     return (
       <>
@@ -1232,7 +1224,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
           {cardContent}
         </BoostedVisibilityWrapper>
 
-        {/* Option Selector Modals */}
+        {/* ✅ Only Cart Option Selector (no favorite selector) */}
         <ProductOptionSelector
           product={product}
           isOpen={showCartOptionSelector}
@@ -1241,37 +1233,20 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
           isDarkMode={isDarkMode}
           localization={localization}
         />
-
-        <ProductOptionSelector
-          product={product}
-          isOpen={showFavoriteOptionSelector}
-          onClose={handleFavoriteOptionSelectorClose}
-          onConfirm={handleFavoriteOptionSelectorConfirm}
-          isDarkMode={isDarkMode}
-          localization={localization}
-        />
       </>
     );
   }
+
   return (
     <>
       {cardContent}
 
-      {/* Option Selector Modals */}
+      {/* ✅ Only Cart Option Selector (no favorite selector) */}
       <ProductOptionSelector
         product={product}
         isOpen={showCartOptionSelector}
         onClose={handleCartOptionSelectorClose}
         onConfirm={handleCartOptionSelectorConfirm}
-        isDarkMode={isDarkMode}
-        localization={localization}
-      />
-
-      <ProductOptionSelector
-        product={product}
-        isOpen={showFavoriteOptionSelector}
-        onClose={handleFavoriteOptionSelectorClose}
-        onConfirm={handleFavoriteOptionSelectorConfirm}
         isDarkMode={isDarkMode}
         localization={localization}
       />

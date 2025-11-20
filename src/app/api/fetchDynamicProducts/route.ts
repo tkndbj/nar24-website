@@ -13,7 +13,6 @@ import {
   QueryConstraint,
   CollectionReference,
   QuerySnapshot,
-  QueryDocumentSnapshot,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Product, ProductUtils } from "@/app/models/Product";
@@ -21,21 +20,45 @@ import { Product, ProductUtils } from "@/app/models/Product";
 const LIMIT = 20;
 const MAX_ARRAY_FILTER_SIZE = 10;
 
+// ✅ Cache configuration
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const MAX_CACHE_SIZE = 200; // Maximum number of cached entries
+const CACHE_CLEANUP_THRESHOLD = 0.9; // Clean when 90% full
+
+// ✅ Response interface
+interface ApiResponse {
+  products: Product[];
+  boostedProducts: Product[];
+  hasMore: boolean;
+  page: number;
+  total: number;
+}
+
+// ✅ In-memory cache with LRU eviction - FIXED to cache full response
+interface CacheEntry {
+  data: ApiResponse; // ✅ Changed from Product[] to ApiResponse
+  timestamp: number;
+  accessCount: number;
+  lastAccess: number;
+}
+
+const responseCache = new Map<string, CacheEntry>();
+
 // Category mapping cache to avoid repeated string operations
 const CATEGORY_MAPPING: Record<string, string> = {
   "clothing-fashion": "Clothing & Fashion",
-  "footwear": "Footwear",
-  "accessories": "Accessories",
+  footwear: "Footwear",
+  accessories: "Accessories",
   "bags-luggage": "Bags & Luggage",
   "beauty-personal-care": "Beauty & Personal Care",
   "mother-child": "Mother & Child",
   "home-furniture": "Home & Furniture",
-  "electronics": "Electronics",
+  electronics: "Electronics",
   "sports-outdoor": "Sports & Outdoor",
   "books-stationery-hobby": "Books, Stationery & Hobby",
   "tools-hardware": "Tools & Hardware",
   "pet-supplies": "Pet Supplies",
-  "automotive": "Automotive",
+  automotive: "Automotive",
   "health-wellness": "Health & Wellness",
 };
 
@@ -55,54 +78,179 @@ interface QueryParams {
   page: number;
 }
 
+// ✅ Generate cache key
+function generateCacheKey(params: QueryParams): string {
+  const keyParts = [
+    params.category || "",
+    params.subcategory || "",
+    params.subsubcategory || "",
+    params.buyerCategory || "",
+    params.buyerSubcategory || "",
+    params.sortOption,
+    params.quickFilter || "",
+    params.brands.sort().join(","),
+    params.colors.sort().join(","),
+    params.filterSubcategories.sort().join(","),
+    params.minPrice || "",
+    params.maxPrice || "",
+    params.page,
+  ];
+  return keyParts.join("|");
+}
+
+// ✅ Get from cache with TTL check - FIXED return type
+function getFromCache(key: string): ApiResponse | null {
+  const entry = responseCache.get(key);
+  if (!entry) return null;
+
+  const now = Date.now();
+
+  // Check if expired
+  if (now - entry.timestamp > CACHE_TTL) {
+    responseCache.delete(key);
+    return null;
+  }
+
+  // Update access stats for LRU
+  entry.accessCount++;
+  entry.lastAccess = now;
+
+  return entry.data;
+}
+
+// ✅ Set in cache with automatic cleanup - FIXED parameter type
+function setInCache(key: string, data: ApiResponse): void {
+  const now = Date.now();
+
+  // Trigger cleanup if approaching max size
+  if (responseCache.size >= MAX_CACHE_SIZE * CACHE_CLEANUP_THRESHOLD) {
+    cleanupCache();
+  }
+
+  responseCache.set(key, {
+    data,
+    timestamp: now,
+    accessCount: 1,
+    lastAccess: now,
+  });
+}
+
+// ✅ Cleanup cache using LRU strategy
+function cleanupCache(): void {
+  const now = Date.now();
+  const entries = Array.from(responseCache.entries());
+
+  // Remove expired entries first
+  const validEntries = entries.filter(([key, entry]) => {
+    if (now - entry.timestamp > CACHE_TTL) {
+      responseCache.delete(key);
+      return false;
+    }
+    return true;
+  });
+
+  // If still over limit, remove least recently used
+  if (validEntries.length > MAX_CACHE_SIZE) {
+    // Sort by last access time (oldest first) and access count (least used first)
+    validEntries.sort((a, b) => {
+      const scoreA = a[1].lastAccess + a[1].accessCount * 1000;
+      const scoreB = b[1].lastAccess + b[1].accessCount * 1000;
+      return scoreA - scoreB;
+    });
+
+    // Remove oldest 20%
+    const toRemove = Math.floor(validEntries.length * 0.2);
+    for (let i = 0; i < toRemove; i++) {
+      responseCache.delete(validEntries[i][0]);
+    }
+  }
+}
+
 export async function GET(request: NextRequest) {
+  const startTime = Date.now();
+
   try {
     const { searchParams } = new URL(request.url);
 
     // Extract and parse parameters
     const params = extractQueryParams(searchParams);
 
-    // Convert category to Firestore format
-    const firestoreCategory = params.category 
-      ? CATEGORY_MAPPING[params.category] || params.category 
-      : null;
+    // ✅ Generate cache key
+    const cacheKey = generateCacheKey(params);
 
-    // Build main products query
-    const productsQuery = buildProductsQuery({
-      ...params,
-      category: firestoreCategory,
-    });
-
-    // Execute query with error handling
-    const snapshot = await getDocs(productsQuery);
-    
-    // Parse products efficiently
-    const products = parseProducts(snapshot);
-
-    // Fetch boosted products if needed (only for default filter)
-    let boostedProducts: Product[] = [];
-    if (!params.quickFilter && firestoreCategory && params.subsubcategory) {
-      boostedProducts = await fetchBoostedProducts({
-        category: firestoreCategory,
-        subsubcategory: params.subsubcategory,
-        buyerCategory: params.buyerCategory,
-        dynamicBrands: params.brands,
-        dynamicColors: params.colors,
-        dynamicSubSubcategories: params.filterSubcategories,
-        minPrice: params.minPrice,
-        maxPrice: params.maxPrice,
+    // ✅ Check cache first - now returns full ApiResponse
+    const cachedResponse = getFromCache(cacheKey);
+    if (cachedResponse) {
+      console.log(`✅ Cache HIT for: ${cacheKey.substring(0, 50)}...`);
+      return NextResponse.json(cachedResponse, {
+        headers: {
+          "X-Cache": "HIT",
+          "X-Response-Time": `${Date.now() - startTime}ms`,
+          "Cache-Control": "public, max-age=300, stale-while-revalidate=60",
+        },
       });
     }
 
-    return NextResponse.json({
+    console.log(`❌ Cache MISS for: ${cacheKey.substring(0, 50)}...`);
+
+    // Convert category to Firestore format
+    const firestoreCategory = params.category
+      ? CATEGORY_MAPPING[params.category] || params.category
+      : null;
+
+    // ✅ Parallel fetching for products and boosted products
+    const shouldFetchBoosted =
+      !params.quickFilter && firestoreCategory && params.subsubcategory;
+
+    const [products, boostedProducts] = await Promise.all([
+      // Main products query
+      (async () => {
+        const productsQuery = buildProductsQuery({
+          ...params,
+          category: firestoreCategory,
+        });
+        const snapshot = await getDocs(productsQuery);
+        return parseProducts(snapshot);
+      })(),
+
+      // Boosted products query (conditional)
+      shouldFetchBoosted
+        ? fetchBoostedProducts({
+            category: firestoreCategory!,
+            subsubcategory: params.subsubcategory!,
+            buyerCategory: params.buyerCategory,
+            dynamicBrands: params.brands,
+            dynamicColors: params.colors,
+            dynamicSubSubcategories: params.filterSubcategories,
+            minPrice: params.minPrice,
+            maxPrice: params.maxPrice,
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const responseData: ApiResponse = {
       products,
       boostedProducts,
       hasMore: products.length >= LIMIT,
       page: params.page,
-      total: snapshot.size,
+      total: products.length,
+    };
+
+    // ✅ Store full response in cache
+    setInCache(cacheKey, responseData);
+
+    const responseTime = Date.now() - startTime;
+    console.log(`⚡ API response time: ${responseTime}ms`);
+
+    return NextResponse.json(responseData, {
+      headers: {
+        "X-Cache": "MISS",
+        "X-Response-Time": `${responseTime}ms`,
+        "Cache-Control": "public, max-age=300, stale-while-revalidate=60",
+      },
     });
-  } catch (error) {
-    console.error("Error fetching products:", error);
+  } catch (error: unknown) {
+    console.error("❌ Error fetching products:", error);
     return NextResponse.json(
       {
         error: "Failed to fetch products",
@@ -124,33 +272,51 @@ function extractQueryParams(searchParams: URLSearchParams): QueryParams {
     page: parseInt(searchParams.get("page") || "0", 10),
     sortOption: searchParams.get("sort") || "date",
     quickFilter: searchParams.get("filter"),
-    filterSubcategories: searchParams.get("filterSubcategories")?.split(",").filter(Boolean) || [],
+    filterSubcategories:
+      searchParams.get("filterSubcategories")?.split(",").filter(Boolean) || [],
     colors: searchParams.get("colors")?.split(",").filter(Boolean) || [],
     brands: searchParams.get("brands")?.split(",").filter(Boolean) || [],
-    minPrice: searchParams.get("minPrice") ? parseFloat(searchParams.get("minPrice")!) : null,
-    maxPrice: searchParams.get("maxPrice") ? parseFloat(searchParams.get("maxPrice")!) : null,
+    minPrice: searchParams.get("minPrice")
+      ? parseFloat(searchParams.get("minPrice")!)
+      : null,
+    maxPrice: searchParams.get("maxPrice")
+      ? parseFloat(searchParams.get("maxPrice")!)
+      : null,
   };
 }
 
-// Parse products from snapshot
+// ✅ Optimized product parsing with early error handling
 function parseProducts(snapshot: QuerySnapshot<DocumentData>): Product[] {
   const products: Product[] = [];
-  
-  snapshot.docs.forEach((doc: QueryDocumentSnapshot<DocumentData>) => {
+  const errors: string[] = [];
+
+  for (const doc of snapshot.docs) {
     try {
       const data = { id: doc.id, ...doc.data() };
       const product = ProductUtils.fromJson(data);
       products.push(product);
-    } catch (error) {
-      console.warn(`Failed to parse product ${doc.id}:`, error);
+    } catch (error: unknown) {
+      errors.push(doc.id);
+      console.error("Error parsing product:", error);
     }
-  });
+  }
+
+  if (errors.length > 0) {
+    console.warn(
+      `Failed to parse ${errors.length} products:`,
+      errors.slice(0, 5)
+    );
+  }
 
   return products;
 }
 
-function buildProductsQuery(params: QueryParams): Query<DocumentData, DocumentData> {
-  const collectionRef: CollectionReference<DocumentData, DocumentData> = collection(db, "shop_products");
+// ✅ Optimized query builder with constraint reuse
+function buildProductsQuery(
+  params: QueryParams
+): Query<DocumentData, DocumentData> {
+  const collectionRef: CollectionReference<DocumentData, DocumentData> =
+    collection(db, "shop_products");
   const constraints: QueryConstraint[] = [];
 
   // Basic filters - only add if values exist
@@ -233,8 +399,8 @@ function applyQuickFilter(constraints: QueryConstraint[], quickFilter: string) {
 
 // Apply sorting constraints
 function applySorting(
-  constraints: QueryConstraint[], 
-  sortOption: string, 
+  constraints: QueryConstraint[],
+  sortOption: string,
   quickFilter?: string | null
 ) {
   if (quickFilter === "bestSellers") {
@@ -259,21 +425,14 @@ function applySorting(
       break;
     case "date":
     default:
-      // Default sorting: promotionScore or fallback to legacy
-      try {
-        constraints.push(orderBy("promotionScore", "desc"));
-        constraints.push(orderBy("createdAt", "desc"));
-      } catch {
-        // Fallback if promotionScore doesn't exist
-        constraints.push(orderBy("isBoosted", "desc"));
-        constraints.push(orderBy("rankingScore", "desc"));
-        constraints.push(orderBy("createdAt", "desc"));
-      }
+      // Default sorting: promotionScore first
+      constraints.push(orderBy("promotionScore", "desc"));
+      constraints.push(orderBy("createdAt", "desc"));
       break;
   }
 }
 
-// Fetch boosted products separately
+// ✅ Optimized boosted products with reduced query complexity
 async function fetchBoostedProducts({
   category,
   subsubcategory,
@@ -307,15 +466,26 @@ async function fetchBoostedProducts({
     }
 
     // Apply dynamic filters to boosted products
-    if (dynamicBrands.length > 0 && dynamicBrands.length <= MAX_ARRAY_FILTER_SIZE) {
+    if (
+      dynamicBrands.length > 0 &&
+      dynamicBrands.length <= MAX_ARRAY_FILTER_SIZE
+    ) {
       constraints.push(where("brandModel", "in", dynamicBrands));
     }
 
-    if (dynamicColors.length > 0 && dynamicColors.length <= MAX_ARRAY_FILTER_SIZE) {
-      constraints.push(where("availableColors", "array-contains-any", dynamicColors));
+    if (
+      dynamicColors.length > 0 &&
+      dynamicColors.length <= MAX_ARRAY_FILTER_SIZE
+    ) {
+      constraints.push(
+        where("availableColors", "array-contains-any", dynamicColors)
+      );
     }
 
-    if (dynamicSubSubcategories.length > 0 && dynamicSubSubcategories.length <= MAX_ARRAY_FILTER_SIZE) {
+    if (
+      dynamicSubSubcategories.length > 0 &&
+      dynamicSubSubcategories.length <= MAX_ARRAY_FILTER_SIZE
+    ) {
       constraints.push(where("subsubcategory", "in", dynamicSubSubcategories));
     }
 
@@ -328,21 +498,37 @@ async function fetchBoostedProducts({
     }
 
     // Sorting for boosted products
-    try {
-      constraints.push(orderBy("promotionScore", "desc"));
-      constraints.push(limit(20));
-    } catch {
-      constraints.push(orderBy("rankingScore", "desc"));
-      constraints.push(orderBy("createdAt", "desc"));
-      constraints.push(limit(20));
-    }
+    constraints.push(orderBy("promotionScore", "desc"));
+    constraints.push(limit(20));
 
     const q = query(collectionRef, ...constraints);
     const snapshot = await getDocs(q);
 
     return parseProducts(snapshot);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error fetching boosted products:", error);
     return [];
   }
+}
+
+// ✅ Optional: Manual cache cleanup endpoint (for maintenance)
+export async function DELETE() {
+  responseCache.clear();
+  return NextResponse.json({ message: "Cache cleared successfully" });
+}
+
+// ✅ Optional: Cache stats endpoint (for monitoring)
+export async function HEAD() {
+  const now = Date.now();
+  const stats = {
+    size: responseCache.size,
+    maxSize: MAX_CACHE_SIZE,
+    entries: Array.from(responseCache.entries()).map(([key, entry]) => ({
+      key: key.substring(0, 50),
+      age: Math.floor((now - entry.timestamp) / 1000),
+      accessCount: entry.accessCount,
+    })),
+  };
+
+  return NextResponse.json(stats);
 }

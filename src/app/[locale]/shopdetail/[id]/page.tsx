@@ -1017,6 +1017,10 @@ export default function ShopDetailPage() {
       <SecondHeader />
       <div
         className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
+        style={{
+          transform: 'translateZ(0)',
+          backfaceVisibility: 'hidden',
+        }}
       >
         <div className="max-w-6xl mx-auto">
           <div>
