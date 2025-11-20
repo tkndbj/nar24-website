@@ -830,7 +830,8 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           typeof bundlePrice === "number" ? bundlePrice : undefined;
       }
 
-      return {
+      // ✅ Build the data object with potential undefined values
+      const data: Record<string, unknown> = {
         productId: product.id,
         productName: product.productName,
         description: product.description,
@@ -874,6 +875,12 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         cachedBulkDiscountPercentage: product.bulkDiscountPercentage,
         cachedMaxQuantity: product.maxQuantity,
       };
+
+      // ✅ CRITICAL FIX: Remove undefined values before returning
+      // Firestore rejects undefined but accepts null
+      return Object.fromEntries(
+        Object.entries(data).filter(([value]) => value !== undefined)
+      );
     },
     []
   );
