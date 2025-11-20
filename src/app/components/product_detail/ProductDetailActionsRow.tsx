@@ -309,22 +309,24 @@ const ProductDetailActionsRow: React.FC<ProductDetailActionsRowProps> = ({
     <>
       <div className="space-y-6">
         {/* Rating Section */}
-        <div className="space-y-3">
-          <StarRating 
-            rating={product.averageRating} 
-            reviewCount={product.reviewCount || undefined}
-            isDarkMode={isDarkMode}
-            t={t}
-          />
-          
-          <RotatingCountText
-            cartCount={product.cartCount}
-            favoriteCount={product.favoritesCount}
-            purchaseCount={product.purchaseCount}
-            isDarkMode={isDarkMode}
-            t={t}
-          />
-        </div>
+        {product.averageRating > 0 && (
+          <div className="space-y-3">
+            <StarRating
+              rating={product.averageRating}
+              reviewCount={product.reviewCount || undefined}
+              isDarkMode={isDarkMode}
+              t={t}
+            />
+
+            <RotatingCountText
+              cartCount={product.cartCount}
+              favoriteCount={product.favoritesCount}
+              purchaseCount={product.purchaseCount}
+              isDarkMode={isDarkMode}
+              t={t}
+            />
+          </div>
+        )}
 
         {/* Trust Badges */}
         <div className="grid grid-cols-2 gap-3">

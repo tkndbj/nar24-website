@@ -412,7 +412,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
         <div
           key={item.productId}
           className={`
-            rounded-xl border p-3 transition-all duration-200
+            rounded-lg border p-2 transition-all duration-200
             ${
               isDarkMode
                 ? "bg-gray-800 border-gray-700"
@@ -426,13 +426,13 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
           {item.showSellerHeader && (
             <div
               className={`
-                flex items-center space-x-2 mb-2 px-2 py-1 rounded-lg
+                flex items-center space-x-1.5 mb-1.5 px-1.5 py-0.5 rounded-md
                 ${isDarkMode ? "bg-gray-700" : "bg-orange-50"}
               `}
             >
-              <ShoppingBag size={14} className="text-orange-500" />
+              <ShoppingBag size={12} className="text-orange-500" />
               <span
-                className={`text-xs font-semibold ${
+                className={`text-xs font-medium ${
                   isDarkMode ? "text-gray-300" : "text-gray-700"
                 }`}
               >
@@ -442,29 +442,35 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
           )}
 
           {/* Product Content */}
-          <div
-            className="flex items-start space-x-3 cursor-pointer"
-            onClick={() => {
-              onClose();
-              router.push(`/productdetail/${item.productId}`);
-            }}
-          >
+          <div className="flex items-start space-x-2">
             {/* Checkbox */}
-            <input
-              type="checkbox"
-              checked={isSelected}
-              onChange={(e) => {
+            <div
+              onClick={(e) => {
                 e.stopPropagation();
                 setSelectedProducts((prev) => ({
                   ...prev,
-                  [item.productId]: e.target.checked,
+                  [item.productId]: !prev[item.productId],
                 }));
               }}
-              className="mt-1 w-4 h-4 text-orange-500 rounded focus:ring-orange-500"
-            />
+              className="flex items-center justify-center cursor-pointer p-1 -m-1"
+            >
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={() => {}}
+                onClick={(e) => e.stopPropagation()}
+                className="mt-0.5 w-4 h-4 text-orange-500 rounded focus:ring-orange-500 pointer-events-none"
+              />
+            </div>
 
             {/* Product Image */}
-            <div className="relative w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden">
+            <div
+              className="relative w-16 h-16 flex-shrink-0 rounded-md overflow-hidden cursor-pointer"
+              onClick={() => {
+                onClose();
+                router.push(`/productdetail/${item.productId}`);
+              }}
+            >
               <Image
                 src={
                   item.selectedColorImage || item.product?.imageUrls?.[0] || ""
@@ -472,15 +478,21 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 alt={item.product?.productName || ""}
                 fill
                 className="object-cover"
-                sizes="80px"
+                sizes="64px"
               />
             </div>
 
             {/* Product Details */}
-            <div className="flex-1 min-w-0">
+            <div
+              className="flex-1 min-w-0 cursor-pointer"
+              onClick={() => {
+                onClose();
+                router.push(`/productdetail/${item.productId}`);
+              }}
+            >
               {item.product?.brandModel && (
                 <p
-                  className={`text-xs font-semibold mb-1 ${
+                  className={`text-xs font-medium mb-0.5 ${
                     isDarkMode ? "text-blue-300" : "text-blue-600"
                   }`}
                 >
@@ -488,18 +500,18 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 </p>
               )}
               <h3
-                className={`text-sm font-semibold line-clamp-2 ${
+                className={`text-xs font-semibold line-clamp-2 leading-tight ${
                   isDarkMode ? "text-white" : "text-gray-900"
                 }`}
               >
                 {item.product?.productName || t("loadingProduct")}
               </h3>
-              <p className="text-sm font-bold text-orange-500 mt-1">
+              <p className="text-sm font-bold text-orange-500 mt-0.5">
                 {item.product?.price.toFixed(2)}{" "}
                 {item.product?.currency || "TL"}
               </p>
               {availableStock < 10 && (
-                <p className="text-xs text-red-500 mt-1">
+                <p className="text-xs text-red-500 mt-0.5">
                   {t("onlyLeft")} {availableStock}
                 </p>
               )}
@@ -509,7 +521,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
           {/* Attributes */}
           {attributesDisplay && (
             <p
-              className={`text-xs mt-2 px-2 ${
+              className={`text-xs mt-1.5 px-1 ${
                 isDarkMode ? "text-gray-400" : "text-gray-600"
               }`}
             >
@@ -518,15 +530,15 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
           )}
 
           {/* Quantity Controls */}
-          <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
             <span
-              className={`text-sm font-medium ${
+              className={`text-xs font-medium ${
                 isDarkMode ? "text-gray-300" : "text-gray-700"
               }`}
             >
               {t("quantity")}:
             </span>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-1.5">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -536,7 +548,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 }}
                 disabled={item.quantity <= 1 || item.isOptimistic}
                 className={`
-                  p-1 rounded-lg transition-colors
+                  p-1 rounded-md transition-colors
                   ${
                     isDarkMode
                       ? "hover:bg-gray-700 text-gray-300"
@@ -545,11 +557,11 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   disabled:opacity-50 disabled:cursor-not-allowed
                 `}
               >
-                <Minus size={16} />
+                <Minus size={14} />
               </button>
 
               <span
-                className={`min-w-[40px] text-center font-semibold ${
+                className={`min-w-[32px] text-center text-sm font-semibold ${
                   isDarkMode ? "text-white" : "text-gray-900"
                 }`}
               >
@@ -565,7 +577,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 }}
                 disabled={item.quantity >= maxQuantity || item.isOptimistic}
                 className={`
-                  p-1 rounded-lg transition-colors
+                  p-1 rounded-md transition-colors
                   ${
                     isDarkMode
                       ? "hover:bg-gray-700 text-gray-300"
@@ -574,7 +586,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   disabled:opacity-50 disabled:cursor-not-allowed
                 `}
               >
-                <Plus size={16} />
+                <Plus size={14} />
               </button>
             </div>
           </div>
@@ -582,10 +594,10 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
           {/* Sale Preference Label */}
           {item.salePreferences?.discountThreshold &&
             item.salePreferences?.bulkDiscountPercentage && (
-              <div className="mt-2">
+              <div className="mt-1.5">
                 <div
                   className={`
-                  inline-flex items-center space-x-1 px-2 py-1 rounded-full text-xs
+                  inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-full text-xs
                   ${
                     item.quantity >= item.salePreferences.discountThreshold
                       ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
@@ -621,7 +633,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
             }}
             disabled={item.isOptimistic}
             className={`
-              mt-3 w-full flex items-center justify-center space-x-2 px-3 py-2 rounded-lg text-sm
+              mt-2 w-full flex items-center justify-center space-x-1.5 px-2 py-1.5 rounded-md text-xs
               transition-colors duration-200
               ${
                 isDarkMode
@@ -631,7 +643,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
               disabled:opacity-50 disabled:cursor-not-allowed
             `}
           >
-            <Trash2 size={14} />
+            <Trash2 size={12} />
             <span>{t("remove")}</span>
           </button>
         </div>
@@ -837,8 +849,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
               </div>
             ) : (
               /* Cart Items */
-              <div className="px-4 py-4">
-                <div className="space-y-4 pb-32">{renderCartItems}</div>
+              <div className="px-3 py-3">
+                <div className="space-y-2.5 pb-32">{renderCartItems}</div>
 
                 {/* Load More */}
                 {hasMore && (

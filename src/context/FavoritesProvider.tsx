@@ -284,6 +284,119 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
     ].includes(key);
   }, []);
 
+  const fetchProductDetailsForIds = useCallback(
+    async (
+      productIds: string[],
+      favoriteDocs: DocumentSnapshot[]
+    ): Promise<PaginatedFavorite[]> => {
+      if (productIds.length === 0) return [];
+
+      const results: PaginatedFavorite[] = [];
+      const favoriteDetailsByProductId: Record<string, FavoriteAttributes> = {};
+
+      // Build attributes map
+      favoriteDocs.forEach((doc) => {
+        const data = doc.data();
+        if (data && data.productId) {
+          const attrs = { ...data };
+          delete attrs.productId;
+          delete attrs.addedAt;
+          favoriteDetailsByProductId[data.productId as string] = attrs;
+        }
+      });
+
+      // Chunk IDs for Firestore 'in' queries (max 10)
+      const FIRESTORE_IN_LIMIT = 10;
+      for (let i = 0; i < productIds.length; i += FIRESTORE_IN_LIMIT) {
+        const chunk = productIds.slice(i, i + FIRESTORE_IN_LIMIT);
+
+        try {
+          // ✅ Query BOTH collections in parallel (like Flutter)
+          const [productsSnap, shopProductsSnap] = await Promise.all([
+            getDocs(
+              query(collection(db, "products"), where("__name__", "in", chunk))
+            ),
+            getDocs(
+              query(
+                collection(db, "shop_products"),
+                where("__name__", "in", chunk)
+              )
+            ),
+          ]);
+
+          // Process products collection
+          productsSnap.docs.forEach((doc) => {
+            try {
+              const data = doc.data();
+              const product: ProductData = {
+                id: doc.id,
+                ...data,
+              };
+
+              const attributes = favoriteDetailsByProductId[doc.id] || {};
+              results.push({
+                product,
+                attributes,
+                productId: doc.id,
+              });
+            } catch (error) {
+              console.error("Error parsing product", doc.id, error);
+            }
+          });
+
+          // Process shop_products collection
+          shopProductsSnap.docs.forEach((doc) => {
+            try {
+              const data = doc.data();
+              const product: ProductData = {
+                id: doc.id,
+                ...data,
+              };
+
+              const attributes = favoriteDetailsByProductId[doc.id] || {};
+              results.push({
+                product,
+                attributes,
+                productId: doc.id,
+              });
+            } catch (error) {
+              console.error("Error parsing product", doc.id, error);
+            }
+          });
+        } catch (error) {
+          console.error("Error fetching product chunk:", error);
+        }
+      }
+
+      return results;
+    },
+    []
+  );
+
+  const addPaginatedItems = useCallback(
+    (items: PaginatedFavorite[]) => {
+      items.forEach((item) => {
+        const productId = item.productId;
+        if (!paginatedFavoritesMap.current.has(productId)) {
+          if (paginatedFavoritesMap.current.size >= MAX_PAGINATED_CACHE) {
+            const firstKey = Array.from(
+              paginatedFavoritesMap.current.keys()
+            )[0];
+            paginatedFavoritesMap.current.delete(firstKey);
+          }
+          paginatedFavoritesMap.current.set(productId, item);
+        }
+      });
+
+      setPaginatedFavorites(Array.from(paginatedFavoritesMap.current.values()));
+
+      if (paginatedFavoritesMap.current.size > 0 && !isInitialLoadComplete) {
+        setIsInitialLoadComplete(true);
+      }
+    },
+    [isInitialLoadComplete]
+  );
+
   const showSuccessToast = useCallback((message: string) => {
     console.log("✅", message);
     // TODO: Implement toast notification
@@ -580,7 +693,61 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
             await addDoc(collection(db, collectionPath), favoriteData);
 
-            // ✅ STEP 3: Get shopId and log metrics
+            // ✅ STEP 2.5: FETCH AND ADD PRODUCT TO PAGINATED LIST (NEW!)
+            try {
+              // Fetch product details from BOTH collections
+              const [productDoc, shopProductDoc] = await Promise.all([
+                getDoc(doc(db, "products", productId)),
+                getDoc(doc(db, "shop_products", productId)),
+              ]);
+
+              let productData: ProductData | null = null;
+
+              if (productDoc.exists()) {
+                const data = productDoc.data();
+                productData = {
+                  id: productDoc.id,
+                  ...data,
+                };
+              } else if (shopProductDoc.exists()) {
+                const data = shopProductDoc.data();
+                productData = {
+                  id: shopProductDoc.id,
+                  ...data,
+                };
+              }
+
+              // Add to paginated cache immediately
+              if (productData) {
+                const newItem: PaginatedFavorite = {
+                  product: productData,
+                  attributes: {
+                    quantity: attributes.quantity || 1,
+                    selectedColor: attributes.selectedColor,
+                    selectedColorImage: attributes.selectedColorImage,
+                    ...Object.fromEntries(
+                      Object.entries(attributes).filter(
+                        ([k]) => !isSystemField(k)
+                      )
+                    ),
+                  },
+                  productId,
+                };
+
+                // Add to beginning of paginated list (most recent first)
+                paginatedFavoritesMap.current.set(productId, newItem);
+                setPaginatedFavorites(
+                  Array.from(paginatedFavoritesMap.current.values())
+                );
+
+                console.log("✅ Added product to paginated list immediately");
+              }
+            } catch (error) {
+              console.error("⚠️ Failed to fetch product details:", error);
+              // Non-critical error - the product will appear on next reload
+            }
+
+            // STEP 3: Get shopId and log metrics
             const shopId = await getProductShopId(productId);
             metricsEventService.logFavoriteAdded({
               productId,
@@ -1021,6 +1188,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
       console.log("🔵 loadNextPage: Set isLoading=true");
 
       try {
+        // Step 1: Fetch favorite documents
         const result = await fetchPaginatedFavorites(
           lastDocument.current,
           limit
@@ -1028,6 +1196,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
         const docs = result.docs as DocumentSnapshot[];
         const hasMore = result.hasMore;
+        const productIds = result.productIds;
 
         console.log(
           "🔵 loadNextPage RESULT: docs=",
@@ -1041,6 +1210,20 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         if (docs.length > 0) {
           lastDocument.current = docs[docs.length - 1];
           setHasMoreData(hasMore);
+
+          // ✅ Step 2: Fetch product details (THIS WAS MISSING!)
+          if (productIds) {
+            const newItems = await fetchProductDetailsForIds(
+              Array.from(productIds),
+              docs
+            );
+
+            // ✅ Step 3: Add to paginated list (THIS WAS MISSING!)
+            addPaginatedItems(newItems);
+
+            console.log("✅ Added", newItems.length, "items to paginated list");
+          }
+
           console.log(
             "🔵 loadNextPage: Set hasMoreData=",
             hasMore,
@@ -1060,7 +1243,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         return {
           docs,
           hasMore,
-          productIds: result.productIds,
+          productIds,
           error: null,
         };
       } catch (error) {
@@ -1075,7 +1258,13 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         };
       }
     },
-    [isLoadingMore, hasMoreData, fetchPaginatedFavorites]
+    [
+      isLoadingMore,
+      hasMoreData,
+      fetchPaginatedFavorites,
+      fetchProductDetailsForIds, // ✅ ADD THIS
+      addPaginatedItems, // ✅ ADD THIS
+    ]
   );
 
   const resetPagination = useCallback(() => {

@@ -8,7 +8,6 @@ import {
   MapPinIcon,
   UsersIcon,
   EyeIcon,
-  SparklesIcon,
 } from "@heroicons/react/24/outline";
 import {
   HeartIcon as HeartSolidIcon,
@@ -100,7 +99,6 @@ const getCategoryTranslationKey = (category: string): string => {
 export default function ShopCard({ shop, isDarkMode }: ShopCardProps) {
   const [isFavorite, setIsFavorite] = useState(false);
   const [imageError, setImageError] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
   const [lastNavigationTime, setLastNavigationTime] = useState<number>(0);
 
   const t = useTranslations();
@@ -143,12 +141,12 @@ export default function ShopCard({ shop, isDarkMode }: ShopCardProps) {
       stars.push(
         <div key={i} className="relative">
           {i <= Math.floor(rating) ? (
-            <StarSolidIcon className="w-4 h-4 text-yellow-400" />
+            <StarSolidIcon className="w-4 h-4 text-amber-400" />
           ) : i === Math.ceil(rating) && rating % 1 !== 0 ? (
             <div className="relative">
               <StarIcon className="w-4 h-4 text-gray-300" />
               <StarSolidIcon
-                className="w-4 h-4 text-yellow-400 absolute top-0 left-0"
+                className="w-4 h-4 text-amber-400 absolute top-0 left-0"
                 style={{
                   clipPath: `inset(0 ${100 - (rating % 1) * 100}% 0 0)`,
                 }}
@@ -166,33 +164,23 @@ export default function ShopCard({ shop, isDarkMode }: ShopCardProps) {
   return (
     <div
       onClick={handleShopClick}
-      className={`relative group cursor-pointer rounded-2xl overflow-hidden transition-all duration-500 transform hover:scale-[1.03] ${
+      className={`relative group cursor-pointer rounded-lg overflow-hidden transition-all duration-200 ${
         isDarkMode
-          ? "bg-gradient-to-br from-gray-800 via-gray-800 to-gray-700 border border-gray-700/50 shadow-xl"
-          : "bg-gradient-to-br from-white via-white to-gray-50 border border-gray-200/50 shadow-lg"
-      } hover:shadow-2xl backdrop-blur-sm`}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+          ? "bg-gray-800 border border-gray-700 hover:border-gray-600"
+          : "bg-white border border-gray-200 hover:border-gray-300"
+      } hover:shadow-lg`}
     >
-      {/* Glow Effect - Only for boosted shops */}
-      {shop.isBoosted && (
-        <div
-          className={`absolute inset-0 rounded-2xl transition-opacity duration-500 bg-gradient-to-r from-yellow-400/20 to-orange-500/20 ${
-            isHovered ? "opacity-100" : "opacity-0"
-          } blur-xl`}
-        />
-      )}
-
       {/* Boosted Badge */}
       {shop.isBoosted && (
-        <div className="absolute top-4 left-4 z-20">
-          <div className="relative group/badge">
-            <div className="absolute -inset-1 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full blur opacity-75 group-hover/badge:opacity-100 transition duration-300" />
-            <div className="relative bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg">
-              <SparklesIcon className="w-3 h-3" />
-              <span>{t("shops.boosted")}</span>
-              <div className="absolute -inset-1 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full opacity-0 group-hover/badge:opacity-30 blur transition duration-300" />
-            </div>
+        <div className="absolute top-3 left-3 z-20">
+          <div
+            className={`text-xs font-medium px-2.5 py-1 rounded-md ${
+              isDarkMode
+                ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                : "bg-amber-50 text-amber-700 border border-amber-200"
+            }`}
+          >
+            {t("shops.boosted")}
           </div>
         </div>
       )}
@@ -200,25 +188,25 @@ export default function ShopCard({ shop, isDarkMode }: ShopCardProps) {
       {/* Favorite Button */}
       <button
         onClick={handleFavoriteToggle}
-        className="absolute top-4 right-4 z-20 p-2.5 rounded-full backdrop-blur-md transition-all duration-300 hover:scale-110 active:scale-95 group/fav"
-        style={{
-          background: isDarkMode
-            ? "rgba(0, 0, 0, 0.4)"
-            : "rgba(255, 255, 255, 0.4)",
-          border: "1px solid rgba(255, 255, 255, 0.2)",
-        }}
+        className={`absolute top-3 right-3 z-20 p-2 rounded-lg transition-colors ${
+          isDarkMode
+            ? "bg-gray-900/60 hover:bg-gray-900/80 backdrop-blur-sm"
+            : "bg-white/60 hover:bg-white/80 backdrop-blur-sm"
+        }`}
       >
-        <div className="relative">
-          {isFavorite ? (
-            <HeartSolidIcon className="w-5 h-5 text-red-500 drop-shadow-sm" />
-          ) : (
-            <HeartIcon className="w-5 h-5 text-white drop-shadow-sm group-hover/fav:text-red-300 transition-colors" />
-          )}
-        </div>
+        {isFavorite ? (
+          <HeartSolidIcon className="w-5 h-5 text-red-500" />
+        ) : (
+          <HeartIcon
+            className={`w-5 h-5 ${
+              isDarkMode ? "text-gray-300" : "text-gray-600"
+            }`}
+          />
+        )}
       </button>
 
       {/* Cover Image */}
-      <div className="relative h-40 overflow-hidden">
+      <div className="relative h-40 overflow-hidden bg-gray-100 dark:bg-gray-700">
         {shop.coverImageUrls &&
         shop.coverImageUrls.length > 0 &&
         !imageError ? (
@@ -226,134 +214,110 @@ export default function ShopCard({ shop, isDarkMode }: ShopCardProps) {
             src={shop.coverImageUrls[0]}
             alt={`${shop.name} cover`}
             fill
-            className="object-cover transition-transform duration-700 group-hover:scale-110"
+            className="object-cover transition-transform duration-300 group-hover:scale-105"
             onError={() => setImageError(true)}
           />
         ) : (
           <div
             className={`w-full h-full flex items-center justify-center ${
-              isDarkMode
-                ? "bg-gradient-to-br from-gray-700 to-gray-600"
-                : "bg-gradient-to-br from-gray-200 to-gray-100"
+              isDarkMode ? "bg-gray-700" : "bg-gray-100"
             }`}
           >
-            <div className="relative">
-              <div
-                className={`text-6xl ${
-                  isDarkMode ? "text-gray-500" : "text-gray-400"
-                } transition-transform duration-300 group-hover:scale-110`}
-              >
-                🏪
-              </div>
-              <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12" />
+            <div
+              className={`text-5xl ${
+                isDarkMode ? "text-gray-600" : "text-gray-300"
+              }`}
+            >
+              🏪
             </div>
           </div>
         )}
-
-        {/* Enhanced Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-
-        {/* Floating Elements */}
-        <div className="absolute inset-0">
-          {[...Array(3)].map((_, i) => (
-            <div
-              key={i}
-              className="absolute w-1 h-1 bg-white/30 rounded-full animate-pulse"
-              style={{
-                left: `${20 + i * 30}%`,
-                top: `${20 + i * 20}%`,
-                animationDelay: `${i * 0.5}s`,
-              }}
-            />
-          ))}
-        </div>
+        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent" />
       </div>
 
       {/* Profile Image */}
-      <div className="absolute top-28 left-4 z-10">
-        <div className="relative group/profile">
-          <div className="relative w-20 h-20 rounded-full border-4 border-white dark:border-gray-700 overflow-hidden shadow-xl backdrop-blur-sm">
-            {shop.profileImageUrl ? (
-              <Image
-                src={shop.profileImageUrl}
-                alt={shop.name}
-                fill
-                className="object-cover transition-transform duration-300 group-hover/profile:scale-110"
-              />
-            ) : (
-              <div
-                className={`w-full h-full flex items-center justify-center ${
-                  isDarkMode ? "bg-gray-600" : "bg-gray-300"
-                }`}
-              >
-                <span className="text-2xl">🏪</span>
-              </div>
-            )}
-          </div>
+      <div className="absolute top-32 left-4 z-10">
+        <div
+          className={`relative w-16 h-16 rounded-full border-3 overflow-hidden shadow-md ${
+            isDarkMode ? "border-gray-800" : "border-white"
+          }`}
+        >
+          {shop.profileImageUrl ? (
+            <Image
+              src={shop.profileImageUrl}
+              alt={shop.name}
+              fill
+              className="object-cover"
+            />
+          ) : (
+            <div
+              className={`w-full h-full flex items-center justify-center ${
+                isDarkMode ? "bg-gray-700" : "bg-gray-200"
+              }`}
+            >
+              <span className="text-xl">🏪</span>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Content */}
-      <div className="p-6 pt-12 space-y-4">
+      <div className="p-4 pt-10">
         {/* Shop Name */}
-        <div className="space-y-2">
-          <h3
-            className={`font-bold text-xl mb-1 truncate transition-colors duration-300 ${
-              isDarkMode
-                ? "text-white group-hover:text-blue-300"
-                : "text-gray-900 group-hover:text-blue-600"
-            }`}
-          >
-            {shop.name}
-          </h3>
+        <h3
+          className={`font-semibold text-base mb-2 truncate ${
+            isDarkMode ? "text-white" : "text-gray-900"
+          }`}
+        >
+          {shop.name}
+        </h3>
 
-          {/* Rating */}
-          {shop.averageRating > 0 && (
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1">
-                {renderStars(shop.averageRating)}
-              </div>
+        {/* Rating */}
+        {shop.averageRating > 0 && (
+          <div className="flex items-center gap-2 mb-3">
+            <div className="flex items-center gap-0.5">
+              {renderStars(shop.averageRating)}
+            </div>
+            <span
+              className={`text-sm font-medium ${
+                isDarkMode ? "text-gray-300" : "text-gray-700"
+              }`}
+            >
+              {shop.averageRating.toFixed(1)}
+            </span>
+            {shop.reviewCount > 0 && (
               <span
-                className={`text-sm font-medium ${
-                  isDarkMode ? "text-gray-300" : "text-gray-600"
+                className={`text-xs ${
+                  isDarkMode ? "text-gray-500" : "text-gray-500"
                 }`}
               >
-                {shop.averageRating.toFixed(1)}
+                ({shop.reviewCount})
               </span>
-              {shop.reviewCount > 0 && (
-                <span
-                  className={`text-xs ${
-                    isDarkMode ? "text-gray-400" : "text-gray-500"
-                  }`}
-                >
-                  ({shop.reviewCount})
-                </span>
-              )}
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         {/* Categories */}
         {shop.categories && shop.categories.length > 0 && (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5 mb-3">
             {shop.categories.slice(0, 2).map((category, index) => (
               <span
                 key={index}
-                className={`text-xs px-3 py-1.5 rounded-full font-medium transition-all duration-300 ${
+                className={`text-xs px-2 py-1 rounded-md ${
                   isDarkMode
-                    ? "bg-blue-900/30 text-blue-300 border border-blue-700/30"
-                    : "bg-blue-100 text-blue-800 border border-blue-200"
-                } hover:scale-105`}
+                    ? "bg-gray-700 text-gray-300"
+                    : "bg-gray-100 text-gray-700"
+                }`}
               >
                 {t(getCategoryTranslationKey(category))}
               </span>
             ))}
             {shop.categories.length > 2 && (
               <span
-                className={`text-xs px-2 py-1 rounded-full ${
+                className={`text-xs px-2 py-1 rounded-md ${
                   isDarkMode
-                    ? "text-gray-400 bg-gray-800/50"
-                    : "text-gray-500 bg-gray-100"
+                    ? "bg-gray-700 text-gray-400"
+                    : "bg-gray-100 text-gray-500"
                 }`}
               >
                 +{shop.categories.length - 2}
@@ -362,9 +326,9 @@ export default function ShopCard({ shop, isDarkMode }: ShopCardProps) {
           </div>
         )}
 
-        {/* Stats */}
-        <div className="flex items-center justify-between pt-2">
-          <div className="flex items-center gap-4">
+        {/* Stats & Address */}
+        <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex items-center gap-3">
             {shop.followerCount > 0 && (
               <div className="flex items-center gap-1">
                 <UsersIcon
@@ -374,7 +338,7 @@ export default function ShopCard({ shop, isDarkMode }: ShopCardProps) {
                 />
                 <span
                   className={`text-xs ${
-                    isDarkMode ? "text-gray-300" : "text-gray-600"
+                    isDarkMode ? "text-gray-400" : "text-gray-600"
                   }`}
                 >
                   {shop.followerCount}
@@ -391,7 +355,7 @@ export default function ShopCard({ shop, isDarkMode }: ShopCardProps) {
                 />
                 <span
                   className={`text-xs ${
-                    isDarkMode ? "text-gray-300" : "text-gray-600"
+                    isDarkMode ? "text-gray-400" : "text-gray-600"
                   }`}
                 >
                   {shop.clickCount}
@@ -402,19 +366,14 @@ export default function ShopCard({ shop, isDarkMode }: ShopCardProps) {
 
           {/* Address Indicator */}
           {shop.address && (
-            <div className="flex items-center gap-1">
-              <MapPinIcon
-                className={`w-4 h-4 ${
-                  isDarkMode ? "text-gray-400" : "text-gray-500"
-                }`}
-              />
-            </div>
+            <MapPinIcon
+              className={`w-4 h-4 ${
+                isDarkMode ? "text-gray-400" : "text-gray-500"
+              }`}
+            />
           )}
         </div>
       </div>
-
-      {/* Shimmer Effect on Hover */}
-      <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-12 pointer-events-none" />
     </div>
   );
 }

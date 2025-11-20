@@ -3,10 +3,11 @@
 
 "use client";
 
-import React, { useState, useCallback } from "react";
-import { Plus, X } from "lucide-react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
+import { Plus, X, ChevronDown } from "lucide-react";
 import { useFavorites } from "@/context/FavoritesProvider";
 import { useUser } from "@/context/UserProvider";
+import { useTranslations } from "next-intl";
 
 interface FavoriteBasketWidgetProps {
   isDarkMode?: boolean;
@@ -25,6 +26,31 @@ export const FavoriteBasketWidget: React.FC<FavoriteBasketWidgetProps> = ({
     deleteFavoriteBasket,
     setSelectedBasket,
   } = useFavorites();
+  const localization = useTranslations();
+
+  const t = useCallback(
+    (key: string) => {
+      if (!localization) return key;
+
+      try {
+        const translation = localization(`FavoritesDrawer.${key}`);
+        if (translation && translation !== `FavoritesDrawer.${key}`) {
+          return translation;
+        }
+
+        const directTranslation = localization(key);
+        if (directTranslation && directTranslation !== key) {
+          return directTranslation;
+        }
+
+        return key;
+      } catch (error) {
+        console.warn(`Translation error for key: ${key}`, error);
+        return key;
+      }
+    },
+    [localization]
+  );
 
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [newBasketName, setNewBasketName] = useState("");
@@ -32,6 +58,27 @@ export const FavoriteBasketWidget: React.FC<FavoriteBasketWidgetProps> = ({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(
     null
   );
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    if (isDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+      };
+    }
+  }, [isDropdownOpen]);
 
   const handleBasketClick = useCallback(
     (basketId: string) => {
@@ -41,6 +88,9 @@ export const FavoriteBasketWidget: React.FC<FavoriteBasketWidgetProps> = ({
       } else {
         setSelectedBasket(basketId);
       }
+
+      // Close dropdown
+      setIsDropdownOpen(false);
 
       // Notify parent to reload if needed
       onBasketChanged?.();
@@ -59,7 +109,7 @@ export const FavoriteBasketWidget: React.FC<FavoriteBasketWidgetProps> = ({
         setNewBasketName("");
         setShowCreateDialog(false);
       } else if (result === "Maximum basket limit reached") {
-        alert("Maximum 10 baskets allowed");
+        alert(t("maxBasketsReached"));
       }
     } catch (error) {
       console.error("Error creating basket:", error);
@@ -67,7 +117,7 @@ export const FavoriteBasketWidget: React.FC<FavoriteBasketWidgetProps> = ({
     } finally {
       setIsCreating(false);
     }
-  }, [newBasketName, createFavoriteBasket]);
+  }, [newBasketName, createFavoriteBasket, t]);
 
   const handleDeleteBasket = useCallback(
     async (basketId: string) => {
@@ -85,76 +135,165 @@ export const FavoriteBasketWidget: React.FC<FavoriteBasketWidgetProps> = ({
   if (!user) return null;
 
   // ========================================================================
-  // BASKET CHIP RENDER
+  // BASKET DROPDOWN RENDER
   // ========================================================================
+
+  const selectedBasket = favoriteBaskets.find(
+    (b) => b.id === selectedBasketId
+  );
 
   return (
     <>
-      {/* Basket Chips Container */}
-      <div className="overflow-x-auto scrollbar-hide">
-        <div className="flex space-x-2 py-1">
-          {/* Basket Chips */}
-          {favoriteBaskets.map((basket) => {
-            const isSelected = basket.id === selectedBasketId;
+      {/* Basket Dropdown Container */}
+      <div className="relative" ref={dropdownRef}>
+        {/* Dropdown Button */}
+        <button
+          onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+          className={`
+            w-full flex items-center justify-between px-4 py-2.5 rounded-lg
+            transition-colors duration-200 text-sm font-medium
+            ${
+              isDarkMode
+                ? "bg-gray-800 hover:bg-gray-700 text-white border border-gray-700"
+                : "bg-gray-50 hover:bg-gray-100 text-gray-900 border border-gray-300"
+            }
+          `}
+        >
+          <span>
+            {selectedBasket ? selectedBasket.name : t("allFavorites")}
+          </span>
+          <ChevronDown
+            size={18}
+            className={`transition-transform duration-200 ${
+              isDropdownOpen ? "rotate-180" : ""
+            }`}
+          />
+        </button>
 
-            return (
-              <div
-                key={basket.id}
-                className={`
-                  flex items-center space-x-1 px-3 py-1.5 rounded-full
-                  transition-colors duration-200 cursor-pointer
-                  whitespace-nowrap text-sm
-                  ${
-                    isSelected
-                      ? "bg-orange-500 text-white"
-                      : isDarkMode
-                      ? "bg-gray-600 text-white hover:bg-gray-500"
-                      : "bg-gray-600 text-white hover:bg-gray-500"
-                  }
-                `}
-              >
-                <span
-                  onClick={() => handleBasketClick(basket.id)}
-                  className="font-medium"
-                >
-                  {basket.name}
-                </span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowDeleteConfirm(basket.id);
-                  }}
-                  className="hover:opacity-80 transition-opacity"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            );
-          })}
-
-          {/* Create Basket Chip */}
-          <button
-            onClick={() => {
-              if (favoriteBaskets.length >= 10) {
-                alert("Maximum 10 baskets allowed");
-                return;
-              }
-              setShowCreateDialog(true);
-            }}
+        {/* Dropdown Menu */}
+        {isDropdownOpen && (
+          <div
             className={`
-              flex items-center space-x-1 px-3 py-1.5 rounded-full
-              transition-colors duration-200 whitespace-nowrap text-sm
+              absolute top-full left-0 right-0 mt-2 rounded-lg shadow-2xl
+              border overflow-hidden z-[70]
               ${
                 isDarkMode
-                  ? "bg-gray-400 text-white hover:bg-gray-300"
-                  : "bg-gray-400 text-white hover:bg-gray-300"
+                  ? "bg-gray-800 border-gray-700"
+                  : "bg-white border-gray-200"
               }
             `}
           >
-            <span className="font-medium">Create Basket</span>
-            <Plus size={14} />
-          </button>
-        </div>
+            {/* All Favorites Option */}
+            <button
+              onClick={() => {
+                setSelectedBasket(null);
+                setIsDropdownOpen(false);
+                onBasketChanged?.();
+              }}
+              className={`
+                w-full px-4 py-2.5 text-left text-sm transition-colors duration-150
+                ${
+                  !selectedBasketId
+                    ? "bg-orange-500 text-white"
+                    : isDarkMode
+                    ? "text-white hover:bg-gray-700"
+                    : "text-gray-900 hover:bg-gray-50"
+                }
+              `}
+            >
+              {t("allFavorites")}
+            </button>
+
+            {/* Divider */}
+            {favoriteBaskets.length > 0 && (
+              <div
+                className={`
+                  border-t
+                  ${isDarkMode ? "border-gray-700" : "border-gray-200"}
+                `}
+              />
+            )}
+
+            {/* Basket Options */}
+            {favoriteBaskets.map((basket) => {
+              const isSelected = basket.id === selectedBasketId;
+
+              return (
+                <div
+                  key={basket.id}
+                  className={`
+                    flex items-center justify-between px-4 py-2.5
+                    transition-colors duration-150
+                    ${
+                      isSelected
+                        ? "bg-orange-500 text-white"
+                        : isDarkMode
+                        ? "text-white hover:bg-gray-700"
+                        : "text-gray-900 hover:bg-gray-50"
+                    }
+                  `}
+                >
+                  <button
+                    onClick={() => handleBasketClick(basket.id)}
+                    className="flex-1 text-left text-sm font-medium"
+                  >
+                    {basket.name}
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowDeleteConfirm(basket.id);
+                      setIsDropdownOpen(false);
+                    }}
+                    className={`
+                      ml-2 p-1 rounded transition-colors duration-150
+                      ${
+                        isSelected
+                          ? "hover:bg-orange-600"
+                          : isDarkMode
+                          ? "hover:bg-gray-600"
+                          : "hover:bg-gray-200"
+                      }
+                    `}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              );
+            })}
+
+            {/* Create Basket Option */}
+            <div
+              className={`
+                border-t
+                ${isDarkMode ? "border-gray-700" : "border-gray-200"}
+              `}
+            >
+              <button
+                onClick={() => {
+                  if (favoriteBaskets.length >= 10) {
+                    alert(t("maxBasketsReached"));
+                    return;
+                  }
+                  setShowCreateDialog(true);
+                  setIsDropdownOpen(false);
+                }}
+                className={`
+                  w-full flex items-center justify-center space-x-2 px-4 py-2.5
+                  text-sm font-medium transition-colors duration-150
+                  ${
+                    isDarkMode
+                      ? "text-orange-400 hover:bg-gray-700"
+                      : "text-orange-600 hover:bg-gray-50"
+                  }
+                `}
+              >
+                <Plus size={16} />
+                <span>{t("createNewBasket")}</span>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Create Basket Dialog */}
@@ -172,13 +311,13 @@ export const FavoriteBasketWidget: React.FC<FavoriteBasketWidgetProps> = ({
                 ${isDarkMode ? "text-white" : "text-gray-900"}
               `}
             >
-              Create Basket
+              {t("createBasket")}
             </h3>
             <input
               type="text"
               value={newBasketName}
               onChange={(e) => setNewBasketName(e.target.value)}
-              placeholder="Enter basket name"
+              placeholder={t("enterBasketNamePlaceholder")}
               autoFocus
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
@@ -212,7 +351,7 @@ export const FavoriteBasketWidget: React.FC<FavoriteBasketWidgetProps> = ({
                   }
                 `}
               >
-                Cancel
+                {t("cancel")}
               </button>
               <button
                 onClick={handleCreateBasket}
@@ -225,7 +364,7 @@ export const FavoriteBasketWidget: React.FC<FavoriteBasketWidgetProps> = ({
                   transition-all duration-200
                 "
               >
-                {isCreating ? "Creating..." : "Create"}
+                {isCreating ? t("creating") : t("create")}
               </button>
             </div>
           </div>
@@ -247,7 +386,7 @@ export const FavoriteBasketWidget: React.FC<FavoriteBasketWidgetProps> = ({
                 ${isDarkMode ? "text-white" : "text-gray-900"}
               `}
             >
-              Delete Basket?
+              {t("deleteBasket")}
             </h3>
             <p
               className={`
@@ -255,8 +394,7 @@ export const FavoriteBasketWidget: React.FC<FavoriteBasketWidgetProps> = ({
                 ${isDarkMode ? "text-gray-300" : "text-gray-600"}
               `}
             >
-              Are you sure you want to delete this basket? This action cannot be
-              undone.
+              {t("deleteBasketConfirmation")}
             </p>
             <div className="flex space-x-3">
               <button
@@ -271,7 +409,7 @@ export const FavoriteBasketWidget: React.FC<FavoriteBasketWidgetProps> = ({
                   }
                 `}
               >
-                Cancel
+                {t("cancel")}
               </button>
               <button
                 onClick={() => handleDeleteBasket(showDeleteConfirm)}
@@ -282,7 +420,7 @@ export const FavoriteBasketWidget: React.FC<FavoriteBasketWidgetProps> = ({
                   transition-colors duration-200
                 "
               >
-                Delete
+                {t("delete")}
               </button>
             </div>
           </div>

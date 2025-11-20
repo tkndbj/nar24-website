@@ -1788,9 +1788,13 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   // EFFECTS
   // ========================================================================
 
-  // Clear data on user logout
+  // Initialize cart when user logs in or clear on logout
   useEffect(() => {
-    if (!user) {
+    if (user && !isInitialized) {
+      // User logged in - initialize cart
+      initializeCartIfNeeded();
+    } else if (!user) {
+      // User logged out - clear all data
       disableLiveUpdates();
       setCartCount(0);
       setCartProductIds(new Set());
@@ -1802,7 +1806,8 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       optimisticTimeoutsRef.current.clear();
       quantityUpdateLocksRef.current.clear();
     }
-  }, [user, disableLiveUpdates]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   // Cleanup on unmount
   useEffect(() => {

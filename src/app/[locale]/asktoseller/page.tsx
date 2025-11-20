@@ -544,7 +544,7 @@ const AskToSellerPage: React.FC<PageProps> = ({ params, searchParams }) => {
       </div>
 
       {/* Content */}
-      <div className="max-w-4xl mx-auto p-4 pb-24">
+      <div className="max-w-4xl mx-auto p-4">
         <div className="space-y-6">
           {/* Seller Info */}
           <div
@@ -797,32 +797,24 @@ const AskToSellerPage: React.FC<PageProps> = ({ params, searchParams }) => {
               </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Bottom Submit Button */}
-      <div
-        className={`fixed bottom-0 left-0 right-0 p-4 ${
-          isDarkMode
-            ? "bg-gray-800 border-t border-gray-700"
-            : "bg-white border-t border-gray-200"
-        } shadow-lg`}
-      >
-        <div className="max-w-4xl mx-auto">
-          <button
-            onClick={handleSubmit}
-            disabled={isSubmitting || !questionText.trim() || !acceptTerms}
-            className="w-full py-4 px-6 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-xl font-semibold text-lg transition-all duration-300 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 disabled:transform-none disabled:cursor-not-allowed"
-          >
-            {isSubmitting ? (
-              <>
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                {t("sending")}...
-              </>
-            ) : (
-              t("sendQuestion")
-            )}
-          </button>
+          {/* Submit Button */}
+          <div className="pt-2 pb-4 flex justify-center">
+            <button
+              onClick={handleSubmit}
+              disabled={isSubmitting || !questionText.trim() || !acceptTerms}
+              className="w-full max-w-md py-4 px-6 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-xl font-semibold text-lg transition-all duration-300 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 disabled:transform-none disabled:cursor-not-allowed"
+            >
+              {isSubmitting ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  {t("sending")}...
+                </>
+              ) : (
+                t("sendQuestion")
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>

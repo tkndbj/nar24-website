@@ -276,21 +276,18 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                         onClick={() => switchLanguage("tr")}
                         className={`
                           w-full flex items-center space-x-3 px-4 py-3 text-left
-                          hover:bg-gray-100 dark:hover:bg-gray-700
                           transition-colors duration-150
                           ${
                             locale === "tr"
                               ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-                              : ""
+                              : isDark
+                              ? "text-gray-200 hover:bg-gray-700"
+                              : "text-gray-900 hover:bg-gray-100"
                           }
                         `}
                       >
                         <span className="text-lg">🇹🇷</span>
-                        <span
-                          className={`text-sm font-medium ${
-                            isDark ? "text-gray-200" : "text-gray-900"
-                          }`}
-                        >
+                        <span className="text-sm font-medium">
                           {t("header.turkish")}
                         </span>
                       </button>
@@ -298,21 +295,18 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                         onClick={() => switchLanguage("en")}
                         className={`
                           w-full flex items-center space-x-3 px-4 py-3 text-left
-                          hover:bg-gray-100 dark:hover:bg-gray-700
                           transition-colors duration-150
                           ${
                             locale === "en"
                               ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-                              : ""
+                              : isDark
+                              ? "text-gray-200 hover:bg-gray-700"
+                              : "text-gray-900 hover:bg-gray-100"
                           }
                         `}
                       >
                         <span className="text-lg">🇺🇸</span>
-                        <span
-                          className={`text-sm font-medium ${
-                            isDark ? "text-gray-200" : "text-gray-900"
-                          }`}
-                        >
+                        <span className="text-sm font-medium">
                           {t("header.english")}
                         </span>
                       </button>
@@ -456,21 +450,18 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                       onClick={() => switchLanguage("tr")}
                       className={`
                         w-full flex items-center space-x-3 px-4 py-3 text-left
-                        hover:bg-gray-100 dark:hover:bg-gray-700
                         transition-colors duration-150
                         ${
                           locale === "tr"
                             ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-                            : ""
+                            : isDark
+                            ? "text-gray-200 hover:bg-gray-700"
+                            : "text-gray-900 hover:bg-gray-100"
                         }
                       `}
                     >
                       <span className="text-lg">🇹🇷</span>
-                      <span
-                        className={`text-sm font-medium ${
-                          isDark ? "text-gray-200" : "text-gray-900"
-                        }`}
-                      >
+                      <span className="text-sm font-medium">
                         {t("header.turkish")}
                       </span>
                     </button>
@@ -478,21 +469,18 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                       onClick={() => switchLanguage("en")}
                       className={`
                         w-full flex items-center space-x-3 px-4 py-3 text-left
-                        hover:bg-gray-100 dark:hover:bg-gray-700
                         transition-colors duration-150
                         ${
                           locale === "en"
                             ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-                            : ""
+                            : isDark
+                            ? "text-gray-200 hover:bg-gray-700"
+                            : "text-gray-900 hover:bg-gray-100"
                         }
                       `}
                     >
                       <span className="text-lg">🇺🇸</span>
-                      <span
-                        className={`text-sm font-medium ${
-                          isDark ? "text-gray-200" : "text-gray-900"
-                        }`}
-                      >
+                      <span className="text-sm font-medium">
                         {t("header.english")}
                       </span>
                     </button>

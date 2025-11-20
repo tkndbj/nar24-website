@@ -1961,7 +1961,14 @@
     "failedToTransferToBasket": "Failed to transfer to basket",
     "failedToAddToCart": "Failed to add to cart",
     "itemsAddedToCart": "items added to cart",
-    "selectBasket": "Select Basket"
+    "selectBasket": "Select Basket",
+    "allFavorites": "All Favorites",
+    "createBasket": "Create Basket",
+    "deleteBasket": "Delete Basket?",
+    "deleteBasketConfirmation": "Are you sure you want to delete this basket? This action cannot be undone.",
+    "delete": "Delete",
+    "maxBasketsReached": "Maximum 10 baskets allowed",
+    "enterBasketNamePlaceholder": "Enter basket name"
   },
   "gender": "Gender",
   "clothingSize": "Clothing Size",
@@ -2540,7 +2547,8 @@
     "noImageAvailable": "No image available",
     "bestSeller": "Best Seller",
     "productImage": "Product image",
-    "productDescription": "Product Description"
+    "productDescription": "Product Description",
+    "readAll": "Read All"
   },
   "DynamicAttributesWidget": {
     "title": "Product Specifications",
@@ -4181,7 +4189,10 @@
     }
   },
   "ProductCard": {
-    "featured": "Featured"
+    "featured": "Featured",
+    "onlyLeft": "Only {quantity} left",
+    "fastDelivery": "Fast Delivery",
+    "discount": "Discount"
   },
   "BoostAnalysis": {
     "title": "Boost Analysis",

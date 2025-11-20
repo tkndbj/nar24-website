@@ -7,6 +7,7 @@ import React, {
   useEffect,
   useCallback,
   useMemo,
+  useRef,
   lazy,
   Suspense,
 } from "react";
@@ -253,12 +254,19 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [previousImageIndex, setPreviousImageIndex] = useState(0);
+  const [slideDirection, setSlideDirection] = useState<'left' | 'right'>('right');
   const [showFullScreenViewer, setShowFullScreenViewer] = useState(false);
   const [showVideoModal, setShowVideoModal] = useState(false);
+  const [showDescriptionModal, setShowDescriptionModal] = useState(false);
   const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
 
   // ✅ NEW: Track if user has scrolled down to lazy load components
   const [hasScrolled, setHasScrolled] = useState(false);
+
+  // ✅ NEW: Track if user has scrolled past action buttons
+  const [showHeaderButtons, setShowHeaderButtons] = useState(false);
+  const actionButtonsRef = useRef<HTMLDivElement>(null);
 
   const isInCart = useCallback(
     (productId: string): boolean => {
@@ -333,6 +341,19 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     const handleScroll = () => {
       if (window.scrollY > 300 && !hasScrolled) {
         setHasScrolled(true);
+      }
+
+      // Check if user has scrolled past the action buttons
+      if (actionButtonsRef.current) {
+        const buttonRect = actionButtonsRef.current.getBoundingClientRect();
+        const headerHeight = 64 + 52; // MarketHeader (64px) + Product header (~52px)
+
+        // Show header buttons when original buttons scroll above viewport + header
+        if (buttonRect.bottom < headerHeight) {
+          setShowHeaderButtons(true);
+        } else {
+          setShowHeaderButtons(false);
+        }
       }
     };
 
@@ -756,24 +777,20 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
       className={`min-h-screen ${
         isDarkMode ? "bg-gray-900" : "bg-gray-50"
       }`}
-      style={{
-        transform: 'translateZ(0)',
-        backfaceVisibility: 'hidden',
-      }}
     >
       {/* Header */}
       <div
-        className={`sticky top-0 z-10 backdrop-blur-md border-b ${
+        className={`sticky top-16 z-40 backdrop-blur-md border-b transition-all duration-300 ${
           isDarkMode
             ? "bg-gray-900/95 border-gray-700"
             : "bg-white/95 border-gray-200"
         }`}
       >
         <div className="w-full px-3 py-2 sm:max-w-6xl sm:mx-auto sm:px-4 sm:py-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <button
               onClick={() => router.back()}
-              className={`p-1.5 sm:p-2 rounded-lg transition-colors ${
+              className={`p-1.5 sm:p-2 rounded-lg transition-colors flex-shrink-0 ${
                 isDarkMode
                   ? "hover:bg-gray-800 text-gray-300"
                   : "hover:bg-gray-100 text-gray-700"
@@ -782,7 +799,50 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               <ArrowLeft className="w-5 h-5" />
             </button>
 
-            <div className="flex items-center gap-1 sm:gap-2">
+            {/* Spacer to push buttons to the right */}
+            <div className="flex-1"></div>
+
+            {/* Action Buttons - Show when scrolled past original buttons */}
+            <div
+              className={`flex items-center gap-1.5 transition-all duration-300 overflow-hidden ${
+                showHeaderButtons
+                  ? "max-w-[280px] sm:max-w-[320px] opacity-100"
+                  : "max-w-0 opacity-0"
+              }`}
+            >
+              <button
+                onClick={() => handleAddToCart()}
+                disabled={isProcessing}
+                className={`
+                  py-1.5 px-2 sm:px-3 rounded-lg font-semibold text-[10px] sm:text-xs transition-all duration-300 flex items-center justify-center gap-1 whitespace-nowrap
+                  ${
+                    productInCart && cartButtonState === "idle"
+                      ? isDarkMode
+                        ? "border border-red-500 text-red-400 hover:bg-red-900/20"
+                        : "border border-red-500 text-red-600 hover:bg-red-50"
+                      : cartButtonState === "added" ||
+                        cartButtonState === "removed"
+                      ? "border border-green-500 text-green-600 bg-green-50"
+                      : isDarkMode
+                      ? "border border-orange-500 text-orange-400 hover:bg-orange-900/20"
+                      : "border border-orange-500 text-orange-600 hover:bg-orange-50"
+                  }
+                  ${isProcessing ? "opacity-75 cursor-not-allowed" : ""}
+                `}
+              >
+                <span className="hidden sm:inline">{cartButtonContent.icon}</span>
+                <span>{cartButtonContent.text}</span>
+              </button>
+
+              <button
+                onClick={handleBuyNow}
+                className={`py-1.5 px-2 sm:px-3 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white rounded-lg font-semibold text-[10px] sm:text-xs transition-all duration-300 flex items-center justify-center whitespace-nowrap shadow-lg`}
+              >
+                {t("buyNow")}
+              </button>
+            </div>
+
+            <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
               <button
                 onClick={handleToggleFavorite}
                 className={`p-1.5 sm:p-2 rounded-lg transition-colors ${
@@ -816,30 +876,89 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
       </div>
 
       {/* Main Content */}
-      <div className="w-full sm:max-w-6xl sm:mx-auto p-3 sm:p-4 lg:p-6">
-        <div className="grid lg:grid-cols-2 gap-4 sm:gap-8 lg:gap-12">
+      <div className="w-full sm:max-w-6xl sm:mx-auto p-2 sm:p-3 lg:p-4">
+        <div className="grid lg:grid-cols-2 gap-3 sm:gap-6 lg:gap-8">
           {/* Left Column - Images */}
-          <div className="space-y-3 sm:space-y-4">
+          <div className="space-y-2 sm:space-y-3">
             {/* Main Image */}
-            <div
-              className={`relative w-full aspect-square rounded-lg sm:rounded-2xl overflow-hidden ${
-                isDarkMode ? "bg-gray-800" : "bg-white"
-              } shadow-sm border ${
-                isDarkMode ? "border-gray-700" : "border-gray-200"
-              }`}
-            >
+            <div className="relative w-full h-[400px] sm:h-[480px] lg:h-[560px] rounded-lg overflow-hidden">
               {product.imageUrls.length > 0 &&
               !imageErrors.has(currentImageIndex) ? (
-                <Image
-                  src={product.imageUrls[currentImageIndex]}
-                  alt={product.productName}
-                  fill
-                  className="object-contain cursor-pointer hover:scale-105 transition-transform duration-300"
-                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                  onClick={() => setShowFullScreenViewer(true)}
-                  onError={() => handleImageError(currentImageIndex)}
-                  priority
-                />
+                <div className="relative w-full h-full overflow-hidden">
+                  {/* Previous Image - Sliding Out */}
+                  {previousImageIndex !== currentImageIndex && (
+                    <div className="absolute inset-0">
+                      <Image
+                        key={`prev-${previousImageIndex}`}
+                        src={product.imageUrls[previousImageIndex]}
+                        alt={product.productName}
+                        fill
+                        className="object-contain"
+                        style={{
+                          animation: slideDirection === 'right'
+                            ? 'slideOutToLeft 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards'
+                            : 'slideOutToRight 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards'
+                        }}
+                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                      />
+                    </div>
+                  )}
+
+                  {/* Current Image - Sliding In */}
+                  <div className="absolute inset-0">
+                    <Image
+                      key={`current-${currentImageIndex}`}
+                      src={product.imageUrls[currentImageIndex]}
+                      alt={product.productName}
+                      fill
+                      className="object-contain cursor-pointer hover:scale-105 transition-transform duration-300"
+                      style={{
+                        animation: slideDirection === 'right'
+                          ? 'slideInFromRight 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards'
+                          : 'slideInFromLeft 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards'
+                      }}
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                      onClick={() => setShowFullScreenViewer(true)}
+                      onError={() => handleImageError(currentImageIndex)}
+                      priority
+                    />
+                  </div>
+
+                  <style jsx>{`
+                    @keyframes slideInFromRight {
+                      0% {
+                        transform: translateX(100%);
+                      }
+                      100% {
+                        transform: translateX(0);
+                      }
+                    }
+                    @keyframes slideInFromLeft {
+                      0% {
+                        transform: translateX(-100%);
+                      }
+                      100% {
+                        transform: translateX(0);
+                      }
+                    }
+                    @keyframes slideOutToLeft {
+                      0% {
+                        transform: translateX(0);
+                      }
+                      100% {
+                        transform: translateX(-100%);
+                      }
+                    }
+                    @keyframes slideOutToRight {
+                      0% {
+                        transform: translateX(0);
+                      }
+                      100% {
+                        transform: translateX(100%);
+                      }
+                    }
+                  `}</style>
+                </div>
               ) : (
                 <div
                   className={`w-full h-full flex items-center justify-center ${
@@ -883,16 +1002,27 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
             {/* Thumbnail Images */}
             {product.imageUrls.length > 1 && (
-              <div className="relative">
+              <div className="flex justify-center">
                 <div
-                  className="flex gap-2 sm:gap-3 overflow-x-auto py-2 px-1 scrollbar-hide"
+                  className="flex gap-1.5 sm:gap-2 overflow-x-auto py-2 px-2 scrollbar-hide"
                   style={{ WebkitOverflowScrolling: "touch" }}
                 >
                   {product.imageUrls.map((url, index) => (
                     <button
                       key={index}
-                      onClick={() => setCurrentImageIndex(index)}
-                      className={`flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden border-2 transition-all ${
+                      onClick={() => {
+                        const direction = index > currentImageIndex ? 'right' : 'left';
+                        setSlideDirection(direction);
+                        setPreviousImageIndex(currentImageIndex);
+                        setCurrentImageIndex(index);
+                      }}
+                      onMouseEnter={() => {
+                        const direction = index > currentImageIndex ? 'right' : 'left';
+                        setSlideDirection(direction);
+                        setPreviousImageIndex(currentImageIndex);
+                        setCurrentImageIndex(index);
+                      }}
+                      className={`flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-md overflow-hidden border-2 transition-all duration-300 ${
                         index === currentImageIndex
                           ? "border-orange-500 shadow-lg scale-105"
                           : isDarkMode
@@ -903,8 +1033,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                       <Image
                         src={url}
                         alt={`${t("productImage")} ${index + 1}`}
-                        width={80}
-                        height={80}
+                        width={56}
+                        height={56}
                         className="w-full h-full object-cover"
                         onError={() => handleImageError(index)}
                       />
@@ -916,23 +1046,25 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           </div>
 
           {/* Right Column - Product Info */}
-          <div className="space-y-4 sm:space-y-6">
+          <div className="space-y-3 sm:space-y-4">
             {/* Product Title & Brand */}
-            <div className="space-y-2 sm:space-y-3">
-              <div className="flex items-start gap-2 sm:gap-3">
-                <span
-                  className={`text-xs sm:text-sm font-semibold px-2 py-0.5 sm:px-3 sm:py-1 rounded-full ${
-                    isDarkMode
-                      ? "bg-blue-900/30 text-blue-400 border border-blue-700"
-                      : "bg-blue-50 text-blue-700 border border-blue-200"
-                  }`}
-                >
-                  {product.brandModel}
-                </span>
-              </div>
+            <div className="space-y-1.5 sm:space-y-2">
+              {product.brandModel && (
+                <div className="flex items-start gap-2 sm:gap-3">
+                  <span
+                    className={`text-xs sm:text-sm font-semibold px-2 py-0.5 sm:px-3 sm:py-1 rounded-full ${
+                      isDarkMode
+                        ? "bg-blue-900/30 text-blue-400 border border-blue-700"
+                        : "bg-blue-50 text-blue-700 border border-blue-200"
+                    }`}
+                  >
+                    {product.brandModel}
+                  </span>
+                </div>
+              )}
 
               <h1
-                className={`text-xl sm:text-2xl lg:text-3xl font-bold leading-tight ${
+                className={`text-base sm:text-lg lg:text-xl font-bold leading-tight ${
                   isDarkMode ? "text-white" : "text-gray-900"
                 }`}
               >
@@ -940,7 +1072,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               </h1>
 
               <div
-                className={`text-2xl sm:text-3xl lg:text-4xl font-bold text-orange-600`}
+                className={`text-lg sm:text-xl lg:text-2xl font-bold text-orange-600`}
               >
                 {product.price} {product.currency}
               </div>
@@ -957,12 +1089,12 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
             />
 
             {/* Action Buttons */}
-            <div className="flex gap-2 sm:gap-3 pt-2 sm:pt-4">
+            <div ref={actionButtonsRef} className="flex gap-2 sm:gap-3 pt-1 sm:pt-2">
               <button
                 onClick={() => handleAddToCart()}
                 disabled={isProcessing}
                 className={`
-                  flex-1 py-3 px-3 sm:py-4 sm:px-6 rounded-lg sm:rounded-xl font-semibold text-sm sm:text-lg transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 relative overflow-hidden
+                  flex-1 py-2 px-3 sm:py-2.5 sm:px-4 rounded-lg font-semibold text-xs sm:text-sm transition-all duration-300 flex items-center justify-center gap-1.5 sm:gap-2 relative overflow-hidden
                   ${
                     productInCart && cartButtonState === "idle"
                       ? isDarkMode
@@ -1004,7 +1136,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
               <button
                 onClick={handleBuyNow}
-                className="flex-1 py-3 px-3 sm:py-4 sm:px-6 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white rounded-lg sm:rounded-xl font-semibold text-sm sm:text-lg transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                className="flex-1 py-2 px-3 sm:py-2.5 sm:px-4 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white rounded-lg font-semibold text-xs sm:text-sm transition-all duration-300 flex items-center justify-center gap-1.5 sm:gap-2 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
               >
                 {t("buyNow")}
               </button>
@@ -1018,43 +1150,67 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               isDarkMode={isDarkMode}
               localization={localization}
             />
+
+            {/* Attributes Widget */}
+            <DynamicAttributesWidget
+              product={product}
+              isDarkMode={isDarkMode}
+              localization={localization}
+            />
+
+            {/* Description */}
+            {product.description && (
+              <div
+                className={`rounded-lg p-2 sm:p-3 border ${
+                  isDarkMode
+                    ? "bg-gray-800 border-gray-700"
+                    : "bg-white border-gray-200"
+                }`}
+              >
+                <h3
+                  className={`text-xs sm:text-sm font-bold mb-1.5 sm:mb-2 ${
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  }`}
+                >
+                  {t("productDescription")}
+                </h3>
+                <div className="relative">
+                  <p
+                    className={`leading-relaxed text-xs sm:text-sm ${
+                      isDarkMode ? "text-gray-300" : "text-gray-700"
+                    } line-clamp-[6]`}
+                  >
+                    {product.description}
+                  </p>
+                  {product.description.length > 250 && (
+                    <div
+                      className={`absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t ${
+                        isDarkMode
+                          ? "from-gray-800 via-gray-800/80 to-transparent"
+                          : "from-white via-white/80 to-transparent"
+                      } pointer-events-none`}
+                    />
+                  )}
+                </div>
+                {product.description.length > 250 && (
+                  <button
+                    onClick={() => setShowDescriptionModal(true)}
+                    className={`mt-2 text-xs sm:text-sm font-semibold transition-colors ${
+                      isDarkMode
+                        ? "text-orange-400 hover:text-orange-300"
+                        : "text-orange-600 hover:text-orange-700"
+                    }`}
+                  >
+                    {t("readAll") || "Read All"}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
         {/* ✅ OPTIMIZED: Bottom sections lazy loaded */}
-        <div className="mt-8 sm:mt-12 space-y-6 sm:space-y-8">
-          {/* Always render attributes (lightweight) */}
-          <DynamicAttributesWidget
-            product={product}
-            isDarkMode={isDarkMode}
-            localization={localization}
-          />
-
-          {/* Description */}
-          {product.description && (
-            <div
-              className={`rounded-lg sm:rounded-2xl p-4 sm:p-6 ${
-                isDarkMode
-                  ? "bg-gray-800 border border-gray-700"
-                  : "bg-white border border-gray-200"
-              } shadow-sm`}
-            >
-              <h3
-                className={`text-lg sm:text-xl font-bold mb-3 sm:mb-4 ${
-                  isDarkMode ? "text-white" : "text-gray-900"
-                }`}
-              >
-                {t("productDescription")}
-              </h3>
-              <p
-                className={`leading-relaxed text-sm sm:text-base ${
-                  isDarkMode ? "text-gray-300" : "text-gray-700"
-                }`}
-              >
-                {product.description}
-              </p>
-            </div>
-          )}
+        <div className="mt-4 sm:mt-6 space-y-3 sm:space-y-4">
 
           {/* ✅ LAZY LOADED: Heavy components below the fold */}
           {hasScrolled && (
@@ -1196,6 +1352,67 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
             localization={localization}
           />
         </Suspense>
+      )}
+
+      {/* Description Modal */}
+      {showDescriptionModal && product.description && (
+        <div className="fixed top-4 right-4 z-50 max-w-md w-[calc(100vw-2rem)] animate-slideInFromTop">
+          <div
+            className={`rounded-lg shadow-2xl border overflow-hidden ${
+              isDarkMode
+                ? "bg-gray-800 border-gray-700"
+                : "bg-white border-gray-200"
+            }`}
+            style={{
+              animation: "slideInFromTop 0.3s ease-out forwards",
+            }}
+          >
+            <div
+              className={`flex items-center justify-between p-3 border-b ${
+                isDarkMode ? "border-gray-700" : "border-gray-200"
+              }`}
+            >
+              <h3
+                className={`text-sm sm:text-base font-bold ${
+                  isDarkMode ? "text-white" : "text-gray-900"
+                }`}
+              >
+                {t("productDescription")}
+              </h3>
+              <button
+                onClick={() => setShowDescriptionModal(false)}
+                className={`p-1 rounded-lg transition-colors ${
+                  isDarkMode
+                    ? "hover:bg-gray-700 text-gray-400"
+                    : "hover:bg-gray-100 text-gray-600"
+                }`}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div
+              className={`p-3 max-h-[70vh] overflow-y-auto ${
+                isDarkMode ? "text-gray-300" : "text-gray-700"
+              }`}
+            >
+              <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap">
+                {product.description}
+              </p>
+            </div>
+          </div>
+          <style jsx>{`
+            @keyframes slideInFromTop {
+              0% {
+                transform: translateY(-100%);
+                opacity: 0;
+              }
+              100% {
+                transform: translateY(0);
+                opacity: 1;
+              }
+            }
+          `}</style>
+        </div>
       )}
     </div>
   );

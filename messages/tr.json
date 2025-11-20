@@ -1967,7 +1967,14 @@
     "failedToTransferToBasket": "Sepete aktarılamadı",
     "failedToAddToCart": "Sepete eklenemedi",
     "itemsAddedToCart": "ürün sepete eklendi",
-    "selectBasket": "Sepet Seç"
+    "selectBasket": "Sepet Seç",
+    "allFavorites": "Tüm Favoriler",
+    "createBasket": "Sepet Oluştur",
+    "deleteBasket": "Sepet Silinsin mi?",
+    "deleteBasketConfirmation": "Bu sepeti silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
+    "delete": "Sil",
+    "maxBasketsReached": "Maksimum 10 sepet oluşturulabilir",
+    "enterBasketNamePlaceholder": "Sepet adı girin"
   },
   "gender": "Cinsiyet",
   "clothingSize": "Kıyafet Bedeni",
@@ -2576,7 +2583,8 @@
     "noImageAvailable": "Resim mevcut değil",
     "bestSeller": "En Çok Satan",
     "productImage": "Ürün resmi",
-    "productDescription": "Ürün Açıklaması"
+    "productDescription": "Ürün Açıklaması",
+    "readAll": "Tümünü Oku"
   },
   "DynamicAttributesWidget": {
     "title": "Ürün Özellikleri",
@@ -4193,7 +4201,10 @@
     }
   },
   "ProductCard": {
-    "featured": "Öne Çıkan"
+    "featured": "Öne Çıkan",
+    "onlyLeft": "Sadece {quantity} adet kaldı",
+    "fastDelivery": "Hızlı Teslimat",
+    "discount": "İndirim"
   },
   "BoostAnalysis": {
     "title": "Boost Analizi",

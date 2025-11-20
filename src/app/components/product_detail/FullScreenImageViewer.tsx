@@ -1,6 +1,7 @@
 // src/components/productdetail/FullScreenImageViewer.tsx
 
 import React, { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import Image from "next/image";
 
@@ -17,9 +18,15 @@ const FullScreenImageViewer: React.FC<FullScreenImageViewerProps> = ({
   initialIndex = 0,
   isOpen,
   onClose,
+  isDarkMode = false,
 }) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     setCurrentIndex(initialIndex);
@@ -69,152 +76,228 @@ const FullScreenImageViewer: React.FC<FullScreenImageViewerProps> = ({
     if (isOpen) {
       document.body.style.overflow = "hidden";
     } else {
-      document.body.style.overflow = "unset";
+      document.body.style.overflow = "";
     }
 
     return () => {
-      document.body.style.overflow = "unset";
+      document.body.style.overflow = "";
     };
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   const currentImageUrl = imageUrls[currentIndex];
   const hasImageError = imageErrors.has(currentIndex);
+  const hasMultipleImages = imageUrls.length > 1;
 
-  return (
+  const modalContent = (
     <div
-      className="fixed z-50 bg-black"
       style={{
+        position: 'fixed',
         top: 0,
         left: 0,
         right: 0,
         bottom: 0,
-        width: '100vw',
-        height: '100vh',
-        overflow: 'hidden'
+        zIndex: 9999,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '16px',
+        overflow: 'auto'
       }}
     >
-      {/* Header */}
+      {/* Backdrop */}
       <div
-        className="absolute left-0 right-0 z-20 bg-black/50 backdrop-blur-sm"
-        style={{ top: 0, height: '72px' }}
-      >
-        <div className="flex items-center justify-between p-4">
-          <button
-            onClick={onClose}
-            className="p-2 rounded-full hover:bg-white/10 transition-colors text-white"
-            aria-label="Close viewer"
-          >
-            <X className="w-6 h-6" />
-          </button>
-          <div className="text-white text-lg font-medium">
-            {currentIndex + 1} / {imageUrls.length}
-          </div>
-          <div className="w-10" /> {/* Spacer for centering */}
-        </div>
-      </div>
-
-      {/* Main image area - using viewport units */}
-      <div
-        className="absolute left-0 right-0 flex items-center justify-center p-4"
         style={{
-          top: '72px',
-          bottom: imageUrls.length > 1 ? '160px' : '0'
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: -1
+        }}
+        className="bg-black/80 backdrop-blur-sm"
+        onClick={onClose}
+      />
+
+      {/* Modal */}
+      <div
+        className={`relative rounded-2xl shadow-2xl overflow-hidden ${
+          isDarkMode ? "bg-gray-900" : "bg-white"
+        }`}
+        style={{
+          width: '100%',
+          maxWidth: "1152px",
+          maxHeight: "90vh",
+          zIndex: 1
         }}
       >
-        {/* Navigation arrows */}
-        {imageUrls.length > 1 && (
-          <>
-            <button
-              onClick={goToPrevious}
-              className="absolute left-4 top-1/2 -translate-y-1/2 z-10 p-3 rounded-full bg-black/50 hover:bg-black/70 transition-colors text-white"
-              aria-label="Previous image"
-            >
-              <ChevronLeft className="w-6 h-6" />
-            </button>
+        {/* Header */}
+        <div
+          className={`flex items-center justify-between px-5 py-2.5 border-b ${
+            isDarkMode ? "border-gray-700" : "border-gray-200"
+          }`}
+        >
+          <div
+            className={`text-sm font-medium ${
+              isDarkMode ? "text-white" : "text-gray-900"
+            }`}
+          >
+            {currentIndex + 1} / {imageUrls.length}
+          </div>
+          <button
+            onClick={onClose}
+            className={`p-1.5 rounded-lg transition-colors ${
+              isDarkMode
+                ? "hover:bg-gray-800 text-gray-400 hover:text-white"
+                : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
+            }`}
+            aria-label="Close viewer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
 
-            <button
-              onClick={goToNext}
-              className="absolute right-4 top-1/2 -translate-y-1/2 z-10 p-3 rounded-full bg-black/50 hover:bg-black/70 transition-colors text-white"
-              aria-label="Next image"
-            >
-              <ChevronRight className="w-6 h-6" />
-            </button>
-          </>
-        )}
+        {/* Main Image Area */}
+        <div
+          className={`relative flex items-center justify-center ${
+            isDarkMode ? "bg-gray-800" : "bg-gray-50"
+          }`}
+          style={{ height: "600px" }}
+        >
+          {/* Navigation Arrows */}
+          {hasMultipleImages && (
+            <>
+              <button
+                onClick={goToPrevious}
+                className={`absolute left-4 z-10 p-3 rounded-full transition-colors ${
+                  isDarkMode
+                    ? "bg-gray-700 hover:bg-gray-600 text-white"
+                    : "bg-white hover:bg-gray-100 text-gray-900 shadow-lg"
+                }`}
+                aria-label="Previous image"
+              >
+                <ChevronLeft className="w-6 h-6" />
+              </button>
 
-        {/* Current image */}
-        {!hasImageError ? (
-          <img
-            src={currentImageUrl}
-            alt={`Product image ${currentIndex + 1}`}
-            onError={() => handleImageError(currentIndex)}
-            style={{
-              maxWidth: '100%',
-              maxHeight: '100%',
-              width: 'auto',
-              height: 'auto',
-              objectFit: 'contain',
-              display: 'block'
-            }}
-          />
-        ) : (
-          <div className="w-96 h-96 flex items-center justify-center bg-gray-800 rounded-lg">
-            <div className="text-center text-white/60">
-              <div className="w-16 h-16 mx-auto mb-2 bg-gray-700 rounded-lg flex items-center justify-center">
-                <X className="w-8 h-8" />
+              <button
+                onClick={goToNext}
+                className={`absolute right-4 z-10 p-3 rounded-full transition-colors ${
+                  isDarkMode
+                    ? "bg-gray-700 hover:bg-gray-600 text-white"
+                    : "bg-white hover:bg-gray-100 text-gray-900 shadow-lg"
+                }`}
+                aria-label="Next image"
+              >
+                <ChevronRight className="w-6 h-6" />
+              </button>
+            </>
+          )}
+
+          {/* Current Image */}
+          {!hasImageError ? (
+            <div className="relative w-full h-full flex items-center justify-center p-4">
+              <img
+                src={currentImageUrl}
+                alt={`Product image ${currentIndex + 1}`}
+                onError={() => handleImageError(currentIndex)}
+                className="max-w-full max-h-full object-contain"
+              />
+            </div>
+          ) : (
+            <div
+              className={`flex items-center justify-center w-64 h-64 rounded-lg ${
+                isDarkMode ? "bg-gray-700" : "bg-gray-200"
+              }`}
+            >
+              <div
+                className={`text-center ${
+                  isDarkMode ? "text-gray-400" : "text-gray-500"
+                }`}
+              >
+                <div
+                  className={`w-16 h-16 mx-auto mb-2 rounded-lg flex items-center justify-center ${
+                    isDarkMode ? "bg-gray-600" : "bg-gray-300"
+                  }`}
+                >
+                  <X className="w-8 h-8" />
+                </div>
+                <p>Failed to load image</p>
               </div>
-              <p>Failed to load image</p>
+            </div>
+          )}
+        </div>
+
+        {/* Thumbnails */}
+        {hasMultipleImages && (
+          <div
+            className={`px-6 py-5 border-t ${
+              isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-white"
+            }`}
+            style={{ overflow: 'hidden' }}
+          >
+            <div
+              style={{
+                overflowX: 'auto',
+                overflowY: 'hidden',
+                scrollbarWidth: 'none',
+                msOverflowStyle: 'none',
+                WebkitOverflowScrolling: 'touch'
+              }}
+              className="[&::-webkit-scrollbar]:hidden"
+            >
+              <div className="flex gap-3 justify-center" style={{ padding: '2px' }}>
+                {imageUrls.map((url, index) => (
+                  <button
+                    key={index}
+                    onClick={() => goToIndex(index)}
+                    className={`flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all ${
+                      index === currentIndex
+                        ? "border-orange-500"
+                        : isDarkMode
+                        ? "border-gray-700 hover:border-gray-600"
+                        : "border-gray-300 hover:border-gray-400"
+                    }`}
+                    style={{
+                      width: "80px",
+                      height: "80px",
+                    }}
+                  >
+                    {!imageErrors.has(index) ? (
+                      <div className="relative w-full h-full">
+                        <Image
+                          src={url}
+                          alt={`Thumbnail ${index + 1}`}
+                          fill
+                          className="object-cover"
+                          onError={() => handleImageError(index)}
+                          sizes="80px"
+                        />
+                      </div>
+                    ) : (
+                      <div
+                        className={`w-full h-full flex items-center justify-center ${
+                          isDarkMode ? "bg-gray-700" : "bg-gray-200"
+                        }`}
+                      >
+                        <X
+                          className={`w-4 h-4 ${
+                            isDarkMode ? "text-gray-500" : "text-gray-400"
+                          }`}
+                        />
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}
       </div>
-
-      {/* Thumbnails */}
-      {imageUrls.length > 1 && (
-        <div className="absolute left-0 right-0 z-20 bg-black/50 backdrop-blur-sm" style={{ bottom: '30px', height: '140px' }}>
-          <div className="flex gap-2 p-4 overflow-x-auto scrollbar-hide">
-            <div className="flex gap-2 mx-auto">
-              {imageUrls.map((url, index) => (
-                <button
-                  key={index}
-                  onClick={() => goToIndex(index)}
-                  className={`relative w-18 h-18 rounded-lg overflow-hidden border-2 transition-all ${
-                    index === currentIndex
-                      ? "border-orange-500 scale-110"
-                      : "border-gray-600 hover:border-gray-400"
-                  }`}
-                >
-                  {!imageErrors.has(index) ? (
-                    <Image
-                      src={url}
-                      alt={`Thumbnail ${index + 1}`}
-                      width={72}
-                      height={72}
-                      className="w-full h-full object-cover"
-                      onError={() => handleImageError(index)}
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gray-800 flex items-center justify-center">
-                      <X className="w-4 h-4 text-white/40" />
-                    </div>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Click outside to close */}
-      <div
-        className="absolute inset-0 -z-10"
-        onClick={onClose}
-        aria-label="Close viewer"
-      />
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 };
 
 export default FullScreenImageViewer;

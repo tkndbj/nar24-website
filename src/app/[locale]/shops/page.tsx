@@ -20,9 +20,14 @@ import { db } from "../../../lib/firebase";
 import SecondHeader from "../../components/market_screen/SecondHeader";
 import ShopCard from "../../components/shops/ShopCard";
 import CreateShopButton from "../../components/shops/CreateShopButton";
-import SearchAndFilter from "../../components/shops/SearchAndFilter";
 import LoadingShopCard from "../../components/shops/LoadingShopCard";
 import AlgoliaServiceManager from "@/lib/algolia";
+import {
+  MagnifyingGlassIcon,
+  FunnelIcon,
+  XMarkIcon,
+} from "@heroicons/react/24/outline";
+import { AllInOneCategoryData } from "@/constants/productData";
 
 interface Shop {
   id: string;
@@ -40,6 +45,61 @@ interface Shop {
   isBoosted: boolean;
   createdAt: Timestamp;
 }
+
+// Get categories from productData
+const CATEGORIES = AllInOneCategoryData.kCategories.map((cat) => cat.key);
+
+// Helper function to get the translation key for any category
+const getCategoryTranslationKey = (category: string): string => {
+  switch (category) {
+    case "Women":
+      return "buyerCategoryWomen";
+    case "Men":
+      return "buyerCategoryMen";
+    case "Clothing & Fashion":
+      return "categoryClothingFashion";
+    case "Footwear":
+      return "categoryFootwear";
+    case "Accessories":
+      return "categoryAccessories";
+    case "Mother & Child":
+      return "categoryMotherChild";
+    case "Home & Furniture":
+      return "categoryHomeFurniture";
+    case "Beauty & Personal Care":
+      return "categoryBeautyPersonalCare";
+    case "Bags & Luggage":
+      return "categoryBagsLuggage";
+    case "Electronics":
+      return "categoryElectronics";
+    case "Sports & Outdoor":
+      return "categorySportsOutdoor";
+    case "Books, Stationery & Hobby":
+      return "categoryBooksStationeryHobby";
+    case "Tools & Hardware":
+      return "categoryToolsHardware";
+    case "Pet Supplies":
+      return "categoryPetSupplies";
+    case "Automotive":
+      return "categoryAutomotive";
+    case "Health & Wellness":
+      return "categoryHealthWellness";
+    case "Kids":
+      return "categoryMotherChild";
+    case "Beauty":
+      return "categoryBeautyPersonalCare";
+    case "Jewelry":
+      return "categoryAccessories";
+    case "Home & Garden":
+      return "categoryHomeFurniture";
+    case "Sports":
+      return "categorySportsOutdoor";
+    case "Books":
+      return "categoryBooksStationeryHobby";
+    default:
+      return category;
+  }
+};
 
 export default function ShopsPage() {
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -62,8 +122,10 @@ export default function ShopsPage() {
 
   // Track if we're actively filtering to show shimmer
   const [isFiltering, setIsFiltering] = useState(false);
+  const [isFilterExpanded, setIsFilterExpanded] = useState(false);
 
   const t = useTranslations("shops");
+  const tRoot = useTranslations();
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -473,8 +535,9 @@ export default function ShopsPage() {
 
   const handleCategoryFilter = (category: string | null) => {
     setIsFiltering(true);
+    setIsFilterExpanded(false);
     startTransition(() => {
-      setSelectedCategory(category);
+      setSelectedCategory(category === selectedCategory ? null : category);
     });
   };
 
@@ -509,21 +572,21 @@ export default function ShopsPage() {
         >
           <div className="max-w-7xl mx-auto px-4 py-8">
             <div className="text-center py-20">
-              <div className={`text-6xl mb-6 ${
+              <div className={`text-5xl mb-4 ${
                 isDarkMode ? "text-gray-600" : "text-gray-400"
               }`}>
                 ⚠️
               </div>
 
               <h3
-                className={`text-2xl font-semibold mb-4 ${
+                className={`text-xl font-semibold mb-3 ${
                   isDarkMode ? "text-white" : "text-gray-900"
                 }`}
               >
                 {t("errorLoading")}
               </h3>
               <p
-                className={`text-base mb-8 max-w-md mx-auto ${
+                className={`text-sm mb-6 max-w-md mx-auto ${
                   isDarkMode ? "text-gray-400" : "text-gray-600"
                 }`}
               >
@@ -531,7 +594,7 @@ export default function ShopsPage() {
               </p>
               <button
                 onClick={handleRefresh}
-                className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+                className={`px-5 py-2.5 rounded-lg font-medium transition-colors ${
                   isDarkMode
                     ? "bg-blue-600 hover:bg-blue-700 text-white"
                     : "bg-blue-600 hover:bg-blue-700 text-white"
@@ -553,65 +616,216 @@ export default function ShopsPage() {
         className={`min-h-screen ${
           isDarkMode ? "bg-gray-900" : "bg-gray-50"
         }`}
+        style={{
+          transform: 'translateZ(0)',
+          backfaceVisibility: 'hidden',
+          WebkitFontSmoothing: 'antialiased'
+        }}
       >
-        <div className="max-w-7xl mx-auto px-4 py-8">
-          {/* Header */}
-          <div className="mb-8">
-            {/* Title Section */}
-            <div className="text-center mb-8">
-              <h1
-                className={`text-3xl md:text-4xl font-bold mb-6 ${
-                  isDarkMode ? "text-white" : "text-gray-900"
-                }`}
-              >
-                {t("title")}
-              </h1>
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          {/* Compact Header Row */}
+          <div className="mb-5">
+            <div className="flex flex-col lg:flex-row lg:items-center gap-4 mb-4">
+              {/* Title and Create Button */}
+              <div className="flex items-center gap-3">
+                <h1
+                  className={`text-xl md:text-2xl font-semibold whitespace-nowrap ${
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  }`}
+                >
+                  {t("title")}
+                </h1>
+                <CreateShopButton />
+              </div>
+
+              {/* Search and Filter in Same Row */}
+              <div className="flex-1 flex items-center gap-3">
+                {/* Search Bar */}
+                <div className="relative flex-1">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <MagnifyingGlassIcon
+                      className={`h-4 w-4 ${
+                        isDarkMode ? "text-gray-400" : "text-gray-500"
+                      }`}
+                    />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder={t("searchShops")}
+                    value={searchTerm}
+                    onChange={(e) => handleSearch(e.target.value)}
+                    className={`w-full pl-9 pr-10 py-2 text-sm rounded-lg border transition-colors focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      isDarkMode
+                        ? "bg-gray-800 border-gray-700 text-white placeholder-gray-400"
+                        : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
+                    }`}
+                  />
+                  {searchTerm && (
+                    <button
+                      onClick={() => handleSearch("")}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    >
+                      <XMarkIcon
+                        className={`h-4 w-4 ${
+                          isDarkMode
+                            ? "text-gray-400 hover:text-gray-300"
+                            : "text-gray-500 hover:text-gray-700"
+                        }`}
+                      />
+                    </button>
+                  )}
+                </div>
+
+                {/* Filter Dropdown */}
+                <div className="relative">
+                  <button
+                    onClick={() => setIsFilterExpanded(!isFilterExpanded)}
+                    className={`flex items-center gap-2 px-3 py-2 text-sm rounded-lg border transition-colors whitespace-nowrap ${
+                      isDarkMode
+                        ? "bg-gray-800 border-gray-700 text-white hover:bg-gray-700"
+                        : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
+                    } ${selectedCategory ? "ring-2 ring-blue-500" : ""}`}
+                  >
+                    <FunnelIcon className="w-4 h-4" />
+                    {t("filter")}
+                    {selectedCategory && (
+                      <span className="ml-1 px-1.5 py-0.5 text-xs bg-blue-600 text-white rounded-full">
+                        1
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Filter Dropdown Menu */}
+                  {isFilterExpanded && (
+                    <>
+                      {/* Backdrop */}
+                      <div
+                        className="fixed inset-0 z-10"
+                        onClick={() => setIsFilterExpanded(false)}
+                      />
+
+                      {/* Dropdown */}
+                      <div
+                        className={`absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto rounded-lg border shadow-lg z-50 ${
+                          isDarkMode
+                            ? "bg-gray-800 border-gray-700"
+                            : "bg-white border-gray-200"
+                        }`}
+                      >
+                        <div className="p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <h3
+                              className={`font-semibold text-sm ${
+                                isDarkMode ? "text-white" : "text-gray-900"
+                              }`}
+                            >
+                              {t("categories")}
+                            </h3>
+                            {selectedCategory && (
+                              <button
+                                onClick={() => handleCategoryFilter(null)}
+                                className={`text-xs px-2 py-1 rounded transition-colors ${
+                                  isDarkMode
+                                    ? "text-gray-400 hover:text-white hover:bg-gray-700"
+                                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                                }`}
+                              >
+                                {t("clearFilters")}
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="space-y-1">
+                            {CATEGORIES.map((category) => (
+                              <button
+                                key={category}
+                                onClick={() => handleCategoryFilter(category)}
+                                className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                                  selectedCategory === category
+                                    ? "bg-blue-600 text-white"
+                                    : isDarkMode
+                                    ? "text-gray-300 hover:bg-gray-700"
+                                    : "text-gray-700 hover:bg-gray-100"
+                                }`}
+                              >
+                                {tRoot(getCategoryTranslationKey(category))}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
 
-            {/* Create Shop Button */}
-            <div className="flex justify-center mb-6">
-              <CreateShopButton />
-            </div>
+            {/* Active Filters Display */}
+            {(searchTerm.trim() || selectedCategory) && (
+              <div className="flex flex-wrap gap-2">
+                {searchTerm.trim() && (
+                  <div
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs ${
+                      isDarkMode
+                        ? "bg-blue-900/50 text-blue-300"
+                        : "bg-blue-100 text-blue-800"
+                    }`}
+                  >
+                    <span>&quot;{searchTerm}&quot;</span>
+                    <button
+                      onClick={() => handleSearch("")}
+                      className="ml-1 hover:opacity-70"
+                    >
+                      <XMarkIcon className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
 
-            {/* Search and Filter */}
-            <div className={`rounded-lg p-6 border ${
-              isDarkMode
-                ? "bg-gray-800 border-gray-700"
-                : "bg-white border-gray-200"
-            }`}>
-              <SearchAndFilter
-                onSearch={handleSearch}
-                onCategoryFilter={handleCategoryFilter}
-                selectedCategory={selectedCategory}
-                isDarkMode={isDarkMode}
-              />
-            </div>
+                {selectedCategory && (
+                  <div
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs ${
+                      isDarkMode
+                        ? "bg-green-900/50 text-green-300"
+                        : "bg-green-100 text-green-800"
+                    }`}
+                  >
+                    <span>{tRoot(getCategoryTranslationKey(selectedCategory))}</span>
+                    <button
+                      onClick={() => handleCategoryFilter(null)}
+                      className="ml-1 hover:opacity-70"
+                    >
+                      <XMarkIcon className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Shops Grid */}
           {(isLoading && shops.length === 0) || isSearching || isFiltering ? (
-            <div className={`grid ${getGridCols()} gap-6`}>
+            <div className={`grid ${getGridCols()} gap-4`}>
               {Array.from({ length: 8 }).map((_, index) => (
                 <LoadingShopCard key={index} isDarkMode={isDarkMode} />
               ))}
             </div>
           ) : displayedShops.length === 0 ? (
-            <div className="text-center py-20">
-              <div className={`text-6xl mb-6 ${
+            <div className="text-center py-16">
+              <div className={`text-5xl mb-4 ${
                 isDarkMode ? "text-gray-600" : "text-gray-400"
               }`}>
                 🏪
               </div>
 
               <h3
-                className={`text-2xl font-semibold mb-4 ${
+                className={`text-xl font-semibold mb-2 ${
                   isDarkMode ? "text-white" : "text-gray-900"
                 }`}
               >
                 {t("noShopsFound")}
               </h3>
               <p
-                className={`text-base max-w-md mx-auto ${
+                className={`text-sm max-w-md mx-auto ${
                   isDarkMode ? "text-gray-400" : "text-gray-600"
                 }`}
               >
@@ -624,19 +838,19 @@ export default function ShopsPage() {
             <>
               {/* Subtle loading indicator when filtering */}
               {isPending && (
-                <div className="flex justify-center mb-4">
-                  <div className={`px-4 py-2 rounded-lg ${
-                    isDarkMode ? "bg-gray-800 text-gray-300" : "bg-gray-100 text-gray-600"
+                <div className="flex justify-center mb-3">
+                  <div className={`px-3 py-2 rounded-lg text-sm ${
+                    isDarkMode ? "bg-gray-800 text-gray-400" : "bg-gray-100 text-gray-600"
                   }`}>
                     <div className="flex items-center gap-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
-                      <span className="text-sm">{t("loading")}</span>
+                      <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-blue-500 border-t-transparent"></div>
+                      <span>{t("loading")}</span>
                     </div>
                   </div>
                 </div>
               )}
 
-              <div className={`grid ${getGridCols()} gap-6 ${isPending ? 'opacity-70 transition-opacity duration-200' : ''}`}>
+              <div className={`grid ${getGridCols()} gap-4 ${isPending ? 'opacity-60 transition-opacity duration-200' : ''}`}>
                 {displayedShops.map((shop) => (
                   <ShopCard key={shop.id} shop={shop} isDarkMode={isDarkMode} />
                 ))}
@@ -644,9 +858,9 @@ export default function ShopsPage() {
 
               {/* Load More Trigger - only for Firebase pagination */}
               {!searchTerm.trim() && (
-                <div ref={loadMoreRef} className="mt-8">
+                <div ref={loadMoreRef} className="mt-6">
                   {isLoadingMore && (
-                    <div className={`grid ${getGridCols()} gap-6`}>
+                    <div className={`grid ${getGridCols()} gap-4`}>
                       {Array.from({ length: 4 }).map((_, index) => (
                         <LoadingShopCard key={`loading-${index}`} isDarkMode={isDarkMode} />
                       ))}
@@ -655,18 +869,6 @@ export default function ShopsPage() {
                 </div>
               )}
 
-              {/* End Message */}
-              {!hasMore && !searchTerm.trim() && shops.length > 0 && (
-                <div className="text-center py-12">
-                  <div className={`inline-flex items-center gap-2 px-6 py-3 rounded-lg ${
-                    isDarkMode
-                      ? "bg-gray-800 border border-gray-700 text-gray-300"
-                      : "bg-white border border-gray-200 text-gray-600"
-                  }`}>
-                    <span className="font-medium">{t("allShopsLoaded")}</span>
-                  </div>
-                </div>
-              )}
             </>
           )}
         </div>
