@@ -23,6 +23,7 @@ import { useUser } from "@/context/UserProvider";
 import ProductOptionSelector from "@/app/components/ProductOptionSelector";
 import { Product } from "@/app/models/Product";
 import { analyticsBatcher } from "@/app/utils/analyticsBatcher";
+import { useProductCache } from "@/context/ProductCacheProvider";
 
 interface ProductCardProps {
   product: Product;
@@ -360,6 +361,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
   localization,
 }) => {
   const router = useRouter();
+  const { setProduct } = useProductCache();
   const t = useTranslations();
 
   // Cart, favorites, and user hooks
@@ -436,28 +438,40 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
   const [lastNavigationTime, setLastNavigationTime] = useState<number>(0);
   const NAVIGATION_THROTTLE = 500;
 
-  // ✅ Handle card click with analytics tracking
+  useEffect(() => {
+    setProduct(product.id, product);
+  }, [product, setProduct]);
+
   const handleCardClick = useCallback(() => {
     const now = Date.now();
-
-    // Throttle rapid taps (same as Flutter)
+  
+    // Throttle rapid taps
     if (now - lastNavigationTime < NAVIGATION_THROTTLE) {
       return;
     }
-
+  
     setLastNavigationTime(now);
-
+  
     // Record click analytics
     analyticsBatcher.recordClick(product.id, product.shopId);
-
+  
+    // ✅ Cache is already set by useEffect above
+    // No need to do anything here!
+  
+    // ✅ Precache hero image
+    if (product.imageUrls.length > 0) {
+      const img = new window.Image();
+      img.src = product.imageUrls[0];
+    }
+  
+    // Navigate
     if (onTap) {
       onTap();
     } else {
-      // Navigate with slide transition
       router.push(`/productdetail/${product.id}`);
     }
-  }, [onTap, product.id, product.shopId, router, lastNavigationTime]);
-
+  }, [product, router, lastNavigationTime, onTap]);
+  
   // ✅ Check theme changes
   useEffect(() => {
     const checkTheme = () => {

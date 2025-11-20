@@ -15,13 +15,15 @@ import { PersonalizedRecommendationsProvider } from "@/context/PersonalizedRecom
 import { AppInitializer } from '@/app/components/AppInitializer';
 import { AnalyticsInitializer } from '@/app/components/AnalyticsInitializer'; // ✅ NEW
 import { db } from "@/lib/firebase";
+import { ProductCacheProvider } from '@/context/ProductCacheProvider';
 
 // Inner component that has access to user context
 function AppProviders({ children }: { children: React.ReactNode }) {
   const { user } = useUser();
 
   return (
-    <CartProvider user={user} db={db}>
+    <ProductCacheProvider>
+    <CartProvider user={user} db={db}>      
       <FavoritesProvider>
         <BadgeProvider>
           <SearchProvider>
@@ -37,6 +39,7 @@ function AppProviders({ children }: { children: React.ReactNode }) {
         </BadgeProvider>
       </FavoritesProvider>
     </CartProvider>
+    </ProductCacheProvider>
   );
 }
 

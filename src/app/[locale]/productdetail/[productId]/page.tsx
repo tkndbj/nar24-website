@@ -30,6 +30,7 @@ import ProductOptionSelector from "@/app/components/ProductOptionSelector";
 import { useCart } from "@/context/CartProvider";
 import { useUser } from "@/context/UserProvider";
 import { Product, ProductUtils } from "@/app/models/Product";
+import { useProductCache } from '@/context/ProductCacheProvider';
 
 // ✅ LAZY LOAD: Heavy components that aren't immediately visible
 const ProductCollectionWidget = lazy(
@@ -148,7 +149,65 @@ LoadingSkeleton.displayName = "LoadingSkeleton";
 const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   const router = useRouter();
   const localization = useTranslations();
-  const [productId, setProductId] = useState<string>("");
+  const { getProduct } = useProductCache();
+  const [productId, setProductId] = useState<string>("");  
+  const [error, setError] = useState<string | null>(null);
+  const [product, setProduct] = useState<Product | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  useEffect(() => {
+    params.then((resolvedParams) => {
+      setProductId(resolvedParams.productId);
+    });
+  }, [params]);
+
+  // ✅ Load from in-memory cache FIRST, then sessionStorage, then fetch
+  useEffect(() => {
+    if (!productId) return;
+
+    // ✅ PRIORITY 1: Check in-memory cache (INSTANT - like Flutter!)
+    const cachedProduct = getProduct(productId);
+    if (cachedProduct) {
+      console.log('✅ Loaded from in-memory cache (instant!)');
+      setProduct(cachedProduct);
+      setIsLoading(false);
+      
+      // Fetch fresh data in background
+      fetchFreshData(productId);
+      return;
+    }
+
+    // ✅ PRIORITY 2: Check sessionStorage (fast, but slower than memory)
+    const sessionCached = sessionStorage.getItem(`product_${productId}`);
+    const timestamp = sessionStorage.getItem(`product_${productId}_timestamp`);
+
+    if (sessionCached && timestamp) {
+      const age = Date.now() - parseInt(timestamp);
+      const MAX_AGE = 5 * 60 * 1000;
+
+      if (age < MAX_AGE) {
+        try {
+          console.log('✅ Loaded from sessionStorage');
+          const cachedProduct = JSON.parse(sessionCached);
+          const parsedProduct = ProductUtils.fromJson(cachedProduct);
+          setProduct(parsedProduct);
+          setIsLoading(false);
+
+          // Fetch fresh data in background
+          fetchFreshData(productId);
+          return;
+        } catch (e) {
+          console.error('Error parsing cached product:', e);
+        }
+      }
+    }
+
+    // ✅ PRIORITY 3: No cache - fetch from API
+    console.log('❌ No cache - fetching from API');
+    fetchProduct(productId);
+  }, [productId, getProduct]);
+
+
 
   // ✅ OPTIMIZED: Translation function with better caching
   const t = useCallback(
@@ -195,9 +254,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
   // UI states
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [product, setProduct] = useState<Product | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showFullScreenViewer, setShowFullScreenViewer] = useState(false);
   const [showVideoModal, setShowVideoModal] = useState(false);
@@ -213,6 +270,38 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
       setProductId(resolvedParams.productId);
     });
   }, [params]);
+
+  useEffect(() => {
+    if (!productId) return;
+
+    // Try to get from sessionStorage
+    const cached = sessionStorage.getItem(`product_${productId}`);
+    const timestamp = sessionStorage.getItem(`product_${productId}_timestamp`);
+
+    if (cached && timestamp) {
+      const age = Date.now() - parseInt(timestamp);
+      const MAX_AGE = 5 * 60 * 1000; // 5 minutes
+
+      if (age < MAX_AGE) {
+        try {
+          const cachedProduct = JSON.parse(cached);
+          const parsedProduct = ProductUtils.fromJson(cachedProduct);
+          setProduct(parsedProduct);
+          setIsLoading(false);
+
+          // ✅ Fetch fresh data in background
+          fetchFreshData(productId);
+          return;
+        } catch (e) {
+          console.error('Error parsing cached product:', e);
+        }
+      }
+    }
+
+    // No cache or expired - fetch normally
+    fetchProduct(productId);
+  }, [productId]);
+
 
   // ✅ OPTIMIZED: Dark mode detection with debouncing
   useEffect(() => {
@@ -277,45 +366,76 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     }
   }, [productId]);
 
-  // ✅ OPTIMIZED: Fetch product data with AbortController
-  useEffect(() => {
-    if (!productId) return;
-
+  const fetchProduct = useCallback(async (id: string) => {
     const abortController = new AbortController();
 
-    const fetchProduct = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
+    try {
+      setIsLoading(true);
+      setError(null);
 
-        const response = await fetch(`/api/products/${productId}`, {
-          signal: abortController.signal,
-        });
+      const response = await fetch(`/api/products/${id}`, {
+        signal: abortController.signal,
+      });
 
-        if (!response.ok) {
-          throw new Error(t("productNotFound"));
-        }
-
-        const productData = await response.json();
-        const parsedProduct = ProductUtils.fromJson(productData);
-        setProduct(parsedProduct);
-      } catch (err) {
-        if (err instanceof Error && err.name === "AbortError") {
-          return; // Request was cancelled, ignore
-        }
-        console.error("Error fetching product:", err);
-        setError(err instanceof Error ? err.message : t("failedToLoadProduct"));
-      } finally {
-        setIsLoading(false);
+      if (!response.ok) {
+        throw new Error(t("productNotFound"));
       }
-    };
 
-    fetchProduct();
+      const productData = await response.json();
+      const parsedProduct = ProductUtils.fromJson(productData);
+      setProduct(parsedProduct);
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
+        return;
+      }
+      console.error("Error fetching product:", err);
+      setError(err instanceof Error ? err.message : t("failedToLoadProduct"));
+    } finally {
+      setIsLoading(false);
+    }
 
     return () => {
       abortController.abort();
     };
-  }, [productId, t]);
+  }, [t]);
+
+  const fetchFreshData = useCallback(async (id: string) => {
+    try {
+      const response = await fetch(`/api/products/${id}`);
+      
+      if (response.ok) {
+        const productData = await response.json();
+        const freshProduct = ProductUtils.fromJson(productData);
+        
+        // Update if data changed
+        setProduct(prevProduct => {
+          if (!prevProduct) return freshProduct;
+          
+          // Compare prices, stock, etc. - update if different
+          if (
+            prevProduct.price !== freshProduct.price ||
+            prevProduct.quantity !== freshProduct.quantity
+          ) {
+            return freshProduct;
+          }
+          
+          return prevProduct;
+        });
+
+        // Update cache
+        sessionStorage.setItem(
+          `product_${id}`, 
+          JSON.stringify(productData)
+        );
+        sessionStorage.setItem(
+          `product_${id}_timestamp`, 
+          Date.now().toString()
+        );
+      }
+    } catch (error) {
+      console.error('Error fetching fresh data:', error);
+    }
+  }, []);
 
   // Image error handling
   const handleImageError = useCallback((index: number) => {
