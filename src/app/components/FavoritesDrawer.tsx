@@ -14,7 +14,6 @@ import {
   ShoppingBag,
   RefreshCw,
   Search,
-  Share2,
   CheckCircle,
   Circle,
   ArrowRight,
@@ -549,18 +548,13 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
             <div className="flex items-center space-x-2">
               <button
                 onClick={() => {
-                  /* TODO: Implement share */
+                  onClose();
+                  router.push("/login");
                 }}
-                className={`
-                  p-2 rounded-full transition-colors duration-200
-                  ${
-                    isDarkMode
-                      ? "hover:bg-gray-800 text-gray-400 hover:text-white"
-                      : "hover:bg-gray-100 text-gray-500 hover:text-gray-700"
-                  }
-                `}
+                className="flex items-center space-x-2 px-6 py-3 rounded-full bg-gradient-to-r from-orange-500 to-pink-500 text-white hover:from-orange-600 hover:to-pink-600 transition-all duration-200 shadow-lg hover:shadow-xl active:scale-95"
               >
-                <Share2 size={20} />
+                <LogIn size={18} />
+                <span className="font-medium">{t("login")}</span>
               </button>
 
               <button
