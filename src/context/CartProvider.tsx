@@ -816,6 +816,35 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   // ========================================================================
   // ADD TO CART - Matching Flutter implementation
   // ========================================================================
+  const cleanFirestoreData = (obj: unknown): unknown => {
+    if (obj === null) {
+      return null; // null is valid in Firestore
+    }
+
+    if (obj === undefined) {
+      return undefined; // Will be filtered out
+    }
+
+    if (Array.isArray(obj)) {
+      return obj
+        .map((item) => cleanFirestoreData(item))
+        .filter((item) => item !== undefined);
+    }
+
+    if (typeof obj === "object" && obj !== null) {
+      const cleaned: Record<string, unknown> = {};
+      Object.entries(obj as Record<string, unknown>).forEach(([key, value]) => {
+        const cleanedValue = cleanFirestoreData(value);
+        // Only include if not undefined
+        if (cleanedValue !== undefined) {
+          cleaned[key] = cleanedValue;
+        }
+      });
+      return cleaned;
+    }
+
+    return obj;
+  };
 
   const buildProductDataForCart = useCallback(
     (
@@ -830,15 +859,13 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           typeof bundlePrice === "number" ? bundlePrice : undefined;
       }
 
-      // ✅ Build the data object with potential undefined values
+      // Build base data (always present fields)
       const data: Record<string, unknown> = {
         productId: product.id,
         productName: product.productName,
         description: product.description,
         unitPrice: product.price,
         currency: product.currency,
-        originalPrice: product.originalPrice,
-        discountPercentage: product.discountPercentage,
         condition: product.condition,
         brandModel: product.brandModel,
         category: product.category,
@@ -846,41 +873,99 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         subsubcategory: product.subsubcategory,
         allImages: product.imageUrls,
         productImage: product.imageUrls.length > 0 ? product.imageUrls[0] : "",
-        colorImages: product.colorImages,
-        videoUrl: product.videoUrl,
         availableStock: product.quantity,
-        colorQuantities: product.colorQuantities,
-        availableColors: product.availableColors,
         averageRating: product.averageRating,
         reviewCount: product.reviewCount,
-        maxQuantity: product.maxQuantity,
-        discountThreshold: product.discountThreshold,
-        bulkDiscountPercentage: product.bulkDiscountPercentage,
-        bundleIds: product.bundleIds,
-        bundleData: product.bundleData,
         sellerId: product.userId,
         sellerName: product.sellerName,
         isShop: product.shopId != null,
-        shopId: product.shopId,
         ilanNo: product.ilanNo,
         createdAt: product.createdAt,
         deliveryOption: product.deliveryOption,
-        selectedColor,
-        attributes,
-        // Cached values for validation
         cachedPrice: product.price,
-        cachedDiscountPercentage: product.discountPercentage,
-        cachedDiscountThreshold: product.discountThreshold,
-        cachedBundlePrice: extractedBundlePrice,
-        cachedBulkDiscountPercentage: product.bulkDiscountPercentage,
-        cachedMaxQuantity: product.maxQuantity,
       };
 
-      // ✅ CRITICAL FIX: Remove undefined values before returning
-      // Firestore rejects undefined but accepts null
-      return Object.fromEntries(
-        Object.entries(data).filter(([value]) => value !== undefined)
-      );
+      // Add optional fields only if they exist
+      if (
+        product.originalPrice !== undefined &&
+        product.originalPrice !== null
+      ) {
+        data.originalPrice = product.originalPrice;
+      }
+
+      if (
+        product.discountPercentage !== undefined &&
+        product.discountPercentage !== null
+      ) {
+        data.discountPercentage = product.discountPercentage;
+        data.cachedDiscountPercentage = product.discountPercentage;
+      }
+
+      if (product.colorImages && Object.keys(product.colorImages).length > 0) {
+        data.colorImages = product.colorImages;
+      }
+
+      if (product.videoUrl) {
+        data.videoUrl = product.videoUrl;
+      }
+
+      if (
+        product.colorQuantities &&
+        Object.keys(product.colorQuantities).length > 0
+      ) {
+        data.colorQuantities = product.colorQuantities;
+      }
+
+      if (product.availableColors && product.availableColors.length > 0) {
+        data.availableColors = product.availableColors;
+      }
+
+      if (product.maxQuantity !== undefined && product.maxQuantity !== null) {
+        data.maxQuantity = product.maxQuantity;
+        data.cachedMaxQuantity = product.maxQuantity;
+      }
+
+      if (
+        product.discountThreshold !== undefined &&
+        product.discountThreshold !== null
+      ) {
+        data.discountThreshold = product.discountThreshold;
+        data.cachedDiscountThreshold = product.discountThreshold;
+      }
+
+      if (
+        product.bulkDiscountPercentage !== undefined &&
+        product.bulkDiscountPercentage !== null
+      ) {
+        data.bulkDiscountPercentage = product.bulkDiscountPercentage;
+        data.cachedBulkDiscountPercentage = product.bulkDiscountPercentage;
+      }
+
+      if (product.bundleIds && product.bundleIds.length > 0) {
+        data.bundleIds = product.bundleIds;
+      }
+
+      if (product.bundleData && product.bundleData.length > 0) {
+        data.bundleData = product.bundleData;
+      }
+
+      if (extractedBundlePrice !== undefined) {
+        data.cachedBundlePrice = extractedBundlePrice;
+      }
+
+      if (product.shopId) {
+        data.shopId = product.shopId;
+      }
+
+      if (selectedColor) {
+        data.selectedColor = selectedColor;
+      }
+
+      if (attributes && Object.keys(attributes).length > 0) {
+        data.attributes = attributes;
+      }
+
+      return data;
     },
     []
   );
@@ -988,25 +1073,31 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         return "Please wait before adding again";
       }
 
-      const productData = buildProductDataForCart(
-        product,
-        selectedColor,
-        attributes
-      );
-
       try {
-        // Optimistic update
+        const productData = buildProductDataForCart(
+          product,
+          selectedColor,
+          attributes
+        );
+
+        // ✅ Clean any nested undefined values (defense in depth)
+        const cleanedProductData = cleanFirestoreData(productData) as Record<
+          string,
+          unknown
+        >;
+
+        // Optimistic update (use original data for UI)
         applyOptimisticAdd(product.id, productData, quantity);
 
-        // Write to Firestore
+        // Write to Firestore (use cleaned data)
         await setDoc(doc(db, "users", user.uid, "cart", product.id), {
-          ...productData,
+          ...cleanedProductData,
           quantity,
           addedAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
 
-        // ✅ ADD METRICS LOGGING (NEW)
+        // ✅ Metrics logging
         const shopId = await getProductShopId(product.id);
         metricsEventService.logCartAdded({
           productId: product.id,
@@ -1035,7 +1126,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       applyOptimisticAdd,
       rollbackOptimisticUpdate,
       backgroundRefreshTotals,
-      getProductShopId, // ✅ ADD THIS DEPENDENCY
+      getProductShopId,
     ]
   );
 
