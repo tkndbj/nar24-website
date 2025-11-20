@@ -83,9 +83,23 @@ const FullScreenImageViewer: React.FC<FullScreenImageViewerProps> = ({
   const hasImageError = imageErrors.has(currentIndex);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black">
+    <div
+      className="fixed z-50 bg-black"
+      style={{
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: '100vw',
+        height: '100vh',
+        overflow: 'hidden'
+      }}
+    >
       {/* Header */}
-      <div className="absolute top-0 left-0 right-0 z-10 bg-black/50 backdrop-blur-sm">
+      <div
+        className="absolute left-0 right-0 z-20 bg-black/50 backdrop-blur-sm"
+        style={{ top: 0, height: '72px' }}
+      >
         <div className="flex items-center justify-between p-4">
           <button
             onClick={onClose}
@@ -101,8 +115,14 @@ const FullScreenImageViewer: React.FC<FullScreenImageViewerProps> = ({
         </div>
       </div>
 
-      {/* Main image area */}
-      <div className="relative w-full h-full flex items-center justify-center pt-16 pb-24">
+      {/* Main image area - using viewport units */}
+      <div
+        className="absolute left-0 right-0 flex items-center justify-center p-4"
+        style={{
+          top: '72px',
+          bottom: imageUrls.length > 1 ? '160px' : '0'
+        }}
+      >
         {/* Navigation arrows */}
         {imageUrls.length > 1 && (
           <>
@@ -125,35 +145,35 @@ const FullScreenImageViewer: React.FC<FullScreenImageViewerProps> = ({
         )}
 
         {/* Current image */}
-        <div className="relative w-full h-full flex items-center justify-center px-4">
-          {!hasImageError ? (
-            <div className="relative w-full h-full max-w-5xl max-h-full">
-              <Image
-                src={currentImageUrl}
-                alt={`Product image ${currentIndex + 1}`}
-                fill
-                className="object-contain"
-                onError={() => handleImageError(currentIndex)}
-                priority
-                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 70vw"
-              />
-            </div>
-          ) : (
-            <div className="w-96 h-96 flex items-center justify-center bg-gray-800 rounded-lg">
-              <div className="text-center text-white/60">
-                <div className="w-16 h-16 mx-auto mb-2 bg-gray-700 rounded-lg flex items-center justify-center">
-                  <X className="w-8 h-8" />
-                </div>
-                <p>Failed to load image</p>
+        {!hasImageError ? (
+          <img
+            src={currentImageUrl}
+            alt={`Product image ${currentIndex + 1}`}
+            onError={() => handleImageError(currentIndex)}
+            style={{
+              maxWidth: '100%',
+              maxHeight: '100%',
+              width: 'auto',
+              height: 'auto',
+              objectFit: 'contain',
+              display: 'block'
+            }}
+          />
+        ) : (
+          <div className="w-96 h-96 flex items-center justify-center bg-gray-800 rounded-lg">
+            <div className="text-center text-white/60">
+              <div className="w-16 h-16 mx-auto mb-2 bg-gray-700 rounded-lg flex items-center justify-center">
+                <X className="w-8 h-8" />
               </div>
+              <p>Failed to load image</p>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Thumbnails */}
       {imageUrls.length > 1 && (
-        <div className="absolute bottom-0 left-0 right-0 bg-black/50 backdrop-blur-sm">
+        <div className="absolute left-0 right-0 z-20 bg-black/50 backdrop-blur-sm" style={{ bottom: '30px', height: '140px' }}>
           <div className="flex gap-2 p-4 overflow-x-auto scrollbar-hide">
             <div className="flex gap-2 mx-auto">
               {imageUrls.map((url, index) => (

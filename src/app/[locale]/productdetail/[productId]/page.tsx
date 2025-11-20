@@ -29,6 +29,7 @@ import ProductDetailSellerInfo from "../../../components/product_detail/SellerIn
 import ProductOptionSelector from "@/app/components/ProductOptionSelector";
 import { useCart } from "@/context/CartProvider";
 import { useUser } from "@/context/UserProvider";
+import { useFavorites } from "@/context/FavoritesProvider";
 import { Product, ProductUtils } from "@/app/models/Product";
 import { useProductCache } from "@/context/ProductCacheProvider";
 
@@ -154,6 +155,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   const [error, setError] = useState<string | null>(null);
   const [product, setProduct] = useState<Product | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [localCartState, setLocalCartState] = useState<boolean | null>(null);
+  const [isPending, setIsPending] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -235,6 +238,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     cartItems, // ✅ ADD THIS
   } = useCart();
   const { user } = useUser();
+  const { addToFavorites, removeMultipleFromFavorites, isFavorite } =
+    useFavorites();
 
   // Animation states
   const [cartButtonState, setCartButtonState] = useState<
@@ -250,7 +255,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showFullScreenViewer, setShowFullScreenViewer] = useState(false);
   const [showVideoModal, setShowVideoModal] = useState(false);
-  const [isFavorite, setIsFavorite] = useState(false);
   const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
 
   // ✅ NEW: Track if user has scrolled down to lazy load components
@@ -439,105 +443,28 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     }
   }, [product, t]);
 
-  // ✅ OPTIMIZED: Favorite toggle with optimistic update
+  // ✅ OPTIMIZED: Favorite toggle with FavoritesProvider
   const handleToggleFavorite = useCallback(async () => {
     if (!product?.id) return;
+    if (!user) {
+      router.push("/login");
+      return;
+    }
 
-    // Optimistic update
-    setIsFavorite((prev) => !prev);
+    const isCurrentlyFavorite = isFavorite(product.id);
 
     try {
-      const response = await fetch("/api/favorites/toggle", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          productId: product.id,
-        }),
-      });
-
-      if (!response.ok) {
-        // Revert on failure
-        setIsFavorite((prev) => !prev);
+      if (isCurrentlyFavorite) {
+        // Remove from favorites
+        await removeMultipleFromFavorites([product.id]);
+      } else {
+        // Add to favorites
+        await addToFavorites(product.id);
       }
     } catch (error) {
       console.error("Error toggling favorite:", error);
-      // Revert on error
-      setIsFavorite((prev) => !prev);
     }
-  }, [product?.id]);
-
-  const performCartAddition = useCallback(
-    async (selectedOptions?: { quantity?: number; [key: string]: unknown }) => {
-      if (!product) return;
-
-      try {
-        setCartButtonState("adding");
-
-        let quantityToAdd = 1;
-        const attributesToAdd: Record<string, unknown> = {};
-
-        if (selectedOptions) {
-          if (typeof selectedOptions.quantity === "number") {
-            quantityToAdd = selectedOptions.quantity;
-          }
-
-          // Copy all attributes EXCEPT quantity
-          Object.entries(selectedOptions).forEach(([key, value]) => {
-            if (key !== "quantity") {
-              attributesToAdd[key] = value;
-            }
-          });
-        }
-
-        // ✅ FIX: Extract selectedColor separately
-        const selectedColor = attributesToAdd.selectedColor as
-          | string
-          | undefined;
-        delete attributesToAdd.selectedColor;
-
-        // ✅ FIX: Use addProductToCart (not addToCart)
-        const result = await addProductToCart(
-          product,
-          quantityToAdd,
-          selectedColor,
-          attributesToAdd
-        );
-
-        if (result.includes("Added") || result.includes("cart")) {
-          setCartButtonState("added");
-          setTimeout(() => setCartButtonState("idle"), 1500);
-        } else {
-          setCartButtonState("idle");
-        }
-      } catch (error) {
-        console.error("Error adding to cart:", error);
-        setCartButtonState("idle");
-      }
-    },
-    [product, addProductToCart]
-  );
-
-  const performCartRemoval = useCallback(async () => {
-    if (!product) return;
-
-    try {
-      setCartButtonState("removing");
-
-      const result = await removeFromCart(product.id);
-
-      if (result.includes("Removed")) {
-        setCartButtonState("removed");
-        setTimeout(() => setCartButtonState("idle"), 1500);
-      } else {
-        setCartButtonState("idle");
-      }
-    } catch (error) {
-      console.error("Error removing from cart:", error);
-      setCartButtonState("idle");
-    }
-  }, [product, removeFromCart]);
+  }, [product?.id, user, router, isFavorite, addToFavorites, removeMultipleFromFavorites]);
 
   const handleAddToCart = useCallback(
     async (selectedOptions?: { quantity?: number; [key: string]: unknown }) => {
@@ -548,36 +475,126 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
       if (!product) return;
 
-      const productInCart = cartProductIds.has(product.id); // ✅ Use directly
+      // Prevent double-taps
+      if (isPending) return;
 
-      if (productInCart) {
-        await performCartRemoval();
-        return;
-      }
+      const productInCart = cartProductIds.has(product.id);
+      const isAdding = !productInCart;
 
-      if (!productInCart && hasSelectableOptions(product) && !selectedOptions) {
+      // ✅ STEP 1: Handle options modal FIRST (if needed and no options provided)
+      if (isAdding && hasSelectableOptions(product) && !selectedOptions) {
         setShowCartOptionSelector(true);
-        return;
+        return; // Modal will call this function again with options
       }
 
-      await performCartAddition(selectedOptions);
+      try {
+        // ✅ STEP 2: INSTANT visual update (like Flutter)
+        setLocalCartState(isAdding);
+        setIsPending(true);
+        setCartButtonState(isAdding ? "adding" : "removing");
+
+        // ✅ STEP 3: Haptic feedback
+        if (isAdding && navigator.vibrate) {
+          navigator.vibrate(10);
+        }
+
+        // ✅ STEP 4: Perform background operation
+        let result: string;
+
+        if (isAdding) {
+          // Adding to cart
+          let quantityToAdd = 1;
+          const attributesToAdd: Record<string, unknown> = {};
+
+          if (selectedOptions) {
+            if (typeof selectedOptions.quantity === "number") {
+              quantityToAdd = selectedOptions.quantity;
+            }
+
+            // Copy all attributes EXCEPT quantity
+            Object.entries(selectedOptions).forEach(([key, value]) => {
+              if (key !== "quantity") {
+                attributesToAdd[key] = value;
+              }
+            });
+          }
+
+          // Extract selectedColor separately
+          const selectedColor = attributesToAdd.selectedColor as
+            | string
+            | undefined;
+          delete attributesToAdd.selectedColor;
+
+          result = await addProductToCart(
+            product,
+            quantityToAdd,
+            selectedColor,
+            Object.keys(attributesToAdd).length > 0
+              ? attributesToAdd
+              : undefined
+          );
+        } else {
+          // Removing from cart
+          result = await removeFromCart(product.id);
+        }
+
+        // ✅ STEP 5: Handle result
+        if (
+          !result.includes("Added") &&
+          !result.includes("Removed") &&
+          !result.includes("cart")
+        ) {
+          // Operation failed - revert optimistic update
+          setLocalCartState(null);
+          setCartButtonState("idle");
+
+          console.error("Cart operation failed:", result);
+
+          // Show error toast (optional)
+          if (result === "Please log in first") {
+            router.push("/login");
+          }
+        } else {
+          // Success!
+          setCartButtonState(isAdding ? "added" : "removed");
+
+          // Auto-reset after animation
+          setTimeout(() => {
+            setLocalCartState(null);
+            setCartButtonState("idle");
+          }, 1500);
+        }
+      } catch (error) {
+        console.error("Cart operation error:", error);
+
+        // Revert on error
+        setLocalCartState(null);
+        setCartButtonState("idle");
+      } finally {
+        // Release pending lock after short delay
+        setTimeout(() => {
+          setIsPending(false);
+        }, 300);
+      }
     },
     [
       user,
       product,
       cartProductIds,
+      isPending,
       router,
-      performCartRemoval,
-      performCartAddition,
-    ] // ✅ FIXED
+      addProductToCart,
+      removeFromCart,
+    ]
   );
 
   const handleCartOptionSelectorConfirm = useCallback(
     async (selectedOptions: { quantity?: number; [key: string]: unknown }) => {
       setShowCartOptionSelector(false);
-      await performCartAddition(selectedOptions);
+      // ✅ Pass the selected options to handleAddToCart
+      await handleAddToCart(selectedOptions);
     },
-    [performCartAddition]
+    [handleAddToCart] // ✅ Fixed dependency
   );
 
   const handleCartOptionSelectorClose = useCallback(() => {
@@ -612,7 +629,11 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         text: t("addToCart"),
       };
 
-    const productInCart = isInCart(product.id);
+    // ✅ Use local state for instant feedback, fallback to actual state
+    const actualInCart = isInCart(product.id);
+    const productInCart =
+      localCartState !== null ? localCartState : actualInCart;
+
     const isOptimisticAdd = isOptimisticallyAdding(product.id);
     const isOptimisticRemove = isOptimisticallyRemoving(product.id);
 
@@ -661,6 +682,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     };
   }, [
     product,
+    localCartState, // ✅ ADD THIS
     isInCart,
     isOptimisticallyAdding,
     isOptimisticallyRemoving,
@@ -671,23 +693,18 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   useEffect(() => {
     if (!product) return;
 
-    const isOptimisticAdd = isOptimisticallyAdding(product.id);
-    const isOptimisticRemove = isOptimisticallyRemoving(product.id);
+    const actualInCart = isInCart(product.id);
 
+    // Sync local state with actual state when they match
     if (
-      (cartButtonState === "adding" || cartButtonState === "removing") &&
-      !isOptimisticAdd &&
-      !isOptimisticRemove
+      localCartState !== null &&
+      localCartState === actualInCart &&
+      !isPending
     ) {
-      setCartButtonState("idle");
+      // State is synced, clear local state
+      setLocalCartState(null);
     }
-  }, [
-    product?.id,
-    isInCart,
-    isOptimisticallyAdding,
-    isOptimisticallyRemoving,
-    cartButtonState,
-  ]);
+  }, [product?.id, localCartState, isInCart, isPending]);
 
   if (isLoading) {
     return <LoadingSkeleton isDarkMode={isDarkMode} />;
@@ -728,6 +745,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
   const productInCart = isInCart(product.id);
   const isProcessing =
+    isPending ||
     cartButtonState === "adding" ||
     cartButtonState === "removing" ||
     isOptimisticallyAdding(product.id) ||
@@ -735,9 +753,13 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
   return (
     <div
-      className={`min-h-screen overflow-x-hidden ${
+      className={`min-h-screen ${
         isDarkMode ? "bg-gray-900" : "bg-gray-50"
       }`}
+      style={{
+        transform: 'translateZ(0)',
+        backfaceVisibility: 'hidden',
+      }}
     >
       {/* Header */}
       <div
@@ -771,7 +793,9 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               >
                 <Heart
                   className={`w-5 h-5 ${
-                    isFavorite ? "fill-red-500 text-red-500" : ""
+                    product && isFavorite(product.id)
+                      ? "fill-red-500 text-red-500"
+                      : ""
                   }`}
                 />
               </button>
@@ -859,9 +883,9 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
             {/* Thumbnail Images */}
             {product.imageUrls.length > 1 && (
-              <div className="relative overflow-hidden">
+              <div className="relative">
                 <div
-                  className="flex gap-2 sm:gap-3 overflow-x-auto pb-2 scrollbar-hide"
+                  className="flex gap-2 sm:gap-3 overflow-x-auto py-2 px-1 scrollbar-hide"
                   style={{ WebkitOverflowScrolling: "touch" }}
                 >
                   {product.imageUrls.map((url, index) => (
@@ -927,7 +951,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               product={product}
               onShare={handleShare}
               onToggleFavorite={handleToggleFavorite}
-              isFavorite={isFavorite}
+              isFavorite={isFavorite(product.id)}
               isDarkMode={isDarkMode}
               localization={localization}
             />
