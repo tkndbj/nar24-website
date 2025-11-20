@@ -19,10 +19,11 @@ export interface Product {
   availableColors: string[];
   gender?: string;
   bundleIds: string[];
-  bundlePrice?: number;
+  bundleData?: Array<Record<string, unknown>>; // ✅ ADDED: Matches Flutter's List<Map<String, dynamic>>?
   maxQuantity?: number;
-  userId: string;
   discountThreshold?: number;
+  bulkDiscountPercentage?: number; // ✅ ADDED: Was missing
+  userId: string;
   rankingScore: number;
   promotionScore: number;
   campaign?: string;
@@ -57,9 +58,9 @@ export interface Product {
   colorImages: Record<string, string[]>;
   videoUrl?: string;
   attributes: Record<string, unknown>;
-  relatedProductIds?: string[];
-  relatedLastUpdated?: Date;   // When Cloud Function last updated related products
-  relatedCount?: number;  
+  relatedProductIds: string[];
+  relatedLastUpdated?: Date;
+  relatedCount: number;
   // Add reference property for Firestore document reference
   reference?: {
     id: string;
@@ -85,7 +86,7 @@ type ApiData = Record<string, unknown>;
 
 // Utility class for Product operations
 export class ProductUtils {
-  // Safe parsing helpers
+  // Safe parsing helpers - Matching Flutter implementation
   static safeDouble(value: unknown, defaultValue: number = 0): number {
     if (value == null) return defaultValue;
     if (typeof value === "number") return value;
@@ -132,6 +133,24 @@ export class ProductUtils {
       }
     });
     return result;
+  }
+
+  // ✅ ADDED: Safe bundle data parser matching Flutter's _safeBundleData
+  static safeBundleData(value: unknown): Array<Record<string, unknown>> | undefined {
+    if (value == null) return undefined;
+    if (!Array.isArray(value)) return undefined;
+
+    try {
+      return value.map((item) => {
+        if (item && typeof item === "object" && !Array.isArray(item)) {
+          return item as Record<string, unknown>;
+        }
+        return {};
+      });
+    } catch (error) {
+      console.error("Error parsing bundleData:", error);
+      return undefined;
+    }
   }
 
   static safeDate(value: unknown): Date {
@@ -207,7 +226,7 @@ export class ProductUtils {
     return undefined;
   }
 
-  // Factory method to create Product from API response
+  // Factory method to create Product from API response - Matching Flutter's fromJson
   static fromJson(json: ApiData): Product {
     const attributes = ProductUtils.safeAttributes(json.attributes);
 
@@ -239,10 +258,8 @@ export class ProductUtils {
       reviewCount: ProductUtils.safeInt(json.reviewCount),
       gender: ProductUtils.safeStringNullable(json.gender),
       bundleIds: ProductUtils.safeStringArray(json.bundleIds),
-      bundlePrice:
-        json.bundlePrice != null
-          ? ProductUtils.safeDouble(json.bundlePrice)
-          : undefined,
+      // ✅ FIXED: Use safeBundleData instead of simple undefined check
+      bundleData: ProductUtils.safeBundleData(json.bundleData),
       originalPrice:
         json.originalPrice != null
           ? ProductUtils.safeDouble(json.originalPrice)
@@ -255,9 +272,18 @@ export class ProductUtils {
       boostClickCountAtStart: ProductUtils.safeInt(json.boostClickCountAtStart),
       availableColors: ProductUtils.safeStringArray(json.availableColors),
       userId: ProductUtils.safeString(json.userId),
+      maxQuantity:
+        json.maxQuantity != null
+          ? ProductUtils.safeInt(json.maxQuantity)
+          : undefined,
       discountThreshold:
         json.discountThreshold != null
           ? ProductUtils.safeInt(json.discountThreshold)
+          : undefined,
+      // ✅ ADDED: bulkDiscountPercentage (was missing)
+      bulkDiscountPercentage:
+        json.bulkDiscountPercentage != null
+          ? ProductUtils.safeInt(json.bulkDiscountPercentage)
           : undefined,
       rankingScore: ProductUtils.safeDouble(json.rankingScore),
       promotionScore: ProductUtils.safeDouble(json.promotionScore),
@@ -271,6 +297,11 @@ export class ProductUtils {
       subcategory: ProductUtils.safeString(json.subcategory),
       subsubcategory: ProductUtils.safeString(json.subsubcategory),
       quantity: ProductUtils.safeInt(json.quantity),
+      // ✅ FIXED: relatedProductIds should default to empty array, not undefined
+      relatedProductIds: ProductUtils.safeStringArray(json.relatedProductIds),
+      relatedLastUpdated: ProductUtils.safeDateNullable(json.relatedLastUpdated),
+      // ✅ FIXED: relatedCount should default to 0, not undefined
+      relatedCount: ProductUtils.safeInt(json.relatedCount),
       bestSellerRank:
         json.bestSellerRank != null
           ? ProductUtils.safeInt(json.bestSellerRank)
@@ -302,13 +333,10 @@ export class ProductUtils {
       videoUrl: ProductUtils.safeStringNullable(json.videoUrl),
       attributes,
       reference: ProductUtils.safeReference(json.reference),
-      relatedProductIds: ProductUtils.safeStringArray(json.relatedProductIds),
-      relatedLastUpdated: ProductUtils.safeDateNullable(json.relatedLastUpdated),
-      relatedCount: json.relatedCount != null ? ProductUtils.safeInt(json.relatedCount) : undefined,
     };
   }
 
-  // Convert Product to JSON for API calls
+  // Convert Product to JSON for API calls - Matching Flutter's toJson
   static toJson(product: Product): Record<string, unknown> {
     const json: Record<string, unknown> = {
       id: product.id,
@@ -324,10 +352,14 @@ export class ProductUtils {
       originalPrice: product.originalPrice,
       discountPercentage: product.discountPercentage,
       discountThreshold: product.discountThreshold,
+      maxQuantity: product.maxQuantity,
+      // ✅ ADDED: bulkDiscountPercentage
+      bulkDiscountPercentage: product.bulkDiscountPercentage,
       boostClickCountAtStart: product.boostClickCountAtStart,
       userId: product.userId,
       bundleIds: product.bundleIds,
-      bundlePrice: product.bundlePrice,
+      // ✅ ADDED: bundleData
+      bundleData: product.bundleData,
       ownerId: product.ownerId,
       shopId: product.shopId,
       ilan_no: product.ilanNo,
@@ -358,6 +390,7 @@ export class ProductUtils {
       lastClickDate: product.lastClickDate?.getTime(),
       paused: product.paused,
       promotionScore: product.promotionScore,
+      rankingScore: product.rankingScore,
       campaign: product.campaign,
       campaignName: product.campaignName,
       colorImages: product.colorImages,
@@ -366,10 +399,10 @@ export class ProductUtils {
       reference: product.reference,
       relatedProductIds: product.relatedProductIds,
       relatedLastUpdated: product.relatedLastUpdated?.getTime(),
-    relatedCount: product.relatedCount,
+      relatedCount: product.relatedCount,
     };
 
-    // Remove null/undefined values
+    // Remove null/undefined values (matching Flutter's removeWhere)
     Object.keys(json).forEach((key) => {
       if (json[key] == null) {
         delete json[key];
@@ -379,13 +412,12 @@ export class ProductUtils {
     return json;
   }
 
-  // Factory method for Algolia data
+  // Factory method for Algolia data - Matching Flutter's fromAlgolia
   static fromAlgolia(json: ApiData): Product {
-    // Algolia uses objectID instead of id
     // Extract and normalize the ID
     let normalizedId = String(json.objectID ?? json.id ?? "");
 
-    // Remove common Algolia prefixes
+    // Remove common Algolia prefixes (matching Flutter implementation)
     if (normalizedId.startsWith("products_")) {
       normalizedId = normalizedId.substring("products_".length);
     } else if (normalizedId.startsWith("shop_products_")) {
@@ -396,10 +428,11 @@ export class ProductUtils {
       ...json,
       id: normalizedId,
     };
+
     return ProductUtils.fromJson(modifiedJson);
   }
 
-  // Create Product with copyWith functionality
+  // Create Product with copyWith functionality - Matching Flutter's copyWith
   static copyWith(
     product: Product,
     updates: Partial<Product> & {
@@ -425,5 +458,82 @@ export class ProductUtils {
         ? undefined
         : otherUpdates.discountPercentage ?? product.discountPercentage,
     };
+  }
+
+  // ✅ ADDED: toMap method for Firestore serialization (matching Flutter)
+  static toMap(product: Product): Record<string, unknown> {
+    const map: Record<string, unknown> = {
+      productName: product.productName,
+      description: product.description,
+      price: product.price,
+      currency: product.currency,
+      condition: product.condition,
+      brandModel: product.brandModel,
+      imageUrls: product.imageUrls,
+      averageRating: product.averageRating,
+      reviewCount: product.reviewCount,
+      originalPrice: product.originalPrice,
+      discountPercentage: product.discountPercentage,
+      colorQuantities: product.colorQuantities,
+      bundleIds: product.bundleIds,
+      bundleData: product.bundleData,
+      maxQuantity: product.maxQuantity,
+      boostClickCountAtStart: product.boostClickCountAtStart,
+      availableColors: product.availableColors,
+      userId: product.userId,
+      discountThreshold: product.discountThreshold,
+      bulkDiscountPercentage: product.bulkDiscountPercentage,
+      rankingScore: product.rankingScore,
+      promotionScore: product.promotionScore,
+      campaign: product.campaign,
+      ownerId: product.ownerId,
+      shopId: product.shopId,
+      ilan_no: product.ilanNo,
+      gender: product.gender,
+      createdAt: product.createdAt,
+      sellerName: product.sellerName,
+      category: product.category,
+      subcategory: product.subcategory,
+      subsubcategory: product.subsubcategory,
+      quantity: product.quantity,
+      bestSellerRank: product.bestSellerRank,
+      sold: product.sold,
+      clickCount: product.clickCount,
+      clickCountAtStart: product.clickCountAtStart,
+      favoritesCount: product.favoritesCount,
+      cartCount: product.cartCount,
+      purchaseCount: product.purchaseCount,
+      deliveryOption: product.deliveryOption,
+      boostedImpressionCount: product.boostedImpressionCount,
+      boostImpressionCountAtStart: product.boostImpressionCountAtStart,
+      isFeatured: product.isFeatured,
+      isTrending: product.isTrending,
+      isBoosted: product.isBoosted,
+      boostStartTime: product.boostStartTime,
+      boostEndTime: product.boostEndTime,
+      dailyClickCount: product.dailyClickCount,
+      lastClickDate: product.lastClickDate,
+      paused: product.paused,
+      campaignName: product.campaignName,
+      colorImages: product.colorImages,
+      videoUrl: product.videoUrl,
+      relatedProductIds: product.relatedProductIds,
+      relatedLastUpdated: product.relatedLastUpdated,
+      relatedCount: product.relatedCount,
+    };
+
+    // Add attributes if not empty
+    if (product.attributes && Object.keys(product.attributes).length > 0) {
+      map.attributes = product.attributes;
+    }
+
+    // Remove null/undefined values
+    Object.keys(map).forEach((key) => {
+      if (map[key] == null) {
+        delete map[key];
+      }
+    });
+
+    return map;
   }
 }

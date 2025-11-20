@@ -1,3 +1,6 @@
+// context/FavoritesProvider.tsx - REFACTORED v3.0 (Production Grade + Simplified)
+// Matches Flutter favorite_product_provider.dart exactly
+
 "use client";
 
 import React, {
@@ -19,24 +22,27 @@ import {
   increment,
   query,
   where,
-  limit,
-  QuerySnapshot,
-  runTransaction,
-  getDoc,
+  limit as firestoreLimit,
   getDocs,
+  getDoc,
   Timestamp,
-  DocumentReference,
-  FieldValue,
-  deleteDoc,
+  DocumentSnapshot,
   addDoc,
+  deleteDoc,
+  Unsubscribe,
+  FieldValue,
+  orderBy,
+  startAfter as firestoreStartAfter,
 } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
 import { useUser } from "./UserProvider";
-import { requestDeduplicator } from "@/app/utils/requestDeduplicator";
-import { cacheManager } from "@/app/utils/cacheManager";
-import { circuitBreaker, CIRCUITS } from "@/app/utils/circuitBreaker";
-// Types
+import redisService from "@/services/redis_service";
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
 interface FavoriteBasket {
   id: string;
   name: string;
@@ -44,64 +50,83 @@ interface FavoriteBasket {
 }
 
 interface FavoriteAttributes {
-  [key: string]: unknown; // Allow any attribute dynamically
+  quantity?: number;
+  selectedColor?: string;
+  selectedColorImage?: string;
+  [key: string]: unknown;
 }
 
-interface ProductDocumentData {
+interface ProductData {
+  id: string;
   shopId?: string;
   ownerId?: string;
-  shopName?: string;
-  sellerName?: string;
-  brandModel?: string;
-  ownerName?: string;
-  favoritesCount?: number;
-  metricsUpdatedAt?: Timestamp | FieldValue;
   productName?: string;
+  brandModel?: string;
   price?: number;
   currency?: string;
   imageUrls?: string[];
   colorImages?: Record<string, string[]>;
   averageRating?: number;
-  attributes?: Record<string, unknown>; // 🚀 NEW: Product attributes
+  originalPrice?: number;
+  discountPercentage?: number;
+  attributes?: Record<string, unknown>;
+  favoritesCount?: number;
+}
+
+interface PaginatedFavorite {
+  product: ProductData;
+  attributes: FavoriteAttributes;
+  productId: string;
 }
 
 interface FavoritesContextType {
-  // State
-  favoriteProductIds: Set<string>;
-  allFavoriteProductIds: Set<string>;
+  // Reactive state (like ValueNotifiers in Flutter)
+  favoriteIds: Set<string>;
   favoriteCount: number;
-  selectedBasketId: string | null;
-  favoriteBaskets: FavoriteBasket[];
+  paginatedFavorites: PaginatedFavorite[];
   isLoading: boolean;
+  selectedBasketId: string | null;
+  hasMoreData: boolean;
+  isLoadingMore: boolean;
+  isInitialLoadComplete: boolean;
+  favoriteBaskets: FavoriteBasket[];
 
   // Methods
   addToFavorites: (
     productId: string,
-    attributes?: FavoriteAttributes // 🚀 Now supports any dynamic attributes
+    attributes?: FavoriteAttributes
   ) => Promise<string>;
-  removeFromFavorites: (productId: string) => Promise<string>;
-  removeGloballyFromFavorites: (productId: string) => Promise<string>;
   removeMultipleFromFavorites: (productIds: string[]) => Promise<string>;
+  removeGloballyFromFavorites: (productId: string) => Promise<string>;
 
   // Basket management
   createFavoriteBasket: (name: string) => Promise<string>;
   deleteFavoriteBasket: (basketId: string) => Promise<string>;
   setSelectedBasket: (basketId: string | null) => void;
-  transferFavoritesToBasket: (
-    productIds: string[],
-    basketId: string
+  transferToBasket: (
+    productId: string,
+    targetBasketId: string | null
   ) => Promise<string>;
-  moveFavoritesFromBasketToDefault: (productIds: string[]) => Promise<string>;
 
-  // Utility methods
+  // Pagination
+  loadNextPage: (limit?: number) => Promise<{
+    docs: DocumentSnapshot[];
+    hasMore: boolean;
+    productIds?: Set<string>;
+    error?: string | null;
+  }>;
+  resetPagination: () => void;
+  shouldReloadFavorites: (basketId: string | null) => boolean;
+
+  // Real-time listeners
+  enableLiveUpdates: () => void;
+  disableLiveUpdates: () => void;
+
+  // Utilities
   isFavorite: (productId: string) => boolean;
   isGloballyFavorited: (productId: string) => boolean;
   isFavoritedInBasket: (productId: string) => Promise<boolean>;
   getBasketNameForProduct: (productId: string) => Promise<string | null>;
-
-  // Toast notifications
-  showSuccessToast: (message: string) => void;
-  showErrorToast: (message: string) => void;
 }
 
 const FavoritesContext = createContext<FavoritesContextType | undefined>(
@@ -110,17 +135,87 @@ const FavoritesContext = createContext<FavoritesContextType | undefined>(
 
 export const useFavorites = (): FavoritesContextType => {
   const context = useContext(FavoritesContext);
-  if (context === undefined) {
-    throw new Error("useFavorites must be used within a FavoritesProvider");
+  if (!context) {
+    throw new Error("useFavorites must be used within FavoritesProvider");
   }
   return context;
 };
 
-// Constants
-const BATCH_SIZE = 50;
+// ============================================================================
+// RATE LIMITER (Prevents spam)
+// ============================================================================
+
+class RateLimiter {
+  private lastOperations: Map<string, number> = new Map();
+  private cooldown: number;
+
+  constructor(cooldownMs: number) {
+    this.cooldown = cooldownMs;
+  }
+
+  canProceed(operationKey: string): boolean {
+    const lastTime = this.lastOperations.get(operationKey);
+    const now = Date.now();
+
+    if (!lastTime) {
+      this.lastOperations.set(operationKey, now);
+      return true;
+    }
+
+    const elapsed = now - lastTime;
+    if (elapsed >= this.cooldown) {
+      this.lastOperations.set(operationKey, now);
+      return true;
+    }
+    return false;
+  }
+}
+
+// ============================================================================
+// CIRCUIT BREAKER (Fault tolerance)
+// ============================================================================
+
+class CircuitBreaker {
+  private failureCount = 0;
+  private lastFailureTime: number | null = null;
+  private readonly threshold = 5;
+  private readonly resetDuration = 60000; // 1 minute
+
+  get isOpen(): boolean {
+    if (this.failureCount >= this.threshold) {
+      if (
+        this.lastFailureTime &&
+        Date.now() - this.lastFailureTime > this.resetDuration
+      ) {
+        this.failureCount = 0;
+        return false;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  recordFailure(): void {
+    this.failureCount++;
+    this.lastFailureTime = Date.now();
+  }
+
+  recordSuccess(): void {
+    this.failureCount = 0;
+  }
+}
+
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
 const FIRESTORE_IN_LIMIT = 10;
 const MAX_BASKETS = 10;
-const DEBOUNCE_DELAY = 500;
+const MAX_PAGINATED_CACHE = 200;
+
+// ============================================================================
+// FAVORITES PROVIDER
+// ============================================================================
 
 interface FavoritesProviderProps {
   children: ReactNode;
@@ -131,217 +226,986 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 }) => {
   const { user } = useUser();
 
-  // State
-  const [favoriteProductIds, setFavoriteProductIds] = useState<Set<string>>(
-    new Set()
-  );
-  const [allFavoriteProductIds, setAllFavoriteProductIds] = useState<
-    Set<string>
-  >(new Set());
+  // Rate limiters
+  const addFavoriteLimiter = useRef(new RateLimiter(300));
+  const removeFavoriteLimiter = useRef(new RateLimiter(200));
+
+  // Circuit breaker
+  const circuitBreaker = useRef(new CircuitBreaker());
+
+  // Reactive state (like ValueNotifiers)
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [favoriteCount, setFavoriteCount] = useState(0);
+  const [paginatedFavorites, setPaginatedFavorites] = useState<
+    PaginatedFavorite[]
+  >([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [selectedBasketId, setSelectedBasketIdState] = useState<string | null>(
     null
   );
+  const [hasMoreData, setHasMoreData] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isInitialLoadComplete, setIsInitialLoadComplete] = useState(false);
   const [favoriteBaskets, setFavoriteBaskets] = useState<FavoriteBasket[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
 
-  // Refs for optimization
-  const basketFavoriteCacheRef = useRef<Record<string, boolean>>({});
-  const basketNameCacheRef = useRef<Record<string, string | null>>({});
-  const lastCacheUpdateRef = useRef<Date | null>(null);
-  const removeFavoriteTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const selectedBasketIdRef = useRef<string | null>(null); // Fix circular dependency
-  const basketDeletionTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Internal state
+  const [allFavoriteIds] = useState<Set<string>>(new Set());
+  const lastDocument = useRef<DocumentSnapshot | null>(null);
+  const paginatedFavoritesMap = useRef<Map<string, PaginatedFavorite>>(
+    new Map()
+  );
+  const currentBasketId = useRef<string | null>(null);
+  const selectedBasketIdRef = useRef<string | null>(null);
 
-  // Subscription cleanup
-  const unsubscribeFavoritesRef = useRef<(() => void) | null>(null);
-  const unsubscribeGlobalFavoritesRef = useRef<(() => void) | null>(null);
-  const unsubscribeBasketsRef = useRef<(() => void) | null>(null);
+  // Firestore listeners
+  const favoriteSubscription = useRef<Unsubscribe | null>(null);
+  const globalFavoriteSubscription = useRef<Unsubscribe | null>(null);
+  const basketsSubscription = useRef<Unsubscribe | null>(null);
+  const authSubscription = useRef<Unsubscribe | null>(null);
 
-  // Utility function to chunk arrays
-  const chunkArray = useCallback(<T,>(array: T[], size: number): T[][] => {
-    const chunks: T[][] = [];
-    for (let i = 0; i < array.length; i += size) {
-      chunks.push(array.slice(i, i + size));
-    }
-    return chunks;
+  // Timers
+  const removeFavoriteTimer = useRef<NodeJS.Timeout | null>(null);
+  const cleanupTimer = useRef<NodeJS.Timeout | null>(null);
+
+  // Concurrency control
+  const favoriteLocks = useRef<Map<string, Promise<string>>>(new Map());
+  const pendingFetches = useRef<Map<string, Promise<void>>>(new Map());
+
+  // ========================================================================
+  // UTILITY FUNCTIONS
+  // ========================================================================
+
+  const isSystemField = useCallback((key: string): boolean => {
+    return [
+      "addedAt",
+      "productId",
+      "quantity",
+      "selectedColor",
+      "selectedColorImage",
+    ].includes(key);
   }, []);
 
-  // Clear user data on logout
-  const clearUserData = useCallback(() => {
-    setFavoriteProductIds(new Set());
-    setAllFavoriteProductIds(new Set());
-    setFavoriteCount(0);
-    setSelectedBasketIdState(null);
-    selectedBasketIdRef.current = null; // Keep ref in sync
-    setFavoriteBaskets([]);
-    setIsLoading(false);
-
-    basketFavoriteCacheRef.current = {};
-    basketNameCacheRef.current = {};
-    lastCacheUpdateRef.current = null;
-
-    // Clear timers
-    if (removeFavoriteTimerRef.current) {
-      clearTimeout(removeFavoriteTimerRef.current);
-      removeFavoriteTimerRef.current = null;
-    }
-    if (basketDeletionTimerRef.current) {
-      clearTimeout(basketDeletionTimerRef.current);
-      basketDeletionTimerRef.current = null;
-    }
+  const showSuccessToast = useCallback((message: string) => {
+    console.log("✅", message);
+    // TODO: Implement toast notification
   }, []);
 
-  // Get product document reference with circuit breaker protection
+  const showErrorToast = useCallback((message: string) => {
+    console.error("❌", message);
+    // TODO: Implement toast notification
+  }, []);
+
+  const showDebouncedRemoveToast = useCallback(() => {
+    if (removeFavoriteTimer.current) {
+      clearTimeout(removeFavoriteTimer.current);
+    }
+    removeFavoriteTimer.current = setTimeout(() => {
+      showSuccessToast("Removed from favorites");
+    }, 500);
+  }, [showSuccessToast]);
+
+  // ========================================================================
+  // PRODUCT DOCUMENT HELPERS
+  // ========================================================================
+
   const getProductDocument = useCallback(
-    async (productId: string): Promise<DocumentReference | null> => {
+    async (productId: string): Promise<DocumentSnapshot | null> => {
       try {
-        const productsDoc = doc(db, "products", productId);
-        // Wrap with circuit breaker for resilience
-        const productsSnapshot = await circuitBreaker.execute(
-          CIRCUITS.FIREBASE_PRODUCTS,
-          () => getDoc(productsDoc),
-          async () =>
-            ({
-              exists: () => false,
-              data: () => undefined,
-            } as unknown as Awaited<ReturnType<typeof getDoc>>)
+        const productsDoc = await getDoc(doc(db, "products", productId));
+        if (productsDoc.exists()) return productsDoc;
+
+        const shopProductsDoc = await getDoc(
+          doc(db, "shop_products", productId)
         );
-
-        if (productsSnapshot.exists()) {
-          return productsDoc;
-        }
-
-        const shopProductsDoc = doc(db, "shop_products", productId);
-        // Wrap with circuit breaker for resilience
-        const shopSnapshot = await circuitBreaker.execute(
-          CIRCUITS.FIREBASE_SHOP_PRODUCTS,
-          () => getDoc(shopProductsDoc),
-          async () =>
-            ({
-              exists: () => false,
-              data: () => undefined,
-            } as unknown as Awaited<ReturnType<typeof getDoc>>)
-        );
-
-        if (shopSnapshot.exists()) {
-          return shopProductsDoc;
-        }
+        if (shopProductsDoc.exists()) return shopProductsDoc;
 
         return null;
       } catch (error) {
-        if (process.env.NODE_ENV === "development") {
-          console.error("Error finding product document:", error);
-        }
+        console.error("Error finding product document:", error);
         return null;
       }
     },
     []
   );
 
-  // Subscribe to current basket favorites
-  const subscribeToFavorites = useCallback(
-    (userId: string) => {
-      if (unsubscribeFavoritesRef.current) {
-        unsubscribeFavoritesRef.current();
+  // ========================================================================
+  // INITIALIZATION & DATA LOADING
+  // ========================================================================
+
+  const loadFavoriteIds = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      const basketId = selectedBasketIdRef.current;
+
+      // Try Redis cache first
+      const cached = await redisService.getCachedFavoriteIds(
+        user.uid,
+        basketId
+      );
+
+      if (cached) {
+        console.log("⚡ Favorites cache hit:", cached.size, "items");
+        setFavoriteIds(cached);
+        setFavoriteCount(cached.size);
+        return;
       }
 
-      // Use ref instead of state to avoid circular dependency
-      const basketId = selectedBasketIdRef.current;
-      const favCollection = basketId
-        ? collection(
-            db,
-            "users",
-            userId,
-            "favorite_baskets",
-            basketId,
-            "favorites"
-          )
-        : collection(db, "users", userId, "favorites");
+      // Fetch from Firestore
+      const collectionPath = basketId
+        ? `users/${user.uid}/favorite_baskets/${basketId}/favorites`
+        : `users/${user.uid}/favorites`;
 
-      unsubscribeFavoritesRef.current = onSnapshot(
-        favCollection,
-        (snapshot) => {
-          const ids = new Set<string>();
-          snapshot.docs.forEach((doc) => {
-            const data = doc.data();
-            if (data.productId) {
-              ids.add(data.productId);
-            }
-          });
+      const snapshot = await getDocs(collection(db, collectionPath));
 
-          setFavoriteProductIds(ids);
-          setFavoriteCount(ids.size);
-        },
-        (error) => {
-          if (process.env.NODE_ENV === "development") {
-            console.error("Favorites subscription error:", error);
-          }
+      const ids = new Set<string>();
+      snapshot.docs.forEach((doc) => {
+        const data = doc.data();
+        if (data.productId) {
+          ids.add(data.productId as string);
         }
-      );
+      });
+
+      setFavoriteIds(ids);
+      setFavoriteCount(ids.size);
+
+      // Cache in Redis
+      await redisService.cacheFavoriteIds(user.uid, ids, basketId);
+    } catch (error) {
+      console.error("❌ Load favorites error:", error);
+    }
+  }, [user]);
+
+  const initializeIfNeeded = useCallback(async () => {
+    if (!user) return;
+
+    // Request coalescing
+    if (pendingFetches.current.has("init")) {
+      console.log("⏳ Already initializing, waiting...");
+      await pendingFetches.current.get("init");
+      return;
+    }
+
+    const promise = (async () => {
+      try {
+        await loadFavoriteIds();
+        enableLiveUpdates();
+      } catch (error) {
+        console.error("❌ Init error:", error);
+      }
+    })();
+
+    pendingFetches.current.set("init", promise);
+    await promise;
+    pendingFetches.current.delete("init");
+  }, [user, loadFavoriteIds]);
+
+  // ========================================================================
+  // REAL-TIME LISTENERS
+  // ========================================================================
+
+  const enableLiveUpdates = useCallback(() => {
+    if (!user) return;
+
+    if (favoriteSubscription.current) {
+      favoriteSubscription.current();
+    }
+
+    console.log("🔴 Enabling real-time favorites listener");
+
+    const basketId = selectedBasketIdRef.current;
+    const collectionPath = basketId
+      ? `users/${user.uid}/favorite_baskets/${basketId}/favorites`
+      : `users/${user.uid}/favorites`;
+
+    favoriteSubscription.current = onSnapshot(
+      collection(db, collectionPath),
+      (snapshot) => {
+        if (snapshot.metadata.fromCache) {
+          console.log("⏭️ Skipping cache event");
+          return;
+        }
+
+        console.log(
+          "🔥 Real-time update:",
+          snapshot.docChanges().length,
+          "changes"
+        );
+
+        const ids = new Set<string>();
+        snapshot.docs.forEach((doc) => {
+          const data = doc.data();
+          if (data.productId) {
+            ids.add(data.productId as string);
+          }
+        });
+
+        setFavoriteIds(ids);
+        setFavoriteCount(ids.size);
+
+        // Invalidate Redis cache
+        if (user) {
+          redisService.invalidateFavorites(user.uid);
+        }
+      },
+      (error) => console.error("❌ Listener error:", error)
+    );
+  }, [user]);
+
+  const disableLiveUpdates = useCallback(() => {
+    console.log("🔴 Disabling favorites listener");
+    if (favoriteSubscription.current) {
+      favoriteSubscription.current();
+      favoriteSubscription.current = null;
+    }
+  }, []);
+
+  // ========================================================================
+  // ADD/REMOVE FAVORITES
+  // ========================================================================
+
+  const addToFavorites = useCallback(
+    async (
+      productId: string,
+      attributes: FavoriteAttributes = {}
+    ): Promise<string> => {
+      if (!user) return "Please log in";
+
+      // Rate limiting
+      if (!addFavoriteLimiter.current.canProceed(`add_${productId}`)) {
+        console.log("⏱️ Rate limit: Please wait before adding again");
+        return "Please wait";
+      }
+
+      // Concurrency control
+      if (favoriteLocks.current.has(productId)) {
+        console.log("⏳ Operation already in progress for", productId);
+        await favoriteLocks.current.get(productId);
+        return "Operation in progress";
+      }
+
+      // Circuit breaker
+      if (circuitBreaker.current.isOpen) {
+        console.log("⚠️ Circuit breaker open - rejecting operation");
+        showErrorToast("Service temporarily unavailable");
+        return "Service temporarily unavailable";
+      }
+
+      const lockPromise = (async () => {
+        const basketId = selectedBasketIdRef.current;
+        const collectionPath = basketId
+          ? `users/${user.uid}/favorite_baskets/${basketId}/favorites`
+          : `users/${user.uid}/favorites`;
+
+        // Store previous state for rollback
+        const wasFavorited = favoriteIds.has(productId);
+        let isRemoving = false;
+
+        try {
+          // Check if already exists
+          const existingSnap = await getDocs(
+            query(
+              collection(db, collectionPath),
+              where("productId", "==", productId),
+              firestoreLimit(1)
+            )
+          );
+          isRemoving = existingSnap.docs.length > 0;
+
+          if (isRemoving) {
+            // STEP 1: Optimistic removal
+            const newIds = new Set(favoriteIds);
+            newIds.delete(productId);
+            setFavoriteIds(newIds);
+            setFavoriteCount(newIds.size);
+
+            // Remove from pagination cache
+            paginatedFavoritesMap.current.delete(productId);
+            setPaginatedFavorites(
+              Array.from(paginatedFavoritesMap.current.values())
+            );
+
+            // STEP 2: Delete from Firestore
+            await deleteDoc(existingSnap.docs[0].ref);
+
+            // STEP 3: Update product counter
+            const productDoc = await getProductDocument(productId);
+            if (productDoc) {
+              const batch = writeBatch(db);
+              batch.update(productDoc.ref, {
+                favoritesCount: increment(-1),
+                metricsUpdatedAt: serverTimestamp(),
+              });
+              await batch.commit();
+            }
+
+            // STEP 4: Invalidate cache
+            await redisService.invalidateFavorites(user.uid);
+
+            circuitBreaker.current.recordSuccess();
+            showDebouncedRemoveToast();
+            return "Removed from favorites";
+          } else {
+            // STEP 1: Optimistic add
+            const newIds = new Set(favoriteIds);
+            newIds.add(productId);
+            setFavoriteIds(newIds);
+            setFavoriteCount(newIds.size);
+
+            // STEP 2: Add to Firestore
+            const favoriteData: Record<string, unknown> = {
+              productId,
+              addedAt: serverTimestamp(),
+              quantity: attributes.quantity || 1,
+            };
+
+            if (attributes.selectedColor) {
+              favoriteData.selectedColor = attributes.selectedColor;
+              if (attributes.selectedColorImage) {
+                favoriteData.selectedColorImage = attributes.selectedColorImage;
+              }
+            }
+
+            // Add additional attributes
+            Object.entries(attributes).forEach(([k, v]) => {
+              if (!isSystemField(k) && v !== undefined && v !== null) {
+                favoriteData[k] = v;
+              }
+            });
+
+            await addDoc(collection(db, collectionPath), favoriteData);
+
+            // STEP 3: Update product counter
+            const productDoc = await getProductDocument(productId);
+            if (productDoc) {
+              const batch = writeBatch(db);
+              batch.update(productDoc.ref, {
+                favoritesCount: increment(1),
+                metricsUpdatedAt: serverTimestamp(),
+              });
+              await batch.commit();
+            }
+
+            // STEP 4: Invalidate cache
+            await redisService.invalidateFavorites(user.uid);
+
+            circuitBreaker.current.recordSuccess();
+            showSuccessToast("Added to favorites");
+            return "Added to favorites";
+          }
+        } catch (error) {
+          console.error("❌ Favorite operation error:", error);
+          circuitBreaker.current.recordFailure();
+
+          // Rollback
+          if (wasFavorited) {
+            const newIds = new Set(favoriteIds);
+            newIds.add(productId);
+            setFavoriteIds(newIds);
+          } else {
+            const newIds = new Set(favoriteIds);
+            newIds.delete(productId);
+            setFavoriteIds(newIds);
+            paginatedFavoritesMap.current.delete(productId);
+            setPaginatedFavorites(
+              Array.from(paginatedFavoritesMap.current.values())
+            );
+          }
+          setFavoriteCount(favoriteIds.size);
+
+          showErrorToast("Failed to update favorites");
+          return "Failed to update favorites";
+        }
+      })();
+
+      favoriteLocks.current.set(productId, lockPromise);
+      const result = await lockPromise;
+      favoriteLocks.current.delete(productId);
+
+      return result;
     },
-    [] // Remove selectedBasketId dependency to fix circular dependency
+    [
+      user,
+      favoriteIds,
+      getProductDocument,
+      isSystemField,
+      showSuccessToast,
+      showErrorToast,
+      showDebouncedRemoveToast,
+    ]
   );
 
-  // Subscribe to all favorites (global)
-  const subscribeToGlobalFavorites = useCallback((userId: string) => {
-    if (unsubscribeGlobalFavoritesRef.current) {
-      unsubscribeGlobalFavoritesRef.current();
-    }
+  const removeMultipleFromFavorites = useCallback(
+    async (productIds: string[]): Promise<string> => {
+      if (!user) return "Please log in";
+      if (productIds.length === 0) return "No products selected";
 
-    // Subscribe to default favorites
-    const defaultFavoritesRef = collection(db, "users", userId, "favorites");
-    const defaultUnsubscribe = onSnapshot(defaultFavoritesRef, () => {
-      // Trigger global favorites recalculation
-      loadAllFavorites(userId);
-    });
-
-    // Subscribe to basket changes to recalculate global favorites
-    const basketsRef = collection(db, "users", userId, "favorite_baskets");
-    const basketsUnsubscribe = onSnapshot(basketsRef, () => {
-      loadAllFavorites(userId);
-    });
-
-    unsubscribeGlobalFavoritesRef.current = () => {
-      defaultUnsubscribe();
-      basketsUnsubscribe();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // loadAllFavorites intentionally omitted to avoid circular dependency
-
-  const updateShopMetricsSafely = async (
-    shopId: string,
-    metricField: string
-  ): Promise<void> => {
-    try {
-      await writeBatch(db)
-        .update(doc(db, "shops", shopId), {
-          [`metrics.${metricField}`]: increment(1),
-          "metrics.lastUpdated": serverTimestamp(),
-        })
-        .commit();
-    } catch (error) {
-      // Silently fail - metrics are non-critical
-      if (process.env.NODE_ENV === "development") {
-        console.error(`Metrics update failed for shop ${shopId}:`, error);
+      // Rate limiting
+      if (!removeFavoriteLimiter.current.canProceed("batch_remove")) {
+        return "Please wait";
       }
-    }
-  };
 
-  // Subscribe to favorite baskets
-  const subscribeToBaskets = useCallback((userId: string) => {
-    if (unsubscribeBasketsRef.current) {
-      unsubscribeBasketsRef.current();
+      const previousIds = new Set(favoriteIds);
+
+      try {
+        // Optimistic removal
+        const newIds = new Set(favoriteIds);
+        productIds.forEach((id) => newIds.delete(id));
+        setFavoriteIds(newIds);
+        setFavoriteCount(newIds.size);
+
+        // Remove from pagination cache
+        productIds.forEach((id) => paginatedFavoritesMap.current.delete(id));
+        setPaginatedFavorites(
+          Array.from(paginatedFavoritesMap.current.values())
+        );
+
+        // Batch delete from Firestore
+        const basketId = selectedBasketIdRef.current;
+        const collectionPath = basketId
+          ? `users/${user.uid}/favorite_baskets/${basketId}/favorites`
+          : `users/${user.uid}/favorites`;
+
+        const batchSize = 50;
+        for (let i = 0; i < productIds.length; i += batchSize) {
+          const chunk = productIds.slice(i, i + batchSize);
+          await removeMultipleBatch(chunk, collectionPath);
+        }
+
+        // Invalidate cache
+        await redisService.invalidateFavorites(user.uid);
+
+        return "Products removed from favorites";
+      } catch (error) {
+        console.error("❌ Batch remove error:", error);
+
+        // Rollback
+        setFavoriteIds(previousIds);
+        setFavoriteCount(previousIds.size);
+
+        return "Error removing favorites";
+      }
+    },
+    [user, favoriteIds]
+  );
+
+  const removeMultipleBatch = useCallback(
+    async (productIds: string[], collectionPath: string) => {
+      if (!user) return;
+
+      const batch = writeBatch(db);
+
+      // Process in chunks of 10 (Firestore whereIn limit)
+      for (let i = 0; i < productIds.length; i += FIRESTORE_IN_LIMIT) {
+        const chunk = productIds.slice(i, i + FIRESTORE_IN_LIMIT);
+        const snap = await getDocs(
+          query(collection(db, collectionPath), where("productId", "in", chunk))
+        );
+
+        snap.docs.forEach((doc) => {
+          batch.delete(doc.ref);
+        });
+      }
+
+      // Update product counters
+      for (const productId of productIds) {
+        const productDoc = await getProductDocument(productId);
+        if (productDoc) {
+          batch.update(productDoc.ref, {
+            favoritesCount: increment(-1),
+            metricsUpdatedAt: serverTimestamp(),
+          });
+        }
+      }
+
+      await batch.commit();
+    },
+    [user, getProductDocument]
+  );
+
+  const removeGloballyFromFavorites = useCallback(
+    async (productId: string): Promise<string> => {
+      if (!user) return "Please log in";
+
+      // Optimistic removal
+      const previousIds = new Set(favoriteIds);
+      const newIds = new Set(favoriteIds);
+      newIds.delete(productId);
+      setFavoriteIds(newIds);
+      setFavoriteCount(newIds.size);
+
+      paginatedFavoritesMap.current.delete(productId);
+      setPaginatedFavorites(Array.from(paginatedFavoritesMap.current.values()));
+
+      try {
+        const batch = writeBatch(db);
+
+        // Remove from default favorites
+        const defaultFavsSnap = await getDocs(
+          query(
+            collection(db, `users/${user.uid}/favorites`),
+            where("productId", "==", productId)
+          )
+        );
+
+        defaultFavsSnap.docs.forEach((doc) => {
+          batch.delete(doc.ref);
+        });
+
+        // Remove from all baskets
+        const basketsSnapshot = await getDocs(
+          collection(db, `users/${user.uid}/favorite_baskets`)
+        );
+
+        for (const basketDoc of basketsSnapshot.docs) {
+          const favoriteSnapshot = await getDocs(
+            query(
+              collection(basketDoc.ref, "favorites"),
+              where("productId", "==", productId)
+            )
+          );
+
+          favoriteSnapshot.docs.forEach((favDoc) => {
+            batch.delete(favDoc.ref);
+          });
+        }
+
+        // Update product counter
+        const productDoc = await getProductDocument(productId);
+        if (productDoc) {
+          batch.update(productDoc.ref, {
+            favoritesCount: increment(-1),
+            metricsUpdatedAt: serverTimestamp(),
+          });
+        }
+
+        await batch.commit();
+
+        // Invalidate cache
+        await redisService.invalidateFavorites(user.uid);
+
+        console.log("✅ Removed", productId, "from all favorites");
+        return "Removed from all favorites";
+      } catch (error) {
+        console.error("❌ Error removing from favorites:", error);
+
+        // Rollback
+        setFavoriteIds(previousIds);
+        setFavoriteCount(previousIds.size);
+
+        return "Error removing from favorites";
+      }
+    },
+    [user, favoriteIds, getProductDocument]
+  );
+
+  // ========================================================================
+  // BASKET MANAGEMENT
+  // ========================================================================
+
+  const setSelectedBasket = useCallback((basketId: string | null) => {
+    setSelectedBasketIdState(basketId);
+    selectedBasketIdRef.current = basketId;
+    if (currentBasketId.current !== basketId) {
+      currentBasketId.current = basketId;
+      resetPagination();
+    }
+  }, []);
+
+  const transferToBasket = useCallback(
+    async (
+      productId: string,
+      targetBasketId: string | null
+    ): Promise<string> => {
+      if (!user) return "Please log in";
+
+      try {
+        const currentBasket = selectedBasketIdRef.current;
+
+        // Get current favorite item data
+        const currentCollectionPath = currentBasket
+          ? `users/${user.uid}/favorite_baskets/${currentBasket}/favorites`
+          : `users/${user.uid}/favorites`;
+
+        const itemSnapshot = await getDocs(
+          query(
+            collection(db, currentCollectionPath),
+            where("productId", "==", productId),
+            firestoreLimit(1)
+          )
+        );
+
+        if (itemSnapshot.docs.length === 0) {
+          return "Item not found";
+        }
+
+        const itemData = itemSnapshot.docs[0].data();
+
+        // Add to target location
+        const targetCollectionPath = targetBasketId
+          ? `users/${user.uid}/favorite_baskets/${targetBasketId}/favorites`
+          : `users/${user.uid}/favorites`;
+
+        await addDoc(collection(db, targetCollectionPath), {
+          ...itemData,
+          addedAt: serverTimestamp(),
+        });
+
+        // Remove from current location
+        await deleteDoc(itemSnapshot.docs[0].ref);
+
+        // Update cache
+        paginatedFavoritesMap.current.delete(productId);
+        setPaginatedFavorites(
+          Array.from(paginatedFavoritesMap.current.values())
+        );
+        await redisService.invalidateFavorites(user.uid);
+
+        console.log(
+          "✅ Transferred",
+          productId,
+          "to",
+          targetBasketId || "default favorites"
+        );
+        return "Transferred successfully";
+      } catch (error) {
+        console.error("❌ Transfer error:", error);
+        return "Error transferring item";
+      }
+    },
+    [user]
+  );
+
+  const createFavoriteBasket = useCallback(
+    async (name: string): Promise<string> => {
+      if (!user) return "Please log in";
+
+      try {
+        const basketsSnapshot = await getDocs(
+          collection(db, `users/${user.uid}/favorite_baskets`)
+        );
+
+        if (basketsSnapshot.docs.length >= MAX_BASKETS) {
+          return "Maximum basket limit reached";
+        }
+
+        await addDoc(collection(db, `users/${user.uid}/favorite_baskets`), {
+          name,
+          createdAt: serverTimestamp(),
+        });
+
+        showSuccessToast("Basket created");
+        return "Basket created";
+      } catch (error) {
+        console.error("Error creating basket:", error);
+        return "Error creating basket";
+      }
+    },
+    [user, showSuccessToast]
+  );
+
+  const deleteFavoriteBasket = useCallback(
+    async (basketId: string): Promise<string> => {
+      if (!user) return "Please log in";
+
+      try {
+        await deleteDoc(
+          doc(db, `users/${user.uid}/favorite_baskets/${basketId}`)
+        );
+
+        if (selectedBasketIdRef.current === basketId) {
+          setSelectedBasket(null);
+        }
+
+        // Invalidate cache
+        await redisService.invalidateFavorites(user.uid);
+
+        showSuccessToast("Basket deleted");
+        return "Basket deleted";
+      } catch (error) {
+        console.error("Error deleting basket:", error);
+        return "Error deleting basket";
+      }
+    },
+    [user, showSuccessToast, setSelectedBasket]
+  );
+
+  // ========================================================================
+  // PAGINATION
+  // ========================================================================
+
+  const fetchPaginatedFavorites = useCallback(
+    async (
+      startAfterDoc: DocumentSnapshot | null = null,
+      limit: number = 50
+    ) => {
+      if (!user) return { docs: [], hasMore: false };
+
+      const basketId = selectedBasketIdRef.current;
+      const collectionPath = basketId
+        ? `users/${user.uid}/favorite_baskets/${basketId}/favorites`
+        : `users/${user.uid}/favorites`;
+
+      console.log(
+        "🟡 fetchPaginatedFavorites: limit=",
+        limit,
+        "collection=",
+        collectionPath
+      );
+
+      let q = query(
+        collection(db, collectionPath),
+        orderBy("addedAt", "desc"),
+        firestoreLimit(limit + 1)
+      );
+
+      if (startAfterDoc) {
+        q = query(q, firestoreStartAfter(startAfterDoc));
+      }
+
+      const snapshot = await getDocs(q);
+      const hasMore = snapshot.docs.length > limit;
+      const docs = hasMore ? snapshot.docs.slice(0, limit) : snapshot.docs;
+
+      const productIds = new Set<string>();
+      docs.forEach((d) => {
+        const data = d.data();
+        if (data.productId) {
+          productIds.add(data.productId as string);
+        }
+      });
+
+      console.log(
+        "🟡 fetchPaginatedFavorites RESULT: fetched=",
+        snapshot.docs.length,
+        "limit=",
+        limit,
+        "hasMore=",
+        hasMore,
+        "returning",
+        docs.length,
+        "docs"
+      );
+
+      return {
+        docs,
+        hasMore,
+        productIds,
+      };
+    },
+    [user]
+  );
+
+  const loadNextPage = useCallback(
+    async (limit: number = 50) => {
+      console.log(
+        "🔵 loadNextPage START: isLoading=",
+        isLoadingMore,
+        "hasMore=",
+        hasMoreData
+      );
+
+      if (isLoadingMore || !hasMoreData) {
+        console.log("🔵 loadNextPage SKIP: Already loading or no more data");
+        return {
+          docs: [],
+          hasMore: false,
+          error: null,
+        };
+      }
+
+      setIsLoadingMore(true);
+      console.log("🔵 loadNextPage: Set isLoading=true");
+
+      try {
+        const result = await fetchPaginatedFavorites(
+          lastDocument.current,
+          limit
+        );
+
+        const docs = result.docs as DocumentSnapshot[];
+        const hasMore = result.hasMore;
+
+        console.log(
+          "🔵 loadNextPage RESULT: docs=",
+          docs.length,
+          "hasMore=",
+          hasMore,
+          "limit=",
+          limit
+        );
+
+        if (docs.length > 0) {
+          lastDocument.current = docs[docs.length - 1];
+          setHasMoreData(hasMore);
+          console.log(
+            "🔵 loadNextPage: Set hasMoreData=",
+            hasMore,
+            "(docs not empty)"
+          );
+        } else {
+          setHasMoreData(false);
+          console.log("🔵 loadNextPage: Set hasMoreData=false (docs empty)");
+        }
+
+        setIsLoadingMore(false);
+        console.log(
+          "🔵 loadNextPage END: Set isLoading=false, hasMore=",
+          hasMoreData
+        );
+
+        return {
+          docs,
+          hasMore,
+          productIds: result.productIds,
+          error: null,
+        };
+      } catch (error) {
+        console.error("❌ loadNextPage ERROR:", error);
+        setIsLoadingMore(false);
+        setHasMoreData(false);
+
+        return {
+          docs: [],
+          hasMore: false,
+          error: (error as Error).toString(),
+        };
+      }
+    },
+    [isLoadingMore, hasMoreData, fetchPaginatedFavorites]
+  );
+
+  const resetPagination = useCallback(() => {
+    console.log("🟣 resetPagination: Resetting pagination state");
+    lastDocument.current = null;
+    setHasMoreData(true);
+    setIsLoadingMore(false);
+    paginatedFavoritesMap.current.clear();
+    setPaginatedFavorites([]);
+    setIsInitialLoadComplete(false);
+    console.log(
+      "🟣 resetPagination END: hasMore=true, isLoading=false, cleared all data"
+    );
+  }, []);
+
+  const shouldReloadFavorites = useCallback(
+    (basketId: string | null): boolean => {
+      if (currentBasketId.current !== basketId) return true;
+      return paginatedFavorites.length === 0 && !isInitialLoadComplete;
+    },
+    [paginatedFavorites.length, isInitialLoadComplete]
+  );
+
+  // ========================================================================
+  // UTILITY METHODS
+  // ========================================================================
+
+  const isFavorite = useCallback(
+    (productId: string): boolean => {
+      return favoriteIds.has(productId);
+    },
+    [favoriteIds]
+  );
+
+  const isGloballyFavorited = useCallback(
+    (productId: string): boolean => {
+      return allFavoriteIds.has(productId);
+    },
+    [allFavoriteIds]
+  );
+
+  const isFavoritedInBasket = useCallback(
+    async (productId: string): Promise<boolean> => {
+      if (!user) return false;
+
+      try {
+        const basketsSnap = await getDocs(
+          collection(db, `users/${user.uid}/favorite_baskets`)
+        );
+
+        for (const basketDoc of basketsSnap.docs) {
+          const favoriteSnapshot = await getDocs(
+            query(
+              collection(basketDoc.ref, "favorites"),
+              where("productId", "==", productId),
+              firestoreLimit(1)
+            )
+          );
+
+          if (!favoriteSnapshot.empty) {
+            return true;
+          }
+        }
+        return false;
+      } catch (error) {
+        console.error("Error checking basket favorite:", error);
+        return false;
+      }
+    },
+    [user]
+  );
+
+  const getBasketNameForProduct = useCallback(
+    async (productId: string): Promise<string | null> => {
+      if (!user) return null;
+
+      try {
+        const basketsSnap = await getDocs(
+          collection(db, `users/${user.uid}/favorite_baskets`)
+        );
+
+        for (const basketDoc of basketsSnap.docs) {
+          const favoriteSnapshot = await getDocs(
+            query(
+              collection(basketDoc.ref, "favorites"),
+              where("productId", "==", productId),
+              firestoreLimit(1)
+            )
+          );
+
+          if (!favoriteSnapshot.empty) {
+            const basketData = basketDoc.data();
+            return (basketData.name as string) || null;
+          }
+        }
+        return null;
+      } catch (error) {
+        console.error("Error getting basket name:", error);
+        return null;
+      }
+    },
+    [user]
+  );
+
+  // ========================================================================
+  // CLEANUP & USER CHANGE HANDLING
+  // ========================================================================
+
+  const clearUserData = useCallback(() => {
+    setFavoriteCount(0);
+    setFavoriteIds(new Set());
+    setPaginatedFavorites([]);
+    setIsLoading(false);
+    setSelectedBasketIdState(null);
+    selectedBasketIdRef.current = null;
+    paginatedFavoritesMap.current.clear();
+    setIsInitialLoadComplete(false);
+    setFavoriteBaskets([]);
+  }, []);
+
+  const subscribeToBaskets = useCallback(() => {
+    if (!user) return;
+
+    if (basketsSubscription.current) {
+      basketsSubscription.current();
     }
 
     const basketsCollection = collection(
       db,
-      "users",
-      userId,
-      "favorite_baskets"
+      `users/${user.uid}/favorite_baskets`
     );
 
-    unsubscribeBasketsRef.current = onSnapshot(
+    basketsSubscription.current = onSnapshot(
       basketsCollection,
       (snapshot) => {
         const baskets: FavoriteBasket[] = [];
@@ -349,12 +1213,11 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
           const data = doc.data();
           baskets.push({
             id: doc.id,
-            name: data.name || "",
-            createdAt: data.createdAt,
+            name: (data.name as string) || "",
+            createdAt: data.createdAt as Timestamp | FieldValue,
           });
         });
 
-        // Sort by creation date
         baskets.sort((a, b) => {
           if (
             a.createdAt instanceof Timestamp &&
@@ -367,942 +1230,166 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
         setFavoriteBaskets(baskets);
       },
-      (error) => {
-        if (process.env.NODE_ENV === "development") {
-          console.error("Baskets subscription error:", error);
-        }
-      }
+      (error) => console.error("Baskets subscription error:", error)
     );
-  }, []);
+  }, [user]);
 
-  // Load all favorites for global state
-  const loadAllFavorites = useCallback(async (userId: string) => {
-    try {
-      setIsLoading(true);
+  // ========================================================================
+  // EFFECTS
+  // ========================================================================
 
-      const [defaultSnap, basketsSnap] = await Promise.all([
-        getDocs(collection(db, "users", userId, "favorites")),
-        getDocs(collection(db, "users", userId, "favorite_baskets")),
-      ]);
-
-      const defaultIds = new Set<string>();
-      defaultSnap.docs.forEach((doc) => {
-        const data = doc.data();
-        if (data.productId) {
-          defaultIds.add(data.productId);
-        }
-      });
-
-      // Load basket favorites in parallel
-      const basketFavoritePromises = basketsSnap.docs.map((basketDoc) =>
-        getDocs(collection(basketDoc.ref, "favorites"))
-      );
-
-      const basketFavoriteSnaps = await Promise.all(basketFavoritePromises);
-      const basketIds = new Set<string>();
-
-      basketFavoriteSnaps.forEach((snap) => {
-        snap.docs.forEach((doc) => {
-          const data = doc.data();
-          if (data.productId) {
-            basketIds.add(data.productId);
-          }
-        });
-      });
-
-      const allIds = new Set([...defaultIds, ...basketIds]);
-      setAllFavoriteProductIds(allIds);
-
-      lastCacheUpdateRef.current = new Date();
-    } catch (error) {
-      if (process.env.NODE_ENV === "development") {
-        console.error("Error loading all favorites:", error);
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  // Toast notifications (you can replace with your preferred toast library)
-  const showSuccessToast = useCallback((message: string) => {
-    // Replace with your preferred toast implementation
-    if (process.env.NODE_ENV === "development") {
-      console.log("Success:", message);
-    }
-    // Example: toast.success(message);
-  }, []);
-
-  const showErrorToast = useCallback((message: string) => {
-    // Replace with your preferred toast implementation
-    if (process.env.NODE_ENV === "development") {
-      console.error("Error:", message);
-    }
-    // Example: toast.error(message);
-  }, []);
-
-  // Debounced success messages
-  const showDebouncedRemoveToast = useCallback(() => {
-    if (removeFavoriteTimerRef.current) {
-      clearTimeout(removeFavoriteTimerRef.current);
-    }
-
-    removeFavoriteTimerRef.current = setTimeout(() => {
-      showSuccessToast("Removed from favorites");
-    }, DEBOUNCE_DELAY);
-  }, [showSuccessToast]);
-
-  const showDebouncedBasketDeletionToast = useCallback(() => {
-    if (basketDeletionTimerRef.current) {
-      clearTimeout(basketDeletionTimerRef.current);
-    }
-
-    basketDeletionTimerRef.current = setTimeout(() => {
-      showSuccessToast("Basket deleted successfully");
-    }, DEBOUNCE_DELAY);
-  }, [showSuccessToast]);
-
-  const isSystemField = (key: string): boolean => {
-    const systemFields = new Set([
-      "addedAt",
-      "updatedAt",
-      "productId",
-      "quantity",
-    ]);
-    return systemFields.has(key);
-  };
-
-  // Add to favorites
-  const addToFavorites = useCallback(
-    async (
-      productId: string,
-      attributes: FavoriteAttributes = {}
-    ): Promise<string> => {
-      if (!user) return "Please log in";
-      if (!productId) return "Invalid product ID";
-
-      const favCollection = selectedBasketId
-        ? collection(
-            db,
-            "users",
-            user.uid,
-            "favorite_baskets",
-            selectedBasketId,
-            "favorites"
-          )
-        : collection(db, "users", user.uid, "favorites");
-
-      try {
-        const result = await requestDeduplicator.deduplicate(
-          `favorite-toggle-${productId}`,
-          async () => {
-            return await runTransaction(db, async (transaction) => {
-              // Check if already exists
-              const existingQuery = query(
-                favCollection,
-                where("productId", "==", productId),
-                limit(1)
-              );
-              const existing = await getDocs(existingQuery);
-
-              // Get product reference and data
-              const productRef = await getProductDocument(productId);
-              if (!productRef) return "Product not found";
-
-              const productSnap = await transaction.get(productRef);
-              if (!productSnap.exists()) return "Product not found";
-
-              if (existing.docs.length > 0) {
-                // Remove existing favorite
-                transaction.delete(existing.docs[0].ref);
-                transaction.update(productRef, {
-                  favoritesCount: increment(-1),
-                  metricsUpdatedAt: serverTimestamp(),
-                });
-
-                // Update local state immediately
-                setAllFavoriteProductIds((prev) => {
-                  const newSet = new Set(prev);
-                  newSet.delete(productId);
-                  return newSet;
-                });
-
-                if (!selectedBasketId) {
-                  setFavoriteProductIds((prev) => {
-                    const newSet = new Set(prev);
-                    newSet.delete(productId);
-                    return newSet;
-                  });
-                }
-
-                // Clear cache
-                basketFavoriteCacheRef.current = {};
-                basketNameCacheRef.current = {};
-
-                showDebouncedRemoveToast();
-                return "Removed from favorites";
-              } else {
-                // 🚀 NEW: Get product data and its attributes
-                const productData = productSnap.data() as ProductDocumentData;
-
-                // Add new favorite with dynamic attributes
-                const favoriteData: Record<string, unknown> = {
-                  productId,
-                  addedAt: serverTimestamp(),
-                  quantity: attributes.quantity || 1,
-                };
-
-                // 🚀 NEW: Add product's dynamic attributes from Firestore
-                if (productData.attributes) {
-                  Object.entries(productData.attributes).forEach(
-                    ([key, value]) => {
-                      if (!isSystemField(key)) {
-                        favoriteData[key] = value;
-                      }
-                    }
-                  );
-                }
-
-                // 🚀 NEW: Override with any UI-selected attributes
-                Object.entries(attributes).forEach(([key, value]) => {
-                  if (
-                    !isSystemField(key) &&
-                    value !== undefined &&
-                    value !== null
-                  ) {
-                    favoriteData[key] = value;
-                  }
-                });
-
-                const newFavRef = doc(favCollection);
-                transaction.set(newFavRef, favoriteData);
-                transaction.update(productRef, {
-                  favoritesCount: increment(1),
-                  metricsUpdatedAt: serverTimestamp(),
-                });
-
-                // Update local state immediately
-                setAllFavoriteProductIds(
-                  (prev) => new Set([...prev, productId])
-                );
-
-                if (!selectedBasketId) {
-                  setFavoriteProductIds(
-                    (prev) => new Set([...prev, productId])
-                  );
-                }
-
-                // Clear cache
-                basketFavoriteCacheRef.current = {};
-                basketNameCacheRef.current = {};
-
-                showSuccessToast("Added to favorites");
-                return "Added to favorites";
-              }
-            }); // ✅ Close runTransaction
-          }, // ✅ Close async arrow function
-          { timeout: 15000 }
-        ); // ✅ Close deduplicate
-
-        // ✅ Fire-and-forget metrics update AFTER getting result
-        if (result === "Added to favorites") {
-          const productRef = await getProductDocument(productId);
-          if (productRef) {
-            const productSnap = await getDoc(productRef);
-            if (productSnap.exists()) {
-              const productData = productSnap.data() as ProductDocumentData;
-              const isShopProduct = productRef.path.includes("shop_products");
-
-              if (isShopProduct) {
-                const shopId = productData.shopId ?? productData.ownerId;
-                if (shopId) {
-                  updateShopMetricsSafely(
-                    shopId,
-                    "totalFavoriteAdditions"
-                  ).catch((error) => {
-                    if (process.env.NODE_ENV === "development") {
-                      console.error("Failed to update shop metrics:", error);
-                    }
-                  });
-                }
-              }
-            }
-          }
-        }
-
-        return result;
-      } catch (error) {
-        if (process.env.NODE_ENV === "development") {
-          console.error("Error in add/remove favorite:", error);
-        }
-        showErrorToast("Failed to update favorites");
-        return `Failed to update favorites: ${error}`;
-      }
-    },
-    [
-      user,
-      selectedBasketId,
-      getProductDocument,
-      showSuccessToast,
-      showErrorToast,
-      showDebouncedRemoveToast,
-    ]
-  );
-
-  // Remove from favorites (alias for addToFavorites for toggle behavior)
-  const removeFromFavorites = useCallback(
-    async (productId: string): Promise<string> => {
-      return addToFavorites(productId);
-    },
-    [addToFavorites]
-  );
-
-  // Remove globally from all favorites and baskets
-  const removeGloballyFromFavorites = useCallback(
-    async (productId: string): Promise<string> => {
-      if (!user) return "Please log in";
-
-      try {
-        const batch = writeBatch(db);
-
-        // Parallel queries for better performance
-        const [defaultSnap, basketsSnap] = await Promise.all([
-          getDocs(
-            query(
-              collection(db, "users", user.uid, "favorites"),
-              where("productId", "==", productId)
-            )
-          ),
-          getDocs(collection(db, "users", user.uid, "favorite_baskets")),
-        ]);
-
-        // Delete from default favorites
-        defaultSnap.docs.forEach((doc) => {
-          batch.delete(doc.ref);
-        });
-
-        // Delete from all baskets
-        const basketFavoritePromises = basketsSnap.docs.map((basketDoc) =>
-          getDocs(
-            query(
-              collection(basketDoc.ref, "favorites"),
-              where("productId", "==", productId)
-            )
-          )
-        );
-
-        const basketFavoriteSnaps = await Promise.all(basketFavoritePromises);
-        basketFavoriteSnaps.forEach((snap) => {
-          snap.docs.forEach((doc) => {
-            batch.delete(doc.ref);
-          });
-        });
-
-        // Update product counter
-        const productRef = await getProductDocument(productId);
-        if (productRef) {
-          batch.update(productRef, {
-            favoritesCount: increment(-1),
-            metricsUpdatedAt: serverTimestamp(),
-          });
-        }
-
-        await batch.commit();
-
-        // Update local state
-        setAllFavoriteProductIds((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(productId);
-          return newSet;
-        });
-        setFavoriteProductIds((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(productId);
-          return newSet;
-        });
-
-        // Clear cache
-        basketFavoriteCacheRef.current = {};
-        basketNameCacheRef.current = {};
-
-        showSuccessToast("Removed from all favorites");
-        return "Removed from all favorites";
-      } catch (error) {
-        if (process.env.NODE_ENV === "development") {
-          console.error("Error globally removing favorite:", error);
-        }
-        showErrorToast("Failed to remove from favorites");
-        return `Failed to remove from favorites: ${error}`;
-      }
-    },
-    [user, getProductDocument, showSuccessToast, showErrorToast]
-  );
-
-  // Remove multiple favorites in batches
-  const removeMultipleFromFavorites = useCallback(
-    async (productIds: string[]): Promise<string> => {
-      if (!user) return "Please log in";
-      if (productIds.length === 0) return "No products selected";
-
-      try {
-        // Process in smaller batches to avoid timeout
-        for (let i = 0; i < productIds.length; i += BATCH_SIZE) {
-          const batch = productIds.slice(i, i + BATCH_SIZE);
-          await removeMultipleBatch(batch);
-        }
-
-        showSuccessToast("Products removed from favorites");
-        return "Products removed from favorites";
-      } catch (error) {
-        if (process.env.NODE_ENV === "development") {
-          console.error("Error removing multiple favorites:", error);
-        }
-        showErrorToast("Failed to remove favorites");
-        return `Failed to remove favorites: ${error}`;
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [user, showSuccessToast, showErrorToast] // removeMultipleBatch omitted - defined below
-  );
-
-  // Helper function to remove a batch of favorites
-  const removeMultipleBatch = useCallback(
-    async (productIds: string[]) => {
-      if (!user) return;
-
-      const favCollection = selectedBasketId
-        ? collection(
-            db,
-            "users",
-            user.uid,
-            "favorite_baskets",
-            selectedBasketId,
-            "favorites"
-          )
-        : collection(db, "users", user.uid, "favorites");
-
-      const batch = writeBatch(db);
-
-      // Process in chunks for Firestore whereIn limit
-      for (const chunk of chunkArray(productIds, FIRESTORE_IN_LIMIT)) {
-        const snap = await getDocs(
-          query(favCollection, where("productId", "in", chunk))
-        );
-        snap.docs.forEach((doc) => {
-          batch.delete(doc.ref);
-        });
-      }
-
-      // Update product counters
-      const productRefs = await Promise.all(
-        productIds.map(async (id) => {
-          return await getProductDocument(id);
-        })
-      );
-
-      productRefs.forEach((ref) => {
-        if (ref) {
-          batch.update(ref, {
-            favoritesCount: increment(-1),
-            metricsUpdatedAt: serverTimestamp(),
-          });
-        }
-      });
-
-      await batch.commit();
-    },
-    [user, selectedBasketId, chunkArray, getProductDocument]
-  );
-
-  // Create favorite basket
-  const createFavoriteBasket = useCallback(
-    async (name: string): Promise<string> => {
-      if (!user) return "Please log in";
-      if (!name.trim()) return "Basket name is required";
-
-      try {
-        const basketsSnapshot = await getDocs(
-          collection(db, "users", user.uid, "favorite_baskets")
-        );
-
-        if (basketsSnapshot.docs.length >= MAX_BASKETS) {
-          return "Maximum basket limit reached";
-        }
-
-        await addDoc(collection(db, "users", user.uid, "favorite_baskets"), {
-          name: name.trim(),
-          createdAt: serverTimestamp(),
-        });
-
-        showSuccessToast("Basket created successfully");
-        return "Basket created successfully";
-      } catch (error) {
-        if (process.env.NODE_ENV === "development") {
-          console.error("Error creating basket:", error);
-        }
-        showErrorToast("Failed to create basket");
-        return `Failed to create basket: ${error}`;
-      }
-    },
-    [user, showSuccessToast, showErrorToast]
-  );
-
-  // Delete favorite basket
-  const deleteFavoriteBasket = useCallback(
-    async (basketId: string): Promise<string> => {
-      if (!user) return "Please log in";
-
-      try {
-        await deleteDoc(
-          doc(db, "users", user.uid, "favorite_baskets", basketId)
-        );
-
-        if (selectedBasketId === basketId) {
-          setSelectedBasketIdState(null);
-          selectedBasketIdRef.current = null; // Keep ref in sync
-        }
-
-        // Clear cache
-        basketFavoriteCacheRef.current = {};
-        basketNameCacheRef.current = {};
-
-        showDebouncedBasketDeletionToast();
-        return "Basket deleted successfully";
-      } catch (error) {
-        if (process.env.NODE_ENV === "development") {
-          console.error("Error deleting basket:", error);
-        }
-        showErrorToast("Failed to delete basket");
-        return `Failed to delete basket: ${error}`;
-      }
-    },
-    [user, selectedBasketId, showErrorToast, showDebouncedBasketDeletionToast]
-  );
-
-  // Set selected basket
-  const setSelectedBasket = useCallback((basketId: string | null) => {
-    setSelectedBasketIdState(basketId);
-    selectedBasketIdRef.current = basketId; // Keep ref in sync
-    // Clear cache when switching baskets
-    basketFavoriteCacheRef.current = {};
-    basketNameCacheRef.current = {};
-  }, []);
-
-  // Transfer favorites to basket
-  const transferFavoritesToBasket = useCallback(
-    async (productIds: string[], basketId: string): Promise<string> => {
-      if (!user) return "Please log in";
-      if (productIds.length === 0) return "No products selected";
-
-      try {
-        // Process in smaller batches
-        for (let i = 0; i < productIds.length; i += BATCH_SIZE) {
-          const batch = productIds.slice(i, i + BATCH_SIZE);
-          await transferBatch(batch, basketId);
-        }
-
-        showSuccessToast("Products transferred to basket");
-        return "Products transferred to basket";
-      } catch (error) {
-        if (process.env.NODE_ENV === "development") {
-          console.error("Error transferring favorites:", error);
-        }
-        showErrorToast("Failed to transfer favorites");
-        return `Failed to transfer favorites: ${error}`;
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [user, showSuccessToast, showErrorToast] // transferBatch omitted - defined below
-  );
-
-  // Helper function to transfer a batch
-  const transferBatch = useCallback(
-    async (productIds: string[], basketId: string) => {
-      if (!user) return;
-
-      const defaultFavs = collection(db, "users", user.uid, "favorites");
-      const basketFavs = collection(
-        db,
-        "users",
-        user.uid,
-        "favorite_baskets",
-        basketId,
-        "favorites"
-      );
-
-      const batch = writeBatch(db);
-
-      try {
-        for (const chunk of chunkArray(productIds, FIRESTORE_IN_LIMIT)) {
-          const snap = await getDocs(
-            query(defaultFavs, where("productId", "in", chunk))
-          );
-
-          snap.docs.forEach((docSnap) => {
-            const data = docSnap.data();
-
-            // Delete from default favorites
-            batch.delete(docSnap.ref);
-
-            // 🚀 NEW: Build transfer data with all non-system attributes
-            const transferData: Record<string, unknown> = {
-              productId: data.productId,
-              addedAt: serverTimestamp(),
-              quantity: (data.quantity as number) || 1,
-            };
-
-            // 🚀 NEW: Copy all non-system attributes dynamically
-            Object.entries(data).forEach(([key, value]) => {
-              if (!isSystemField(key) && key !== "productId" && value != null) {
-                transferData[key] = value;
-              }
-            });
-
-            // Add to basket
-            const newBasketRef = doc(basketFavs);
-            batch.set(newBasketRef, transferData);
-          });
-        }
-
-        await batch.commit();
-      } catch (error) {
-        if (process.env.NODE_ENV === "development") {
-          console.error("Error in transferBatch:", error);
-        }
-        throw error;
-      }
-    },
-    [user, chunkArray]
-  );
-
-  // Move favorites from basket to default
-  const moveFavoritesFromBasketToDefault = useCallback(
-    async (productIds: string[]): Promise<string> => {
-      if (!user) return "Please log in";
-      if (!selectedBasketId) return "No basket selected";
-      if (productIds.length === 0) return "No products selected";
-
-      try {
-        // Process in smaller batches
-        for (let i = 0; i < productIds.length; i += BATCH_SIZE) {
-          const batch = productIds.slice(i, i + BATCH_SIZE);
-          await moveFromBasketBatch(batch, selectedBasketId);
-        }
-
-        showSuccessToast("Products moved to default favorites");
-        return "Products moved to default favorites";
-      } catch (error) {
-        if (process.env.NODE_ENV === "development") {
-          console.error("Error moving favorites:", error);
-        }
-        showErrorToast("Failed to move favorites");
-        return `Failed to move favorites: ${error}`;
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [user, selectedBasketId, showSuccessToast, showErrorToast] // moveFromBasketBatch omitted - defined below
-  );
-
-  // Helper function to move from basket batch
-  const moveFromBasketBatch = useCallback(
-    async (productIds: string[], basketId: string) => {
-      if (!user) return;
-
-      const basketFavs = collection(
-        db,
-        "users",
-        user.uid,
-        "favorite_baskets",
-        basketId,
-        "favorites"
-      );
-      const defaultFavs = collection(db, "users", user.uid, "favorites");
-
-      const batch = writeBatch(db);
-
-      try {
-        for (const chunk of chunkArray(productIds, FIRESTORE_IN_LIMIT)) {
-          const snap = await getDocs(
-            query(basketFavs, where("productId", "in", chunk))
-          );
-
-          snap.docs.forEach((docSnap) => {
-            const data = docSnap.data();
-
-            // Delete from basket
-            batch.delete(docSnap.ref);
-
-            // 🚀 NEW: Build transfer data with all non-system attributes
-            const transferData: Record<string, unknown> = {
-              productId: data.productId,
-              addedAt: serverTimestamp(),
-              quantity: (data.quantity as number) || 1,
-            };
-
-            // 🚀 NEW: Copy all non-system attributes dynamically
-            Object.entries(data).forEach(([key, value]) => {
-              if (!isSystemField(key) && key !== "productId" && value != null) {
-                transferData[key] = value;
-              }
-            });
-
-            // Add to default favorites
-            const newDefaultRef = doc(defaultFavs);
-            batch.set(newDefaultRef, transferData);
-          });
-        }
-
-        await batch.commit();
-      } catch (error) {
-        if (process.env.NODE_ENV === "development") {
-          console.error("Error in moveFromBasketBatch:", error);
-        }
-        throw error;
-      }
-    },
-    [user, chunkArray]
-  );
-
-  // Check if product is favorited in any basket
-  const isFavoritedInBasket = useCallback(
-    async (productId: string): Promise<boolean> => {
-      // Check cache first
-      const cachedCheck = cacheManager.get<boolean>(
-        "favorite_basket_check",
-        productId
-      );
-      if (cachedCheck !== null) {
-        return cachedCheck;
-      }
-
-      // Then check ref cache
-      if (basketFavoriteCacheRef.current[productId] !== undefined) {
-        return basketFavoriteCacheRef.current[productId];
-      }
-
-      if (!user) return false;
-
-      try {
-        const basketsSnap = await getDocs(
-          collection(db, "users", user.uid, "favorite_baskets")
-        );
-
-        const checks = basketsSnap.docs.map((basketDoc) =>
-          getDocs(
-            query(
-              collection(basketDoc.ref, "favorites"),
-              where("productId", "==", productId)
-            )
-          )
-        );
-
-        const results = (await Promise.race([
-          Promise.all(checks),
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error("Timeout")), 5000)
-          ),
-        ])) as QuerySnapshot<Record<string, unknown>>[];
-
-        const isFavorited = results.some((snap) => !snap.empty);
-
-        // ✅ Cache in both local ref AND cacheManager
-        basketFavoriteCacheRef.current[productId] = isFavorited;
-        cacheManager.set(
-          "favorite_basket_check",
-          productId,
-          isFavorited,
-          2 * 60 * 1000 // 2 minutes
-        );
-
-        return isFavorited;
-      } catch (error) {
-        if (process.env.NODE_ENV === "development") {
-          console.error("Error checking basket favorite:", error);
-        }
-        return false;
-      }
-    },
-    [user]
-  );
-
-  // Get basket name for a product
-  const getBasketNameForProduct = useCallback(
-    async (productId: string): Promise<string | null> => {
-      // Check cache first
-      if (basketNameCacheRef.current[productId] !== undefined) {
-        return basketNameCacheRef.current[productId];
-      }
-
-      if (!user) return null;
-
-      try {
-        const basketsSnap = await getDocs(
-          collection(db, "users", user.uid, "favorite_baskets")
-        );
-
-        const favChecks = basketsSnap.docs.map(async (basketDoc) => {
-          const snap = await getDocs(
-            query(
-              collection(basketDoc.ref, "favorites"),
-              where("productId", "==", productId)
-            )
-          );
-          return !snap.empty ? (basketDoc.data().name as string) : null;
-        });
-
-        const names = (await Promise.race([
-          Promise.all(favChecks),
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error("Timeout")), 5000)
-          ),
-        ])) as (string | null)[];
-
-        const basketName = names.find((name) => name !== null) || null;
-
-        // Cache the result
-        basketNameCacheRef.current[productId] = basketName;
-
-        return basketName;
-      } catch (error) {
-        if (process.env.NODE_ENV === "development") {
-          console.error("Error getting basket name:", error);
-        }
-        return null;
-      }
-    },
-    [user]
-  );
-
-  // Utility functions
-  const isFavorite = useCallback(
-    (productId: string): boolean => {
-      return favoriteProductIds.has(productId);
-    },
-    [favoriteProductIds]
-  );
-
-  const isGloballyFavorited = useCallback(
-    (productId: string): boolean => {
-      return allFavoriteProductIds.has(productId);
-    },
-    [allFavoriteProductIds]
-  );
-
-  // Effect to handle user changes
+  // Handle user changes
   useEffect(() => {
     if (user) {
-      subscribeToFavorites(user.uid);
-      subscribeToGlobalFavorites(user.uid);
-      subscribeToBaskets(user.uid);
+      clearUserData();
+      initializeIfNeeded();
+      subscribeToBaskets();
     } else {
-      // Cleanup subscriptions
-      if (unsubscribeFavoritesRef.current) {
-        unsubscribeFavoritesRef.current();
-        unsubscribeFavoritesRef.current = null;
-      }
-      if (unsubscribeGlobalFavoritesRef.current) {
-        unsubscribeGlobalFavoritesRef.current();
-        unsubscribeGlobalFavoritesRef.current = null;
-      }
-      if (unsubscribeBasketsRef.current) {
-        unsubscribeBasketsRef.current();
-        unsubscribeBasketsRef.current = null;
+      disableLiveUpdates();
+      if (basketsSubscription.current) {
+        basketsSubscription.current();
+        basketsSubscription.current = null;
       }
       clearUserData();
     }
-
-    return () => {
-      if (unsubscribeFavoritesRef.current) {
-        unsubscribeFavoritesRef.current();
-      }
-      if (unsubscribeGlobalFavoritesRef.current) {
-        unsubscribeGlobalFavoritesRef.current();
-      }
-      if (unsubscribeBasketsRef.current) {
-        unsubscribeBasketsRef.current();
-      }
-    };
   }, [
     user,
-    subscribeToFavorites,
-    subscribeToGlobalFavorites,
+    initializeIfNeeded,
     subscribeToBaskets,
+    disableLiveUpdates,
     clearUserData,
   ]);
 
-  // Effect to re-subscribe to favorites when selected basket changes
+  // Re-subscribe when basket changes
   useEffect(() => {
     if (user) {
-      subscribeToFavorites(user.uid);
+      disableLiveUpdates();
+      loadFavoriteIds();
+      enableLiveUpdates();
     }
-  }, [user, selectedBasketId, subscribeToFavorites]);
+  }, [
+    user,
+    selectedBasketId,
+    loadFavoriteIds,
+    enableLiveUpdates,
+    disableLiveUpdates,
+  ]);
+
+  // Cleanup timer
+  useEffect(() => {
+    cleanupTimer.current = setInterval(() => {
+      // Cleanup old locks
+      favoriteLocks.current.forEach((promise, key) => {
+        promise.then(() => {
+          favoriteLocks.current.delete(key);
+        });
+      });
+
+      // Cleanup pagination cache if too large
+      if (paginatedFavoritesMap.current.size > MAX_PAGINATED_CACHE) {
+        const entries = Array.from(paginatedFavoritesMap.current.entries());
+        const toRemove = entries.slice(0, 50);
+        toRemove.forEach(([key]) => paginatedFavoritesMap.current.delete(key));
+      }
+    }, 30000);
+
+    return () => {
+      if (cleanupTimer.current) {
+        clearInterval(cleanupTimer.current);
+      }
+    };
+  }, []);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (removeFavoriteTimerRef.current) {
-        clearTimeout(removeFavoriteTimerRef.current);
+      if (removeFavoriteTimer.current) {
+        clearTimeout(removeFavoriteTimer.current);
       }
-      if (basketDeletionTimerRef.current) {
-        clearTimeout(basketDeletionTimerRef.current);
+      if (favoriteSubscription.current) {
+        favoriteSubscription.current();
+      }
+      if (globalFavoriteSubscription.current) {
+        globalFavoriteSubscription.current();
+      }
+      if (basketsSubscription.current) {
+        basketsSubscription.current();
+      }
+      if (authSubscription.current) {
+        authSubscription.current();
       }
     };
   }, []);
 
+  // ========================================================================
+  // CONTEXT VALUE
+  // ========================================================================
+
   const contextValue = useMemo<FavoritesContextType>(
     () => ({
       // State
-      favoriteProductIds,
-      allFavoriteProductIds,
+      favoriteIds,
       favoriteCount,
-      selectedBasketId,
-      favoriteBaskets,
+      paginatedFavorites,
       isLoading,
+      selectedBasketId,
+      hasMoreData,
+      isLoadingMore,
+      isInitialLoadComplete,
+      favoriteBaskets,
 
       // Methods
       addToFavorites,
-      removeFromFavorites,
-      removeGloballyFromFavorites,
       removeMultipleFromFavorites,
+      removeGloballyFromFavorites,
 
       // Basket management
       createFavoriteBasket,
       deleteFavoriteBasket,
       setSelectedBasket,
-      transferFavoritesToBasket,
-      moveFavoritesFromBasketToDefault,
+      transferToBasket,
 
-      // Utility methods
+      // Pagination
+      loadNextPage,
+      resetPagination,
+      shouldReloadFavorites,
+
+      // Real-time listeners
+      enableLiveUpdates,
+      disableLiveUpdates,
+
+      // Utilities
       isFavorite,
       isGloballyFavorited,
       isFavoritedInBasket,
       getBasketNameForProduct,
-
-      // Toast notifications
-      showSuccessToast,
-      showErrorToast,
     }),
     [
-      favoriteProductIds,
-      allFavoriteProductIds,
+      favoriteIds,
       favoriteCount,
-      selectedBasketId,
-      favoriteBaskets,
+      paginatedFavorites,
       isLoading,
+      selectedBasketId,
+      hasMoreData,
+      isLoadingMore,
+      isInitialLoadComplete,
+      favoriteBaskets,
       addToFavorites,
-      removeFromFavorites,
-      removeGloballyFromFavorites,
       removeMultipleFromFavorites,
+      removeGloballyFromFavorites,
       createFavoriteBasket,
       deleteFavoriteBasket,
       setSelectedBasket,
-      transferFavoritesToBasket,
-      moveFavoritesFromBasketToDefault,
+      transferToBasket,
+      loadNextPage,
+      resetPagination,
+      shouldReloadFavorites,
+      enableLiveUpdates,
+      disableLiveUpdates,
       isFavorite,
       isGloballyFavorited,
       isFavoritedInBasket,
       getBasketNameForProduct,
-      showSuccessToast,
-      showErrorToast,
     ]
   );
 

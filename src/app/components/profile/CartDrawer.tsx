@@ -10,17 +10,65 @@ import {
   User,
   LogIn,
   Heart,
-  AlertCircle,
   RefreshCw,
+  Minus,
+  Plus,
 } from "lucide-react";
-import { ProductCard3 } from "../ProductCard3";
 import { CompactBundleWidget } from "../CompactBundle";
-import { useCart, CartTotals, CartItemTotal } from "@/context/CartProvider";
+import { useCart, CartTotals } from "@/context/CartProvider";
 import { useUser } from "@/context/UserProvider";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { AttributeLocalizationUtils } from "@/constants/AttributeLocalization";
 import { db } from "@/lib/firebase";
+import Image from "next/image";
+import { Product } from "@/app/models/Product";
+
+// Type definitions matching CartProvider
+interface SalePreferences {
+  discountThreshold?: number;
+  bulkDiscountPercentage?: number;
+  maxQuantity?: number;
+}
+
+interface CartData {
+  quantity: number;
+  selectedColor?: string;
+  selectedSize?: string;
+  selectedMetres?: number;
+  [key: string]: unknown;
+}
+
+interface CartItem {
+  productId: string;
+  cartData: CartData;
+  product: Product | null;
+  quantity: number;
+  sellerName: string;
+  sellerId: string;
+  isShop: boolean;
+  isOptimistic?: boolean;
+  salePreferences?: SalePreferences | null;
+  selectedColorImage?: string;
+  showSellerHeader?: boolean;
+  [key: string]: unknown;
+}
+
+interface PaymentItem {
+  productId: string;
+  quantity: number;
+  sellerName: string;
+  sellerId: string;
+  isShop: boolean;
+  selectedMetres?: number;
+  selectedColor?: string;
+  price?: number;
+  productName?: string;
+  currency?: string;
+  calculatedUnitPrice?: number;
+  calculatedTotal?: number;
+  isBundleItem?: boolean;
+}
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -46,41 +94,40 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     isInitialized,
     updateQuantity,
     removeFromCart,
-    clearCart,
     initializeCartIfNeeded,
     loadMoreItems,
-    isOptimisticallyRemoving,
     calculateCartTotals,
   } = useCart();
 
-  const [isClearing, setIsClearing] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const [shouldRender, setShouldRender] = useState(false);
+  const [selectedProducts, setSelectedProducts] = useState<
+    Record<string, boolean>
+  >({});
 
-  // ✅ FIXED: Proper nested translation function that uses JSON files
+  // Totals state
+  const [calculatedTotals, setCalculatedTotals] = useState<CartTotals>({
+    total: 0,
+    currency: "TL",
+    items: [],
+  });
+  const [isCalculatingTotals, setIsCalculatingTotals] = useState(false);
+
   const t = useCallback(
     (key: string) => {
-      if (!localization) {
-        // Return the key itself if no localization function is provided
-        return key;
-      }
+      if (!localization) return key;
 
       try {
-        // Try to get the nested CartDrawer translation
         const translation = localization(`CartDrawer.${key}`);
-
-        // Check if we got a valid translation (not the same as the key we requested)
         if (translation && translation !== `CartDrawer.${key}`) {
           return translation;
         }
 
-        // If nested translation doesn't exist, try direct key
         const directTranslation = localization(key);
         if (directTranslation && directTranslation !== key) {
           return directTranslation;
         }
 
-        // Return the key as fallback
         return key;
       } catch (error) {
         console.warn(`Translation error for key: ${key}`, error);
@@ -101,31 +148,26 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     }
   }, [isOpen]);
 
+  // Prevent body scroll when drawer is open
   useEffect(() => {
     if (isOpen) {
-      // Store current scroll position
       const scrollY = window.scrollY;
-
-      // Disable scrolling when drawer is open
       document.body.style.overflow = "hidden";
       document.body.style.position = "fixed";
       document.body.style.width = "100%";
       document.body.style.top = `-${scrollY}px`;
     } else {
-      // Re-enable scrolling when drawer is closed
       const scrollY = document.body.style.top;
       document.body.style.overflow = "";
       document.body.style.position = "";
       document.body.style.width = "";
       document.body.style.top = "";
 
-      // Restore scroll position
       if (scrollY) {
         window.scrollTo(0, parseInt(scrollY || "0") * -1);
       }
     }
 
-    // Cleanup function to ensure scrolling is restored
     return () => {
       document.body.style.overflow = "";
       document.body.style.position = "";
@@ -134,199 +176,99 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     };
   }, [isOpen]);
 
-  // Initialize cart when drawer opens and user is authenticated
+  // Initialize cart when drawer opens
   useEffect(() => {
     if (isOpen && user && !isInitialized && !isLoading) {
       initializeCartIfNeeded();
     }
   }, [isOpen, user, isInitialized, isLoading, initializeCartIfNeeded]);
 
-  const [calculatedTotals, setCalculatedTotals] = useState<CartTotals>({
-    subtotal: 0,
-    total: 0,
-    currency: "TL",
-    items: [],
-  });
+  // Sync selections with cart items
+  useEffect(() => {
+    if (cartItems.length > 0) {
+      const newSelected: Record<string, boolean> = {};
+      cartItems.forEach((item) => {
+        // Select all by default (matching Flutter)
+        newSelected[item.productId] = selectedProducts[item.productId] ?? true;
+      });
+      setSelectedProducts(newSelected);
+    }
+  }, [cartItems]);
 
+  // Calculate totals when selections change
   useEffect(() => {
     const calculateTotals = async () => {
-      if (cartItems.length > 0) {
-        const totals = await calculateCartTotals();
+      const selectedIds = Object.entries(selectedProducts)
+        .filter(([, selected]) => selected)
+        .map(([id]) => id);
+
+      if (selectedIds.length === 0) {
+        setCalculatedTotals({ total: 0, currency: "TL", items: [] });
+        return;
+      }
+
+      setIsCalculatingTotals(true);
+      try {
+        const totals = await calculateCartTotals(selectedIds);
         setCalculatedTotals(totals);
-      } else {
-        setCalculatedTotals({
-          subtotal: 0,
-          total: 0,
-          currency: "TL",
-          items: [],
-        });
+      } catch (error) {
+        console.error("Failed to calculate totals:", error);
+      } finally {
+        setIsCalculatingTotals(false);
       }
     };
 
     calculateTotals();
-  }, [cartItems, calculateCartTotals]);
+  }, [selectedProducts, cartItems, calculateCartTotals]);
+
+  // Get available stock for item (matching Flutter logic)
+  const getAvailableStock = useCallback((item: CartItem): number => {
+    const product = item.product;
+    if (!product) return 0;
+
+    const selectedColor = item.cartData?.selectedColor;
+
+    if (
+      selectedColor &&
+      selectedColor !== "" &&
+      selectedColor !== "default" &&
+      product.colorQuantities?.[selectedColor] !== undefined
+    ) {
+      return product.colorQuantities[selectedColor] || 0;
+    }
+
+    return product.quantity || 0;
+  }, []);
 
   // Handle item removal
   const handleRemoveItem = useCallback(
     async (productId: string) => {
       try {
-        console.log("CartDrawer - Removing item:", { productId });
-        const result = await removeFromCart(productId);
-        console.log("CartDrawer - Remove result:", { productId, result });
+        await removeFromCart(productId);
       } catch (error) {
-        console.error("CartDrawer - Failed to remove item:", error);
+        console.error("Failed to remove item:", error);
       }
     },
     [removeFromCart]
   );
 
-  // Handle quantity update
+  // Handle quantity change
   const handleQuantityChange = useCallback(
     async (productId: string, newQuantity: number) => {
-      if (newQuantity < 1) {
-        await handleRemoveItem(productId);
-        return;
-      }
-
       try {
-        console.log("CartDrawer - Updating quantity:", {
-          productId,
-          newQuantity,
-        });
         await updateQuantity(productId, newQuantity);
       } catch (error) {
-        console.error("CartDrawer - Failed to update quantity:", error);
+        console.error("Failed to update quantity:", error);
       }
     },
-    [handleRemoveItem, updateQuantity]
+    [updateQuantity]
   );
 
-  // Handle clear cart
-  const handleClearCart = useCallback(async () => {
-    setIsClearing(true);
-    try {
-      console.log("CartDrawer - Clearing entire cart");
-      await clearCart();
-    } catch (error) {
-      console.error("CartDrawer - Failed to clear cart:", error);
-    } finally {
-      setIsClearing(false);
-    }
-  }, [clearCart]);
-
-  // Handle navigation functions
-  const handleCheckout = useCallback(() => {
-    const totalPrice = calculatedTotals.total;
-
-    // Create pricing lookup from calculated totals
-    const pricingMap = new Map<string, CartItemTotal>();
-    calculatedTotals.items.forEach((itemTotal) => {
-      pricingMap.set(itemTotal.productId, itemTotal);
-    });
-
-    const paymentItems = cartItems
-      .filter(
-        (item) =>
-          !item.isOptimistic &&
-          item.product &&
-          !isOptimisticallyRemoving(item.productId)
-      )
-      .map((item) => {
-        // Create a plain object copy instead of using spread with typed CartItem
-        const paymentItem: Record<string, unknown> = {};
-
-        // Copy all properties except the ones we want to exclude
-        Object.keys(item).forEach((key) => {
-          if (
-            key !== "product" &&
-            key !== "cartData" &&
-            key !== "isOptimistic" &&
-            key !== "isLoadingProduct" &&
-            key !== "loadError" &&
-            key !== "selectedColorImage"
-          ) {
-            paymentItem[key] = (item as Record<string, unknown>)[key];
-          }
-        });
-
-        if (item.cartData) {
-          if (item.cartData.selectedMetres) {
-            paymentItem.selectedMetres = item.cartData.selectedMetres;
-          }
-          if (item.cartData.selectedColor) {
-            paymentItem.selectedColor = item.cartData.selectedColor;
-          }
-          // Add any other cart-specific fields you need
-        }
-
-        // Add product info
-        if (item.product) {
-          paymentItem.price = item.product.price;
-          paymentItem.productName = item.product.productName;
-          paymentItem.currency = item.product.currency;
-        }
-
-        // Add calculated pricing from CartProvider
-        const calculatedPricing = pricingMap.get(item.productId);
-        if (calculatedPricing) {
-          paymentItem.calculatedUnitPrice = calculatedPricing.unitPrice;
-          paymentItem.calculatedTotal = calculatedPricing.total;
-          paymentItem.isBundleItem = calculatedPricing.isBundleItem || false;
-        }
-
-        return paymentItem;
-      });
-
-    console.log("CartDrawer - Payment items prepared:", paymentItems);
-
-    // Save to localStorage as backup
-    localStorage.setItem("cartItems", JSON.stringify(paymentItems));
-    localStorage.setItem("cartTotal", totalPrice.toString());
-
-    onClose();
-
-    // Navigate to payment page
-    try {
-      const itemsParam = encodeURIComponent(JSON.stringify(paymentItems));
-      if (itemsParam.length < 1500) {
-        router.push(`/productpayment?items=${itemsParam}&total=${totalPrice}`);
-      } else {
-        router.push(`/productpayment?total=${totalPrice}`);
-      }
-    } catch (error) {
-      console.error("Error encoding cart items for URL:", error);
-      router.push(`/productpayment?total=${totalPrice}`);
-    }
-  }, [cartItems, calculatedTotals, isOptimisticallyRemoving, onClose, router]);
-
-  const handleViewFullCart = useCallback(() => {
-    console.log("CartDrawer - Navigating to full cart page");
-    onClose();
-    router.push("/cart");
-  }, [onClose, router]);
-
-  const handleGoToLogin = useCallback(() => {
-    console.log("CartDrawer - Navigating to login");
-    onClose();
-    router.push("/login");
-  }, [onClose, router]);
-
-  // Backdrop click handler
-  const handleBackdropClick = useCallback(
-    (e: React.MouseEvent) => {
-      if (e.target === e.currentTarget) {
-        onClose();
-      }
-    },
-    [onClose]
-  );
-
-  // Format dynamic attributes for display
+  // Format attributes for display
   const formatItemAttributes = useCallback(
-    (item: Record<string, unknown>) => {
+    (item: CartItem) => {
       if (!localization) return "";
 
-      const attributes: Record<string, unknown> = {};
       const excludedKeys = [
         "productId",
         "cartData",
@@ -336,22 +278,19 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
         "sellerId",
         "isShop",
         "isOptimistic",
-        "isLoadingProduct",
-        "loadError",
-        "selectedColor",
         "selectedColorImage",
-        "gender",
         "salePreferences",
-        "sellerContactNo",        // ✅ ADD
-  "ourComission",           // ✅ ADD
-  "unitPrice",              // ✅ ADD
-  "currency",               // ✅ ADD
-  "addedAt",                // ✅ ADD
-  "updatedAt",              // ✅ ADD
-  "price",    
+        "sellerContactNo",
+        "ourComission",
+        "unitPrice",
+        "currency",
+        "addedAt",
+        "updatedAt",
+        "showSellerHeader",
       ];
 
-      // Collect all non-excluded attributes
+      const attributes: Record<string, unknown> = {};
+
       Object.entries(item).forEach(([key, value]) => {
         if (
           !excludedKeys.includes(key) &&
@@ -364,17 +303,16 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
         }
       });
 
-      // Handle selected color separately
+      // Handle selected color
       if (
-        typeof item.selectedColor === "string" &&
-        item.selectedColor !== "default"
+        item.cartData?.selectedColor &&
+        item.cartData.selectedColor !== "default"
       ) {
-        attributes["selectedColor"] = item.selectedColor;
+        attributes["selectedColor"] = item.cartData.selectedColor;
       }
 
       if (Object.keys(attributes).length === 0) return "";
 
-      // Get localized values only (without titles)
       const displayValues: string[] = [];
       Object.entries(attributes).forEach(([key, value]) => {
         const localizedValue =
@@ -393,201 +331,322 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     [localization]
   );
 
-  // Check if item is from shop (to determine if we should show bundles)
-  const isShopProduct = useCallback((item: Record<string, unknown>) => {
-    return typeof item.isShop === "boolean" ? item.isShop : false;
-  }, []);
+  // Handle checkout
+  const handleCheckout = useCallback(() => {
+    const selectedIds = Object.entries(selectedProducts)
+      .filter(([, selected]) => selected)
+      .map(([id]) => id);
 
-  // Get shop ID for bundle component
-  const getShopId = useCallback((item: Record<string, unknown>) => {
-    return typeof item.sellerId === "string" ? item.sellerId : undefined;
-  }, []);
+    if (selectedIds.length === 0) return;
 
-  // Get available stock for a cart item considering color selection
-  // This matches the exact logic from CartProvider.calculateCartTotals
-  const getAvailableStock = useCallback((item: Record<string, unknown>): number => {
-    const product = item.product;
-    if (!product || typeof product !== 'object') return 0;
+    const pricingMap = new Map();
+    calculatedTotals.items.forEach((itemTotal) => {
+      pricingMap.set(itemTotal.productId, itemTotal);
+    });
 
-    const cartData = item.cartData;
-    if (!cartData || typeof cartData !== 'object') return 0;
-
-    const selectedColor = (cartData as Record<string, unknown>).selectedColor;
-
-    // EXACT Flutter/CartProvider logic:
-    // If selectedColor exists, is not empty, is not 'default', and colorQuantities has that color
-    if (
-      selectedColor != null &&
-      typeof selectedColor === 'string' &&
-      selectedColor !== "" &&
-      selectedColor !== "default" &&
-      (product as Record<string, unknown>).colorQuantities &&
-      typeof (product as Record<string, unknown>).colorQuantities === 'object' &&
-      Object.prototype.hasOwnProperty.call(
-        (product as Record<string, unknown>).colorQuantities,
-        selectedColor
+    const paymentItems: PaymentItem[] = cartItems
+      .filter(
+        (item) => selectedIds.includes(item.productId) && !item.isOptimistic
       )
-    ) {
-      const colorQuantities = (product as Record<string, unknown>).colorQuantities as Record<string, number>;
-      return colorQuantities[selectedColor] || 0;
-    } else {
-      // Use regular product quantity
-      const quantity = (product as Record<string, unknown>).quantity;
-      return typeof quantity === 'number' ? quantity : 0;
-    }
-  }, []);
+      .map((item) => {
+        const paymentItem: PaymentItem = {
+          productId: item.productId,
+          quantity: item.quantity,
+          sellerName: item.sellerName,
+          sellerId: item.sellerId,
+          isShop: item.isShop,
+        };
 
-  // Memoize cart items rendering with bundle integration
+        if (item.cartData?.selectedMetres) {
+          paymentItem.selectedMetres = item.cartData.selectedMetres;
+        }
+        if (item.cartData?.selectedColor) {
+          paymentItem.selectedColor = item.cartData.selectedColor;
+        }
+
+        if (item.product) {
+          paymentItem.price = item.product.price;
+          paymentItem.productName = item.product.productName;
+          paymentItem.currency = item.product.currency;
+        }
+
+        const calculatedPricing = pricingMap.get(item.productId);
+        if (calculatedPricing) {
+          paymentItem.calculatedUnitPrice = calculatedPricing.unitPrice;
+          paymentItem.calculatedTotal = calculatedPricing.total;
+          paymentItem.isBundleItem = calculatedPricing.isBundleItem || false;
+        }
+
+        return paymentItem;
+      });
+
+    localStorage.setItem("cartItems", JSON.stringify(paymentItems));
+    localStorage.setItem("cartTotal", calculatedTotals.total.toString());
+
+    onClose();
+    router.push(`/productpayment?total=${calculatedTotals.total}`);
+  }, [selectedProducts, cartItems, calculatedTotals, onClose, router]);
+
+  // Backdrop click handler
+  const handleBackdropClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (e.target === e.currentTarget) {
+        onClose();
+      }
+    },
+    [onClose]
+  );
+
+  // Render cart items
   const renderCartItems = useMemo(() => {
     return cartItems.map((item) => {
-      const isRemoving = isOptimisticallyRemoving(item.productId);
-      const attributesDisplay = formatItemAttributes(item);
-      const showBundles = isShopProduct(item);
-      const shopId = getShopId(item);
-
-      // Get available stock considering color selection
+      const isSelected = selectedProducts[item.productId] ?? true;
       const availableStock = getAvailableStock(item);
-      const maxQuantity = availableStock > 0 ? Math.min(availableStock, 99) : 0;
+      const maxQuantity = Math.min(
+        availableStock,
+        item.salePreferences?.maxQuantity ?? 99
+      );
+      const attributesDisplay = formatItemAttributes(item);
 
       return (
         <div
           key={item.productId}
           className={`
-            transition-all duration-300 transform
+            rounded-xl border p-3 transition-all duration-200
             ${
-              isRemoving || item.isOptimistic
-                ? "opacity-50 scale-95"
-                : "opacity-100 scale-100"
+              isDarkMode
+                ? "bg-gray-800 border-gray-700"
+                : "bg-gray-50 border-gray-200"
             }
+            ${item.isOptimistic ? "opacity-50 border-dashed" : ""}
+            ${isSelected ? "border-orange-500" : ""}
           `}
         >
-          <div
-            className={`
-              rounded-xl border p-3 transition-all duration-200
-              ${
-                isDarkMode
-                  ? "bg-gray-800 border-gray-700 hover:border-gray-600"
-                  : "bg-gray-50 border-gray-200 hover:border-gray-300"
-              }
-              ${item.isOptimistic ? "border-dashed" : ""}
-            `}
-          >
+          {/* Seller Header */}
+          {item.showSellerHeader && (
             <div
-              onClick={() => {
-                onClose();
-                router.push(`/productdetail/${item.productId}`);
-              }}
-              className="cursor-pointer"
+              className={`
+                flex items-center space-x-2 mb-2 px-2 py-1 rounded-lg
+                ${isDarkMode ? "bg-gray-700" : "bg-orange-50"}
+              `}
             >
-              {item.product?.brandModel && (
-                <div className="mb-1 px-1">
-                  <span className={`text-sm font-semibold ${isDarkMode ? "text-blue-200" : "text-blue-600"}`}>
-                    {item.product.brandModel}
-                  </span>
-                </div>
-              )}
-              <ProductCard3
-                imageUrl={item.product?.imageUrls?.[0] || ""}
-                colorImages={item.product?.colorImages || {}}
-                selectedColorImage={
-                  typeof item.selectedColorImage === "string"
-                    ? item.selectedColorImage
-                    : undefined
+              <ShoppingBag size={14} className="text-orange-500" />
+              <span
+                className={`text-xs font-semibold ${
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                }`}
+              >
+                {item.sellerName}
+              </span>
+            </div>
+          )}
+
+          {/* Product Content */}
+          <div
+            className="flex items-start space-x-3 cursor-pointer"
+            onClick={() => {
+              onClose();
+              router.push(`/productdetail/${item.productId}`);
+            }}
+          >
+            {/* Checkbox */}
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={(e) => {
+                e.stopPropagation();
+                setSelectedProducts((prev) => ({
+                  ...prev,
+                  [item.productId]: e.target.checked,
+                }));
+              }}
+              className="mt-1 w-4 h-4 text-orange-500 rounded focus:ring-orange-500"
+            />
+
+            {/* Product Image */}
+            <div className="relative w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden">
+              <Image
+                src={
+                  item.selectedColorImage || item.product?.imageUrls?.[0] || ""
                 }
-                productName={item.product?.productName || t("loadingProduct")}
-                brandModel=""
-                price={item.product?.price || 0}
-                currency={item.product?.currency || "TL"}
-                averageRating={item.product?.averageRating || 0}
-                quantity={item.quantity}
-                maxQuantityAllowed={maxQuantity}
-                onQuantityChanged={
-                  item.isOptimistic || isRemoving || maxQuantity === 0
-                    ? undefined
-                    : (newQuantity) =>
-                        handleQuantityChange(item.productId, newQuantity)
-                }
-                isDarkMode={isDarkMode}
-                scaleFactor={0.9}
-                noStockText={t("noStock")}
+                alt={item.product?.productName || ""}
+                fill
+                className="object-cover"
+                sizes="80px"
               />
             </div>
 
-            {/* Display attributes in one line */}
-            {attributesDisplay && (
-              <div className="mt-2 text-xs text-gray-500">
-                <span className="font-medium"></span> {attributesDisplay}
-              </div>
-            )}
+            {/* Product Details */}
+            <div className="flex-1 min-w-0">
+              {item.product?.brandModel && (
+                <p
+                  className={`text-xs font-semibold mb-1 ${
+                    isDarkMode ? "text-blue-300" : "text-blue-600"
+                  }`}
+                >
+                  {item.product.brandModel}
+                </p>
+              )}
+              <h3
+                className={`text-sm font-semibold line-clamp-2 ${
+                  isDarkMode ? "text-white" : "text-gray-900"
+                }`}
+              >
+                {item.product?.productName || t("loadingProduct")}
+              </h3>
+              <p className="text-sm font-bold text-orange-500 mt-1">
+                {item.product?.price.toFixed(2)}{" "}
+                {item.product?.currency || "TL"}
+              </p>
+              {availableStock < 10 && (
+                <p className="text-xs text-red-500 mt-1">
+                  {t("onlyLeft")} {availableStock}
+                </p>
+              )}
+            </div>
+          </div>
 
-            {/* CompactBundleWidget - Show only for shop products */}
-            {showBundles && shopId && shopId.trim() !== "" && (
-              <CompactBundleWidget
-                productId={item.productId}
-                shopId={shopId}
-                isDarkMode={isDarkMode}
-                localization={t}
-                db={db}
-              />
-            )}
+          {/* Attributes */}
+          {attributesDisplay && (
+            <p
+              className={`text-xs mt-2 px-2 ${
+                isDarkMode ? "text-gray-400" : "text-gray-600"
+              }`}
+            >
+              {attributesDisplay}
+            </p>
+          )}
 
-            {/* Remove Button */}
-            <div className="mt-3 flex justify-end">
+          {/* Quantity Controls */}
+          <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+            <span
+              className={`text-sm font-medium ${
+                isDarkMode ? "text-gray-300" : "text-gray-700"
+              }`}
+            >
+              {t("quantity")}:
+            </span>
+            <div className="flex items-center space-x-2">
               <button
-                onClick={() => handleRemoveItem(item.productId)}
-                disabled={isRemoving || item.isOptimistic}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (item.quantity > 1) {
+                    handleQuantityChange(item.productId, item.quantity - 1);
+                  }
+                }}
+                disabled={item.quantity <= 1 || item.isOptimistic}
                 className={`
-                  flex items-center space-x-2 px-3 py-2 rounded-lg text-sm
-                  transition-colors duration-200
+                  p-1 rounded-lg transition-colors
                   ${
                     isDarkMode
-                      ? "text-red-400 hover:text-red-300 hover:bg-red-900/20"
-                      : "text-red-500 hover:text-red-600 hover:bg-red-50"
+                      ? "hover:bg-gray-700 text-gray-300"
+                      : "hover:bg-gray-200 text-gray-700"
                   }
-                  ${
-                    isRemoving || item.isOptimistic
-                      ? "opacity-50 cursor-not-allowed"
-                      : ""
-                  }
+                  disabled:opacity-50 disabled:cursor-not-allowed
                 `}
               >
-                {isRemoving ? (
-                  <RefreshCw size={14} className="animate-spin" />
-                ) : (
-                  <Trash2 size={14} />
-                )}
-                <span>{isRemoving ? t("removing") : t("remove")}</span>
+                <Minus size={16} />
+              </button>
+
+              <span
+                className={`min-w-[40px] text-center font-semibold ${
+                  isDarkMode ? "text-white" : "text-gray-900"
+                }`}
+              >
+                {item.quantity}
+              </span>
+
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (item.quantity < maxQuantity) {
+                    handleQuantityChange(item.productId, item.quantity + 1);
+                  }
+                }}
+                disabled={item.quantity >= maxQuantity || item.isOptimistic}
+                className={`
+                  p-1 rounded-lg transition-colors
+                  ${
+                    isDarkMode
+                      ? "hover:bg-gray-700 text-gray-300"
+                      : "hover:bg-gray-200 text-gray-700"
+                  }
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                `}
+              >
+                <Plus size={16} />
               </button>
             </div>
-
-            {/* Loading/Error States */}
-            {item.isLoadingProduct === true && (
-              <div className="mt-2 flex items-center space-x-2 text-xs text-gray-500">
-                <div className="animate-spin w-3 h-3 border border-gray-400 border-t-transparent rounded-full"></div>
-                <span>{t("loadingProductInfo")}</span>
-              </div>
-            )}
-
-            {item.loadError === true && (
-              <div className="mt-2 flex items-center space-x-2 text-xs text-red-500">
-                <AlertCircle size={12} />
-                <span>{t("productInfoError")}</span>
-              </div>
-            )}
           </div>
+
+          {/* Sale Preference Label */}
+          {item.salePreferences?.discountThreshold &&
+            item.salePreferences?.bulkDiscountPercentage && (
+              <div className="mt-2">
+                <div
+                  className={`
+                  inline-flex items-center space-x-1 px-2 py-1 rounded-full text-xs
+                  ${
+                    item.quantity >= item.salePreferences.discountThreshold
+                      ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
+                      : "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300"
+                  }
+                `}
+                >
+                  <span>
+                    {item.quantity >= item.salePreferences.discountThreshold
+                      ? t("youGotDiscount")
+                      : t("buyForDiscount")}
+                  </span>
+                </div>
+              </div>
+            )}
+
+          {/* Compact Bundle Widget */}
+          {item.isShop && item.sellerId && (
+            <CompactBundleWidget
+              productId={item.productId}
+              shopId={item.sellerId}
+              isDarkMode={isDarkMode}
+              localization={t}
+              db={db}
+            />
+          )}
+
+          {/* Remove Button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleRemoveItem(item.productId);
+            }}
+            disabled={item.isOptimistic}
+            className={`
+              mt-3 w-full flex items-center justify-center space-x-2 px-3 py-2 rounded-lg text-sm
+              transition-colors duration-200
+              ${
+                isDarkMode
+                  ? "text-red-400 hover:bg-red-900/20"
+                  : "text-red-500 hover:bg-red-50"
+              }
+              disabled:opacity-50 disabled:cursor-not-allowed
+            `}
+          >
+            <Trash2 size={14} />
+            <span>{t("remove")}</span>
+          </button>
         </div>
       );
     });
   }, [
     cartItems,
-    isOptimisticallyRemoving,
+    selectedProducts,
     isDarkMode,
+    getAvailableStock,
+    formatItemAttributes,
     handleQuantityChange,
     handleRemoveItem,
-    formatItemAttributes,
-    isShopProduct,
-    getShopId,
-    getAvailableStock,
+    onClose,
+    router,
     t,
   ]);
 
@@ -627,10 +686,9 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div
-                className={`
-                  p-2 rounded-full
-                  ${isDarkMode ? "bg-gray-800" : "bg-gray-100"}
-                `}
+                className={`p-2 rounded-full ${
+                  isDarkMode ? "bg-gray-800" : "bg-gray-100"
+                }`}
               >
                 <ShoppingCart
                   size={20}
@@ -639,19 +697,17 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
               </div>
               <div>
                 <h2
-                  className={`
-                    text-lg font-bold
-                    ${isDarkMode ? "text-white" : "text-gray-900"}
-                  `}
+                  className={`text-lg font-bold ${
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  }`}
                 >
                   {t("title")}
                 </h2>
                 {user && cartCount > 0 && (
                   <p
-                    className={`
-                      text-sm
-                      ${isDarkMode ? "text-gray-400" : "text-gray-500"}
-                    `}
+                    className={`text-sm ${
+                      isDarkMode ? "text-gray-400" : "text-gray-500"
+                    }`}
                   >
                     {cartCount} {t("itemsCount")}
                   </p>
@@ -673,45 +729,18 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
               <X size={20} />
             </button>
           </div>
-
-          {/* Clear Cart Button */}
-          {user && cartCount > 0 && (
-            <div className="mt-4">
-              <button
-                onClick={handleClearCart}
-                disabled={isClearing}
-                className={`
-                  flex items-center space-x-2 text-sm transition-colors duration-200
-                  ${
-                    isDarkMode
-                      ? "text-red-400 hover:text-red-300"
-                      : "text-red-500 hover:text-red-600"
-                  }
-                  ${isClearing ? "opacity-50 cursor-not-allowed" : ""}
-                `}
-              >
-                {isClearing ? (
-                  <RefreshCw size={16} className="animate-spin" />
-                ) : (
-                  <Trash2 size={16} />
-                )}
-                <span>{isClearing ? t("clearing") : t("clearCart")}</span>
-              </button>
-            </div>
-          )}
         </div>
 
         {/* Content */}
         <div className="flex flex-col h-full">
           <div className="flex-1 overflow-y-auto">
-            {/* Not Authenticated State */}
+            {/* Not Authenticated */}
             {!user ? (
               <div className="flex flex-col items-center justify-center h-full px-6 py-12">
                 <div
-                  className={`
-                    w-20 h-20 rounded-full flex items-center justify-center mb-6
-                    ${isDarkMode ? "bg-gray-800" : "bg-gray-100"}
-                  `}
+                  className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 ${
+                    isDarkMode ? "bg-gray-800" : "bg-gray-100"
+                  }`}
                 >
                   <User
                     size={32}
@@ -719,23 +748,24 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   />
                 </div>
                 <h3
-                  className={`
-                    text-xl font-bold mb-3 text-center
-                    ${isDarkMode ? "text-white" : "text-gray-900"}
-                  `}
+                  className={`text-xl font-bold mb-3 text-center ${
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  }`}
                 >
                   {t("loginRequired")}
                 </h3>
                 <p
-                  className={`
-                    text-center mb-8 leading-relaxed
-                    ${isDarkMode ? "text-gray-400" : "text-gray-600"}
-                  `}
+                  className={`text-center mb-8 ${
+                    isDarkMode ? "text-gray-400" : "text-gray-600"
+                  }`}
                 >
                   {t("loginToViewCart")}
                 </p>
                 <button
-                  onClick={handleGoToLogin}
+                  onClick={() => {
+                    onClose();
+                    router.push("/login");
+                  }}
                   className="
                     flex items-center space-x-2 px-6 py-3 rounded-full
                     bg-gradient-to-r from-orange-500 to-pink-500 text-white
@@ -748,25 +778,26 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   <span className="font-medium">{t("login")}</span>
                 </button>
               </div>
-            ) : /* Loading State */ isLoading && !isInitialized ? (
+            ) : /* Loading */ isLoading && !isInitialized ? (
               <div className="flex flex-col items-center justify-center h-full px-6 py-12">
-                <div className="animate-spin w-8 h-8 border-3 border-orange-500 border-t-transparent rounded-full mb-4"></div>
+                <RefreshCw
+                  size={32}
+                  className="animate-spin text-orange-500 mb-4"
+                />
                 <p
-                  className={`
-                    text-center
-                    ${isDarkMode ? "text-gray-400" : "text-gray-600"}
-                  `}
+                  className={`text-center ${
+                    isDarkMode ? "text-gray-400" : "text-gray-600"
+                  }`}
                 >
                   {t("loading")}
                 </p>
               </div>
-            ) : /* Empty Cart State */ cartCount === 0 ? (
+            ) : /* Empty Cart */ cartCount === 0 ? (
               <div className="flex flex-col items-center justify-center h-full px-6 py-12">
                 <div
-                  className={`
-                    w-20 h-20 rounded-full flex items-center justify-center mb-6
-                    ${isDarkMode ? "bg-gray-800" : "bg-gray-100"}
-                  `}
+                  className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 ${
+                    isDarkMode ? "bg-gray-800" : "bg-gray-100"
+                  }`}
                 >
                   <ShoppingBag
                     size={32}
@@ -774,18 +805,16 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   />
                 </div>
                 <h3
-                  className={`
-                    text-xl font-bold mb-3 text-center
-                    ${isDarkMode ? "text-white" : "text-gray-900"}
-                  `}
+                  className={`text-xl font-bold mb-3 text-center ${
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  }`}
                 >
                   {t("emptyCart")}
                 </h3>
                 <p
-                  className={`
-                    text-center mb-8 leading-relaxed
-                    ${isDarkMode ? "text-gray-400" : "text-gray-600"}
-                  `}
+                  className={`text-center mb-8 ${
+                    isDarkMode ? "text-gray-400" : "text-gray-600"
+                  }`}
                 >
                   {t("emptyCartDescription")}
                 </p>
@@ -809,44 +838,40 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
             ) : (
               /* Cart Items */
               <div className="px-4 py-4">
-                <div className="space-y-4 pb-32">
-                  {renderCartItems}
+                <div className="space-y-4 pb-32">{renderCartItems}</div>
 
-                  {/* Load More Button */}
-                  {hasMore && (
-                    <div className="flex justify-center pt-4">
-                      <button
-                        onClick={loadMoreItems}
-                        disabled={isLoadingMore}
-                        className={`
-                          px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200
-                          ${
-                            isDarkMode
-                              ? "bg-gray-800 text-gray-300 hover:bg-gray-700"
-                              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                          }
-                          ${
-                            isLoadingMore ? "opacity-50 cursor-not-allowed" : ""
-                          }
-                        `}
-                      >
-                        {isLoadingMore ? (
-                          <div className="flex items-center space-x-2">
-                            <RefreshCw size={14} className="animate-spin" />
-                            <span>{t("loadingMore")}</span>
-                          </div>
-                        ) : (
-                          t("loadMore")
-                        )}
-                      </button>
-                    </div>
-                  )}
-                </div>
+                {/* Load More */}
+                {hasMore && (
+                  <div className="flex justify-center pt-4">
+                    <button
+                      onClick={loadMoreItems}
+                      disabled={isLoadingMore}
+                      className={`
+                        px-4 py-2 rounded-lg text-sm font-medium transition-colors
+                        ${
+                          isDarkMode
+                            ? "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        }
+                        disabled:opacity-50 disabled:cursor-not-allowed
+                      `}
+                    >
+                      {isLoadingMore ? (
+                        <div className="flex items-center space-x-2">
+                          <RefreshCw size={14} className="animate-spin" />
+                          <span>{t("loadingMore")}</span>
+                        </div>
+                      ) : (
+                        t("loadMore")
+                      )}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
 
-          {/* Footer - Show only when there are items */}
+          {/* Footer */}
           {user && cartCount > 0 && (
             <div
               className={`
@@ -862,22 +887,32 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
               {/* Total */}
               <div className="flex items-center justify-between mb-4">
                 <span
-                  className={`
-                    text-lg font-bold
-                    ${isDarkMode ? "text-white" : "text-gray-900"}
-                  `}
+                  className={`text-lg font-bold ${
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  }`}
                 >
                   {t("total")}:
                 </span>
-                <span className="text-lg font-bold text-orange-500">
-                  {calculatedTotals.total.toFixed(2)} TL
-                </span>
+                {isCalculatingTotals ? (
+                  <RefreshCw
+                    size={20}
+                    className="animate-spin text-orange-500"
+                  />
+                ) : (
+                  <span className="text-lg font-bold text-orange-500">
+                    {calculatedTotals.total.toFixed(2)}{" "}
+                    {calculatedTotals.currency}
+                  </span>
+                )}
               </div>
 
-              {/* Action Buttons */}
+              {/* Buttons */}
               <div className="grid grid-cols-2 gap-3">
                 <button
-                  onClick={handleViewFullCart}
+                  onClick={() => {
+                    onClose();
+                    router.push("/cart");
+                  }}
                   className={`
                     py-3 px-4 rounded-xl font-medium transition-all duration-200
                     ${
@@ -892,12 +927,18 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 </button>
                 <button
                   onClick={handleCheckout}
+                  disabled={
+                    isCalculatingTotals ||
+                    Object.values(selectedProducts).filter((v) => v).length ===
+                      0
+                  }
                   className="
                     py-3 px-4 rounded-xl font-medium transition-all duration-200
                     bg-gradient-to-r from-orange-500 to-pink-500 text-white
                     hover:from-orange-600 hover:to-pink-600
                     shadow-lg hover:shadow-xl active:scale-95
                     flex items-center justify-center space-x-2
+                    disabled:opacity-50 disabled:cursor-not-allowed
                   "
                 >
                   <span>{t("checkout")}</span>

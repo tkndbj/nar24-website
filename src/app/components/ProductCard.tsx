@@ -366,14 +366,17 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
 
   // Cart, favorites, and user hooks
   const {
-    addToCart,
-    isInCart: isProductInCart,
-    isOptimisticallyAdding,
-    isOptimisticallyRemoving,
+    addProductToCart, // ✅ Changed from addToCart
     removeFromCart,
+    cartProductIds, // ✅ Use this to check if in cart
   } = useCart();
   const { addToFavorites, isFavorite: isProductFavorite } = useFavorites();
   const { user } = useUser();
+
+  const isProductInCart = useCallback(
+    (productId: string) => cartProductIds.has(productId),
+    [cartProductIds]
+  );
 
   const [isDarkModeState, setIsDarkMode] = useState(false);
   const isDarkMode =
@@ -444,26 +447,26 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
 
   const handleCardClick = useCallback(() => {
     const now = Date.now();
-  
+
     // Throttle rapid taps
     if (now - lastNavigationTime < NAVIGATION_THROTTLE) {
       return;
     }
-  
+
     setLastNavigationTime(now);
-  
+
     // Record click analytics
     analyticsBatcher.recordClick(product.id, product.shopId);
-  
+
     // ✅ Cache is already set by useEffect above
     // No need to do anything here!
-  
+
     // ✅ Precache hero image
     if (product.imageUrls.length > 0) {
       const img = new window.Image();
       img.src = product.imageUrls[0];
     }
-  
+
     // Navigate
     if (onTap) {
       onTap();
@@ -471,7 +474,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
       router.push(`/productdetail/${product.id}`);
     }
   }, [product, router, lastNavigationTime, onTap]);
-  
+
   // ✅ Check theme changes
   useEffect(() => {
     const checkTheme = () => {
@@ -509,16 +512,33 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
         setCartButtonState("adding");
 
         let quantityToAdd = 1;
-        const attributesToAdd = selectedOptions;
+        let selectedColor: string | undefined;
+        const attributes: Record<string, unknown> = {};
 
-        if (selectedOptions && typeof selectedOptions.quantity === "number") {
-          quantityToAdd = selectedOptions.quantity;
+        if (selectedOptions) {
+          if (typeof selectedOptions.quantity === "number") {
+            quantityToAdd = selectedOptions.quantity;
+          }
+
+          // Extract selectedColor separately
+          if (typeof selectedOptions.selectedColor === "string") {
+            selectedColor = selectedOptions.selectedColor;
+          }
+
+          // Extract other attributes
+          Object.entries(selectedOptions).forEach(([key, value]) => {
+            if (key !== "quantity" && key !== "selectedColor") {
+              attributes[key] = value;
+            }
+          });
         }
 
-        const result = await addToCart(
-          product.id,
+        // ✅ Use addProductToCart with Product object
+        const result = await addProductToCart(
+          product, // Pass the entire product object
           quantityToAdd,
-          attributesToAdd
+          selectedColor,
+          attributes
         );
 
         if (result.includes("Added") || result.includes("Updated")) {
@@ -536,7 +556,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
         setCartButtonState("idle");
       }
     },
-    [product, addToCart, onAddToCart]
+    [product, addProductToCart, onAddToCart]
   );
 
   const performCartRemoval = useCallback(async () => {
@@ -677,10 +697,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
 
   // ✅ Get cart button content
   const getCartButtonContent = useCallback(() => {
-    const isOptimisticAdd = isOptimisticallyAdding(product.id);
-    const isOptimisticRemove = isOptimisticallyRemoving(product.id);
-
-    if (cartButtonState === "adding" || isOptimisticAdd) {
+    if (cartButtonState === "adding") {
       return {
         icon: (
           <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
@@ -689,7 +706,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
       };
     }
 
-    if (cartButtonState === "removing" || isOptimisticRemove) {
+    if (cartButtonState === "removing") {
       return {
         icon: (
           <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
@@ -723,14 +740,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
       icon: <ShoppingCart size={16} />,
       className: isDarkMode ? "text-white" : "text-gray-800",
     };
-  }, [
-    cartButtonState,
-    actualIsInCart,
-    isOptimisticallyAdding,
-    isOptimisticallyRemoving,
-    product.id,
-    isDarkMode,
-  ]);
+  }, [cartButtonState, actualIsInCart, isDarkMode]);
 
   // ✅ Get favorite button content
   const getFavoriteButtonContent = useCallback(() => {
@@ -771,25 +781,6 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
       className: "",
     };
   }, [favoriteButtonState, actualIsFavorite, isDarkMode]);
-
-  // Reset button states when optimistic operations complete
-  useEffect(() => {
-    const isOptimisticAdd = isOptimisticallyAdding(product.id);
-    const isOptimisticRemove = isOptimisticallyRemoving(product.id);
-
-    if (
-      (cartButtonState === "adding" || cartButtonState === "removing") &&
-      !isOptimisticAdd &&
-      !isOptimisticRemove
-    ) {
-      setCartButtonState("idle");
-    }
-  }, [
-    product.id,
-    isOptimisticallyAdding,
-    isOptimisticallyRemoving,
-    cartButtonState,
-  ]);
 
   const effectiveScaleFactor = scaleFactor;
   const finalInternalScaleFactor =
@@ -908,10 +899,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
   const favoriteButtonContent = getFavoriteButtonContent();
 
   const isProcessingCart =
-    cartButtonState === "adding" ||
-    cartButtonState === "removing" ||
-    isOptimisticallyAdding(product.id) ||
-    isOptimisticallyRemoving(product.id);
+    cartButtonState === "adding" || cartButtonState === "removing";
 
   const isProcessingFavorite =
     favoriteButtonState === "adding" || favoriteButtonState === "removing";

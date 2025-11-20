@@ -12,7 +12,7 @@ export default async function LocaleLayout({
 }) {
   const { locale } = await params;
   const messages = await getMessages({ locale });
-  const timeZone = "Europe/Istanbul";
+  const timeZone = "Europe/Istanbul"; // ✅ FIXED - straight quotes
 
   return (
     <LayoutWrapper

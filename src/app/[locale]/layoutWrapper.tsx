@@ -12,10 +12,10 @@ import { SearchHistoryProvider } from "@/context/SearchHistoryProvider";
 import ConditionalFooter from "../components/ConditionalFooter";
 import CookieConsent from "../components/CookieConsent";
 import { PersonalizedRecommendationsProvider } from "@/context/PersonalizedRecommendationsProvider";
-import { AppInitializer } from '@/app/components/AppInitializer';
-import { AnalyticsInitializer } from '@/app/components/AnalyticsInitializer'; // ✅ NEW
-import { db } from "@/lib/firebase";
-import { ProductCacheProvider } from '@/context/ProductCacheProvider';
+import { AppInitializer } from "@/app/components/AppInitializer";
+import { AnalyticsInitializer } from "@/app/components/AnalyticsInitializer"; // ✅ NEW
+import { db, functions } from "@/lib/firebase";
+import { ProductCacheProvider } from "@/context/ProductCacheProvider";
 
 // Inner component that has access to user context
 function AppProviders({ children }: { children: React.ReactNode }) {
@@ -23,22 +23,22 @@ function AppProviders({ children }: { children: React.ReactNode }) {
 
   return (
     <ProductCacheProvider>
-    <CartProvider user={user} db={db}>      
-      <FavoritesProvider>
-        <BadgeProvider>
-          <SearchProvider>
-            <SearchHistoryProvider>
-              <PersonalizedRecommendationsProvider>
-                <ConditionalHeader />
-                <main>{children}</main>
-                <ConditionalFooter />
-                <CookieConsent />
-              </PersonalizedRecommendationsProvider>
-            </SearchHistoryProvider>
-          </SearchProvider>
-        </BadgeProvider>
-      </FavoritesProvider>
-    </CartProvider>
+      <CartProvider user={user} db={db} functions={functions}>
+        <FavoritesProvider>
+          <BadgeProvider>
+            <SearchProvider>
+              <SearchHistoryProvider>
+                <PersonalizedRecommendationsProvider>
+                  <ConditionalHeader />
+                  <main>{children}</main>
+                  <ConditionalFooter />
+                  <CookieConsent />
+                </PersonalizedRecommendationsProvider>
+              </SearchHistoryProvider>
+            </SearchProvider>
+          </BadgeProvider>
+        </FavoritesProvider>
+      </CartProvider>
     </ProductCacheProvider>
   );
 }
@@ -62,16 +62,12 @@ export default function LayoutWrapper({
     >
       {/* ✅ Step 1: Initialize memory manager (no user context needed) */}
       <AppInitializer>
-        
         {/* ✅ Step 2: Provide user context */}
         <UserProvider>
-          
           {/* ✅ Step 3: Initialize analytics (needs user context) */}
           <AnalyticsInitializer>
-            
             {/* ✅ Step 4: Other providers */}
             <AppProviders>{children}</AppProviders>
-            
           </AnalyticsInitializer>
         </UserProvider>
       </AppInitializer>

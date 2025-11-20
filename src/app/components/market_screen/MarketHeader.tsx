@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
 import {
   Bell,
   Heart,
@@ -32,7 +38,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const locale = useLocale();
-  
+
   // ✅ OPTIMIZED: Context hooks - data comes from providers
   const { user, isLoading: userLoading } = useUser();
   const { unreadNotificationsCount } = useBadgeProvider();
@@ -45,7 +51,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
-  
+
   // Drawer states
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
@@ -61,7 +67,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
     };
 
     updateTheme();
-    
+
     const observer = new MutationObserver(updateTheme);
     observer.observe(document.documentElement, {
       attributes: true,
@@ -91,21 +97,24 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
   }, []);
 
   // ✅ OPTIMIZED: Simplified language switching
-  const switchLanguage = useCallback((newLocale: string) => {
-    // Close the menu immediately FIRST
-    setShowLanguageMenu(false);
+  const switchLanguage = useCallback(
+    (newLocale: string) => {
+      // Close the menu immediately FIRST
+      setShowLanguageMenu(false);
 
-    // Small delay to ensure dropdown is fully closed before navigation
-    setTimeout(() => {
-      let pathWithoutLocale = pathname;
-      if (pathname.startsWith(`/${locale}`)) {
-        pathWithoutLocale = pathname.substring(`/${locale}`.length) || "/";
-      }
+      // Small delay to ensure dropdown is fully closed before navigation
+      setTimeout(() => {
+        let pathWithoutLocale = pathname;
+        if (pathname.startsWith(`/${locale}`)) {
+          pathWithoutLocale = pathname.substring(`/${locale}`.length) || "/";
+        }
 
-      const newPath = `/${newLocale}${pathWithoutLocale}`;
-      router.push(newPath);
-    }, 50);
-  }, [pathname, locale, router]);
+        const newPath = `/${newLocale}${pathWithoutLocale}`;
+        router.push(newPath);
+      }, 50);
+    },
+    [pathname, locale, router]
+  );
 
   // ✅ SIMPLIFIED: Search handlers
   const handleSearchStateChange = useCallback((searching: boolean) => {
@@ -116,21 +125,24 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
     setSearchTerm(value);
   }, []);
 
-  const handleSearchSubmit = useCallback((term?: string) => {
-    const searchQuery = (term || searchTerm).trim();
-    if (searchQuery) {
-      setIsSearching(false);
-      router.push(`/search-results?q=${encodeURIComponent(searchQuery)}`);
-      if (!term) {
-        setSearchTerm("");
+  const handleSearchSubmit = useCallback(
+    (term?: string) => {
+      const searchQuery = (term || searchTerm).trim();
+      if (searchQuery) {
+        setIsSearching(false);
+        router.push(`/search-results?q=${encodeURIComponent(searchQuery)}`);
+        if (!term) {
+          setSearchTerm("");
+        }
       }
-    }
-  }, [searchTerm, router]);
+    },
+    [searchTerm, router]
+  );
 
   // ✅ OPTIMIZED: Logout handler with proper error handling
   const handleLogout = useCallback(async () => {
     if (isLoggingOut) return;
-    
+
     try {
       setIsLoggingOut(true);
       await signOut(auth);
@@ -144,7 +156,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
   // ✅ MEMOIZED: Badge components to prevent unnecessary re-renders
   const NotificationBadge = useMemo(() => {
     if (!user || unreadNotificationsCount === 0) return null;
-    
+
     return (
       <div className="absolute -top-1 -right-1 min-w-[18px] lg:min-w-[20px] h-4 lg:h-5 bg-emerald-500 rounded-full flex items-center justify-center shadow-lg ring-2 ring-white dark:ring-gray-900">
         <span className="text-white text-xs font-bold px-1">
@@ -156,7 +168,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
 
   const FavoriteBadge = useMemo(() => {
     if (!user || favoriteCount === 0) return null;
-    
+
     return (
       <div className="absolute -top-1 -right-1 min-w-[18px] lg:min-w-[20px] h-4 lg:h-5 bg-pink-500 rounded-full flex items-center justify-center shadow-lg ring-2 ring-white dark:ring-gray-900">
         <span className="text-white text-xs font-bold px-1">
@@ -168,7 +180,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
 
   const CartBadge = useMemo(() => {
     if (!user || cartCount === 0) return null;
-    
+
     return (
       <div className="absolute -top-1 -right-1 min-w-[18px] lg:min-w-[20px] h-4 lg:h-5 bg-orange-500 rounded-full flex items-center justify-center shadow-lg ring-2 ring-white dark:ring-gray-900">
         <span className="text-white text-xs font-bold px-1">
@@ -181,10 +193,20 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
   // ✅ OPTIMIZED: Loading state with minimal UI
   if (userLoading) {
     return (
-      <header className={`sticky top-0 z-50 ${isDark ? "bg-gray-900/95" : "bg-white/95"} backdrop-blur-xl border-b ${isDark ? "border-gray-700/50" : "border-gray-200/50"} ${className}`}>
+      <header
+        className={`sticky top-0 z-50 ${
+          isDark ? "bg-gray-900/95" : "bg-white/95"
+        } backdrop-blur-xl border-b ${
+          isDark ? "border-gray-700/50" : "border-gray-200/50"
+        } ${className}`}
+      >
         <div className="safe-area-top">
           <div className="h-16 px-4 flex items-center justify-center">
-            <div className={`animate-pulse h-8 w-20 rounded ${isDark ? "bg-gray-800" : "bg-gray-200"}`}></div>
+            <div
+              className={`animate-pulse h-8 w-20 rounded ${
+                isDark ? "bg-gray-800" : "bg-gray-200"
+              }`}
+            ></div>
           </div>
         </div>
       </header>
@@ -194,19 +216,27 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
   // ✅ MEMOIZED: Icon button styles
   const iconButtonClass = `
     relative p-2 lg:p-2.5 rounded-full transition-all duration-200
-    ${isDark
-      ? "hover:bg-gray-700 text-gray-300 hover:text-white"
-      : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"}
+    ${
+      isDark
+        ? "hover:bg-gray-700 text-gray-300 hover:text-white"
+        : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
+    }
     active:scale-95 group
   `;
 
   return (
     <>
-      <header className={`
+      <header
+        className={`
         sticky top-0 z-50
-        ${isDark ? "bg-gray-900/95 border-gray-700/50" : "bg-white/95 border-gray-200/50"}
+        ${
+          isDark
+            ? "bg-gray-900/95 border-gray-700/50"
+            : "bg-white/95 border-gray-200/50"
+        }
         backdrop-blur-xl border-b shadow-sm ${className}
-      `}>
+      `}
+      >
         <div className="safe-area-top">
           {/* Mobile Layout (Two Rows) */}
           <div className="lg:hidden">
@@ -342,7 +372,10 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                     `}
                     aria-label={t("header.logout")}
                   >
-                    <LogOut size={16} className={isLoggingOut ? "animate-pulse" : ""} />
+                    <LogOut
+                      size={16}
+                      className={isLoggingOut ? "animate-pulse" : ""}
+                    />
                   </button>
                 ) : (
                   <button
@@ -519,7 +552,10 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                   `}
                   aria-label={t("header.logout")}
                 >
-                  <LogOut size={18} className={isLoggingOut ? "animate-pulse" : ""} />
+                  <LogOut
+                    size={18}
+                    className={isLoggingOut ? "animate-pulse" : ""}
+                  />
                 </button>
               ) : (
                 <button

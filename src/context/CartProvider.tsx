@@ -16,32 +16,37 @@ import {
   onSnapshot,
   writeBatch,
   serverTimestamp,
-  increment,
+
   query,
   orderBy,
   limit,
   startAfter,
-  where,
+
   DocumentSnapshot,
   QuerySnapshot,
   QueryDocumentSnapshot,
-  runTransaction,
+  DocumentChange,
+
   getDoc,
   getDocs,
   Timestamp,
-  DocumentReference,
+
   FieldValue,
-  documentId,
+
   Firestore,
+  deleteDoc,
+  updateDoc,
+  setDoc,
 } from "firebase/firestore";
 import { User } from "firebase/auth";
 import { ProductUtils, Product } from "@/app/models/Product";
-import { requestDeduplicator } from "@/app/utils/requestDeduplicator";
-import { cacheManager, CACHE_NAMES } from "@/app/utils/cacheManager";
-import { debouncer, DEBOUNCE_DELAYS } from "@/app/utils/debouncer";
-import { circuitBreaker, CIRCUITS } from "@/app/utils/circuitBreaker";
+import RedisService from "@/services/redis_service";
+import { httpsCallable, Functions } from "firebase/functions";
 
-// Types
+// ============================================================================
+// TYPES - Matching Flutter implementation
+// ============================================================================
+
 interface CartUser {
   uid: string;
   email?: string | null;
@@ -50,16 +55,8 @@ interface CartUser {
 
 interface SalePreferences {
   discountThreshold?: number;
-  discountPercentage?: number;
+  bulkDiscountPercentage?: number;
   maxQuantity?: number;
-}
-
-interface BundleData {
-  bundlePrice?: number;
-  currency?: string;
-  bundleId?: string;
-  mainProductId?: string;
-  isBundle?: boolean;
 }
 
 interface CartData {
@@ -74,6 +71,13 @@ interface CartData {
   selectedColor?: string;
   selectedSize?: string;
   selectedMetres?: number;
+  // Cached values for validation
+  cachedPrice?: number;
+  cachedBundlePrice?: number;
+  cachedDiscountPercentage?: number;
+  cachedDiscountThreshold?: number;
+  cachedBulkDiscountPercentage?: number;
+  cachedMaxQuantity?: number;
   [key: string]: unknown;
 }
 
@@ -86,11 +90,9 @@ interface CartItem {
   sellerId: string;
   isShop: boolean;
   isOptimistic?: boolean;
-  isLoadingProduct?: boolean;
-  loadError?: boolean;
-  sellerContactNo?: string | null;
   salePreferences?: SalePreferences | null;
   selectedColorImage?: string;
+  showSellerHeader?: boolean;
   [key: string]: unknown;
 }
 
@@ -98,15 +100,7 @@ interface CartAttributes {
   [key: string]: unknown;
 }
 
-interface SellerInfo {
-  sellerId: string;
-  sellerName: string;
-  isShop: boolean;
-  sellerContactNo?: string | null;
-}
-
 export interface CartTotals {
-  subtotal: number;
   total: number;
   currency: string;
   items: CartItemTotal[];
@@ -120,6 +114,42 @@ export interface CartItemTotal {
   isBundleItem?: boolean;
 }
 
+// Type for cart data from Firestore
+interface FirestoreCartData {
+  [key: string]: unknown;
+}
+
+// Type for optimistic cache entries
+interface OptimisticCacheEntry {
+  _deleted?: boolean;
+  _optimistic?: boolean;
+  [key: string]: unknown;
+}
+
+// Type for validated items from payment validation
+interface ValidatedCartItem {
+  productId: string;
+  unitPrice?: number;
+  bundlePrice?: number;
+  discountPercentage?: number;
+  discountThreshold?: number;
+  bulkDiscountPercentage?: number;
+  maxQuantity?: number;
+  [key: string]: unknown;
+}
+
+// Type for validation errors/warnings
+interface ValidationMessage {
+  key: string;
+  params: Record<string, unknown>;
+}
+
+// Type for bundle data items
+interface BundleDataItem {
+  bundlePrice?: number;
+  [key: string]: unknown;
+}
+
 interface CartContextType {
   // State
   cartCount: number;
@@ -131,31 +161,37 @@ interface CartContextType {
   isInitialized: boolean;
 
   // Methods
-  addToCart: (
+  addProductToCart: (
+    product: Product,
+    quantity?: number,
+    selectedColor?: string,
+    attributes?: CartAttributes
+  ) => Promise<string>;
+  addToCartById: (
     productId: string,
     quantity?: number,
+    selectedColor?: string,
     attributes?: CartAttributes
   ) => Promise<string>;
   removeFromCart: (productId: string) => Promise<string>;
   updateQuantity: (productId: string, newQuantity: number) => Promise<string>;
-  incrementQuantity: (productId: string) => Promise<string>;
-  decrementQuantity: (productId: string) => Promise<string>;
-  clearCart: () => Promise<string>;
   removeMultipleFromCart: (productIds: string[]) => Promise<string>;
   initializeCartIfNeeded: () => Promise<void>;
   loadMoreItems: () => Promise<void>;
   calculateCartTotals: (selectedProductIds?: string[]) => Promise<CartTotals>;
-  validateForPayment: (selectedProductIds: string[]) => Promise<{
+  validateForPayment: (
+    selectedProductIds: string[],
+    reserveStock?: boolean
+  ) => Promise<{
     isValid: boolean;
-    errors: Record<string, string>;
+    errors: Record<string, ValidationMessage>;
+    warnings: Record<string, ValidationMessage>;
+    validatedItems: ValidatedCartItem[];
   }>;
+  updateCartCacheFromValidation: (validatedItems: ValidatedCartItem[]) => Promise<boolean>;
   refresh: () => Promise<void>;
-
-  // Utilities
-  isInCart: (productId: string) => boolean;
-  isOptimisticallyAdding: (productId: string) => boolean;
-  isOptimisticallyRemoving: (productId: string) => boolean;
-  getCachedCartItem: (productId: string) => CartData | null;
+  enableLiveUpdates: () => void;
+  disableLiveUpdates: () => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -168,25 +204,63 @@ export const useCart = (): CartContextType => {
   return context;
 };
 
-// Constants - Matching Flutter implementation
+// ============================================================================
+// RATE LIMITER - Matching Flutter implementation
+// ============================================================================
+
+class RateLimiter {
+  private lastOperations: Map<string, number> = new Map();
+  private cooldown: number;
+
+  constructor(cooldownMs: number) {
+    this.cooldown = cooldownMs;
+  }
+
+  canProceed(operationKey: string): boolean {
+    const lastTime = this.lastOperations.get(operationKey);
+    const now = Date.now();
+
+    if (!lastTime) {
+      this.lastOperations.set(operationKey, now);
+      return true;
+    }
+
+    const elapsed = now - lastTime;
+    if (elapsed >= this.cooldown) {
+      this.lastOperations.set(operationKey, now);
+      return true;
+    }
+
+    return false;
+  }
+}
+
+// ============================================================================
+// CONSTANTS - Matching Flutter implementation
+// ============================================================================
+
 const ITEMS_PER_PAGE = 20;
-const CACHE_VALID_DURATION = 5 * 60 * 1000; // 5 minutes
-const OPTIMISTIC_TIMEOUT = 10000; // 10 seconds
-const MAX_RETRIES = 3;
-const RETRY_DELAY = 2000;
+const OPTIMISTIC_TIMEOUT = 3000; // 3 seconds like Flutter
+const ADD_TO_CART_COOLDOWN = 300; // 300ms like Flutter
+const QUANTITY_UPDATE_COOLDOWN = 200; // 200ms like Flutter
 
 interface CartProviderProps {
   children: ReactNode;
   user: CartUser | User | null;
   db: Firestore;
+  functions: Functions;
 }
 
 export const CartProvider: React.FC<CartProviderProps> = ({
   children,
   user,
   db,
+  functions,
 }) => {
-  // Core state matching Flutter implementation
+  // ========================================================================
+  // STATE - Matching Flutter ValueNotifiers
+  // ========================================================================
+
   const [cartProductIds, setCartProductIds] = useState<Set<string>>(new Set());
   const [cartCount, setCartCount] = useState(0);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -195,1723 +269,1343 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
 
-  // Refs for managing state without re-renders
-  const currentPageRef = useRef(0);
+  // ========================================================================
+  // REFS - Internal state management
+  // ========================================================================
+
   const lastDocumentRef = useRef<DocumentSnapshot | null>(null);
-  const cartItemsCacheRef = useRef<Record<string, CartData>>({});
-  const lastCacheUpdateRef = useRef<Date | null>(null);
-  const retryCountRef = useRef(0);
-
-  // Optimistic operations tracking - matching Flutter implementation
-  const optimisticAddsRef = useRef<Set<string>>(new Set());
-  const optimisticRemovesRef = useRef<Set<string>>(new Set());
-  const optimisticItemsRef = useRef<Map<string, CartItem>>(new Map());
-  const optimisticTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
-  const operationIdsRef = useRef<Map<string, string>>(new Map());
-
-  const pendingUpdatesRef = useRef<Record<string, Partial<CartData>>>({});
-  const batchUpdateTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isInitializingRef = useRef(false);
   const unsubscribeCartRef = useRef<(() => void) | null>(null);
 
-  // System fields checker - matching Flutter
-  const isSystemField = useCallback((key: string): boolean => {
-    const systemFields = new Set([
-      "addedAt",
-      "updatedAt",
-      "quantity",
-      "sellerId",
-      "sellerName",
-      "isShop",
-      "selectedMetres",
-    ]);
-    return systemFields.has(key);
-  }, []);
-
-  // Clear optimistic state - matching Flutter implementation
-  const clearOptimisticState = useCallback((productId: string): void => {
-    optimisticAddsRef.current.delete(productId);
-    optimisticRemovesRef.current.delete(productId);
-    optimisticItemsRef.current.delete(productId);
-
-    const timer = optimisticTimersRef.current.get(productId);
-    if (timer) {
-      clearTimeout(timer);
-      optimisticTimersRef.current.delete(productId);
-    }
-
-    operationIdsRef.current.delete(productId);
-  }, []);
-
-  // Clear all data when user logs out - matching Flutter
-  const clearUserData = useCallback((): void => {
-    setCartCount(0);
-    setCartProductIds(new Set());
-    setCartItems([]);
-    setIsInitialized(false);
-    setIsLoading(false);
-    setIsLoadingMore(false);
-    setHasMore(true);
-
-    cartItemsCacheRef.current = {};
-    lastCacheUpdateRef.current = null;
-    pendingUpdatesRef.current = {};
-    retryCountRef.current = 0;
-    currentPageRef.current = 0;
-    lastDocumentRef.current = null;
-
-    // Clear optimistic state
-    optimisticAddsRef.current.clear();
-    optimisticRemovesRef.current.clear();
-    optimisticItemsRef.current.clear();
-    optimisticTimersRef.current.forEach((timer) => clearTimeout(timer));
-    optimisticTimersRef.current.clear();
-    operationIdsRef.current.clear();
-
-    if (batchUpdateTimerRef.current) {
-      clearTimeout(batchUpdateTimerRef.current);
-      batchUpdateTimerRef.current = null;
-    }
-  }, []);
-
-  // Fetch active bundle for product - matching Flutter with circuit breaker
-  const fetchActiveBundleForProduct = useCallback(
-    async (productId: string): Promise<BundleData | null> => {
-      try {
-        // Wrap with circuit breaker for resilience
-        const snapshot = await circuitBreaker.execute(
-          CIRCUITS.FIREBASE_PRODUCTS,
-          () =>
-            getDocs(
-              query(
-                collection(db, "bundles"),
-                where("productId", "==", productId),
-                where("isActive", "==", true),
-                limit(1)
-              )
-            ),
-          async () => ({ docs: [], empty: true } as unknown as QuerySnapshot) // Fallback
-        );
-
-        if (snapshot.empty) return null;
-
-        const data = snapshot.docs[0].data();
-        return {
-          bundlePrice: data.bundlePrice,
-          currency: data.currency,
-          bundleId: data.bundleId,
-          mainProductId: data.mainProductId,
-          isBundle: true,
-        };
-      } catch (error) {
-        if (process.env.NODE_ENV === "development") {
-          console.error("Error fetching bundle:", error);
-        }
-        return null;
-      }
-    },
-    [db]
+  // Rate limiters
+  const addToCartLimiterRef = useRef(
+    new RateLimiter(ADD_TO_CART_COOLDOWN)
+  );
+  const quantityLimiterRef = useRef(
+    new RateLimiter(QUANTITY_UPDATE_COOLDOWN)
   );
 
+  // Optimistic updates tracking
+  const optimisticCacheRef = useRef<Map<string, OptimisticCacheEntry>>(new Map());
+  const optimisticTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+
+  // Concurrency control
+  const quantityUpdateLocksRef = useRef<Map<string, Promise<string>>>(
+    new Map()
+  );
+  const pendingFetchesRef = useRef<Map<string, Promise<unknown>>>(new Map());
+
+  // Redis service instance
+  const redisRef = useRef(RedisService);
+
+  // ========================================================================
+  // HELPER FUNCTIONS
+  // ========================================================================
+
+  const clearOptimisticUpdate = useCallback((productId: string) => {
+    optimisticCacheRef.current.delete(productId);
+    const timer = optimisticTimeoutsRef.current.get(productId);
+    if (timer) {
+      clearTimeout(timer);
+      optimisticTimeoutsRef.current.delete(productId);
+    }
+  }, []);
+
+  const hasRequiredFields = useCallback((cartData: FirestoreCartData): boolean => {
+    const required = [
+      "productId",
+      "productName",
+      "unitPrice",
+      "availableStock",
+      "sellerName",
+      "sellerId",
+    ];
+
+    for (const field of required) {
+      if (!cartData[field]) return false;
+    }
+
+    const productName = cartData.productName;
+    if (!productName || productName === "Unknown Product") return false;
+
+    const sellerName = cartData.sellerName;
+    if (!sellerName || sellerName === "Unknown") return false;
+
+    return true;
+  }, []);
+
+  const buildProductFromCartData = useCallback((cartData: FirestoreCartData): Product => {
+    // Safe getters matching Flutter implementation
+    const safeGet = <T,>(key: string, defaultValue: T): T => {
+      const value = cartData[key];
+      if (value === null || value === undefined) return defaultValue;
+
+      if (typeof defaultValue === "number") {
+        if (typeof value === "number") return value as T;
+        if (typeof value === "string") {
+          const parsed =
+            defaultValue % 1 === 0 ? parseInt(value) : parseFloat(value);
+          return (isNaN(parsed) ? defaultValue : parsed) as T;
+        }
+      }
+
+      if (typeof defaultValue === "string") return String(value) as T;
+      if (typeof defaultValue === "boolean") {
+        if (typeof value === "boolean") return value as T;
+        return (String(value).toLowerCase() === "true") as T;
+      }
+
+      return value as T;
+    };
+
+    const safeStringList = (key: string): string[] => {
+      const value = cartData[key];
+      if (!value) return [];
+      if (Array.isArray(value)) return value.map((e) => String(e));
+      if (typeof value === "string" && value) return [value];
+      return [];
+    };
+
+    const safeColorImages = (key: string): Record<string, string[]> => {
+      const value = cartData[key];
+      if (!value || typeof value !== "object") return {};
+
+      const result: Record<string, string[]> = {};
+      Object.entries(value).forEach(([k, v]) => {
+        if (Array.isArray(v)) {
+          result[k] = v.map((e) => String(e));
+        } else if (typeof v === "string" && v) {
+          result[k] = [v];
+        }
+      });
+      return result;
+    };
+
+    const safeColorQuantities = (key: string): Record<string, number> => {
+      const value = cartData[key];
+      if (!value || typeof value !== "object") return {};
+
+      const result: Record<string, number> = {};
+      Object.entries(value).forEach(([k, v]) => {
+        if (typeof v === "number") {
+          result[k] = v;
+        } else if (typeof v === "string") {
+          result[k] = parseInt(v) || 0;
+        }
+      });
+      return result;
+    };
+
+    const safeBundleData = (key: string): BundleDataItem[] | undefined => {
+      const value = cartData[key];
+      if (!value || !Array.isArray(value)) return undefined;
+
+      try {
+        return value.map((item): BundleDataItem => {
+          if (typeof item === "object" && item !== null) {
+            return item as BundleDataItem;
+          }
+          return {};
+        });
+      } catch {
+        return undefined;
+      }
+    };
+
+    const safeTimestamp = (key: string): Timestamp => {
+      const value = cartData[key];
+      if (value instanceof Timestamp) return value;
+      if (typeof value === "number")
+        return Timestamp.fromMillis(value);
+      if (typeof value === "string") {
+        try {
+          return Timestamp.fromDate(new Date(value));
+        } catch {}
+      }
+      return Timestamp.now();
+    };
+
+    // Build Product object
+    const imageUrls = safeStringList("allImages");
+    return ProductUtils.fromJson({
+      id: safeGet("productId", ""),
+      productName: safeGet("productName", "Unknown Product"),
+      description: safeGet("description", ""),
+      price: safeGet("unitPrice", 0),
+      currency: safeGet("currency", "TL"),
+      originalPrice: cartData.originalPrice ?? undefined,
+      discountPercentage: cartData.discountPercentage ?? undefined,
+      condition: safeGet("condition", "Brand New"),
+      brandModel: safeGet("brandModel", ""),
+      category: safeGet("category", "Uncategorized"),
+      subcategory: safeGet("subcategory", ""),
+      subsubcategory: safeGet("subsubcategory", ""),
+      imageUrls: imageUrls.length > 0 ? imageUrls : [safeGet("productImage", "")],
+      colorImages: safeColorImages("colorImages"),
+      videoUrl: cartData.videoUrl ?? undefined,
+      quantity: safeGet("availableStock", 0),
+      colorQuantities: safeColorQuantities("colorQuantities"),
+      averageRating: safeGet("averageRating", 0),
+      reviewCount: safeGet("reviewCount", 0),
+      maxQuantity: cartData.maxQuantity ?? undefined,
+      discountThreshold: cartData.discountThreshold ?? undefined,
+      bulkDiscountPercentage: cartData.bulkDiscountPercentage ?? undefined,
+      bundleIds: safeStringList("bundleIds"),
+      bundleData: safeBundleData("bundleData") ?? safeBundleData("cachedBundleData"),
+      userId: safeGet("sellerId", ""),
+      ownerId: safeGet("sellerId", ""),
+      shopId: cartData.isShop === true ? safeGet("sellerId", undefined) : undefined,
+      sellerName: safeGet("sellerName", "Unknown"),
+      ilanNo: safeGet("ilanNo", "N/A"),
+      createdAt: safeTimestamp("createdAt"),
+      deliveryOption: safeGet("deliveryOption", "Self Delivery"),
+      availableColors: safeStringList("availableColors"),
+      attributes: cartData.attributes ?? {},
+      reference: {
+        id: safeGet("productId", ""),
+        path: `shop_products/${safeGet("productId", "")}`,
+        parent: { id: "shop_products" },
+      },
+    });
+  }, []);
+
   const extractSalePreferences = useCallback(
-    (product: Product): SalePreferences | null => {
-      // Build map only if there are sale preferences
+    (data: FirestoreCartData): SalePreferences | null => {
       const salePrefs: SalePreferences = {};
 
-      if (product.maxQuantity != null) {
-        salePrefs.maxQuantity = product.maxQuantity;
+      if (data.maxQuantity !== undefined && data.maxQuantity !== null) {
+        salePrefs.maxQuantity = data.maxQuantity as number;
       }
-      if (product.discountThreshold != null) {
-        salePrefs.discountThreshold = product.discountThreshold;
+      if (data.discountThreshold !== undefined && data.discountThreshold !== null) {
+        salePrefs.discountThreshold = data.discountThreshold as number;
       }
-      if (product.discountPercentage != null) {
-        salePrefs.discountPercentage = product.discountPercentage;
+      if (data.bulkDiscountPercentage !== undefined && data.bulkDiscountPercentage !== null) {
+        salePrefs.bulkDiscountPercentage = data.bulkDiscountPercentage as number;
       }
 
-      // Return null if empty, otherwise return the map
       return Object.keys(salePrefs).length === 0 ? null : salePrefs;
     },
     []
   );
 
-  // Get product document references - matching Flutter implementation with circuit breaker
-  const getProductDocument = useCallback(
-    async (
-      productIds: string[]
-    ): Promise<Record<string, DocumentReference | null>> => {
-      const result: Record<string, DocumentReference | null> = {};
-
-      try {
-        for (let i = 0; i < productIds.length; i += 10) {
-          const batch = productIds.slice(i, i + 10);
-
-          // Try shop_products first - with circuit breaker protection
-          const shopSnapshot = await circuitBreaker.execute(
-            CIRCUITS.FIREBASE_SHOP_PRODUCTS,
-            () =>
-              getDocs(
-                query(
-                  collection(db, "shop_products"),
-                  where(documentId(), "in", batch)
-                )
-              ),
-            async () => ({ docs: [], empty: true } as unknown as QuerySnapshot) // Fallback
-          );
-
-          const foundInShop = new Set<string>();
-          shopSnapshot.docs.forEach((doc: QueryDocumentSnapshot) => {
-            result[doc.id] = doc.ref;
-            foundInShop.add(doc.id);
-          });
-
-          // Check remaining IDs in products collection - with circuit breaker protection
-          const remainingIds = batch.filter((id) => !foundInShop.has(id));
-          if (remainingIds.length > 0) {
-            const productsSnapshot = await circuitBreaker.execute(
-              CIRCUITS.FIREBASE_PRODUCTS,
-              () =>
-                getDocs(
-                  query(
-                    collection(db, "products"),
-                    where(documentId(), "in", remainingIds)
-                  )
-                ),
-              async () =>
-                ({ docs: [], empty: true } as unknown as QuerySnapshot) // Fallback
-            );
-
-            productsSnapshot.docs.forEach((doc: QueryDocumentSnapshot) => {
-              result[doc.id] = doc.ref;
-            });
-          }
-
-          // Mark unfound products as null
-          batch.forEach((productId) => {
-            if (!(productId in result)) {
-              result[productId] = null;
-            }
-          });
-        }
-      } catch (error) {
-        if (process.env.NODE_ENV === "development") {
-          console.error("Error fetching product documents:", error);
-        }
-        productIds.forEach((productId) => {
-          result[productId] = null;
-        });
-      }
-
-      return result;
-    },
-    [db]
-  );
-
-  // Fetch product details batch - matching Flutter implementation
-  const fetchProductDetailsBatch = useCallback(
-    async (productIds: string[]): Promise<Record<string, Product | null>> => {
-      const result: Record<string, Product | null> = {};
-
-      try {
-        for (let i = 0; i < productIds.length; i += 10) {
-          const chunk = productIds.slice(i, i + 10);
-
-          // ✅ Check cache first
-          const uncachedIds: string[] = [];
-          chunk.forEach((id) => {
-            const cached = cacheManager.get<Product>(CACHE_NAMES.PRODUCTS, id);
-            if (cached) {
-              result[id] = cached;
-            } else {
-              uncachedIds.push(id);
-            }
-          });
-
-          // Only fetch uncached products - with circuit breaker protection
-          if (uncachedIds.length > 0) {
-            const snapshot = await circuitBreaker.execute(
-              CIRCUITS.FIREBASE_SHOP_PRODUCTS,
-              () =>
-                getDocs(
-                  query(
-                    collection(db, "shop_products"),
-                    where(documentId(), "in", uncachedIds)
-                  )
-                ),
-              async () =>
-                ({ docs: [], empty: true } as unknown as QuerySnapshot) // Fallback
-            );
-
-            snapshot.docs.forEach((doc: QueryDocumentSnapshot) => {
-              if (!result[doc.id]) {
-                try {
-                  const docData = doc.data();
-                  const productJson = {
-                    ...docData,
-                    id: doc.id,
-                    reference: {
-                      id: doc.id,
-                      path: doc.ref.path,
-                      parent: {
-                        id: doc.ref.parent.id,
-                      },
-                    },
-                  };
-
-                  const product = ProductUtils.fromJson(productJson);
-                  result[doc.id] = product;
-
-                  // ✅ Cache for 5 minutes
-                  cacheManager.set(
-                    CACHE_NAMES.PRODUCTS,
-                    doc.id,
-                    product,
-                    5 * 60 * 1000
-                  );
-                } catch (error) {
-                  if (process.env.NODE_ENV === "development") {
-                    console.error(`Error parsing product ${doc.id}:`, error);
-                  }
-                  result[doc.id] = null;
-                }
-              }
-            });
-          }
-        }
-      } catch (error) {
-        if (process.env.NODE_ENV === "development") {
-          console.error("Error fetching product details:", error);
-        }
-      }
-
-      return result;
-    },
-    [db]
-  );
-
-  // Fetch seller info - matching Flutter implementation
-  const fetchSellerInfo = useCallback(
-    async (
-      prodRef: DocumentReference,
-      productData: Product // ✅ Changed from ProductDocumentData to Product
-    ): Promise<SellerInfo> => {
-      const parent = prodRef.parent.id;
-      let sellerId: string;
-      let sellerName: string;
-      let isShop: boolean;
-      let sellerContactNo: string | null = null;
-
-      if (parent === "shop_products") {
-        const shopId = productData.shopId || productData.ownerId;
-        sellerId = shopId || "unknown";
-        isShop = true;
-
-        if (shopId) {
-          try {
-            // Wrap with circuit breaker for resilience
-            const shopDoc = await circuitBreaker.execute(
-              CIRCUITS.FIREBASE_SHOP_PRODUCTS,
-              () => getDoc(doc(db, "shops", shopId)),
-              async () =>
-                ({
-                  exists: () => false,
-                  data: () => undefined,
-                } as unknown as DocumentSnapshot) // Fallback
-            );
-
-            if (shopDoc.exists()) {
-              const shopData = shopDoc.data();
-              sellerName = shopData?.name || "Unknown Shop";
-              sellerContactNo = shopData?.contactNo || null;
-            } else {
-              sellerName = productData.sellerName || "Unknown Shop";
-            }
-          } catch (error) {
-            if (process.env.NODE_ENV === "development") {
-              console.error("Error fetching shop info:", error);
-            }
-            sellerName = productData.sellerName || "Unknown Shop";
-          }
-        } else {
-          sellerName = "Unknown Shop";
-        }
-      } else {
-        const ownerId = productData.ownerId;
-        sellerId = ownerId || "unknown";
-        isShop = false;
-
-        if (ownerId) {
-          try {
-            // Wrap with circuit breaker for resilience
-            const userDoc = await circuitBreaker.execute(
-              CIRCUITS.FIREBASE_PRODUCTS,
-              () => getDoc(doc(db, "users", ownerId)),
-              async () =>
-                ({
-                  exists: () => false,
-                  data: () => undefined,
-                } as unknown as DocumentSnapshot) // Fallback
-            );
-
-            if (userDoc.exists()) {
-              const userData = userDoc.data();
-              const sellerInfo = userData?.sellerInfo;
-              sellerName =
-                sellerInfo?.name || userData?.displayName || "Unknown Seller";
-              sellerContactNo = sellerInfo?.phone || null;
-            } else {
-              sellerName = productData.sellerName || "Unknown Seller";
-            }
-          } catch (error) {
-            if (process.env.NODE_ENV === "development") {
-              console.error("Error fetching user info:", error);
-            }
-            sellerName = productData.sellerName || "Unknown Seller";
-          }
-        } else {
-          sellerName = "Unknown Seller";
-        }
-      }
-
-      return { sellerId, sellerName, isShop, sellerContactNo };
-    },
-    [db]
-  );
-
-  // Apply optimistic update - matching Flutter implementation
-  const applyOptimisticUpdate = useCallback(
-    async (
-      productId: string,
-      isAdding: boolean,
-      quantity: number,
-      attributes?: CartAttributes
-    ): Promise<void> => {
-      clearOptimisticState(productId);
-
-      if (isAdding) {
-        optimisticAddsRef.current.add(productId);
-
-        // Update cart IDs immediately - use functional update to avoid race conditions
-        setCartProductIds((prev) => {
-          const newIds = new Set(prev);
-          newIds.add(productId);
-          setCartCount(newIds.size);
-          return newIds;
-        });
-
-        // If initialized, try to add optimistic item with product data
-        if (isInitialized) {
-          const productDetails = await fetchProductDetailsBatch([productId]);
-          const product = productDetails[productId];
-
-          if (product) {
-            const optimisticItem: CartItem = {
-              cartData: {
-                quantity,
-                addedAt: serverTimestamp(),
-                sellerId: "loading...",
-                sellerName: "Loading...",
-                isShop: false,
-                ...attributes,
-              } as CartData,
-              product,
-              productId,
-              isOptimistic: true,
-              quantity,
-              sellerName: "Loading...",
-              sellerId: "loading...",
-              isShop: false,
-              ...attributes,
-            };
-
-            optimisticItemsRef.current.set(productId, optimisticItem);
-
-            // Add to UI immediately - use functional update to avoid race conditions
-            setCartItems((prevItems) => [optimisticItem, ...prevItems]);
-          }
-        }
-      } else {
-        optimisticRemovesRef.current.add(productId);
-
-        // Remove from IDs immediately - use functional update to avoid race conditions
-        setCartProductIds((prev) => {
-          const newIds = new Set(prev);
-          newIds.delete(productId);
-          setCartCount(newIds.size);
-          return newIds;
-        });
-
-        // Remove from UI immediately - use functional update to avoid race conditions
-        if (isInitialized) {
-          setCartItems((prevItems) =>
-            prevItems.filter((item) => item.productId !== productId)
-          );
-        }
-      }
-
-      // Set timeout for rollback
-      const timeout = setTimeout(() => {
-        rollbackOptimisticUpdate(productId, isAdding);
-      }, OPTIMISTIC_TIMEOUT);
-
-      optimisticTimersRef.current.set(productId, timeout);
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isInitialized, fetchProductDetailsBatch, clearOptimisticState]
-  );
-
-  // Rollback optimistic update - matching Flutter implementation
-  const rollbackOptimisticUpdate = useCallback(
-    (productId: string, wasAdding: boolean): void => {
-      if (wasAdding && optimisticAddsRef.current.has(productId)) {
-        optimisticAddsRef.current.delete(productId);
-        const newIds = new Set(cartProductIds);
-        newIds.delete(productId);
-        setCartProductIds(newIds);
-        setCartCount(newIds.size);
-
-        if (isInitialized) {
-          const currentItems = [...cartItems];
-          const filtered = currentItems.filter(
-            (item) => !(item.productId === productId && item.isOptimistic)
-          );
-          setCartItems(filtered);
-        }
-      } else if (!wasAdding && optimisticRemovesRef.current.has(productId)) {
-        optimisticRemovesRef.current.delete(productId);
-        const newIds = new Set(cartProductIds);
-        newIds.add(productId);
-        setCartProductIds(newIds);
-        setCartCount(newIds.size);
-
-        if (isInitialized && cartItemsCacheRef.current[productId]) {
-          // Restore removed item logic would go here
-        }
-      }
-
-      const timer = optimisticTimersRef.current.get(productId);
-      if (timer) {
-        clearTimeout(timer);
-        optimisticTimersRef.current.delete(productId);
-      }
-      optimisticItemsRef.current.delete(productId);
-    },
-    [cartProductIds, cartItems, isInitialized]
-  );
-
-  // Resolve color image - matching Flutter implementation
   const resolveColorImage = useCallback(
     (product: Product, selectedColor?: string): string | undefined => {
-      if (!selectedColor) return undefined;
-
-      if (product.colorImages && product.colorImages[selectedColor]) {
-        const colorImagesList = product.colorImages[selectedColor];
-        if (colorImagesList && colorImagesList.length > 0) {
-          return colorImagesList[0];
-        }
+      if (!selectedColor || !product.colorImages?.[selectedColor]) {
+        return undefined;
       }
 
-      return undefined;
+      const images = product.colorImages[selectedColor];
+      return images?.[0];
     },
     []
   );
 
-  // Update cart items from snapshot - matching Flutter implementation
-  const updateCartItemsFromSnapshot = useCallback(
-    async (snapshot: QuerySnapshot): Promise<void> => {
-      if (snapshot.empty) {
-        setCartItems([]);
-        return;
+  const createCartItem = useCallback(
+    (productId: string, cartData: FirestoreCartData, product: Product): CartItem => {
+      const salePreferences = extractSalePreferences(cartData);
+
+      return {
+        product,
+        productId,
+        quantity: (cartData.quantity as number) ?? 1,
+        salePreferences,
+        selectedColorImage: resolveColorImage(product, cartData.selectedColor as string | undefined),
+        sellerName: (cartData.sellerName as string) ?? "Unknown",
+        sellerId: (cartData.sellerId as string) ?? "unknown",
+        isShop: (cartData.isShop as boolean) ?? false,
+        cartData: cartData as CartData,
+        isOptimistic: false,
+      };
+    },
+    [extractSalePreferences, resolveColorImage]
+  );
+
+  const sortCartItems = useCallback((items: CartItem[]) => {
+    items.sort((a, b) => {
+      // Group by seller
+      const sellerA = a.sellerId ?? "";
+      const sellerB = b.sellerId ?? "";
+      if (sellerA !== sellerB) return sellerA.localeCompare(sellerB);
+
+      // Then by added date
+      const dateA = a.cartData.addedAt as Timestamp;
+      const dateB = b.cartData.addedAt as Timestamp;
+      if (!dateA || !dateB) return 0;
+      return dateB.toMillis() - dateA.toMillis();
+    });
+
+    // Add seller headers
+    let lastSeller: string | null = null;
+    items.forEach((item) => {
+      const sellerId = item.sellerId ?? "";
+      item.showSellerHeader = sellerId !== lastSeller;
+      lastSeller = sellerId;
+    });
+  }, []);
+
+  // ========================================================================
+  // REAL-TIME LISTENER - Matching Flutter implementation
+  // ========================================================================
+
+  const updateCartIds = useCallback((docs: QueryDocumentSnapshot[]) => {
+    const ids = new Set(docs.map((doc) => doc.id));
+
+    // Apply optimistic updates
+    const effectiveIds = new Set(ids);
+    optimisticCacheRef.current.forEach((value, key) => {
+      if (value._deleted === true) {
+        effectiveIds.delete(key);
+      } else {
+        effectiveIds.add(key);
       }
+    });
 
-      const productIds = snapshot.docs.map((doc) => doc.id);
-      const productDetails = await fetchProductDetailsBatch(productIds);
+    setCartProductIds(effectiveIds);
+    setCartCount(effectiveIds.size);
+  }, []);
 
-      const updatedItems: CartItem[] = [];
+  const processCartChanges = useCallback(
+    async (changes: DocumentChange<FirestoreCartData>[]) => {
+      const itemsMap = new Map<string, CartItem>();
 
-      for (const cartDoc of snapshot.docs) {
-        const cartData = cartDoc.data() as CartData;
-        const productDetail = productDetails[cartDoc.id];
+      // Start with current items (exclude optimistic ones)
+      cartItems.forEach((item) => {
+        if (!item.isOptimistic) {
+          itemsMap.set(item.productId, item);
+        }
+      });
 
-        // ✅ NEW: Extract from product instead of fetching
-        const salePreferences = productDetail
-          ? extractSalePreferences(productDetail)
-          : null;
+      // Process changes
+      for (const change of changes) {
+        const productId = change.doc.id;
+        const cartData = change.doc.data();
 
-        if (productDetail) {
-          const quantity = cartData.quantity || 1;
-
-          const dynamicAttributes: Record<string, unknown> = {};
-          Object.entries(cartData).forEach(([key, value]) => {
-            if (!isSystemField(key)) {
-              dynamicAttributes[key] = value;
+        if (
+          change.type === "added" ||
+          change.type === "modified"
+        ) {
+          if (cartData && hasRequiredFields(cartData)) {
+            try {
+              const product = buildProductFromCartData(cartData);
+              itemsMap.set(productId, createCartItem(productId, cartData, product));
+              clearOptimisticUpdate(productId);
+            } catch (error) {
+              console.error(`Failed to process ${productId}:`, error);
             }
-          });
-
-          const selectedColorImage = resolveColorImage(
-            productDetail,
-            cartData.selectedColor as string
-          );
-
-          updatedItems.push({
-            cartData,
-            product: productDetail,
-            productId: cartDoc.id,
-            isOptimistic: false,
-            quantity,
-            salePreferences, // ✅ Now using extracted preferences
-            selectedColorImage,
-            sellerName: cartData.sellerName,
-            sellerId: cartData.sellerId,
-            isShop: cartData.isShop,
-            sellerContactNo: cartData.sellerContactNo as string | null,
-            ...dynamicAttributes,
-          });
+          }
+        } else if (change.type === "removed") {
+          itemsMap.delete(productId);
+          clearOptimisticUpdate(productId);
         }
       }
 
-      // Sort by addedAt
-      updatedItems.sort((a, b) => {
-        const aTime = a.cartData.addedAt as Timestamp;
-        const bTime = b.cartData.addedAt as Timestamp;
-        if (!aTime || !bTime) return 0;
-        return bTime.toMillis() - aTime.toMillis();
-      });
+      // Deduplicate by productId
+      const uniqueItems = Array.from(itemsMap.values());
+      sortCartItems(uniqueItems);
+      setCartItems(uniqueItems);
 
-      // Add optimistic items that aren't in server response yet
-      optimisticItemsRef.current.forEach((optimisticItem, productId) => {
-        if (!updatedItems.some((item) => item.productId === productId)) {
-          updatedItems.unshift(optimisticItem);
-        }
-      });
-
-      setCartItems(updatedItems);
+      // Invalidate Redis cache
+      if (user) {
+        redisRef.current.invalidateCartTotals(user.uid);
+      }
     },
     [
-      fetchProductDetailsBatch,
-      extractSalePreferences,
-      isSystemField,
-      resolveColorImage,
+      cartItems,
+      hasRequiredFields,
+      buildProductFromCartData,
+      createCartItem,
+      clearOptimisticUpdate,
+      sortCartItems,
+      user,
     ]
   );
 
-  // Process cart snapshot - reconcile with optimistic updates
-  const processCartSnapshot = useCallback(
-    (snapshot: QuerySnapshot): void => {
-      const serverIds = new Set<string>();
-      const newCache: Record<string, CartData> = {};
+  const handleRealtimeUpdate = useCallback(
+    (snapshot: QuerySnapshot) => {
+      // Skip during initialization
+      if (isInitializingRef.current) {
+        console.log("⏭️ Skipping listener (initializing)");
+        return;
+      }
 
-      snapshot.docs.forEach((doc) => {
-        serverIds.add(doc.id);
-        const data = doc.data();
+      if (snapshot.metadata.fromCache) {
+        console.log("⏭️ Skipping cache event");
+        return;
+      }
 
-        const cartData: CartData = {
-          quantity: data.quantity || 1,
-          addedAt: data.addedAt,
-          updatedAt: data.updatedAt,
-          sellerId: data.sellerId || "unknown",
-          sellerName: data.sellerName || "Unknown",
-          isShop: data.isShop || false,
-        };
+      console.log(`🔥 Real-time update: ${snapshot.docChanges().length} changes`);
 
-        // Add dynamic attributes
-        Object.entries(data).forEach(([key, value]) => {
-          if (!isSystemField(key)) {
-            cartData[key] = value;
+      updateCartIds(snapshot.docs);
+
+      if (snapshot.docChanges().length > 0) {
+        processCartChanges(snapshot.docChanges());
+      } else if (snapshot.docs.length === 0) {
+        setCartItems([]);
+      }
+    },
+    [updateCartIds, processCartChanges]
+  );
+
+  const enableLiveUpdates = useCallback(() => {
+    if (!user) return;
+
+    // Cancel existing listener
+    if (unsubscribeCartRef.current) {
+      unsubscribeCartRef.current();
+      unsubscribeCartRef.current = null;
+    }
+
+    console.log("🔴 Enabling real-time cart listener");
+
+    const cartQuery = query(collection(db, "users", user.uid, "cart"));
+
+    unsubscribeCartRef.current = onSnapshot(
+      cartQuery,
+      { includeMetadataChanges: false },
+      handleRealtimeUpdate,
+      (error) => console.error("❌ Listener error:", error)
+    );
+  }, [user, db, handleRealtimeUpdate]);
+
+  const disableLiveUpdates = useCallback(() => {
+    console.log("🔴 Disabling cart listener");
+    if (unsubscribeCartRef.current) {
+      unsubscribeCartRef.current();
+      unsubscribeCartRef.current = null;
+    }
+  }, []);
+
+  // ========================================================================
+  // INITIALIZATION
+  // ========================================================================
+
+  const buildCartItemsFromDocs = useCallback(
+    async (docs: QueryDocumentSnapshot[]) => {
+      const items: CartItem[] = [];
+
+      for (const doc of docs) {
+        const cartData = doc.data();
+        if (hasRequiredFields(cartData)) {
+          try {
+            const product = buildProductFromCartData(cartData);
+            items.push(createCartItem(doc.id, cartData, product));
+          } catch (error) {
+            console.error(`Failed to build item ${doc.id}:`, error);
           }
-        });
+        }
+      }
 
-        newCache[doc.id] = cartData;
+      sortCartItems(items);
+      setCartItems(items);
+      updateCartIds(docs);
+    },
+    [
+      hasRequiredFields,
+      buildProductFromCartData,
+      createCartItem,
+      sortCartItems,
+      updateCartIds,
+    ]
+  );
+
+  const initializeCartIfNeeded = useCallback(async () => {
+    if (!user || isInitialized) return;
+
+    if (pendingFetchesRef.current.has("init")) {
+      console.log("⏳ Already initializing, waiting...");
+      await pendingFetchesRef.current.get("init");
+      return;
+    }
+
+    const initPromise = (async () => {
+      setIsLoading(true);
+      isInitializingRef.current = true;
+
+      // Clear existing items
+      setCartItems([]);
+      setCartProductIds(new Set());
+      setCartCount(0);
+
+      // Reset pagination state
+      lastDocumentRef.current = null;
+      setHasMore(true);
+
+      try {
+        const cartQuery = query(
+          collection(db, "users", user.uid, "cart"),
+          orderBy("addedAt", "desc"),
+          limit(ITEMS_PER_PAGE)
+        );
+
+        const snapshot = await getDocs(cartQuery);
+
+        await buildCartItemsFromDocs(snapshot.docs);
+
+        if (snapshot.docs.length > 0) {
+          lastDocumentRef.current = snapshot.docs[snapshot.docs.length - 1];
+          setHasMore(snapshot.docs.length >= ITEMS_PER_PAGE);
+        }
+
+        setIsInitialized(true);
+
+        // Enable listener AFTER initialization
+        enableLiveUpdates();
+      } catch (error) {
+        console.error("❌ Init error:", error);
+      } finally {
+        setIsLoading(false);
+        isInitializingRef.current = false;
+      }
+    })();
+
+    pendingFetchesRef.current.set("init", initPromise);
+    await initPromise;
+    pendingFetchesRef.current.delete("init");
+  }, [user, isInitialized, db, buildCartItemsFromDocs, enableLiveUpdates]);
+
+  // ========================================================================
+  // ADD TO CART - Matching Flutter implementation
+  // ========================================================================
+
+  const buildProductDataForCart = useCallback(
+    (
+      product: Product,
+      selectedColor?: string,
+      attributes?: CartAttributes
+    ): Record<string, unknown> => {
+      let extractedBundlePrice: number | undefined;
+      if (product.bundleData && product.bundleData.length > 0) {
+        const bundlePrice = product.bundleData[0]?.bundlePrice;
+        extractedBundlePrice = typeof bundlePrice === 'number' ? bundlePrice : undefined;
+      }
+
+      return {
+        productId: product.id,
+        productName: product.productName,
+        description: product.description,
+        unitPrice: product.price,
+        currency: product.currency,
+        originalPrice: product.originalPrice,
+        discountPercentage: product.discountPercentage,
+        condition: product.condition,
+        brandModel: product.brandModel,
+        category: product.category,
+        subcategory: product.subcategory,
+        subsubcategory: product.subsubcategory,
+        allImages: product.imageUrls,
+        productImage: product.imageUrls.length > 0 ? product.imageUrls[0] : "",
+        colorImages: product.colorImages,
+        videoUrl: product.videoUrl,
+        availableStock: product.quantity,
+        colorQuantities: product.colorQuantities,
+        availableColors: product.availableColors,
+        averageRating: product.averageRating,
+        reviewCount: product.reviewCount,
+        maxQuantity: product.maxQuantity,
+        discountThreshold: product.discountThreshold,
+        bulkDiscountPercentage: product.bulkDiscountPercentage,
+        bundleIds: product.bundleIds,
+        bundleData: product.bundleData,
+        sellerId: product.userId,
+        sellerName: product.sellerName,
+        isShop: product.shopId != null,
+        shopId: product.shopId,
+        ilanNo: product.ilanNo,
+        createdAt: product.createdAt,
+        deliveryOption: product.deliveryOption,
+        selectedColor,
+        attributes,
+        // Cached values for validation
+        cachedPrice: product.price,
+        cachedDiscountPercentage: product.discountPercentage,
+        cachedDiscountThreshold: product.discountThreshold,
+        cachedBundlePrice: extractedBundlePrice,
+        cachedBulkDiscountPercentage: product.bulkDiscountPercentage,
+        cachedMaxQuantity: product.maxQuantity,
+      };
+    },
+    []
+  );
+
+  const backgroundRefreshTotals = useCallback(async () => {
+    if (!user || cartProductIds.size === 0) return;
+
+    try {
+      await calculateCartTotals(Array.from(cartProductIds));
+      console.log("⚡ Background totals cached");
+    } catch (error) {
+      console.log("⚠️ Background total refresh failed:", error);
+    }
+  }, [user, cartProductIds]);
+
+  const applyOptimisticAdd = useCallback(
+    (productId: string, productData: Record<string, unknown>, quantity: number) => {
+      clearOptimisticUpdate(productId);
+
+      // Remove ALL existing items with this productId
+      const existingItems = cartItems.filter(
+        (item) => item.productId !== productId
+      );
+
+      // Mark as optimistic
+      optimisticCacheRef.current.set(productId, {
+        ...productData,
+        quantity,
+        _optimistic: true,
       });
 
-      cartItemsCacheRef.current = newCache;
-      lastCacheUpdateRef.current = new Date();
+      // Update IDs
+      const newIds = new Set(cartProductIds);
+      newIds.add(productId);
+      setCartProductIds(newIds);
+      setCartCount(newIds.size);
 
-      // Reconcile optimistic updates
-      const confirmedAdds = new Set(
-        [...optimisticAddsRef.current].filter((id) => serverIds.has(id))
-      );
-      confirmedAdds.forEach((productId) => clearOptimisticState(productId));
+      // Add optimistic item at top
+      try {
+        const optimisticProduct = buildProductFromCartData(productData);
+        const optimisticItem: CartItem = {
+          ...createCartItem(productId, productData, optimisticProduct),
+          isOptimistic: true,
+        };
 
-      const confirmedRemoves = new Set(
-        [...optimisticRemovesRef.current].filter((id) => !serverIds.has(id))
-      );
-      confirmedRemoves.forEach((productId) => clearOptimisticState(productId));
+        setCartItems([optimisticItem, ...existingItems]);
+      } catch (error) {
+        console.error("Failed to create optimistic item:", error);
+      }
 
-      // Compute effective IDs
-      const effectiveIds = new Set(serverIds);
-      optimisticAddsRef.current.forEach((id) => effectiveIds.add(id));
-      optimisticRemovesRef.current.forEach((id) => effectiveIds.delete(id));
+      // Set timeout
+      const timeout = setTimeout(() => {
+        if (optimisticCacheRef.current.has(productId)) {
+          console.log("⚠️ Optimistic timeout:", productId);
+          clearOptimisticUpdate(productId);
+        }
+      }, OPTIMISTIC_TIMEOUT);
 
-      setCartProductIds(effectiveIds);
-      setCartCount(effectiveIds.size);
+      optimisticTimeoutsRef.current.set(productId, timeout);
+    },
+    [
+      cartItems,
+      cartProductIds,
+      clearOptimisticUpdate,
+      buildProductFromCartData,
+      createCartItem,
+    ]
+  );
 
-      // Update cart items if initialized
-      if (isInitialized) {
-        updateCartItemsFromSnapshot(snapshot);
+  const rollbackOptimisticUpdate = useCallback(
+    (productId: string) => {
+      optimisticCacheRef.current.delete(productId);
+      const timer = optimisticTimeoutsRef.current.get(productId);
+      if (timer) {
+        clearTimeout(timer);
+        optimisticTimeoutsRef.current.delete(productId);
+      }
+
+      // Update IDs
+      const newIds = new Set(cartProductIds);
+      newIds.delete(productId);
+      setCartProductIds(newIds);
+      setCartCount(newIds.size);
+
+      console.log("🔄 Rolled back optimistic update:", productId);
+    },
+    [cartProductIds]
+  );
+
+  const addProductToCart = useCallback(
+    async (
+      product: Product,
+      quantity: number = 1,
+      selectedColor?: string,
+      attributes?: CartAttributes
+    ): Promise<string> => {
+      if (!user) return "Please log in first";
+
+      // Rate limiting
+      if (!addToCartLimiterRef.current.canProceed(`add_${product.id}`)) {
+        return "Please wait before adding again";
+      }
+
+      const productData = buildProductDataForCart(product, selectedColor, attributes);
+
+      try {
+        // Optimistic update
+        applyOptimisticAdd(product.id, productData, quantity);
+
+        // Write to Firestore
+        await setDoc(
+          doc(db, "users", user.uid, "cart", product.id),
+          {
+            ...productData,
+            quantity,
+            addedAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          }
+        );
+
+        console.log("✅ Added to cart:", product.id);
+
+        // Invalidate totals cache
+        redisRef.current.invalidateCartTotals(user.uid);
+
+        // Background refresh totals
+        backgroundRefreshTotals();
+
+        return "Added to cart";
+      } catch (error) {
+        console.error("❌ Add to cart error:", error);
+        rollbackOptimisticUpdate(product.id);
+        return "Failed to add to cart";
       }
     },
     [
-      isSystemField,
-      isInitialized,
-      clearOptimisticState,
-      updateCartItemsFromSnapshot,
+      user,
+      db,
+      buildProductDataForCart,
+      applyOptimisticAdd,
+      rollbackOptimisticUpdate,
+      backgroundRefreshTotals,
     ]
+  );
+
+  const addToCartById = useCallback(
+    async (
+      productId: string,
+      quantity: number = 1,
+      selectedColor?: string,
+      attributes?: CartAttributes
+    ): Promise<string> => {
+      if (!user) return "Please log in first";
+
+      try {
+        const productDoc = await getDoc(doc(db, "shop_products", productId));
+
+        if (!productDoc.exists()) {
+          return "Product not found";
+        }
+
+        const product = ProductUtils.fromJson({
+          ...productDoc.data(),
+          id: productDoc.id,
+          reference: {
+            id: productDoc.id,
+            path: productDoc.ref.path,
+            parent: { id: productDoc.ref.parent.id },
+          },
+        });
+
+        return addProductToCart(product, quantity, selectedColor, attributes);
+      } catch (error) {
+        console.error("❌ Add to cart by ID error:", error);
+        return "Failed to add to cart";
+      }
+    },
+    [user, db, addProductToCart]
+  );
+
+  // ========================================================================
+  // REMOVE FROM CART
+  // ========================================================================
+
+  const applyOptimisticRemove = useCallback(
+    (productId: string) => {
+      optimisticCacheRef.current.set(productId, { _deleted: true });
+
+      // Update IDs immediately
+      const newIds = new Set(cartProductIds);
+      newIds.delete(productId);
+      setCartProductIds(newIds);
+      setCartCount(newIds.size);
+
+      // Remove from items list
+      setCartItems((items) => items.filter((item) => item.productId !== productId));
+
+      // Set timeout
+      const timeout = setTimeout(() => {
+        optimisticCacheRef.current.delete(productId);
+        optimisticTimeoutsRef.current.delete(productId);
+      }, 5000);
+
+      optimisticTimeoutsRef.current.set(productId, timeout);
+    },
+    [cartProductIds]
+  );
+
+  const rollbackOptimisticRemove = useCallback(
+    async (productId: string) => {
+      optimisticCacheRef.current.delete(productId);
+      const timer = optimisticTimeoutsRef.current.get(productId);
+      if (timer) {
+        clearTimeout(timer);
+        optimisticTimeoutsRef.current.delete(productId);
+      }
+
+      // Force refresh from Firestore
+      if (user) {
+        try {
+          const docSnap = await getDoc(doc(db, "users", user.uid, "cart", productId));
+          if (docSnap.exists()) {
+            const newIds = new Set(cartProductIds);
+            newIds.add(productId);
+            setCartProductIds(newIds);
+            setCartCount(newIds.size);
+          }
+        } catch (error) {
+          console.error("Failed to rollback remove:", error);
+        }
+      }
+    },
+    [user, db, cartProductIds]
+  );
+
+  const removeFromCart = useCallback(
+    async (productId: string): Promise<string> => {
+      if (!user) return "Please log in first";
+
+      try {
+        applyOptimisticRemove(productId);
+
+        await deleteDoc(doc(db, "users", user.uid, "cart", productId));
+
+        // Background refresh totals
+        backgroundRefreshTotals();
+
+        return "Removed from cart";
+      } catch (error) {
+        console.error("❌ Remove error:", error);
+        rollbackOptimisticRemove(productId);
+        return "Failed to remove from cart";
+      }
+    },
+    [user, db, applyOptimisticRemove, rollbackOptimisticRemove, backgroundRefreshTotals]
+  );
+
+  // ========================================================================
+  // UPDATE QUANTITY
+  // ========================================================================
+
+  const applyOptimisticQuantityChange = useCallback(
+    (productId: string, newQuantity: number) => {
+      setCartItems((items) => {
+        const newItems = [...items];
+        const indices: number[] = [];
+
+        // Find ALL occurrences
+        for (let i = 0; i < newItems.length; i++) {
+          if (newItems[i].productId === productId) {
+            indices.push(i);
+          }
+        }
+
+        if (indices.length === 0) return items;
+
+        // Keep only the first occurrence, update its quantity
+        newItems[indices[0]] = {
+          ...newItems[indices[0]],
+          quantity: newQuantity,
+        };
+
+        // Remove duplicates
+        for (let i = indices.length - 1; i > 0; i--) {
+          newItems.splice(indices[i], 1);
+        }
+
+        return newItems;
+      });
+    },
+    []
   );
 
   const updateQuantity = useCallback(
     async (productId: string, newQuantity: number): Promise<string> => {
-      if (!user) return "Please log in";
-      if (newQuantity < 1) return "Quantity must be at least 1";
+      if (!user) return "Please log in first";
 
-      try {
-        const cartItem = cartItems.find((item) => item.productId === productId);
-        const salePrefs = cartItem?.salePreferences;
-
-        if (salePrefs?.maxQuantity && newQuantity > salePrefs.maxQuantity) {
-          return `Cannot set quantity to ${newQuantity}. Maximum allowed: ${salePrefs.maxQuantity}`;
-        }
-
-        await debouncer.debounce(
-          `cart-qty-${productId}`,
-          async () => {
-            await writeBatch(db)
-              .update(doc(db, "users", user.uid, "cart", productId), {
-                quantity: newQuantity,
-                updatedAt: serverTimestamp(),
-              })
-              .commit();
-          },
-          DEBOUNCE_DELAYS.CART // 500ms
-        )();
-
-        // Update UI
-        if (isInitialized) {
-          const items = [...cartItems];
-          const idx = items.findIndex((e) => e.productId === productId);
-          if (idx !== -1) {
-            items[idx].quantity = newQuantity;
-            items[idx].cartData.quantity = newQuantity;
-            setCartItems(items);
-          }
-        }
-
-        return "Quantity updated";
-      } catch (error) {
-        return `Failed to update quantity: ${error}`;
+      if (newQuantity < 1) {
+        return removeFromCart(productId);
       }
-    },
-    [user, db, isInitialized, cartItems]
-  );
 
-  const updateShopMetricsSafely = async (
-    shopId: string,
-    metricField: string
-  ): Promise<void> => {
-    try {
-      await writeBatch(db)
-        .update(doc(db, "shops", shopId), {
-          [`metrics.${metricField}`]: increment(1),
-          "metrics.lastUpdated": serverTimestamp(),
-        })
-        .commit();
-    } catch (error) {
-      // Silently fail - metrics are non-critical
-      if (process.env.NODE_ENV === "development") {
-        console.error(`Metrics update failed for shop ${shopId}:`, error);
+      // Rate limiting
+      if (!quantityLimiterRef.current.canProceed(`qty_${productId}`)) {
+        return "Please wait";
       }
-    }
-  };
 
-  // Main cart operations - matching Flutter implementation
-  const addToCart = useCallback(
-    async (
-      productId: string,
-      quantity: number = 1,
-      attributes?: CartAttributes
-    ): Promise<string> => {
-      const operationId = `${productId}_${Date.now()}`;
-      return requestDeduplicator.deduplicate(
-        `cart-add-${productId}`,
-        async () => {
-          if (!user) return "Please log in";
-          if (!productId.trim()) return "Invalid product ID";
-          if (quantity < 1) return "Quantity must be at least 1";
-          if (operationIdsRef.current.has(productId))
-            return "Operation in progress";
+      // Concurrency control
+      if (quantityUpdateLocksRef.current.has(productId)) {
+        return quantityUpdateLocksRef.current.get(productId)!;
+      }
 
-          operationIdsRef.current.set(productId, operationId);
+      const updatePromise = (async () => {
+        try {
+          // Optimistic update
+          applyOptimisticQuantityChange(productId, newQuantity);
 
-          try {
-            const isCurrentlyInCart = cartProductIds.has(productId);
+          // Update Firestore
+          await updateDoc(doc(db, "users", user.uid, "cart", productId), {
+            quantity: newQuantity,
+            updatedAt: serverTimestamp(),
+          });
 
-            // Get product document reference
-            const prodRef = await getProductDocument([productId]);
-            if (!prodRef[productId]) {
-              return "Product not found";
-            }
+          console.log("✅ Updated quantity:", productId, "=", newQuantity);
 
-            // Fetch product data
-            const prodSnapshot = await getDoc(prodRef[productId]!);
-            if (!prodSnapshot.exists()) {
-              return "Product not found";
-            }
+          // Invalidate totals cache
+          redisRef.current.invalidateCartTotals(user.uid);
 
-            // ✅ Use ProductUtils.fromJson to parse as Product
-            const productData = ProductUtils.fromJson({
-              ...prodSnapshot.data(),
-              id: prodSnapshot.id,
-              reference: {
-                id: prodSnapshot.id,
-                path: prodSnapshot.ref.path,
-                parent: {
-                  id: prodSnapshot.ref.parent.id,
-                },
-              },
-            });
+          // Background refresh totals
+          backgroundRefreshTotals();
 
-            // ✅ Now extract sale preferences directly from Product
-            const salePrefs: SalePreferences | null = (() => {
-              const prefs: SalePreferences = {};
-              if (productData.maxQuantity != null)
-                prefs.maxQuantity = productData.maxQuantity;
-              if (productData.discountThreshold != null)
-                prefs.discountThreshold = productData.discountThreshold;
-              if (productData.discountPercentage != null)
-                prefs.discountPercentage = productData.discountPercentage;
-              return Object.keys(prefs).length === 0 ? null : prefs;
-            })();
-
-            if (salePrefs?.maxQuantity) {
-              if (isCurrentlyInCart) {
-                const currentCartItem = cartItemsCacheRef.current[productId];
-                const currentQuantity = currentCartItem?.quantity || 0;
-                const totalQuantity = currentQuantity + quantity;
-
-                if (totalQuantity > salePrefs.maxQuantity) {
-                  return `Cannot add more. Maximum allowed: ${salePrefs.maxQuantity}`;
-                }
-                return await updateQuantity(productId, totalQuantity);
-              } else {
-                if (quantity > salePrefs.maxQuantity) {
-                  return `Cannot add ${quantity}. Maximum allowed: ${salePrefs.maxQuantity}`;
-                }
-              }
-            }
-
-            // Apply optimistic update immediately
-            await applyOptimisticUpdate(productId, true, quantity, attributes);
-
-            // Fetch bundle info and seller details
-            const bundleData = await fetchActiveBundleForProduct(productId);
-            const sellerInfo = await fetchSellerInfo(
-              prodRef[productId]!,
-              productData // ✅ Now passing Product type
-            );
-
-            // Run transaction
-            const result = await runTransaction(db, async (transaction) => {
-              const cartRef = doc(db, "users", user.uid, "cart", productId);
-              const prodSnap = await transaction.get(prodRef[productId]!);
-
-              if (!prodSnap.exists()) return "Product not found";
-
-              // ✅ Parse as Product in transaction too
-              const txProductData = ProductUtils.fromJson({
-                ...prodSnap.data(),
-                id: prodSnap.id,
-                reference: {
-                  id: prodSnap.id,
-                  path: prodSnap.ref.path,
-                  parent: {
-                    id: prodSnap.ref.parent.id,
-                  },
-                },
-              });
-
-              const cartSnap = await transaction.get(cartRef);
-
-              if (cartSnap.exists()) {
-                // Update existing item quantity
-                const existingData = cartSnap.data();
-                const newQuantity = (existingData?.quantity || 0) + quantity;
-
-                if (
-                  salePrefs?.maxQuantity &&
-                  newQuantity > salePrefs.maxQuantity
-                ) {
-                  return `Cannot add more. Maximum allowed: ${salePrefs.maxQuantity}`;
-                }
-
-                transaction.update(cartRef, {
-                  quantity: newQuantity,
-                  updatedAt: serverTimestamp(),
-                });
-
-                return "Updated cart quantity";
-              } else {
-                // Add new item to cart
-                const unitPrice =
-                  bundleData?.bundlePrice ?? txProductData.price ?? 0;
-
-                // Get commission rate
-                let commissionRate = 0.0;
-                if (sellerInfo.isShop) {
-                  const shopId = txProductData.shopId ?? txProductData.ownerId;
-                  if (shopId) {
-                    try {
-                      const shopDoc = await getDoc(doc(db, "shops", shopId));
-                      if (shopDoc.exists()) {
-                        commissionRate = shopDoc.data()?.ourComission || 0.0;
-                      }
-                    } catch (error) {
-                      if (process.env.NODE_ENV === "development") {
-                        console.error("Error fetching shop commission:", error);
-                      }
-                    }
-                  }
-                } else {
-                  commissionRate = 10.0;
-                }
-
-                const cartData: Record<string, unknown> = {
-                  addedAt: serverTimestamp(),
-                  updatedAt: serverTimestamp(),
-                  quantity,
-                  unitPrice,
-                  currency: txProductData.currency || "TL",
-                  ourComission: commissionRate,
-                  sellerId: sellerInfo.sellerId,
-                  sellerName: sellerInfo.sellerName,
-                  isShop: sellerInfo.isShop,
-                  sellerContactNo: sellerInfo.sellerContactNo,
-                };
-
-                if (bundleData) {
-                  cartData.isBundle = true;
-                  if (bundleData.bundleId) {
-                    cartData.bundleId = bundleData.bundleId;
-                  }
-                }
-
-                if (attributes) {
-                  Object.entries(attributes).forEach(([k, v]) => {
-                    if (v !== undefined && v !== null) {
-                      cartData[k] = v;
-                    }
-                  });
-                }
-
-                transaction.set(cartRef, cartData);
-
-                transaction.update(prodRef[productId]!, {
-                  cartCount: increment(1),
-                  metricsUpdatedAt: serverTimestamp(),
-                });
-
-                return "Added to cart";
-              }
-            });
-
-            clearOptimisticState(productId);
-            // ✅ Fire-and-forget metrics update (matching Flutter implementation)
-            if (result === "Added to cart") {
-              const shopId = productData.shopId ?? productData.ownerId;
-              if (shopId) {
-                updateShopMetricsSafely(shopId, "totalCartAdditions").catch(
-                  (error) => {
-                    if (process.env.NODE_ENV === "development") {
-                      console.error("Failed to update shop metrics:", error);
-                    }
-                  }
-                );
-              }
-            }
-            return result;
-          } catch (error) {
-            if (process.env.NODE_ENV === "development") {
-              console.error("Cart operation error:", error);
-            }
-            rollbackOptimisticUpdate(productId, true);
-            return `Failed to update cart: ${error}`;
-          } finally {
-            setTimeout(() => {
-              if (operationIdsRef.current.get(productId) === operationId) {
-                operationIdsRef.current.delete(productId);
-              }
-            }, 5000);
-          }
+          return "Quantity updated";
+        } catch (error) {
+          console.error("❌ Update quantity error:", error);
+          return "Failed to update quantity";
+        } finally {
+          quantityUpdateLocksRef.current.delete(productId);
         }
-      );
+      })();
+
+      quantityUpdateLocksRef.current.set(productId, updatePromise);
+      return updatePromise;
     },
     [
       user,
-      cartProductIds,
-      getProductDocument,
-      applyOptimisticUpdate,
-      fetchActiveBundleForProduct,
-      fetchSellerInfo,
-      updateQuantity,
       db,
-      clearOptimisticState,
-      rollbackOptimisticUpdate,
+      removeFromCart,
+      applyOptimisticQuantityChange,
+      backgroundRefreshTotals,
     ]
   );
 
-  // Replace your current removeFromCart function with this dedicated removal logic
-  const removeFromCart = useCallback(
-    async (productId: string): Promise<string> => {
-      const operationId = `remove_${productId}_${Date.now()}`;
-      return requestDeduplicator.deduplicate(
-        `cart-remove-${productId}`,
-        async () => {
-          if (!user) return "Please log in";
-          if (!productId.trim()) return "Invalid product ID";
-          if (operationIdsRef.current.has(productId))
-            return "Operation in progress";
-
-          operationIdsRef.current.set(productId, operationId);
-
-          try {
-            const isCurrentlyInCart = cartProductIds.has(productId);
-
-            if (!isCurrentlyInCart) {
-              return "Item not in cart";
-            }
-
-            // Get product document reference for metrics update
-            const prodRef = await getProductDocument([productId]);
-            if (!prodRef[productId]) {
-              return "Product not found";
-            }
-
-            // Apply optimistic removal immediately
-            await applyOptimisticUpdate(productId, false, 0);
-
-            // Run transaction to remove from cart
-            const result = await runTransaction(db, async (transaction) => {
-              const cartRef = doc(db, "users", user.uid, "cart", productId);
-              const cartSnap = await transaction.get(cartRef);
-
-              if (!cartSnap.exists()) {
-                return "Item not in cart";
-              }
-
-              // Delete from cart
-              transaction.delete(cartRef);
-
-              // Update product metrics
-              if (prodRef[productId]) {
-                transaction.update(prodRef[productId]!, {
-                  cartCount: increment(-1),
-                  metricsUpdatedAt: serverTimestamp(),
-                });
-              }
-
-              return "Removed from cart";
-            });
-
-            // Clear optimistic state on success
-            clearOptimisticState(productId);
-
-            return result;
-          } catch (error) {
-            if (process.env.NODE_ENV === "development") {
-              console.error("Remove from cart error:", error);
-            }
-            // Rollback optimistic removal
-            rollbackOptimisticUpdate(productId, false);
-            return `Failed to remove from cart: ${error}`;
-          } finally {
-            setTimeout(() => {
-              if (operationIdsRef.current.get(productId) === operationId) {
-                operationIdsRef.current.delete(productId);
-              }
-            }, 5000);
-          }
-        }
-      );
-    },
-    [
-      user,
-      cartProductIds,
-      getProductDocument,
-      applyOptimisticUpdate,
-      db,
-      clearOptimisticState,
-      rollbackOptimisticUpdate,
-    ]
-  );
-
-  const incrementQuantity = useCallback(
-    async (productId: string): Promise<string> => {
-      if (!user) return "Please log in";
-
-      try {
-        const cartDoc = await getDoc(
-          doc(db, "users", user.uid, "cart", productId)
-        );
-        if (!cartDoc.exists()) return "Item not in cart";
-
-        const currentQty = cartDoc.data()?.quantity || 1;
-        return updateQuantity(productId, currentQty + 1);
-      } catch (error) {
-        return `Failed to increment: ${error}`;
-      }
-    },
-    [user, db, updateQuantity]
-  );
-
-  const decrementQuantity = useCallback(
-    async (productId: string): Promise<string> => {
-      if (!user) return "Please log in";
-
-      try {
-        const cartDoc = await getDoc(
-          doc(db, "users", user.uid, "cart", productId)
-        );
-        if (!cartDoc.exists()) return "Item not in cart";
-
-        const currentQty = cartDoc.data()?.quantity || 1;
-        if (currentQty <= 1) return "Quantity cannot be less than 1";
-
-        return updateQuantity(productId, currentQty - 1);
-      } catch (error) {
-        return `Failed to decrement: ${error}`;
-      }
-    },
-    [user, db, updateQuantity]
-  );
+  // ========================================================================
+  // BATCH REMOVE
+  // ========================================================================
 
   const removeMultipleFromCart = useCallback(
     async (productIds: string[]): Promise<string> => {
-      if (!user) return "Please log in";
-      if (productIds.length === 0) return "No products to remove";
-
-      // Optimistic UI update
-      if (isInitialized) {
-        const current = [...cartItems];
-        const filtered = current.filter(
-          (it) => !productIds.includes(it.productId)
-        );
-        setCartItems(filtered);
-      }
+      if (!user) return "Please log in first";
+      if (productIds.length === 0) return "No items selected";
 
       try {
-        const batch = writeBatch(db);
-        for (const id of productIds) {
-          const docRef = doc(db, "users", user.uid, "cart", id);
-          batch.delete(docRef);
-          delete cartItemsCacheRef.current[id];
-        }
+        // Optimistic removal
+        productIds.forEach((productId) => applyOptimisticRemove(productId));
 
+        // Batch delete from Firestore
+        const batch = writeBatch(db);
+        productIds.forEach((productId) => {
+          batch.delete(doc(db, "users", user.uid, "cart", productId));
+        });
         await batch.commit();
+
+        console.log(`✅ Removed ${productIds.length} items`);
+        redisRef.current.invalidateCartTotals(user.uid);
+
+        // Background refresh totals
+        backgroundRefreshTotals();
+
         return "Products removed from cart";
       } catch (error) {
-        return `Failed to remove products: ${error}`;
+        console.error("❌ Batch remove error:", error);
+        return "Failed to remove products";
       }
     },
-    [user, db, isInitialized, cartItems]
+    [user, db, applyOptimisticRemove, backgroundRefreshTotals]
   );
 
-  const clearCart = useCallback(async (): Promise<string> => {
-    if (!user) return "Please log in";
+  // ========================================================================
+  // REFRESH
+  // ========================================================================
+
+  const refresh = useCallback(async () => {
+    if (!user) return;
+
+    // Reset pagination
+    lastDocumentRef.current = null;
+    setHasMore(true);
 
     try {
-      const cartCollection = collection(db, "users", user.uid, "cart");
-      const snapshot = await getDocs(cartCollection);
-
-      if (snapshot.empty) return "Cart is already empty";
-
-      const productIds = snapshot.docs.map((doc) => doc.id);
-      return await removeMultipleFromCart(productIds);
-    } catch (error) {
-      return `Failed to clear cart: ${error}`;
-    }
-  }, [user, db, removeMultipleFromCart]);
-
-  const validateForPayment = useCallback(
-    async (
-      selectedProductIds: string[]
-    ): Promise<{
-      isValid: boolean;
-      errors: Record<string, string>;
-    }> => {
-      const errors: Record<string, string> = {};
-
-      for (let i = 0; i < selectedProductIds.length; i += 10) {
-        const batch = selectedProductIds.slice(i, i + 10);
-
-        const snapshot = await getDocs(
-          query(
-            collection(db, "shop_products"),
-            where(documentId(), "in", batch)
-          )
-        );
-
-        // ✅ Use Product type
-        const productDataMap: Record<string, Product> = {};
-        snapshot.docs.forEach((doc) => {
-          productDataMap[doc.id] = ProductUtils.fromJson({
-            ...doc.data(),
-            id: doc.id,
-            reference: {
-              id: doc.id,
-              path: doc.ref.path,
-              parent: {
-                id: doc.ref.parent.id,
-              },
-            },
-          });
-        });
-
-        for (const productId of batch) {
-          const productData = productDataMap[productId];
-          if (!productData) {
-            errors[productId] = "Product no longer available";
-            continue;
-          }
-
-          const paused = productData.paused || false;
-          const quantity = productData.quantity || 0;
-
-          if (paused) {
-            errors[productId] = "Product is currently unavailable";
-          } else if (quantity <= 0) {
-            errors[productId] = "Product is out of stock";
-          }
-        }
-      }
-
-      return {
-        isValid: Object.keys(errors).length === 0,
-        errors,
-      };
-    },
-    [db]
-  );
-
-  const calculateIndividualItemTotal = useCallback(
-    (
-      cartItem: CartItem
-    ): {
-      total: number;
-      currency: string;
-      item: CartItemTotal;
-    } => {
-      const product = cartItem.product;
-      if (!product) {
-        return {
-          total: 0,
-          currency: "TL",
-          item: {
-            productId: "",
-            quantity: 0,
-            unitPrice: 0,
-            total: 0,
-          },
-        };
-      }
-
-      const cartData = cartItem.cartData;
-      const quantity = cartItem.quantity || 1;
-      const salePreferences = cartItem.salePreferences;
-
-      // Get base unit price - EXACT Flutter logic
-      let unitPrice: number;
-      // Flutter: cartData['isBundle'] == true ? (cartData['unitPrice'] as num?)?.toDouble() ?? product.price : product.price;
-      if (cartData.isBundle === true) {
-        unitPrice =
-          typeof cartData.unitPrice === "number"
-            ? cartData.unitPrice
-            : product.price;
-      } else {
-        unitPrice = product.price;
-      }
-
-      // Apply sale preference discount if applicable - EXACT Flutter logic
-      if (salePreferences) {
-        const discountThreshold = salePreferences.discountThreshold;
-        const discountPercentage = salePreferences.discountPercentage;
-
-        if (
-          discountThreshold != null &&
-          discountPercentage != null &&
-          quantity >= discountThreshold
-        ) {
-          // Apply discount to unit price
-          unitPrice = unitPrice * (1 - discountPercentage / 100);
-        }
-      }
-
-      const itemTotal = unitPrice * quantity;
-
-      return {
-        total: itemTotal,
-        currency:
-          product.currency && product.currency.length > 0
-            ? product.currency
-            : "TL",
-        item: {
-          productId: product.id,
-          quantity,
-          unitPrice,
-          total: itemTotal,
-        },
-      };
-    },
-    []
-  );
-
-  // Fixed calculateCartTotals function for React CartProvider
-  const calculateCartTotals = useCallback(
-    async (selectedProductIds?: string[]): Promise<CartTotals> => {
-      if (!user) {
-        return { subtotal: 0, total: 0, currency: "TL", items: [] };
-      }
-
-      try {
-        const currentCartItems = cartItems;
-        if (currentCartItems.length === 0) {
-          return { subtotal: 0, total: 0, currency: "TL", items: [] };
-        }
-
-        let itemsToCalculate: CartItem[];
-
-        if (selectedProductIds && selectedProductIds.length > 0) {
-          itemsToCalculate = currentCartItems.filter((item) =>
-            selectedProductIds.includes(item.product?.id || "")
-          );
-        } else {
-          itemsToCalculate = currentCartItems;
-        }
-
-        if (itemsToCalculate.length === 0) {
-          return { subtotal: 0, total: 0, currency: "TL", items: [] };
-        }
-
-        // Filter out out-of-stock items first - EXACT Flutter logic
-        const inStockItems: CartItem[] = [];
-        for (const item of itemsToCalculate) {
-          const product = item.product;
-          if (!product) continue;
-
-          const cartData = item.cartData;
-          const selectedColor = cartData.selectedColor as string;
-
-          let availableStock: number;
-          // EXACT Flutter condition: selectedColor != null && selectedColor.isNotEmpty && selectedColor != 'default' && product.colorQuantities.containsKey(selectedColor)
-          if (
-            selectedColor != null &&
-            selectedColor !== "" &&
-            selectedColor !== "default" &&
-            product.colorQuantities &&
-            Object.prototype.hasOwnProperty.call(
-              product.colorQuantities,
-              selectedColor
-            )
-          ) {
-            availableStock = product.colorQuantities[selectedColor] || 0;
-          } else {
-            availableStock = product.quantity;
-          }
-
-          if (availableStock > 0) {
-            inStockItems.push(item);
-          }
-        }
-
-        if (inStockItems.length === 0) {
-          return { subtotal: 0, total: 0, currency: "TL", items: [] };
-        }
-
-        // Group items by bundleId for bundle detection - EXACT Flutter logic
-        const bundleGroups: Record<string, CartItem[]> = {};
-        const individualItems: CartItem[] = [];
-
-        for (const item of inStockItems) {
-          const product = item.product;
-          if (!product) continue;
-
-          // CRITICAL: This is the exact Flutter condition
-          // bundleIds != null && bundleIds.isNotEmpty && product.bundlePrice != null
-          if (
-            product.bundleIds != null &&
-            Array.isArray(product.bundleIds) &&
-            product.bundleIds.length > 0 &&
-            product.bundlePrice != null
-          ) {
-            const bundleId = product.bundleIds[0]; // Flutter: bundleIds.first
-            if (!bundleGroups[bundleId]) {
-              bundleGroups[bundleId] = [];
-            }
-            bundleGroups[bundleId].push(item);
-          } else {
-            individualItems.push(item);
-          }
-        }
-
-        let subtotal = 0;
-        const items: CartItemTotal[] = [];
-        let currency = "TL";
-        const processedBundles = new Set<string>();
-
-        // Process bundle groups - EXACT Flutter logic
-        for (const [bundleId, bundleItems] of Object.entries(bundleGroups)) {
-          if (bundleItems.length >= 2 && !processedBundles.has(bundleId)) {
-            // Calculate minimum quantity across all bundle products
-            const minQuantity = Math.min(
-              ...bundleItems.map((item) => item.quantity)
-            );
-
-            if (minQuantity > 0) {
-              const firstProduct = bundleItems[0].product!;
-              const bundlePrice = firstProduct.bundlePrice || 0;
-
-              if (bundlePrice > 0) {
-                processedBundles.add(bundleId);
-
-                // Process each bundle item with hybrid pricing - EXACT Flutter logic
-                for (const item of bundleItems) {
-                  const product = item.product!;
-                  const totalQuantity = item.quantity;
-
-                  // Bundle portion (no sale preferences applied)
-                  const bundlePortion = minQuantity;
-                  const bundleItemCost =
-                    (bundlePrice / bundleItems.length) * bundlePortion;
-
-                  // Extra portion (check sale preferences based on TOTAL quantity)
-                  const extraQuantity = totalQuantity - bundlePortion;
-                  let extraCost = 0;
-
-                  if (extraQuantity > 0) {
-                    let extraUnitPrice = product.price;
-
-                    // Apply sale preferences based on TOTAL quantity, not just extra
-                    const salePreferences = item.salePreferences;
-                    if (salePreferences) {
-                      const discountThreshold =
-                        salePreferences.discountThreshold;
-                      const discountPercentage =
-                        salePreferences.discountPercentage;
-
-                      // Check if TOTAL quantity meets threshold (exact Flutter logic)
-                      if (
-                        discountThreshold != null &&
-                        discountPercentage != null &&
-                        totalQuantity >= discountThreshold
-                      ) {
-                        extraUnitPrice =
-                          extraUnitPrice * (1 - discountPercentage / 100);
-                      }
-                    }
-
-                    extraCost = extraUnitPrice * extraQuantity;
-                  }
-
-                  const totalItemCost = bundleItemCost + extraCost;
-                  subtotal += totalItemCost;
-
-                  items.push({
-                    productId: product.id,
-                    quantity: totalQuantity,
-                    unitPrice: totalItemCost / totalQuantity,
-                    total: totalItemCost,
-                    isBundleItem: bundlePortion > 0,
-                  });
-                }
-
-                if (items.length === 1) {
-                  currency =
-                    firstProduct.currency.length > 0
-                      ? firstProduct.currency
-                      : "TL";
-                }
-
-                continue;
-              }
-            }
-          }
-
-          // Bundle not valid or no stock - calculate individually with sale preferences
-          for (const item of bundleItems) {
-            const itemTotal = calculateIndividualItemTotal(item);
-            subtotal += itemTotal.total;
-            items.push(itemTotal.item);
-
-            if (items.length === 1) {
-              currency = itemTotal.currency;
-            }
-          }
-        }
-
-        // Process individual (non-bundle) items
-        for (const item of individualItems) {
-          const itemTotal = calculateIndividualItemTotal(item);
-          subtotal += itemTotal.total;
-          items.push(itemTotal.item);
-
-          if (items.length === 1) {
-            currency = itemTotal.currency;
-          }
-        }
-
-        return {
-          subtotal,
-          total: subtotal,
-          currency,
-          items,
-        };
-      } catch (error) {
-        if (process.env.NODE_ENV === "development") {
-          console.error("Error calculating cart totals:", error);
-        }
-        return { subtotal: 0, total: 0, currency: "TL", items: [] };
-      }
-    },
-    [user, cartItems, calculateIndividualItemTotal]
-  );
-
-  // Load cart page implementation
-  const loadCartPage = useCallback(
-    async (page: number): Promise<void> => {
-      if (!user) return;
-
-      let cartQuery = query(
+      const cartQuery = query(
         collection(db, "users", user.uid, "cart"),
         orderBy("addedAt", "desc"),
         limit(ITEMS_PER_PAGE)
       );
 
-      if (page > 0 && lastDocumentRef.current) {
-        cartQuery = query(cartQuery, startAfter(lastDocumentRef.current));
-      } else if (page === 0) {
-        setCartItems([]);
-        currentPageRef.current = 0;
-        lastDocumentRef.current = null;
-        setHasMore(true);
-      }
-
       const snapshot = await getDocs(cartQuery);
 
-      if (snapshot.empty) {
-        setHasMore(false);
-        return;
+      await buildCartItemsFromDocs(snapshot.docs);
+
+      if (snapshot.docs.length > 0) {
+        lastDocumentRef.current = snapshot.docs[snapshot.docs.length - 1];
+        setHasMore(snapshot.docs.length >= ITEMS_PER_PAGE);
       }
 
-      lastDocumentRef.current = snapshot.docs[snapshot.docs.length - 1];
-      currentPageRef.current = page;
-      setHasMore(snapshot.docs.length >= ITEMS_PER_PAGE);
-
-      await processCartItemsFromDocs(snapshot.docs);
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [user, db]
-  );
-
-  // Process cart items from docs
-  const processCartItemsFromDocs = useCallback(
-    async (cartDocs: DocumentSnapshot[]): Promise<void> => {
-      const productIds = cartDocs.map((doc) => doc.id);
-      const productDetails = await fetchProductDetailsBatch(productIds);
-
-      const existingItems = new Map<string, CartItem>();
-      cartItems
-        .filter((item) => !item.isOptimistic)
-        .forEach((item) => existingItems.set(item.productId, item));
-
-      for (const cartDoc of cartDocs) {
-        const data = cartDoc.data();
-        if (!data) continue;
-
-        const cartData = data as CartData;
-        const productDetail = productDetails[cartDoc.id];
-
-        // ✅ NEW: Extract from product
-        const salePreferences = productDetail
-          ? extractSalePreferences(productDetail)
-          : null;
-
-        if (productDetail) {
-          const quantity = cartData.quantity || 1;
-
-          const dynamicAttributes: Record<string, unknown> = {};
-          Object.entries(cartData).forEach(([key, value]) => {
-            if (!isSystemField(key)) {
-              dynamicAttributes[key] = value;
-            }
-          });
-
-          existingItems.set(cartDoc.id, {
-            cartData,
-            product: productDetail,
-            productId: cartDoc.id,
-            isOptimistic: false,
-            quantity,
-            salePreferences, // ✅ Now using extracted preferences
-            selectedColorImage: resolveColorImage(
-              productDetail,
-              cartData.selectedColor as string
-            ),
-            sellerName: cartData.sellerName,
-            sellerId: cartData.sellerId,
-            isShop: cartData.isShop,
-            sellerContactNo: cartData.sellerContactNo as string | null,
-            ...dynamicAttributes,
-          });
-        }
-      }
-
-      const sortedItems = Array.from(existingItems.values()).sort((a, b) => {
-        const aTime = a.cartData.addedAt as Timestamp;
-        const bTime = b.cartData.addedAt as Timestamp;
-        if (!aTime || !bTime) return 0;
-        return bTime.toMillis() - aTime.toMillis();
-      });
-
-      setCartItems(sortedItems);
-    },
-    [
-      cartItems,
-      fetchProductDetailsBatch,
-      extractSalePreferences,
-      isSystemField,
-      resolveColorImage,
-    ]
-  );
-
-  const initializeCartIfNeeded = useCallback(async (): Promise<void> => {
-    if (!user) {
-      return;
-    }
-
-    if (isInitialized || isLoading) {
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      await loadCartPage(0);
-      setIsInitialized(true);
+      console.log("✅ Cart refreshed with pagination reset");
     } catch (error) {
-      if (process.env.NODE_ENV === "development") {
-        console.error("Error initializing cart:", error);
-      }
-    } finally {
-      setIsLoading(false);
+      console.error("❌ Refresh error:", error);
     }
-  }, [user, isInitialized, isLoading, loadCartPage]);
+  }, [user, db, buildCartItemsFromDocs]);
 
-  const loadMoreItems = useCallback(async (): Promise<void> => {
-    if (isLoadingMore || !hasMore) return;
+  // ========================================================================
+  // TOTALS CALCULATION - With Redis caching
+  // ========================================================================
 
-    setIsLoadingMore(true);
-    try {
-      await loadCartPage(currentPageRef.current + 1);
-    } catch (error) {
-      if (process.env.NODE_ENV === "development") {
-        console.error("Error loading more cart items:", error);
-      }
-    } finally {
-      setIsLoadingMore(false);
+  const deepConvertMap = (map: unknown): Record<string, unknown> => {
+    if (!map || typeof map !== "object" || Array.isArray(map)) {
+      return {};
     }
-  }, [isLoadingMore, hasMore, loadCartPage]);
-
-  const refresh = useCallback(async (): Promise<void> => {
-    setHasMore(true);
-    setIsInitialized(false);
-    currentPageRef.current = 0;
-    lastDocumentRef.current = null;
-    cartItemsCacheRef.current = {};
-    lastCacheUpdateRef.current = null;
-
-    await initializeCartIfNeeded();
-  }, [initializeCartIfNeeded]);
-
-  // Utility methods
-  const isInCart = useCallback(
-    (productId: string): boolean => cartProductIds.has(productId),
-    [cartProductIds]
-  );
-
-  const isOptimisticallyAdding = useCallback(
-    (productId: string): boolean => optimisticAddsRef.current.has(productId),
-    []
-  );
-
-  const isOptimisticallyRemoving = useCallback(
-    (productId: string): boolean => optimisticRemovesRef.current.has(productId),
-    []
-  );
-
-  const getCachedCartItem = useCallback(
-    (productId: string): CartData | null => {
-      if (
-        lastCacheUpdateRef.current &&
-        Date.now() - lastCacheUpdateRef.current.getTime() <
-          CACHE_VALID_DURATION &&
-        cartItemsCacheRef.current[productId]
-      ) {
-        return { ...cartItemsCacheRef.current[productId] };
+    
+    const result: Record<string, unknown> = {};
+    Object.entries(map as Record<string, unknown>).forEach(([key, value]) => {
+      if (value && typeof value === "object" && !Array.isArray(value)) {
+        result[key] = deepConvertMap(value);
+      } else if (Array.isArray(value)) {
+        result[key] = deepConvertList(value);
+      } else {
+        result[key] = value;
       }
-      return null;
-    },
-    []
-  );
+    });
+    return result;
+  };
 
-  // Main effect for cart subscription
-  useEffect(() => {
-    if (user) {
-      if (unsubscribeCartRef.current) {
-        unsubscribeCartRef.current();
+  const deepConvertList = (list: unknown[]): unknown[] => {
+    return list.map((item) => {
+      if (item && typeof item === "object" && !Array.isArray(item)) {
+        return deepConvertMap(item);
+      } else if (Array.isArray(item)) {
+        return deepConvertList(item);
+      }
+      return item;
+    });
+  };
+
+  const calculateCartTotals = useCallback(
+    async (selectedProductIds?: string[]): Promise<CartTotals> => {
+      if (!user) {
+        return { total: 0, items: [], currency: "TL" };
       }
 
-      const cartCollection = collection(db, "users", user.uid, "cart");
-      unsubscribeCartRef.current = onSnapshot(
-        cartCollection,
-        (snapshot) => {
-          processCartSnapshot(snapshot);
-        },
-        (error) => {
-          if (process.env.NODE_ENV === "development") {
-            console.error("Cart subscription error:", error);
-          }
-          if (retryCountRef.current < MAX_RETRIES) {
-            retryCountRef.current++;
-            setTimeout(() => {
-              // Retry subscription
-            }, RETRY_DELAY * retryCountRef.current);
-          }
-        }
+      const productsToCalculate =
+        selectedProductIds ??
+        cartItems.map((item) => item.productId);
+
+      if (productsToCalculate.length === 0) {
+        return { total: 0, items: [], currency: "TL" };
+      }
+
+      // Check Redis cache first
+      const cached = await redisRef.current.getCachedTotals(
+        user.uid,
+        productsToCalculate
       );
-    } else {
-      if (unsubscribeCartRef.current) {
-        unsubscribeCartRef.current();
-        unsubscribeCartRef.current = null;
+      if (cached) {
+        console.log("⚡ Cache hit - instant total");
+        return {
+          total: cached.total ?? 0,
+          currency: cached.currency ?? "TL",
+          items: cached.items ?? [],
+        };
       }
-      clearUserData();
+
+      // Request deduplication
+      const cacheKey = productsToCalculate.join(",");
+      if (pendingFetchesRef.current.has(`totals_${cacheKey}`)) {
+        console.log("⏳ Waiting for existing totals calculation...");
+        const result = await pendingFetchesRef.current.get(`totals_${cacheKey}`);
+        return result as CartTotals;
+      }
+
+      const totalsPromise = (async () => {
+        try {
+          console.log(
+            `🔥 Calling Cloud Function for ${productsToCalculate.length} items`
+          );
+
+          const calculateCartTotalsFunction = httpsCallable(
+            functions,
+            "calculateCartTotals"
+          );
+
+          const result = await calculateCartTotalsFunction({
+            selectedProductIds: productsToCalculate,
+          });
+
+          // Deep conversion of nested structures
+          const rawData = result.data;
+          const totalsData = deepConvertMap(rawData);
+
+          console.log("✅ Converted totals data:", Object.keys(totalsData));
+
+          const totals: CartTotals = {
+            total: (totalsData.total as number) ?? 0,
+            currency: (totalsData.currency as string) ?? "TL",
+            items: (Array.isArray(totalsData.items) ? totalsData.items : []).map((item): CartItemTotal => {
+              const itemData = item as Record<string, unknown>;
+              return {
+                productId: (itemData.productId as string) ?? "",
+                unitPrice: (itemData.unitPrice as number) ?? 0,
+                total: (itemData.total as number) ?? 0,
+                quantity: (itemData.quantity as number) ?? 1,
+                isBundleItem: (itemData.isBundleItem as boolean) ?? false,
+              };
+            }),
+          };
+
+          // Cache result in Redis
+          await redisRef.current.cacheTotals(
+            user.uid,
+            productsToCalculate,
+            totalsData
+          );
+
+          console.log(`✅ Total calculated: ${totals.total} ${totals.currency}`);
+          return totals;
+        } catch (error) {
+          console.error("❌ Cloud Function error:", error);
+          // Return empty totals on error
+          return { total: 0, items: [], currency: "TL" };
+        }
+      })();
+
+      pendingFetchesRef.current.set(`totals_${cacheKey}`, totalsPromise);
+      const result = await totalsPromise;
+      pendingFetchesRef.current.delete(`totals_${cacheKey}`);
+
+      return result;
+    },
+    [user, cartItems, functions]
+  );
+
+  // ========================================================================
+  // VALIDATION
+  // ========================================================================
+
+  const validateForPayment = useCallback(
+    async (
+      selectedProductIds: string[],
+      reserveStock: boolean = false
+    ): Promise<{
+      isValid: boolean;
+      errors: Record<string, ValidationMessage>;
+      warnings: Record<string, ValidationMessage>;
+      validatedItems: ValidatedCartItem[];
+    }> => {
+      try {
+        const itemsToValidate = cartItems
+          .filter((item) => selectedProductIds.includes(item.productId))
+          .map((item) => {
+            const cartData = item.cartData;
+
+            return {
+              productId: item.productId,
+              quantity: item.quantity ?? 1,
+              selectedColor: cartData.selectedColor,
+              cachedPrice: cartData.cachedPrice,
+              cachedBundlePrice: cartData.cachedBundlePrice,
+              cachedDiscountPercentage: cartData.cachedDiscountPercentage,
+              cachedDiscountThreshold: cartData.cachedDiscountThreshold,
+              cachedBulkDiscountPercentage: cartData.cachedBulkDiscountPercentage,
+              cachedMaxQuantity: cartData.cachedMaxQuantity,
+            };
+          });
+
+        const validateCartCheckoutFunction = httpsCallable(
+          functions,
+          "validateCartCheckout"
+        );
+
+        const result = await validateCartCheckoutFunction({
+          cartItems: itemsToValidate,
+          reserveStock,
+        });
+
+        const rawData = result.data;
+        const data = deepConvertMap(rawData);
+
+        return {
+          isValid: (data.isValid as boolean) ?? false,
+          errors: (data.errors as Record<string, ValidationMessage>) ?? {},
+          warnings: (data.warnings as Record<string, ValidationMessage>) ?? {},
+          validatedItems: (data.validatedItems as ValidatedCartItem[]) ?? [],
+        };
+      } catch (error) {
+        console.error("❌ Validation error:", error);
+        return {
+          isValid: false,
+          errors: { _system: { key: "validation_failed", params: {} } },
+          warnings: {},
+          validatedItems: [],
+        };
+      }
+    },
+    [cartItems, functions]
+  );
+
+  const updateCartCacheFromValidation = useCallback(
+    async (validatedItems: ValidatedCartItem[]): Promise<boolean> => {
+      if (!user) return false;
+
+      try {
+        console.log(
+          `🔄 Updating cart cache for ${validatedItems.length} items...`
+        );
+
+        const updates = validatedItems.map((item) => ({
+          productId: item.productId?.toString(),
+          updates: {
+            cachedPrice: item.unitPrice,
+            cachedBundlePrice: item.bundlePrice,
+            cachedDiscountPercentage: item.discountPercentage,
+            cachedDiscountThreshold: item.discountThreshold,
+            cachedBulkDiscountPercentage: item.bulkDiscountPercentage,
+            cachedMaxQuantity: item.maxQuantity,
+            unitPrice: item.unitPrice,
+            bundlePrice: item.bundlePrice,
+            discountPercentage: item.discountPercentage,
+            discountThreshold: item.discountThreshold,
+            bulkDiscountPercentage: item.bulkDiscountPercentage,
+            maxQuantity: item.maxQuantity,
+          },
+        }));
+
+        const updateCartCacheFunction = httpsCallable(functions, "updateCartCache");
+
+        const result = await updateCartCacheFunction({
+          productUpdates: updates,
+        });
+
+        const data = deepConvertMap(result.data);
+
+        console.log(`✅ Cache updated: ${(data.updated as number)} items`);
+
+        return (data.success as boolean) === true;
+      } catch (error) {
+        console.error("❌ Cache update error:", error);
+        return false;
+      }
+    },
+    [user, functions]
+  );
+
+  // ========================================================================
+  // LOAD MORE (Pagination)
+  // ========================================================================
+
+  const loadMoreItems = useCallback(async () => {
+    if (!user || !hasMore || isLoadingMore) return;
+
+    if (pendingFetchesRef.current.has("loadMore")) {
+      console.log("⏳ Already loading more...");
+      return;
     }
 
-    return () => {
-      if (unsubscribeCartRef.current) {
-        unsubscribeCartRef.current();
+    const loadMorePromise = (async () => {
+      setIsLoadingMore(true);
+
+      try {
+        let cartQuery = query(
+          collection(db, "users", user.uid, "cart"),
+          orderBy("addedAt", "desc"),
+          limit(ITEMS_PER_PAGE)
+        );
+
+        if (lastDocumentRef.current) {
+          cartQuery = query(cartQuery, startAfter(lastDocumentRef.current));
+        }
+
+        const snapshot = await getDocs(cartQuery);
+
+        if (snapshot.docs.length === 0) {
+          setHasMore(false);
+          console.log("📄 No more items to load");
+          return;
+        }
+
+        lastDocumentRef.current = snapshot.docs[snapshot.docs.length - 1];
+        setHasMore(snapshot.docs.length >= ITEMS_PER_PAGE);
+
+        const newItems: CartItem[] = [];
+        for (const doc of snapshot.docs) {
+          const cartData = doc.data();
+          if (hasRequiredFields(cartData)) {
+            try {
+              const product = buildProductFromCartData(cartData);
+              newItems.push(createCartItem(doc.id, cartData, product));
+            } catch (error) {
+              console.error(`Failed to build item ${doc.id}:`, error);
+            }
+          }
+        }
+
+        // Deduplication
+        const existingIds = new Set(cartItems.map((item) => item.productId));
+        const uniqueNewItems = newItems.filter(
+          (item) => !existingIds.has(item.productId)
+        );
+
+        if (uniqueNewItems.length > 0) {
+          const allItems = [...cartItems, ...uniqueNewItems];
+          sortCartItems(allItems);
+          setCartItems(allItems);
+
+          console.log(
+            `✅ Loaded ${uniqueNewItems.length} more items (${
+              newItems.length - uniqueNewItems.length
+            } duplicates skipped)`
+          );
+        } else {
+          console.log(`⚠️ All ${newItems.length} items already loaded`);
+        }
+      } catch (error) {
+        console.error("❌ Load more error:", error);
+      } finally {
+        setIsLoadingMore(false);
       }
-    };
-  }, [user, db, processCartSnapshot, clearUserData]);
+    })();
+
+    pendingFetchesRef.current.set("loadMore", loadMorePromise);
+    await loadMorePromise;
+    pendingFetchesRef.current.delete("loadMore");
+  }, [
+    user,
+    hasMore,
+    isLoadingMore,
+    db,
+    cartItems,
+    hasRequiredFields,
+    buildProductFromCartData,
+    createCartItem,
+    sortCartItems,
+  ]);
+
+  // ========================================================================
+  // EFFECTS
+  // ========================================================================
+
+  // Clear data on user logout
+  useEffect(() => {
+    if (!user) {
+      disableLiveUpdates();
+      setCartCount(0);
+      setCartProductIds(new Set());
+      setCartItems([]);
+      setIsInitialized(false);
+      setIsLoading(false);
+      optimisticCacheRef.current.clear();
+      optimisticTimeoutsRef.current.forEach((timer) => clearTimeout(timer));
+      optimisticTimeoutsRef.current.clear();
+      quantityUpdateLocksRef.current.clear();
+    }
+  }, [user, disableLiveUpdates]);
 
   // Cleanup on unmount
   useEffect(() => {
-    const optimisticTimers = optimisticTimersRef.current;
     return () => {
-      if (unsubscribeCartRef.current) {
-        unsubscribeCartRef.current();
-      }
-      if (batchUpdateTimerRef.current) {
-        clearTimeout(batchUpdateTimerRef.current);
-      }
-      optimisticTimers.forEach((timer) => clearTimeout(timer));
+      disableLiveUpdates();
+      optimisticTimeoutsRef.current.forEach((timer) => clearTimeout(timer));
+      optimisticTimeoutsRef.current.clear();
     };
-  }, []);
+  }, [disableLiveUpdates]);
+
+  // ========================================================================
+  // CONTEXT VALUE
+  // ========================================================================
 
   const contextValue = useMemo<CartContextType>(
     () => ({
@@ -1925,24 +1619,19 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       isInitialized,
 
       // Methods
-      addToCart,
+      addProductToCart,
+      addToCartById,
       removeFromCart,
       updateQuantity,
-      incrementQuantity,
-      decrementQuantity,
-      clearCart,
       removeMultipleFromCart,
       initializeCartIfNeeded,
       loadMoreItems,
       calculateCartTotals,
       validateForPayment,
+      updateCartCacheFromValidation,
       refresh,
-
-      // Utilities
-      isInCart,
-      isOptimisticallyAdding,
-      isOptimisticallyRemoving,
-      getCachedCartItem,
+      enableLiveUpdates,
+      disableLiveUpdates,
     }),
     [
       cartCount,
@@ -1952,22 +1641,19 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       isLoadingMore,
       hasMore,
       isInitialized,
-      addToCart,
+      addProductToCart,
+      addToCartById,
       removeFromCart,
       updateQuantity,
-      incrementQuantity,
-      decrementQuantity,
-      clearCart,
       removeMultipleFromCart,
       initializeCartIfNeeded,
       loadMoreItems,
       calculateCartTotals,
       validateForPayment,
+      updateCartCacheFromValidation,
       refresh,
-      isInCart,
-      isOptimisticallyAdding,
-      isOptimisticallyRemoving,
-      getCachedCartItem,
+      enableLiveUpdates,
+      disableLiveUpdates,
     ]
   );
 
