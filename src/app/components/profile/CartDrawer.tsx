@@ -407,10 +407,9 @@ const proceedToPayment = useCallback(
       pricingMap.set(itemTotal.productId, itemTotal);
     });
 
+    // ✅ FIX: Don't filter by isOptimistic - filter by selectedIds only
     const paymentItems: PaymentItem[] = cartItems
-      .filter(
-        (item) => selectedIds.includes(item.productId) && !item.isOptimistic
-      )
+      .filter((item) => selectedIds.includes(item.productId)) // ✅ Remove the isOptimistic check
       .map((item) => {
         const paymentItem: PaymentItem = {
           productId: item.productId,
