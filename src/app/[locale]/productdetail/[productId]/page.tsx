@@ -276,7 +276,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   );
 
   const isOptimisticallyAdding = useCallback(
-    (_productId: string): boolean => {
+    (): boolean => {
       // ✅ FIX: Only check if button state says we're adding
       // Don't rely on cartItems which updates slowly
       return cartButtonState === "adding";
@@ -285,7 +285,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   );
   
   const isOptimisticallyRemoving = useCallback(
-    (_productId: string): boolean => {
+    (): boolean => {
       // ✅ FIX: Only check if button state says we're removing
       return cartButtonState === "removing";
     },
@@ -652,8 +652,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     const productInCart =
       localCartState !== null ? localCartState : actualInCart;
 
-    const isOptimisticAdd = isOptimisticallyAdding(product.id);
-    const isOptimisticRemove = isOptimisticallyRemoving(product.id);
+      const isOptimisticAdd = isOptimisticallyAdding();
+      const isOptimisticRemove = isOptimisticallyRemoving();
 
     if (cartButtonState === "adding" || isOptimisticAdd) {
       return {
@@ -777,8 +777,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     isPending ||
     cartButtonState === "adding" ||
     cartButtonState === "removing" ||
-    isOptimisticallyAdding(product.id) ||
-    isOptimisticallyRemoving(product.id);
+    isOptimisticallyAdding() ||
+    isOptimisticallyRemoving();
 
   return (
     <div
