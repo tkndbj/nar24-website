@@ -275,6 +275,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   const isInitializingRef = useRef(false);
   const unsubscribeCartRef = useRef<(() => void) | null>(null);
 
+  // Keep a ref to current cart items to avoid stale closures in listeners
+  const cartItemsRef = useRef<CartItem[]>([]);
+
   // Rate limiters
   const addToCartLimiterRef = useRef(new RateLimiter(ADD_TO_CART_COOLDOWN));
   const quantityLimiterRef = useRef(new RateLimiter(QUANTITY_UPDATE_COOLDOWN));
@@ -616,14 +619,13 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     async (changes: DocumentChange<FirestoreCartData>[]) => {
       const itemsMap = new Map<string, CartItem>();
 
-      // Start with current items (exclude optimistic ones)
-      cartItems.forEach((item) => {
-        if (!item.isOptimistic) {
-          itemsMap.set(item.productId, item);
-        }
+      // Start with current items - use ref to avoid stale closure
+      // Include ALL items initially, we'll replace optimistic ones with real data
+      cartItemsRef.current.forEach((item) => {
+        itemsMap.set(item.productId, item);
       });
 
-      // Process changes
+      // Process changes - these will override any optimistic items
       for (const change of changes) {
         const productId = change.doc.id;
         const cartData = change.doc.data();
@@ -632,14 +634,15 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           if (cartData && hasRequiredFields(cartData)) {
             try {
               const product = buildProductFromCartData(cartData);
-              itemsMap.set(
-                productId,
-                createCartItem(productId, cartData, product)
-              );
+              const newItem = createCartItem(productId, cartData, product);
+              // Replace any existing item (including optimistic ones)
+              itemsMap.set(productId, newItem);
               clearOptimisticUpdate(productId);
             } catch (error) {
               console.error(`Failed to process ${productId}:`, error);
             }
+          } else {
+            console.warn(`⚠️ Item ${productId} missing required fields, keeping optimistic version if exists`);
           }
         } else if (change.type === "removed") {
           itemsMap.delete(productId);
@@ -658,7 +661,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       }
     },
     [
-      cartItems,
       hasRequiredFields,
       buildProductFromCartData,
       createCartItem,
@@ -989,8 +991,8 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     ) => {
       clearOptimisticUpdate(productId);
 
-      // Remove ALL existing items with this productId
-      const existingItems = cartItems.filter(
+      // Remove ALL existing items with this productId - use ref to avoid stale closure
+      const existingItems = cartItemsRef.current.filter(
         (item) => item.productId !== productId
       );
 
@@ -1031,7 +1033,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       optimisticTimeoutsRef.current.set(productId, timeout);
     },
     [
-      cartItems,
       cartProductIds,
       clearOptimisticUpdate,
       buildProductFromCartData,
@@ -1787,6 +1788,11 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   // ========================================================================
   // EFFECTS
   // ========================================================================
+
+  // Keep cartItemsRef in sync with cartItems state
+  useEffect(() => {
+    cartItemsRef.current = cartItems;
+  }, [cartItems]);
 
   // Initialize cart when user logs in or clear on logout
   useEffect(() => {

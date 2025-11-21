@@ -23,6 +23,23 @@ import { AttributeLocalizationUtils } from "@/constants/AttributeLocalization";
 import { db } from "@/lib/firebase";
 import Image from "next/image";
 import { Product } from "@/app/models/Product";
+import CartValidationDialog from "../CartValidationDialog";
+
+interface ValidationMessage {
+  key: string;
+  params: Record<string, unknown>;
+}
+
+interface ValidatedCartItem {
+  productId: string;
+  unitPrice?: number;
+  bundlePrice?: number;
+  discountPercentage?: number;
+  discountThreshold?: number;
+  bulkDiscountPercentage?: number;
+  maxQuantity?: number;
+  [key: string]: unknown;
+}
 
 // Type definitions matching CartProvider
 interface SalePreferences {
@@ -97,6 +114,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     initializeCartIfNeeded,
     loadMoreItems,
     calculateCartTotals,
+    validateForPayment,              // ✅ ADD THIS
+  updateCartCacheFromValidation,
   } = useCart();
 
   const [isAnimating, setIsAnimating] = useState(false);
@@ -186,12 +205,16 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   // Sync selections with cart items
   useEffect(() => {
     if (cartItems.length > 0) {
-      const newSelected: Record<string, boolean> = {};
-      cartItems.forEach((item) => {
-        // Select all by default (matching Flutter)
-        newSelected[item.productId] = selectedProducts[item.productId] ?? true;
+      setSelectedProducts((prev) => {
+        const newSelected: Record<string, boolean> = {};
+        cartItems.forEach((item) => {
+          // Select all by default (matching Flutter)
+          newSelected[item.productId] = prev[item.productId] ?? true;
+        });
+        return newSelected;
       });
-      setSelectedProducts(newSelected);
+    } else {
+      setSelectedProducts({});
     }
   }, [cartItems]);
 
@@ -331,14 +354,54 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     [localization]
   );
 
-  // Handle checkout
-  const handleCheckout = useCallback(() => {
-    const selectedIds = Object.entries(selectedProducts)
-      .filter(([, selected]) => selected)
-      .map(([id]) => id);
+  const [isValidating, setIsValidating] = useState(false);
+const [showValidationDialog, setShowValidationDialog] = useState(false);
+const [validationResult, setValidationResult] = useState<{
+  isValid: boolean;
+  errors: Record<string, ValidationMessage>;
+  warnings: Record<string, ValidationMessage>;
+  validatedItems: ValidatedCartItem[];
+} | null>(null);
 
-    if (selectedIds.length === 0) return;
+// Replace handleCheckout function
+const handleCheckout = useCallback(async () => {
+  const selectedIds = Object.entries(selectedProducts)
+    .filter(([, selected]) => selected)
+    .map(([id]) => id);
 
+  if (selectedIds.length === 0) return;
+
+  // ✅ STEP 1: Set loading state
+  setIsValidating(true);
+
+  try {
+    // ✅ STEP 2: Validate cart with Cloud Function
+    const validation = await validateForPayment(selectedIds, false);
+
+    setIsValidating(false);
+
+    // ✅ STEP 3: Check if validation passed
+    if (
+      validation.isValid &&
+      Object.keys(validation.warnings).length === 0
+    ) {
+      // No issues - proceed directly to payment
+      proceedToPayment(selectedIds);
+    } else {
+      // Has errors or warnings - show validation dialog
+      setValidationResult(validation);
+      setShowValidationDialog(true);
+    }
+  } catch (error) {
+    setIsValidating(false);
+    console.error("❌ Checkout validation error:", error);
+    // Show error to user
+    alert(t("validationFailed") || "Validation failed. Please try again.");
+  }
+}, [selectedProducts, validateForPayment, t]);
+
+const proceedToPayment = useCallback(
+  async (selectedIds: string[]) => {
     const pricingMap = new Map();
     calculatedTotals.items.forEach((itemTotal) => {
       pricingMap.set(itemTotal.productId, itemTotal);
@@ -385,7 +448,59 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
     onClose();
     router.push(`/productpayment?total=${calculatedTotals.total}`);
-  }, [selectedProducts, cartItems, calculatedTotals, onClose, router]);
+  },
+  [cartItems, calculatedTotals, onClose, router]
+);
+
+// ✅ NEW: Handle validation dialog continue
+const handleValidationContinue = useCallback(async () => {
+  if (!validationResult) return;
+
+  setIsValidating(true);
+  setShowValidationDialog(false);
+
+  try {
+    // Update cart cache with fresh values
+    if (validationResult.validatedItems.length > 0) {
+      await updateCartCacheFromValidation(validationResult.validatedItems);
+    }
+
+    // Remove error items from selection
+    const errorIds = Object.keys(validationResult.errors);
+    setSelectedProducts((prev) => {
+      const updated = { ...prev };
+      errorIds.forEach((id) => delete updated[id]);
+      return updated;
+    });
+
+    // Get valid items only
+    const validIds = validationResult.validatedItems
+      .map((item) => item.productId)
+      .filter((id) => !errorIds.includes(id));
+
+    setIsValidating(false);
+
+    if (validIds.length > 0) {
+      // Recalculate totals with fresh data
+      const totals = await calculateCartTotals(validIds);
+      setCalculatedTotals(totals);
+
+      // Proceed to payment
+      proceedToPayment(validIds);
+    } else {
+      alert(t("noValidItemsToCheckout") || "No valid items to checkout");
+    }
+  } catch (error) {
+    setIsValidating(false);
+    console.error("❌ Cache update error:", error);
+  }
+}, [
+  validationResult,
+  updateCartCacheFromValidation,
+  calculateCartTotals,
+  proceedToPayment,
+  t,
+]);
 
   // Backdrop click handler
   const handleBackdropClick = useCallback(
@@ -938,29 +1053,53 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   {t("viewCart")}
                 </button>
                 <button
-                  onClick={handleCheckout}
-                  disabled={
-                    isCalculatingTotals ||
-                    Object.values(selectedProducts).filter((v) => v).length ===
-                      0
-                  }
-                  className="
-                    py-3 px-4 rounded-xl font-medium transition-all duration-200
-                    bg-gradient-to-r from-orange-500 to-pink-500 text-white
-                    hover:from-orange-600 hover:to-pink-600
-                    shadow-lg hover:shadow-xl active:scale-95
-                    flex items-center justify-center space-x-2
-                    disabled:opacity-50 disabled:cursor-not-allowed
-                  "
-                >
-                  <span>{t("checkout")}</span>
-                  <ArrowRight size={16} />
-                </button>
+  onClick={handleCheckout}
+  disabled={
+    isCalculatingTotals ||
+    isValidating ||  // ✅ ADD THIS
+    Object.values(selectedProducts).filter((v) => v).length === 0
+  }
+  className="
+    py-3 px-4 rounded-xl font-medium transition-all duration-200
+    bg-gradient-to-r from-orange-500 to-pink-500 text-white
+    hover:from-orange-600 hover:to-pink-600
+    shadow-lg hover:shadow-xl active:scale-95
+    flex items-center justify-center space-x-2
+    disabled:opacity-50 disabled:cursor-not-allowed
+  "
+>
+  {isValidating ? (  // ✅ ADD THIS
+    <>
+      <RefreshCw size={16} className="animate-spin" />
+      <span>{t("validating")}</span>
+    </>
+  ) : (
+    <>
+      <span>{t("checkout")}</span>
+      <ArrowRight size={16} />
+    </>
+  )}
+</button>
               </div>
             </div>
           )}
         </div>
       </div>
+      {showValidationDialog && validationResult && (
+  <CartValidationDialog
+    open={showValidationDialog}
+    errors={validationResult.errors}
+    warnings={validationResult.warnings}
+    validatedItems={validationResult.validatedItems}
+    cartItems={cartItems}
+    onContinue={handleValidationContinue}
+    onCancel={() => {
+      setShowValidationDialog(false);
+      setValidationResult(null);
+    }}
+  />
+)}
     </div>
+    
   );
 };
