@@ -441,9 +441,7 @@ const proceedToPayment = useCallback(
 
         return paymentItem;
       });
-
-    localStorage.setItem("cartItems", JSON.stringify(paymentItems));
-    localStorage.setItem("cartTotal", freshTotals.total.toString());
+   
 
     onClose();
     router.push(`/productpayment?total=${freshTotals.total}`);

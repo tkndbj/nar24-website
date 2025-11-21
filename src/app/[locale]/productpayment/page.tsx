@@ -484,50 +484,23 @@ export default function ProductPaymentPage() {
   useEffect(() => {
     const totalParam = searchParams.get("total");
     const itemsParam = searchParams.get("items");
-
-    if (itemsParam) {
-      try {
-        const items = JSON.parse(decodeURIComponent(itemsParam));
-        setCartItems(items);
-
-        // ✅ ALWAYS use URL total param (from Cloud Function)
-        if (totalParam) {
-          const cfTotal = parseFloat(totalParam);
-          console.log("💰 Using Cloud Function total from URL:", cfTotal);
-          setTotalPrice(cfTotal);
-        } else {
-          console.error("❌ Missing total parameter in URL!");
-          // Redirect back if total is missing
-          router.push("/cart");
-          return;
-        }
-      } catch (error) {
-        console.error("Error parsing cart items:", error);
-        router.push("/");
-      }
-    } else {
-      // ✅ Load from localStorage (set by CartDrawer)
-      const savedCart = localStorage.getItem("cartItems");
-      const savedTotal = localStorage.getItem("cartTotal");
-
-      if (savedCart && savedTotal) {
-        try {
-          const items = JSON.parse(savedCart);
-          const cfTotal = parseFloat(savedTotal);
-
-          console.log("💰 Using Cloud Function total from localStorage:", cfTotal);
-          console.log("📦 Cart items:", items.length);
-
-          setCartItems(items);
-          setTotalPrice(cfTotal);
-        } catch (error) {
-          console.error("Error parsing saved cart:", error);
-          router.push("/");
-        }
-      } else {
-        console.warn("⚠️ No cart data found, redirecting to cart page");
-        router.push("/cart");
-      }
+  
+    if (!totalParam || !itemsParam) {
+      // Missing data → Go back to cart
+      router.push("/cart");
+      return;
+    }
+  
+    try {
+      const items = JSON.parse(decodeURIComponent(itemsParam));
+      const cfTotal = parseFloat(totalParam);
+  
+      console.log("💰 Cloud Function total:", cfTotal);
+      setCartItems(items);
+      setTotalPrice(cfTotal);
+    } catch (error) {
+      console.error("Error parsing cart data:", error);
+      router.push("/cart");
     }
   }, [searchParams, router]);
 
