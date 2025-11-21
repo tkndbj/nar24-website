@@ -89,6 +89,9 @@ interface CartItem {
   salePreferences?: SalePreferences | null;
   selectedColorImage?: string;
   showSellerHeader?: boolean;
+  selectedColor?: string;
+  selectedSize?: string;
+  selectedMetres?: number;
   [key: string]: unknown;
 }
 
@@ -562,7 +565,8 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     ): CartItem => {
       const salePreferences = extractSalePreferences(cartData);
 
-      return {
+      // ✅ START WITH BASE ITEM
+      const item: CartItem = {
         product,
         productId,
         quantity: (cartData.quantity as number) ?? 1,
@@ -577,6 +581,27 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         cartData: cartData as CartData,
         isOptimistic: false,
       };
+
+      // ✅ FLATTEN selectedColor TO ROOT LEVEL (matching Flutter)
+      if (
+        cartData.selectedColor !== undefined &&
+        cartData.selectedColor !== null
+      ) {
+        item.selectedColor = cartData.selectedColor as string;
+      }
+
+      // ✅ FLATTEN attributes TO ROOT LEVEL (matching Flutter)
+      if (cartData.attributes && typeof cartData.attributes === "object") {
+        const attributes = cartData.attributes as Record<string, unknown>;
+        Object.entries(attributes).forEach(([key, value]) => {
+          // Only add if not already present in item
+          if (!(key in item)) {
+            item[key] = value;
+          }
+        });
+      }
+
+      return item;
     },
     [extractSalePreferences, resolveColorImage]
   );
@@ -685,7 +710,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         console.log(`  📦 Final cart has ${uniqueItems.length} items`);
         return uniqueItems;
       });
-  
+
       // Invalidate Redis cache
       if (user) {
         redisRef.current.invalidateCartTotals(user.uid);
@@ -709,7 +734,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       }
 
       console.log(
-        `🔥 Real-time update: ${snapshot.docChanges().length} changes, ${snapshot.docs.length} total docs`
+        `🔥 Real-time update: ${snapshot.docChanges().length} changes, ${
+          snapshot.docs.length
+        } total docs`
       );
 
       // ✅ ALWAYS update IDs from full snapshot
@@ -717,7 +744,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
       // ✅ Process changes if any exist
       if (snapshot.docChanges().length > 0) {
-        console.log(`📝 Processing ${snapshot.docChanges().length} document changes`);
+        console.log(
+          `📝 Processing ${snapshot.docChanges().length} document changes`
+        );
         processCartChanges(snapshot.docChanges());
       } else if (snapshot.docs.length === 0) {
         // Only clear if cart is actually empty
@@ -836,7 +865,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
         // ✅ Set initialized FIRST
         setIsInitialized(true);
-
       } catch (error) {
         console.error("❌ Init error:", error);
       } finally {
@@ -858,7 +886,14 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         }
       });
     }
-  }, [user, isInitialized, db, buildCartItemsFromDocs, enableLiveUpdates, cartItems.length]);
+  }, [
+    user,
+    isInitialized,
+    db,
+    buildCartItemsFromDocs,
+    enableLiveUpdates,
+    cartItems.length,
+  ]);
 
   // ========================================================================
   // ADD TO CART - Matching Flutter implementation
@@ -920,10 +955,16 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         subcategory: product.subcategory || "",
         subsubcategory: product.subsubcategory || "",
         allImages: Array.isArray(product.imageUrls) ? product.imageUrls : [],
-        productImage: Array.isArray(product.imageUrls) && product.imageUrls.length > 0 ? product.imageUrls[0] : "",
-        availableStock: typeof product.quantity === "number" ? product.quantity : 0,
-        averageRating: typeof product.averageRating === "number" ? product.averageRating : 0,
-        reviewCount: typeof product.reviewCount === "number" ? product.reviewCount : 0,
+        productImage:
+          Array.isArray(product.imageUrls) && product.imageUrls.length > 0
+            ? product.imageUrls[0]
+            : "",
+        availableStock:
+          typeof product.quantity === "number" ? product.quantity : 0,
+        averageRating:
+          typeof product.averageRating === "number" ? product.averageRating : 0,
+        reviewCount:
+          typeof product.reviewCount === "number" ? product.reviewCount : 0,
         sellerId: product.userId || product.shopId || "unknown",
         sellerName: product.sellerName || "Seller",
         isShop: product.shopId != null,
@@ -1036,21 +1077,21 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       quantity: number
     ) => {
       clearOptimisticUpdate(productId);
-  
+
       // ✅ FIX: Use setState to get current items, not ref
       setCartItems((currentItems) => {
         // Remove any existing item with this ID
         const existingItems = currentItems.filter(
           (item) => item.productId !== productId
         );
-  
+
         // Mark as optimistic
         optimisticCacheRef.current.set(productId, {
           ...productData,
           quantity,
           _optimistic: true,
         });
-  
+
         // Create optimistic item
         try {
           const optimisticProduct = buildProductFromCartData(productData);
@@ -1058,7 +1099,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
             ...createCartItem(productId, productData, optimisticProduct),
             isOptimistic: true,
           };
-  
+
           // Add at top
           return [optimisticItem, ...existingItems];
         } catch (error) {
@@ -1066,13 +1107,13 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           return currentItems;
         }
       });
-  
+
       // Update IDs
       const newIds = new Set(cartProductIds);
       newIds.add(productId);
       setCartProductIds(newIds);
       setCartCount(newIds.size);
-  
+
       // Set timeout
       const timeout = setTimeout(() => {
         if (optimisticCacheRef.current.has(productId)) {
@@ -1080,7 +1121,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           clearOptimisticUpdate(productId);
         }
       }, OPTIMISTIC_TIMEOUT);
-  
+
       optimisticTimeoutsRef.current.set(productId, timeout);
     },
     [
@@ -1122,28 +1163,28 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       if (!isInitialized) {
         await initializeCartIfNeeded();
       }
-  
+
       // Rate limiting
       if (!addToCartLimiterRef.current.canProceed(`add_${product.id}`)) {
         return "Please wait before adding again";
       }
-  
+
       try {
         const productData = buildProductDataForCart(
           product,
           selectedColor,
           attributes
         );
-  
+
         // Clean any nested undefined values
         const cleanedProductData = cleanFirestoreData(productData) as Record<
           string,
           unknown
         >;
-  
+
         // ✅ STEP 2: Apply optimistic update for instant feedback
         applyOptimisticAdd(product.id, productData, quantity);
-  
+
         // ✅ STEP 3: Write to Firestore
         await setDoc(doc(db, "users", user.uid, "cart", product.id), {
           ...cleanedProductData,
@@ -1151,22 +1192,22 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           addedAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
-  
+
         // Metrics logging
         const shopId = await getProductShopId(product.id);
         metricsEventService.logCartAdded({
           productId: product.id,
           shopId,
         });
-  
+
         console.log("✅ Added to cart:", product.id);
-  
+
         // Invalidate totals cache
         redisRef.current.invalidateCartTotals(user.uid);
-  
+
         // Background refresh totals
         backgroundRefreshTotals();
-  
+
         return "Added to cart";
       } catch (error) {
         console.error("❌ Add to cart error:", error);
@@ -1850,8 +1891,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     cartItemsRef.current = cartItems;
   }, [cartItems]);
 
- 
-
   // Initialize cart when user logs in or clear on logout
   useEffect(() => {
     if (!user) {
@@ -1871,7 +1910,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       }
       return;
     }
-  
+
     // ✅ User is logged in
     if (!isInitialized) {
       // First time - initialize from Firestore

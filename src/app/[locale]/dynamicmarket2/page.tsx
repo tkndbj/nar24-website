@@ -472,7 +472,7 @@ const DynamicMarketPage: React.FC = () => {
       timeoutId = setTimeout(() => {
         if (
           window.innerHeight + document.documentElement.scrollTop >=
-          document.documentElement.offsetHeight - 300
+          document.documentElement.offsetHeight - 1500
         ) {
           if (hasMore && !isLoadingMore) {
             handleLoadMore();
@@ -1613,15 +1613,10 @@ const DynamicMarketPage: React.FC = () => {
 
             {/* Loading more indicator */}
             {!isInitialLoading && isLoadingMore && (
-              <div className="text-center py-8">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
-                <p
-                  className={`mt-2 text-sm ${
-                    isDarkMode ? "text-gray-400" : "text-gray-600"
-                  }`}
-                >
-                  {t("DynamicMarket.loadingMore")}
-                </p>
+              <div className="flex items-center justify-center py-8 gap-2">
+                <div className="w-2.5 h-2.5 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                <div className="w-2.5 h-2.5 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                <div className="w-2.5 h-2.5 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
               </div>
             )}
 

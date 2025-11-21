@@ -866,7 +866,7 @@ const SearchResultsContent: React.FC = () => {
     const handleScroll = throttle(() => {
       if (
         window.innerHeight + document.documentElement.scrollTop >=
-        document.documentElement.offsetHeight - 1000
+        document.documentElement.offsetHeight - 1500
       ) {
         loadMoreIfNeeded();
       }
@@ -1119,17 +1119,10 @@ const SearchResultsContent: React.FC = () => {
 
       {/* Enhanced Loading more indicator */}
       {isLoadingMore && (
-        <div className="flex justify-center py-8">
-          <div className="flex items-center gap-2">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-orange-500" />
-            <span
-              className={`text-sm ${
-                isDarkMode ? "text-gray-400" : "text-gray-600"
-              }`}
-            >
-              {t("loadingMoreProducts") || "Loading more products..."}
-            </span>
-          </div>
+        <div className="flex items-center justify-center py-8 gap-2">
+          <div className="w-2.5 h-2.5 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+          <div className="w-2.5 h-2.5 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+          <div className="w-2.5 h-2.5 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
         </div>
       )}
 

@@ -70,7 +70,7 @@ const availableColors = [
 
 // Constants
 const PRODUCTS_PER_PAGE = 20;
-const SCROLL_THRESHOLD = 1000;
+const SCROLL_THRESHOLD = 1500;
 const DEBOUNCE_DELAY = 300;
 
 // Create a wrapper to convert useTranslations to AppLocalizations format
@@ -1118,11 +1118,10 @@ export default function DynamicMarketPage() {
 
   {/* Loading more indicator */}
   {loadingMore && (
-    <div className="flex items-center justify-center py-8">
-      <Loader2 size={24} className="animate-spin text-orange-500" />
-      <span className={`ml-3 text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-        Loading more products...
-      </span>
+    <div className="flex items-center justify-center py-8 gap-2">
+      <div className="w-2.5 h-2.5 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+      <div className="w-2.5 h-2.5 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+      <div className="w-2.5 h-2.5 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
     </div>
   )}
 </div>
