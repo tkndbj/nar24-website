@@ -5,7 +5,7 @@ import {
   Star,
   Filter,
   Calendar,
-  Edit,
+
   X,
   Send,
   Store,
@@ -13,29 +13,34 @@ import {
   RefreshCw,
   Camera,
   ArrowLeft,
+
 } from "lucide-react";
 import { useUser } from "@/context/UserProvider";
 import { useRouter } from "next/navigation";
 import {
-  collection,
+ 
   query,
   where,
   orderBy,
   limit,
   startAfter,
   getDocs,
-  serverTimestamp,
   collectionGroup,
   Timestamp,
   QueryDocumentSnapshot,
-  addDoc,
+  DocumentData,
 } from "firebase/firestore";
-import { db, storage } from "@/lib/firebase";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { db, storage, functions } from "@/lib/firebase";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import { httpsCallable, HttpsCallableResult } from "firebase/functions";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
+import imageCompression from "browser-image-compression";
 
-// Types
+// ============================================================================
+// TYPES
+// ============================================================================
+
 interface PendingReview {
   id: string;
   productId: string;
@@ -80,14 +85,72 @@ interface FilterOptions {
 
 type ReviewTab = "pending" | "myReviews";
 
+interface ImageValidationResult {
+  valid: boolean;
+  error?: string;
+  message?: string;
+}
+
+interface ImageProcessResult {
+  success: boolean;
+  url?: string;
+  ref?: string;
+  error?: string;
+  message?: string;
+}
+
+interface ModerationResult {
+  approved: boolean;
+  rejectionReason?: string;
+}
+
+interface SubmitReviewData {
+  isProduct: boolean;
+  isShopProduct: boolean;
+  productId?: string;
+  sellerId: string;
+  shopId?: string;
+  transactionId: string;
+  orderId: string;
+  rating: number;
+  review: string;
+  imageUrls: string[];
+}
+
+interface SubmitReviewResult {
+  success: boolean;
+  message?: string;
+}
+
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
 const PAGE_SIZE = 20;
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+const ALLOWED_MIME_TYPES = [
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/heic",
+  "image/heif",
+  "image/webp",
+];
+const MAX_IMAGES = 3;
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
 
 export default function ReviewsPage() {
   const router = useRouter();
   const { user, profileData } = useUser();
   const t = useTranslations("Reviews");
 
-  // State
+  // ============================================================================
+  // STATE
+  // ============================================================================
+
   const [activeTab, setActiveTab] = useState<ReviewTab>("pending");
   const [filters, setFilters] = useState<FilterOptions>({ reviewType: "all" });
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -97,27 +160,26 @@ export default function ReviewsPage() {
   const [pendingLoading, setPendingLoading] = useState(false);
   const [pendingHasMore, setPendingHasMore] = useState(true);
   const [pendingLastDoc, setPendingLastDoc] =
-    useState<QueryDocumentSnapshot | null>(null);
+    useState<QueryDocumentSnapshot<DocumentData> | null>(null);
 
   // My reviews state
   const [myReviews, setMyReviews] = useState<Review[]>([]);
   const [myReviewsLoading, setMyReviewsLoading] = useState(false);
   const [myReviewsHasMore, setMyReviewsHasMore] = useState(true);
   const [myReviewsLastDoc, setMyReviewsLastDoc] =
-    useState<QueryDocumentSnapshot | null>(null);
+    useState<QueryDocumentSnapshot<DocumentData> | null>(null);
 
   // Modal states
   const [showReviewModal, setShowReviewModal] = useState(false);
-  const [selectedReview, setSelectedReview] = useState<
-    PendingReview | Review | null
-  >(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showLoadingModal, setShowLoadingModal] = useState(false);
+  const [selectedReview, setSelectedReview] = useState<PendingReview | null>(
+    null
+  );
 
   // Review form state
   const [rating, setRating] = useState(0);
   const [reviewText, setReviewText] = useState("");
   const [reviewImages, setReviewImages] = useState<File[]>([]);
-  const [existingImageUrls, setExistingImageUrls] = useState<string[]>([]);
   const [reviewType, setReviewType] = useState<"product" | "seller">("product");
 
   // Refs
@@ -125,114 +187,15 @@ export default function ReviewsPage() {
   const prevFilters = useRef(filters);
   const isLoadingMoreRef = useRef(false);
 
-  // Check dark mode
-  useEffect(() => {
-    const checkDarkMode = () => {
-      setIsDarkMode(document.documentElement.classList.contains("dark"));
-    };
-    checkDarkMode();
-    const observer = new MutationObserver(checkDarkMode);
-    observer.observe(document.documentElement, { attributes: true });
-    return () => observer.disconnect();
-  }, []);
+  // ============================================================================
+  // EFFECTS
+  // ============================================================================
 
-  // Redirect if not authenticated
-  useEffect(() => {
-    if (!user) {
-      router.push("/login");
-    }
-  }, [user, router]);
-
-  // Load initial data when user changes
-  useEffect(() => {
-    if (user) {
-      // Reset state when user changes
-      resetPaginationState();
-      loadPendingReviews(true);
-      loadMyReviews(true);
-    }
-  }, [user]);
-
-  // Load data when filters change (optimized like Flutter)
-  useEffect(() => {
-    if (user) {
-      const filtersChanged =
-        JSON.stringify(filters) !== JSON.stringify(prevFilters.current);
-      if (filtersChanged) {
-        resetPaginationState();
-        loadPendingReviews(true);
-        loadMyReviews(true);
-        prevFilters.current = filters;
-      }
-    }
-  }, [filters, user]);
-
-  // Reset filter when switching tabs (like Flutter)
-  useEffect(() => {
-    if (activeTab !== "myReviews") {
-      setFilters((prev) => ({ ...prev, reviewType: "all" }));
-    }
-  }, [activeTab]);
-
-  // Window scroll handler for infinite loading
-  useEffect(() => {
-    const handleScroll = () => {
-      // Check if we're near the bottom (200px threshold)
-      const scrollPosition = window.innerHeight + window.scrollY;
-      const threshold = document.documentElement.scrollHeight - 200;
-
-      if (scrollPosition >= threshold) {
-        if (
-          activeTab === "pending" &&
-          pendingHasMore &&
-          !pendingLoading &&
-          !isLoadingMoreRef.current
-        ) {
-          isLoadingMoreRef.current = true;
-          loadPendingReviews(false).finally(() => {
-            isLoadingMoreRef.current = false;
-          });
-        } else if (
-          activeTab === "myReviews" &&
-          myReviewsHasMore &&
-          !myReviewsLoading &&
-          !isLoadingMoreRef.current
-        ) {
-          isLoadingMoreRef.current = true;
-          loadMyReviews(false).finally(() => {
-            isLoadingMoreRef.current = false;
-          });
-        }
-      }
-    };
-
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [
-    activeTab,
-    pendingHasMore,
-    pendingLoading,
-    myReviewsHasMore,
-    myReviewsLoading,
-  ]);
-
-  // Helper function to reset pagination state
-  const resetPaginationState = () => {
-    setPendingReviews([]);
-    setMyReviews([]);
-    setPendingLastDoc(null);
-    setMyReviewsLastDoc(null);
-    setPendingHasMore(true);
-    setMyReviewsHasMore(true);
-    isLoadingMoreRef.current = false;
-  };
-
-  // Load pending reviews (optimized like Flutter)
   const loadPendingReviews = useCallback(
     async (reset = false) => {
       if (!user) return;
       if (pendingLoading) return;
-      if (!reset && !pendingHasMore) return; // Prevent unnecessary calls
+      if (!reset && !pendingHasMore) return;
 
       setPendingLoading(true);
       try {
@@ -241,7 +204,7 @@ export default function ReviewsPage() {
           where("buyerId", "==", user.uid)
         );
 
-        // Apply filters (server-side filtering like Flutter ReviewProvider)
+        // Apply filters
         if (filters.productId) {
           q = query(q, where("productId", "==", filters.productId));
         }
@@ -293,14 +256,12 @@ export default function ReviewsPage() {
           }
         });
 
-        // Set hasMore based on actual results length
         const hasMore = newReviews.length === PAGE_SIZE;
         setPendingHasMore(hasMore);
 
         if (reset) {
           setPendingReviews(newReviews);
         } else {
-          // Use Map to ensure uniqueness (like Flutter's approach)
           setPendingReviews((prev) => {
             const combined = [...prev, ...newReviews];
             const uniqueMap = new Map();
@@ -311,7 +272,6 @@ export default function ReviewsPage() {
           });
         }
 
-        // Set last document for pagination
         if (newReviews.length > 0) {
           setPendingLastDoc(snapshot.docs[snapshot.docs.length - 1]);
         } else if (reset) {
@@ -326,12 +286,11 @@ export default function ReviewsPage() {
     [user, filters, pendingLoading, pendingLastDoc, pendingHasMore]
   );
 
-  // Load my reviews (optimized like Flutter)
   const loadMyReviews = useCallback(
     async (reset = false) => {
       if (!user) return;
       if (myReviewsLoading) return;
-      if (!reset && !myReviewsHasMore) return; // Prevent unnecessary calls
+      if (!reset && !myReviewsHasMore) return;
 
       setMyReviewsLoading(true);
       try {
@@ -340,7 +299,7 @@ export default function ReviewsPage() {
           where("userId", "==", user.uid)
         );
 
-        // Apply filters based on review type (like Flutter's switch statement)
+        // Apply filters based on review type
         if (filters.reviewType === "product") {
           q = query(q, where("productId", "!=", null));
         } else if (filters.reviewType === "seller") {
@@ -380,14 +339,12 @@ export default function ReviewsPage() {
             } as Review)
         );
 
-        // Set hasMore based on actual results length
         const hasMore = newReviews.length === PAGE_SIZE;
         setMyReviewsHasMore(hasMore);
 
         if (reset) {
           setMyReviews(newReviews);
         } else {
-          // Use Map to ensure uniqueness (like Flutter's approach)
           setMyReviews((prev) => {
             const combined = [...prev, ...newReviews];
             const uniqueMap = new Map();
@@ -398,7 +355,6 @@ export default function ReviewsPage() {
           });
         }
 
-        // Set last document for pagination
         if (newReviews.length > 0) {
           setMyReviewsLastDoc(snapshot.docs[snapshot.docs.length - 1]);
         } else if (reset) {
@@ -413,150 +369,120 @@ export default function ReviewsPage() {
     [user, filters, myReviewsLoading, myReviewsLastDoc, myReviewsHasMore]
   );
 
-  // Refresh function (like Flutter's refreshPendingReviews)
-  const refreshReviews = useCallback(() => {
+  // Check dark mode
+  useEffect(() => {
+    const checkDarkMode = () => {
+      setIsDarkMode(document.documentElement.classList.contains("dark"));
+    };
+    checkDarkMode();
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, { attributes: true });
+    return () => observer.disconnect();
+  }, []);
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!user) {
+      router.push("/login");
+    }
+  }, [user, router]);
+
+  // Load initial data when user changes
+  useEffect(() => {
     if (user) {
       resetPaginationState();
       loadPendingReviews(true);
       loadMyReviews(true);
     }
-  }, [user, loadPendingReviews, loadMyReviews]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
-  // Handle image upload
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || []);
-    const maxImages = 3;
-    const currentCount = reviewImages.length + existingImageUrls.length;
-
-    if (currentCount >= maxImages) {
-      alert(t("maxImagesReached") || `Maximum ${maxImages} images allowed`);
-      return;
-    }
-
-    const remainingSlots = maxImages - currentCount;
-    const filesToAdd = files.slice(0, remainingSlots);
-
-    setReviewImages((prev) => [...prev, ...filesToAdd]);
-  };
-
-  // Remove image
-  const removeImage = (index: number, isExisting = false) => {
-    if (isExisting) {
-      setExistingImageUrls((prev) => prev.filter((_, i) => i !== index));
-    } else {
-      setReviewImages((prev) => prev.filter((_, i) => i !== index));
-    }
-  };
-
-  // Submit review
-  const handleSubmitReview = async () => {
-    if (!user || !selectedReview || rating === 0 || !reviewText.trim()) {
-      alert(
-        t("pleaseProvideRatingAndReview") ||
-          "Please provide a rating and review text"
-      );
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      // Upload images first
-      const uploadedUrls: string[] = [];
-      for (const image of reviewImages) {
-        const fileName = `${user.uid}_${Date.now()}_${image.name}`;
-        const imageRef = ref(storage, `reviews/${fileName}`);
-        await uploadBytes(imageRef, image);
-        const downloadURL = await getDownloadURL(imageRef);
-        uploadedUrls.push(downloadURL);
+  // Load data when filters change
+  useEffect(() => {
+    if (user) {
+      const filtersChanged =
+        JSON.stringify(filters) !== JSON.stringify(prevFilters.current);
+      if (filtersChanged) {
+        resetPaginationState();
+        loadPendingReviews(true);
+        loadMyReviews(true);
+        prevFilters.current = filters;
       }
-
-      const allImageUrls = [...existingImageUrls, ...uploadedUrls];
-
-      // Determine collection path
-      const isProductReview = reviewType === "product";
-      let collectionPath: string;
-
-      if (isProductReview) {
-        const pending = selectedReview as PendingReview;
-        collectionPath = pending.isShopProduct
-          ? `shop_products/${pending.productId}/reviews`
-          : `products/${pending.productId}/reviews`;
-      } else {
-        const pending = selectedReview as PendingReview;
-        collectionPath = pending.shopId
-          ? `shops/${pending.shopId}/reviews`
-          : `users/${pending.sellerId}/reviews`;
-      }
-
-      // Create review document
-      const reviewData = {
-        userId: user.uid,
-        userName: profileData?.displayName || "Anonymous",
-        userProfileImage: profileData?.profileImage || "",
-        rating,
-        review: reviewText.trim(),
-        imageUrls: allImageUrls,
-        timestamp: serverTimestamp(),
-        orderId: selectedReview.id,
-        ...(isProductReview && {
-          productId: (selectedReview as PendingReview).productId,
-          productName: (selectedReview as PendingReview).productName,
-          productImage: (selectedReview as PendingReview).productImage,
-          productPrice: (selectedReview as PendingReview).productPrice,
-          currency: (selectedReview as PendingReview).currency,
-        }),
-        sellerId: (selectedReview as PendingReview).sellerId,
-        ...((selectedReview as PendingReview).shopId && {
-          shopId: (selectedReview as PendingReview).shopId,
-        }),
-      };
-
-      await addDoc(collection(db, collectionPath), reviewData);
-
-      // Reset form and close modal
-      resetReviewForm();
-      setShowReviewModal(false);
-
-      // Refresh data (like Flutter's approach)
-      refreshReviews();
-
-      alert(
-        t("reviewSubmittedSuccessfully") || "Review submitted successfully!"
-      );
-    } catch (error) {
-      console.error("Error submitting review:", error);
-      alert(t("errorSubmittingReview") || "Error submitting review");
-    } finally {
-      setIsSubmitting(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters, user]);
+
+  // Reset filter when switching tabs
+  useEffect(() => {
+    if (activeTab !== "myReviews") {
+      setFilters((prev) => ({ ...prev, reviewType: "all" }));
+    }
+  }, [activeTab]);
+
+  // Window scroll handler for infinite loading
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollPosition = window.innerHeight + window.scrollY;
+      const threshold = document.documentElement.scrollHeight - 200;
+
+      if (scrollPosition >= threshold) {
+        if (
+          activeTab === "pending" &&
+          pendingHasMore &&
+          !pendingLoading &&
+          !isLoadingMoreRef.current
+        ) {
+          isLoadingMoreRef.current = true;
+          loadPendingReviews(false).finally(() => {
+            isLoadingMoreRef.current = false;
+          });
+        } else if (
+          activeTab === "myReviews" &&
+          myReviewsHasMore &&
+          !myReviewsLoading &&
+          !isLoadingMoreRef.current
+        ) {
+          isLoadingMoreRef.current = true;
+          loadMyReviews(false).finally(() => {
+            isLoadingMoreRef.current = false;
+          });
+        }
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [
+    activeTab,
+    pendingHasMore,
+    pendingLoading,
+    myReviewsHasMore,
+    myReviewsLoading,
+    loadPendingReviews,
+    loadMyReviews,
+  ]);
+
+  // ============================================================================
+  // HELPER FUNCTIONS
+  // ============================================================================
+
+  const resetPaginationState = () => {
+    setPendingReviews([]);
+    setMyReviews([]);
+    setPendingLastDoc(null);
+    setMyReviewsLastDoc(null);
+    setPendingHasMore(true);
+    setMyReviewsHasMore(true);
+    isLoadingMoreRef.current = false;
   };
 
-  // Reset form
   const resetReviewForm = () => {
     setRating(0);
     setReviewText("");
     setReviewImages([]);
-    setExistingImageUrls([]);
     setSelectedReview(null);
   };
 
-  // Open review modal
-  const openReviewModal = (
-    review: PendingReview,
-    type: "product" | "seller"
-  ) => {
-    setSelectedReview(review);
-    setReviewType(type);
-    setShowReviewModal(true);
-  };
-
-  // Open edit modal (placeholder for future implementation)
-  const openEditModal = (review: Review) => {
-    // TODO: Implement edit functionality
-    console.log("Edit review:", review);
-  };
-
-  // Format date
   const formatDate = (timestamp: Timestamp) => {
     return new Intl.DateTimeFormat("tr-TR", {
       day: "2-digit",
@@ -567,7 +493,6 @@ export default function ReviewsPage() {
     }).format(timestamp.toDate());
   };
 
-  // Get active filters count
   const getActiveFiltersCount = () => {
     let count = 0;
     if (filters.productId) count++;
@@ -577,7 +502,6 @@ export default function ReviewsPage() {
     return count;
   };
 
-  // Filter my reviews based on current filter (client-side like Flutter)
   const getFilteredMyReviews = () => {
     return myReviews.filter((review) => {
       switch (filters.reviewType) {
@@ -592,7 +516,336 @@ export default function ReviewsPage() {
     });
   };
 
-  // Product Card Component
+  // ============================================================================
+  // IMAGE VALIDATION & PROCESSING (Like Flutter)
+  // ============================================================================
+
+  const validateFile = (file: File): ImageValidationResult => {
+    // Check file size
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      return {
+        valid: false,
+        error: "file_too_large",
+        message: t("imageTooLarge") || "Image is too large (max 10MB)",
+      };
+    }
+
+    // Check file type
+    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+      return {
+        valid: false,
+        error: "invalid_format",
+        message:
+          t("invalidImageFormat") ||
+          "Invalid image format (JPG, PNG, HEIC, WEBP only)",
+      };
+    }
+
+    return { valid: true };
+  };
+
+  const compressImage = async (file: File): Promise<File> => {
+    try {
+      const options = {
+        maxSizeMB: 1,
+        maxWidthOrHeight: 1920,
+        useWebWorker: true,
+        fileType: "image/jpeg",
+      };
+      const compressedFile = await imageCompression(file, options);
+      return compressedFile;
+    } catch (error) {
+      console.error("Error compressing image:", error);
+      return file; // Return original if compression fails
+    }
+  };
+
+  const processImage = async (
+    imageFile: File,
+    storagePath: string,
+    index: number
+  ): Promise<ImageProcessResult> => {
+    if (!user) {
+      return {
+        success: false,
+        error: "no_user",
+        message: "User not authenticated",
+      };
+    }
+
+    try {
+      // 1. Validate file first
+      const validation = validateFile(imageFile);
+      if (!validation.valid) {
+        return {
+          success: false,
+          error: validation.error,
+          message: validation.message,
+        };
+      }
+
+      // 2. Compress
+      const compressedFile = await compressImage(imageFile);
+
+      // 3. Upload to Storage
+      const fileName = `${user.uid}_${Date.now()}_${index}.jpg`;
+      const storageRef = ref(storage, `${storagePath}/${fileName}`);
+
+      await uploadBytes(storageRef, compressedFile);
+      const imageUrl = await getDownloadURL(storageRef);
+
+      // 4. Moderate via Cloud Function
+      const moderateImageFunction = httpsCallable
+        <{ imageUrl: string },
+        ModerationResult
+      >(functions, "moderateImage");
+
+      const result: HttpsCallableResult<ModerationResult> =
+        await moderateImageFunction({ imageUrl });
+      const data = result.data;
+
+      if (data.approved) {
+        // Approved - keep it
+        return {
+          success: true,
+          url: imageUrl,
+          ref: storageRef.fullPath,
+        };
+      } else {
+        // Rejected - delete it
+        await deleteObject(storageRef);
+        return {
+          success: false,
+          error: data.rejectionReason || "inappropriate_content",
+        };
+      }
+    } catch (error) {
+      console.error("Error processing image:", error);
+      return {
+        success: false,
+        error: "processing_error",
+        message: "Failed to process image",
+      };
+    }
+  };
+
+  // ============================================================================
+  // DATA LOADING FUNCTIONS
+  // ============================================================================
+
+  const refreshReviews = useCallback(() => {
+    if (user) {
+      resetPaginationState();
+      loadPendingReviews(true);
+      loadMyReviews(true);
+    }
+  }, [user, loadPendingReviews, loadMyReviews]);
+
+  // ============================================================================
+  // IMAGE UPLOAD HANDLING
+  // ============================================================================
+
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    const currentCount = reviewImages.length;
+
+    if (currentCount >= MAX_IMAGES) {
+      showErrorToast(
+        t("maxImagesReached") || `Maximum ${MAX_IMAGES} images allowed`
+      );
+      return;
+    }
+
+    const remainingSlots = MAX_IMAGES - currentCount;
+    const filesToAdd = files.slice(0, remainingSlots);
+
+    // Validate each file before adding
+    const validFiles: File[] = [];
+    for (const file of filesToAdd) {
+      const validation = validateFile(file);
+      if (validation.valid) {
+        validFiles.push(file);
+      } else {
+        showErrorToast(validation.message || "Invalid file");
+      }
+    }
+
+    setReviewImages((prev) => [...prev, ...validFiles]);
+  };
+
+  const removeImage = (index: number) => {
+    setReviewImages((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // ============================================================================
+  // REVIEW SUBMISSION (Like Flutter with Two-Modal System)
+  // ============================================================================
+
+  const openReviewModal = (
+    review: PendingReview,
+    type: "product" | "seller"
+  ) => {
+    setSelectedReview(review);
+    setReviewType(type);
+    setShowReviewModal(true);
+  };
+
+  const handleReviewSubmit = () => {
+    // Validate inputs
+    if (rating === 0 || reviewText.trim() === "") {
+      showErrorToast(
+        t("pleaseProvideRatingAndReview") ||
+          "Please provide a rating and review text"
+      );
+      return;
+    }
+
+    // Close review modal immediately (like Flutter)
+    setShowReviewModal(false);
+
+    // Show loading modal
+    setShowLoadingModal(true);
+
+    // Start async submission
+    submitReviewAsync();
+  };
+
+  const submitReviewAsync = async () => {
+    if (!user || !selectedReview) {
+      setShowLoadingModal(false);
+      showErrorToast("Missing user or review data");
+      return;
+    }
+
+    try {
+      const approvedUrls: string[] = [];
+      const uploadedRefs: string[] = [];
+
+      // Process images if this is a product review
+      if (reviewType === "product" && reviewImages.length > 0) {
+        const storagePath = `reviews/${selectedReview.productId}`;
+
+        for (let i = 0; i < reviewImages.length; i++) {
+          const result = await processImage(reviewImages[i], storagePath, i);
+
+          if (!result.success) {
+            // Clean up previously uploaded images
+            for (const refPath of uploadedRefs) {
+              try {
+                await deleteObject(ref(storage, refPath));
+              } catch (error) {
+                console.error("Error deleting image:", error);
+              }
+            }
+
+            setShowLoadingModal(false);
+
+            // Show detailed error message
+            let message = `Image ${i + 1}: `;
+            if (result.message) {
+              message += result.message;
+            } else {
+              switch (result.error) {
+                case "adult_content":
+                  message += "Contains inappropriate adult content";
+                  break;
+                case "violent_content":
+                  message += "Contains violent content";
+                  break;
+                case "file_too_large":
+                  message += "File too large (max 10MB)";
+                  break;
+                case "invalid_format":
+                  message += "Invalid format (JPG, PNG, HEIC, WEBP only)";
+                  break;
+                case "processing_error":
+                  message += "Failed to process image";
+                  break;
+                default:
+                  message += "Inappropriate content detected";
+              }
+            }
+
+            showErrorToast(message);
+            resetReviewForm();
+            return;
+          }
+
+          if (result.url && result.ref) {
+            approvedUrls.push(result.url);
+            uploadedRefs.push(result.ref);
+          }
+        }
+      }
+
+      // Call submitReview Cloud Function (like Flutter)
+      const submitReviewFunction = httpsCallable
+        <SubmitReviewData,
+        SubmitReviewResult
+      >(functions, "submitReview");
+
+      const reviewData: SubmitReviewData = {
+        isProduct: reviewType === "product",
+        isShopProduct: selectedReview.isShopProduct,
+        productId:
+          reviewType === "product" ? selectedReview.productId : undefined,
+        sellerId: selectedReview.sellerId,
+        shopId: selectedReview.shopId,
+        transactionId: selectedReview.id,
+        orderId: selectedReview.orderId,
+        rating,
+        review: reviewText.trim(),
+        imageUrls: approvedUrls,
+      };
+
+      const result = await submitReviewFunction(reviewData);
+
+      setShowLoadingModal(false);
+
+      if (result.data.success) {
+        showSuccessToast(
+          t("reviewSubmittedSuccessfully") || "Review submitted successfully!"
+        );
+
+        // Reset form and refresh data
+        resetReviewForm();
+        refreshReviews();
+      } else {
+        showErrorToast(result.data.message || "Failed to submit review");
+        resetReviewForm();
+      }
+    } catch (error) {
+      setShowLoadingModal(false);
+      console.error("Error submitting review:", error);
+      
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "An unexpected error occurred";
+      
+      showErrorToast(errorMessage);
+      resetReviewForm();
+    }
+  };
+
+  // ============================================================================
+  // TOAST NOTIFICATIONS
+  // ============================================================================
+
+  const showSuccessToast = (message: string) => {
+    // You can replace this with your toast library
+    alert(message);
+  };
+
+  const showErrorToast = (message: string) => {
+    // You can replace this with your toast library
+    alert(message);
+  };
+
+  // ============================================================================
+  // UI COMPONENTS
+  // ============================================================================
+
   const ProductCard = ({ review }: { review: PendingReview }) => (
     <div
       className={`
@@ -638,7 +891,6 @@ export default function ReviewsPage() {
     </div>
   );
 
-  // Star Rating Component
   const StarRating = ({
     value,
     onChange,
@@ -673,37 +925,114 @@ export default function ReviewsPage() {
     </div>
   );
 
+  const LoadingModal = () => (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div
+        className={`
+          rounded-2xl p-8 max-w-sm w-full
+          ${isDarkMode ? "bg-gray-800" : "bg-white"}
+          shadow-2xl
+        `}
+      >
+        <div className="flex flex-col items-center space-y-4">
+          {/* Animated Icon */}
+          <div className="relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-green-400 to-green-600 rounded-full blur-xl opacity-50 animate-pulse"></div>
+            <div
+              className="relative w-20 h-20 bg-gradient-to-r from-green-400 to-green-600 rounded-full flex items-center justify-center animate-spin"
+              style={{ animationDuration: "3s" }}
+            >
+              <Star size={32} className="text-white" />
+            </div>
+          </div>
+
+          {/* Text */}
+          <div className="text-center space-y-2">
+            <h3
+              className={`
+                text-lg font-semibold
+                ${isDarkMode ? "text-white" : "text-gray-900"}
+              `}
+            >
+              {t("submittingReview") || "Submitting Review..."}
+            </h3>
+            <p
+              className={`
+                text-sm
+                ${isDarkMode ? "text-gray-400" : "text-gray-600"}
+              `}
+            >
+              {t("pleaseWaitWhileWeProcessYourReview") ||
+                "Please wait while we process your review"}
+            </p>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-green-400 to-green-600 rounded-full animate-pulse"
+              style={{
+                animation: "progress 2s ease-in-out infinite",
+              }}
+            ></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ============================================================================
+  // RENDER
+  // ============================================================================
+
   if (!user) {
-    return null; // Will redirect to login
+    return null;
   }
 
   const filteredMyReviews = getFilteredMyReviews();
 
   return (
-    <div
-      className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
-      style={{
-        transform: "translateZ(0)",
-        backfaceVisibility: "hidden",
-        WebkitFontSmoothing: "antialiased",
-      }}
-    >
-      {/* Header */}
+    <>
       <div
-        className={`
-        sticky top-0 z-10 border-b
-        ${
-          isDarkMode
-            ? "bg-gray-900 border-gray-700"
-            : "bg-white border-gray-200"
-        }
-      `}
+        className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
       >
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
+        {/* Header */}
+        <div
+          className={`
+          sticky top-0 z-10 border-b
+          ${
+            isDarkMode
+              ? "bg-gray-900 border-gray-700"
+              : "bg-white border-gray-200"
+          }
+        `}
+        >
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={() => router.back()}
+                  className={`
+                    p-2 rounded-lg transition-colors
+                    ${
+                      isDarkMode
+                        ? "hover:bg-gray-800 text-gray-400 hover:text-white"
+                        : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
+                    }
+                  `}
+                >
+                  <ArrowLeft size={20} />
+                </button>
+                <h1
+                  className={`
+                  text-xl font-bold
+                  ${isDarkMode ? "text-white" : "text-gray-900"}
+                `}
+                >
+                  {t("title") || "My Reviews"}
+                </h1>
+              </div>
               <button
-                onClick={() => router.back()}
                 className={`
                   p-2 rounded-lg transition-colors
                   ${
@@ -713,154 +1042,216 @@ export default function ReviewsPage() {
                   }
                 `}
               >
-                <ArrowLeft size={20} />
+                <Calendar size={20} />
               </button>
-              <h1
+            </div>
+
+            {/* Tab Bar */}
+            <div
+              className={`
+              mt-4 p-1 rounded-lg
+              ${isDarkMode ? "bg-gray-800" : "bg-gray-100"}
+            `}
+            >
+              <div className="flex">
+                {(["pending", "myReviews"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`
+                      flex-1 flex items-center justify-center space-x-2 py-2 px-4 rounded-md text-sm font-medium transition-all duration-200
+                      ${
+                        activeTab === tab
+                          ? "bg-green-500 text-white shadow-lg"
+                          : isDarkMode
+                          ? "text-gray-400 hover:text-white hover:bg-gray-700"
+                          : "text-gray-600 hover:text-gray-900 hover:bg-gray-200"
+                      }
+                    `}
+                  >
+                    {tab === "pending" ? (
+                      <>
+                        <ShoppingBag size={16} />
+                        <span>{t("toReview") || "To Review"}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Star size={16} />
+                        <span>{t("myRatings") || "My Ratings"}</span>
+                      </>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Filters */}
+            <div className="flex items-center space-x-2 mt-4">
+              <button
                 className={`
-                text-xl font-bold
-                ${isDarkMode ? "text-white" : "text-gray-900"}
-              `}
+                  flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium border transition-colors
+                  ${
+                    getActiveFiltersCount() > 0
+                      ? "bg-orange-500 text-white border-orange-500"
+                      : isDarkMode
+                      ? "border-gray-600 text-gray-300 hover:bg-gray-800"
+                      : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                  }
+                `}
               >
-                {t("title") || "My Reviews"}
-              </h1>
+                <Filter size={16} />
+                <span>
+                  {getActiveFiltersCount() > 0
+                    ? `${t("filter")} (${getActiveFiltersCount()})`
+                    : t("filter") || "Filter"}
+                </span>
+              </button>
+
+              {activeTab === "myReviews" && (
+                <>
+                  <button
+                    onClick={() =>
+                      setFilters((prev) => ({
+                        ...prev,
+                        reviewType:
+                          prev.reviewType === "product" ? "all" : "product",
+                      }))
+                    }
+                    className={`
+                      px-4 py-2 rounded-full text-sm font-medium border transition-colors
+                      ${
+                        filters.reviewType === "product"
+                          ? "bg-orange-500 text-white border-orange-500"
+                          : isDarkMode
+                          ? "border-gray-600 text-gray-300 hover:bg-gray-800"
+                          : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                      }
+                    `}
+                  >
+                    {t("product") || "Product"}
+                  </button>
+
+                  <button
+                    onClick={() =>
+                      setFilters((prev) => ({
+                        ...prev,
+                        reviewType:
+                          prev.reviewType === "seller" ? "all" : "seller",
+                      }))
+                    }
+                    className={`
+                      px-4 py-2 rounded-full text-sm font-medium border transition-colors
+                      ${
+                        filters.reviewType === "seller"
+                          ? "bg-orange-500 text-white border-orange-500"
+                          : isDarkMode
+                          ? "border-gray-600 text-gray-300 hover:bg-gray-800"
+                          : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                      }
+                    `}
+                  >
+                    {t("seller") || "Seller"}
+                  </button>
+                </>
+              )}
             </div>
-            <button
-              className={`
-                p-2 rounded-lg transition-colors
-                ${
-                  isDarkMode
-                    ? "hover:bg-gray-800 text-gray-400 hover:text-white"
-                    : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
-                }
-              `}
-            >
-              <Calendar size={20} />
-            </button>
-          </div>
-
-          {/* Tab Bar */}
-          <div
-            className={`
-            mt-4 p-1 rounded-lg
-            ${isDarkMode ? "bg-gray-800" : "bg-gray-100"}
-          `}
-          >
-            <div className="flex">
-              {(["pending", "myReviews"] as const).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`
-                    flex-1 flex items-center justify-center space-x-2 py-2 px-4 rounded-md text-sm font-medium transition-all duration-200
-                    ${
-                      activeTab === tab
-                        ? "bg-green-500 text-white shadow-lg"
-                        : isDarkMode
-                        ? "text-gray-400 hover:text-white hover:bg-gray-700"
-                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-200"
-                    }
-                  `}
-                >
-                  {tab === "pending" ? (
-                    <>
-                      <ShoppingBag size={16} />
-                      <span>{t("toReview") || "To Review"}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Star size={16} />
-                      <span>{t("myRatings") || "My Ratings"}</span>
-                    </>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Filters */}
-          <div className="flex items-center space-x-2 mt-4">
-            <button
-              className={`
-                flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium border transition-colors
-                ${
-                  getActiveFiltersCount() > 0
-                    ? "bg-orange-500 text-white border-orange-500"
-                    : isDarkMode
-                    ? "border-gray-600 text-gray-300 hover:bg-gray-800"
-                    : "border-gray-300 text-gray-700 hover:bg-gray-50"
-                }
-              `}
-            >
-              <Filter size={16} />
-              <span>
-                {getActiveFiltersCount() > 0
-                  ? `${t("filter")} (${getActiveFiltersCount()})`
-                  : t("filter") || "Filter"}
-              </span>
-            </button>
-
-            {activeTab === "myReviews" && (
-              <>
-                <button
-                  onClick={() =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      reviewType:
-                        prev.reviewType === "product" ? "all" : "product",
-                    }))
-                  }
-                  className={`
-                    px-4 py-2 rounded-full text-sm font-medium border transition-colors
-                    ${
-                      filters.reviewType === "product"
-                        ? "bg-orange-500 text-white border-orange-500"
-                        : isDarkMode
-                        ? "border-gray-600 text-gray-300 hover:bg-gray-800"
-                        : "border-gray-300 text-gray-700 hover:bg-gray-50"
-                    }
-                  `}
-                >
-                  {t("product") || "Product"}
-                </button>
-
-                <button
-                  onClick={() =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      reviewType:
-                        prev.reviewType === "seller" ? "all" : "seller",
-                    }))
-                  }
-                  className={`
-                    px-4 py-2 rounded-full text-sm font-medium border transition-colors
-                    ${
-                      filters.reviewType === "seller"
-                        ? "bg-orange-500 text-white border-orange-500"
-                        : isDarkMode
-                        ? "border-gray-600 text-gray-300 hover:bg-gray-800"
-                        : "border-gray-300 text-gray-700 hover:bg-gray-50"
-                    }
-                  `}
-                >
-                  {t("seller") || "Seller"}
-                </button>
-              </>
-            )}
           </div>
         </div>
-      </div>
 
-      {/* Content */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 pb-16">
-        {activeTab === "pending" ? (
-          // Pending Reviews Tab
-          pendingReviews.length === 0 && !pendingLoading ? (
+        {/* Content */}
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 pb-16">
+          {activeTab === "pending" ? (
+            pendingReviews.length === 0 && !pendingLoading ? (
+              <div className="flex flex-col items-center justify-center py-16">
+                <div
+                  className={`
+                  w-24 h-24 rounded-full flex items-center justify-center mb-6
+                  ${isDarkMode ? "bg-gray-800" : "bg-gray-100"}
+                `}
+                >
+                  <Star
+                    size={32}
+                    className={isDarkMode ? "text-gray-400" : "text-gray-500"}
+                  />
+                </div>
+                <h3
+                  className={`
+                  text-lg font-medium mb-2
+                  ${isDarkMode ? "text-white" : "text-gray-900"}
+                `}
+                >
+                  {t("nothingToReview") || "Nothing to Review"}
+                </h3>
+                <p
+                  className={`
+                  text-center
+                  ${isDarkMode ? "text-gray-400" : "text-gray-600"}
+                `}
+                >
+                  {t("noUnreviewedPurchases") ||
+                    "You have no unreviewed purchases"}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {pendingReviews.map((review) => (
+                  <div
+                    key={review.id}
+                    className={`
+                      rounded-lg border p-4 space-y-4
+                      ${
+                        isDarkMode
+                          ? "bg-gray-800 border-gray-700"
+                          : "bg-white border-gray-200"
+                      }
+                    `}
+                  >
+                    <ProductCard review={review} />
+
+                    <div className="flex space-x-2">
+                      {review.needsProductReview && (
+                        <button
+                          onClick={() => openReviewModal(review, "product")}
+                          className="
+                            flex-1 flex items-center justify-center space-x-2 py-2 px-4 rounded-lg text-sm font-medium
+                            bg-green-500 text-white hover:bg-green-600 transition-colors
+                          "
+                        >
+                          <Star size={16} />
+                          <span>
+                            {t("writeYourReview") || "Write Your Review"}
+                          </span>
+                        </button>
+                      )}
+
+                      {review.needsSellerReview && (
+                        <button
+                          onClick={() => openReviewModal(review, "seller")}
+                          className="
+                            flex-1 flex items-center justify-center space-x-2 py-2 px-4 rounded-lg text-sm font-medium
+                            bg-orange-500 text-white hover:bg-orange-600 transition-colors
+                          "
+                        >
+                          <Store size={16} />
+                          <span>
+                            {review.isShopProduct
+                              ? t("shopReview") || "Shop Review"
+                              : t("sellerReview") || "Seller Review"}
+                          </span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          ) : filteredMyReviews.length === 0 && !myReviewsLoading ? (
             <div className="flex flex-col items-center justify-center py-16">
               <div
                 className={`
-                w-24 h-24 rounded-full flex items-center justify-center mb-6
-                ${isDarkMode ? "bg-gray-800" : "bg-gray-100"}
-              `}
+                  w-24 h-24 rounded-full flex items-center justify-center mb-6
+                  ${isDarkMode ? "bg-gray-800" : "bg-gray-100"}
+                `}
               >
                 <Star
                   size={32}
@@ -869,274 +1260,165 @@ export default function ReviewsPage() {
               </div>
               <h3
                 className={`
-                text-lg font-medium mb-2
-                ${isDarkMode ? "text-white" : "text-gray-900"}
-              `}
+                  text-lg font-medium mb-2
+                  ${isDarkMode ? "text-white" : "text-gray-900"}
+                `}
               >
-                {t("nothingToReview") || "Nothing to Review"}
+                {t("youHaveNoReviews") || "You Have No Reviews"}
               </h3>
               <p
                 className={`
-                text-center
-                ${isDarkMode ? "text-gray-400" : "text-gray-600"}
-              `}
+                  text-center
+                  ${isDarkMode ? "text-gray-400" : "text-gray-600"}
+                `}
               >
-                {t("noUnreviewedPurchases") ||
-                  "You have no unreviewed purchases"}
+                {t("startReviewingProducts") ||
+                  "Start reviewing products you've purchased"}
               </p>
             </div>
           ) : (
             <div className="space-y-4">
-              {pendingReviews.map((review, index) => (
+              {filteredMyReviews.map((review) => (
                 <div
-                  key={`pending-${review.id}-${index}`} // More unique key
+                  key={review.id}
                   className={`
-                    rounded-lg border p-4 space-y-4
-                    ${
-                      isDarkMode
-                        ? "bg-gray-800 border-gray-700"
-                        : "bg-white border-gray-200"
-                    }
-                  `}
+                      rounded-lg border p-4 space-y-4
+                      ${
+                        isDarkMode
+                          ? "bg-gray-800 border-gray-700"
+                          : "bg-white border-gray-200"
+                      }
+                    `}
                 >
-                  <ProductCard review={review} />
-
-                  <div className="flex space-x-2">
-                    {review.needsProductReview && (
-                      <button
-                        onClick={() => openReviewModal(review, "product")}
-                        className="
-                          flex-1 flex items-center justify-center space-x-2 py-2 px-4 rounded-lg text-sm font-medium
-                          bg-green-500 text-white hover:bg-green-600 transition-colors
-                        "
-                      >
-                        <Star size={16} />
-                        <span>
-                          {t("writeYourReview") || "Write Your Review"}
-                        </span>
-                      </button>
-                    )}
-
-                    {review.needsSellerReview && (
-                      <button
-                        onClick={() => openReviewModal(review, "seller")}
-                        className="
-                          flex-1 flex items-center justify-center space-x-2 py-2 px-4 rounded-lg text-sm font-medium
-                          bg-orange-500 text-white hover:bg-orange-600 transition-colors
-                        "
-                      >
-                        <Store size={16} />
-                        <span>
-                          {review.isShopProduct
-                            ? t("shopReview") || "Shop Review"
-                            : t("sellerReview") || "Seller Review"}
-                        </span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )
-        ) : // My Reviews Tab
-        filteredMyReviews.length === 0 && !myReviewsLoading ? (
-          <div className="flex flex-col items-center justify-center py-16">
-            <div
-              className={`
-                w-24 h-24 rounded-full flex items-center justify-center mb-6
-                ${isDarkMode ? "bg-gray-800" : "bg-gray-100"}
-              `}
-            >
-              <Star
-                size={32}
-                className={isDarkMode ? "text-gray-400" : "text-gray-500"}
-              />
-            </div>
-            <h3
-              className={`
-                text-lg font-medium mb-2
-                ${isDarkMode ? "text-white" : "text-gray-900"}
-              `}
-            >
-              {t("youHaveNoReviews") || "You Have No Reviews"}
-            </h3>
-            <p
-              className={`
-                text-center
-                ${isDarkMode ? "text-gray-400" : "text-gray-600"}
-              `}
-            >
-              {t("startReviewingProducts") ||
-                "Start reviewing products you've purchased"}
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {filteredMyReviews.map((review, index) => (
-              <div
-                key={`myreview-${review.id}-${index}`} // More unique key
-                className={`
-                    rounded-lg border p-4 space-y-4
-                    ${
-                      isDarkMode
-                        ? "bg-gray-800 border-gray-700"
-                        : "bg-white border-gray-200"
-                    }
-                  `}
-              >
-                {/* Product or Seller Info */}
-                {review.productId ? (
-                  <div
-                    className={`
-                        p-4 rounded-lg border cursor-pointer transition-colors duration-200
-                        ${
-                          isDarkMode
-                            ? "bg-gray-700 border-gray-600 hover:border-gray-500"
-                            : "bg-gray-50 border-gray-200 hover:border-gray-300"
-                        }
-                      `}
-                    onClick={() => router.push(`/productdetail/${review.productId}`)}
-                  >
-                    <div className="flex space-x-3">
-                      <div className="relative w-16 h-16 flex-shrink-0">
-                        <Image
-                          src={
-                            review.productImage || "/placeholder-product.png"
+                  {review.productId ? (
+                    <div
+                      className={`
+                          p-4 rounded-lg border cursor-pointer transition-colors duration-200
+                          ${
+                            isDarkMode
+                              ? "bg-gray-700 border-gray-600 hover:border-gray-500"
+                              : "bg-gray-50 border-gray-200 hover:border-gray-300"
                           }
-                          alt={review.productName || "Product"}
-                          fill
-                          className="object-cover rounded-lg"
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4
-                          className={`
-                            font-medium text-sm line-clamp-2
-                            ${isDarkMode ? "text-white" : "text-gray-900"}
-                          `}
-                        >
-                          {review.productName}
-                        </h4>
-                        {review.productPrice && (
-                          <div className="flex items-center space-x-2 mt-1">
-                            <span
-                              className={`
-                                font-bold text-sm
-                                ${
-                                  isDarkMode ? "text-green-400" : "text-green-600"
-                                }
-                              `}
-                            >
-                              ₺{review.productPrice.toLocaleString()}
-                            </span>
-                          </div>
-                        )}
+                        `}
+                      onClick={() =>
+                        router.push(`/productdetail/${review.productId}`)
+                      }
+                    >
+                      <div className="flex space-x-3">
+                        <div className="relative w-16 h-16 flex-shrink-0">
+                          <Image
+                            src={
+                              review.productImage || "/placeholder-product.png"
+                            }
+                            alt={review.productName || "Product"}
+                            fill
+                            className="object-cover rounded-lg"
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4
+                            className={`
+                              font-medium text-sm line-clamp-2
+                              ${isDarkMode ? "text-white" : "text-gray-900"}
+                            `}
+                          >
+                            {review.productName}
+                          </h4>
+                          {review.productPrice && (
+                            <div className="flex items-center space-x-2 mt-1">
+                              <span
+                                className={`
+                                  font-bold text-sm
+                                  ${
+                                    isDarkMode
+                                      ? "text-green-400"
+                                      : "text-green-600"
+                                  }
+                                `}
+                              >
+                                ₺{review.productPrice.toLocaleString()}
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ) : (
+                  ) : (
+                    <div
+                      className={`
+                        p-4 rounded-lg
+                        ${isDarkMode ? "bg-gray-700" : "bg-gray-50"}
+                      `}
+                    >
+                      <p
+                        className={`
+                          font-medium
+                          ${isDarkMode ? "text-white" : "text-gray-900"}
+                        `}
+                      >
+                        {t("sellerReview")}:{" "}
+                        {review.sellerName || "Unknown Seller"}
+                      </p>
+                    </div>
+                  )}
+
                   <div
                     className={`
                       p-4 rounded-lg
                       ${isDarkMode ? "bg-gray-700" : "bg-gray-50"}
                     `}
                   >
+                    <div className="flex items-center justify-between mb-3">
+                      <StarRating value={review.rating} readonly />
+                      <span
+                        className={`
+                          text-xs
+                          ${isDarkMode ? "text-gray-400" : "text-gray-600"}
+                        `}
+                      >
+                        {formatDate(review.timestamp)}
+                      </span>
+                    </div>
+
                     <p
                       className={`
-                        font-medium
-                        ${isDarkMode ? "text-white" : "text-gray-900"}
+                        text-sm mb-3
+                        ${isDarkMode ? "text-gray-200" : "text-gray-800"}
                       `}
                     >
-                      {t("sellerReview")}:{" "}
-                      {review.sellerName || "Unknown Seller"}
+                      {review.review}
                     </p>
+
+                    {review.imageUrls && review.imageUrls.length > 0 && (
+                      <div className="flex space-x-2 overflow-x-auto">
+                        {review.imageUrls.map((url, index) => (
+                          <div
+                            key={index}
+                            className="relative w-16 h-16 flex-shrink-0"
+                          >
+                            <Image
+                              src={url}
+                              alt={`Review image ${index + 1}`}
+                              fill
+                              className="object-cover rounded-lg cursor-pointer"
+                              onClick={() => window.open(url, "_blank")}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
-
-                {/* Review Content */}
-                <div
-                  className={`
-                    p-4 rounded-lg
-                    ${isDarkMode ? "bg-gray-700" : "bg-gray-50"}
-                  `}
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <StarRating value={review.rating} readonly />
-                    <span
-                      className={`
-                        text-xs
-                        ${isDarkMode ? "text-gray-400" : "text-gray-600"}
-                      `}
-                    >
-                      {formatDate(review.timestamp)}
-                    </span>
-                  </div>
-
-                  <p
-                    className={`
-                      text-sm mb-3
-                      ${isDarkMode ? "text-gray-200" : "text-gray-800"}
-                    `}
-                  >
-                    {review.review}
-                  </p>
-
-                  {/* Review Images */}
-                  {review.imageUrls && review.imageUrls.length > 0 && (
-                    <div className="flex space-x-2 overflow-x-auto">
-                      {review.imageUrls.map((url, index) => (
-                        <div
-                          key={index}
-                          className="relative w-16 h-16 flex-shrink-0"
-                        >
-                          <Image
-                            src={url}
-                            alt={`Review image ${index + 1}`}
-                            fill
-                            className="object-cover rounded-lg cursor-pointer"
-                            onClick={() => window.open(url, "_blank")}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
-
-                {/* Edit Button */}
-                <div className="flex justify-end">
-                  <button
-                    onClick={() => openEditModal(review)}
-                    className="
-                        p-2 rounded-full bg-blue-500 text-white hover:bg-blue-600 transition-colors
-                      "
-                  >
-                    <Edit size={16} />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Loading indicator at bottom */}
-        {(pendingLoading || myReviewsLoading) && (
-          <div className="flex justify-center py-8">
-            <RefreshCw size={24} className="animate-spin text-green-500" />
-          </div>
-        )}
-
-        {activeTab === "myReviews" &&
-          filteredMyReviews.length > 0 &&
-          !myReviewsHasMore &&
-          !myReviewsLoading && (
-            <div className="flex justify-center py-8">
-              <p
-                className={`text-sm ${
-                  isDarkMode ? "text-gray-400" : "text-gray-600"
-                }`}
-              ></p>
+              ))}
             </div>
           )}
+
+          {(pendingLoading || myReviewsLoading) && (
+            <div className="flex justify-center py-8">
+              <RefreshCw size={24} className="animate-spin text-green-500" />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Review Modal */}
@@ -1144,17 +1426,17 @@ export default function ReviewsPage() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div
             className={`
-            w-full max-w-md rounded-xl p-6
-            ${isDarkMode ? "bg-gray-800" : "bg-white"}
-            shadow-2xl max-h-[90vh] overflow-y-auto
-          `}
+              w-full max-w-md rounded-xl p-6
+              ${isDarkMode ? "bg-gray-800" : "bg-white"}
+              shadow-2xl max-h-[90vh] overflow-y-auto
+            `}
           >
             <div className="flex items-center justify-between mb-4">
               <h3
                 className={`
-                text-lg font-bold
-                ${isDarkMode ? "text-white" : "text-gray-900"}
-              `}
+                  text-lg font-bold
+                  ${isDarkMode ? "text-white" : "text-gray-900"}
+                `}
               >
                 {reviewType === "product"
                   ? t("productReview") || "Product Review"
@@ -1166,33 +1448,31 @@ export default function ReviewsPage() {
                   resetReviewForm();
                 }}
                 className={`
-                  p-1 rounded-full transition-colors
-                  ${
-                    isDarkMode
-                      ? "hover:bg-gray-700 text-gray-400"
-                      : "hover:bg-gray-100 text-gray-500"
-                  }
-                `}
+                    p-1 rounded-full transition-colors
+                    ${
+                      isDarkMode
+                        ? "hover:bg-gray-700 text-gray-400"
+                        : "hover:bg-gray-100 text-gray-500"
+                    }
+                  `}
               >
                 <X size={20} />
               </button>
             </div>
 
             <div className="space-y-4">
-              {/* Star Rating */}
               <div className="flex flex-col items-center space-y-2">
                 <StarRating value={rating} onChange={setRating} />
                 <p
                   className={`
-                  text-sm
-                  ${isDarkMode ? "text-gray-400" : "text-gray-600"}
-                `}
+                    text-sm
+                    ${isDarkMode ? "text-gray-400" : "text-gray-600"}
+                  `}
                 >
                   {t("tapToRate") || "Tap to rate"}
                 </p>
               </div>
 
-              {/* Review Text */}
               <textarea
                 value={reviewText}
                 onChange={(e) => setReviewText(e.target.value)}
@@ -1201,54 +1481,32 @@ export default function ReviewsPage() {
                 }
                 rows={4}
                 className={`
-                  w-full px-3 py-2 rounded-lg border resize-none
-                  ${
-                    isDarkMode
-                      ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-                      : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
-                  }
-                  focus:ring-2 focus:ring-green-500 focus:border-transparent
-                `}
+                    w-full px-3 py-2 rounded-lg border resize-none
+                    ${
+                      isDarkMode
+                        ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                        : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
+                    }
+                    focus:ring-2 focus:ring-green-500 focus:border-transparent
+                  `}
               />
 
-              {/* Image Upload (only for products) */}
               {reviewType === "product" && (
                 <div className="space-y-3">
                   <p
                     className={`
-                    text-sm font-medium
-                    ${isDarkMode ? "text-white" : "text-gray-900"}
-                  `}
+                      text-sm font-medium
+                      ${isDarkMode ? "text-white" : "text-gray-900"}
+                    `}
                   >
                     {t("uploadPhotos") || "Upload Photos"}
                   </p>
 
-                  {/* Image Preview */}
-                  {(existingImageUrls.length > 0 ||
-                    reviewImages.length > 0) && (
+                  {reviewImages.length > 0 && (
                     <div className="flex space-x-2 overflow-x-auto">
-                      {existingImageUrls.map((url, index) => (
-                        <div
-                          key={`existing-${index}`}
-                          className="relative w-16 h-16 flex-shrink-0"
-                        >
-                          <Image
-                            src={url}
-                            alt={`Review image ${index + 1}`}
-                            fill
-                            className="object-cover rounded-lg"
-                          />
-                          <button
-                            onClick={() => removeImage(index, true)}
-                            className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs"
-                          >
-                            <X size={12} />
-                          </button>
-                        </div>
-                      ))}
                       {reviewImages.map((file, index) => (
                         <div
-                          key={`new-${index}`}
+                          key={index}
                           className="relative w-16 h-16 flex-shrink-0"
                         >
                           <Image
@@ -1258,7 +1516,7 @@ export default function ReviewsPage() {
                             className="object-cover rounded-lg"
                           />
                           <button
-                            onClick={() => removeImage(index, false)}
+                            onClick={() => removeImage(index)}
                             className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs"
                           >
                             <X size={12} />
@@ -1268,21 +1526,20 @@ export default function ReviewsPage() {
                     </div>
                   )}
 
-                  {/* Add Image Button */}
-                  {existingImageUrls.length + reviewImages.length < 3 && (
+                  {reviewImages.length < MAX_IMAGES && (
                     <button
                       onClick={() => fileInputRef.current?.click()}
                       className="
-                        flex items-center space-x-2 px-4 py-2 rounded-lg border-2 border-dashed
-                        border-gray-300 hover:border-green-500 transition-colors
-                      "
+                          flex items-center space-x-2 px-4 py-2 rounded-lg border-2 border-dashed
+                          border-gray-300 hover:border-green-500 transition-colors
+                        "
                     >
                       <Camera size={16} className="text-gray-400" />
                       <span
                         className={`
-                        text-sm
-                        ${isDarkMode ? "text-gray-400" : "text-gray-600"}
-                      `}
+                          text-sm
+                          ${isDarkMode ? "text-gray-400" : "text-gray-600"}
+                        `}
                       >
                         {t("addImage") || "Add Image"}
                       </span>
@@ -1300,7 +1557,6 @@ export default function ReviewsPage() {
                 </div>
               )}
 
-              {/* Submit Button */}
               <div className="flex space-x-3 mt-6">
                 <button
                   onClick={() => {
@@ -1308,32 +1564,28 @@ export default function ReviewsPage() {
                     resetReviewForm();
                   }}
                   className={`
-                    flex-1 py-2 px-4 rounded-lg
-                    ${
-                      isDarkMode
-                        ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    }
-                    transition-colors duration-200
-                  `}
+                      flex-1 py-2 px-4 rounded-lg
+                      ${
+                        isDarkMode
+                          ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                      }
+                      transition-colors duration-200
+                    `}
                 >
                   {t("cancel") || "Cancel"}
                 </button>
                 <button
-                  onClick={handleSubmitReview}
-                  disabled={isSubmitting || rating === 0 || !reviewText.trim()}
+                  onClick={handleReviewSubmit}
+                  disabled={rating === 0 || !reviewText.trim()}
                   className="
-                    flex-1 flex items-center justify-center space-x-2 py-2 px-4 rounded-lg
-                    bg-green-500 text-white hover:bg-green-600
-                    disabled:opacity-50 disabled:cursor-not-allowed
-                    transition-colors duration-200
-                  "
+                      flex-1 flex items-center justify-center space-x-2 py-2 px-4 rounded-lg
+                      bg-green-500 text-white hover:bg-green-600
+                      disabled:opacity-50 disabled:cursor-not-allowed
+                      transition-colors duration-200
+                    "
                 >
-                  {isSubmitting ? (
-                    <RefreshCw size={16} className="animate-spin" />
-                  ) : (
-                    <Send size={16} />
-                  )}
+                  <Send size={16} />
                   <span>{t("submit") || "Submit"}</span>
                 </button>
               </div>
@@ -1341,6 +1593,10 @@ export default function ReviewsPage() {
           </div>
         </div>
       )}
-    </div>
+
+      {/* Loading Modal */}
+      {showLoadingModal && <LoadingModal />}
+    
+    </>
   );
 }
