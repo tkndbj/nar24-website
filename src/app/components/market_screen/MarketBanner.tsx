@@ -192,6 +192,7 @@ const useMarketBanners = () => {
     if (!isLoading && banners.length === 0 && hasMore) {
       fetchNextPage();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty dependency to run once on mount
 
   return { banners, isLoading, error, hasMore, fetchNextPage, refresh };

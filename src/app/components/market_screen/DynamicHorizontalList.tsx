@@ -33,7 +33,7 @@ interface DynamicListData {
 }
 
 // Shimmer loading component
-const ShimmerCard: React.FC<{ width?: number; isMobile?: boolean }> = ({ width, isMobile }) => {
+const ShimmerCard: React.FC = () => {
   return (
     <div
       className="animate-pulse bg-gray-300 dark:bg-gray-600 rounded-lg w-full h-full"
@@ -61,7 +61,7 @@ const ShimmerList: React.FC<{ height: number; count?: number }> = ({
     >
       {Array.from({ length: count }, (_, index) => (
         <div key={index} className="flex-shrink-0" style={{ width: isMobile ? "180px" : "205px" }}>
-          <ShimmerCard isMobile={isMobile} />
+          <ShimmerCard />
         </div>
       ))}
     </div>
@@ -223,7 +223,7 @@ const DynamicList: React.FC<{
     } finally {
       setLoading(false);
     }
-  }, [listData.id, listData.selectedProductIds, listData.selectedShopId, listData.limit]);
+  }, [listData]);
 
   // Load products when component mounts
   useEffect(() => {

@@ -9,7 +9,7 @@ import { useTranslations } from "next-intl";
 import { usePersonalizedRecommendations } from "@/context/PersonalizedRecommendationsProvider";
 
 // ✅ MATCHES FLUTTER: Shimmer component
-const ShimmerCard = React.memo(({ isDarkMode, isMobile }: { isDarkMode: boolean; isMobile?: boolean }) => {
+const ShimmerCard = React.memo(({ isDarkMode }: { isDarkMode: boolean }) => {
   const baseColor = isDarkMode
     ? "rgba(40, 37, 58, 1)"
     : "rgb(229, 231, 235)";
@@ -49,7 +49,7 @@ const ShimmerList = React.memo(({ rowHeight, isDarkMode }: { rowHeight: number; 
     >
       {[0, 1, 2, 3, 4].map((index) => (
         <div key={index} className="flex-shrink-0" style={{ width: isMobile ? "180px" : "205px" }}>
-          <ShimmerCard isDarkMode={isDarkMode} isMobile={isMobile} />
+          <ShimmerCard isDarkMode={isDarkMode} />
         </div>
       ))}
     </div>
