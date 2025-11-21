@@ -1393,67 +1393,74 @@ export default function ProductPaymentPage() {
                 </h3>
               </div>
 
-              {/* Cart Items */}
-              <div className="space-y-3 sm:space-y-4 mb-6 sm:mb-8">
-                {cartItems.map((item, index) => (
-                  <div
-                    key={index}
-                    className={`flex items-center space-x-3 sm:space-x-4 p-3 sm:p-4 rounded-xl ${
-                      isDarkMode ? "bg-gray-700/30" : "bg-gray-50"
-                    }`}
-                  >
-                    <div
-                      className={`w-12 h-12 sm:w-16 sm:h-16 rounded-xl flex items-center justify-center ${
-                        isDarkMode
-                          ? "bg-gradient-to-br from-blue-500/20 to-purple-500/20"
-                          : "bg-gradient-to-br from-blue-100 to-purple-100"
-                      }`}
-                    >
-                      <span
-                        className={`text-sm sm:text-lg font-bold ${
-                          isDarkMode ? "text-white" : "text-gray-900"
-                        }`}
-                      >
-                        {item.quantity}×
-                      </span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p
-                        className={`text-sm sm:text-base font-semibold ${
-                          isDarkMode ? "text-white" : "text-gray-900"
-                        }`}
-                      >
-                        {item.productName || t("product")}
-                      </p>
-                      <p
-                        className={`text-xs sm:text-sm ${
-                          isDarkMode ? "text-gray-400" : "text-gray-600"
-                        }`}
-                      >
-                        {t("unitPrice")}: {(item.price || 0).toFixed(2)}{" "}
-                        {item.currency || "TL"}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <span
-                        className={`text-base sm:text-lg font-bold ${
-                          isDarkMode ? "text-white" : "text-gray-900"
-                        }`}
-                      >
-                        {((item.price || 0) * item.quantity).toFixed(2)}
-                      </span>
-                      <p
-                        className={`text-xs sm:text-sm ${
-                          isDarkMode ? "text-gray-400" : "text-gray-600"
-                        }`}
-                      >
-                        {item.currency || "TL"}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
+             {/* Cart Items */}
+<div className="space-y-3 sm:space-y-4 mb-6 sm:mb-8">
+  {cartItems.map((item, index) => (
+    <div
+      key={index}
+      className={`flex items-center space-x-3 sm:space-x-4 p-3 sm:p-4 rounded-xl ${
+        isDarkMode ? "bg-gray-700/30" : "bg-gray-50"
+      }`}
+    >
+      <div
+        className={`w-12 h-12 sm:w-16 sm:h-16 rounded-xl flex items-center justify-center ${
+          isDarkMode
+            ? "bg-gradient-to-br from-blue-500/20 to-purple-500/20"
+            : "bg-gradient-to-br from-blue-100 to-purple-100"
+        }`}
+      >
+        <span
+          className={`text-sm sm:text-lg font-bold ${
+            isDarkMode ? "text-white" : "text-gray-900"
+          }`}
+        >
+          {item.quantity}×
+        </span>
+      </div>
+      <div className="flex-1 min-w-0">
+        <p
+          className={`text-sm sm:text-base font-semibold ${
+            isDarkMode ? "text-white" : "text-gray-900"
+          }`}
+        >
+          {item.productName || t("product")}
+        </p>
+        <p
+          className={`text-xs sm:text-sm ${
+            isDarkMode ? "text-gray-400" : "text-gray-600"
+          }`}
+        >
+          {t("unitPrice")}: {(
+            typeof item.calculatedUnitPrice === 'number' 
+              ? item.calculatedUnitPrice 
+              : (typeof item.price === 'number' ? item.price : 0)
+          ).toFixed(2)}{" "}
+          {item.currency || "TL"}
+        </p>
+      </div>
+      <div className="text-right">
+        <span
+          className={`text-base sm:text-lg font-bold ${
+            isDarkMode ? "text-white" : "text-gray-900"
+          }`}
+        >
+          {(
+            typeof item.calculatedTotal === 'number'
+              ? item.calculatedTotal
+              : ((typeof item.price === 'number' ? item.price : 0) * item.quantity)
+          ).toFixed(2)}
+        </span>
+        <p
+          className={`text-xs sm:text-sm ${
+            isDarkMode ? "text-gray-400" : "text-gray-600"
+          }`}
+        >
+          {item.currency || "TL"}
+        </p>
+      </div>
+    </div>
+  ))}
+</div>
               {/* Pricing Breakdown */}
               <div
                 className={`border-t pt-5 sm:pt-6 space-y-3 sm:space-y-4 ${
