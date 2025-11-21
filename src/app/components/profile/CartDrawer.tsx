@@ -386,7 +386,7 @@ const handleCheckout = useCallback(async () => {
       Object.keys(validation.warnings).length === 0
     ) {
       // No issues - proceed directly to payment
-      proceedToPayment(selectedIds, calculatedTotals);
+      proceedToPayment(calculatedTotals);
     } else {
       // Has errors or warnings - show validation dialog
       setValidationResult(validation);
@@ -401,24 +401,31 @@ const handleCheckout = useCallback(async () => {
 }, [selectedProducts, validateForPayment, t]);
 
 const proceedToPayment = useCallback(
-  async (selectedIds: string[], freshTotals: CartTotals) => {  // ✅ Take totals as param
+  async (freshTotals: CartTotals) => {
+    // ✅ Build pricing map from Cloud Function totals
     const pricingMap = new Map();
-    freshTotals.items.forEach((itemTotal) => {  // ✅ Use fresh totals
+    freshTotals.items.forEach((itemTotal) => {
       pricingMap.set(itemTotal.productId, itemTotal);
     });
 
-    // ✅ FIX: Don't filter by isOptimistic - filter by selectedIds only
+    // ✅ Get selected IDs
+    const selectedIds = Object.entries(selectedProducts)
+      .filter(([, selected]) => selected)
+      .map(([id]) => id);
+
+    // ✅ Build full payment items with ALL required fields
     const paymentItems: PaymentItem[] = cartItems
-      .filter((item) => selectedIds.includes(item.productId)) // ✅ Remove the isOptimistic check
+      .filter((item) => selectedIds.includes(item.productId))
       .map((item) => {
         const paymentItem: PaymentItem = {
           productId: item.productId,
           quantity: item.quantity,
-          sellerName: item.sellerName,
-          sellerId: item.sellerId,
-          isShop: item.isShop,
+          sellerName: item.sellerName,      // ✅ From cart
+          sellerId: item.sellerId,          // ✅ From cart
+          isShop: item.isShop,              // ✅ From cart
         };
 
+        // Add optional attributes
         if (item.cartData?.selectedMetres) {
           paymentItem.selectedMetres = item.cartData.selectedMetres;
         }
@@ -426,12 +433,14 @@ const proceedToPayment = useCallback(
           paymentItem.selectedColor = item.cartData.selectedColor;
         }
 
+        // Add product info
         if (item.product) {
           paymentItem.price = item.product.price;
           paymentItem.productName = item.product.productName;
           paymentItem.currency = item.product.currency;
         }
 
+        // ✅ Add calculated pricing from Cloud Function
         const calculatedPricing = pricingMap.get(item.productId);
         if (calculatedPricing) {
           paymentItem.calculatedUnitPrice = calculatedPricing.unitPrice;
@@ -441,12 +450,16 @@ const proceedToPayment = useCallback(
 
         return paymentItem;
       });
-   
 
+    // ✅ Pass complete items + total via URL
+    const itemsJson = encodeURIComponent(JSON.stringify(paymentItems));
+    
+    router.push(
+      `/productpayment?total=${freshTotals.total}&items=${itemsJson}`
+    );
     onClose();
-    router.push(`/productpayment?total=${freshTotals.total}`);
   },
-  [cartItems, onClose, router]
+  [cartItems, selectedProducts, onClose, router]  // ✅ Add dependencies
 );
 
 // ✅ NEW: Handle validation dialog continue
@@ -483,7 +496,7 @@ const handleValidationContinue = useCallback(async () => {
       setCalculatedTotals(totals);
 
       // Proceed to payment
-      proceedToPayment(validIds, totals);
+      proceedToPayment(totals);
     } else {
       alert(t("noValidItemsToCheckout") || "No valid items to checkout");
     }
