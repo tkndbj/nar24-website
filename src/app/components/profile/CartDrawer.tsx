@@ -15,7 +15,7 @@ import {
   Plus,
 } from "lucide-react";
 import { CompactBundleWidget } from "../CompactBundle";
-import { useCart, CartTotals } from "@/context/CartProvider";
+import { useCart, CartTotals, CartItemTotal } from "@/context/CartProvider";
 import { useUser } from "@/context/UserProvider";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -114,8 +114,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     initializeCartIfNeeded,
     loadMoreItems,
     calculateCartTotals,
-    validateForPayment,              // ✅ ADD THIS
-  updateCartCacheFromValidation,
+    validateForPayment, // ✅ ADD THIS
+    updateCartCacheFromValidation,
   } = useCart();
 
   const [isAnimating, setIsAnimating] = useState(false);
@@ -355,162 +355,182 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   );
 
   const [isValidating, setIsValidating] = useState(false);
-const [showValidationDialog, setShowValidationDialog] = useState(false);
-const [validationResult, setValidationResult] = useState<{
-  isValid: boolean;
-  errors: Record<string, ValidationMessage>;
-  warnings: Record<string, ValidationMessage>;
-  validatedItems: ValidatedCartItem[];
-} | null>(null);
+  const [showValidationDialog, setShowValidationDialog] = useState(false);
+  const [validationResult, setValidationResult] = useState<{
+    isValid: boolean;
+    errors: Record<string, ValidationMessage>;
+    warnings: Record<string, ValidationMessage>;
+    validatedItems: ValidatedCartItem[];
+  } | null>(null);
 
-// Replace handleCheckout function
-const handleCheckout = useCallback(async () => {
-  const selectedIds = Object.entries(selectedProducts)
-    .filter(([, selected]) => selected)
-    .map(([id]) => id);
-
-  if (selectedIds.length === 0) return;
-
-  // ✅ STEP 1: Set loading state
-  setIsValidating(true);
-
-  try {
-    // ✅ STEP 2: Validate cart with Cloud Function
-    const validation = await validateForPayment(selectedIds, false);
-
-    setIsValidating(false);
-
-    // ✅ STEP 3: Check if validation passed
-    if (
-      validation.isValid &&
-      Object.keys(validation.warnings).length === 0
-    ) {
-      // No issues - proceed directly to payment
-      proceedToPayment(calculatedTotals);
-    } else {
-      // Has errors or warnings - show validation dialog
-      setValidationResult(validation);
-      setShowValidationDialog(true);
-    }
-  } catch (error) {
-    setIsValidating(false);
-    console.error("❌ Checkout validation error:", error);
-    // Show error to user
-    alert(t("validationFailed") || "Validation failed. Please try again.");
-  }
-}, [selectedProducts, validateForPayment, t]);
-
-const proceedToPayment = useCallback(
-  async (freshTotals: CartTotals) => {
-    // ✅ Build pricing map from Cloud Function totals
-    const pricingMap = new Map();
-    freshTotals.items.forEach((itemTotal) => {
-      pricingMap.set(itemTotal.productId, itemTotal);
-    });
-
-    // ✅ Get selected IDs
+  // Replace handleCheckout function
+  const handleCheckout = useCallback(async () => {
     const selectedIds = Object.entries(selectedProducts)
       .filter(([, selected]) => selected)
       .map(([id]) => id);
 
-    // ✅ Build full payment items with ALL required fields
-    const paymentItems: PaymentItem[] = cartItems
-      .filter((item) => selectedIds.includes(item.productId))
-      .map((item) => {
-        const paymentItem: PaymentItem = {
-          productId: item.productId,
-          quantity: item.quantity,
-          sellerName: item.sellerName,      // ✅ From cart
-          sellerId: item.sellerId,          // ✅ From cart
-          isShop: item.isShop,              // ✅ From cart
-        };
+    if (selectedIds.length === 0) return;
 
-        // Add optional attributes
-        if (item.cartData?.selectedMetres) {
-          paymentItem.selectedMetres = item.cartData.selectedMetres;
-        }
-        if (item.cartData?.selectedColor) {
-          paymentItem.selectedColor = item.cartData.selectedColor;
-        }
+    // ✅ STEP 1: Set loading state
+    setIsValidating(true);
 
-        // Add product info
-        if (item.product) {
-          paymentItem.price = item.product.price;
-          paymentItem.productName = item.product.productName;
-          paymentItem.currency = item.product.currency;
-        }
+    try {
+      // ✅ STEP 2: Validate cart with Cloud Function
+      const validation = await validateForPayment(selectedIds, false);
 
-        // ✅ Add calculated pricing from Cloud Function
-        const calculatedPricing = pricingMap.get(item.productId);
-        if (calculatedPricing) {
-          paymentItem.calculatedUnitPrice = calculatedPricing.unitPrice;
-          paymentItem.calculatedTotal = calculatedPricing.total;
-          paymentItem.isBundleItem = calculatedPricing.isBundleItem || false;
-        }
+      setIsValidating(false);
 
-        return paymentItem;
+      // ✅ STEP 3: Check if validation passed
+      if (validation.isValid && Object.keys(validation.warnings).length === 0) {
+        // No issues - proceed directly to payment
+        proceedToPayment(calculatedTotals);
+      } else {
+        // Has errors or warnings - show validation dialog
+        setValidationResult(validation);
+        setShowValidationDialog(true);
+      }
+    } catch (error) {
+      setIsValidating(false);
+      console.error("❌ Checkout validation error:", error);
+      // Show error to user
+      alert(t("validationFailed") || "Validation failed. Please try again.");
+    }
+  }, [selectedProducts, validateForPayment, t]);
+
+  const proceedToPayment = useCallback(
+    async (freshTotals: CartTotals) => {
+      // ✅ Build pricing map from Cloud Function totals
+      const pricingMap = new Map<string, CartItemTotal>();
+      freshTotals.items.forEach((itemTotal) => {
+        pricingMap.set(itemTotal.productId, itemTotal);
       });
 
-    // ✅ Pass complete items + total via URL
-    const itemsJson = encodeURIComponent(JSON.stringify(paymentItems));
-    
-    router.push(
-      `/productpayment?total=${freshTotals.total}&items=${itemsJson}`
-    );
-    onClose();
-  },
-  [cartItems, selectedProducts, onClose, router]  // ✅ Add dependencies
-);
+      // Get selected IDs
+      const selectedIds = Object.entries(selectedProducts)
+        .filter(([, selected]) => selected)
+        .map(([id]) => id);
 
-// ✅ NEW: Handle validation dialog continue
-const handleValidationContinue = useCallback(async () => {
-  if (!validationResult) return;
+      // ✅ Build full payment items with ALL required fields
+      const paymentItems: PaymentItem[] = cartItems
+        .filter((item) => selectedIds.includes(item.productId))
+        .map((item) => {
+          // Get calculated pricing from CF
+          const calculatedPricing = pricingMap.get(item.productId);
 
-  setIsValidating(true);
-  setShowValidationDialog(false);
+          // ✅ CRITICAL: Ensure calculatedPricing exists
+          if (!calculatedPricing) {
+            console.error(`❌ Missing pricing for ${item.productId}`);
+            throw new Error(`Missing calculated pricing for ${item.productId}`);
+          }
 
-  try {
-    // Update cart cache with fresh values
-    if (validationResult.validatedItems.length > 0) {
-      await updateCartCacheFromValidation(validationResult.validatedItems);
+          const paymentItem: PaymentItem = {
+            productId: item.productId,
+            quantity: item.quantity,
+            sellerName: item.sellerName,
+            sellerId: item.sellerId,
+            isShop: item.isShop,
+            // ✅ Add calculated pricing from Cloud Function
+            calculatedUnitPrice: calculatedPricing.unitPrice,
+            calculatedTotal: calculatedPricing.total,
+            isBundleItem: calculatedPricing.isBundleItem || false,
+          };
+
+          // Add optional attributes
+          if (item.cartData?.selectedMetres) {
+            paymentItem.selectedMetres = item.cartData.selectedMetres;
+          }
+          if (item.cartData?.selectedColor) {
+            paymentItem.selectedColor = item.cartData.selectedColor;
+          }
+
+          // Add product info
+          if (item.product) {
+            paymentItem.price = item.product.price;
+            paymentItem.productName = item.product.productName;
+            paymentItem.currency = item.product.currency;
+          }
+
+          return paymentItem;
+        });
+
+      // ✅ Verify all items have calculated pricing before proceeding
+      const allHavePricing = paymentItems.every(
+        (item) =>
+          typeof item.calculatedUnitPrice === "number" &&
+          typeof item.calculatedTotal === "number"
+      );
+
+      if (!allHavePricing) {
+        console.error("❌ Some items missing calculated pricing");
+        alert(
+          t("pricingError") || "Pricing calculation error. Please try again."
+        );
+        return;
+      }
+
+      console.log("✅ Proceeding with items:", paymentItems);
+      console.log("✅ Total:", freshTotals.total);
+
+      // Pass complete items + total via URL
+      const itemsJson = encodeURIComponent(JSON.stringify(paymentItems));
+
+      router.push(
+        `/productpayment?total=${freshTotals.total}&items=${itemsJson}`
+      );
+      onClose();
+    },
+    [cartItems, selectedProducts, onClose, router, t]
+  );
+
+  // ✅ NEW: Handle validation dialog continue
+  const handleValidationContinue = useCallback(async () => {
+    if (!validationResult) return;
+
+    setIsValidating(true);
+    setShowValidationDialog(false);
+
+    try {
+      // Update cart cache with fresh values
+      if (validationResult.validatedItems.length > 0) {
+        await updateCartCacheFromValidation(validationResult.validatedItems);
+      }
+
+      // Remove error items from selection
+      const errorIds = Object.keys(validationResult.errors);
+      setSelectedProducts((prev) => {
+        const updated = { ...prev };
+        errorIds.forEach((id) => delete updated[id]);
+        return updated;
+      });
+
+      // Get valid items only
+      const validIds = validationResult.validatedItems
+        .map((item) => item.productId)
+        .filter((id) => !errorIds.includes(id));
+
+      setIsValidating(false);
+
+      if (validIds.length > 0) {
+        // Recalculate totals with fresh data
+        const totals = await calculateCartTotals(validIds);
+        setCalculatedTotals(totals);
+
+        // Proceed to payment
+        proceedToPayment(totals);
+      } else {
+        alert(t("noValidItemsToCheckout") || "No valid items to checkout");
+      }
+    } catch (error) {
+      setIsValidating(false);
+      console.error("❌ Cache update error:", error);
     }
-
-    // Remove error items from selection
-    const errorIds = Object.keys(validationResult.errors);
-    setSelectedProducts((prev) => {
-      const updated = { ...prev };
-      errorIds.forEach((id) => delete updated[id]);
-      return updated;
-    });
-
-    // Get valid items only
-    const validIds = validationResult.validatedItems
-      .map((item) => item.productId)
-      .filter((id) => !errorIds.includes(id));
-
-    setIsValidating(false);
-
-    if (validIds.length > 0) {
-      // Recalculate totals with fresh data
-      const totals = await calculateCartTotals(validIds);
-      setCalculatedTotals(totals);
-
-      // Proceed to payment
-      proceedToPayment(totals);
-    } else {
-      alert(t("noValidItemsToCheckout") || "No valid items to checkout");
-    }
-  } catch (error) {
-    setIsValidating(false);
-    console.error("❌ Cache update error:", error);
-  }
-}, [
-  validationResult,
-  updateCartCacheFromValidation,
-  calculateCartTotals,
-  proceedToPayment,
-  t,
-]);
+  }, [
+    validationResult,
+    updateCartCacheFromValidation,
+    calculateCartTotals,
+    proceedToPayment,
+    t,
+  ]);
 
   // Backdrop click handler
   const handleBackdropClick = useCallback(
@@ -1063,13 +1083,14 @@ const handleValidationContinue = useCallback(async () => {
                   {t("viewCart")}
                 </button>
                 <button
-  onClick={handleCheckout}
-  disabled={
-    isCalculatingTotals ||
-    isValidating ||  // ✅ ADD THIS
-    Object.values(selectedProducts).filter((v) => v).length === 0
-  }
-  className="
+                  onClick={handleCheckout}
+                  disabled={
+                    isCalculatingTotals ||
+                    isValidating || // ✅ ADD THIS
+                    Object.values(selectedProducts).filter((v) => v).length ===
+                      0
+                  }
+                  className="
     py-3 px-4 rounded-xl font-medium transition-all duration-200
     bg-gradient-to-r from-orange-500 to-pink-500 text-white
     hover:from-orange-600 hover:to-pink-600
@@ -1077,39 +1098,38 @@ const handleValidationContinue = useCallback(async () => {
     flex items-center justify-center space-x-2
     disabled:opacity-50 disabled:cursor-not-allowed
   "
->
-  {isValidating ? (  // ✅ ADD THIS
-    <>
-      <RefreshCw size={16} className="animate-spin" />
-      <span>{t("validating")}</span>
-    </>
-  ) : (
-    <>
-      <span>{t("checkout")}</span>
-      <ArrowRight size={16} />
-    </>
-  )}
-</button>
+                >
+                  {isValidating ? ( // ✅ ADD THIS
+                    <>
+                      <RefreshCw size={16} className="animate-spin" />
+                      <span>{t("validating")}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>{t("checkout")}</span>
+                      <ArrowRight size={16} />
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           )}
         </div>
       </div>
       {showValidationDialog && validationResult && (
-  <CartValidationDialog
-    open={showValidationDialog}
-    errors={validationResult.errors}
-    warnings={validationResult.warnings}
-    validatedItems={validationResult.validatedItems}
-    cartItems={cartItems}
-    onContinue={handleValidationContinue}
-    onCancel={() => {
-      setShowValidationDialog(false);
-      setValidationResult(null);
-    }}
-  />
-)}
+        <CartValidationDialog
+          open={showValidationDialog}
+          errors={validationResult.errors}
+          warnings={validationResult.warnings}
+          validatedItems={validationResult.validatedItems}
+          cartItems={cartItems}
+          onContinue={handleValidationContinue}
+          onCancel={() => {
+            setShowValidationDialog(false);
+            setValidationResult(null);
+          }}
+        />
+      )}
     </div>
-    
   );
 };

@@ -57,6 +57,23 @@ interface FormData {
   location: { latitude: number; longitude: number } | null;
 }
 
+interface PaymentItem {
+  productId: string;
+  quantity: number;
+  sellerName: string;
+  sellerId: string;
+  isShop: boolean;
+  selectedMetres?: number;
+  selectedColor?: string;
+  price?: number;
+  productName?: string;
+  currency?: string;
+  calculatedUnitPrice?: number;
+  calculatedTotal?: number;
+  isBundleItem?: boolean;
+  [key: string]: string | number | boolean | string[] | undefined;
+}
+
 interface PaymentItemPayload {
   productId: string;
   quantity: number;
@@ -450,7 +467,7 @@ export default function ProductPaymentPage() {
 
   const [isAddressExpanded, setIsAddressExpanded] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode] = useState(false);
 
   const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(
@@ -472,30 +489,35 @@ export default function ProductPaymentPage() {
   }, []);
 
   useEffect(() => {
-    const checkDarkMode = () => {
-      setIsDarkMode(document.documentElement.classList.contains("dark"));
-    };
-    checkDarkMode();
-    const observer = new MutationObserver(checkDarkMode);
-    observer.observe(document.documentElement, { attributes: true });
-    return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
     const totalParam = searchParams.get("total");
     const itemsParam = searchParams.get("items");
-  
+
     if (!totalParam || !itemsParam) {
-      // Missing data → Go back to cart
       router.push("/cart");
       return;
     }
-  
+
     try {
       const items = JSON.parse(decodeURIComponent(itemsParam));
       const cfTotal = parseFloat(totalParam);
-  
+
       console.log("💰 Cloud Function total:", cfTotal);
+      console.log("📦 Items from CF:", items);
+
+      // ✅ CRITICAL: Verify items have calculated pricing
+      const validItems = items.every(
+        (item: PaymentItem) =>
+          typeof item.calculatedUnitPrice === "number" &&
+          typeof item.calculatedTotal === "number"
+      );
+
+      if (!validItems) {
+        console.error("❌ Items missing calculated pricing!");
+        console.error("Items:", items);
+        router.push("/cart");
+        return;
+      }
+
       setCartItems(items);
       setTotalPrice(cfTotal);
     } catch (error) {
@@ -1366,74 +1388,76 @@ export default function ProductPaymentPage() {
                 </h3>
               </div>
 
-             {/* Cart Items */}
-<div className="space-y-3 sm:space-y-4 mb-6 sm:mb-8">
-  {cartItems.map((item, index) => (
-    <div
-      key={index}
-      className={`flex items-center space-x-3 sm:space-x-4 p-3 sm:p-4 rounded-xl ${
-        isDarkMode ? "bg-gray-700/30" : "bg-gray-50"
-      }`}
-    >
-      <div
-        className={`w-12 h-12 sm:w-16 sm:h-16 rounded-xl flex items-center justify-center ${
-          isDarkMode
-            ? "bg-gradient-to-br from-blue-500/20 to-purple-500/20"
-            : "bg-gradient-to-br from-blue-100 to-purple-100"
-        }`}
-      >
-        <span
-          className={`text-sm sm:text-lg font-bold ${
-            isDarkMode ? "text-white" : "text-gray-900"
-          }`}
-        >
-          {item.quantity}×
-        </span>
-      </div>
-      <div className="flex-1 min-w-0">
-        <p
-          className={`text-sm sm:text-base font-semibold ${
-            isDarkMode ? "text-white" : "text-gray-900"
-          }`}
-        >
-          {item.productName || t("product")}
-        </p>
-        <p
-          className={`text-xs sm:text-sm ${
-            isDarkMode ? "text-gray-400" : "text-gray-600"
-          }`}
-        >
-          {t("unitPrice")}: {(
-            typeof item.calculatedUnitPrice === 'number' 
-              ? item.calculatedUnitPrice 
-              : (typeof item.price === 'number' ? item.price : 0)
-          ).toFixed(2)}{" "}
-          {item.currency || "TL"}
-        </p>
-      </div>
-      <div className="text-right">
-        <span
-          className={`text-base sm:text-lg font-bold ${
-            isDarkMode ? "text-white" : "text-gray-900"
-          }`}
-        >
-          {(
-            typeof item.calculatedTotal === 'number'
-              ? item.calculatedTotal
-              : ((typeof item.price === 'number' ? item.price : 0) * item.quantity)
-          ).toFixed(2)}
-        </span>
-        <p
-          className={`text-xs sm:text-sm ${
-            isDarkMode ? "text-gray-400" : "text-gray-600"
-          }`}
-        >
-          {item.currency || "TL"}
-        </p>
-      </div>
-    </div>
-  ))}
-</div>
+              {/* Cart Items */}
+              <div className="space-y-3 sm:space-y-4 mb-6 sm:mb-8">
+                {cartItems.map((item, index) => (
+                  <div
+                    key={index}
+                    className={`flex items-center space-x-3 sm:space-x-4 p-3 sm:p-4 rounded-xl ${
+                      isDarkMode ? "bg-gray-700/30" : "bg-gray-50"
+                    }`}
+                  >
+                    <div
+                      className={`w-12 h-12 sm:w-16 sm:h-16 rounded-xl flex items-center justify-center ${
+                        isDarkMode
+                          ? "bg-gradient-to-br from-blue-500/20 to-purple-500/20"
+                          : "bg-gradient-to-br from-blue-100 to-purple-100"
+                      }`}
+                    >
+                      <span
+                        className={`text-sm sm:text-lg font-bold ${
+                          isDarkMode ? "text-white" : "text-gray-900"
+                        }`}
+                      >
+                        {item.quantity}×
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p
+                        className={`text-sm sm:text-base font-semibold ${
+                          isDarkMode ? "text-white" : "text-gray-900"
+                        }`}
+                      >
+                        {item.productName || t("product")}
+                      </p>
+                      <p
+                        className={`text-xs sm:text-sm ${
+                          isDarkMode ? "text-gray-400" : "text-gray-600"
+                        }`}
+                      >
+                        {t("unitPrice")}:{" "}
+                        {(typeof item.calculatedUnitPrice === "number"
+                          ? item.calculatedUnitPrice
+                          : typeof item.price === "number"
+                          ? item.price
+                          : 0
+                        ).toFixed(2)}{" "}
+                        {item.currency || "TL"}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span
+                        className={`text-base sm:text-lg font-bold ${
+                          isDarkMode ? "text-white" : "text-gray-900"
+                        }`}
+                      >
+                        {(typeof item.calculatedTotal === "number"
+                          ? item.calculatedTotal
+                          : (typeof item.price === "number" ? item.price : 0) *
+                            item.quantity
+                        ).toFixed(2)}
+                      </span>
+                      <p
+                        className={`text-xs sm:text-sm ${
+                          isDarkMode ? "text-gray-400" : "text-gray-600"
+                        }`}
+                      >
+                        {item.currency || "TL"}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
               {/* Pricing Breakdown */}
               <div
                 className={`border-t pt-5 sm:pt-6 space-y-3 sm:space-y-4 ${
