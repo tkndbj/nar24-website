@@ -41,18 +41,21 @@ const ShimmerCard: React.FC = () => {
   );
 };
 
-const ShimmerList: React.FC<{ height: number; count?: number }> = ({
+const ShimmerList: React.FC<{
+  height: number;
+  count?: number;
+  portraitImageHeight: number;
+  infoAreaHeight: number;
+  scaleFactor: number;
+}> = ({
   height,
   count = 5,
+  portraitImageHeight,
+  infoAreaHeight,
+  scaleFactor,
 }) => {
-  const [isMobile, setIsMobile] = React.useState(false);
-
-  React.useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+  // Calculate exact card height to match ProductCard
+  const cardHeight = (portraitImageHeight + infoAreaHeight) * scaleFactor;
 
   return (
     <div
@@ -60,7 +63,7 @@ const ShimmerList: React.FC<{ height: number; count?: number }> = ({
       style={{ height: `${height}px` }}
     >
       {Array.from({ length: count }, (_, index) => (
-        <div key={index} className="flex-shrink-0" style={{ width: isMobile ? "180px" : "205px" }}>
+        <div key={index} className="flex-shrink-0" style={{ width: "205px", height: `${cardHeight}px` }}>
           <ShimmerCard />
         </div>
       ))}
@@ -262,7 +265,13 @@ const DynamicList: React.FC<{
 
           {/* Product list */}
           {loading ? (
-            <ShimmerList height={rowHeight - 60} count={5} />
+            <ShimmerList
+              height={rowHeight - 60}
+              count={5}
+              portraitImageHeight={portraitImageHeight}
+              infoAreaHeight={infoAreaHeight}
+              scaleFactor={scaleFactor}
+            />
           ) : products.length === 0 ? (
             <div
               className="flex items-center justify-center text-white px-0 lg:px-0"
@@ -466,7 +475,13 @@ export default function DynamicHorizontalList({ keyPrefix = '' }: DynamicHorizon
                       <div className="h-4 bg-white bg-opacity-30 rounded animate-pulse w-16" />
                     </div>
                   </div>
-                  <ShimmerList height={rowHeight - 60} count={5} />
+                  <ShimmerList
+                    height={rowHeight - 60}
+                    count={5}
+                    portraitImageHeight={portraitImageHeight}
+                    infoAreaHeight={infoAreaHeight}
+                    scaleFactor={0.88}
+                  />
                 </div>
               </div>
             </div>
@@ -504,7 +519,13 @@ export default function DynamicHorizontalList({ keyPrefix = '' }: DynamicHorizon
                       <div className="h-4 bg-white bg-opacity-30 rounded animate-pulse w-16" />
                     </div>
                   </div>
-                  <ShimmerList height={rowHeight - 60} count={5} />
+                  <ShimmerList
+                    height={rowHeight - 60}
+                    count={5}
+                    portraitImageHeight={portraitImageHeight}
+                    infoAreaHeight={infoAreaHeight}
+                    scaleFactor={0.88}
+                  />
                 </div>
               </div>
             </div>

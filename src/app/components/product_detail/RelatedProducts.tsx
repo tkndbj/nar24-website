@@ -18,16 +18,19 @@ interface ProductDetailRelatedProductsProps {
 const LoadingSkeleton: React.FC<{
   cardCount: number;
   isDarkMode?: boolean;
-}> = ({ cardCount, isDarkMode = false }) => (
-  <div className="flex overflow-hidden" style={{ gap: "0px" }}>
-    {Array.from({ length: cardCount }).map((_, i) => (
-      <div
-        key={i}
-        className={`flex-shrink-0 w-48 sm:w-60 rounded-xl sm:rounded-2xl animate-pulse ${
-          isDarkMode ? "bg-gray-700" : "bg-gray-200"
-        }`}
-        style={{ height: "380px" }}
-      >
+}> = ({ cardCount, isDarkMode = false }) => {
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+
+  return (
+    <div className="flex overflow-hidden" style={{ gap: "0px" }}>
+      {Array.from({ length: cardCount }).map((_, i) => (
+        <div
+          key={i}
+          className={`flex-shrink-0 w-48 sm:w-60 rounded-xl sm:rounded-2xl animate-pulse ${
+            isDarkMode ? "bg-gray-700" : "bg-gray-200"
+          }`}
+          style={{ height: isMobile ? "420px" : "380px" }}
+        >
         <div className="p-3 sm:p-4 space-y-2 sm:space-y-3 h-full flex flex-col">
           <div
             className={`flex-1 rounded-lg sm:rounded-xl ${
@@ -55,7 +58,8 @@ const LoadingSkeleton: React.FC<{
       </div>
     ))}
   </div>
-);
+  );
+};
 
 const ProductDetailRelatedProducts: React.FC<
   ProductDetailRelatedProductsProps
@@ -126,7 +130,7 @@ const ProductDetailRelatedProducts: React.FC<
     const mobile = screenWidth < 768;
 
     return {
-      listViewHeight: mobile ? 380 : 450,
+      listViewHeight: mobile ? 420 : 450,
       cardWidth: mobile ? 200 : 240,
       cardCount: mobile ? 3 : 6,
       gap: 0,

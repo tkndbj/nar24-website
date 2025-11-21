@@ -32,15 +32,15 @@ const ShimmerCard = React.memo(({ isDarkMode }: { isDarkMode: boolean }) => {
 ShimmerCard.displayName = 'ShimmerCard';
 
 // ✅ MATCHES FLUTTER: Shimmer list
-const ShimmerList = React.memo(({ rowHeight, isDarkMode }: { rowHeight: number; isDarkMode: boolean }) => {
-  const [isMobile, setIsMobile] = React.useState(false);
-
-  React.useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+const ShimmerList = React.memo(({ rowHeight, isDarkMode, portraitImageHeight, infoAreaHeight, scaleFactor }: {
+  rowHeight: number;
+  isDarkMode: boolean;
+  portraitImageHeight: number;
+  infoAreaHeight: number;
+  scaleFactor: number;
+}) => {
+  // Calculate exact card height to match ProductCard
+  const cardHeight = (portraitImageHeight + infoAreaHeight) * scaleFactor;
 
   return (
     <div
@@ -48,7 +48,7 @@ const ShimmerList = React.memo(({ rowHeight, isDarkMode }: { rowHeight: number; 
       style={{ height: `${rowHeight - 60}px` }}
     >
       {[0, 1, 2, 3, 4].map((index) => (
-        <div key={index} className="flex-shrink-0" style={{ width: isMobile ? "180px" : "205px" }}>
+        <div key={index} className="flex-shrink-0" style={{ width: "205px", height: `${cardHeight}px` }}>
           <ShimmerCard isDarkMode={isDarkMode} />
         </div>
       ))}
@@ -203,7 +203,13 @@ export const PreferenceProduct = React.memo(({ keyPrefix = '' }: PreferenceProdu
 
           {/* ✅ MATCHES FLUTTER: Content */}
           {isLoading && recommendations.length === 0 ? (
-            <ShimmerList rowHeight={rowHeight} isDarkMode={isDarkMode} />
+            <ShimmerList
+              rowHeight={rowHeight}
+              isDarkMode={isDarkMode}
+              portraitImageHeight={portraitImageHeight}
+              infoAreaHeight={infoAreaHeight}
+              scaleFactor={scaleFactor}
+            />
           ) : error && recommendations.length === 0 ? (
             // ✅ MATCHES FLUTTER: Error state
             <div
