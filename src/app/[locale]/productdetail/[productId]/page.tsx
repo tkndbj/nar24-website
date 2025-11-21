@@ -277,22 +277,19 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
   const isOptimisticallyAdding = useCallback(
     (productId: string): boolean => {
-      return cartItems.some(
-        (item) => item.productId === productId && item.isOptimistic === true
-      );
+      // ✅ FIX: Only check if button state says we're adding
+      // Don't rely on cartItems which updates slowly
+      return cartButtonState === "adding";
     },
-    [cartItems]
+    [cartButtonState] // ✅ Only depend on button state, not cartItems
   );
-
+  
   const isOptimisticallyRemoving = useCallback(
     (productId: string): boolean => {
-      // Check if product was just removed but listener hasn't caught up yet
-      return cartItems.some(
-        (item) =>
-          item.productId === productId && item.cartData?._deleted === true
-      );
+      // ✅ FIX: Only check if button state says we're removing
+      return cartButtonState === "removing";
     },
-    [cartItems]
+    [cartButtonState] // ✅ Only depend on button state, not cartItems
   );
 
   // ✅ OPTIMIZED: Dark mode detection with debouncing

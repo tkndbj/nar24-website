@@ -533,7 +533,7 @@ const handleValidationContinue = useCallback(async () => {
                 ? "bg-gray-800 border-gray-700"
                 : "bg-gray-50 border-gray-200"
             }
-            ${item.isOptimistic ? "opacity-50 border-dashed" : ""}
+            
             ${isSelected ? "border-orange-500" : ""}
           `}
         >

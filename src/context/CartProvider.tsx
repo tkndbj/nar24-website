@@ -1072,11 +1072,12 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     ): Promise<string> => {
       if (!user) return "Please log in first";
 
-      // ✅ FIX: Ensure cart is initialized before adding first product
-      // This ensures the real-time listener is running to clear optimistic updates
+      // ✅ FIX: Ensure listener is active and initialization flag is cleared
       if (!isInitialized) {
-        console.log("🔄 Initializing cart before first add...");
-        await initializeCartIfNeeded();
+        console.log("🔄 Enabling listener for first add...");
+        isInitializingRef.current = false; // ✅ Clear the flag FIRST
+        setIsInitialized(true);
+        enableLiveUpdates(); // Then start listener
       }
 
       // Rate limiting
@@ -1091,16 +1092,16 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           attributes
         );
 
-        // ✅ Clean any nested undefined values (defense in depth)
+        // Clean any nested undefined values
         const cleanedProductData = cleanFirestoreData(productData) as Record<
           string,
           unknown
         >;
 
-        // Optimistic update (use original data for UI)
+        // Optimistic update
         applyOptimisticAdd(product.id, productData, quantity);
 
-        // Write to Firestore (use cleaned data)
+        // Write to Firestore
         await setDoc(doc(db, "users", user.uid, "cart", product.id), {
           ...cleanedProductData,
           quantity,
@@ -1108,7 +1109,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           updatedAt: serverTimestamp(),
         });
 
-        // ✅ Metrics logging
+        // Metrics logging
         const shopId = await getProductShopId(product.id);
         metricsEventService.logCartAdded({
           productId: product.id,
@@ -1134,7 +1135,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       user,
       db,
       isInitialized,
-      initializeCartIfNeeded,
+      enableLiveUpdates,
       buildProductDataForCart,
       applyOptimisticAdd,
       rollbackOptimisticUpdate,
