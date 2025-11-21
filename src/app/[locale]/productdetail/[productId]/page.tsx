@@ -156,8 +156,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   const [error, setError] = useState<string | null>(null);
   const [product, setProduct] = useState<Product | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [localCartState, setLocalCartState] = useState<boolean | null>(null);
-  const [isPending, setIsPending] = useState(false);
+
 
   useEffect(() => {
     let mounted = true;
@@ -267,30 +266,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   // ✅ NEW: Track if user has scrolled past action buttons
   const [showHeaderButtons, setShowHeaderButtons] = useState(false);
   const actionButtonsRef = useRef<HTMLDivElement>(null);
-
-  const isInCart = useCallback(
-    (productId: string): boolean => {
-      return cartProductIds.has(productId);
-    },
-    [cartProductIds]
-  );
-
-  const isOptimisticallyAdding = useCallback(
-    (): boolean => {
-      // ✅ FIX: Only check if button state says we're adding
-      // Don't rely on cartItems which updates slowly
-      return cartButtonState === "adding";
-    },
-    [cartButtonState]
-  );
-  
-  const isOptimisticallyRemoving = useCallback(
-    (): boolean => {
-      // ✅ FIX: Only check if button state says we're removing
-      return cartButtonState === "removing";
-    },
-    [cartButtonState]
-  );
 
   // ✅ OPTIMIZED: Dark mode detection with debouncing
   useEffect(() => {
@@ -490,116 +465,91 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         router.push("/login");
         return;
       }
-
+  
       if (!product) return;
-
-      // Prevent double-taps
-      if (isPending) return;
-
+  
+      // ✅ Prevent double-clicks
+      if (cartButtonState === "adding" || cartButtonState === "removing") {
+        return;
+      }
+  
       const productInCart = cartProductIds.has(product.id);
       const isAdding = !productInCart;
-
-      // ✅ STEP 1: Handle options modal FIRST (if needed and no options provided)
+  
+      // ✅ Handle options modal FIRST (if needed)
       if (isAdding && hasSelectableOptions(product) && !selectedOptions) {
         setShowCartOptionSelector(true);
-        return; // Modal will call this function again with options
+        return;
       }
-
+  
       try {
-        // ✅ STEP 2: INSTANT visual update (like Flutter)
-        setLocalCartState(isAdding);
-        setIsPending(true);
+        // ✅ Set button state BEFORE operation
         setCartButtonState(isAdding ? "adding" : "removing");
-
-        // ✅ STEP 3: Haptic feedback
+  
+        // ✅ Haptic feedback
         if (isAdding && navigator.vibrate) {
           navigator.vibrate(10);
         }
-
-        // ✅ STEP 4: Perform background operation
+  
+        // ✅ Perform operation
         let result: string;
-
+  
         if (isAdding) {
-          // Adding to cart
           let quantityToAdd = 1;
           const attributesToAdd: Record<string, unknown> = {};
-
+  
           if (selectedOptions) {
             if (typeof selectedOptions.quantity === "number") {
               quantityToAdd = selectedOptions.quantity;
             }
-
-            // Copy all attributes EXCEPT quantity
+  
             Object.entries(selectedOptions).forEach(([key, value]) => {
               if (key !== "quantity") {
                 attributesToAdd[key] = value;
               }
             });
           }
-
-          // Extract selectedColor separately
-          const selectedColor = attributesToAdd.selectedColor as
-            | string
-            | undefined;
+  
+          const selectedColor = attributesToAdd.selectedColor as string | undefined;
           delete attributesToAdd.selectedColor;
-
+  
           result = await addProductToCart(
             product,
             quantityToAdd,
             selectedColor,
-            Object.keys(attributesToAdd).length > 0
-              ? attributesToAdd
-              : undefined
+            Object.keys(attributesToAdd).length > 0 ? attributesToAdd : undefined
           );
         } else {
-          // Removing from cart
           result = await removeFromCart(product.id);
         }
-
-        // ✅ STEP 5: Handle result
-        if (
-          !result.includes("Added") &&
-          !result.includes("Removed") &&
-          !result.includes("cart")
-        ) {
-          // Operation failed - revert optimistic update
-          setLocalCartState(null);
+  
+        // ✅ Check result
+        if (result.includes("Added") || result.includes("Removed") || result.includes("cart")) {
+          // Success
+          setCartButtonState(isAdding ? "added" : "removed");
+          
+          // Reset after animation
+          setTimeout(() => {
+            setCartButtonState("idle");
+          }, 1500);
+        } else {
+          // Failed
           setCartButtonState("idle");
-
-          console.error("Cart operation failed:", result);
-
-          // Show error toast (optional)
+          
           if (result === "Please log in first") {
             router.push("/login");
           }
-        } else {
-          // Success!
-          setCartButtonState(isAdding ? "added" : "removed");
-
-          // Auto-reset after animation
-          setTimeout(() => {
-            setLocalCartState(null);
-            setCartButtonState("idle");
-          }, 1500);
         }
       } catch (error) {
         console.error("Cart operation error:", error);
-
-        // Revert on error
-        setLocalCartState(null);
         setCartButtonState("idle");
-      } finally {
-        // Release pending lock after short delay
-        setTimeout(() => {
-          setIsPending(false);
-        }, 300);
       }
     },
     [
       user,
       product,
       cartProductIds,
-      isPending,
+      cartButtonState,
       router,
       addProductToCart,
       removeFromCart,
@@ -639,23 +589,18 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     }
   }, [user, product, cartProductIds, addProductToCart, router]);
 
-  // Get current cart button content
   const cartButtonContent = useMemo(() => {
-    if (!product)
+    if (!product) {
       return {
         icon: <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5" />,
         text: t("addToCart"),
       };
-
-    // ✅ Use local state for instant feedback, fallback to actual state
-    const actualInCart = isInCart(product.id);
-    const productInCart =
-      localCartState !== null ? localCartState : actualInCart;
-
-      const isOptimisticAdd = isOptimisticallyAdding();
-      const isOptimisticRemove = isOptimisticallyRemoving();
-
-    if (cartButtonState === "adding" || isOptimisticAdd) {
+    }
+  
+    const productInCart = cartProductIds.has(product.id);
+  
+    // Show state based on button state first, then actual cart state
+    if (cartButtonState === "adding") {
       return {
         icon: (
           <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
@@ -663,8 +608,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         text: t("adding"),
       };
     }
-
-    if (cartButtonState === "removing" || isOptimisticRemove) {
+  
+    if (cartButtonState === "removing") {
       return {
         icon: (
           <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
@@ -672,68 +617,51 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         text: t("removing"),
       };
     }
-
+  
     if (cartButtonState === "added") {
       return {
         icon: <Check className="w-4 h-4 sm:w-5 sm:h-5" />,
         text: t("addedToCart"),
       };
     }
-
+  
     if (cartButtonState === "removed") {
       return {
         icon: <Check className="w-4 h-4 sm:w-5 sm:h-5" />,
         text: t("removedFromCart"),
       };
     }
-
+  
+    // Default state based on actual cart
     if (productInCart) {
       return {
         icon: <Minus className="w-4 h-4 sm:w-5 sm:h-5" />,
         text: t("removeFromCart"),
       };
     }
-
+  
     return {
       icon: <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5" />,
       text: t("addToCart"),
     };
-  }, [
-    product,
-    localCartState, // ✅ ADD THIS
-    isInCart,
-    isOptimisticallyAdding,
-    isOptimisticallyRemoving,
-    cartButtonState,
-    t,
-  ]);
+  }, [product, cartProductIds, cartButtonState, t]);
 
   // Check if add to cart button should be disabled
   const isAddToCartDisabled = useMemo(() => {
     if (!product) return false;
-
-    // Disable if quantity is 0 AND no color options available
+    
+    // Disable while processing
+    if (cartButtonState === "adding" || cartButtonState === "removing") {
+      return true;
+    }
+  
+    // Disable if no stock and no color options
     const hasNoStock = product.quantity === 0;
     const hasColorOptions = product.colorQuantities && Object.keys(product.colorQuantities).length > 0;
-
+    
     return hasNoStock && !hasColorOptions;
-  }, [product]);
+  }, [product, cartButtonState]);
 
-  useEffect(() => {
-    if (!product) return;
-
-    const actualInCart = isInCart(product.id);
-
-    // Sync local state with actual state when they match
-    if (
-      localCartState !== null &&
-      localCartState === actualInCart &&
-      !isPending
-    ) {
-      // State is synced, clear local state
-      setLocalCartState(null);
-    }
-  }, [product?.id, localCartState, isInCart, isPending]);
 
   if (isLoading) {
     return <LoadingSkeleton isDarkMode={isDarkMode} />;
@@ -772,13 +700,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     );
   }
 
-  const productInCart = isInCart(product.id);
-  const isProcessing =
-    isPending ||
-    cartButtonState === "adding" ||
-    cartButtonState === "removing" ||
-    isOptimisticallyAdding() ||
-    isOptimisticallyRemoving();
+  const productInCart = product ? cartProductIds.has(product.id) : false;
+  const isProcessing = cartButtonState === "adding" || cartButtonState === "removing";
 
   return (
     <div

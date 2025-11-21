@@ -272,7 +272,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   // ========================================================================
 
   const lastDocumentRef = useRef<DocumentSnapshot | null>(null);
-  const isInitializingRef = useRef(false);
   const unsubscribeCartRef = useRef<(() => void) | null>(null);
 
   // Keep a ref to current cart items to avoid stale closures in listeners
@@ -351,15 +350,26 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         "sellerId",
       ];
 
+      // ✅ FIX: Check for null/undefined, not falsy (0 is valid!)
       for (const field of required) {
-        if (!cartData[field]) return false;
+        const value = cartData[field];
+        if (value === null || value === undefined) {
+          console.warn(`  ❌ Field "${field}" is null/undefined`);
+          return false;
+        }
       }
 
       const productName = cartData.productName;
-      if (!productName || productName === "Unknown Product") return false;
+      if (!productName || productName === "Unknown Product") {
+        console.warn(`  ❌ Invalid productName: "${productName}"`);
+        return false;
+      }
 
       const sellerName = cartData.sellerName;
-      if (!sellerName || sellerName === "Unknown") return false;
+      if (!sellerName || sellerName === "Unknown") {
+        console.warn(`  ❌ Invalid sellerName: "${sellerName}"`);
+        return false;
+      }
 
       return true;
     },
@@ -617,14 +627,13 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
   const processCartChanges = useCallback(
     async (changes: DocumentChange<FirestoreCartData>[]) => {
-      // ✅ FIX: Don't rely on cartItemsRef - build from scratch using changes
-      // This is the correct approach for real-time listeners
-      
       if (changes.length === 0) {
-        return; // No changes to process
+        return;
       }
 
-      // Get current items from state, not ref (to avoid stale closure)
+      console.log(`🔄 Processing ${changes.length} cart changes`);
+
+      // ✅ FIX: Build from current state, not ref
       setCartItems((currentItems) => {
         const itemsMap = new Map<string, CartItem>();
 
@@ -639,32 +648,44 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           const cartData = change.doc.data();
 
           if (change.type === "added" || change.type === "modified") {
+            console.log(`  ✅ ${change.type.toUpperCase()}: ${productId}`);
             if (cartData && hasRequiredFields(cartData)) {
               try {
                 const product = buildProductFromCartData(cartData);
                 const newItem = createCartItem(productId, cartData, product);
-                // Replace any existing item (including optimistic ones)
                 itemsMap.set(productId, newItem);
                 clearOptimisticUpdate(productId);
+                console.log(`    ✓ Item processed and optimistic flag cleared`);
               } catch (error) {
-                console.error(`Failed to process ${productId}:`, error);
+                console.error(`    ❌ Failed to process ${productId}:`, error);
               }
             } else {
-              console.warn(`⚠️ Item ${productId} missing required fields, keeping existing version if exists`);
+              console.warn(`    ⚠️ Item ${productId} MISSING REQUIRED FIELDS`);
+              console.warn(`    📋 Has fields:`, Object.keys(cartData || {}));
+              console.warn(`    📋 Data:`, {
+                productId: cartData?.productId,
+                productName: cartData?.productName,
+                unitPrice: cartData?.unitPrice,
+                availableStock: cartData?.availableStock,
+                sellerName: cartData?.sellerName,
+                sellerId: cartData?.sellerId,
+              });
             }
           } else if (change.type === "removed") {
+            console.log(`  🗑️ REMOVED: ${productId}`);
             itemsMap.delete(productId);
             clearOptimisticUpdate(productId);
           }
         }
 
-        // Deduplicate by productId
+        // Convert back to array and sort
         const uniqueItems = Array.from(itemsMap.values());
         sortCartItems(uniqueItems);
-        
+
+        console.log(`  📦 Final cart has ${uniqueItems.length} items`);
         return uniqueItems;
       });
-
+  
       // Invalidate Redis cache
       if (user) {
         redisRef.current.invalidateCartTotals(user.uid);
@@ -682,66 +703,32 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
   const handleRealtimeUpdate = useCallback(
     (snapshot: QuerySnapshot) => {
-      // Skip during initialization
-      if (isInitializingRef.current) {
-        console.log("⏭️ Skipping listener (initializing)");
-        return;
-      }
-
       if (snapshot.metadata.fromCache) {
         console.log("⏭️ Skipping cache event");
         return;
       }
 
       console.log(
-        `🔥 Real-time update: ${snapshot.docChanges().length} changes`
+        `🔥 Real-time update: ${snapshot.docChanges().length} changes, ${snapshot.docs.length} total docs`
       );
 
+      // ✅ ALWAYS update IDs from full snapshot
       updateCartIds(snapshot.docs);
 
-      // ✅ FIX: Handle both changes AND full snapshots
+      // ✅ Process changes if any exist
       if (snapshot.docChanges().length > 0) {
+        console.log(`📝 Processing ${snapshot.docChanges().length} document changes`);
         processCartChanges(snapshot.docChanges());
-      } else if (snapshot.docs.length > 0) {
-        // ✅ NEW: If no changes but docs exist, it's the initial snapshot after refresh
-        // Build items from all docs
-        console.log("📦 Processing initial snapshot with", snapshot.docs.length, "docs");
-        
-        setCartItems((currentItems) => {
-          const itemsMap = new Map<string, CartItem>();
-
-          // Start with current items (might be empty after refresh)
-          currentItems.forEach((item) => {
-            itemsMap.set(item.productId, item);
-          });
-
-          // Process ALL documents as "added" changes
-          for (const doc of snapshot.docs) {
-            const productId = doc.id;
-            const cartData = doc.data();
-
-            if (cartData && hasRequiredFields(cartData)) {
-              try {
-                const product = buildProductFromCartData(cartData);
-                const newItem = createCartItem(productId, cartData, product);
-                itemsMap.set(productId, newItem);
-                clearOptimisticUpdate(productId);
-              } catch (error) {
-                console.error(`Failed to process ${productId}:`, error);
-              }
-            }
-          }
-
-          const uniqueItems = Array.from(itemsMap.values());
-          sortCartItems(uniqueItems);
-          
-          return uniqueItems;
-        });
       } else if (snapshot.docs.length === 0) {
+        // Only clear if cart is actually empty
+        console.log("🗑️ Cart is empty, clearing items");
         setCartItems([]);
+      } else {
+        // No changes but docs exist - this is normal for initial listener attach
+        console.log("✅ No changes detected, keeping current state");
       }
     },
-    [updateCartIds, processCartChanges, hasRequiredFields, buildProductFromCartData, createCartItem, clearOptimisticUpdate, sortCartItems]
+    [updateCartIds, processCartChanges]
   );
 
   const enableLiveUpdates = useCallback(() => {
@@ -817,12 +804,13 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
     const initPromise = (async () => {
       setIsLoading(true);
-      isInitializingRef.current = true;
 
-      // Clear existing items
-      setCartItems([]);
-      setCartProductIds(new Set());
-      setCartCount(0);
+      // Only clear if there are existing items to avoid clearing optimistic updates
+      if (cartItems.length > 0) {
+        setCartItems([]);
+        setCartProductIds(new Set());
+        setCartCount(0);
+      }
 
       // Reset pagination state
       lastDocumentRef.current = null;
@@ -844,16 +832,13 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           setHasMore(snapshot.docs.length >= ITEMS_PER_PAGE);
         }
 
+        console.log("✅ Cart initialized with", snapshot.docs.length, "items");
+
+        // ✅ Set initialized FIRST
         setIsInitialized(true);
 
-        // Clear initializing flag BEFORE enabling listener to avoid race condition
-        isInitializingRef.current = false;
-
-        // Enable listener AFTER initialization
-        enableLiveUpdates();
       } catch (error) {
         console.error("❌ Init error:", error);
-        isInitializingRef.current = false;
       } finally {
         setIsLoading(false);
       }
@@ -862,7 +847,18 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     pendingFetchesRef.current.set("init", initPromise);
     await initPromise;
     pendingFetchesRef.current.delete("init");
-  }, [user, isInitialized, db, buildCartItemsFromDocs, enableLiveUpdates]);
+
+    // ✅ CRITICAL FIX: Enable listener IMMEDIATELY after init completes
+    // Use setImmediate equivalent to ensure state is flushed
+    if (user && !unsubscribeCartRef.current) {
+      Promise.resolve().then(() => {
+        if (user && !unsubscribeCartRef.current) {
+          console.log("🔴 Enabling listener immediately after init");
+          enableLiveUpdates();
+        }
+      });
+    }
+  }, [user, isInitialized, db, buildCartItemsFromDocs, enableLiveUpdates, cartItems.length]);
 
   // ========================================================================
   // ADD TO CART - Matching Flutter implementation
@@ -910,30 +906,31 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           typeof bundlePrice === "number" ? bundlePrice : undefined;
       }
 
-      // Build base data (always present fields)
+      // ✅ FIX: Ensure all required fields have non-null defaults
+      // Required fields: productId, productName, unitPrice, availableStock, sellerName, sellerId
       const data: Record<string, unknown> = {
-        productId: product.id,
-        productName: product.productName,
-        description: product.description,
-        unitPrice: product.price,
-        currency: product.currency,
-        condition: product.condition,
-        brandModel: product.brandModel,
-        category: product.category,
-        subcategory: product.subcategory,
-        subsubcategory: product.subsubcategory,
-        allImages: product.imageUrls,
-        productImage: product.imageUrls.length > 0 ? product.imageUrls[0] : "",
-        availableStock: product.quantity,
-        averageRating: product.averageRating,
-        reviewCount: product.reviewCount,
-        sellerId: product.userId,
-        sellerName: product.sellerName,
+        productId: product.id || "",
+        productName: product.productName || "Product",
+        description: product.description || "",
+        unitPrice: typeof product.price === "number" ? product.price : 0,
+        currency: product.currency || "TL",
+        condition: product.condition || "New",
+        brandModel: product.brandModel || "",
+        category: product.category || "Uncategorized",
+        subcategory: product.subcategory || "",
+        subsubcategory: product.subsubcategory || "",
+        allImages: Array.isArray(product.imageUrls) ? product.imageUrls : [],
+        productImage: Array.isArray(product.imageUrls) && product.imageUrls.length > 0 ? product.imageUrls[0] : "",
+        availableStock: typeof product.quantity === "number" ? product.quantity : 0,
+        averageRating: typeof product.averageRating === "number" ? product.averageRating : 0,
+        reviewCount: typeof product.reviewCount === "number" ? product.reviewCount : 0,
+        sellerId: product.userId || product.shopId || "unknown",
+        sellerName: product.sellerName || "Seller",
         isShop: product.shopId != null,
-        ilanNo: product.ilanNo,
-        createdAt: product.createdAt,
-        deliveryOption: product.deliveryOption,
-        cachedPrice: product.price,
+        ilanNo: product.ilanNo || "N/A",
+        createdAt: product.createdAt || new Date(),
+        deliveryOption: product.deliveryOption || "Standard",
+        cachedPrice: typeof product.price === "number" ? product.price : 0,
       };
 
       // Add optional fields only if they exist
@@ -1039,38 +1036,43 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       quantity: number
     ) => {
       clearOptimisticUpdate(productId);
-
-      // Remove ALL existing items with this productId - use ref to avoid stale closure
-      const existingItems = cartItemsRef.current.filter(
-        (item) => item.productId !== productId
-      );
-
-      // Mark as optimistic
-      optimisticCacheRef.current.set(productId, {
-        ...productData,
-        quantity,
-        _optimistic: true,
+  
+      // ✅ FIX: Use setState to get current items, not ref
+      setCartItems((currentItems) => {
+        // Remove any existing item with this ID
+        const existingItems = currentItems.filter(
+          (item) => item.productId !== productId
+        );
+  
+        // Mark as optimistic
+        optimisticCacheRef.current.set(productId, {
+          ...productData,
+          quantity,
+          _optimistic: true,
+        });
+  
+        // Create optimistic item
+        try {
+          const optimisticProduct = buildProductFromCartData(productData);
+          const optimisticItem: CartItem = {
+            ...createCartItem(productId, productData, optimisticProduct),
+            isOptimistic: true,
+          };
+  
+          // Add at top
+          return [optimisticItem, ...existingItems];
+        } catch (error) {
+          console.error("Failed to create optimistic item:", error);
+          return currentItems;
+        }
       });
-
+  
       // Update IDs
       const newIds = new Set(cartProductIds);
       newIds.add(productId);
       setCartProductIds(newIds);
       setCartCount(newIds.size);
-
-      // Add optimistic item at top
-      try {
-        const optimisticProduct = buildProductFromCartData(productData);
-        const optimisticItem: CartItem = {
-          ...createCartItem(productId, productData, optimisticProduct),
-          isOptimistic: true,
-        };
-
-        setCartItems([optimisticItem, ...existingItems]);
-      } catch (error) {
-        console.error("Failed to create optimistic item:", error);
-      }
-
+  
       // Set timeout
       const timeout = setTimeout(() => {
         if (optimisticCacheRef.current.has(productId)) {
@@ -1078,7 +1080,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           clearOptimisticUpdate(productId);
         }
       }, OPTIMISTIC_TIMEOUT);
-
+  
       optimisticTimeoutsRef.current.set(productId, timeout);
     },
     [
@@ -1117,59 +1119,54 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       attributes?: CartAttributes
     ): Promise<string> => {
       if (!user) return "Please log in first";
-
-      // ✅ FIX: Ensure listener is active and initialization flag is cleared
       if (!isInitialized) {
-        console.log("🔄 Enabling listener for first add...");
-        isInitializingRef.current = false; // ✅ Clear the flag FIRST
-        setIsInitialized(true);
-        enableLiveUpdates(); // Then start listener
+        await initializeCartIfNeeded();
       }
-
+  
       // Rate limiting
       if (!addToCartLimiterRef.current.canProceed(`add_${product.id}`)) {
         return "Please wait before adding again";
       }
-
+  
       try {
         const productData = buildProductDataForCart(
           product,
           selectedColor,
           attributes
         );
-
+  
         // Clean any nested undefined values
         const cleanedProductData = cleanFirestoreData(productData) as Record<
           string,
           unknown
         >;
-
-        // Optimistic update
+  
+        // ✅ STEP 2: Apply optimistic update for instant feedback
         applyOptimisticAdd(product.id, productData, quantity);
-
-        // Write to Firestore
+  
+        // ✅ STEP 3: Write to Firestore
         await setDoc(doc(db, "users", user.uid, "cart", product.id), {
           ...cleanedProductData,
           quantity,
           addedAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
-
+  
         // Metrics logging
         const shopId = await getProductShopId(product.id);
         metricsEventService.logCartAdded({
           productId: product.id,
           shopId,
         });
-
+  
         console.log("✅ Added to cart:", product.id);
-
+  
         // Invalidate totals cache
         redisRef.current.invalidateCartTotals(user.uid);
-
+  
         // Background refresh totals
         backgroundRefreshTotals();
-
+  
         return "Added to cart";
       } catch (error) {
         console.error("❌ Add to cart error:", error);
@@ -1853,26 +1850,41 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     cartItemsRef.current = cartItems;
   }, [cartItems]);
 
+ 
+
   // Initialize cart when user logs in or clear on logout
   useEffect(() => {
-    if (user && !isInitialized) {
-      // User logged in - initialize cart
+    if (!user) {
+      // ✅ User logged out - clear everything
+      if (isInitialized) {
+        console.log("🔴 User logged out, clearing cart...");
+        disableLiveUpdates();
+        setCartCount(0);
+        setCartProductIds(new Set());
+        setCartItems([]);
+        setIsInitialized(false);
+        setIsLoading(false);
+        optimisticCacheRef.current.clear();
+        optimisticTimeoutsRef.current.forEach((timer) => clearTimeout(timer));
+        optimisticTimeoutsRef.current.clear();
+        quantityUpdateLocksRef.current.clear();
+      }
+      return;
+    }
+  
+    // ✅ User is logged in
+    if (!isInitialized) {
+      // First time - initialize from Firestore
+      console.log("🔵 User ready, initializing cart...");
       initializeCartIfNeeded();
-    } else if (!user) {
-      // User logged out - clear all data
-      disableLiveUpdates();
-      setCartCount(0);
-      setCartProductIds(new Set());
-      setCartItems([]);
-      setIsInitialized(false);
-      setIsLoading(false);
-      optimisticCacheRef.current.clear();
-      optimisticTimeoutsRef.current.forEach((timer) => clearTimeout(timer));
-      optimisticTimeoutsRef.current.clear();
-      quantityUpdateLocksRef.current.clear();
+    } else if (!unsubscribeCartRef.current) {
+      // ✅ CRITICAL FIX: Already initialized but listener not active
+      // This happens after refresh when isInitialized is already true
+      console.log("🟡 Reattaching listener after refresh...");
+      enableLiveUpdates();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, isInitialized]);
 
   // Cleanup on unmount
   useEffect(() => {
