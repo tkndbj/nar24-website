@@ -354,49 +354,6 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     [localization]
   );
 
-  const [isValidating, setIsValidating] = useState(false);
-  const [showValidationDialog, setShowValidationDialog] = useState(false);
-  const [validationResult, setValidationResult] = useState<{
-    isValid: boolean;
-    errors: Record<string, ValidationMessage>;
-    warnings: Record<string, ValidationMessage>;
-    validatedItems: ValidatedCartItem[];
-  } | null>(null);
-
-  // Replace handleCheckout function
-  const handleCheckout = useCallback(async () => {
-    const selectedIds = Object.entries(selectedProducts)
-      .filter(([, selected]) => selected)
-      .map(([id]) => id);
-
-    if (selectedIds.length === 0) return;
-
-    // ✅ STEP 1: Set loading state
-    setIsValidating(true);
-
-    try {
-      // ✅ STEP 2: Validate cart with Cloud Function
-      const validation = await validateForPayment(selectedIds, false);
-
-      setIsValidating(false);
-
-      // ✅ STEP 3: Check if validation passed
-      if (validation.isValid && Object.keys(validation.warnings).length === 0) {
-        // No issues - proceed directly to payment
-        proceedToPayment(calculatedTotals);
-      } else {
-        // Has errors or warnings - show validation dialog
-        setValidationResult(validation);
-        setShowValidationDialog(true);
-      }
-    } catch (error) {
-      setIsValidating(false);
-      console.error("❌ Checkout validation error:", error);
-      // Show error to user
-      alert(t("validationFailed") || "Validation failed. Please try again.");
-    }
-  }, [selectedProducts, validateForPayment, t]);
-
   const proceedToPayment = useCallback(
     async (freshTotals: CartTotals) => {
       // ✅ Build pricing map from Cloud Function totals
@@ -478,7 +435,55 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     [cartItems, selectedProducts, onClose, router, t]
   );
 
-  // ✅ NEW: Handle validation dialog continue
+  const [isValidating, setIsValidating] = useState(false);
+  const [showValidationDialog, setShowValidationDialog] = useState(false);
+  const [validationResult, setValidationResult] = useState<{
+    isValid: boolean;
+    errors: Record<string, ValidationMessage>;
+    warnings: Record<string, ValidationMessage>;
+    validatedItems: ValidatedCartItem[];
+  } | null>(null);
+
+  const handleCheckout = useCallback(async () => {
+    const selectedIds = Object.entries(selectedProducts)
+      .filter(([, selected]) => selected)
+      .map(([id]) => id);
+
+    if (selectedIds.length === 0) return;
+
+    setIsValidating(true);
+
+    try {
+      // ✅ STEP 1: Validate cart
+      const validation = await validateForPayment(selectedIds, false);
+
+      setIsValidating(false);
+
+      if (validation.isValid && Object.keys(validation.warnings).length === 0) {
+        // ✅ STEP 2: Calculate FRESH totals (like Flutter)
+        console.log("💰 Calculating fresh totals before payment...");
+        const freshTotals = await calculateCartTotals(selectedIds);
+        console.log("💰 Fresh totals:", freshTotals);
+
+        // ✅ STEP 3: Proceed with fresh totals
+        proceedToPayment(freshTotals);
+      } else {
+        setValidationResult(validation);
+        setShowValidationDialog(true);
+      }
+    } catch (error) {
+      setIsValidating(false);
+      console.error("❌ Checkout validation error:", error);
+      alert(t("validationFailed") || "Validation failed. Please try again.");
+    }
+  }, [
+    selectedProducts,
+    validateForPayment,
+    calculateCartTotals,
+    proceedToPayment,
+    t,
+  ]);
+
   const handleValidationContinue = useCallback(async () => {
     if (!validationResult) return;
 
@@ -486,12 +491,12 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     setShowValidationDialog(false);
 
     try {
-      // Update cart cache with fresh values
+      // Update cart cache
       if (validationResult.validatedItems.length > 0) {
         await updateCartCacheFromValidation(validationResult.validatedItems);
       }
 
-      // Remove error items from selection
+      // Remove error items
       const errorIds = Object.keys(validationResult.errors);
       setSelectedProducts((prev) => {
         const updated = { ...prev };
@@ -499,7 +504,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
         return updated;
       });
 
-      // Get valid items only
+      // Get valid IDs
       const validIds = validationResult.validatedItems
         .map((item) => item.productId)
         .filter((id) => !errorIds.includes(id));
@@ -507,12 +512,13 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
       setIsValidating(false);
 
       if (validIds.length > 0) {
-        // Recalculate totals with fresh data
-        const totals = await calculateCartTotals(validIds);
-        setCalculatedTotals(totals);
+        // ✅ Calculate FRESH totals (like Flutter)
+        console.log("💰 Calculating fresh totals after validation...");
+        const freshTotals = await calculateCartTotals(validIds);
+        console.log("💰 Fresh totals:", freshTotals);
 
-        // Proceed to payment
-        proceedToPayment(totals);
+        // ✅ Proceed with fresh totals
+        proceedToPayment(freshTotals);
       } else {
         alert(t("noValidItemsToCheckout") || "No valid items to checkout");
       }

@@ -394,7 +394,7 @@ const ProductDetailRelatedProducts: React.FC<
                   msOverflowStyle: "none",
                   paddingBottom: "0",
                   paddingLeft: isMobile ? "4px" : "0",
-                  gap: "0px",
+                  gap: isMobile ? "8px" : "0px",
                 }}
               >
                 {relatedProducts.map((product, index) => (
@@ -404,7 +404,7 @@ const ProductDetailRelatedProducts: React.FC<
                     style={{
                       width: `${cardWidth}px`,
                       minWidth: `${cardWidth}px`,
-                      marginRight: index < relatedProducts.length - 1 ? "-20px" : "0px",
+                      marginRight: index < relatedProducts.length - 1 ? (isMobile ? "0px" : "-20px") : "0px",
                     }}
                   >
                     <ProductCard

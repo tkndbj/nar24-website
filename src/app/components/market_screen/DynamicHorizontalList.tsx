@@ -33,26 +33,42 @@ interface DynamicListData {
 }
 
 // Shimmer loading component
-const ShimmerCard: React.FC<{ width?: number }> = ({ width = 205 }) => (
-  <div
-    className="animate-pulse bg-gray-300 dark:bg-gray-600 rounded-lg"
-    style={{ width: `${width}px` }}
-  />
-);
+const ShimmerCard: React.FC<{ width?: number; isMobile?: boolean }> = ({ width, isMobile }) => {
+  // Match the actual product card width - wider on mobile for better visibility
+  const cardWidth = width || (isMobile ? 180 : 205);
+
+  return (
+    <div
+      className="animate-pulse bg-gray-300 dark:bg-gray-600 rounded-lg"
+      style={{ width: `${cardWidth}px` }}
+    />
+  );
+};
 
 const ShimmerList: React.FC<{ height: number; count?: number }> = ({
   height,
   count = 5,
-}) => (
-  <div
-    className="flex gap-6 px-2 justify-center"
-    style={{ height: `${height}px` }}
-  >
-    {Array.from({ length: count }, (_, index) => (
-      <ShimmerCard key={index} />
-    ))}
-  </div>
-);
+}) => {
+  const [isMobile, setIsMobile] = React.useState(false);
+
+  React.useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  return (
+    <div
+      className="flex gap-6 px-2 justify-center"
+      style={{ height: `${height}px` }}
+    >
+      {Array.from({ length: count }, (_, index) => (
+        <ShimmerCard key={index} isMobile={isMobile} />
+      ))}
+    </div>
+  );
+};
 
 // Single Dynamic List Component
 const DynamicList: React.FC<{

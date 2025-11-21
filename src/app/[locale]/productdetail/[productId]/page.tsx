@@ -735,9 +735,9 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
             {/* Action Buttons - Show when scrolled past original buttons */}
             <div
-              className={`flex items-center gap-1.5 transition-all duration-300 overflow-hidden ${
+              className={`flex items-center gap-1.5 sm:gap-2 transition-all duration-300 overflow-hidden ${
                 showHeaderButtons
-                  ? "max-w-[280px] sm:max-w-[320px] opacity-100"
+                  ? "max-w-[320px] sm:max-w-[360px] opacity-100"
                   : "max-w-0 opacity-0"
               }`}
             >
@@ -745,7 +745,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                 onClick={() => handleAddToCart()}
                 disabled={isProcessing || isAddToCartDisabled}
                 className={`
-                  py-1.5 px-2 sm:px-3 rounded-lg font-semibold text-[10px] sm:text-xs transition-all duration-300 flex items-center justify-center gap-1 whitespace-nowrap
+                  py-1.5 sm:py-2 px-2.5 sm:px-3 rounded-lg font-semibold text-[11px] sm:text-xs transition-all duration-300 flex items-center justify-center gap-1 sm:gap-1.5 whitespace-nowrap
                   ${
                     productInCart && cartButtonState === "idle"
                       ? isDarkMode
@@ -761,13 +761,13 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                   ${isProcessing || isAddToCartDisabled ? "opacity-50 cursor-not-allowed" : ""}
                 `}
               >
-                <span className="hidden sm:inline">{cartButtonContent.icon}</span>
+                <span className="inline">{cartButtonContent.icon}</span>
                 <span>{cartButtonContent.text}</span>
               </button>
 
               <button
                 onClick={handleBuyNow}
-                className={`py-1.5 px-2 sm:px-3 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white rounded-lg font-semibold text-[10px] sm:text-xs transition-all duration-300 flex items-center justify-center whitespace-nowrap shadow-lg`}
+                className={`py-1.5 sm:py-2 px-2.5 sm:px-3 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white rounded-lg font-semibold text-[11px] sm:text-xs transition-all duration-300 flex items-center justify-center whitespace-nowrap shadow-lg`}
               >
                 {t("buyNow")}
               </button>

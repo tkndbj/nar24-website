@@ -9,7 +9,7 @@ import { useTranslations } from "next-intl";
 import { usePersonalizedRecommendations } from "@/context/PersonalizedRecommendationsProvider";
 
 // ✅ MATCHES FLUTTER: Shimmer component
-const ShimmerCard = React.memo(({ isDarkMode }: { isDarkMode: boolean }) => {
+const ShimmerCard = React.memo(({ isDarkMode, isMobile }: { isDarkMode: boolean; isMobile?: boolean }) => {
   const baseColor = isDarkMode
     ? "rgba(40, 37, 58, 1)"
     : "rgb(229, 231, 235)";
@@ -17,11 +17,14 @@ const ShimmerCard = React.memo(({ isDarkMode }: { isDarkMode: boolean }) => {
     ? "rgba(60, 57, 78, 1)"
     : "rgb(243, 244, 246)";
 
+  // Match the actual product card width - wider on mobile for better visibility
+  const cardWidth = isMobile ? "180px" : "205px";
+
   return (
     <div
       className="rounded-lg"
       style={{
-        width: "205px",
+        width: cardWidth,
         height: "100%",
         background: baseColor,
         animation: "shimmer 1.5s infinite",
@@ -34,16 +37,27 @@ const ShimmerCard = React.memo(({ isDarkMode }: { isDarkMode: boolean }) => {
 ShimmerCard.displayName = 'ShimmerCard';
 
 // ✅ MATCHES FLUTTER: Shimmer list
-const ShimmerList = React.memo(({ rowHeight, isDarkMode }: { rowHeight: number; isDarkMode: boolean }) => (
-  <div
-    className="flex gap-6 px-2 justify-center"
-    style={{ height: `${rowHeight - 60}px` }}
-  >
-    {[0, 1, 2, 3, 4].map((index) => (
-      <ShimmerCard key={index} isDarkMode={isDarkMode} />
-    ))}
-  </div>
-));
+const ShimmerList = React.memo(({ rowHeight, isDarkMode }: { rowHeight: number; isDarkMode: boolean }) => {
+  const [isMobile, setIsMobile] = React.useState(false);
+
+  React.useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  return (
+    <div
+      className="flex gap-6 px-2 justify-center"
+      style={{ height: `${rowHeight - 60}px` }}
+    >
+      {[0, 1, 2, 3, 4].map((index) => (
+        <ShimmerCard key={index} isDarkMode={isDarkMode} isMobile={isMobile} />
+      ))}
+    </div>
+  );
+});
 ShimmerList.displayName = 'ShimmerList';
 
 interface PreferenceProductProps {
