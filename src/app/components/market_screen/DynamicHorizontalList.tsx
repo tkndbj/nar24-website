@@ -75,9 +75,10 @@ const ShimmerList: React.FC<{
 const DynamicList: React.FC<{
   listData: DynamicListData;
   portraitImageHeight: number;
+  infoAreaHeight: number;
   rowHeight: number;
   keyPrefix?: string;
-}> = ({ listData, portraitImageHeight, rowHeight, keyPrefix = '' }) => {
+}> = ({ listData, portraitImageHeight, infoAreaHeight, rowHeight, keyPrefix = '' }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -557,6 +558,7 @@ export default function DynamicHorizontalList({ keyPrefix = '' }: DynamicHorizon
             <DynamicList
               listData={listData}
               portraitImageHeight={portraitImageHeight}
+              infoAreaHeight={infoAreaHeight}
               rowHeight={rowHeight}
               keyPrefix={keyPrefix}
             />
