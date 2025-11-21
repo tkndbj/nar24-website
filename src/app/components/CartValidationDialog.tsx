@@ -539,7 +539,7 @@ interface WarningProductCardProps {
   }
 
 const WarningProductCard: React.FC<WarningProductCardProps> = ({
-  productId,
+  
   warningData,
   product,
   validatedItem,
