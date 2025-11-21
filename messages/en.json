@@ -1,4 +1,7 @@
 {
+  "common": {
+    "cancel": "Cancel"
+  },
   "buyerCategoryWomen": "Women",
   "buyerCategoryMen": "Men",
   "buyerSubcategoryFashion": "Fashion",
@@ -3442,7 +3445,38 @@
     },
     "validation": {
       "fillAllFields": "Please fill in all required fields",
-      "addImageForColor": "Please add an image for {{color}} color"
+      "addImageForColor": "Please add an image for {{color}} color",
+      "unknownError": "An unknown error occurred",
+      "unknownProduct": "Unknown Product",
+      "productNotAvailable": "Product is not available",
+      "productCurrentlyUnavailable": "Product is currently unavailable",
+      "outOfStock": "Out of stock",
+      "insufficientStock": "Insufficient stock: {{available}} available, {{requested}} requested",
+      "maxQuantityExceeded": "Maximum quantity exceeded: {{maxQuantity}} allowed",
+      "priceChanged": "Price changed: {{currency}} {{oldPrice}} → {{currency}} {{newPrice}}",
+      "bundlePriceChanged": "Bundle price changed: {{currency}} {{oldPrice}} → {{currency}} {{newPrice}}",
+      "discountUpdated": "Discount updated: {{oldDiscount}}% → {{newDiscount}}%",
+      "discountThresholdChanged": "Discount threshold changed: Buy {{oldThreshold}}+ → Buy {{newThreshold}}+",
+      "maxQuantityReduced": "Maximum quantity reduced: {{oldMax}} → {{newMax}}",
+      "reservationFailed": "Failed to reserve stock. Please try again.",
+      "errorOccurred": "An error occurred while processing",
+      "price": "Price",
+      "bundlePrice": "Bundle Price",
+      "discount": "Discount",
+      "discountThreshold": "Discount Threshold",
+      "buy": "Buy",
+      "maxQuantity": "Max Quantity",
+      "bothIssues": "{{errorCount}} errors and {{warningCount}} warnings detected",
+      "errorsCount": "{{count}} error(s) detected",
+      "warningsCount": "{{count}} warning(s) detected",
+      "issuesDetected": "Issues Detected",
+      "errorsTitle": "Products with Errors",
+      "warningsTitle": "Products with Changes",
+      "color": "Color",
+      "willBeRemoved": "This product will be removed from your cart",
+      "acceptChange": "I accept this change",
+      "continueWithoutErrors": "Continue with Valid Products",
+      "continueWithChanges": "Continue with Changes"
     },
     "buttons": {
       "processing": "Processing...",

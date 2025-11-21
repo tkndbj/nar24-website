@@ -34,13 +34,9 @@ interface DynamicListData {
 
 // Shimmer loading component
 const ShimmerCard: React.FC<{ width?: number; isMobile?: boolean }> = ({ width, isMobile }) => {
-  // Match the actual product card width - wider on mobile for better visibility
-  const cardWidth = width || (isMobile ? 180 : 205);
-
   return (
     <div
-      className="animate-pulse bg-gray-300 dark:bg-gray-600 rounded-lg"
-      style={{ width: `${cardWidth}px` }}
+      className="animate-pulse bg-gray-300 dark:bg-gray-600 rounded-lg w-full h-full"
     />
   );
 };
@@ -60,11 +56,13 @@ const ShimmerList: React.FC<{ height: number; count?: number }> = ({
 
   return (
     <div
-      className="flex gap-6 px-2 justify-center"
+      className="flex gap-0 px-0 lg:px-2"
       style={{ height: `${height}px` }}
     >
       {Array.from({ length: count }, (_, index) => (
-        <ShimmerCard key={index} isMobile={isMobile} />
+        <div key={index} className="flex-shrink-0" style={{ width: isMobile ? "180px" : "205px" }}>
+          <ShimmerCard isMobile={isMobile} />
+        </div>
       ))}
     </div>
   );

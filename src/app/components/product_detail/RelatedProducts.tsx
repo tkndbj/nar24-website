@@ -413,6 +413,7 @@ const ProductDetailRelatedProducts: React.FC<
                       internalScaleFactor={1.1}
                       showCartIcon={true}
                       showExtraLabels={false}
+                      localization={localization}
                       onFavoriteToggle={(productId) => {
                         console.log("Toggle favorite for:", productId);
                       }}

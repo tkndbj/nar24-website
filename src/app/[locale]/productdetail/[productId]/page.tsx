@@ -318,7 +318,11 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
       // Check if user has scrolled past the action buttons
       if (actionButtonsRef.current) {
         const buttonRect = actionButtonsRef.current.getBoundingClientRect();
-        const headerHeight = 64 + 52; // MarketHeader (64px) + Product header (~52px)
+        // Responsive header height: mobile has smaller headers
+        const isMobileView = window.innerWidth < 640;
+        const marketHeaderHeight = 64; // MarketHeader height
+        const productHeaderHeight = isMobileView ? 48 : 52; // Product detail header
+        const headerHeight = marketHeaderHeight + productHeaderHeight;
 
         // Show header buttons when original buttons scroll above viewport + header
         if (buttonRect.bottom < headerHeight) {
@@ -716,6 +720,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
             ? "bg-gray-900/95 border-gray-700"
             : "bg-white/95 border-gray-200"
         }`}
+        style={{ position: "sticky" }}
       >
         <div className="w-full px-3 py-2 sm:max-w-6xl sm:mx-auto sm:px-4 sm:py-3">
           <div className="flex items-center justify-between gap-2">
@@ -735,17 +740,20 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
             {/* Action Buttons - Show when scrolled past original buttons */}
             <div
-              className={`flex items-center gap-1.5 sm:gap-2 transition-all duration-300 overflow-hidden ${
+              className={`flex items-center gap-1.5 sm:gap-2 transition-all duration-500 ease-in-out overflow-hidden ${
                 showHeaderButtons
-                  ? "max-w-[320px] sm:max-w-[360px] opacity-100"
+                  ? "max-w-[400px] sm:max-w-[420px] opacity-100"
                   : "max-w-0 opacity-0"
               }`}
+              style={{
+                transitionProperty: "max-width, opacity",
+              }}
             >
               <button
                 onClick={() => handleAddToCart()}
                 disabled={isProcessing || isAddToCartDisabled}
                 className={`
-                  py-1.5 sm:py-2 px-2.5 sm:px-3 rounded-lg font-semibold text-[11px] sm:text-xs transition-all duration-300 flex items-center justify-center gap-1 sm:gap-1.5 whitespace-nowrap
+                  py-2 px-3 rounded-lg font-semibold text-xs transition-all duration-300 flex items-center justify-center gap-1.5 whitespace-nowrap flex-shrink-0
                   ${
                     productInCart && cartButtonState === "idle"
                       ? isDarkMode
@@ -767,7 +775,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
               <button
                 onClick={handleBuyNow}
-                className={`py-1.5 sm:py-2 px-2.5 sm:px-3 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white rounded-lg font-semibold text-[11px] sm:text-xs transition-all duration-300 flex items-center justify-center whitespace-nowrap shadow-lg`}
+                className={`py-2 px-3 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white rounded-lg font-semibold text-xs transition-all duration-300 flex items-center justify-center whitespace-nowrap shadow-lg flex-shrink-0`}
               >
                 {t("buyNow")}
               </button>

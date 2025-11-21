@@ -467,7 +467,7 @@ export default function ProductPaymentPage() {
 
   const [isAddressExpanded, setIsAddressExpanded] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
   const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(
@@ -479,6 +479,41 @@ export default function ProductPaymentPage() {
   const [mapsLoaded, setMapsLoaded] = useState(false);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Dark mode detection
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const detectDarkMode = () => {
+      const htmlElement = document.documentElement;
+      const darkModeMediaQuery = window.matchMedia(
+        "(prefers-color-scheme: dark)"
+      );
+
+      const isDark =
+        htmlElement.classList.contains("dark") ||
+        htmlElement.getAttribute("data-theme") === "dark" ||
+        darkModeMediaQuery.matches;
+
+      setIsDarkMode(isDark);
+    };
+
+    detectDarkMode();
+
+    const observer = new MutationObserver(detectDarkMode);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class", "data-theme"],
+    });
+
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    mediaQuery.addEventListener("change", detectDarkMode);
+
+    return () => {
+      observer.disconnect();
+      mediaQuery.removeEventListener("change", detectDarkMode);
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window !== "undefined") {

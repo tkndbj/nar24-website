@@ -1,4 +1,7 @@
 {
+  "common": {
+    "cancel": "İptal"
+  },
   "buyerCategoryWomen": "Kadın",
   "buyerCategoryMen": "Erkek",
   "buyerSubcategoryFashion": "Moda",
@@ -3454,7 +3457,38 @@
     },
     "validation": {
       "fillAllFields": "Lütfen tüm gerekli alanları doldurun",
-      "addImageForColor": "Lütfen {{color}} rengi için resim ekleyin"
+      "addImageForColor": "Lütfen {{color}} rengi için resim ekleyin",
+      "unknownError": "Bilinmeyen bir hata oluştu",
+      "unknownProduct": "Bilinmeyen Ürün",
+      "productNotAvailable": "Ürün mevcut değil",
+      "productCurrentlyUnavailable": "Ürün şu anda mevcut değil",
+      "outOfStock": "Stokta yok",
+      "insufficientStock": "Yetersiz stok: {{available}} mevcut, {{requested}} talep edildi",
+      "maxQuantityExceeded": "Maksimum adet aşıldı: {{maxQuantity}} izin verilir",
+      "priceChanged": "Fiyat değişti: {{currency}} {{oldPrice}} → {{currency}} {{newPrice}}",
+      "bundlePriceChanged": "Paket fiyatı değişti: {{currency}} {{oldPrice}} → {{currency}} {{newPrice}}",
+      "discountUpdated": "İndirim güncellendi: %{{oldDiscount}} → %{{newDiscount}}",
+      "discountThresholdChanged": "İndirim eşiği değişti: {{oldThreshold}}+ Al → {{newThreshold}}+ Al",
+      "maxQuantityReduced": "Maksimum adet azaltıldı: {{oldMax}} → {{newMax}}",
+      "reservationFailed": "Stok rezerve edilemedi. Lütfen tekrar deneyin.",
+      "errorOccurred": "İşlem sırasında bir hata oluştu",
+      "price": "Fiyat",
+      "bundlePrice": "Paket Fiyatı",
+      "discount": "İndirim",
+      "discountThreshold": "İndirim Eşiği",
+      "buy": "Al",
+      "maxQuantity": "Maksimum Adet",
+      "bothIssues": "{{errorCount}} hata ve {{warningCount}} uyarı tespit edildi",
+      "errorsCount": "{{count}} hata tespit edildi",
+      "warningsCount": "{{count}} uyarı tespit edildi",
+      "issuesDetected": "Sorunlar Tespit Edildi",
+      "errorsTitle": "Hatalı Ürünler",
+      "warningsTitle": "Değişiklik Olan Ürünler",
+      "color": "Renk",
+      "willBeRemoved": "Bu ürün sepetinizden çıkarılacak",
+      "acceptChange": "Bu değişikliği kabul ediyorum",
+      "continueWithoutErrors": "Geçerli Ürünlerle Devam Et",
+      "continueWithChanges": "Değişikliklerle Devam Et"
     },
     "buttons": {
       "processing": "İşleniyor...",

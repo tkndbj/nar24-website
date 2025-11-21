@@ -17,15 +17,10 @@ const ShimmerCard = React.memo(({ isDarkMode, isMobile }: { isDarkMode: boolean;
     ? "rgba(60, 57, 78, 1)"
     : "rgb(243, 244, 246)";
 
-  // Match the actual product card width - wider on mobile for better visibility
-  const cardWidth = isMobile ? "180px" : "205px";
-
   return (
     <div
-      className="rounded-lg"
+      className="rounded-lg w-full h-full"
       style={{
-        width: cardWidth,
-        height: "100%",
         background: baseColor,
         animation: "shimmer 1.5s infinite",
         backgroundImage: `linear-gradient(90deg, ${baseColor} 25%, ${highlightColor} 50%, ${baseColor} 75%)`,
@@ -49,11 +44,13 @@ const ShimmerList = React.memo(({ rowHeight, isDarkMode }: { rowHeight: number; 
 
   return (
     <div
-      className="flex gap-6 px-2 justify-center"
+      className="flex gap-0 px-0 lg:px-2"
       style={{ height: `${rowHeight - 60}px` }}
     >
       {[0, 1, 2, 3, 4].map((index) => (
-        <ShimmerCard key={index} isDarkMode={isDarkMode} isMobile={isMobile} />
+        <div key={index} className="flex-shrink-0" style={{ width: isMobile ? "180px" : "205px" }}>
+          <ShimmerCard isDarkMode={isDarkMode} isMobile={isMobile} />
+        </div>
       ))}
     </div>
   );
