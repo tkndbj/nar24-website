@@ -800,13 +800,16 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
         setIsInitialized(true);
 
+        // Clear initializing flag BEFORE enabling listener to avoid race condition
+        isInitializingRef.current = false;
+
         // Enable listener AFTER initialization
         enableLiveUpdates();
       } catch (error) {
         console.error("❌ Init error:", error);
+        isInitializingRef.current = false;
       } finally {
         setIsLoading(false);
-        isInitializingRef.current = false;
       }
     })();
 
