@@ -617,43 +617,53 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
   const processCartChanges = useCallback(
     async (changes: DocumentChange<FirestoreCartData>[]) => {
-      const itemsMap = new Map<string, CartItem>();
-
-      // Start with current items - use ref to avoid stale closure
-      // Include ALL items initially, we'll replace optimistic ones with real data
-      cartItemsRef.current.forEach((item) => {
-        itemsMap.set(item.productId, item);
-      });
-
-      // Process changes - these will override any optimistic items
-      for (const change of changes) {
-        const productId = change.doc.id;
-        const cartData = change.doc.data();
-
-        if (change.type === "added" || change.type === "modified") {
-          if (cartData && hasRequiredFields(cartData)) {
-            try {
-              const product = buildProductFromCartData(cartData);
-              const newItem = createCartItem(productId, cartData, product);
-              // Replace any existing item (including optimistic ones)
-              itemsMap.set(productId, newItem);
-              clearOptimisticUpdate(productId);
-            } catch (error) {
-              console.error(`Failed to process ${productId}:`, error);
-            }
-          } else {
-            console.warn(`⚠️ Item ${productId} missing required fields, keeping optimistic version if exists`);
-          }
-        } else if (change.type === "removed") {
-          itemsMap.delete(productId);
-          clearOptimisticUpdate(productId);
-        }
+      // ✅ FIX: Don't rely on cartItemsRef - build from scratch using changes
+      // This is the correct approach for real-time listeners
+      
+      if (changes.length === 0) {
+        return; // No changes to process
       }
 
-      // Deduplicate by productId
-      const uniqueItems = Array.from(itemsMap.values());
-      sortCartItems(uniqueItems);
-      setCartItems(uniqueItems);
+      // Get current items from state, not ref (to avoid stale closure)
+      setCartItems((currentItems) => {
+        const itemsMap = new Map<string, CartItem>();
+
+        // Start with current items
+        currentItems.forEach((item) => {
+          itemsMap.set(item.productId, item);
+        });
+
+        // Process changes
+        for (const change of changes) {
+          const productId = change.doc.id;
+          const cartData = change.doc.data();
+
+          if (change.type === "added" || change.type === "modified") {
+            if (cartData && hasRequiredFields(cartData)) {
+              try {
+                const product = buildProductFromCartData(cartData);
+                const newItem = createCartItem(productId, cartData, product);
+                // Replace any existing item (including optimistic ones)
+                itemsMap.set(productId, newItem);
+                clearOptimisticUpdate(productId);
+              } catch (error) {
+                console.error(`Failed to process ${productId}:`, error);
+              }
+            } else {
+              console.warn(`⚠️ Item ${productId} missing required fields, keeping existing version if exists`);
+            }
+          } else if (change.type === "removed") {
+            itemsMap.delete(productId);
+            clearOptimisticUpdate(productId);
+          }
+        }
+
+        // Deduplicate by productId
+        const uniqueItems = Array.from(itemsMap.values());
+        sortCartItems(uniqueItems);
+        
+        return uniqueItems;
+      });
 
       // Invalidate Redis cache
       if (user) {
