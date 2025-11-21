@@ -731,6 +731,15 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
     };
   }, [cartButtonState, actualIsInCart, isDarkMode]);
 
+  // Check if add to cart should be disabled
+  const isAddToCartDisabled = useMemo(() => {
+    // Disable if quantity is 0 AND no color options available
+    const hasNoStock = product.quantity === 0;
+    const hasColorOptions = product.colorQuantities && Object.keys(product.colorQuantities).length > 0;
+
+    return hasNoStock && !hasColorOptions;
+  }, [product]);
+
   // ✅ Get favorite button content (matches Flutter states)
   const getFavoriteButtonContent = useCallback(() => {
     if (
@@ -1188,12 +1197,14 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
             {/* Cart Icon */}
             {showCartIcon && (
               <button
-                className="w-6 h-6 flex items-center justify-center transform -translate-y-1 transition-all hover:scale-110 relative overflow-hidden"
+                className={`w-6 h-6 flex items-center justify-center transform -translate-y-1 transition-all hover:scale-110 relative overflow-hidden ${
+                  isAddToCartDisabled ? "opacity-50 cursor-not-allowed" : ""
+                }`}
                 onClick={(e) => {
                   e.stopPropagation();
                   handleAddToCart();
                 }}
-                disabled={isProcessingCart}
+                disabled={isProcessingCart || isAddToCartDisabled}
               >
                 <span
                   className={`transition-all duration-300 ${

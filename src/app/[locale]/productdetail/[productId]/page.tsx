@@ -711,6 +711,17 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     t,
   ]);
 
+  // Check if add to cart button should be disabled
+  const isAddToCartDisabled = useMemo(() => {
+    if (!product) return false;
+
+    // Disable if quantity is 0 AND no color options available
+    const hasNoStock = product.quantity === 0;
+    const hasColorOptions = product.colorQuantities && Object.keys(product.colorQuantities).length > 0;
+
+    return hasNoStock && !hasColorOptions;
+  }, [product]);
+
   useEffect(() => {
     if (!product) return;
 
@@ -812,7 +823,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
             >
               <button
                 onClick={() => handleAddToCart()}
-                disabled={isProcessing}
+                disabled={isProcessing || isAddToCartDisabled}
                 className={`
                   py-1.5 px-2 sm:px-3 rounded-lg font-semibold text-[10px] sm:text-xs transition-all duration-300 flex items-center justify-center gap-1 whitespace-nowrap
                   ${
@@ -827,7 +838,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                       ? "border border-orange-500 text-orange-400 hover:bg-orange-900/20"
                       : "border border-orange-500 text-orange-600 hover:bg-orange-50"
                   }
-                  ${isProcessing ? "opacity-75 cursor-not-allowed" : ""}
+                  ${isProcessing || isAddToCartDisabled ? "opacity-50 cursor-not-allowed" : ""}
                 `}
               >
                 <span className="hidden sm:inline">{cartButtonContent.icon}</span>
@@ -1092,7 +1103,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
             <div ref={actionButtonsRef} className="flex gap-2 sm:gap-3 pt-1 sm:pt-2">
               <button
                 onClick={() => handleAddToCart()}
-                disabled={isProcessing}
+                disabled={isProcessing || isAddToCartDisabled}
                 className={`
                   flex-1 py-2 px-3 sm:py-2.5 sm:px-4 rounded-lg font-semibold text-xs sm:text-sm transition-all duration-300 flex items-center justify-center gap-1.5 sm:gap-2 relative overflow-hidden
                   ${
@@ -1107,7 +1118,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                       ? "border-2 border-orange-500 text-orange-400 hover:bg-orange-900/20"
                       : "border-2 border-orange-500 text-orange-600 hover:bg-orange-50"
                   }
-                  ${isProcessing ? "opacity-75 cursor-not-allowed" : ""}
+                  ${isProcessing || isAddToCartDisabled ? "opacity-50 cursor-not-allowed" : ""}
                   ${
                     cartButtonState === "added" || cartButtonState === "removed"
                       ? "transform scale-105"
