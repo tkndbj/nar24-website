@@ -699,13 +699,49 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
       updateCartIds(snapshot.docs);
 
+      // ✅ FIX: Handle both changes AND full snapshots
       if (snapshot.docChanges().length > 0) {
         processCartChanges(snapshot.docChanges());
+      } else if (snapshot.docs.length > 0) {
+        // ✅ NEW: If no changes but docs exist, it's the initial snapshot after refresh
+        // Build items from all docs
+        console.log("📦 Processing initial snapshot with", snapshot.docs.length, "docs");
+        
+        setCartItems((currentItems) => {
+          const itemsMap = new Map<string, CartItem>();
+
+          // Start with current items (might be empty after refresh)
+          currentItems.forEach((item) => {
+            itemsMap.set(item.productId, item);
+          });
+
+          // Process ALL documents as "added" changes
+          for (const doc of snapshot.docs) {
+            const productId = doc.id;
+            const cartData = doc.data();
+
+            if (cartData && hasRequiredFields(cartData)) {
+              try {
+                const product = buildProductFromCartData(cartData);
+                const newItem = createCartItem(productId, cartData, product);
+                itemsMap.set(productId, newItem);
+                clearOptimisticUpdate(productId);
+              } catch (error) {
+                console.error(`Failed to process ${productId}:`, error);
+              }
+            }
+          }
+
+          const uniqueItems = Array.from(itemsMap.values());
+          sortCartItems(uniqueItems);
+          
+          return uniqueItems;
+        });
       } else if (snapshot.docs.length === 0) {
         setCartItems([]);
       }
     },
-    [updateCartIds, processCartChanges]
+    [updateCartIds, processCartChanges, hasRequiredFields, buildProductFromCartData, createCartItem, clearOptimisticUpdate, sortCartItems]
   );
 
   const enableLiveUpdates = useCallback(() => {
