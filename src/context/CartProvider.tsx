@@ -1072,6 +1072,13 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     ): Promise<string> => {
       if (!user) return "Please log in first";
 
+      // ✅ FIX: Ensure cart is initialized before adding first product
+      // This ensures the real-time listener is running to clear optimistic updates
+      if (!isInitialized) {
+        console.log("🔄 Initializing cart before first add...");
+        await initializeCartIfNeeded();
+      }
+
       // Rate limiting
       if (!addToCartLimiterRef.current.canProceed(`add_${product.id}`)) {
         return "Please wait before adding again";
@@ -1126,6 +1133,8 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     [
       user,
       db,
+      isInitialized,
+      initializeCartIfNeeded,
       buildProductDataForCart,
       applyOptimisticAdd,
       rollbackOptimisticUpdate,
