@@ -144,7 +144,7 @@ const MAX_IMAGES = 3;
 
 export default function ReviewsPage() {
   const router = useRouter();
-  const { user, profileData } = useUser();
+  const { user } = useUser();
   const t = useTranslations("Reviews");
 
   // ============================================================================
