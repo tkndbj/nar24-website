@@ -7,24 +7,22 @@ import {
   Plus,
   Minus,
   Check,
-  Loader2,
   MoveHorizontal,
   MoveVertical,
+  AlertCircle,
+  ShoppingBag,
 } from "lucide-react";
 import { doc, getDoc } from "firebase/firestore";
 import { useTranslations } from "next-intl";
 import { db } from "@/lib/firebase";
 import { useUser } from "@/context/UserProvider";
 import { AttributeLocalizationUtils } from "@/constants/AttributeLocalization";
-import { Product } from "@/app/models/Product";
+import { Product, ProductUtils } from "@/app/models/Product";
 
 interface SalePreferences {
   maxQuantity?: number;
   discountThreshold?: number;
-  discountPercentage?: number;
-  acceptOffers?: boolean;
-  minOffer?: number;
-  quickSale?: boolean;
+  bulkDiscountPercentage?: number;
 }
 
 interface OptionSelectorResult {
@@ -63,6 +61,9 @@ interface AttributeChipProps {
   isDarkMode?: boolean;
 }
 
+// ============================================================================
+// COLOR THUMBNAIL COMPONENT
+// ============================================================================
 const ColorThumb: React.FC<ColorThumbProps> = ({
   colorKey,
   imageUrl,
@@ -78,13 +79,13 @@ const ColorThumb: React.FC<ColorThumbProps> = ({
       onClick={disabled ? undefined : onSelect}
       disabled={disabled}
       className={`
-        relative flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden border-2 transition-all duration-200 mx-1
+        relative flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden border transition-all duration-200 mx-1
         ${
           isSelected
-            ? "border-orange-500 border-3 shadow-lg"
+            ? "border-orange-500 border-[3px] shadow-lg"
             : isDarkMode
-            ? "border-gray-600 hover:border-orange-400"
-            : "border-gray-300 hover:border-orange-400"
+            ? "border-gray-600 border-2 hover:border-orange-400"
+            : "border-gray-300 border-2 hover:border-orange-400"
         }
         ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
       `}
@@ -92,7 +93,7 @@ const ColorThumb: React.FC<ColorThumbProps> = ({
       <img
         src={imageUrl}
         alt={label || `${t("color")} ${colorKey}`}
-        className="w-full h-full object-cover"
+        className={`w-full h-full object-cover ${disabled ? "grayscale" : ""}`}
         onError={(e) => {
           const target = e.target as HTMLImageElement;
           target.style.display = "none";
@@ -106,28 +107,33 @@ const ColorThumb: React.FC<ColorThumbProps> = ({
           isDarkMode ? "bg-gray-700" : "bg-gray-200"
         }`}
       >
-        <div className="w-6 h-6 bg-gray-400 rounded" />
+        <AlertCircle className="w-6 h-6 text-gray-400" />
       </div>
 
-      {/* Disabled overlay */}
+      {/* Disabled overlay (matches Flutter's black overlay) */}
       {disabled && (
-        <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
-          <span className="text-white text-xs font-bold text-center px-1 bg-black/70 rounded px-2 py-1">
+        <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
+          <span className="text-white text-[11px] font-bold text-center px-2 py-1">
             {t("noStock")}
           </span>
         </div>
       )}
 
-      {/* Selected indicator */}
+      {/* Selected indicator (matches Flutter's check circle) */}
       {isSelected && !disabled && (
         <div className="absolute inset-0 flex items-center justify-center">
-          <Check className="w-6 h-6 text-orange-500 bg-white rounded-full p-1" />
+          <div className="bg-white rounded-full p-0.5">
+            <Check className="w-5 h-5 text-orange-500" strokeWidth={3} />
+          </div>
         </div>
       )}
     </button>
   );
 };
 
+// ============================================================================
+// ATTRIBUTE CHIP COMPONENT
+// ============================================================================
 const AttributeChip: React.FC<AttributeChipProps> = ({
   label,
   isSelected,
@@ -138,13 +144,13 @@ const AttributeChip: React.FC<AttributeChipProps> = ({
     <button
       onClick={onSelect}
       className={`
-        px-4 py-2 rounded-full border transition-all duration-200 text-sm font-medium mx-1 mb-2
+        px-4 py-2.5 rounded-full border transition-all duration-200 text-sm mx-1 mb-2
         ${
           isSelected
-            ? "border-orange-500 border-2 text-orange-500 bg-orange-50 dark:bg-orange-950"
+            ? "border-orange-500 border-2 text-orange-500 font-semibold"
             : isDarkMode
-            ? "border-gray-600 text-gray-300 hover:border-orange-400"
-            : "border-gray-300 text-gray-700 hover:border-orange-400"
+            ? "border-gray-600 border text-gray-300 hover:border-orange-400 font-medium"
+            : "border-gray-300 border text-gray-700 hover:border-orange-400 font-medium"
         }
       `}
     >
@@ -153,59 +159,93 @@ const AttributeChip: React.FC<AttributeChipProps> = ({
   );
 };
 
+// ============================================================================
+// LOADING SHIMMER COMPONENT (matches Flutter)
+// ============================================================================
+const LoadingShimmer: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => {
+  return (
+    <div className="p-4 space-y-4">
+      {/* Color selector shimmer */}
+      <div className="flex gap-2">
+        {[1, 2, 3].map((i) => (
+          <div
+            key={i}
+            className={`w-20 h-20 rounded-xl animate-pulse ${
+              isDarkMode ? "bg-gray-700" : "bg-gray-200"
+            }`}
+          />
+        ))}
+      </div>
+
+      {/* Options shimmer */}
+      <div
+        className={`w-full h-10 rounded-lg animate-pulse ${
+          isDarkMode ? "bg-gray-700" : "bg-gray-200"
+        }`}
+      />
+      <div
+        className={`w-full h-10 rounded-lg animate-pulse ${
+          isDarkMode ? "bg-gray-700" : "bg-gray-200"
+        }`}
+      />
+    </div>
+  );
+};
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
 const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
-  product,
+  product: initialProduct,
   isOpen,
   onClose,
   onConfirm,
   isDarkMode = false,
   localization,
 }) => {
-  // Auto-detect dark mode if not provided as prop
-  const [detectedDarkMode, setDetectedDarkMode] = React.useState(false);
+  const { user } = useUser();
 
-  React.useEffect(() => {
-    if (typeof document !== "undefined") {
-      const checkTheme = () => {
-        setDetectedDarkMode(
-          document.documentElement.classList.contains("dark")
-        );
-      };
+  // ============================================================================
+  // STATE - Matching Flutter exactly
+  // ============================================================================
+  const [selections, setSelections] = useState<Record<string, string>>({});
+  const [selectedColor, setSelectedColor] = useState<string | null>(null);
+  const [selectedQuantity, setSelectedQuantity] = useState(1);
 
-      checkTheme();
-      const observer = new MutationObserver(checkTheme);
-      observer.observe(document.documentElement, {
-        attributes: true,
-        attributeFilter: ["class"],
-      });
+  // Curtain dimensions
+  const [curtainWidth, setCurtainWidth] = useState("");
+  const [curtainHeight, setCurtainHeight] = useState("");
 
-      return () => observer.disconnect();
-    }
-  }, []);
+  // Sale preferences
+  const [salePreferences, setSalePreferences] =
+    useState<SalePreferences | null>(null);
 
-  // ✅ FIXED: Proper nested translation function that uses JSON files
+  // ✅ CRITICAL: Fresh product state (matches Flutter)
+  const [freshProduct, setFreshProduct] = useState<Product | null>(null);
+  const [isLoadingProduct, setIsLoadingProduct] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  // ✅ Use fresh product with fallback (matches Flutter)
+  const currentProduct = freshProduct || initialProduct;
+
+  // ============================================================================
+  // TRANSLATION HELPER
+  // ============================================================================
   const t = useCallback(
     (key: string) => {
-      if (!localization) {
-        return key;
-      }
+      if (!localization) return key;
 
       try {
-        // Try to get the nested ProductOptionSelector translation
         const translation = localization(`ProductOptionSelector.${key}`);
-
-        // Check if we got a valid translation (not the same as the key we requested)
         if (translation && translation !== `ProductOptionSelector.${key}`) {
           return translation;
         }
 
-        // If nested translation doesn't exist, try direct key
         const directTranslation = localization(key);
         if (directTranslation && directTranslation !== key) {
           return directTranslation;
         }
 
-        // Return the key as fallback
         return key;
       } catch (error) {
         console.warn(`Translation error for key: ${key}`, error);
@@ -215,130 +255,31 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
     [localization]
   );
 
-  // Use provided isDarkMode prop or auto-detected value
-  const actualDarkMode = isDarkMode || detectedDarkMode;
-  const { user } = useUser();
+  // ============================================================================
+  // COMPUTED PROPERTIES (matching Flutter getters)
+  // ============================================================================
+  const hasColors = useMemo(() => {
+    const colorImages = currentProduct.colorImages;
+    return (
+      colorImages != null &&
+      typeof colorImages === "object" &&
+      Object.keys(colorImages).length > 0
+    );
+  }, [currentProduct.colorImages]);
 
-  const [selections, setSelections] = useState<Record<string, string>>({});
-  const [selectedColor, setSelectedColor] = useState<string | null>(null);
-  const [selectedQuantity, setSelectedQuantity] = useState(1);
-
-  // Curtain dimension states
-  const [curtainWidth, setCurtainWidth] = useState("");
-  const [curtainHeight, setCurtainHeight] = useState("");
-
-  const [salePreferences, setSalePreferences] =
-    useState<SalePreferences | null>(null);
-  const [isLoadingSalePrefs, setIsLoadingSalePrefs] = useState(false);
-
-  // Check if product is a curtain
   const isCurtain = useMemo(() => {
-    return product.subsubcategory?.toLowerCase() === "curtains";
-  }, [product.subsubcategory]);
-
-  // Initialize default selections and load sale preferences
-  useEffect(() => {
-    if (!isOpen) return;
-
-    // Initialize default selections for single-option attributes
-    const newSelections: Record<string, string> = {};
-    Object.entries(product.attributes || {}).forEach(([key, value]) => {
-      let options: string[] = [];
-
-      if (Array.isArray(value)) {
-        options = value
-          .map((item) => item.toString())
-          .filter((item) => item.trim() !== "");
-      } else if (typeof value === "string" && value.trim() !== "") {
-        options = value
-          .split(",")
-          .map((item) => item.trim())
-          .filter((item) => item !== "");
-      }
-
-      // Auto-select single options
-      if (options.length === 1) {
-        newSelections[key] = options[0];
-      }
-    });
-
-    setSelections(newSelections);
-
-    // Auto-select default color if no color options available
-    if (Object.keys(product.colorImages || {}).length === 0) {
-      setSelectedColor("default");
-    } else {
-      setSelectedColor(null);
-    }
-
-    setSelectedQuantity(1);
-    setCurtainWidth("");
-    setCurtainHeight("");
-    setSalePreferences(null);
-
-    // Load sale preferences for shop products
-    loadSalePreferences();
-  }, [isOpen, product]);
-
-  const loadSalePreferences = useCallback(async () => {
-    if (!product.reference) return;
-
-    try {
-      setIsLoadingSalePrefs(true);
-
-      // Check if this is a shop product
-      const parentCollection = product.reference.parent?.id;
-      if (parentCollection !== "shop_products") return;
-
-      const salePrefsDoc = await getDoc(
-        doc(db, product.reference.path, "sale_preferences", "preferences")
-      );
-
-      if (salePrefsDoc.exists()) {
-        const prefs = salePrefsDoc.data() as SalePreferences;
-        setSalePreferences(prefs);
-
-        // Adjust quantity if needed
-        const maxAllowed = getMaxQuantityAllowed(prefs);
-        if (selectedQuantity > maxAllowed) {
-          setSelectedQuantity(maxAllowed);
-        }
-      }
-    } catch (error) {
-      console.error("Error loading sale preferences:", error);
-    } finally {
-      setIsLoadingSalePrefs(false);
-    }
-  }, [product.reference, selectedQuantity]);
-
-  const getMaxQuantityAllowed = useCallback(
-    (prefs?: SalePreferences | null) => {
-      const stockQuantity = getMaxQuantity();
-      const preferences = prefs || salePreferences;
-
-      if (!preferences?.maxQuantity) return stockQuantity;
-
-      return Math.min(stockQuantity, preferences.maxQuantity);
-    },
-    [selectedColor, product.quantity, product.colorQuantities, salePreferences]
-  );
-
-  const getMaxQuantity = useCallback(() => {
-    if (selectedColor && selectedColor !== "default") {
-      return product.colorQuantities[selectedColor] || 0;
-    }
-    return product.quantity;
-  }, [selectedColor, product.quantity, product.colorQuantities]);
+    return currentProduct.subsubcategory?.toLowerCase() === "curtains";
+  }, [currentProduct.subsubcategory]);
 
   const getSelectableAttributes = useMemo((): Record<string, string[]> => {
     const selectableAttrs: Record<string, string[]> = {};
 
-    Object.entries(product.attributes || {}).forEach(([key, value]) => {
+    Object.entries(currentProduct.attributes || {}).forEach(([key, value]) => {
       let options: string[] = [];
 
       if (Array.isArray(value)) {
         options = value
-          .map((item) => item.toString())
+          .map((item) => item?.toString() || "")
           .filter((item) => item.trim() !== "");
       } else if (typeof value === "string" && value.trim() !== "") {
         options = value
@@ -354,18 +295,155 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
     });
 
     return selectableAttrs;
-  }, [product.attributes]);
+  }, [currentProduct.attributes]);
 
-  const hasColors = useMemo(() => {
-    // ✅ Add defensive check
-    const colorImages = product.colorImages;
-    return colorImages != null && 
-           typeof colorImages === 'object' && 
-           Object.keys(colorImages).length > 0;
-  }, [product.colorImages]);
+  // ============================================================================
+  // FETCH FRESH PRODUCT DATA (matches Flutter exactly)
+  // ============================================================================
+  const fetchFreshProductData = useCallback(async () => {
+    try {
+      setIsLoadingProduct(true);
+      setLoadError(null);
 
-  // Validate curtain dimensions
-  const validateCurtainDimensions = useCallback(() => {
+      // ✅ Try shop_products first (optimization matching Flutter)
+      const shopProductDoc = await getDoc(
+        doc(db, "shop_products", initialProduct.id)
+      );
+
+      let validDoc = null;
+
+      if (shopProductDoc.exists()) {
+        validDoc = shopProductDoc;
+      } else {
+        // Fallback to products collection
+        const productsDoc = await getDoc(
+          doc(db, "products", initialProduct.id)
+        );
+        if (productsDoc.exists()) {
+          validDoc = productsDoc;
+        }
+      }
+
+      if (!validDoc || !validDoc.exists()) {
+        setLoadError("Product not found");
+        setIsLoadingProduct(false);
+        return;
+      }
+
+      // Parse fresh product
+      const data = validDoc.data();
+      const fresh = ProductUtils.fromJson({
+        ...data,
+        id: validDoc.id,
+      });
+
+      setFreshProduct(fresh);
+      setIsLoadingProduct(false);
+    } catch (error) {
+      console.error("❌ Error fetching fresh product:", error);
+      setLoadError("Failed to load product details");
+      setIsLoadingProduct(false);
+    }
+  }, [initialProduct.id]);
+
+  // ============================================================================
+  // LOAD SALE PREFERENCES (matches Flutter)
+  // ============================================================================
+  const loadSalePreferencesFromProduct = useCallback(() => {
+    if (
+      currentProduct.maxQuantity != null ||
+      currentProduct.discountThreshold != null ||
+      currentProduct.bulkDiscountPercentage != null
+    ) {
+      const prefs: SalePreferences = {};
+
+      if (currentProduct.maxQuantity != null) {
+        prefs.maxQuantity = currentProduct.maxQuantity;
+      }
+      if (currentProduct.discountThreshold != null) {
+        prefs.discountThreshold = currentProduct.discountThreshold;
+      }
+      if (currentProduct.bulkDiscountPercentage != null) {
+        prefs.bulkDiscountPercentage = currentProduct.bulkDiscountPercentage;
+      }
+
+      setSalePreferences(prefs);
+
+      // Adjust quantity if needed
+      const maxAllowed = getMaxQuantityAllowed(prefs);
+      if (selectedQuantity > maxAllowed) {
+        setSelectedQuantity(maxAllowed);
+      }
+    }
+  }, [
+    currentProduct.maxQuantity,
+    currentProduct.discountThreshold,
+    currentProduct.bulkDiscountPercentage,
+    selectedQuantity,
+  ]);
+
+  // ============================================================================
+  // INITIALIZE DEFAULT SELECTIONS (matches Flutter)
+  // ============================================================================
+  const initializeDefaultSelections = useCallback(() => {
+    const newSelections: Record<string, string> = {};
+
+    Object.entries(currentProduct.attributes || {}).forEach(([key, value]) => {
+      let options: string[] = [];
+
+      if (Array.isArray(value)) {
+        options = value
+          .map((item) => item?.toString() || "")
+          .filter((item) => item.trim() !== "");
+      } else if (typeof value === "string" && value.trim() !== "") {
+        options = value
+          .split(",")
+          .map((item) => item.trim())
+          .filter((item) => item !== "");
+      }
+
+      // Auto-select single options (matches Flutter)
+      if (options.length === 1) {
+        newSelections[key] = options[0];
+      }
+    });
+
+    setSelections(newSelections);
+
+    // Auto-select default color if no color options (matches Flutter)
+    if (!hasColors) {
+      setSelectedColor("default");
+    } else {
+      setSelectedColor(null);
+    }
+  }, [currentProduct.attributes, hasColors]);
+
+  // ============================================================================
+  // QUANTITY HELPERS (matching Flutter)
+  // ============================================================================
+  const getMaxQuantity = useCallback((): number => {
+    if (selectedColor && selectedColor !== "default") {
+      return currentProduct.colorQuantities?.[selectedColor] || 0;
+    }
+    return currentProduct.quantity || 0;
+  }, [selectedColor, currentProduct.quantity, currentProduct.colorQuantities]);
+
+  const getMaxQuantityAllowed = useCallback(
+    (prefs?: SalePreferences | null): number => {
+      const stockQuantity = getMaxQuantity();
+      const preferences = prefs || salePreferences;
+
+      if (!preferences?.maxQuantity) return stockQuantity;
+
+      return Math.min(stockQuantity, preferences.maxQuantity);
+    },
+    [getMaxQuantity, salePreferences]
+  );
+
+  // ============================================================================
+  // CURTAIN VALIDATION (matches Flutter)
+  // ============================================================================
+  const validateCurtainDimensions = useCallback((): boolean => {
     if (!isCurtain) return true;
 
     const widthText = curtainWidth.trim();
@@ -379,9 +457,8 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
     if (isNaN(width) || width <= 0) return false;
     if (isNaN(height) || height <= 0) return false;
 
-    // Check against max dimensions from attributes
-    const maxWidth = product.attributes?.curtainMaxWidth;
-    const maxHeight = product.attributes?.curtainMaxHeight;
+    const maxWidth = currentProduct.attributes?.curtainMaxWidth;
+    const maxHeight = currentProduct.attributes?.curtainMaxHeight;
 
     if (maxWidth != null) {
       const maxW = parseFloat(maxWidth.toString());
@@ -394,20 +471,21 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
     }
 
     return true;
-  }, [isCurtain, curtainWidth, curtainHeight, product.attributes]);
+  }, [isCurtain, curtainWidth, curtainHeight, currentProduct.attributes]);
 
+  // ============================================================================
+  // CONFIRM ENABLED CHECK (matches Flutter exactly)
+  // ============================================================================
   const isConfirmEnabled = useMemo(() => {
-    // For curtains, check dimensions instead of quantity
     if (isCurtain) {
       if (!validateCurtainDimensions()) return false;
     }
 
-    // Only check color if product has color options
-    if (hasColors && !selectedColor) return false;
+    if (hasColors && selectedColor == null) return false;
 
-    // Check if all selectable attributes have been selected
-    for (const key of Object.keys(getSelectableAttributes)) {
-      if (!selections[key]) return false;
+    const selectableAttrs = getSelectableAttributes;
+    for (const key of Object.keys(selectableAttrs)) {
+      if (selections[key] == null) return false;
     }
 
     return true;
@@ -420,46 +498,51 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
     getSelectableAttributes,
   ]);
 
-  const handleConfirm = useCallback(() => {
-   
-  
-    const result: OptionSelectorResult = {
-      quantity: isCurtain ? 1 : selectedQuantity,
-      ...selections,
-    };
-  
-    if (isCurtain) {
-      result.curtainWidth = parseFloat(curtainWidth.trim());
-      result.curtainHeight = parseFloat(curtainHeight.trim());
+  // ============================================================================
+  // INITIALIZATION EFFECT (matches Flutter)
+  // ============================================================================
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // Reset state
+    setSelectedQuantity(1);
+    setCurtainWidth("");
+    setCurtainHeight("");
+    setSalePreferences(null);
+
+    // Fetch fresh product data
+    fetchFreshProductData();
+  }, [isOpen, fetchFreshProductData]);
+
+  // Initialize after fresh data loaded
+  useEffect(() => {
+    if (!isLoadingProduct && freshProduct) {
+      loadSalePreferencesFromProduct();
+      initializeDefaultSelections();
     }
-  
-    if (selectedColor) {
-      result.selectedColor = selectedColor;
-  
-      // ✅ ADD SAFE ACCESS to colorImages
-      if (selectedColor !== "default") {
-        const colorImages = product.colorImages?.[selectedColor];
-        if (colorImages && Array.isArray(colorImages) && colorImages.length > 0) {
-          result.selectedColorImage = colorImages[0];
-        }
-      } else if (product.imageUrls && product.imageUrls.length > 0) {
-        result.selectedColorImage = product.imageUrls[0];
-      }
-    }
-  
-    onConfirm(result);
   }, [
-    isConfirmEnabled,
-    selectedQuantity,
-    selections,
-    selectedColor,
-    product,
-    onConfirm,
-    isCurtain,
-    curtainWidth,
-    curtainHeight,
+    isLoadingProduct,
+    freshProduct,
+    loadSalePreferencesFromProduct,
+    initializeDefaultSelections,
   ]);
 
+  // ============================================================================
+  // QUANTITY ADJUSTMENT (matches Flutter)
+  // ============================================================================
+  useEffect(() => {
+    const safeMax = getMaxQuantityAllowed();
+
+    if (safeMax <= 0) {
+      setSelectedQuantity(1);
+    } else {
+      setSelectedQuantity((prev) => Math.max(1, Math.min(prev, safeMax)));
+    }
+  }, [selectedColor, salePreferences, getMaxQuantityAllowed]);
+
+  // ============================================================================
+  // HANDLERS
+  // ============================================================================
   const handleQuantityChange = useCallback(
     (increment: number) => {
       const maxAllowed = getMaxQuantityAllowed();
@@ -467,75 +550,103 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
 
       if (newQuantity >= 1 && newQuantity <= maxAllowed) {
         setSelectedQuantity(newQuantity);
-
       }
     },
-    [selectedQuantity, getMaxQuantityAllowed, product.id]
+    [selectedQuantity, getMaxQuantityAllowed]
   );
 
-  // Update selected quantity when color changes (to respect color-specific stock limits)
-  useEffect(() => {
-    const maxAllowed = getMaxQuantityAllowed();
-    if (selectedQuantity > maxAllowed) {
-      const adjustedQuantity = Math.max(1, maxAllowed);
-      setSelectedQuantity(adjustedQuantity);
+  const handleConfirm = useCallback(() => {
+    if (!isConfirmEnabled) return;
 
-      
+    const result: OptionSelectorResult = {
+      ...selections,
+      quantity: isCurtain ? 1 : selectedQuantity,
+    };
+
+    if (isCurtain) {
+      result.curtainWidth = parseFloat(curtainWidth.trim());
+      result.curtainHeight = parseFloat(curtainHeight.trim());
     }
+
+    if (hasColors && selectedColor) {
+      result.selectedColor = selectedColor;
+
+      // Add selected color image
+      if (selectedColor !== "default") {
+        const colorImages = currentProduct.colorImages?.[selectedColor];
+        if (
+          colorImages &&
+          Array.isArray(colorImages) &&
+          colorImages.length > 0
+        ) {
+          result.selectedColorImage = colorImages[0];
+        }
+      } else if (
+        currentProduct.imageUrls &&
+        currentProduct.imageUrls.length > 0
+      ) {
+        result.selectedColorImage = currentProduct.imageUrls[0];
+      }
+    }
+
+    onConfirm(result);
   }, [
-    selectedColor,
-    salePreferences,
+    isConfirmEnabled,
+    selections,
+    isCurtain,
     selectedQuantity,
-    getMaxQuantityAllowed,
-    product.id,
+    curtainWidth,
+    curtainHeight,
+    hasColors,
+    selectedColor,
+    currentProduct,
+    onConfirm,
   ]);
 
+  // ============================================================================
+  // RENDER HELPERS
+  // ============================================================================
   const renderSalePreferenceInfo = useCallback(() => {
     if (
       !salePreferences?.discountThreshold ||
-      !salePreferences?.discountPercentage
+      !salePreferences?.bulkDiscountPercentage
     )
       return null;
 
-    const { discountThreshold, discountPercentage } = salePreferences;
+    const { discountThreshold, bulkDiscountPercentage } = salePreferences;
     const hasDiscount = selectedQuantity >= discountThreshold;
 
     return (
       <div
-        className={`mt-4 p-3 rounded-lg border ${
-          actualDarkMode
+        className={`mt-2 p-2 rounded-lg border ${
+          isDarkMode
             ? "bg-blue-900/20 border-blue-800"
             : "bg-blue-50 border-blue-200"
         }`}
       >
-        <div className="text-center">
-          <p
-            className={`text-sm font-medium ${
-              hasDiscount
-                ? "text-green-600 dark:text-green-400"
-                : "text-orange-600 dark:text-orange-400"
-            }`}
-          >
-            {hasDiscount
-              ? `${t("discountApplied")}: ${discountPercentage}%`
-              : `${t("buyText")} ${discountThreshold} ${t(
-                  "forDiscount"
-                )} ${discountPercentage}%!`}
-          </p>
-        </div>
+        <p
+          className={`text-[13px] font-medium text-center ${
+            hasDiscount
+              ? "text-green-600 dark:text-green-400"
+              : "text-orange-600 dark:text-orange-400"
+          }`}
+        >
+          {hasDiscount
+            ? `${t("discountApplied")}: ${bulkDiscountPercentage}%`
+            : `${t("buyText")} ${discountThreshold} ${t(
+                "forDiscount"
+              )} ${bulkDiscountPercentage}%!`}
+        </p>
       </div>
     );
-  }, [salePreferences, selectedQuantity, t, actualDarkMode]);
+  }, [salePreferences, selectedQuantity, t, isDarkMode]);
 
   const renderColorSelector = useCallback(() => {
     if (!hasColors) return null;
-  
-    // ✅ CRITICAL FIX: Add defensive check for colorImages AND colorQuantities
-    const safeColorImages = product.colorImages || {};
-    const safeColorQuantities = product.colorQuantities || {};
-  
-  
-  
+
+    const safeColorImages = currentProduct.colorImages || {};
+    const safeColorQuantities = currentProduct.colorQuantities || {};
+
     return (
       <div className="mb-6">
         <h3 className="text-center text-orange-500 font-bold text-base mb-3">
@@ -545,47 +656,37 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
           className="flex overflow-x-auto pb-2 px-1"
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         >
-          {/* Default option - only show if main imageUrls exist */}
-          {product.imageUrls && product.imageUrls.length > 0 && (
+          {/* Default option */}
+          {currentProduct.imageUrls && currentProduct.imageUrls.length > 0 && (
             <ColorThumb
               colorKey="default"
-              imageUrl={product.imageUrls[0]}
+              imageUrl={currentProduct.imageUrls[0]}
               isSelected={selectedColor === "default"}
-              disabled={product.quantity === 0}
-              isDarkMode={actualDarkMode}
-              onSelect={() => {
-                setSelectedColor("default");
-                
-              }}
+              disabled={currentProduct.quantity === 0}
+              isDarkMode={isDarkMode}
+              onSelect={() => setSelectedColor("default")}
               label={t("default")}
               t={t}
             />
           )}
-  
-          {/* Color options from colorImages - ✅ USE SAFE ACCESS */}
-          {Object.entries(safeColorImages).map(([colorKey, images]) => {
-  // ✅ Ensure images is an array with items
-  if (!images || !Array.isArray(images) || images.length === 0) {
-    return null;
-  }
 
-  // ✅ FIX: Use safeColorQuantities instead of product.colorQuantities
-  const qty = safeColorQuantities[colorKey] || 0;
-  
-  
-            
+          {/* Color options */}
+          {Object.entries(safeColorImages).map(([colorKey, images]) => {
+            if (!images || !Array.isArray(images) || images.length === 0) {
+              return null;
+            }
+
+            const qty = safeColorQuantities[colorKey] || 0;
+
             return (
               <ColorThumb
                 key={colorKey}
                 colorKey={colorKey}
                 imageUrl={images[0]}
                 isSelected={selectedColor === colorKey}
-                disabled={qty === 0}  // ✅ This should now correctly show qty=1 for "Gray"
-                isDarkMode={actualDarkMode}
-                onSelect={() => {
-                  setSelectedColor(colorKey);
-                 
-                }}
+                disabled={qty === 0}
+                isDarkMode={isDarkMode}
+                onSelect={() => setSelectedColor(colorKey)}
                 label={colorKey}
                 t={t}
               />
@@ -594,7 +695,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
         </div>
       </div>
     );
-  }, [hasColors, product, selectedColor, t, actualDarkMode]);
+  }, [hasColors, currentProduct, selectedColor, t, isDarkMode]);
 
   const renderAttributeSelector = useCallback(
     (attributeKey: string, options: string[]) => {
@@ -622,13 +723,12 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
                     : option
                 }
                 isSelected={selections[attributeKey] === option}
-                isDarkMode={actualDarkMode}
+                isDarkMode={isDarkMode}
                 onSelect={() => {
                   setSelections((prev) => ({
                     ...prev,
                     [attributeKey]: option,
                   }));
-                 
                 }}
               />
             ))}
@@ -636,14 +736,14 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
         </div>
       );
     },
-    [selections, localization, product.id, actualDarkMode]
+    [selections, localization, isDarkMode]
   );
 
   const renderCurtainDimensionsInput = useCallback(() => {
     if (!isCurtain) return null;
 
-    const maxWidth = product.attributes?.curtainMaxWidth;
-    const maxHeight = product.attributes?.curtainMaxHeight;
+    const maxWidth = currentProduct.attributes?.curtainMaxWidth;
+    const maxHeight = currentProduct.attributes?.curtainMaxHeight;
 
     const widthValue = parseFloat(curtainWidth);
     const heightValue = parseFloat(curtainHeight);
@@ -665,19 +765,19 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
           {t("curtainDimensions")}
         </h3>
         <div
-          className={`p-3 rounded-lg border ${
-            actualDarkMode
+          className={`p-3 rounded-xl border ${
+            isDarkMode
               ? "bg-gray-800/50 border-gray-700"
               : "bg-gray-50 border-gray-200"
           }`}
         >
-          {/* Width input */}
+          {/* Width */}
           <div className="mb-3">
             <div className="flex items-center gap-2 mb-2">
               <MoveHorizontal className="text-orange-500" size={20} />
               <label
                 className={`text-sm font-medium ${
-                  actualDarkMode ? "text-gray-300" : "text-gray-700"
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
                 }`}
               >
                 {t("maxWidth")}
@@ -690,20 +790,18 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
               value={curtainWidth}
               onChange={(e) => setCurtainWidth(e.target.value)}
               placeholder={`${t("enterValue")} (${t("metersUnit")})`}
-              className={`w-full px-3 py-2 rounded-lg border ${
+              className={`w-full px-3 py-2 rounded-lg border-2 focus:outline-none ${
                 widthExceedsMax
-                  ? "border-red-500 focus:border-red-500 focus:ring-red-500"
-                  : "border-orange-500 focus:border-orange-500 focus:ring-orange-500"
-              } focus:ring-2 focus:outline-none ${
-                actualDarkMode
-                  ? "bg-gray-900 text-white"
-                  : "bg-white text-gray-900"
+                  ? "border-red-500 focus:border-red-500"
+                  : "border-orange-500 focus:border-orange-500"
+              } ${
+                isDarkMode ? "bg-gray-900 text-white" : "bg-white text-gray-900"
               }`}
             />
             {maxWidth != null && (
               <p
                 className={`text-xs mt-1 ${
-                  actualDarkMode ? "text-gray-400" : "text-gray-600"
+                  isDarkMode ? "text-gray-400" : "text-gray-600"
                 }`}
               >
                 {t("maximum")}: {maxWidth.toString()} {t("metersUnit")}
@@ -716,13 +814,13 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
             )}
           </div>
 
-          {/* Height input */}
+          {/* Height */}
           <div>
             <div className="flex items-center gap-2 mb-2">
               <MoveVertical className="text-orange-500" size={20} />
               <label
                 className={`text-sm font-medium ${
-                  actualDarkMode ? "text-gray-300" : "text-gray-700"
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
                 }`}
               >
                 {t("maxHeight")}
@@ -735,20 +833,18 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
               value={curtainHeight}
               onChange={(e) => setCurtainHeight(e.target.value)}
               placeholder={`${t("enterValue")} (${t("metersUnit")})`}
-              className={`w-full px-3 py-2 rounded-lg border ${
+              className={`w-full px-3 py-2 rounded-lg border-2 focus:outline-none ${
                 heightExceedsMax
-                  ? "border-red-500 focus:border-red-500 focus:ring-red-500"
-                  : "border-orange-500 focus:border-orange-500 focus:ring-orange-500"
-              } focus:ring-2 focus:outline-none ${
-                actualDarkMode
-                  ? "bg-gray-900 text-white"
-                  : "bg-white text-gray-900"
+                  ? "border-red-500 focus:border-red-500"
+                  : "border-orange-500 focus:border-orange-500"
+              } ${
+                isDarkMode ? "bg-gray-900 text-white" : "bg-white text-gray-900"
               }`}
             />
             {maxHeight != null && (
               <p
                 className={`text-xs mt-1 ${
-                  actualDarkMode ? "text-gray-400" : "text-gray-600"
+                  isDarkMode ? "text-gray-400" : "text-gray-600"
                 }`}
               >
                 {t("maximum")}: {maxHeight.toString()} {t("metersUnit")}
@@ -767,15 +863,15 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
     isCurtain,
     curtainWidth,
     curtainHeight,
-    product.attributes,
+    currentProduct.attributes,
     t,
-    actualDarkMode,
+    isDarkMode,
   ]);
 
   const renderQuantitySelector = useCallback(() => {
-    if (isCurtain) return null; // Don't show for curtains
+    if (isCurtain) return null;
 
-    const maxAllowed = getMaxQuantityAllowed();
+    const safeMax = getMaxQuantityAllowed();
 
     return (
       <div className="mb-6">
@@ -786,38 +882,39 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
           <button
             onClick={() => handleQuantityChange(-1)}
             disabled={selectedQuantity <= 1}
-            className={`p-2 rounded-full border transition-colors ${
-              actualDarkMode
-                ? "border-gray-600 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed text-white"
-                : "border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`p-2 rounded-full transition-colors ${
+              isDarkMode
+                ? "text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                : "text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
             }`}
           >
-            <Minus size={20} />
+            <Minus size={24} />
           </button>
 
-          <div className="px-4 py-2 border border-orange-500 rounded-lg min-w-[60px] text-center">
-            <span className={`text-lg font-semibold ${actualDarkMode ? "text-white" : ""}`}>{selectedQuantity}</span>
+          <div className="px-4 py-2 border-2 border-orange-500 rounded-lg min-w-[60px] text-center">
+            <span
+              className={`text-lg font-semibold ${
+                isDarkMode ? "text-white" : "text-gray-900"
+              }`}
+            >
+              {selectedQuantity}
+            </span>
           </div>
 
           <button
             onClick={() => handleQuantityChange(1)}
-            disabled={selectedQuantity >= maxAllowed}
-            className={`p-2 rounded-full border transition-colors ${
-              actualDarkMode
-                ? "border-gray-600 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed text-white"
-                : "border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={selectedQuantity >= safeMax}
+            className={`p-2 rounded-full transition-colors ${
+              isDarkMode
+                ? "text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                : "text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
             }`}
           >
-            <Plus size={20} />
+            <Plus size={24} />
           </button>
         </div>
 
-        {/* Loading indicator for sale preferences */}
-        {isLoadingSalePrefs && (
-          <div className="flex justify-center mt-2">
-            <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
-          </div>
-        )}
+        {renderSalePreferenceInfo()}
       </div>
     );
   }, [
@@ -825,21 +922,26 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
     selectedQuantity,
     getMaxQuantityAllowed,
     handleQuantityChange,
-    isLoadingSalePrefs,
     t,
-    actualDarkMode,
+    isDarkMode,
+    renderSalePreferenceInfo,
   ]);
 
-  // Redirect to login if user is not authenticated
-  useEffect(() => {
-    if (isOpen && !user) {
-      onClose();
-    }
-  }, [isOpen, user, onClose]);
+  // ============================================================================
+  // CHECK TOTAL STOCK (matches Flutter)
+  // ============================================================================
+  const totalStock = useMemo(() => {
+    let total = currentProduct.quantity || 0;
+    Object.values(currentProduct.colorQuantities || {}).forEach((qty) => {
+      total += qty || 0;
+    });
+    return total;
+  }, [currentProduct.quantity, currentProduct.colorQuantities]);
 
-  if (!user) {
-    return null;
-  }
+  // ============================================================================
+  // MAIN RENDER
+  // ============================================================================
+  if (!user) return null;
 
   return (
     <AnimatePresence>
@@ -851,8 +953,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 z-[9998]"
-            style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
+            className="fixed inset-0 z-[9998] bg-black/50"
           />
 
           {/* Modal */}
@@ -875,7 +976,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
                 }`}
               >
                 <h2
-                  className={`text-lg font-semibold ${
+                  className={`text-base font-semibold ${
                     isDarkMode ? "text-white" : "text-gray-900"
                   }`}
                 >
@@ -885,7 +986,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
                   onClick={onClose}
                   className={`p-1 rounded-full transition-colors ${
                     isDarkMode
-                      ? "hover:bg-gray-800 text-gray-500"
+                      ? "hover:bg-gray-800 text-gray-400"
                       : "hover:bg-gray-100 text-gray-500"
                   }`}
                 >
@@ -894,64 +995,115 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
               </div>
 
               {/* Content */}
-              <div className="p-4 max-h-[60vh] overflow-y-auto">
-                {/* Color selector - only show if product has color options */}
-                {renderColorSelector()}
-
-                {/* Dynamic attribute selectors */}
-                {Object.entries(getSelectableAttributes).map(([key, options]) =>
-                  renderAttributeSelector(key, options)
-                )}
-
-                {/* Conditional rendering: Curtain dimensions OR Quantity selector */}
-                {isCurtain ? (
-                  renderCurtainDimensionsInput()
+              <div className="max-h-[60vh] overflow-y-auto">
+                {/* ✅ LOADING STATE (matches Flutter shimmer) */}
+                {isLoadingProduct ? (
+                  <LoadingShimmer isDarkMode={isDarkMode} />
+                ) : /* ✅ ERROR STATE (matches Flutter error display) */ loadError ? (
+                  <div className="p-6 flex flex-col items-center">
+                    <AlertCircle size={48} className="text-red-500 mb-4" />
+                    <p
+                      className={`text-base font-medium text-center ${
+                        isDarkMode ? "text-gray-300" : "text-gray-600"
+                      }`}
+                    >
+                      {loadError}
+                    </p>
+                  </div>
+                ) : /* ✅ OUT OF STOCK (matches Flutter out of stock display) */ totalStock <=
+                  0 ? (
+                  <div className="p-6 flex flex-col items-center">
+                    <div
+                      className={`p-3 rounded-full mb-4 ${
+                        isDarkMode ? "bg-gray-800" : "bg-gray-100"
+                      }`}
+                    >
+                      <ShoppingBag size={32} className="text-gray-500" />
+                    </div>
+                    <p
+                      className={`text-base font-medium text-center ${
+                        isDarkMode ? "text-gray-300" : "text-gray-600"
+                      }`}
+                    >
+                      {t("productOutOfStock")}
+                    </p>
+                  </div>
                 ) : (
-                  <>
-                    {renderQuantitySelector()}
-                    {/* Sale preference info */}
-                    {renderSalePreferenceInfo()}
-                  </>
+                  /* ✅ MAIN CONTENT */
+                  <div className="p-4">
+                    {renderColorSelector()}
+
+                    {Object.entries(getSelectableAttributes).map(
+                      ([key, options]) => renderAttributeSelector(key, options)
+                    )}
+
+                    {isCurtain
+                      ? renderCurtainDimensionsInput()
+                      : renderQuantitySelector()}
+                  </div>
                 )}
               </div>
 
               {/* Footer */}
-              <div
-                className={`p-4 border-t space-y-2 ${
-                  isDarkMode ? "border-gray-700" : "border-gray-200"
-                }`}
-              >
-                <button
-                  onClick={handleConfirm}
-                  disabled={!isConfirmEnabled}
-                  className={`
-                    w-full py-3 px-4 rounded-lg font-semibold transition-all duration-200
-                    ${
-                      isConfirmEnabled
-                        ? "bg-orange-500 hover:bg-orange-600 text-white"
-                        : isDarkMode
-                        ? "bg-gray-700 text-gray-500 cursor-not-allowed"
-                        : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                    }
-                  `}
-                >
-                  {t("confirm")}{" "}
-                  {!isCurtain &&
-                    selectedQuantity > 1 &&
-                    `(${selectedQuantity})`}
-                </button>
-
-                <button
-                  onClick={onClose}
-                  className={`w-full py-2 px-4 transition-colors ${
-                    isDarkMode
-                      ? "text-gray-400 hover:text-gray-200"
-                      : "text-gray-600 hover:text-gray-800"
+              {!isLoadingProduct && !loadError && totalStock > 0 && (
+                <div
+                  className={`p-4 border-t ${
+                    isDarkMode ? "border-gray-700" : "border-gray-200"
                   }`}
                 >
-                  {t("cancel")}
-                </button>
-              </div>
+                  <button
+                    onClick={handleConfirm}
+                    disabled={!isConfirmEnabled}
+                    className={`
+                      w-full py-3 px-4 rounded-lg font-semibold transition-all duration-200 text-base
+                      ${
+                        isConfirmEnabled
+                          ? `${
+                              isDarkMode ? "text-white" : "text-white"
+                            } bg-orange-500 hover:bg-orange-600`
+                          : `${
+                              isDarkMode
+                                ? "bg-gray-700 text-gray-500"
+                                : "bg-gray-300 text-gray-500"
+                            } cursor-not-allowed`
+                      }
+                    `}
+                  >
+                    {t("confirm")}
+                  </button>
+
+                  <button
+                    onClick={onClose}
+                    className={`w-full py-2 mt-2 text-sm transition-colors ${
+                      isDarkMode
+                        ? "text-gray-400 hover:text-gray-200"
+                        : "text-gray-600 hover:text-gray-800"
+                    }`}
+                  >
+                    {t("cancel")}
+                  </button>
+                </div>
+              )}
+
+              {/* Error/Loading footer */}
+              {(isLoadingProduct || loadError || totalStock <= 0) && (
+                <div
+                  className={`p-4 border-t ${
+                    isDarkMode ? "border-gray-700" : "border-gray-200"
+                  }`}
+                >
+                  <button
+                    onClick={onClose}
+                    className={`w-full py-3 px-4 rounded-lg font-medium transition-colors ${
+                      isDarkMode
+                        ? "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                  >
+                    {t("close")}
+                  </button>
+                </div>
+              )}
             </div>
           </motion.div>
         </>
