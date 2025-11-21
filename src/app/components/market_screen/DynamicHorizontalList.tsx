@@ -32,12 +32,37 @@ interface DynamicListData {
   limit?: number;  
 }
 
-// Shimmer loading component
-const ShimmerCard: React.FC = () => {
+// Shimmer loading component - matches ProductCard structure
+const ShimmerCard: React.FC<{
+  portraitImageHeight: number;
+  infoAreaHeight: number;
+  scaleFactor: number;
+}> = ({ portraitImageHeight, infoAreaHeight, scaleFactor }) => {
+  const cardHeight = (portraitImageHeight + infoAreaHeight) * scaleFactor;
+  const imageHeight = portraitImageHeight * scaleFactor;
+  const infoHeight = infoAreaHeight * scaleFactor;
+
   return (
     <div
-      className="animate-pulse bg-gray-300 dark:bg-gray-600 rounded-lg w-full h-full"
-    />
+      className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-sm"
+      style={{ height: `${cardHeight}px` }}
+    >
+      {/* Image area */}
+      <div
+        className="w-full bg-gray-200 dark:bg-gray-700 animate-pulse"
+        style={{ height: `${imageHeight}px` }}
+      />
+
+      {/* Info area */}
+      <div className="p-2 space-y-2" style={{ height: `${infoHeight}px` }}>
+        {/* Title skeleton */}
+        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-3/4" />
+        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-1/2" />
+
+        {/* Price skeleton */}
+        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-2/5 mt-auto" />
+      </div>
+    </div>
   );
 };
 
@@ -54,17 +79,18 @@ const ShimmerList: React.FC<{
   infoAreaHeight,
   scaleFactor,
 }) => {
-  // Calculate exact card height to match ProductCard
-  const cardHeight = (portraitImageHeight + infoAreaHeight) * scaleFactor;
-
   return (
     <div
-      className="flex gap-0 px-0 lg:px-2"
+      className="flex gap-2 px-0 lg:px-2 overflow-hidden"
       style={{ height: `${height}px` }}
     >
       {Array.from({ length: count }, (_, index) => (
-        <div key={index} className="flex-shrink-0" style={{ width: "205px", height: `${cardHeight}px` }}>
-          <ShimmerCard />
+        <div key={index} className="flex-shrink-0" style={{ width: "190px" }}>
+          <ShimmerCard
+            portraitImageHeight={portraitImageHeight}
+            infoAreaHeight={infoAreaHeight}
+            scaleFactor={scaleFactor}
+          />
         </div>
       ))}
     </div>

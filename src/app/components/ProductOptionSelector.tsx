@@ -851,7 +851,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 z-50"
+            className="fixed inset-0 z-[9998]"
             style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
           />
 
@@ -861,7 +861,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 100 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed inset-x-0 bottom-0 z-50 max-h-[90vh]"
+            className="fixed inset-x-0 bottom-0 z-[9999] max-h-[90vh]"
           >
             <div
               className={`rounded-t-2xl shadow-2xl max-w-lg mx-auto ${

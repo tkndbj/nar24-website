@@ -8,48 +8,69 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { usePersonalizedRecommendations } from "@/context/PersonalizedRecommendationsProvider";
 
-// ✅ MATCHES FLUTTER: Shimmer component
-const ShimmerCard = React.memo(({ isDarkMode }: { isDarkMode: boolean }) => {
-  const baseColor = isDarkMode
-    ? "rgba(40, 37, 58, 1)"
-    : "rgb(229, 231, 235)";
-  const highlightColor = isDarkMode
-    ? "rgba(60, 57, 78, 1)"
-    : "rgb(243, 244, 246)";
-
-  return (
-    <div
-      className="rounded-lg w-full h-full"
-      style={{
-        background: baseColor,
-        animation: "shimmer 1.5s infinite",
-        backgroundImage: `linear-gradient(90deg, ${baseColor} 25%, ${highlightColor} 50%, ${baseColor} 75%)`,
-        backgroundSize: "200% 100%",
-      }}
-    />
-  );
-});
-ShimmerCard.displayName = 'ShimmerCard';
-
-// ✅ MATCHES FLUTTER: Shimmer list
-const ShimmerList = React.memo(({ rowHeight, isDarkMode, portraitImageHeight, infoAreaHeight, scaleFactor }: {
-  rowHeight: number;
-  isDarkMode: boolean;
+// Shimmer loading component - matches ProductCard structure
+const ShimmerCard = React.memo(({
+  portraitImageHeight,
+  infoAreaHeight,
+  scaleFactor
+}: {
   portraitImageHeight: number;
   infoAreaHeight: number;
   scaleFactor: number;
 }) => {
-  // Calculate exact card height to match ProductCard
   const cardHeight = (portraitImageHeight + infoAreaHeight) * scaleFactor;
+  const imageHeight = portraitImageHeight * scaleFactor;
+  const infoHeight = infoAreaHeight * scaleFactor;
 
   return (
     <div
-      className="flex gap-0 px-0 lg:px-2"
+      className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-sm"
+      style={{ height: `${cardHeight}px` }}
+    >
+      {/* Image area */}
+      <div
+        className="w-full bg-gray-200 dark:bg-gray-700 animate-pulse"
+        style={{ height: `${imageHeight}px` }}
+      />
+
+      {/* Info area */}
+      <div className="p-2 space-y-2" style={{ height: `${infoHeight}px` }}>
+        {/* Title skeleton */}
+        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-3/4" />
+        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-1/2" />
+
+        {/* Price skeleton */}
+        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-2/5 mt-auto" />
+      </div>
+    </div>
+  );
+});
+ShimmerCard.displayName = 'ShimmerCard';
+
+// Shimmer list
+const ShimmerList = React.memo(({
+  rowHeight,
+  portraitImageHeight,
+  infoAreaHeight,
+  scaleFactor
+}: {
+  rowHeight: number;
+  portraitImageHeight: number;
+  infoAreaHeight: number;
+  scaleFactor: number;
+}) => {
+  return (
+    <div
+      className="flex gap-2 px-0 lg:px-2 overflow-hidden"
       style={{ height: `${rowHeight - 60}px` }}
     >
       {[0, 1, 2, 3, 4].map((index) => (
-        <div key={index} className="flex-shrink-0" style={{ width: "205px", height: `${cardHeight}px` }}>
-          <ShimmerCard isDarkMode={isDarkMode} />
+        <div key={index} className="flex-shrink-0" style={{ width: "190px" }}>
+          <ShimmerCard
+            portraitImageHeight={portraitImageHeight}
+            infoAreaHeight={infoAreaHeight}
+            scaleFactor={scaleFactor}
+          />
         </div>
       ))}
     </div>
@@ -205,7 +226,6 @@ export const PreferenceProduct = React.memo(({ keyPrefix = '' }: PreferenceProdu
           {isLoading && recommendations.length === 0 ? (
             <ShimmerList
               rowHeight={rowHeight}
-              isDarkMode={isDarkMode}
               portraitImageHeight={portraitImageHeight}
               infoAreaHeight={infoAreaHeight}
               scaleFactor={scaleFactor}
