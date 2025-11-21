@@ -490,41 +490,43 @@ export default function ProductPaymentPage() {
         const items = JSON.parse(decodeURIComponent(itemsParam));
         setCartItems(items);
 
+        // ✅ ALWAYS use URL total param (from Cloud Function)
         if (totalParam) {
-          setTotalPrice(parseFloat(totalParam));
+          const cfTotal = parseFloat(totalParam);
+          console.log("💰 Using Cloud Function total from URL:", cfTotal);
+          setTotalPrice(cfTotal);
         } else {
-          const total = items.reduce((sum: number, item: CartItem) => {
-            return sum + (item.price || 0) * item.quantity;
-          }, 0);
-          setTotalPrice(total);
+          console.error("❌ Missing total parameter in URL!");
+          // Redirect back if total is missing
+          router.push("/cart");
+          return;
         }
       } catch (error) {
         console.error("Error parsing cart items:", error);
         router.push("/");
       }
     } else {
+      // ✅ Load from localStorage (set by CartDrawer)
       const savedCart = localStorage.getItem("cartItems");
       const savedTotal = localStorage.getItem("cartTotal");
 
-      if (savedCart) {
+      if (savedCart && savedTotal) {
         try {
           const items = JSON.parse(savedCart);
-          setCartItems(items);
+          const cfTotal = parseFloat(savedTotal);
 
-          if (savedTotal) {
-            setTotalPrice(parseFloat(savedTotal));
-          } else {
-            const total = items.reduce((sum: number, item: CartItem) => {
-              return sum + (item.price || 0) * item.quantity;
-            }, 0);
-            setTotalPrice(total);
-          }
+          console.log("💰 Using Cloud Function total from localStorage:", cfTotal);
+          console.log("📦 Cart items:", items.length);
+
+          setCartItems(items);
+          setTotalPrice(cfTotal);
         } catch (error) {
           console.error("Error parsing saved cart:", error);
           router.push("/");
         }
       } else {
-        router.push("/");
+        console.warn("⚠️ No cart data found, redirecting to cart page");
+        router.push("/cart");
       }
     }
   }, [searchParams, router]);
