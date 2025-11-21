@@ -386,7 +386,7 @@ const handleCheckout = useCallback(async () => {
       Object.keys(validation.warnings).length === 0
     ) {
       // No issues - proceed directly to payment
-      proceedToPayment(selectedIds);
+      proceedToPayment(selectedIds, calculatedTotals);
     } else {
       // Has errors or warnings - show validation dialog
       setValidationResult(validation);
@@ -401,9 +401,9 @@ const handleCheckout = useCallback(async () => {
 }, [selectedProducts, validateForPayment, t]);
 
 const proceedToPayment = useCallback(
-  async (selectedIds: string[]) => {
+  async (selectedIds: string[], freshTotals: CartTotals) => {  // ✅ Take totals as param
     const pricingMap = new Map();
-    calculatedTotals.items.forEach((itemTotal) => {
+    freshTotals.items.forEach((itemTotal) => {  // ✅ Use fresh totals
       pricingMap.set(itemTotal.productId, itemTotal);
     });
 
@@ -443,12 +443,12 @@ const proceedToPayment = useCallback(
       });
 
     localStorage.setItem("cartItems", JSON.stringify(paymentItems));
-    localStorage.setItem("cartTotal", calculatedTotals.total.toString());
+    localStorage.setItem("cartTotal", freshTotals.total.toString());
 
     onClose();
-    router.push(`/productpayment?total=${calculatedTotals.total}`);
+    router.push(`/productpayment?total=${freshTotals.total}`);
   },
-  [cartItems, calculatedTotals, onClose, router]
+  [cartItems, onClose, router]
 );
 
 // ✅ NEW: Handle validation dialog continue
@@ -485,7 +485,7 @@ const handleValidationContinue = useCallback(async () => {
       setCalculatedTotals(totals);
 
       // Proceed to payment
-      proceedToPayment(validIds);
+      proceedToPayment(validIds, totals);
     } else {
       alert(t("noValidItemsToCheckout") || "No valid items to checkout");
     }
