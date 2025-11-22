@@ -368,18 +368,13 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
       }
 
       setSalePreferences(prefs);
-
-      // Adjust quantity if needed
-      const maxAllowed = getMaxQuantityAllowed(prefs);
-      if (selectedQuantity > maxAllowed) {
-        setSelectedQuantity(maxAllowed);
-      }
+      // ✅ REMOVED the quantity adjustment - let the useEffect handle it
     }
   }, [
     currentProduct.maxQuantity,
     currentProduct.discountThreshold,
     currentProduct.bulkDiscountPercentage,
-    selectedQuantity,
+    // ✅ REMOVED selectedQuantity dependency
   ]);
 
   // ============================================================================
@@ -527,32 +522,90 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
     initializeDefaultSelections,
   ]);
 
-  // ============================================================================
-  // QUANTITY ADJUSTMENT (matches Flutter)
-  // ============================================================================
   useEffect(() => {
-    const safeMax = getMaxQuantityAllowed();
+    setSelectedQuantity((prevQuantity) => {
+      // Calculate current max
+      let stockQuantity = 0;
 
-    if (safeMax <= 0) {
-      setSelectedQuantity(1);
-    } else {
-      setSelectedQuantity((prev) => Math.max(1, Math.min(prev, safeMax)));
-    }
-  }, [selectedColor, salePreferences, getMaxQuantityAllowed]);
+      if (selectedColor && selectedColor !== "default") {
+        stockQuantity = currentProduct.colorQuantities?.[selectedColor] || 0;
+      } else {
+        stockQuantity = currentProduct.quantity || 0;
+      }
+
+      let maxAllowed = stockQuantity;
+      if (salePreferences?.maxQuantity) {
+        maxAllowed = Math.min(stockQuantity, salePreferences.maxQuantity);
+      }
+
+      // Only change if current quantity exceeds max
+      if (prevQuantity > maxAllowed && maxAllowed > 0) {
+        return maxAllowed;
+      }
+
+      // If no stock, set to 1 (will be disabled by UI)
+      if (maxAllowed === 0) {
+        return 1;
+      }
+
+      // Otherwise keep current quantity
+      return prevQuantity;
+    });
+  }, [
+    selectedColor,
+    currentProduct.quantity,
+    currentProduct.colorQuantities,
+    salePreferences,
+  ]);
 
   // ============================================================================
   // HANDLERS
   // ============================================================================
   const handleQuantityChange = useCallback(
     (increment: number) => {
-      const maxAllowed = getMaxQuantityAllowed();
-      const newQuantity = selectedQuantity + increment;
+      setSelectedQuantity((prevQuantity) => {
+        // ✅ Calculate max stock directly here (fresh values)
+        let stockQuantity = 0;
 
-      if (newQuantity >= 1 && newQuantity <= maxAllowed) {
-        setSelectedQuantity(newQuantity);
-      }
+        if (selectedColor && selectedColor !== "default") {
+          // Use color-specific quantity
+          stockQuantity = currentProduct.colorQuantities?.[selectedColor] || 0;
+        } else {
+          // Use default quantity
+          stockQuantity = currentProduct.quantity || 0;
+        }
+
+        // Apply sale preferences limit if exists
+        let maxAllowed = stockQuantity;
+        if (salePreferences?.maxQuantity) {
+          maxAllowed = Math.min(stockQuantity, salePreferences.maxQuantity);
+        }
+
+        // Calculate new quantity
+        const newQuantity = prevQuantity + increment;
+
+        // Clamp between 1 and maxAllowed
+        const clampedQuantity = Math.max(1, Math.min(newQuantity, maxAllowed));
+
+        console.log("🔢 Quantity change:", {
+          prevQuantity,
+          increment,
+          newQuantity,
+          selectedColor,
+          stockQuantity,
+          maxAllowed,
+          clampedQuantity,
+        });
+
+        return clampedQuantity;
+      });
     },
-    [selectedQuantity, getMaxQuantityAllowed]
+    [
+      selectedColor,
+      currentProduct.quantity,
+      currentProduct.colorQuantities,
+      salePreferences,
+    ]
   );
 
   const handleConfirm = useCallback(() => {

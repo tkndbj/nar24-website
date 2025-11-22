@@ -524,41 +524,87 @@ export default function ProductPaymentPage() {
   }, []);
 
   useEffect(() => {
+    const buyNowData = searchParams.get("buyNowData");
     const totalParam = searchParams.get("total");
     const itemsParam = searchParams.get("items");
 
-    if (!totalParam || !itemsParam) {
-      router.push("/cart");
-      return;
-    }
+    // ✅ CASE 1: Buy Now - Single Product Purchase
+    if (buyNowData) {
+      try {
+        console.log("🛒 Buy Now Mode - Decoding buyNowData...");
+        const decodedItem = JSON.parse(atob(buyNowData));
 
-    try {
-      const items = JSON.parse(decodeURIComponent(itemsParam));
-      const cfTotal = parseFloat(totalParam);
+        console.log("✅ Decoded Buy Now Item:", decodedItem);
 
-      console.log("💰 Cloud Function total:", cfTotal);
-      console.log("📦 Items from CF:", items);
+        // ✅ FIX: Add calculated prices for Buy Now items
+        // The payment page expects calculatedUnitPrice and calculatedTotal
+        const itemWithCalculatedPrices = {
+          ...decodedItem,
+          calculatedUnitPrice: decodedItem.unitPrice, // ✅ Map unitPrice to calculatedUnitPrice
+          calculatedTotal: decodedItem.unitPrice * decodedItem.quantity, // ✅ Calculate total
+          price: decodedItem.unitPrice, // ✅ Also set price for fallback
+        };
 
-      // ✅ CRITICAL: Verify items have calculated pricing
-      const validItems = items.every(
-        (item: PaymentItem) =>
-          typeof item.calculatedUnitPrice === "number" &&
-          typeof item.calculatedTotal === "number"
-      );
+        // Convert single item to array format (matching cart structure)
+        setCartItems([itemWithCalculatedPrices]);
 
-      if (!validItems) {
-        console.error("❌ Items missing calculated pricing!");
-        console.error("Items:", items);
+        // Calculate total from the item
+        const itemTotal = decodedItem.unitPrice * decodedItem.quantity;
+        setTotalPrice(itemTotal);
+
+        console.log("💰 Buy Now Total:", itemTotal);
+        console.log(
+          "✅ Item with calculated prices:",
+          itemWithCalculatedPrices
+        );
+        return;
+      } catch (error) {
+        console.error("❌ Failed to parse buyNowData:", error);
+        alert("Invalid buy now data. Redirecting to cart...");
         router.push("/cart");
         return;
       }
-
-      setCartItems(items);
-      setTotalPrice(cfTotal);
-    } catch (error) {
-      console.error("Error parsing cart data:", error);
-      router.push("/cart");
     }
+
+    // ✅ CASE 2: Regular Cart Checkout - Multiple Products
+    if (totalParam && itemsParam) {
+      try {
+        console.log("🛒 Cart Checkout Mode - Parsing items...");
+        const items = JSON.parse(decodeURIComponent(itemsParam));
+        const cfTotal = parseFloat(totalParam);
+
+        console.log("💰 Cloud Function total:", cfTotal);
+        console.log("📦 Items from CF:", items);
+
+        // Verify items have calculated pricing
+        const validItems = items.every(
+          (item: PaymentItem) =>
+            typeof item.calculatedUnitPrice === "number" &&
+            typeof item.calculatedTotal === "number"
+        );
+
+        if (!validItems) {
+          console.error("❌ Items missing calculated pricing!");
+          console.error("Items:", items);
+          router.push("/cart");
+          return;
+        }
+
+        setCartItems(items);
+        setTotalPrice(cfTotal);
+        return;
+      } catch (error) {
+        console.error("Error parsing cart data:", error);
+        router.push("/cart");
+        return;
+      }
+    }
+
+    // ✅ CASE 3: No Valid Data - Redirect to Cart
+    console.warn(
+      "⚠️ No valid payment data (buyNowData, total, or items). Redirecting to cart..."
+    );
+    router.push("/cart");
   }, [searchParams, router]);
 
   useEffect(() => {

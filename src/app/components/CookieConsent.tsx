@@ -359,13 +359,6 @@ export default function CookieConsent() {
                 className="text-orange-500 hover:text-orange-600 underline"
               >
                 {t("privacyPolicy")}
-              </Link>{" "}
-              {t("and")}{" "}
-              <Link
-                href="/cookies"
-                className="text-orange-500 hover:text-orange-600 underline"
-              >
-                {t("cookiePolicy")}
               </Link>
             </p>
           </div>

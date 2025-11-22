@@ -24,6 +24,7 @@ import {
   Heart,
 } from "lucide-react";
 import Image from "next/image";
+import { useLocale } from "next-intl";
 import ProductDetailActionsRow from "../../../components/product_detail/ProductDetailActionsRow";
 import DynamicAttributesWidget from "../../../components/product_detail/DynamicAttributesWidget";
 import ProductDetailSellerInfo from "../../../components/product_detail/SellerInfo";
@@ -150,6 +151,7 @@ LoadingSkeleton.displayName = "LoadingSkeleton";
 
 const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   const router = useRouter();
+  const locale = useLocale();
   const localization = useTranslations();
   const { getProduct, setProduct: setProductCache } = useProductCache();
   const [productId, setProductId] = useState<string>("");
@@ -568,7 +570,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
       const encodedData = btoa(JSON.stringify(cartLikeItem));
 
       // ✅ Navigate to payment page
-      router.push(`/productpayment?buyNowData=${encodedData}`);
+      router.push(`/${locale}/productpayment?buyNowData=${encodedData}`);
     },
     [product, router]
   );
@@ -719,7 +721,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
       setShowBuyNowOptionSelector(false);
       navigateToBuyNow(selectedOptions);
     },
-    []
+    [navigateToBuyNow]
   );
 
   // ✅ ADD: Handler for Buy Now option selector close
