@@ -920,35 +920,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   // ========================================================================
   // ADD TO CART - Matching Flutter implementation
   // ========================================================================
-  const cleanFirestoreData = (obj: unknown): unknown => {
-    if (obj === null) {
-      return null; // null is valid in Firestore
-    }
-
-    if (obj === undefined) {
-      return undefined; // Will be filtered out
-    }
-
-    if (Array.isArray(obj)) {
-      return obj
-        .map((item) => cleanFirestoreData(item))
-        .filter((item) => item !== undefined);
-    }
-
-    if (typeof obj === "object" && obj !== null) {
-      const cleaned: Record<string, unknown> = {};
-      Object.entries(obj as Record<string, unknown>).forEach(([key, value]) => {
-        const cleanedValue = cleanFirestoreData(value);
-        // Only include if not undefined
-        if (cleanedValue !== undefined) {
-          cleaned[key] = cleanedValue;
-        }
-      });
-      return cleaned;
-    }
-
-    return obj;
-  };
 
   const buildProductDataForCart = useCallback(
     (
@@ -963,8 +934,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           typeof bundlePrice === "number" ? bundlePrice : undefined;
       }
 
-      // ✅ FIX: Ensure all required fields have non-null defaults
-      // Required fields: productId, productName, unitPrice, availableStock, sellerName, sellerId
       const data: Record<string, unknown> = {
         productId: product.id || "",
         productName: product.productName || "Product",
@@ -987,37 +956,45 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           typeof product.averageRating === "number" ? product.averageRating : 0,
         reviewCount:
           typeof product.reviewCount === "number" ? product.reviewCount : 0,
-        sellerId: product.userId || product.shopId || "unknown",
+
+        // ✅ FIX: Use shopId when isShop is true, otherwise userId
+        sellerId: product.shopId || product.userId || "unknown",
         sellerName: product.sellerName || "Seller",
         isShop: product.shopId != null,
-        ilanNo: product.ilanNo || "N/A",
-        createdAt: product.createdAt || new Date(),
+        ilanNo: product.ilanNo || product.id || "N/A", // ✅ FIX: Use productId as fallback
+        createdAt: product.createdAt || Timestamp.now(), // ✅ FIX: Use Timestamp
         deliveryOption: product.deliveryOption || "Standard",
         cachedPrice: typeof product.price === "number" ? product.price : 0,
+
+        // ✅ INCLUDE NULL FIELDS (matching Flutter)
+        originalPrice: product.originalPrice ?? null,
+        discountPercentage: product.discountPercentage ?? null,
+        discountThreshold: product.discountThreshold ?? null,
+        bulkDiscountPercentage: product.bulkDiscountPercentage ?? null,
+        videoUrl: product.videoUrl ?? null,
       };
 
-      // Add optional fields only if they exist
-      if (
-        product.originalPrice !== undefined &&
-        product.originalPrice !== null
-      ) {
-        data.originalPrice = product.originalPrice;
+      // Cached discount fields
+      if (product.discountPercentage !== undefined) {
+        data.cachedDiscountPercentage = product.discountPercentage;
+      } else {
+        data.cachedDiscountPercentage = null;
       }
 
-      if (
-        product.discountPercentage !== undefined &&
-        product.discountPercentage !== null
-      ) {
-        data.discountPercentage = product.discountPercentage;
-        data.cachedDiscountPercentage = product.discountPercentage;
+      if (product.discountThreshold !== undefined) {
+        data.cachedDiscountThreshold = product.discountThreshold;
+      } else {
+        data.cachedDiscountThreshold = null;
+      }
+
+      if (product.bulkDiscountPercentage !== undefined) {
+        data.cachedBulkDiscountPercentage = product.bulkDiscountPercentage;
+      } else {
+        data.cachedBulkDiscountPercentage = null;
       }
 
       if (product.colorImages && Object.keys(product.colorImages).length > 0) {
         data.colorImages = product.colorImages;
-      }
-
-      if (product.videoUrl) {
-        data.videoUrl = product.videoUrl;
       }
 
       if (
@@ -1036,22 +1013,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         data.cachedMaxQuantity = product.maxQuantity;
       }
 
-      if (
-        product.discountThreshold !== undefined &&
-        product.discountThreshold !== null
-      ) {
-        data.discountThreshold = product.discountThreshold;
-        data.cachedDiscountThreshold = product.discountThreshold;
-      }
-
-      if (
-        product.bulkDiscountPercentage !== undefined &&
-        product.bulkDiscountPercentage !== null
-      ) {
-        data.bulkDiscountPercentage = product.bulkDiscountPercentage;
-        data.cachedBulkDiscountPercentage = product.bulkDiscountPercentage;
-      }
-
       if (product.bundleIds && product.bundleIds.length > 0) {
         data.bundleIds = product.bundleIds;
       }
@@ -1068,16 +1029,44 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         data.shopId = product.shopId;
       }
 
+      // ✅ FIX: Add selectedColor at ROOT level (matching Flutter)
+      if (selectedColor) {
+        data.selectedColor = selectedColor;
+      }
+
+      // ✅ Build attributes map
       if (attributes && Object.keys(attributes).length > 0) {
-        // Merge selectedColor into attributes
         const attributesWithColor = { ...attributes };
+
+        // Add selectedColor to attributes
         if (selectedColor) {
           attributesWithColor.selectedColor = selectedColor;
         }
+
+        // ✅ ADD selectedColorImage to attributes if color exists
+        if (selectedColor && product.colorImages?.[selectedColor]) {
+          const colorImages = product.colorImages[selectedColor];
+          if (colorImages && colorImages.length > 0) {
+            attributesWithColor.selectedColorImage = colorImages[0];
+          }
+        }
+
         data.attributes = attributesWithColor;
       } else if (selectedColor) {
-        // If no attributes but has color, create attributes with just color
-        data.attributes = { selectedColor };
+        // If no attributes but has color
+        const attributesMap: Record<string, unknown> = {
+          selectedColor,
+        };
+
+        // Add selectedColorImage
+        if (product.colorImages?.[selectedColor]) {
+          const colorImages = product.colorImages[selectedColor];
+          if (colorImages && colorImages.length > 0) {
+            attributesMap.selectedColorImage = colorImages[0];
+          }
+        }
+
+        data.attributes = attributesMap;
       }
 
       return data;
@@ -1202,18 +1191,11 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           attributes
         );
 
-        // Clean any nested undefined values
-        const cleanedProductData = cleanFirestoreData(productData) as Record<
-          string,
-          unknown
-        >;
-
         // ✅ STEP 2: Apply optimistic update for instant feedback
         applyOptimisticAdd(product.id, productData, quantity);
 
-        // ✅ STEP 3: Write to Firestore
         await setDoc(doc(db, "users", user.uid, "cart", product.id), {
-          ...cleanedProductData,
+          ...productData, // ✅ Use directly, don't clean nulls
           quantity,
           addedAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
