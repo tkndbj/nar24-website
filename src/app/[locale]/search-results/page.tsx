@@ -866,7 +866,7 @@ const SearchResultsContent: React.FC = () => {
     const handleScroll = throttle(() => {
       if (
         window.innerHeight + document.documentElement.scrollTop >=
-        document.documentElement.offsetHeight - 1500
+        document.documentElement.offsetHeight - 2500
       ) {
         loadMoreIfNeeded();
       }

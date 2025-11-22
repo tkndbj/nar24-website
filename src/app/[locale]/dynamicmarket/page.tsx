@@ -75,7 +75,7 @@ const availableColors = [
 
 // Constants
 const PRODUCTS_PER_PAGE = 20;
-const SCROLL_THRESHOLD = 1500;
+const SCROLL_THRESHOLD = 2500;
 const DEBOUNCE_DELAY = 300;
 
 // Create a wrapper to convert useTranslations to AppLocalizations format

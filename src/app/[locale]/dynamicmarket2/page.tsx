@@ -472,7 +472,7 @@ const DynamicMarketPage: React.FC = () => {
       timeoutId = setTimeout(() => {
         if (
           window.innerHeight + document.documentElement.scrollTop >=
-          document.documentElement.offsetHeight - 1500
+          document.documentElement.offsetHeight - 2500
         ) {
           if (hasMore && !isLoadingMore) {
             handleLoadMore();
