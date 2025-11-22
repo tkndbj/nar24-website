@@ -957,16 +957,14 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         reviewCount:
           typeof product.reviewCount === "number" ? product.reviewCount : 0,
 
-        // ✅ FIX: Use shopId when isShop is true, otherwise userId
         sellerId: product.shopId || product.userId || "unknown",
         sellerName: product.sellerName || "Seller",
         isShop: product.shopId != null,
-        ilanNo: product.ilanNo || product.id || "N/A", // ✅ FIX: Use productId as fallback
-        createdAt: product.createdAt || Timestamp.now(), // ✅ FIX: Use Timestamp
+        ilanNo: product.ilanNo || product.id || "N/A",
+        createdAt: product.createdAt || Timestamp.now(),
         deliveryOption: product.deliveryOption || "Standard",
         cachedPrice: typeof product.price === "number" ? product.price : 0,
 
-        // ✅ INCLUDE NULL FIELDS (matching Flutter)
         originalPrice: product.originalPrice ?? null,
         discountPercentage: product.discountPercentage ?? null,
         discountThreshold: product.discountThreshold ?? null,
@@ -974,7 +972,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         videoUrl: product.videoUrl ?? null,
       };
 
-      // Cached discount fields
+      // ✅ Cached discount fields
       if (product.discountPercentage !== undefined) {
         data.cachedDiscountPercentage = product.discountPercentage;
       } else {
@@ -1029,37 +1027,17 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         data.shopId = product.shopId;
       }
 
-      // ✅ FIX: Add selectedColor at ROOT level (matching Flutter)
+      // ✅ Add selectedColor at ROOT level (matching Flutter)
       if (selectedColor) {
         data.selectedColor = selectedColor;
       }
 
-      // ✅ Build attributes map
+      // ✅ Build attributes WITHOUT selectedColor
       if (attributes && Object.keys(attributes).length > 0) {
-        const attributesWithColor = { ...attributes };
+        const attributesMap = { ...attributes };
 
-        // Add selectedColor to attributes
-        if (selectedColor) {
-          attributesWithColor.selectedColor = selectedColor;
-        }
-
-        // ✅ ADD selectedColorImage to attributes if color exists
+        // Add selectedColorImage to attributes if color exists
         if (selectedColor && product.colorImages?.[selectedColor]) {
-          const colorImages = product.colorImages[selectedColor];
-          if (colorImages && colorImages.length > 0) {
-            attributesWithColor.selectedColorImage = colorImages[0];
-          }
-        }
-
-        data.attributes = attributesWithColor;
-      } else if (selectedColor) {
-        // If no attributes but has color
-        const attributesMap: Record<string, unknown> = {
-          selectedColor,
-        };
-
-        // Add selectedColorImage
-        if (product.colorImages?.[selectedColor]) {
           const colorImages = product.colorImages[selectedColor];
           if (colorImages && colorImages.length > 0) {
             attributesMap.selectedColorImage = colorImages[0];
@@ -1067,6 +1045,14 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         }
 
         data.attributes = attributesMap;
+      } else if (selectedColor && product.colorImages?.[selectedColor]) {
+        // If no attributes but has color, only add selectedColorImage
+        const colorImages = product.colorImages[selectedColor];
+        if (colorImages && colorImages.length > 0) {
+          data.attributes = {
+            selectedColorImage: colorImages[0],
+          };
+        }
       }
 
       return data;

@@ -738,23 +738,7 @@ export default function ProductPaymentPage() {
           quantity: item.quantity,
         };
 
-        // ✅ FIX: Extract attributes from nested cartData
-        const cartData = (item as CartItem).cartData; // Type assertion needed
-
-        if (cartData?.attributes) {
-          // Add all attributes from cartData.attributes
-          Object.entries(cartData.attributes).forEach(([key, value]) => {
-            if (
-              value != null &&
-              value !== "" &&
-              (!Array.isArray(value) || value.length > 0)
-            ) {
-              payload[key] = value as string | number | boolean | string[];
-            }
-          });
-        }
-
-        // Also include root-level fields like selectedColor
+        // ✅ FIX: Match Flutter - extract from ROOT level, not nested cartData
         const systemFields = new Set([
           "product",
           "quantity",
@@ -765,18 +749,21 @@ export default function ProductPaymentPage() {
           "isShop",
           "productId",
           "salePreferences",
+          "salePreferenceInfo", // ✅ Add this
           "selectedColorImage",
           "sellerContactNo",
           "isOptimistic",
-          "cartData",
+          "cartData", // ✅ Skip entire cartData object
           "calculatedTotal",
           "calculatedUnitPrice",
           "isBundleItem",
           "price",
           "productName",
           "currency",
+          "showSellerHeader", // ✅ Add this
         ]);
 
+        // ✅ MATCH FLUTTER: Iterate over ROOT-level item fields
         Object.keys(item).forEach((key) => {
           const value = item[key];
           if (
