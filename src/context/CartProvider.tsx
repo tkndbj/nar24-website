@@ -86,12 +86,17 @@ interface CartItem {
   sellerId: string;
   isShop: boolean;
   isOptimistic?: boolean;
+
+  // ✅ MATCH FLUTTER NAMING
+  salePreferenceInfo?: SalePreferences | null; // New - matches Flutter
+  selectedAttributes?: Record<string, unknown>; // New - matches Flutter
+
+  // Deprecated (keep for backward compatibility)
   salePreferences?: SalePreferences | null;
+
   selectedColorImage?: string;
   showSellerHeader?: boolean;
-  selectedColor?: string;
-  selectedSize?: string;
-  selectedMetres?: number;
+  selectedColor?: string; // Flattened for display
   [key: string]: unknown;
 }
 
@@ -565,12 +570,40 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     ): CartItem => {
       const salePreferences = extractSalePreferences(cartData);
 
-      // ✅ START WITH BASE ITEM
+      // ✅ BUILD selectedAttributes map (matching Flutter)
+      const selectedAttributes: Record<string, unknown> = {};
+
+      // Add color if present
+      if (
+        cartData.selectedColor !== undefined &&
+        cartData.selectedColor !== null
+      ) {
+        selectedAttributes.selectedColor = cartData.selectedColor;
+      }
+
+      // Flatten all attributes from cartData.attributes into selectedAttributes
+      if (cartData.attributes && typeof cartData.attributes === "object") {
+        const attributes = cartData.attributes as Record<string, unknown>;
+        Object.entries(attributes).forEach(([key, value]) => {
+          selectedAttributes[key] = value;
+        });
+      }
+
+      // ✅ CREATE ITEM MATCHING FLUTTER STRUCTURE
       const item: CartItem = {
         product,
         productId,
         quantity: (cartData.quantity as number) ?? 1,
-        salePreferences,
+
+        // ✅ Store as selectedAttributes map (matching Flutter)
+        selectedAttributes:
+          Object.keys(selectedAttributes).length > 0
+            ? selectedAttributes
+            : undefined,
+
+        // ✅ Store salePreferenceInfo (matching Flutter naming)
+        salePreferenceInfo: salePreferences,
+
         selectedColorImage: resolveColorImage(
           product,
           cartData.selectedColor as string | undefined
@@ -580,25 +613,14 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         isShop: (cartData.isShop as boolean) ?? false,
         cartData: cartData as CartData,
         isOptimistic: false,
+
+        // ✅ DEPRECATED: Keep for backward compatibility but don't use in orders
+        salePreferences, // Old field
       };
 
-      // ✅ FLATTEN selectedColor TO ROOT LEVEL (matching Flutter)
-      if (
-        cartData.selectedColor !== undefined &&
-        cartData.selectedColor !== null
-      ) {
-        item.selectedColor = cartData.selectedColor as string;
-      }
-
-      // ✅ FLATTEN attributes TO ROOT LEVEL (matching Flutter)
-      if (cartData.attributes && typeof cartData.attributes === "object") {
-        const attributes = cartData.attributes as Record<string, unknown>;
-        Object.entries(attributes).forEach(([key, value]) => {
-          // Only add if not already present in item
-          if (!(key in item)) {
-            item[key] = value;
-          }
-        });
+      // ✅ ADD FLATTENED FIELDS TO ROOT (for display compatibility)
+      if (selectedAttributes.selectedColor) {
+        item.selectedColor = selectedAttributes.selectedColor as string;
       }
 
       return item;
@@ -1046,12 +1068,16 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         data.shopId = product.shopId;
       }
 
-      if (selectedColor) {
-        data.selectedColor = selectedColor;
-      }
-
       if (attributes && Object.keys(attributes).length > 0) {
-        data.attributes = attributes;
+        // Merge selectedColor into attributes
+        const attributesWithColor = { ...attributes };
+        if (selectedColor) {
+          attributesWithColor.selectedColor = selectedColor;
+        }
+        data.attributes = attributesWithColor;
+      } else if (selectedColor) {
+        // If no attributes but has color, create attributes with just color
+        data.attributes = { selectedColor };
       }
 
       return data;
