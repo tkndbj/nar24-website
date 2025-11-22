@@ -45,7 +45,20 @@ interface CartItem {
   price?: number;
   productName?: string;
   currency?: string;
-  [key: string]: string | number | boolean | string[] | undefined; // For dynamic attributes
+  calculatedUnitPrice?: number; // ✅ Add this
+  calculatedTotal?: number; // ✅ Add this
+  isBundleItem?: boolean; // ✅ Add this
+  cartData?: {
+    attributes?: Record<string, unknown>;
+    [key: string]: unknown;
+  };
+  [key: string]:
+    | string
+    | number
+    | boolean
+    | string[]
+    | undefined
+    | Record<string, unknown>;
 }
 
 interface FormData {
@@ -725,7 +738,23 @@ export default function ProductPaymentPage() {
           quantity: item.quantity,
         };
 
-        // ✅ MATCH FLUTTER'S SYSTEM FIELDS EXACTLY
+        // ✅ FIX: Extract attributes from nested cartData
+        const cartData = (item as CartItem).cartData; // Type assertion needed
+
+        if (cartData?.attributes) {
+          // Add all attributes from cartData.attributes
+          Object.entries(cartData.attributes).forEach(([key, value]) => {
+            if (
+              value != null &&
+              value !== "" &&
+              (!Array.isArray(value) || value.length > 0)
+            ) {
+              payload[key] = value as string | number | boolean | string[];
+            }
+          });
+        }
+
+        // Also include root-level fields like selectedColor
         const systemFields = new Set([
           "product",
           "quantity",
@@ -735,17 +764,17 @@ export default function ProductPaymentPage() {
           "sellerName",
           "isShop",
           "productId",
-          "salePreferences", // ✅ Added
-          "selectedColorImage", // ✅ Added
-          "sellerContactNo", // ✅ Added
-          "isOptimistic", // ✅ Added
-          "cartData", // ✅ Added
-          "calculatedTotal", // ✅ Added (CRITICAL!)
-          "calculatedUnitPrice", // ✅ Added (CRITICAL!)
-          "isBundleItem", // ✅ Added (CRITICAL!)
-          "price", // ✅ Keep excluded
-          "productName", // ✅ Keep excluded
-          "currency", // ✅ Keep excluded
+          "salePreferences",
+          "selectedColorImage",
+          "sellerContactNo",
+          "isOptimistic",
+          "cartData",
+          "calculatedTotal",
+          "calculatedUnitPrice",
+          "isBundleItem",
+          "price",
+          "productName",
+          "currency",
         ]);
 
         Object.keys(item).forEach((key) => {
@@ -756,7 +785,7 @@ export default function ProductPaymentPage() {
             value !== "" &&
             (!Array.isArray(value) || value.length > 0)
           ) {
-            payload[key] = value;
+            payload[key] = value as string | number | boolean | string[];
           }
         });
 
