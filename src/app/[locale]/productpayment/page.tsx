@@ -725,7 +725,7 @@ export default function ProductPaymentPage() {
           quantity: item.quantity,
         };
 
-        // Add all dynamic attributes except system fields
+        // ✅ MATCH FLUTTER'S SYSTEM FIELDS EXACTLY
         const systemFields = new Set([
           "product",
           "quantity",
@@ -734,9 +734,18 @@ export default function ProductPaymentPage() {
           "sellerId",
           "sellerName",
           "isShop",
-          "price",
-          "productName",
-          "currency",
+          "productId",
+          "salePreferences", // ✅ Added
+          "selectedColorImage", // ✅ Added
+          "sellerContactNo", // ✅ Added
+          "isOptimistic", // ✅ Added
+          "cartData", // ✅ Added
+          "calculatedTotal", // ✅ Added (CRITICAL!)
+          "calculatedUnitPrice", // ✅ Added (CRITICAL!)
+          "isBundleItem", // ✅ Added (CRITICAL!)
+          "price", // ✅ Keep excluded
+          "productName", // ✅ Keep excluded
+          "currency", // ✅ Keep excluded
         ]);
 
         Object.keys(item).forEach((key) => {
@@ -745,8 +754,7 @@ export default function ProductPaymentPage() {
             !systemFields.has(key) &&
             value != null &&
             value !== "" &&
-            (!Array.isArray(value) ||
-              (Array.isArray(value) && value.length > 0))
+            (!Array.isArray(value) || value.length > 0)
           ) {
             payload[key] = value;
           }
