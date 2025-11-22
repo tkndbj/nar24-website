@@ -157,7 +157,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   const [product, setProduct] = useState<Product | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-
   useEffect(() => {
     let mounted = true;
 
@@ -231,12 +230,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   );
 
   // Cart and user hooks
-  const {
-    addProductToCart,
-    removeFromCart,
-    cartProductIds,
-    
-  } = useCart();
+  const { addProductToCart, removeFromCart, cartProductIds } = useCart();
   const { user } = useUser();
   const { addToFavorites, removeMultipleFromFavorites, isFavorite } =
     useFavorites();
@@ -254,7 +248,9 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [previousImageIndex, setPreviousImageIndex] = useState(0);
-  const [slideDirection, setSlideDirection] = useState<'left' | 'right'>('right');
+  const [slideDirection, setSlideDirection] = useState<"left" | "right">(
+    "right"
+  );
   const [showFullScreenViewer, setShowFullScreenViewer] = useState(false);
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [showDescriptionModal, setShowDescriptionModal] = useState(false);
@@ -270,6 +266,18 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   // ✅ OPTIMIZED: Dark mode detection with debouncing
   useEffect(() => {
     if (typeof window === "undefined") return;
+
+    // Initialize theme from localStorage
+    const savedTheme = localStorage.getItem("theme");
+    const systemPrefersDark = window.matchMedia(
+      "(prefers-color-scheme: dark)"
+    ).matches;
+
+    if (savedTheme === "dark" || (!savedTheme && systemPrefersDark)) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
 
     let timeoutId: NodeJS.Timeout;
 
@@ -461,7 +469,109 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     } catch (error) {
       console.error("Error toggling favorite:", error);
     }
-  }, [product?.id, user, router, isFavorite, addToFavorites, removeMultipleFromFavorites]);
+  }, [
+    product?.id,
+    user,
+    router,
+    isFavorite,
+    addToFavorites,
+    removeMultipleFromFavorites,
+  ]);
+
+  const navigateToBuyNow = useCallback(
+    (selectedOptions: { quantity?: number; [key: string]: unknown }) => {
+      if (!product) return;
+
+      // ✅ Build cart-like item structure (matching CartProvider format)
+      const cartLikeItem = {
+        productId: product.id,
+        quantity: selectedOptions.quantity || 1,
+
+        // Product data (matching buildProductDataForCart in CartProvider)
+        productName: product.productName,
+        unitPrice: product.price,
+        currency: product.currency,
+        description: product.description || "",
+        condition: product.condition || "New",
+        brandModel: product.brandModel || "",
+        category: product.category || "Uncategorized",
+        subcategory: product.subcategory || "",
+        subsubcategory: product.subsubcategory || "",
+        allImages: product.imageUrls || [],
+        productImage: product.imageUrls?.[0] || "",
+        availableStock: product.quantity || 0,
+        averageRating: product.averageRating || 0,
+        reviewCount: product.reviewCount || 0,
+        sellerId: product.userId || product.shopId || "unknown",
+        sellerName: product.sellerName || "Seller",
+        isShop: product.shopId != null,
+        ilanNo: product.ilanNo || "N/A",
+        deliveryOption: product.deliveryOption || "Standard",
+
+        // ✅ Optional product fields - FIXED
+        ...(product.originalPrice !== undefined &&
+        product.originalPrice !== null
+          ? { originalPrice: product.originalPrice }
+          : {}),
+        ...(product.discountPercentage !== undefined &&
+        product.discountPercentage !== null
+          ? { discountPercentage: product.discountPercentage }
+          : {}),
+        ...(product.colorImages && Object.keys(product.colorImages).length > 0
+          ? { colorImages: product.colorImages }
+          : {}),
+        ...(product.videoUrl ? { videoUrl: product.videoUrl } : {}),
+        ...(product.colorQuantities &&
+        Object.keys(product.colorQuantities).length > 0
+          ? { colorQuantities: product.colorQuantities }
+          : {}),
+        ...(product.availableColors && product.availableColors.length > 0
+          ? { availableColors: product.availableColors }
+          : {}),
+        ...(product.maxQuantity !== undefined && product.maxQuantity !== null
+          ? { maxQuantity: product.maxQuantity }
+          : {}),
+        ...(product.discountThreshold !== undefined &&
+        product.discountThreshold !== null
+          ? { discountThreshold: product.discountThreshold }
+          : {}),
+        ...(product.bulkDiscountPercentage !== undefined &&
+        product.bulkDiscountPercentage !== null
+          ? { bulkDiscountPercentage: product.bulkDiscountPercentage }
+          : {}),
+        ...(product.bundleIds && product.bundleIds.length > 0
+          ? { bundleIds: product.bundleIds }
+          : {}),
+        ...(product.bundleData && product.bundleData.length > 0
+          ? { bundleData: product.bundleData }
+          : {}),
+        ...(product.shopId ? { shopId: product.shopId } : {}),
+
+        // ✅ Selected options (flattened to root - matching cart structure!) - FIXED
+        ...(selectedOptions.selectedColor
+          ? { selectedColor: selectedOptions.selectedColor as string }
+          : {}),
+        ...(selectedOptions.selectedColorImage
+          ? { selectedColorImage: selectedOptions.selectedColorImage as string }
+          : {}),
+
+        // ✅ Flatten ALL other attributes to root level (matching cart!)
+        ...Object.fromEntries(
+          Object.entries(selectedOptions).filter(
+            ([key]) =>
+              !["quantity", "selectedColor", "selectedColorImage"].includes(key)
+          )
+        ),
+      };
+
+      // ✅ Encode as base64 to pass via URL (avoid query string length limits)
+      const encodedData = btoa(JSON.stringify(cartLikeItem));
+
+      // ✅ Navigate to payment page
+      router.push(`/productpayment?buyNowData=${encodedData}`);
+    },
+    [product, router]
+  );
 
   const handleAddToCart = useCallback(
     async (selectedOptions?: { quantity?: number; [key: string]: unknown }) => {
@@ -469,69 +579,77 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         router.push("/login");
         return;
       }
-  
+
       if (!product) return;
-  
+
       // ✅ Prevent double-clicks
       if (cartButtonState === "adding" || cartButtonState === "removing") {
         return;
       }
-  
+
       const productInCart = cartProductIds.has(product.id);
       const isAdding = !productInCart;
-  
+
       // ✅ Handle options modal FIRST (if needed)
       if (isAdding && hasSelectableOptions(product) && !selectedOptions) {
         setShowCartOptionSelector(true);
         return;
       }
-  
+
       try {
         // ✅ Set button state BEFORE operation
         setCartButtonState(isAdding ? "adding" : "removing");
-  
+
         // ✅ Haptic feedback
         if (isAdding && navigator.vibrate) {
           navigator.vibrate(10);
         }
-  
+
         // ✅ Perform operation
         let result: string;
-  
+
         if (isAdding) {
           let quantityToAdd = 1;
           const attributesToAdd: Record<string, unknown> = {};
-  
+
           if (selectedOptions) {
             if (typeof selectedOptions.quantity === "number") {
               quantityToAdd = selectedOptions.quantity;
             }
-  
+
             Object.entries(selectedOptions).forEach(([key, value]) => {
               if (key !== "quantity") {
                 attributesToAdd[key] = value;
               }
             });
           }
-  
-          const selectedColor = attributesToAdd.selectedColor as string | undefined;
+
+          const selectedColor = attributesToAdd.selectedColor as
+            | string
+            | undefined;
           delete attributesToAdd.selectedColor;
-  
+
           result = await addProductToCart(
             product,
             quantityToAdd,
             selectedColor,
-            Object.keys(attributesToAdd).length > 0 ? attributesToAdd : undefined
+            Object.keys(attributesToAdd).length > 0
+              ? attributesToAdd
+              : undefined
           );
         } else {
           result = await removeFromCart(product.id);
         }
-  
+
         // ✅ Check result
-        if (result.includes("Added") || result.includes("Removed") || result.includes("cart")) {
+        if (
+          result.includes("Added") ||
+          result.includes("Removed") ||
+          result.includes("cart")
+        ) {
           // Success
           setCartButtonState(isAdding ? "added" : "removed");
-          
+
           // Reset after animation
           setTimeout(() => {
             setCartButtonState("idle");
@@ -539,7 +657,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         } else {
           // Failed
           setCartButtonState("idle");
-          
+
           if (result === "Please log in first") {
             router.push("/login");
           }
@@ -573,7 +691,10 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     setShowCartOptionSelector(false);
   }, []);
 
-  const handleBuyNow = useCallback(async () => {
+  const [showBuyNowOptionSelector, setShowBuyNowOptionSelector] =
+    useState(false);
+
+  const handleBuyNow = useCallback(() => {
     if (!user) {
       router.push("/login");
       return;
@@ -581,17 +702,30 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
     if (!product) return;
 
-    try {
-      if (!cartProductIds.has(product.id)) {
-        // ✅ Use directly
-        await addProductToCart(product, 1); // ✅ FIXED
-      }
-
-      router.push(`/checkout?productId=${product.id}&quantity=1`);
-    } catch (error) {
-      console.error("Error with buy now:", error);
+    // ✅ Check if product has selectable options
+    if (hasSelectableOptions(product)) {
+      // Show option selector for Buy Now
+      setShowBuyNowOptionSelector(true);
+    } else {
+      // No options needed - navigate directly with default values
+      navigateToBuyNow({
+        quantity: 1,
+      });
     }
-  }, [user, product, cartProductIds, addProductToCart, router]);
+  }, [user, product, router, navigateToBuyNow]);
+
+  const handleBuyNowOptionSelectorConfirm = useCallback(
+    (selectedOptions: { quantity?: number; [key: string]: unknown }) => {
+      setShowBuyNowOptionSelector(false);
+      navigateToBuyNow(selectedOptions);
+    },
+    []
+  );
+
+  // ✅ ADD: Handler for Buy Now option selector close
+  const handleBuyNowOptionSelectorClose = useCallback(() => {
+    setShowBuyNowOptionSelector(false);
+  }, []);
 
   const cartButtonContent = useMemo(() => {
     if (!product) {
@@ -600,9 +734,9 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         text: t("addToCart"),
       };
     }
-  
+
     const productInCart = cartProductIds.has(product.id);
-  
+
     // Show state based on button state first, then actual cart state
     if (cartButtonState === "adding") {
       return {
@@ -612,7 +746,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         text: t("adding"),
       };
     }
-  
+
     if (cartButtonState === "removing") {
       return {
         icon: (
@@ -621,21 +755,21 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         text: t("removing"),
       };
     }
-  
+
     if (cartButtonState === "added") {
       return {
         icon: <Check className="w-4 h-4 sm:w-5 sm:h-5" />,
         text: t("addedToCart"),
       };
     }
-  
+
     if (cartButtonState === "removed") {
       return {
         icon: <Check className="w-4 h-4 sm:w-5 sm:h-5" />,
         text: t("removedFromCart"),
       };
     }
-  
+
     // Default state based on actual cart
     if (productInCart) {
       return {
@@ -643,7 +777,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         text: t("removeFromCart"),
       };
     }
-  
+
     return {
       icon: <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5" />,
       text: t("addToCart"),
@@ -653,19 +787,20 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   // Check if add to cart button should be disabled
   const isAddToCartDisabled = useMemo(() => {
     if (!product) return false;
-    
+
     // Disable while processing
     if (cartButtonState === "adding" || cartButtonState === "removing") {
       return true;
     }
-  
+
     // Disable if no stock and no color options
     const hasNoStock = product.quantity === 0;
-    const hasColorOptions = product.colorQuantities && Object.keys(product.colorQuantities).length > 0;
-    
+    const hasColorOptions =
+      product.colorQuantities &&
+      Object.keys(product.colorQuantities).length > 0;
+
     return hasNoStock && !hasColorOptions;
   }, [product, cartButtonState]);
-
 
   if (isLoading) {
     return <LoadingSkeleton isDarkMode={isDarkMode} />;
@@ -705,13 +840,12 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   }
 
   const productInCart = product ? cartProductIds.has(product.id) : false;
-  const isProcessing = cartButtonState === "adding" || cartButtonState === "removing";
+  const isProcessing =
+    cartButtonState === "adding" || cartButtonState === "removing";
 
   return (
     <div
-      className={`min-h-screen ${
-        isDarkMode ? "bg-gray-900" : "bg-gray-50"
-      }`}
+      className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
     >
       {/* Header */}
       <div
@@ -766,7 +900,11 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                       ? "border border-orange-500 text-orange-400 hover:bg-orange-900/20"
                       : "border border-orange-500 text-orange-600 hover:bg-orange-50"
                   }
-                  ${isProcessing || isAddToCartDisabled ? "opacity-50 cursor-not-allowed" : ""}
+                  ${
+                    isProcessing || isAddToCartDisabled
+                      ? "opacity-50 cursor-not-allowed"
+                      : ""
+                  }
                 `}
               >
                 <span className="inline">{cartButtonContent.icon}</span>
@@ -834,9 +972,10 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                         fill
                         className="object-contain"
                         style={{
-                          animation: slideDirection === 'right'
-                            ? 'slideOutToLeft 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards'
-                            : 'slideOutToRight 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards'
+                          animation:
+                            slideDirection === "right"
+                              ? "slideOutToLeft 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards"
+                              : "slideOutToRight 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards",
                         }}
                         sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                       />
@@ -852,9 +991,10 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                       fill
                       className="object-contain cursor-pointer hover:scale-105 transition-transform duration-300"
                       style={{
-                        animation: slideDirection === 'right'
-                          ? 'slideInFromRight 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards'
-                          : 'slideInFromLeft 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards'
+                        animation:
+                          slideDirection === "right"
+                            ? "slideInFromRight 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards"
+                            : "slideInFromLeft 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards",
                       }}
                       sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                       onClick={() => setShowFullScreenViewer(true)}
@@ -950,13 +1090,15 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                     <button
                       key={index}
                       onClick={() => {
-                        const direction = index > currentImageIndex ? 'right' : 'left';
+                        const direction =
+                          index > currentImageIndex ? "right" : "left";
                         setSlideDirection(direction);
                         setPreviousImageIndex(currentImageIndex);
                         setCurrentImageIndex(index);
                       }}
                       onMouseEnter={() => {
-                        const direction = index > currentImageIndex ? 'right' : 'left';
+                        const direction =
+                          index > currentImageIndex ? "right" : "left";
                         setSlideDirection(direction);
                         setPreviousImageIndex(currentImageIndex);
                         setCurrentImageIndex(index);
@@ -1028,7 +1170,10 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
             />
 
             {/* Action Buttons */}
-            <div ref={actionButtonsRef} className="flex gap-2 sm:gap-3 pt-1 sm:pt-2">
+            <div
+              ref={actionButtonsRef}
+              className="flex gap-2 sm:gap-3 pt-1 sm:pt-2"
+            >
               <button
                 onClick={() => handleAddToCart()}
                 disabled={isProcessing || isAddToCartDisabled}
@@ -1046,7 +1191,11 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                       ? "border-2 border-orange-500 text-orange-400 hover:bg-orange-900/20"
                       : "border-2 border-orange-500 text-orange-600 hover:bg-orange-50"
                   }
-                  ${isProcessing || isAddToCartDisabled ? "opacity-50 cursor-not-allowed" : ""}
+                  ${
+                    isProcessing || isAddToCartDisabled
+                      ? "opacity-50 cursor-not-allowed"
+                      : ""
+                  }
                   ${
                     cartButtonState === "added" || cartButtonState === "removed"
                       ? "transform scale-105"
@@ -1150,7 +1299,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
         {/* ✅ OPTIMIZED: Bottom sections lazy loaded */}
         <div className="mt-4 sm:mt-6 space-y-3 sm:space-y-4">
-
           {/* ✅ LAZY LOADED: Heavy components below the fold */}
           {hasScrolled && (
             <Suspense
@@ -1271,6 +1419,16 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           isOpen={showCartOptionSelector}
           onClose={handleCartOptionSelectorClose}
           onConfirm={handleCartOptionSelectorConfirm}
+          isDarkMode={isDarkMode}
+          localization={localization}
+        />
+      )}
+      {product && (
+        <ProductOptionSelector
+          product={product}
+          isOpen={showBuyNowOptionSelector}
+          onClose={handleBuyNowOptionSelectorClose}
+          onConfirm={handleBuyNowOptionSelectorConfirm}
           isDarkMode={isDarkMode}
           localization={localization}
         />
