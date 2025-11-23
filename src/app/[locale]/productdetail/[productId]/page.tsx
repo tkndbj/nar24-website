@@ -484,12 +484,38 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     (selectedOptions: { quantity?: number; [key: string]: unknown }) => {
       if (!product) return;
 
-      // ✅ Build cart-like item structure (matching CartProvider format)
-      const cartLikeItem = {
+      // ✅ Build selectedAttributes map (matching CartProvider structure)
+      const selectedAttributes: Record<string, unknown> = {};
+
+      // Add selectedColor to attributes if present
+      if (selectedOptions.selectedColor) {
+        selectedAttributes.selectedColor = selectedOptions.selectedColor;
+      }
+
+      // Add selectedColorImage to attributes if present
+      if (selectedOptions.selectedColorImage) {
+        selectedAttributes.selectedColorImage =
+          selectedOptions.selectedColorImage;
+      }
+
+      // Add all other attributes (excluding quantity)
+      Object.entries(selectedOptions).forEach(([key, value]) => {
+        if (
+          !["quantity", "selectedColor", "selectedColorImage"].includes(key) &&
+          value !== undefined &&
+          value !== null &&
+          value !== ""
+        ) {
+          selectedAttributes[key] = value;
+        }
+      });
+
+      // ✅ Build Buy Now item (matching Cart Drawer structure)
+      const buyNowItem = {
         productId: product.id,
         quantity: selectedOptions.quantity || 1,
 
-        // Product data (matching buildProductDataForCart in CartProvider)
+        // ✅ PRODUCT DATA (matching CartProvider.buildProductDataForCart)
         productName: product.productName,
         unitPrice: product.price,
         currency: product.currency,
@@ -510,7 +536,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         ilanNo: product.ilanNo || "N/A",
         deliveryOption: product.deliveryOption || "Standard",
 
-        // ✅ Optional product fields - FIXED
+        // ✅ OPTIONAL FIELDS (only include if present)
         ...(product.originalPrice !== undefined &&
         product.originalPrice !== null
           ? { originalPrice: product.originalPrice }
@@ -549,30 +575,17 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           : {}),
         ...(product.shopId ? { shopId: product.shopId } : {}),
 
-        // ✅ Selected options (flattened to root - matching cart structure!) - FIXED
-        ...(selectedOptions.selectedColor
-          ? { selectedColor: selectedOptions.selectedColor as string }
-          : {}),
-        ...(selectedOptions.selectedColorImage
-          ? { selectedColorImage: selectedOptions.selectedColorImage as string }
-          : {}),
-
-        // ✅ Flatten ALL other attributes to root level (matching cart!)
-        ...Object.fromEntries(
-          Object.entries(selectedOptions).filter(
-            ([key]) =>
-              !["quantity", "selectedColor", "selectedColorImage"].includes(key)
-          )
-        ),
+        // ✅ FLATTEN selectedAttributes to ROOT (matching Cart Drawer)
+        ...selectedAttributes,
       };
 
-      // ✅ Encode as base64 to pass via URL (avoid query string length limits)
-      const encodedData = btoa(JSON.stringify(cartLikeItem));
+      // ✅ Encode as base64 to pass via URL
+      const encodedData = btoa(JSON.stringify(buyNowItem));
 
       // ✅ Navigate to payment page
       router.push(`/${locale}/productpayment?buyNowData=${encodedData}`);
     },
-    [product, router]
+    [product, router, locale]
   );
 
   const handleAddToCart = useCallback(
