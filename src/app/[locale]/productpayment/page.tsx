@@ -738,32 +738,6 @@ export default function ProductPaymentPage() {
           quantity: item.quantity,
         };
 
-        const systemFields = new Set([
-          "product",
-          "quantity",
-          "addedAt",
-          "updatedAt",
-          "sellerId",
-          "sellerName",
-          "isShop",
-          "productId",
-          "salePreferences",
-          "salePreferenceInfo",
-          "selectedColorImage",
-          "sellerContactNo",
-          "isOptimistic",
-          "cartData",
-          "calculatedTotal",
-          "calculatedUnitPrice",
-          "isBundleItem",
-          "price",
-          "productName",
-          "currency",
-          "showSellerHeader",
-          "selectedAttributes", // ✅ CRITICAL: Add this to excluded fields
-        ]);
-
-        // ✅ STEP 1: Check if selectedAttributes exists and flatten it
         if (
           item.selectedAttributes &&
           typeof item.selectedAttributes === "object"
@@ -779,18 +753,6 @@ export default function ProductPaymentPage() {
             }
           });
         }
-
-        // ✅ STEP 2: Also check root-level fields (as fallback)
-        Object.entries(item).forEach(([key, value]) => {
-          if (
-            !systemFields.has(key) &&
-            value != null &&
-            value !== "" &&
-            (!Array.isArray(value) || value.length > 0)
-          ) {
-            payload[key] = value as string | number | boolean | string[];
-          }
-        });
 
         return payload as PaymentItemPayload;
       });

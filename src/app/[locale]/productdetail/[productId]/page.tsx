@@ -485,37 +485,43 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     (selectedOptions: { quantity?: number; [key: string]: unknown }) => {
       if (!product) return;
 
-      // Extract attributes
-      const attributes: Record<string, unknown> = {};
+      // ✅ STEP 1: Build selectedAttributes map
+      const selectedAttributes: Record<string, unknown> = {};
+
       Object.entries(selectedOptions).forEach(([key, value]) => {
         if (
           key !== "quantity" &&
-          key !== "selectedColor" &&
           value !== undefined &&
           value !== null &&
           value !== ""
         ) {
-          attributes[key] = value;
+          selectedAttributes[key] = value;
         }
       });
 
-      // ✅ Use exact same logic as cart
-      const buyNowItem = buildProductDataForCart(
+      // ✅ STEP 2: Use buildProductDataForCart to get product metadata
+      const productData = buildProductDataForCart(
         product,
         selectedOptions.selectedColor as string | undefined,
-        Object.keys(attributes).length > 0 ? attributes : undefined
+        undefined // ✅ Don't pass attributes here!
       );
 
-      // Add quantity
-      const itemWithQuantity = {
-        ...buyNowItem,
+      // ✅ STEP 3: Build Buy Now item matching Cart structure
+      const buyNowItem = {
+        ...productData,
         quantity: selectedOptions.quantity || 1,
+
+        // ✅ CRITICAL: Wrap attributes in selectedAttributes map (matching Cart)
+        selectedAttributes:
+          Object.keys(selectedAttributes).length > 0
+            ? selectedAttributes
+            : undefined,
       };
 
-      console.log("✅ Buy Now Item (matching cart):", itemWithQuantity);
+      console.log("✅ Buy Now Item (matching cart):", buyNowItem);
 
       // Navigate
-      const encodedData = btoa(JSON.stringify(itemWithQuantity));
+      const encodedData = btoa(JSON.stringify(buyNowItem));
       router.push(`/${locale}/productpayment?buyNowData=${encodedData}`);
     },
     [product, router, locale]
