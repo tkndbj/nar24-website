@@ -367,7 +367,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
         .filter(([, selected]) => selected)
         .map(([id]) => id);
 
-      // ✅ CRITICAL FIX: Filter cart items to only include those with calculated pricing
+      // ✅ Filter cart items to only include those with calculated pricing
       const itemsWithPricing = cartItems.filter(
         (item) =>
           selectedIds.includes(item.productId) && pricingMap.has(item.productId)
@@ -377,8 +377,6 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
       if (itemsWithPricing.length !== selectedIds.length) {
         const missingIds = selectedIds.filter((id) => !pricingMap.has(id));
         console.error("❌ Missing pricing for items:", missingIds);
-
-        // Show user-friendly error
         alert(
           t("pricingError") ||
             "Some items are missing pricing information. Please refresh and try again."
@@ -386,39 +384,80 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
         return;
       }
 
+      // ✅ DEFINE excludedKeys HERE (matching formatItemAttributes)
+      const excludedKeys = [
+        "productId",
+        "cartData",
+        "product",
+        "quantity",
+        "sellerName",
+        "sellerId",
+        "isShop",
+        "isOptimistic",
+        "selectedColorImage",
+        "salePreferences",
+        "salePreferenceInfo", // ✅ Add this too
+        "sellerContactNo",
+        "ourComission",
+        "unitPrice",
+        "currency",
+        "addedAt",
+        "updatedAt",
+        "showSellerHeader",
+      ];
+
       // ✅ Build full payment items with ALL required fields
       const paymentItems: PaymentItem[] = itemsWithPricing.map((item) => {
-        // Get calculated pricing from CF - we know it exists now
+        // ✅ GET PRICING FIRST
         const calculatedPricing = pricingMap.get(item.productId)!;
 
-        const paymentItem: PaymentItem = {
+        // ✅ Extract ALL attributes from item
+        const allAttributes: Record<string, unknown> = {};
+
+        // Add selectedColor from cartData
+        if (item.cartData?.selectedColor) {
+          allAttributes.selectedColor = item.cartData.selectedColor;
+        }
+
+        // Add all other attributes from item root (already flattened by CartProvider)
+        Object.entries(item).forEach(([key, value]) => {
+          if (
+            !excludedKeys.includes(key) &&
+            value !== undefined &&
+            value !== null &&
+            value !== ""
+          ) {
+            allAttributes[key] = value;
+          }
+        });
+
+        return {
           productId: item.productId,
           quantity: item.quantity,
           sellerName: item.sellerName,
           sellerId: item.sellerId,
           isShop: item.isShop,
-          // ✅ Add calculated pricing from Cloud Function
+
+          // ✅ Spread all attributes (size, fit, color, etc.)
+          ...allAttributes,
+
+          // ✅ Add complete product data
+          product: item.product,
+
+          // ✅ Sale preferences (use salePreferenceInfo if available, fallback to salePreferences)
+          salePreferences: item.salePreferenceInfo || item.salePreferences,
+
+          // ✅ Images
+          selectedColorImage: item.selectedColorImage,
+
+          // ✅ Cart data (for reference)
+          cartData: item.cartData,
+
+          // ✅ Calculated pricing from Cloud Function
           calculatedUnitPrice: calculatedPricing.unitPrice,
           calculatedTotal: calculatedPricing.total,
           isBundleItem: calculatedPricing.isBundleItem || false,
         };
-
-        // Add optional attributes
-        if (item.cartData?.selectedMetres) {
-          paymentItem.selectedMetres = item.cartData.selectedMetres;
-        }
-        if (item.cartData?.selectedColor) {
-          paymentItem.selectedColor = item.cartData.selectedColor;
-        }
-
-        // Add product info
-        if (item.product) {
-          paymentItem.price = item.product.price;
-          paymentItem.productName = item.product.productName;
-          paymentItem.currency = item.product.currency;
-        }
-
-        return paymentItem;
       });
 
       console.log("✅ Proceeding with items:", paymentItems);
