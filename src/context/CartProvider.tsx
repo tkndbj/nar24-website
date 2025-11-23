@@ -257,6 +257,141 @@ interface CartProviderProps {
   functions: Functions;
 }
 
+export const buildProductDataForCart = (
+  product: Product,
+  selectedColor?: string,
+  attributes?: CartAttributes
+): Record<string, unknown> => {
+  let extractedBundlePrice: number | undefined;
+  if (product.bundleData && product.bundleData.length > 0) {
+    const bundlePrice = product.bundleData[0]?.bundlePrice;
+    extractedBundlePrice =
+      typeof bundlePrice === "number" ? bundlePrice : undefined;
+  }
+
+  const data: Record<string, unknown> = {
+    productId: product.id || "",
+    productName: product.productName || "Product",
+    description: product.description || "",
+    unitPrice: typeof product.price === "number" ? product.price : 0,
+    currency: product.currency || "TL",
+    condition: product.condition || "New",
+    brandModel: product.brandModel || "",
+    category: product.category || "Uncategorized",
+    subcategory: product.subcategory || "",
+    subsubcategory: product.subsubcategory || "",
+    allImages: Array.isArray(product.imageUrls) ? product.imageUrls : [],
+    productImage:
+      Array.isArray(product.imageUrls) && product.imageUrls.length > 0
+        ? product.imageUrls[0]
+        : "",
+    availableStock: typeof product.quantity === "number" ? product.quantity : 0,
+    averageRating:
+      typeof product.averageRating === "number" ? product.averageRating : 0,
+    reviewCount:
+      typeof product.reviewCount === "number" ? product.reviewCount : 0,
+
+    sellerId: product.shopId || product.userId || "unknown",
+    sellerName: product.sellerName || "Seller",
+    isShop: product.shopId != null,
+    ilanNo: product.ilanNo || product.id || "N/A",
+    createdAt: product.createdAt || Timestamp.now(),
+    deliveryOption: product.deliveryOption || "Standard",
+    cachedPrice: typeof product.price === "number" ? product.price : 0,
+
+    originalPrice: product.originalPrice ?? null,
+    discountPercentage: product.discountPercentage ?? null,
+    discountThreshold: product.discountThreshold ?? null,
+    bulkDiscountPercentage: product.bulkDiscountPercentage ?? null,
+    videoUrl: product.videoUrl ?? null,
+  };
+
+  // ✅ Cached discount fields
+  if (product.discountPercentage !== undefined) {
+    data.cachedDiscountPercentage = product.discountPercentage;
+  } else {
+    data.cachedDiscountPercentage = null;
+  }
+
+  if (product.discountThreshold !== undefined) {
+    data.cachedDiscountThreshold = product.discountThreshold;
+  } else {
+    data.cachedDiscountThreshold = null;
+  }
+
+  if (product.bulkDiscountPercentage !== undefined) {
+    data.cachedBulkDiscountPercentage = product.bulkDiscountPercentage;
+  } else {
+    data.cachedBulkDiscountPercentage = null;
+  }
+
+  if (product.colorImages && Object.keys(product.colorImages).length > 0) {
+    data.colorImages = product.colorImages;
+  }
+
+  if (
+    product.colorQuantities &&
+    Object.keys(product.colorQuantities).length > 0
+  ) {
+    data.colorQuantities = product.colorQuantities;
+  }
+
+  if (product.availableColors && product.availableColors.length > 0) {
+    data.availableColors = product.availableColors;
+  }
+
+  if (product.maxQuantity !== undefined && product.maxQuantity !== null) {
+    data.maxQuantity = product.maxQuantity;
+    data.cachedMaxQuantity = product.maxQuantity;
+  }
+
+  if (product.bundleIds && product.bundleIds.length > 0) {
+    data.bundleIds = product.bundleIds;
+  }
+
+  if (product.bundleData && product.bundleData.length > 0) {
+    data.bundleData = product.bundleData;
+  }
+
+  if (extractedBundlePrice !== undefined) {
+    data.cachedBundlePrice = extractedBundlePrice;
+  }
+
+  if (product.shopId) {
+    data.shopId = product.shopId;
+  }
+
+  // ✅ Add selectedColor at ROOT level (matching Flutter)
+  if (selectedColor) {
+    data.selectedColor = selectedColor;
+  }
+
+  // ✅ Build attributes WITHOUT selectedColor
+  if (attributes && Object.keys(attributes).length > 0) {
+    const attributesMap = { ...attributes };
+
+    // Add selectedColorImage to attributes if color exists
+    if (selectedColor && product.colorImages?.[selectedColor]) {
+      const colorImages = product.colorImages[selectedColor];
+      if (colorImages && colorImages.length > 0) {
+        attributesMap.selectedColorImage = colorImages[0];
+      }
+    }
+
+    data.attributes = attributesMap;
+  } else if (selectedColor && product.colorImages?.[selectedColor]) {
+    // If no attributes but has color, only add selectedColorImage
+    const colorImages = product.colorImages[selectedColor];
+    if (colorImages && colorImages.length > 0) {
+      data.attributes = {
+        selectedColorImage: colorImages[0],
+      };
+    }
+  }
+
+  return data;
+};
+
 export const CartProvider: React.FC<CartProviderProps> = ({
   children,
   user,
@@ -916,149 +1051,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     enableLiveUpdates,
     cartItems.length,
   ]);
-
-  // ========================================================================
-  // ADD TO CART - Matching Flutter implementation
-  // ========================================================================
-
-  const buildProductDataForCart = useCallback(
-    (
-      product: Product,
-      selectedColor?: string,
-      attributes?: CartAttributes
-    ): Record<string, unknown> => {
-      let extractedBundlePrice: number | undefined;
-      if (product.bundleData && product.bundleData.length > 0) {
-        const bundlePrice = product.bundleData[0]?.bundlePrice;
-        extractedBundlePrice =
-          typeof bundlePrice === "number" ? bundlePrice : undefined;
-      }
-
-      const data: Record<string, unknown> = {
-        productId: product.id || "",
-        productName: product.productName || "Product",
-        description: product.description || "",
-        unitPrice: typeof product.price === "number" ? product.price : 0,
-        currency: product.currency || "TL",
-        condition: product.condition || "New",
-        brandModel: product.brandModel || "",
-        category: product.category || "Uncategorized",
-        subcategory: product.subcategory || "",
-        subsubcategory: product.subsubcategory || "",
-        allImages: Array.isArray(product.imageUrls) ? product.imageUrls : [],
-        productImage:
-          Array.isArray(product.imageUrls) && product.imageUrls.length > 0
-            ? product.imageUrls[0]
-            : "",
-        availableStock:
-          typeof product.quantity === "number" ? product.quantity : 0,
-        averageRating:
-          typeof product.averageRating === "number" ? product.averageRating : 0,
-        reviewCount:
-          typeof product.reviewCount === "number" ? product.reviewCount : 0,
-
-        sellerId: product.shopId || product.userId || "unknown",
-        sellerName: product.sellerName || "Seller",
-        isShop: product.shopId != null,
-        ilanNo: product.ilanNo || product.id || "N/A",
-        createdAt: product.createdAt || Timestamp.now(),
-        deliveryOption: product.deliveryOption || "Standard",
-        cachedPrice: typeof product.price === "number" ? product.price : 0,
-
-        originalPrice: product.originalPrice ?? null,
-        discountPercentage: product.discountPercentage ?? null,
-        discountThreshold: product.discountThreshold ?? null,
-        bulkDiscountPercentage: product.bulkDiscountPercentage ?? null,
-        videoUrl: product.videoUrl ?? null,
-      };
-
-      // ✅ Cached discount fields
-      if (product.discountPercentage !== undefined) {
-        data.cachedDiscountPercentage = product.discountPercentage;
-      } else {
-        data.cachedDiscountPercentage = null;
-      }
-
-      if (product.discountThreshold !== undefined) {
-        data.cachedDiscountThreshold = product.discountThreshold;
-      } else {
-        data.cachedDiscountThreshold = null;
-      }
-
-      if (product.bulkDiscountPercentage !== undefined) {
-        data.cachedBulkDiscountPercentage = product.bulkDiscountPercentage;
-      } else {
-        data.cachedBulkDiscountPercentage = null;
-      }
-
-      if (product.colorImages && Object.keys(product.colorImages).length > 0) {
-        data.colorImages = product.colorImages;
-      }
-
-      if (
-        product.colorQuantities &&
-        Object.keys(product.colorQuantities).length > 0
-      ) {
-        data.colorQuantities = product.colorQuantities;
-      }
-
-      if (product.availableColors && product.availableColors.length > 0) {
-        data.availableColors = product.availableColors;
-      }
-
-      if (product.maxQuantity !== undefined && product.maxQuantity !== null) {
-        data.maxQuantity = product.maxQuantity;
-        data.cachedMaxQuantity = product.maxQuantity;
-      }
-
-      if (product.bundleIds && product.bundleIds.length > 0) {
-        data.bundleIds = product.bundleIds;
-      }
-
-      if (product.bundleData && product.bundleData.length > 0) {
-        data.bundleData = product.bundleData;
-      }
-
-      if (extractedBundlePrice !== undefined) {
-        data.cachedBundlePrice = extractedBundlePrice;
-      }
-
-      if (product.shopId) {
-        data.shopId = product.shopId;
-      }
-
-      // ✅ Add selectedColor at ROOT level (matching Flutter)
-      if (selectedColor) {
-        data.selectedColor = selectedColor;
-      }
-
-      // ✅ Build attributes WITHOUT selectedColor
-      if (attributes && Object.keys(attributes).length > 0) {
-        const attributesMap = { ...attributes };
-
-        // Add selectedColorImage to attributes if color exists
-        if (selectedColor && product.colorImages?.[selectedColor]) {
-          const colorImages = product.colorImages[selectedColor];
-          if (colorImages && colorImages.length > 0) {
-            attributesMap.selectedColorImage = colorImages[0];
-          }
-        }
-
-        data.attributes = attributesMap;
-      } else if (selectedColor && product.colorImages?.[selectedColor]) {
-        // If no attributes but has color, only add selectedColorImage
-        const colorImages = product.colorImages[selectedColor];
-        if (colorImages && colorImages.length > 0) {
-          data.attributes = {
-            selectedColorImage: colorImages[0],
-          };
-        }
-      }
-
-      return data;
-    },
-    []
-  );
 
   const backgroundRefreshTotals = useCallback(async () => {
     if (!user || cartProductIds.size === 0) return;

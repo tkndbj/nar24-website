@@ -13,6 +13,7 @@ import React, {
 } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { buildProductDataForCart } from "@/context/CartProvider";
 import {
   ArrowLeft,
   Share2,
@@ -484,105 +485,37 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     (selectedOptions: { quantity?: number; [key: string]: unknown }) => {
       if (!product) return;
 
-      // ✅ Build selectedAttributes map (matching CartProvider structure)
-      const selectedAttributes: Record<string, unknown> = {};
-
-      // Add selectedColor to attributes if present
-      if (selectedOptions.selectedColor) {
-        selectedAttributes.selectedColor = selectedOptions.selectedColor;
-      }
-
-      // Add selectedColorImage to attributes if present
-      if (selectedOptions.selectedColorImage) {
-        selectedAttributes.selectedColorImage =
-          selectedOptions.selectedColorImage;
-      }
-
-      // Add all other attributes (excluding quantity)
+      // Extract attributes
+      const attributes: Record<string, unknown> = {};
       Object.entries(selectedOptions).forEach(([key, value]) => {
         if (
-          !["quantity", "selectedColor", "selectedColorImage"].includes(key) &&
+          key !== "quantity" &&
+          key !== "selectedColor" &&
           value !== undefined &&
           value !== null &&
           value !== ""
         ) {
-          selectedAttributes[key] = value;
+          attributes[key] = value;
         }
       });
 
-      // ✅ Build Buy Now item (matching Cart Drawer structure)
-      const buyNowItem = {
-        productId: product.id,
+      // ✅ Use exact same logic as cart
+      const buyNowItem = buildProductDataForCart(
+        product,
+        selectedOptions.selectedColor as string | undefined,
+        Object.keys(attributes).length > 0 ? attributes : undefined
+      );
+
+      // Add quantity
+      const itemWithQuantity = {
+        ...buyNowItem,
         quantity: selectedOptions.quantity || 1,
-
-        // ✅ PRODUCT DATA (matching CartProvider.buildProductDataForCart)
-        productName: product.productName,
-        unitPrice: product.price,
-        currency: product.currency,
-        description: product.description || "",
-        condition: product.condition || "New",
-        brandModel: product.brandModel || "",
-        category: product.category || "Uncategorized",
-        subcategory: product.subcategory || "",
-        subsubcategory: product.subsubcategory || "",
-        allImages: product.imageUrls || [],
-        productImage: product.imageUrls?.[0] || "",
-        availableStock: product.quantity || 0,
-        averageRating: product.averageRating || 0,
-        reviewCount: product.reviewCount || 0,
-        sellerId: product.userId || product.shopId || "unknown",
-        sellerName: product.sellerName || "Seller",
-        isShop: product.shopId != null,
-        ilanNo: product.ilanNo || "N/A",
-        deliveryOption: product.deliveryOption || "Standard",
-
-        // ✅ OPTIONAL FIELDS (only include if present)
-        ...(product.originalPrice !== undefined &&
-        product.originalPrice !== null
-          ? { originalPrice: product.originalPrice }
-          : {}),
-        ...(product.discountPercentage !== undefined &&
-        product.discountPercentage !== null
-          ? { discountPercentage: product.discountPercentage }
-          : {}),
-        ...(product.colorImages && Object.keys(product.colorImages).length > 0
-          ? { colorImages: product.colorImages }
-          : {}),
-        ...(product.videoUrl ? { videoUrl: product.videoUrl } : {}),
-        ...(product.colorQuantities &&
-        Object.keys(product.colorQuantities).length > 0
-          ? { colorQuantities: product.colorQuantities }
-          : {}),
-        ...(product.availableColors && product.availableColors.length > 0
-          ? { availableColors: product.availableColors }
-          : {}),
-        ...(product.maxQuantity !== undefined && product.maxQuantity !== null
-          ? { maxQuantity: product.maxQuantity }
-          : {}),
-        ...(product.discountThreshold !== undefined &&
-        product.discountThreshold !== null
-          ? { discountThreshold: product.discountThreshold }
-          : {}),
-        ...(product.bulkDiscountPercentage !== undefined &&
-        product.bulkDiscountPercentage !== null
-          ? { bulkDiscountPercentage: product.bulkDiscountPercentage }
-          : {}),
-        ...(product.bundleIds && product.bundleIds.length > 0
-          ? { bundleIds: product.bundleIds }
-          : {}),
-        ...(product.bundleData && product.bundleData.length > 0
-          ? { bundleData: product.bundleData }
-          : {}),
-        ...(product.shopId ? { shopId: product.shopId } : {}),
-
-        // ✅ FLATTEN selectedAttributes to ROOT (matching Cart Drawer)
-        ...selectedAttributes,
       };
 
-      // ✅ Encode as base64 to pass via URL
-      const encodedData = btoa(JSON.stringify(buyNowItem));
+      console.log("✅ Buy Now Item (matching cart):", itemWithQuantity);
 
-      // ✅ Navigate to payment page
+      // Navigate
+      const encodedData = btoa(JSON.stringify(itemWithQuantity));
       router.push(`/${locale}/productpayment?buyNowData=${encodedData}`);
     },
     [product, router, locale]
