@@ -733,12 +733,11 @@ export default function ProductPaymentPage() {
     try {
       // Prepare items payload - exactly like Flutter
       const itemsPayload: PaymentItemPayload[] = cartItems.map((item) => {
-        const payload: PaymentItemPayload = {
+        const payload: Record<string, unknown> = {
           productId: item.productId,
           quantity: item.quantity,
         };
 
-        // ✅ FIX: Match Flutter - extract from ROOT level, not nested cartData
         const systemFields = new Set([
           "product",
           "quantity",
@@ -749,34 +748,48 @@ export default function ProductPaymentPage() {
           "isShop",
           "productId",
           "salePreferences",
-          "salePreferenceInfo", // ✅ Add this
+          "salePreferenceInfo",
           "selectedColorImage",
           "sellerContactNo",
           "isOptimistic",
-          "cartData", // ✅ Skip entire cartData object
+          "cartData",
           "calculatedTotal",
           "calculatedUnitPrice",
           "isBundleItem",
           "price",
           "productName",
           "currency",
-          "showSellerHeader", // ✅ Add this
+          "showSellerHeader",
         ]);
 
-        // ✅ MATCH FLUTTER: Iterate over ROOT-level item fields
-        Object.keys(item).forEach((key) => {
-          const value = item[key];
-          if (
-            !systemFields.has(key) &&
-            value != null &&
-            value !== "" &&
-            (!Array.isArray(value) || value.length > 0)
-          ) {
-            payload[key] = value as string | number | boolean | string[];
-          }
-        });
+        // ✅ Check if item has selectedAttributes
+        if (
+          item.selectedAttributes &&
+          typeof item.selectedAttributes === "object"
+        ) {
+          // Store as a map (matching Flutter)
+          payload.selectedAttributes = item.selectedAttributes;
+        } else {
+          // ✅ FALLBACK: Extract from root level into selectedAttributes
+          const extractedAttrs: Record<string, unknown> = {};
 
-        return payload;
+          Object.entries(item).forEach(([key, value]) => {
+            if (
+              !systemFields.has(key) &&
+              value != null &&
+              value !== "" &&
+              (!Array.isArray(value) || value.length > 0)
+            ) {
+              extractedAttrs[key] = value;
+            }
+          });
+
+          if (Object.keys(extractedAttrs).length > 0) {
+            payload.selectedAttributes = extractedAttrs;
+          }
+        }
+
+        return payload as PaymentItemPayload;
       });
 
       const orderNumber = `ORDER-${Date.now()}`;
