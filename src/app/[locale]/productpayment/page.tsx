@@ -760,34 +760,37 @@ export default function ProductPaymentPage() {
           "productName",
           "currency",
           "showSellerHeader",
+          "selectedAttributes", // ✅ CRITICAL: Add this to excluded fields
         ]);
 
-        // ✅ Check if item has selectedAttributes
+        // ✅ STEP 1: Check if selectedAttributes exists and flatten it
         if (
           item.selectedAttributes &&
           typeof item.selectedAttributes === "object"
         ) {
-          // Store as a map (matching Flutter)
-          payload.selectedAttributes = item.selectedAttributes;
-        } else {
-          // ✅ FALLBACK: Extract from root level into selectedAttributes
-          const extractedAttrs: Record<string, unknown> = {};
-
-          Object.entries(item).forEach(([key, value]) => {
+          const attrs = item.selectedAttributes as Record<string, unknown>;
+          Object.entries(attrs).forEach(([key, value]) => {
             if (
-              !systemFields.has(key) &&
               value != null &&
               value !== "" &&
               (!Array.isArray(value) || value.length > 0)
             ) {
-              extractedAttrs[key] = value;
+              payload[key] = value as string | number | boolean | string[];
             }
           });
-
-          if (Object.keys(extractedAttrs).length > 0) {
-            payload.selectedAttributes = extractedAttrs;
-          }
         }
+
+        // ✅ STEP 2: Also check root-level fields (as fallback)
+        Object.entries(item).forEach(([key, value]) => {
+          if (
+            !systemFields.has(key) &&
+            value != null &&
+            value !== "" &&
+            (!Array.isArray(value) || value.length > 0)
+          ) {
+            payload[key] = value as string | number | boolean | string[];
+          }
+        });
 
         return payload as PaymentItemPayload;
       });
