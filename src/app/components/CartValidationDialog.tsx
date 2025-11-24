@@ -1,6 +1,6 @@
 // components/CartValidationDialog.tsx
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { Product } from '@/app/models/Product';
 import { AttributeLocalizationUtils } from '@/constants/AttributeLocalization';
@@ -115,10 +115,11 @@ const CartValidationDialog: React.FC<CartValidationDialogProps> = ({
   localization,
 }) => {
   // Create translation function that works with or without localization prop
-  const t = (key: string, options?: Record<string, string | number | Date>) => {
+  const t = useCallback((key: string, options?: Record<string, string | number | Date>) => {
     if (!localization) return key;
 
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const translation = localization(key, options as any);
       if (translation && translation !== key) {
         return translation;
@@ -128,7 +129,8 @@ const CartValidationDialog: React.FC<CartValidationDialogProps> = ({
       console.warn(`Translation error for key: ${key}`, error);
       return key;
     }
-  };
+  }, [localization]);
+
   const [confirmedWarnings, setConfirmedWarnings] = useState<Set<string>>(new Set());
 
   const hasErrors = Object.keys(errors).length > 0;
