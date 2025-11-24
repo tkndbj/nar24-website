@@ -1169,6 +1169,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
             setShowValidationDialog(false);
             setValidationResult(null);
           }}
+          localization={localization}
         />
       )}
     </div>

@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { Product } from '@/app/models/Product';
-
+import { AttributeLocalizationUtils } from '@/constants/AttributeLocalization';
 // ==================== CUSTOM SVG ICONS ====================
 const XIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -94,6 +94,7 @@ interface CartValidationDialogProps {
   cartItems: CartItem[];
   onContinue: () => void;
   onCancel: () => void;
+  localization?: ReturnType<typeof useTranslations>;
 }
 
 interface ParsedWarning {
@@ -111,8 +112,23 @@ const CartValidationDialog: React.FC<CartValidationDialogProps> = ({
   cartItems,
   onContinue,
   onCancel,
+  localization,
 }) => {
-  const t = useTranslations();
+  // Create translation function that works with or without localization prop
+  const t = (key: string, options?: Record<string, string | number | Date>) => {
+    if (!localization) return key;
+
+    try {
+      const translation = localization(key, options as any);
+      if (translation && translation !== key) {
+        return translation;
+      }
+      return key;
+    } catch (error) {
+      console.warn(`Translation error for key: ${key}`, error);
+      return key;
+    }
+  };
   const [confirmedWarnings, setConfirmedWarnings] = useState<Set<string>>(new Set());
 
   const hasErrors = Object.keys(errors).length > 0;
@@ -396,6 +412,7 @@ const CartValidationDialog: React.FC<CartValidationDialogProps> = ({
                     validatedItem={findValidatedItem(productId)}
                     localizeMessage={localizeValidationMessage}
                     t={t}
+                    localization={localization}
                   />
                 ))}
               </div>
@@ -424,6 +441,7 @@ const CartValidationDialog: React.FC<CartValidationDialogProps> = ({
                     localizeMessage={localizeValidationMessage}
                     parseWarning={parseLocalizedWarning}
                     t={t}
+                    localization={localization}
                   />
                 ))}
               </div>
@@ -473,38 +491,45 @@ interface ErrorProductCardProps {
     product?: Product;
     validatedItem?: ValidatedItem;
     localizeMessage: (message: ValidationError) => string;
-    t: (key: string, options?: Record<string, string | number | Date>) => string; // ✅ FIX HERE
+    t: (key: string, options?: Record<string, string | number | Date>) => string;
+    localization?: ReturnType<typeof useTranslations>;
   }
 
-const ErrorProductCard: React.FC<ErrorProductCardProps> = ({  
-  errorData,
-  product,
-  validatedItem,
-  localizeMessage,
-  t,
-}) => {
-  const errorMessage = localizeMessage(errorData);
-  const colorImage = validatedItem?.colorImage;
-  const selectedColor = validatedItem?.selectedColor;
-
-  return (
-    <div className="rounded-2xl border-2 border-red-300 dark:border-red-800 bg-red-50/50 dark:bg-red-900/10 overflow-hidden">
-      {/* Product Info */}
-      <div className="p-3 flex gap-3">
-        <ProductImage
-          colorImage={colorImage}
-          product={product}
-          size={60}
-        />
-        <div className="flex-1 min-w-0">
-          <h4 className="text-sm font-semibold text-gray-900 dark:text-white line-clamp-2">
-            {product?.productName || t('validation.unknownProduct')}
-          </h4>
-          {selectedColor && (
-            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-              {t('validation.color')}: {selectedColor}
-            </p>
-          )}
+  const ErrorProductCard: React.FC<ErrorProductCardProps> = ({  
+    errorData,
+    product,
+    validatedItem,
+    localizeMessage,
+    t,
+    localization,
+  }) => {
+    const errorMessage = localizeMessage(errorData);
+    const colorImage = validatedItem?.colorImage;
+    const selectedColor = validatedItem?.selectedColor;
+  
+    // ✅ Localize color name
+    const localizedColor = selectedColor && localization
+    ? AttributeLocalizationUtils.localizeColorName(selectedColor, localization)
+    : selectedColor; 
+  
+    return (
+      <div className="rounded-2xl border-2 border-red-300 dark:border-red-800 bg-red-50/50 dark:bg-red-900/10 overflow-hidden">
+        {/* Product Info */}
+        <div className="p-3 flex gap-3">
+          <ProductImage
+            colorImage={colorImage}
+            product={product}
+            size={60}
+          />
+          <div className="flex-1 min-w-0">
+            <h4 className="text-sm font-semibold text-gray-900 dark:text-white line-clamp-2">
+              {product?.productName || t('validation.unknownProduct')}
+            </h4>
+            {localizedColor && (
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                {t('validation.color')}: {localizedColor}  {/* ✅ Localized */}
+              </p>
+            )}
           <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-1 bg-red-100 dark:bg-red-900/30 rounded-lg">
             <BlockIcon className="w-3 h-3 text-red-600" />
             <span className="text-xs font-semibold text-red-600 line-clamp-2">
@@ -535,7 +560,8 @@ interface WarningProductCardProps {
     onToggleConfirm: () => void;
     localizeMessage: (message: ValidationError) => string;
     parseWarning: (warningData: ValidationError) => ParsedWarning | null;
-    t: (key: string, options?: Record<string, string | number | Date>) => string; // ✅ FIX HERE
+    t: (key: string, options?: Record<string, string | number | Date>) => string;
+    localization?: ReturnType<typeof useTranslations>;
   }
 
 const WarningProductCard: React.FC<WarningProductCardProps> = ({
@@ -548,11 +574,16 @@ const WarningProductCard: React.FC<WarningProductCardProps> = ({
   localizeMessage,
   parseWarning,
   t,
+  localization,
 }) => {
   const warningMessage = localizeMessage(warningData);
   const parsedWarning = parseWarning(warningData);
   const colorImage = validatedItem?.colorImage;
   const selectedColor = validatedItem?.selectedColor;
+
+  const localizedColor = selectedColor && localization
+  ? AttributeLocalizationUtils.localizeColorName(selectedColor, localization)
+  : selectedColor;
 
   return (
     <div
@@ -573,14 +604,14 @@ const WarningProductCard: React.FC<WarningProductCardProps> = ({
           <h4 className="text-sm font-semibold text-gray-900 dark:text-white line-clamp-2">
             {product?.productName || t('validation.unknownProduct')}
           </h4>
-          {selectedColor && (
+          {localizedColor && (
             <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-              {t('validation.color')}: {selectedColor}
+              {t('validation.color')}: {localizedColor}  {/* ✅ Localized */}
             </p>
           )}
           <div className="mt-2">
             {parsedWarning ? (
-              <WarningDetail parsedWarning={parsedWarning} />
+              <WarningDetail parsedWarning={parsedWarning} t={t} />
             ) : (
               <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
                 <AlertTriangleIcon className="w-3 h-3 text-orange-600" />
@@ -626,9 +657,10 @@ const WarningProductCard: React.FC<WarningProductCardProps> = ({
 // ==================== WARNING DETAIL ====================
 interface WarningDetailProps {
   parsedWarning: ParsedWarning;
+  t: (key: string) => string;  // ✅ Add t prop
 }
 
-const WarningDetail: React.FC<WarningDetailProps> = ({ parsedWarning }) => {
+const WarningDetail: React.FC<WarningDetailProps> = ({ parsedWarning, t }) => {
   return (
     <div className="p-2.5 bg-orange-100 dark:bg-orange-900/30 rounded-lg border border-orange-200 dark:border-orange-800">
       <p className="text-[10px] font-bold text-orange-800 dark:text-orange-400 uppercase tracking-wide mb-1.5">
@@ -638,7 +670,7 @@ const WarningDetail: React.FC<WarningDetailProps> = ({ parsedWarning }) => {
         {/* Old Value */}
         <div className="flex-1 p-2 bg-gray-200 dark:bg-gray-800 rounded-lg">
           <p className="text-[9px] font-semibold text-gray-600 dark:text-gray-500 mb-0.5">
-            OLD
+            {t('validation.oldLabel')}  {/* ✅ Localized */}
           </p>
           <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 line-through">
             {parsedWarning.oldValue}
@@ -648,7 +680,7 @@ const WarningDetail: React.FC<WarningDetailProps> = ({ parsedWarning }) => {
         {/* New Value */}
         <div className="flex-1 p-2 bg-orange-200 dark:bg-orange-900/40 rounded-lg">
           <p className="text-[9px] font-semibold text-orange-800 dark:text-orange-400 mb-0.5">
-            NEW
+            {t('validation.newLabel')}  {/* ✅ Localized */}
           </p>
           <p className="text-xs font-bold text-orange-900 dark:text-orange-300">
             {parsedWarning.newValue}
@@ -658,7 +690,6 @@ const WarningDetail: React.FC<WarningDetailProps> = ({ parsedWarning }) => {
     </div>
   );
 };
-
 // ==================== PRODUCT IMAGE ====================
 interface ProductImageProps {
   colorImage?: string;
