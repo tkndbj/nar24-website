@@ -176,7 +176,7 @@ const CartValidationDialog: React.FC<CartValidationDialogProps> = ({
 
   // Localize validation messages
   const localizeValidationMessage = (message: ValidationError): string => {
-    if (!message || !message.key) return t('validation.unknownError');
+    if (!message || !message.key) return t('listProduct.validation.unknownError');
 
     const key = message.key;
     const params = message.params || {};
@@ -200,58 +200,58 @@ const CartValidationDialog: React.FC<CartValidationDialogProps> = ({
       switch (key) {
         // ========== ERRORS ==========
         case 'product_not_available':
-          return t('validation.productNotAvailable');
+          return t('listProduct.validation.productNotAvailable');
 
         case 'product_unavailable':
-          return t('validation.productCurrentlyUnavailable');
+          return t('listProduct.validation.productCurrentlyUnavailable');
 
         case 'out_of_stock':
-          return t('validation.outOfStock');
+          return t('listProduct.validation.outOfStock');
 
         case 'insufficient_stock':
           const available = safeInt('available', 0);
           const requested = safeInt('requested', 0);
-          return t('validation.insufficientStock', { available, requested });
+          return t('listProduct.validation.insufficientStock', { available, requested });
 
         case 'max_quantity_exceeded':
           const maxQuantity = safeInt('maxQuantity', 1);
-          return t('validation.maxQuantityExceeded', { maxQuantity });
+          return t('listProduct.validation.maxQuantityExceeded', { maxQuantity });
 
         // ========== WARNINGS ==========
         case 'price_changed':
           const currency = safeString('currency', 'TL');
           const oldPrice = safeString('oldPrice', '0.00');
           const newPrice = safeString('newPrice', '0.00');
-          return t('validation.priceChanged', { currency, oldPrice, newPrice });
+          return t('listProduct.validation.priceChanged', { currency, oldPrice, newPrice });
 
         case 'bundle_price_changed':
           const bundleCurrency = safeString('currency', 'TL');
           const bundleOldPrice = safeString('oldPrice', '0.00');
           const bundleNewPrice = safeString('newPrice', '0.00');
-          return t('validation.bundlePriceChanged', { 
-            currency: bundleCurrency, 
-            oldPrice: bundleOldPrice, 
-            newPrice: bundleNewPrice 
+          return t('listProduct.validation.bundlePriceChanged', {
+            currency: bundleCurrency,
+            oldPrice: bundleOldPrice,
+            newPrice: bundleNewPrice
           });
 
         case 'discount_updated':
           const oldDiscount = safeInt('oldDiscount', 0);
           const newDiscount = safeInt('newDiscount', 0);
-          return t('validation.discountUpdated', { oldDiscount, newDiscount });
+          return t('listProduct.validation.discountUpdated', { oldDiscount, newDiscount });
 
         case 'discount_threshold_changed':
           const oldThreshold = safeInt('oldThreshold', 0);
           const newThreshold = safeInt('newThreshold', 0);
-          return t('validation.discountThresholdChanged', { oldThreshold, newThreshold });
+          return t('listProduct.validation.discountThresholdChanged', { oldThreshold, newThreshold });
 
         case 'max_quantity_reduced':
           const oldMax = safeInt('oldMax', 0);
           const newMax = safeInt('newMax', 0);
-          return t('validation.maxQuantityReduced', { oldMax, newMax });
+          return t('listProduct.validation.maxQuantityReduced', { oldMax, newMax });
 
         // ========== SPECIAL CASES ==========
         case 'reservation_failed':
-          return t('validation.reservationFailed') || 'Failed to reserve stock. Please try again.';
+          return t('listProduct.validation.reservationFailed') || 'Failed to reserve stock. Please try again.';
 
         case 'legacy_message':
           return safeString('message', 'Unknown error');
@@ -264,7 +264,7 @@ const CartValidationDialog: React.FC<CartValidationDialogProps> = ({
       }
     } catch (error) {
       console.error('Error localizing message:', error, 'key:', key, 'params:', params);
-      return t('validation.errorOccurred');
+      return t('listProduct.validation.errorOccurred');
     }
   };
 
@@ -290,7 +290,7 @@ const CartValidationDialog: React.FC<CartValidationDialogProps> = ({
           const newPrice = safeString('newPrice', '0.00');
 
           return {
-            label: key === 'price_changed' ? t('validation.price') : t('validation.bundlePrice'),
+            label: key === 'price_changed' ? t('listProduct.validation.price') : t('listProduct.validation.bundlePrice'),
             oldValue: `${currency} ${oldPrice}`,
             newValue: `${currency} ${newPrice}`,
           };
@@ -300,7 +300,7 @@ const CartValidationDialog: React.FC<CartValidationDialogProps> = ({
           const newDiscount = safeString('newDiscount', '0');
 
           return {
-            label: t('validation.discount'),
+            label: t('listProduct.validation.discount'),
             oldValue: `${oldDiscount}%`,
             newValue: `${newDiscount}%`,
           };
@@ -310,9 +310,9 @@ const CartValidationDialog: React.FC<CartValidationDialogProps> = ({
           const newThreshold = safeString('newThreshold', '0');
 
           return {
-            label: t('validation.discountThreshold'),
-            oldValue: `${t('validation.buy')} ${oldThreshold}+`,
-            newValue: `${t('validation.buy')} ${newThreshold}+`,
+            label: t('listProduct.validation.discountThreshold'),
+            oldValue: `${t('listProduct.validation.buy')} ${oldThreshold}+`,
+            newValue: `${t('listProduct.validation.buy')} ${newThreshold}+`,
           };
 
         case 'max_quantity_reduced':
@@ -320,7 +320,7 @@ const CartValidationDialog: React.FC<CartValidationDialogProps> = ({
           const newMax = safeString('newMax', '0');
 
           return {
-            label: t('validation.maxQuantity'),
+            label: t('listProduct.validation.maxQuantity'),
             oldValue: oldMax,
             newValue: newMax,
           };
@@ -340,11 +340,11 @@ const CartValidationDialog: React.FC<CartValidationDialogProps> = ({
     const warningCount = Object.keys(warnings).length;
 
     if (hasErrors && hasWarnings) {
-      return t('validation.bothIssues', { errorCount, warningCount });
+      return t('listProduct.validation.bothIssues', { errorCount, warningCount });
     } else if (hasErrors) {
-      return t('validation.errorsCount', { count: errorCount });
+      return t('listProduct.validation.errorsCount', { count: errorCount });
     } else {
-      return t('validation.warningsCount', { count: warningCount });
+      return t('listProduct.validation.warningsCount', { count: warningCount });
     }
   }, [errors, warnings, hasErrors, hasWarnings, t]);
 
@@ -378,7 +378,7 @@ const CartValidationDialog: React.FC<CartValidationDialogProps> = ({
             </div>
             <div className="flex-1">
               <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-                {t('validation.issuesDetected')}
+                {t('listProduct.validation.issuesDetected')}
               </h2>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">
                 {headerSubtitle}
@@ -401,7 +401,7 @@ const CartValidationDialog: React.FC<CartValidationDialogProps> = ({
               <div className="flex items-center gap-2 mb-3">
                 <AlertCircleIcon className="w-4.5 h-4.5 text-red-600" />
                 <h3 className="text-sm font-bold text-gray-900 dark:text-white">
-                  {t('validation.errorsTitle')}
+                  {t('listProduct.validation.errorsTitle')}
                 </h3>
               </div>
               <div className="space-y-3">
@@ -427,7 +427,7 @@ const CartValidationDialog: React.FC<CartValidationDialogProps> = ({
               <div className="flex items-center gap-2 mb-3">
                 <AlertTriangleIcon className="w-4.5 h-4.5 text-orange-600" />
                 <h3 className="text-sm font-bold text-gray-900 dark:text-white">
-                  {t('validation.warningsTitle')}
+                  {t('listProduct.validation.warningsTitle')}
                 </h3>
               </div>
               <div className="space-y-3">
@@ -463,12 +463,12 @@ const CartValidationDialog: React.FC<CartValidationDialogProps> = ({
                 {hasErrors ? (
                   <>
                     <ShoppingCartIcon className="w-5 h-5" />
-                    {t('validation.continueWithoutErrors')}
+                    {t('listProduct.validation.continueWithoutErrors')}
                   </>
                 ) : (
                   <>
                     <CheckCircleIcon className="w-5 h-5" />
-                    {t('validation.continueWithChanges')}
+                    {t('listProduct.validation.continueWithChanges')}
                   </>
                 )}
               </button>
@@ -525,11 +525,11 @@ interface ErrorProductCardProps {
           />
           <div className="flex-1 min-w-0">
             <h4 className="text-sm font-semibold text-gray-900 dark:text-white line-clamp-2">
-              {product?.productName || t('validation.unknownProduct')}
+              {product?.productName || t('listProduct.validation.unknownProduct')}
             </h4>
             {localizedColor && (
               <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                {t('validation.color')}: {localizedColor}  {/* ✅ Localized */}
+                {t('listProduct.validation.color')}: {localizedColor}  {/* ✅ Localized */}
               </p>
             )}
           <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-1 bg-red-100 dark:bg-red-900/30 rounded-lg">
@@ -545,7 +545,7 @@ interface ErrorProductCardProps {
       <div className="px-3 py-2.5 bg-red-100 dark:bg-red-900/20 flex items-center gap-2">
         <InfoIcon className="w-3.5 h-3.5 text-red-600 flex-shrink-0" />
         <span className="text-xs font-medium text-red-600">
-          {t('validation.willBeRemoved')}
+          {t('listProduct.validation.willBeRemoved')}
         </span>
       </div>
     </div>
@@ -604,11 +604,11 @@ const WarningProductCard: React.FC<WarningProductCardProps> = ({
         />
         <div className="flex-1 min-w-0">
           <h4 className="text-sm font-semibold text-gray-900 dark:text-white line-clamp-2">
-            {product?.productName || t('validation.unknownProduct')}
+            {product?.productName || t('listProduct.validation.unknownProduct')}
           </h4>
           {localizedColor && (
             <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-              {t('validation.color')}: {localizedColor}  {/* ✅ Localized */}
+              {t('listProduct.validation.color')}: {localizedColor}  {/* ✅ Localized */}
             </p>
           )}
           <div className="mt-2">
@@ -649,7 +649,7 @@ const WarningProductCard: React.FC<WarningProductCardProps> = ({
             isConfirmed ? 'text-emerald-700 dark:text-emerald-400' : 'text-orange-700 dark:text-orange-400'
           }`}
         >
-          {t('validation.acceptChange')}
+          {t('listProduct.validation.acceptChange')}
         </span>
       </button>
     </div>
@@ -672,7 +672,7 @@ const WarningDetail: React.FC<WarningDetailProps> = ({ parsedWarning, t }) => {
         {/* Old Value */}
         <div className="flex-1 p-2 bg-gray-200 dark:bg-gray-800 rounded-lg">
           <p className="text-[9px] font-semibold text-gray-600 dark:text-gray-500 mb-0.5">
-            {t('validation.oldLabel')}  {/* ✅ Localized */}
+            {t('listProduct.validation.oldLabel')}  {/* ✅ Localized */}
           </p>
           <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 line-through">
             {parsedWarning.oldValue}
@@ -682,7 +682,7 @@ const WarningDetail: React.FC<WarningDetailProps> = ({ parsedWarning, t }) => {
         {/* New Value */}
         <div className="flex-1 p-2 bg-orange-200 dark:bg-orange-900/40 rounded-lg">
           <p className="text-[9px] font-semibold text-orange-800 dark:text-orange-400 mb-0.5">
-            {t('validation.newLabel')}  {/* ✅ Localized */}
+            {t('listProduct.validation.newLabel')}  {/* ✅ Localized */}
           </p>
           <p className="text-xs font-bold text-orange-900 dark:text-orange-300">
             {parsedWarning.newValue}
