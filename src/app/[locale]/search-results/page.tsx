@@ -41,6 +41,7 @@ interface Shop {
   contactNo: string;
   ownerId: string;
   isBoosted: boolean;
+  isActive?: boolean;
   createdAt: Timestamp;
 }
 
@@ -479,6 +480,7 @@ const SearchResultsContent: React.FC = () => {
           contactNo: result.contactNo,
           ownerId: result.ownerId,
           isBoosted: result.isBoosted,
+          isActive: (result as unknown as Record<string, unknown>).isActive as boolean | undefined,
           createdAt: result.createdAt
             ? Timestamp.fromDate(new Date(result.createdAt))
             : Timestamp.now(),
@@ -528,6 +530,9 @@ const SearchResultsContent: React.FC = () => {
 
         console.log(`✅ Enrichment complete for ${enrichmentMap.size} shops`);
       }
+
+      // Filter out inactive shops
+      shopResults = shopResults.filter((shop) => shop.isActive !== false);
 
       console.log(`✅ Setting ${shopResults.length} shops to state`);
       setShops(shopResults);

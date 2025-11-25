@@ -669,6 +669,7 @@ async searchShops(
         ownerId: hit.ownerId || "",
         isBoosted: Boolean(hit.isBoosted),
         createdAt: hit.createdAt || new Date().toISOString(),
+        isActive: hit.isActive !== undefined ? Boolean(hit.isActive) : true,
       };
     });
 
