@@ -1017,15 +1017,11 @@ export default function ShopDetailPage() {
       <SecondHeader />
       <div
         className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
-        style={{
-          transform: 'translateZ(0)',
-          backfaceVisibility: 'hidden',
-        }}
       >
         <div className="max-w-6xl mx-auto">
           <div>
             {/* Header with Cover Image */}
-            <div className="relative h-64 overflow-hidden bg-gradient-to-br from-orange-500 to-pink-500">
+            <div className="relative h-80 hover:h-[32rem] overflow-hidden bg-gradient-to-br from-orange-500 to-pink-500 transition-all duration-500 ease-in-out cursor-pointer group">
               {shopData.coverImageUrls &&
                 shopData.coverImageUrls.length > 0 && (
                   <>
@@ -1035,7 +1031,7 @@ export default function ShopDetailPage() {
                       alt={`${shopData.name} cover`}
                       fill
                       sizes="100vw"
-                      className="object-cover"
+                      className="object-cover object-center"
                       priority
                       unoptimized
                       onLoad={() => console.log("✅ Next Image loaded")}
@@ -1043,7 +1039,7 @@ export default function ShopDetailPage() {
                     />
 
                     {/* Overlay using pseudo-element approach */}
-                    <div className="absolute inset-0 bg-black/30 pointer-events-none" />
+                    <div className="absolute inset-0 bg-black/30 group-hover:bg-black/10 transition-all duration-500 pointer-events-none" />
                   </>
                 )}
 
@@ -1059,13 +1055,13 @@ export default function ShopDetailPage() {
               <div className="absolute bottom-4 left-4 right-4 z-20">
                 <div className="flex items-end space-x-4">
                   {/* Profile Image */}
-                  <div className="relative w-20 h-20 rounded-full border-4 border-white overflow-hidden shadow-lg">
+                  <div className="relative w-24 h-24 rounded-full border-4 border-white overflow-hidden shadow-lg bg-white">
                     {shopData.profileImageUrl ? (
                       <Image
                         src={shopData.profileImageUrl}
                         alt={shopData.name}
                         fill
-                        className="object-cover"
+                        className="object-cover object-center"
                       />
                     ) : (
                       <div className="w-full h-full bg-gray-300 flex items-center justify-center">

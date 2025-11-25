@@ -400,6 +400,8 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
   >(selectedColor || null);
   const [isHovered, setIsHovered] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [showEnlargedImage, setShowEnlargedImage] = useState(false);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // ✅ CRITICAL: Only show selector for CART operations, not favorites
   const [showCartOptionSelector, setShowCartOptionSelector] = useState(false);
@@ -876,6 +878,33 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
     [currentImageUrls.length]
   );
 
+  const handleImageHover = useCallback(() => {
+    setIsHovered(true);
+    // Set timeout to show enlarged image after 1 second
+    hoverTimeoutRef.current = setTimeout(() => {
+      setShowEnlargedImage(true);
+    }, 1000);
+  }, []);
+
+  const handleImageLeave = useCallback(() => {
+    setIsHovered(false);
+    // Clear timeout and hide enlarged image
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    setShowEnlargedImage(false);
+  }, []);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+    };
+  }, []);
+
   // ✅ Determine active dot for pagination (matches Flutter logic)
   const getActiveDotIndex = useCallback(() => {
     const imageCount = currentImageUrls.length;
@@ -904,19 +933,20 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
   const isFantasy = isFantasyProduct(product);
 
   const cardContent = (
-    <div
-      className="w-full cursor-pointer transition-transform duration-200 hover:scale-105"
-      onClick={handleCardClick}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      style={{ transform: `scale(${effectiveScaleFactor})` }}
-    >
-      <div className="flex flex-col w-full">
-        {/* Image Section */}
-        <div
-          className="relative group h-[28vh] md:h-[38vh]"
-          style={imageHeight ? { height: imageHeight } : {}}
-        >
+    <>
+      <div
+        className="w-full cursor-pointer transition-transform duration-200 hover:scale-105"
+        onClick={handleCardClick}
+        style={{ transform: `scale(${effectiveScaleFactor})` }}
+      >
+        <div className="flex flex-col w-full">
+          {/* Image Section */}
+          <div
+            className="relative group h-[28vh] md:h-[38vh]"
+            style={imageHeight ? { height: imageHeight } : {}}
+            onMouseEnter={handleImageHover}
+            onMouseLeave={handleImageLeave}
+          >
           <div className="w-full h-full rounded-t-xl overflow-hidden bg-gray-200 relative">
             {currentImageUrls.length > 0 ? (
               <div className="relative w-full h-full">
@@ -1225,7 +1255,48 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
           </div>
         </div>
       </div>
-    </div>
+      </div>
+
+      {/* Enlarged Image Preview - Positioned near the product */}
+      {showEnlargedImage && currentImageUrl && (
+        <div
+          className="fixed z-[99999]"
+          style={{
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-30%, -50%)',
+            pointerEvents: 'none',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: 'rgba(0, 0, 0, 0.3)',
+              backdropFilter: 'blur(4px)',
+              borderRadius: '12px',
+              padding: '8px',
+              display: 'inline-block',
+            }}
+          >
+            <img
+              src={currentImageUrl}
+              alt={product.productName}
+              style={{
+                objectFit: 'contain',
+                maxWidth: '550px',
+                maxHeight: '550px',
+                width: 'auto',
+                height: 'auto',
+                display: 'block',
+                borderRadius: '8px',
+                boxShadow: '0 20px 40px rgba(0, 0, 0, 0.6)',
+                border: '3px solid white',
+              }}
+              loading="eager"
+            />
+          </div>
+        </div>
+      )}
+    </>
   );
 
   if (isBoosted) {
