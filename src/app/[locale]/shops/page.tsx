@@ -200,8 +200,9 @@ export default function ShopsPage() {
         // Search shops index using dedicated method
         const algoliaResults = await algolia.searchShops(
           query,
-          100, // hitsPerPage
-          0 // page
+          100,
+          0,
+          'isActive:true' // ✅ Correct - just pass the string directly
         );
 
         // Check if search was aborted

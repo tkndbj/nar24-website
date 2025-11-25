@@ -65,6 +65,7 @@ export interface Shop {
   ownerId: string;
   isBoosted: boolean;
   createdAt: string;
+  isActive?: boolean;
 }
 
 // Define the types that can be cached - moved to top for proper scoping
@@ -574,101 +575,110 @@ class AlgoliaServiceManager {
   /**
    * Search for shops
    */
-  async searchShops(
-    query: string,
-    hitsPerPage: number = 100,
-    page: number = 0
-  ): Promise<Shop[]> {
-    const cacheKey = this.getCacheKey('shops', query, page, hitsPerPage);
+ /**
+ * Search for shops
+ */
+async searchShops(
+  query: string,
+  hitsPerPage: number = 100,
+  page: number = 0,
+  filters?: string  // Add this parameter
+): Promise<Shop[]> {
+  const cacheKey = this.getCacheKey('shops', query, page, hitsPerPage, filters);
 
-    const cached = this.getFromCache<Shop[]>(cacheKey);
-    if (cached) {
-      console.log(`🎯 Shop cache hit for: ${cacheKey}`);
-      return cached;
+  const cached = this.getFromCache<Shop[]>(cacheKey);
+  if (cached) {
+    console.log(`🎯 Shop cache hit for: ${cacheKey}`);
+    return cached;
+  }
+
+  try {
+    console.log(`🔍 Searching shops with query: "${query}"${filters ? ` with filters: ${filters}` : ''}`);
+
+    const searchParams: SearchParams = {
+      query,
+      page,
+      hitsPerPage,
+      attributesToRetrieve: [
+        "objectID", "name", "profileImageUrl", "coverImageUrls", "homeImageUrls",
+        "address", "averageRating", "reviewCount", "followerCount", "clickCount",
+        "categories", "contactNo", "ownerId", "isBoosted", "createdAt", "isActive"  // Add isActive here
+      ],
+      attributesToHighlight: ["name", "address"],
+      typoTolerance: true,
+      distinct: 0,
+      analytics: false,
+      clickAnalytics: false,
+      facets: []
+    };
+
+    // Add filters if provided
+    if (filters) {
+      searchParams.filters = filters;
     }
 
-    try {
-      console.log(`🔍 Searching shops with query: "${query}"`);
+    const searchResult = await this.client.searchSingleIndex({
+      indexName: 'shops',
+      searchParams
+    });
 
-      const searchParams: SearchParams = {
-        query,
-        page,
-        hitsPerPage,
-        attributesToRetrieve: [
-          "objectID", "name", "profileImageUrl", "coverImageUrls", "homeImageUrls",
-          "address", "averageRating", "reviewCount", "followerCount", "clickCount",
-          "categories", "contactNo", "ownerId", "isBoosted", "createdAt"
-        ],
-        attributesToHighlight: ["name", "address"],
-        typoTolerance: true,
-        distinct: 0,
-        analytics: false,
-        clickAnalytics: false,
-        facets: []
-      };
+    console.log(`✅ Shops returned ${searchResult.hits.length} hits`);
 
-      const searchResult = await this.client.searchSingleIndex({
-        indexName: 'shops',
-        searchParams
+    // Debug: Log first hit to see what we're getting
+    if (searchResult.hits.length > 0) {
+      const firstHit = searchResult.hits[0] as AlgoliaShopHit;
+      console.log('🔍 First shop hit - ALL fields:', firstHit);
+      console.log('🔍 First shop hit - image fields:', {
+        objectID: firstHit.objectID,
+        name: firstHit.name,
+        coverImageUrls: firstHit.coverImageUrls,
+        homeImageUrls: firstHit.homeImageUrls,
+        profileImageUrl: firstHit.profileImageUrl,
       });
+    }
 
-      console.log(`✅ Shops returned ${searchResult.hits.length} hits`);
+    const shops = searchResult.hits.map((hit: AlgoliaShopHit) => {
+      // Handle coverImageUrls - could be array, single string, or might need fallback to homeImageUrls
+      let coverUrls: string[] = [];
 
-      // Debug: Log first hit to see what we're getting
-      if (searchResult.hits.length > 0) {
-        const firstHit = searchResult.hits[0] as AlgoliaShopHit;
-        console.log('🔍 First shop hit - ALL fields:', firstHit);
-        console.log('🔍 First shop hit - image fields:', {
-          objectID: firstHit.objectID,
-          name: firstHit.name,
-          coverImageUrls: firstHit.coverImageUrls,
-          homeImageUrls: firstHit.homeImageUrls,
-          profileImageUrl: firstHit.profileImageUrl,
-        });
+      // Try coverImageUrls first
+      if (Array.isArray(hit.coverImageUrls) && hit.coverImageUrls.length > 0) {
+        coverUrls = hit.coverImageUrls;
+      } else if (typeof hit.coverImageUrls === 'string' && hit.coverImageUrls) {
+        coverUrls = [hit.coverImageUrls];
+      }
+      // Fallback to homeImageUrls if coverImageUrls is empty
+      else if (Array.isArray(hit.homeImageUrls) && hit.homeImageUrls.length > 0) {
+        coverUrls = hit.homeImageUrls;
+      } else if (typeof hit.homeImageUrls === 'string' && hit.homeImageUrls) {
+        coverUrls = [hit.homeImageUrls];
       }
 
-      const shops = searchResult.hits.map((hit: AlgoliaShopHit) => {
-        // Handle coverImageUrls - could be array, single string, or might need fallback to homeImageUrls
-        let coverUrls: string[] = [];
+      return {
+        id: hit.objectID || `unknown-shop-${Math.random().toString(36).substr(2, 9)}`,
+        name: hit.name || "Unknown Shop",
+        profileImageUrl: hit.profileImageUrl || "",
+        coverImageUrls: coverUrls,
+        address: hit.address || "",
+        averageRating: hit.averageRating ? (typeof hit.averageRating === 'string' ? parseFloat(hit.averageRating) : hit.averageRating) || 0 : 0,
+        reviewCount: hit.reviewCount ? (typeof hit.reviewCount === 'string' ? parseInt(hit.reviewCount) : hit.reviewCount) || 0 : 0,
+        followerCount: hit.followerCount ? (typeof hit.followerCount === 'string' ? parseInt(hit.followerCount) : hit.followerCount) || 0 : 0,
+        clickCount: hit.clickCount ? (typeof hit.clickCount === 'string' ? parseInt(hit.clickCount) : hit.clickCount) || 0 : 0,
+        categories: Array.isArray(hit.categories) ? hit.categories : [],
+        contactNo: hit.contactNo || "",
+        ownerId: hit.ownerId || "",
+        isBoosted: Boolean(hit.isBoosted),
+        createdAt: hit.createdAt || new Date().toISOString(),
+      };
+    });
 
-        // Try coverImageUrls first
-        if (Array.isArray(hit.coverImageUrls) && hit.coverImageUrls.length > 0) {
-          coverUrls = hit.coverImageUrls;
-        } else if (typeof hit.coverImageUrls === 'string' && hit.coverImageUrls) {
-          coverUrls = [hit.coverImageUrls];
-        }
-        // Fallback to homeImageUrls if coverImageUrls is empty
-        else if (Array.isArray(hit.homeImageUrls) && hit.homeImageUrls.length > 0) {
-          coverUrls = hit.homeImageUrls;
-        } else if (typeof hit.homeImageUrls === 'string' && hit.homeImageUrls) {
-          coverUrls = [hit.homeImageUrls];
-        }
-
-        return {
-          id: hit.objectID || `unknown-shop-${Math.random().toString(36).substr(2, 9)}`,
-          name: hit.name || "Unknown Shop",
-          profileImageUrl: hit.profileImageUrl || "",
-          coverImageUrls: coverUrls,
-          address: hit.address || "",
-          averageRating: hit.averageRating ? (typeof hit.averageRating === 'string' ? parseFloat(hit.averageRating) : hit.averageRating) || 0 : 0,
-          reviewCount: hit.reviewCount ? (typeof hit.reviewCount === 'string' ? parseInt(hit.reviewCount) : hit.reviewCount) || 0 : 0,
-          followerCount: hit.followerCount ? (typeof hit.followerCount === 'string' ? parseInt(hit.followerCount) : hit.followerCount) || 0 : 0,
-          clickCount: hit.clickCount ? (typeof hit.clickCount === 'string' ? parseInt(hit.clickCount) : hit.clickCount) || 0 : 0,
-          categories: Array.isArray(hit.categories) ? hit.categories : [],
-          contactNo: hit.contactNo || "",
-          ownerId: hit.ownerId || "",
-          isBoosted: Boolean(hit.isBoosted),
-          createdAt: hit.createdAt || new Date().toISOString(),
-        };
-      });
-
-      this.setCache(cacheKey, shops);
-      return shops;
-    } catch (error) {
-      console.error("❌ Shop search error:", error);
-      return [];
-    }
+    this.setCache(cacheKey, shops);
+    return shops;
+  } catch (error) {
+    console.error("❌ Shop search error:", error);
+    return [];
   }
+}
 
   /**
    * Clear all cached data
