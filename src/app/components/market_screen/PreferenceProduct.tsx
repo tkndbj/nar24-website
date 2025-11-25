@@ -94,6 +94,10 @@ interface PreferenceProductProps {
   keyPrefix?: string;
 }
 
+let cachedProducts: Product[] | null = null;
+let productsCacheExpiry: Date | null = null;
+const PRODUCTS_CACHE_DURATION = 60 * 60 * 1000;
+
 export const PreferenceProduct = React.memo(
   ({ keyPrefix = "" }: PreferenceProductProps) => {
     const [products, setProducts] = useState<Product[]>([]);
@@ -173,11 +177,25 @@ export const PreferenceProduct = React.memo(
      * Load recommendations
      */
     const loadRecommendations = useCallback(async () => {
+      // ✅ CHECK CACHE FIRST
+      if (
+        cachedProducts &&
+        cachedProducts.length > 0 &&
+        productsCacheExpiry &&
+        productsCacheExpiry > new Date()
+      ) {
+        console.log(
+          `✅ Using cached preference products (${cachedProducts.length})`
+        );
+        setProducts(cachedProducts);
+        setIsLoading(false);
+        return;
+      }
+
       setIsLoading(true);
       setError(null);
 
       try {
-        // Get product IDs from service
         const productIds = await personalizedFeedService.getProductIds();
 
         if (productIds.length === 0) {
@@ -186,11 +204,15 @@ export const PreferenceProduct = React.memo(
           return;
         }
 
-        // Pick 30 random from 200
         const randomProductIds = getRandomSample(productIds, 30);
-
-        // Fetch product details
         const fetchedProducts = await fetchProductDetails(randomProductIds);
+
+        // ✅ CACHE THE PRODUCTS
+        cachedProducts = fetchedProducts;
+        productsCacheExpiry = new Date(Date.now() + PRODUCTS_CACHE_DURATION);
+        console.log(
+          `📦 Cached ${fetchedProducts.length} preference products for 1 hour`
+        );
 
         setProducts(fetchedProducts);
         setIsLoading(false);
@@ -205,6 +227,10 @@ export const PreferenceProduct = React.memo(
      * Force refresh
      */
     const refresh = useCallback(async () => {
+      // ✅ Clear local cache FIRST
+      cachedProducts = null;
+      productsCacheExpiry = null;
+
       await personalizedFeedService.forceRefresh();
       await loadRecommendations();
     }, [loadRecommendations]);
@@ -436,3 +462,9 @@ export const PreferenceProduct = React.memo(
 );
 
 PreferenceProduct.displayName = "PreferenceProduct";
+
+export function clearPreferenceProductsCache() {
+  cachedProducts = null;
+  productsCacheExpiry = null;
+  console.log("🧹 Cleared preference products cache");
+}

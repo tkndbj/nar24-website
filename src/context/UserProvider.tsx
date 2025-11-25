@@ -11,18 +11,14 @@ import React, {
   useMemo,
 } from "react";
 import { User } from "firebase/auth";
-import {
-  doc,
-  updateDoc,
-  getDoc,
-  Timestamp,
-} from "firebase/firestore";
+import { doc, updateDoc, getDoc, Timestamp } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import TwoFactorService from "@/services/TwoFactorService";
 import { cacheManager } from "@/app/utils/cacheManager";
 import { requestDeduplicator } from "@/app/utils/requestDeduplicator";
 import { debouncer } from "@/app/utils/debouncer";
 import { impressionBatcher } from "@/app/utils/impressionBatcher";
+import { clearPreferenceProductsCache } from "@/app/components/market_screen/PreferenceProduct";
 interface ProfileData {
   displayName?: string;
   email?: string;
@@ -86,9 +82,13 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
-  const [profileComplete, setProfileCompleteState] = useState<boolean | null>(null);
+  const [profileComplete, setProfileCompleteState] = useState<boolean | null>(
+    null
+  );
   const [pending2FA, setPending2FA] = useState(false);
-  const [internalFirebaseUser, setInternalFirebaseUser] = useState<User | null>(null);
+  const [internalFirebaseUser, setInternalFirebaseUser] = useState<User | null>(
+    null
+  );
 
   const twoFactorService = useMemo(() => TwoFactorService.getInstance(), []);
 
@@ -105,47 +105,51 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   }, [profileComplete, profileData]);
 
   // Check if user needs 2FA verification
-  const check2FARequirement = useCallback(async (firebaseUser: User): Promise<boolean> => {
-    if (typeof window === "undefined") return false;
+  const check2FARequirement = useCallback(
+    async (firebaseUser: User): Promise<boolean> => {
+      if (typeof window === "undefined") return false;
 
-    try {
-      const isEmailPasswordUser =
-        firebaseUser.providerData?.some?.(
-          (info) => info.providerId === "password"
-        ) ?? false;
+      try {
+        const isEmailPasswordUser =
+          firebaseUser.providerData?.some?.(
+            (info) => info.providerId === "password"
+          ) ?? false;
 
-      if (isEmailPasswordUser && !firebaseUser.emailVerified) {
-        return false;
-      }
-
-      const needs2FA = await twoFactorService.is2FAEnabled();
-
-      if (needs2FA) {
-        const userDocRef = doc(db, "users", firebaseUser.uid);
-        const userDoc = await getDoc(userDocRef);
-
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          const lastVerification = userData?.lastTwoFactorVerification?.toDate?.();
-
-          if (lastVerification) {
-            // Reduced from 5 minutes to 2 minutes for better security
-            const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
-            if (lastVerification > twoMinutesAgo) {
-              return false;
-            }
-          }
+        if (isEmailPasswordUser && !firebaseUser.emailVerified) {
+          return false;
         }
 
-        return true;
-      }
+        const needs2FA = await twoFactorService.is2FAEnabled();
 
-      return false;
-    } catch (error) {
-      console.error("Error checking 2FA requirement:", error);
-      return false;
-    }
-  }, [twoFactorService]);
+        if (needs2FA) {
+          const userDocRef = doc(db, "users", firebaseUser.uid);
+          const userDoc = await getDoc(userDocRef);
+
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            const lastVerification =
+              userData?.lastTwoFactorVerification?.toDate?.();
+
+            if (lastVerification) {
+              // Reduced from 5 minutes to 2 minutes for better security
+              const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+              if (lastVerification > twoMinutesAgo) {
+                return false;
+              }
+            }
+          }
+
+          return true;
+        }
+
+        return false;
+      } catch (error) {
+        console.error("Error checking 2FA requirement:", error);
+        return false;
+      }
+    },
+    [twoFactorService]
+  );
 
   // Fetch user data
   const fetchUserData = useCallback(async () => {
@@ -204,12 +208,13 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         setProfileData(null);
         setIsAdmin(false);
         setPending2FA(false);
-        
+
         // ✅ NEW: Clear all caches on logout
         cacheManager.clearAll();
+        clearPreferenceProductsCache();
         requestDeduplicator.cancelAll();
         debouncer.cancelAll();
-        console.log('🧹 Cleared all caches and pending operations on logout');
+        console.log("🧹 Cleared all caches and pending operations on logout");
       }
 
       setIsLoading(false);
@@ -226,11 +231,13 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     } else if (internalFirebaseUser && pending2FA) {
       // User is in 2FA state, use internal user
       impressionBatcher.setUserId(internalFirebaseUser.uid);
-      console.log(`👤 ImpressionBatcher: Synced with pending 2FA user ${internalFirebaseUser.uid}`);
+      console.log(
+        `👤 ImpressionBatcher: Synced with pending 2FA user ${internalFirebaseUser.uid}`
+      );
     } else {
       // No user logged in
       impressionBatcher.setUserId(null);
-      console.log('👤 ImpressionBatcher: Synced with anonymous user');
+      console.log("👤 ImpressionBatcher: Synced with anonymous user");
     }
   }, [user, internalFirebaseUser, pending2FA]);
 
@@ -244,34 +251,37 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   }, [fetchUserData]);
 
   // Update profile data
-  const updateProfileData = useCallback(async (updates: Partial<ProfileData>) => {
-    const currentUser = user || internalFirebaseUser;
-    if (!currentUser) return;
+  const updateProfileData = useCallback(
+    async (updates: Partial<ProfileData>) => {
+      const currentUser = user || internalFirebaseUser;
+      if (!currentUser) return;
 
-    try {
-      await debouncer.debounce(
-        'update-profile',
-        async () => {
-          await updateDoc(doc(db, "users", currentUser.uid), updates);
-        },
-        300 // 300ms debounce
-      )();
+      try {
+        await debouncer.debounce(
+          "update-profile",
+          async () => {
+            await updateDoc(doc(db, "users", currentUser.uid), updates);
+          },
+          300 // 300ms debounce
+        )();
 
-      const updatedProfileData = { ...(profileData || {}), ...updates };
-      setProfileData(updatedProfileData);
-      setIsAdmin(updatedProfileData.isAdmin === true);
+        const updatedProfileData = { ...(profileData || {}), ...updates };
+        setProfileData(updatedProfileData);
+        setIsAdmin(updatedProfileData.isAdmin === true);
 
-      const complete = !!(
-        updatedProfileData.gender &&
-        updatedProfileData.birthDate &&
-        updatedProfileData.languageCode
-      );
-      setProfileCompleteState(complete);
-    } catch (error) {
-      console.error("Error updating profile data:", error);
-      throw error;
-    }
-  }, [user, internalFirebaseUser, profileData]);
+        const complete = !!(
+          updatedProfileData.gender &&
+          updatedProfileData.birthDate &&
+          updatedProfileData.languageCode
+        );
+        setProfileCompleteState(complete);
+      } catch (error) {
+        console.error("Error updating profile data:", error);
+        throw error;
+      }
+    },
+    [user, internalFirebaseUser, profileData]
+  );
 
   // Get ID token
   const getIdToken = useCallback(async (): Promise<string | null> => {
@@ -289,31 +299,34 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   }, [user, internalFirebaseUser]);
 
   // Get profile field
-  const getProfileField = useCallback(<T,>(key: string): T | null => {
-    return (profileData?.[key] as T) || null;
-  }, [profileData]);
+  const getProfileField = useCallback(
+    <T,>(key: string): T | null => {
+      return (profileData?.[key] as T) || null;
+    },
+    [profileData]
+  );
 
   // Update user data immediately
-  const updateUserDataImmediately = useCallback(async (
-    currentUser: User,
-    options?: { profileComplete?: boolean }
-  ) => {
-    setInternalFirebaseUser(currentUser);
+  const updateUserDataImmediately = useCallback(
+    async (currentUser: User, options?: { profileComplete?: boolean }) => {
+      setInternalFirebaseUser(currentUser);
 
-    if (options?.profileComplete !== undefined) {
-      setProfileCompleteState(options.profileComplete);
-    }
+      if (options?.profileComplete !== undefined) {
+        setProfileCompleteState(options.profileComplete);
+      }
 
-    const needs2FA = await check2FARequirement(currentUser);
+      const needs2FA = await check2FARequirement(currentUser);
 
-    if (needs2FA) {
-      setPending2FA(true);
-      setUser(null);
-    } else {
-      setUser(currentUser);
-      setPending2FA(false);
-    }
-  }, [check2FARequirement]);
+      if (needs2FA) {
+        setPending2FA(true);
+        setUser(null);
+      } else {
+        setUser(currentUser);
+        setPending2FA(false);
+      }
+    },
+    [check2FARequirement]
+  );
 
   // Set profile complete
   const setProfileComplete = useCallback((complete: boolean) => {
@@ -341,43 +354,44 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     setPending2FA(false);
   }, [internalFirebaseUser]);
 
-  const contextValue: UserContextType = useMemo(() => ({
-    user,
-    isLoading,
-    isAdmin,
-    isProfileComplete,
-    profileData,
-    fetchUserData,
-    refreshUser,
-    updateProfileData,
-    getIdToken,
-    getProfileField,
-    updateUserDataImmediately,
-    setProfileComplete,
-    isPending2FA: pending2FA,
-    complete2FA,
-    cancel2FA,
-  }), [
-    user,
-    isLoading,
-    isAdmin,
-    isProfileComplete,
-    profileData,
-    fetchUserData,
-    refreshUser,
-    updateProfileData,
-    getIdToken,
-    getProfileField,
-    updateUserDataImmediately,
-    setProfileComplete,
-    pending2FA,
-    complete2FA,
-    cancel2FA,
-  ]);
+  const contextValue: UserContextType = useMemo(
+    () => ({
+      user,
+      isLoading,
+      isAdmin,
+      isProfileComplete,
+      profileData,
+      fetchUserData,
+      refreshUser,
+      updateProfileData,
+      getIdToken,
+      getProfileField,
+      updateUserDataImmediately,
+      setProfileComplete,
+      isPending2FA: pending2FA,
+      complete2FA,
+      cancel2FA,
+    }),
+    [
+      user,
+      isLoading,
+      isAdmin,
+      isProfileComplete,
+      profileData,
+      fetchUserData,
+      refreshUser,
+      updateProfileData,
+      getIdToken,
+      getProfileField,
+      updateUserDataImmediately,
+      setProfileComplete,
+      pending2FA,
+      complete2FA,
+      cancel2FA,
+    ]
+  );
 
   return (
-    <UserContext.Provider value={contextValue}>
-      {children}
-    </UserContext.Provider>
+    <UserContext.Provider value={contextValue}>{children}</UserContext.Provider>
   );
 };
