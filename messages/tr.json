@@ -3464,7 +3464,7 @@
       "productCurrentlyUnavailable": "Ürün şu anda mevcut değil",
       "outOfStock": "Stokta yok",
       "oldLabel": "ESKİ",
-    "newLabel": "YENİ",
+      "newLabel": "YENİ",
       "insufficientStock": "Yetersiz stok: {{available}} mevcut, {{requested}} talep edildi",
       "maxQuantityExceeded": "Maksimum adet aşıldı: {{maxQuantity}} izin verilir",
       "priceChanged": "Fiyat değişti: {{currency}} {{oldPrice}} → {{currency}} {{newPrice}}",
@@ -4268,5 +4268,25 @@
     "noMoreResults": "Daha fazla sonuç yok",
     "boosted": "Boost'lu",
     "minutes": "dakika"
+  },
+  "SpecialForYou": {
+    "title": "Sana Özel",
+    "subtitle": "Tercihlerine göre kişiselleştirilmiş öneriler",
+    "products": "ürün",
+    "progress": "Yükleme durumu",
+    "refresh": "Yenile",
+    "refreshing": "Yenileniyor...",
+    "refreshRecommendations": "Önerileri Yenile",
+    "retry": "Tekrar Dene",
+    "errorTitle": "Yüklenemedi",
+    "errorInitializing": "Öneriler yüklenemedi. Lütfen tekrar deneyin.",
+    "errorLoadingProducts": "Daha fazla ürün yüklenemedi.",
+    "errorRefreshing": "Öneriler yenilenemedi.",
+    "noRecommendationsTitle": "Henüz Öneri Yok",
+    "noRecommendationsSubtitle": "Tercihlerini öğreniyoruz.",
+    "noRecommendationsHint": "Kişiselleştirilmiş öneriler almak için göz atmaya ve ürün eklemeye başla!",
+    "endOfRecommendations": "Tüm önerilerini gördün!",
+    "endOfRecommendationsHint": "Daha fazla kişiselleştirilmiş seçim için daha sonra tekrar kontrol et.",
+    "scrollToTop": "Başa dön"
   }
 }

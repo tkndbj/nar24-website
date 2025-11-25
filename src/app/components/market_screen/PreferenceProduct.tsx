@@ -6,7 +6,15 @@ import { ProductCard } from "../ProductCard";
 import { ChevronRight, ChevronLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { usePersonalizedRecommendations } from "@/context/PersonalizedRecommendationsProvider";
+import { personalizedFeedService } from "@/services/personalizedFeedService";
+import {
+  getFirestore,
+  query,
+  where,
+  getDocs,
+  collection,
+} from "firebase/firestore";
+import type { Product } from "@/app/models/Product";
 
 // Shimmer loading component - matches ProductCard structure
 const ShimmerCard = React.memo(
@@ -88,52 +96,129 @@ interface PreferenceProductProps {
 
 export const PreferenceProduct = React.memo(
   ({ keyPrefix = "" }: PreferenceProductProps) => {
-    const { recommendations, isLoading, error, fetchRecommendations, refresh } =
-      usePersonalizedRecommendations();
-
-    const [, setIsDarkMode] = useState(false);
+    const [products, setProducts] = useState<Product[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [canScrollLeft, setCanScrollLeft] = useState(false);
     const [canScrollRight, setCanScrollRight] = useState(false);
-    const [hasInitialized, setHasInitialized] = useState(false);
 
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const router = useRouter();
     const t = useTranslations("MarketScreen");
 
-    // ✅ MATCHES FLUTTER: Fixed dimensions
-
+    // Fixed dimensions (matches Flutter)
     const portraitImageHeight = 380;
     const infoAreaHeight = 80;
     const rowHeight = portraitImageHeight + infoAreaHeight + 40;
     const scaleFactor = 0.88;
     const overrideInnerScale = 1.2;
 
-    // ✅ OPTIMIZED: Dark mode detection
-    useEffect(() => {
-      const updateTheme = () => {
-        setIsDarkMode(document.documentElement.classList.contains("dark"));
-      };
+    /**
+     * Get random sample from array
+     */
+    const getRandomSample = useCallback(
+      (items: string[], sampleSize: number): string[] => {
+        if (items.length <= sampleSize) {
+          return [...items];
+        }
 
-      updateTheme();
+        const indices = new Set<number>();
+        while (indices.size < sampleSize) {
+          indices.add(Math.floor(Math.random() * items.length));
+        }
 
-      const observer = new MutationObserver(updateTheme);
-      observer.observe(document.documentElement, {
-        attributes: true,
-        attributeFilter: ["class"],
-      });
+        return Array.from(indices).map((i) => items[i]);
+      },
+      []
+    );
 
-      return () => observer.disconnect();
-    }, []);
+    /**
+     * Fetch product details from Firestore
+     */
+    const fetchProductDetails = useCallback(
+      async (productIds: string[]): Promise<Product[]> => {
+        if (productIds.length === 0) return [];
 
-    // ✅ MATCHES FLUTTER: Initial fetch - only once on mount
-    useEffect(() => {
-      if (!hasInitialized) {
-        setHasInitialized(true);
-        fetchRecommendations();
+        try {
+          const db = getFirestore();
+          const productsRef = collection(db, "shop_products");
+
+          // Firestore whereIn limit is 30
+          const q = query(productsRef, where("__name__", "in", productIds));
+          const snapshot = await getDocs(q);
+
+          const products: Product[] = [];
+          snapshot.docs.forEach((doc) => {
+            try {
+              products.push({ id: doc.id, ...doc.data() } as Product);
+            } catch (e) {
+              console.error(`Error parsing product ${doc.id}:`, e);
+            }
+          });
+
+          // Maintain order from productIds
+          const productMap = new Map(products.map((p) => [p.id, p]));
+          return productIds
+            .filter((id) => productMap.has(id))
+            .map((id) => productMap.get(id)!);
+        } catch (e) {
+          console.error("Error fetching product details:", e);
+          return [];
+        }
+      },
+      []
+    );
+
+    /**
+     * Load recommendations
+     */
+    const loadRecommendations = useCallback(async () => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        // Get product IDs from service
+        const productIds = await personalizedFeedService.getProductIds();
+
+        if (productIds.length === 0) {
+          setProducts([]);
+          setIsLoading(false);
+          return;
+        }
+
+        // Pick 30 random from 200
+        const randomProductIds = getRandomSample(productIds, 30);
+
+        // Fetch product details
+        const fetchedProducts = await fetchProductDetails(randomProductIds);
+
+        setProducts(fetchedProducts);
+        setIsLoading(false);
+      } catch (e) {
+        console.error("Error loading personalized feed:", e);
+        setError(e instanceof Error ? e.message : "Unknown error");
+        setIsLoading(false);
       }
-    }, [hasInitialized, fetchRecommendations]);
+    }, [getRandomSample, fetchProductDetails]);
 
-    // ✅ OPTIMIZED: Check scroll position
+    /**
+     * Force refresh
+     */
+    const refresh = useCallback(async () => {
+      await personalizedFeedService.forceRefresh();
+      await loadRecommendations();
+    }, [loadRecommendations]);
+
+    /**
+     * Initial load
+     */
+    useEffect(() => {
+      loadRecommendations();
+    }, [loadRecommendations]);
+
+    /**
+     * Check scroll position
+     */
     const checkScrollPosition = useCallback(() => {
       if (scrollContainerRef.current) {
         const { scrollLeft, scrollWidth, clientWidth } =
@@ -143,7 +228,9 @@ export const PreferenceProduct = React.memo(
       }
     }, []);
 
-    // ✅ OPTIMIZED: Scroll handlers
+    /**
+     * Scroll handlers
+     */
     const scrollLeft = useCallback(() => {
       scrollContainerRef.current?.scrollBy({ left: -200, behavior: "smooth" });
     }, []);
@@ -152,27 +239,31 @@ export const PreferenceProduct = React.memo(
       scrollContainerRef.current?.scrollBy({ left: 200, behavior: "smooth" });
     }, []);
 
-    // Check scroll position when recommendations change
+    /**
+     * Check scroll position when products change
+     */
     useEffect(() => {
-      if (recommendations.length > 0) {
+      if (products.length > 0) {
         requestAnimationFrame(checkScrollPosition);
       }
-    }, [recommendations.length, checkScrollPosition]);
+    }, [products.length, checkScrollPosition]);
 
-    // ✅ OPTIMIZED: View all handler
+    /**
+     * View all handler
+     */
     const handleViewAll = useCallback(() => {
-      router.push("/special-for-you");
+      router.push("/specialforyou");
     }, [router]);
 
-    // ✅ MATCHES FLUTTER: Hide if no products and not loading
-    if (recommendations.length === 0 && !isLoading) {
+    // Hide if no products and not loading
+    if (products.length === 0 && !isLoading) {
       return null;
     }
 
     return (
       <div className="w-full my-2 lg:mx-0 lg:px-6">
         <div className="relative w-full rounded-none lg:rounded-t-3xl overflow-visible">
-          {/* ✅ UPDATED: Background gradient with vertical fade mask - matches DynamicList */}
+          {/* Background gradient with vertical fade mask */}
           <div
             className="absolute inset-0 rounded-none lg:rounded-t-3xl"
             style={{
@@ -186,15 +277,15 @@ export const PreferenceProduct = React.memo(
           />
 
           <div className="relative py-3">
-            {/* ✅ MATCHES FLUTTER: Header */}
+            {/* Header */}
             <div className="px-0 lg:px-2 mb-2">
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-2">
                   <h2 className="text-lg font-bold text-white">
                     {t("specialProductsForYou")}
                   </h2>
-                  {/* ✅ MATCHES FLUTTER: Loading indicator when refreshing */}
-                  {isLoading && recommendations.length > 0 && (
+                  {/* Loading indicator when refreshing */}
+                  {isLoading && products.length > 0 && (
                     <div className="w-3 h-3">
                       <svg
                         className="animate-spin text-white/70"
@@ -228,16 +319,16 @@ export const PreferenceProduct = React.memo(
               </div>
             </div>
 
-            {/* ✅ MATCHES FLUTTER: Content */}
-            {isLoading && recommendations.length === 0 ? (
+            {/* Content */}
+            {isLoading && products.length === 0 ? (
               <ShimmerList
                 rowHeight={rowHeight}
                 portraitImageHeight={portraitImageHeight}
                 infoAreaHeight={infoAreaHeight}
                 scaleFactor={scaleFactor}
               />
-            ) : error && recommendations.length === 0 ? (
-              // ✅ MATCHES FLUTTER: Error state
+            ) : error && products.length === 0 ? (
+              // Error state
               <div
                 className="flex flex-col items-center justify-center text-white px-0 lg:px-0"
                 style={{ height: `${rowHeight - 60}px` }}
@@ -267,7 +358,7 @@ export const PreferenceProduct = React.memo(
               </div>
             ) : (
               <div className="relative">
-                {/* ✅ UPDATED: Desktop scroll arrows - positioned outside component like DynamicList */}
+                {/* Desktop scroll arrows */}
                 {canScrollLeft && (
                   <button
                     onClick={scrollLeft}
@@ -296,7 +387,7 @@ export const PreferenceProduct = React.memo(
                   </button>
                 )}
 
-                {/* ✅ UPDATED: Scrollable container - no scrollbars, matches DynamicList */}
+                {/* Scrollable container */}
                 <div
                   ref={scrollContainerRef}
                   className="overflow-x-auto overflow-y-hidden scrollbar-hide"
@@ -306,7 +397,7 @@ export const PreferenceProduct = React.memo(
                   onScroll={checkScrollPosition}
                 >
                   <div className="flex gap-0 px-0 lg:px-2 h-full pr-0 lg:pr-2 -ml-2 lg:ml-0">
-                    {recommendations.map((product) => (
+                    {products.map((product) => (
                       <div
                         key={`${keyPrefix}${product.id}`}
                         className="flex-shrink-0"
@@ -330,15 +421,6 @@ export const PreferenceProduct = React.memo(
         </div>
 
         <style jsx global>{`
-          @keyframes shimmer {
-            0% {
-              background-position: 200% 0;
-            }
-            100% {
-              background-position: -200% 0;
-            }
-          }
-
           .scrollbar-hide::-webkit-scrollbar {
             display: none;
           }

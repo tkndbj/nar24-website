@@ -11,7 +11,6 @@ import ConditionalHeader from "../components/ConditionalHeader";
 import { SearchHistoryProvider } from "@/context/SearchHistoryProvider";
 import ConditionalFooter from "../components/ConditionalFooter";
 import CookieConsent from "../components/CookieConsent";
-import { PersonalizedRecommendationsProvider } from "@/context/PersonalizedRecommendationsProvider";
 import { AppInitializer } from "@/app/components/AppInitializer";
 import { AnalyticsInitializer } from "@/app/components/AnalyticsInitializer"; // ✅ NEW
 import { db, functions } from "@/lib/firebase";
@@ -28,12 +27,10 @@ function AppProviders({ children }: { children: React.ReactNode }) {
           <BadgeProvider>
             <SearchProvider>
               <SearchHistoryProvider>
-                <PersonalizedRecommendationsProvider>
-                  <ConditionalHeader />
-                  <main>{children}</main>
-                  <ConditionalFooter />
-                  <CookieConsent />
-                </PersonalizedRecommendationsProvider>
+                <ConditionalHeader />
+                <main>{children}</main>
+                <ConditionalFooter />
+                <CookieConsent />
               </SearchHistoryProvider>
             </SearchProvider>
           </BadgeProvider>
