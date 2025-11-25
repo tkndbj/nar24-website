@@ -44,6 +44,7 @@ interface Shop {
   ownerId: string;
   isBoosted: boolean;
   createdAt: Timestamp;
+  isActive?: boolean;
 }
 
 // Get categories from productData
@@ -368,6 +369,7 @@ export default function ShopsPage() {
 
         let shopsQuery = query(
           collection(db, "shops"),
+          where("isActive", "==", true),
           orderBy("createdAt", "desc"),
           limit(SHOPS_PER_PAGE)
         );
@@ -376,6 +378,7 @@ export default function ShopsPage() {
         if (categoryFilter) {
           shopsQuery = query(
             collection(db, "shops"),
+            where("isActive", "==", true),
             where("categories", "array-contains", categoryFilter),
             orderBy("createdAt", "desc"),
             limit(SHOPS_PER_PAGE)
@@ -387,6 +390,7 @@ export default function ShopsPage() {
           if (categoryFilter) {
             shopsQuery = query(
               collection(db, "shops"),
+              where("isActive", "==", true),
               where("categories", "array-contains", categoryFilter),
               orderBy("createdAt", "desc"),
               startAfter(lastDocument),
@@ -395,6 +399,7 @@ export default function ShopsPage() {
           } else {
             shopsQuery = query(
               collection(db, "shops"),
+              where("isActive", "==", true),
               orderBy("createdAt", "desc"),
               startAfter(lastDocument),
               limit(SHOPS_PER_PAGE)
