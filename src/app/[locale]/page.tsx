@@ -54,7 +54,12 @@ export default function Home() {
 
     // Check immediately in case page loads scrolled
     handleScroll();
-    
+
+    // On large viewports, load content immediately to avoid empty space below the fold
+    if (window.innerHeight > 900) {
+      setHasScrolled(true);
+    }
+
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, [hasScrolled]);

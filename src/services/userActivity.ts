@@ -245,9 +245,23 @@ import {
     private currentUser: User | null = null;
     private isOnline = true;
   
-    // Firebase
-    private auth = getAuth();
-    private functions = getFunctions(undefined, 'europe-west3');
+    // Firebase - lazily initialized to avoid SSR issues
+    private _auth: ReturnType<typeof getAuth> | null = null;
+    private _functions: ReturnType<typeof getFunctions> | null = null;
+
+    private get auth() {
+      if (!this._auth) {
+        this._auth = getAuth();
+      }
+      return this._auth;
+    }
+
+    private get functions() {
+      if (!this._functions) {
+        this._functions = getFunctions(undefined, 'europe-west3');
+      }
+      return this._functions;
+    }
   
     /**
      * Get singleton instance

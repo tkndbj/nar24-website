@@ -50,6 +50,7 @@ export default function SearchBar({
   const [currentPage, setCurrentPage] = useState(0);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null);
 
   const {
     isLoading,
@@ -75,7 +76,7 @@ export default function SearchBar({
       document.body.style.position = 'fixed';
       document.body.style.top = `-${scrollY}px`;
       document.body.style.width = '100%';
-      
+
       return () => {
         document.body.style.position = '';
         document.body.style.top = '';
@@ -84,6 +85,36 @@ export default function SearchBar({
       };
     }
   }, [isSearching, isMobile]);
+
+  // ✅ Calculate dropdown position for fixed positioning (escapes stacking context)
+  useEffect(() => {
+    if (!isSearching || !searchContainerRef.current) {
+      setDropdownPosition(null);
+      return;
+    }
+
+    const updatePosition = () => {
+      if (searchContainerRef.current) {
+        const rect = searchContainerRef.current.getBoundingClientRect();
+        setDropdownPosition({
+          top: rect.bottom + 8, // 8px gap (mt-2)
+          left: rect.left,
+          width: rect.width,
+        });
+      }
+    };
+
+    updatePosition();
+
+    // Update on scroll/resize
+    window.addEventListener('scroll', updatePosition, { passive: true });
+    window.addEventListener('resize', updatePosition, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', updatePosition);
+      window.removeEventListener('resize', updatePosition);
+    };
+  }, [isSearching]);
 
   // ✅ OPTIMIZED: Click outside handler with conditional setup
   useEffect(() => {
@@ -335,14 +366,19 @@ export default function SearchBar({
         </button>
       </div>
 
-      {/* Search Dropdown */}
-      {isSearching && (
+      {/* Search Dropdown - Fixed positioning to escape stacking context */}
+      {isSearching && dropdownPosition && (
         <div
           ref={dropdownRef}
+          style={{
+            position: 'fixed',
+            top: dropdownPosition.top,
+            left: dropdownPosition.left,
+            width: dropdownPosition.width,
+          }}
           className={`
-            absolute top-full left-0 right-0 mt-2
             ${isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}
-            border rounded-2xl shadow-2xl backdrop-blur-xl z-50
+            border rounded-2xl shadow-2xl backdrop-blur-xl z-[9999]
             max-h-96 overflow-hidden
           `}
         >

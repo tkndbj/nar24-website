@@ -262,6 +262,9 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   // ✅ NEW: Track if user has scrolled down to lazy load components
   const [hasScrolled, setHasScrolled] = useState(false);
 
+  // ✅ NEW: Track if viewport is large enough to show components without scrolling
+  const [isLargeScreen, setIsLargeScreen] = useState(false);
+
   // ✅ NEW: Track if user has scrolled past action buttons
   const [showHeaderButtons, setShowHeaderButtons] = useState(false);
   const actionButtonsRef = useRef<HTMLDivElement>(null);
@@ -317,6 +320,24 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
       observer.disconnect();
       mediaQuery.removeEventListener("change", detectDarkMode);
     };
+  }, []);
+
+  // ✅ NEW: Large screen detection for immediate component loading
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const checkLargeScreen = () => {
+      // Load components immediately on large screens (lg breakpoint: 1024px width, 900px height)
+      const isLarge = window.innerWidth >= 1024 && window.innerHeight >= 900;
+      setIsLargeScreen(isLarge);
+    };
+
+    // Check immediately
+    checkLargeScreen();
+
+    // Listen for resize
+    window.addEventListener("resize", checkLargeScreen);
+    return () => window.removeEventListener("resize", checkLargeScreen);
   }, []);
 
   // ✅ NEW: Scroll detection for lazy loading below-the-fold content
@@ -1253,8 +1274,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
         {/* ✅ OPTIMIZED: Bottom sections lazy loaded */}
         <div className="mt-4 sm:mt-6 space-y-3 sm:space-y-4">
-          {/* ✅ LAZY LOADED: Heavy components below the fold */}
-          {hasScrolled && (
+          {/* ✅ LAZY LOADED: Heavy components below the fold (load immediately on large screens) */}
+          {(hasScrolled || isLargeScreen) && (
             <Suspense
               fallback={
                 <div className="h-40 animate-pulse bg-gray-200 rounded-lg" />
@@ -1269,7 +1290,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
             </Suspense>
           )}
 
-          {hasScrolled && (
+          {(hasScrolled || isLargeScreen) && (
             <Suspense
               fallback={
                 <div className="h-40 animate-pulse bg-gray-200 rounded-lg" />
@@ -1284,7 +1305,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
             </Suspense>
           )}
 
-          {hasScrolled && (
+          {(hasScrolled || isLargeScreen) && (
             <Suspense
               fallback={
                 <div className="h-40 animate-pulse bg-gray-200 rounded-lg" />
@@ -1298,7 +1319,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
             </Suspense>
           )}
 
-          {hasScrolled && (
+          {(hasScrolled || isLargeScreen) && (
             <Suspense
               fallback={
                 <div className="h-40 animate-pulse bg-gray-200 rounded-lg" />
@@ -1315,7 +1336,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
             </Suspense>
           )}
 
-          {hasScrolled && (
+          {(hasScrolled || isLargeScreen) && (
             <Suspense
               fallback={
                 <div className="h-40 animate-pulse bg-gray-200 rounded-lg" />
@@ -1388,7 +1409,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         />
       )}
 
-      {hasScrolled && (
+      {(hasScrolled || isLargeScreen) && (
         <Suspense fallback={null}>
           <AskToSellerBubble
             onTap={() => {
@@ -1407,7 +1428,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
       {/* Description Modal */}
       {showDescriptionModal && product.description && (
-        <div className="fixed top-4 right-4 z-50 max-w-md w-[calc(100vw-2rem)] animate-slideInFromTop">
+        <div className="fixed top-4 right-4 z-[100] max-w-md w-[calc(100vw-2rem)] animate-slideInFromTop">
           <div
             className={`rounded-lg shadow-2xl border overflow-hidden ${
               isDarkMode

@@ -77,6 +77,17 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
     return () => observer.disconnect();
   }, []);
 
+  // ✅ Reset search state when navigating away from search results
+  useEffect(() => {
+    const isSearchResultsPage = pathname.includes("/search-results");
+
+    if (!isSearchResultsPage) {
+      // Clear search term when not on search results page
+      setSearchTerm("");
+      setIsSearching(false);
+    }
+  }, [pathname]);
+
   // ✅ OPTIMIZED: Click outside handler with proper cleanup
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -194,7 +205,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
   if (userLoading) {
     return (
       <header
-        className={`sticky top-0 z-50 ${
+        className={`sticky top-0 z-[100] ${
           isDark ? "bg-gray-900/95" : "bg-white/95"
         } backdrop-blur-xl border-b ${
           isDark ? "border-gray-700/50" : "border-gray-200/50"
@@ -228,7 +239,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
     <>
       <header
         className={`
-        sticky top-0 z-50
+        sticky top-0 z-[900]
         ${
           isDark
             ? "bg-gray-900/95 border-gray-700/50"
