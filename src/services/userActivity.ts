@@ -9,7 +9,7 @@ import {
   import { 
     getFunctions, 
     httpsCallable, 
-    connectFunctionsEmulator 
+    
   } from 'firebase/functions';
   
   // ============================================================================
@@ -72,7 +72,7 @@ import {
     source?: 'search' | 'category' | 'recommendation' | 'trending' | 'direct' | string;
     quantity?: number;
     totalValue?: number;
-    extra?: Record<string, any>;
+    extra?: Record<string, unknown>;
   }
   
   /**
@@ -178,6 +178,33 @@ import {
     query: string;
     resultCount?: number;
     selectedCategory?: string;
+  }
+  
+  /**
+   * Product object for convenience tracking methods
+   */
+  export interface ProductData {
+    id: string;
+    shopId?: string;
+    category?: string;
+    subcategory?: string;
+    subsubcategory?: string;
+    brandModel?: string;
+    price?: number;
+  }
+  
+  /**
+   * Cart data object for convenience tracking methods
+   */
+  export interface CartItemData {
+    productId: string;
+    shopId?: string;
+    productName?: string;
+    category?: string;
+    subcategory?: string;
+    subsubcategory?: string;
+    brandModel?: string;
+    unitPrice?: number;
   }
   
   // ============================================================================
@@ -743,7 +770,7 @@ import {
     /**
      * Track from Product object (convenience method)
      */
-    public trackProductClick(product: any, source?: string): void {
+    public trackProductClick(product: ProductData, source?: string): void {
       try {
         this.trackClick({
           productId: product.id,
@@ -763,7 +790,7 @@ import {
     /**
      * Track from Product object (convenience method)
      */
-    public trackProductView(product: any, source?: string, viewDuration?: number): void {
+    public trackProductView(product: ProductData, source?: string, viewDuration?: number): void {
       try {
         this.trackView({
           productId: product.id,
@@ -784,7 +811,7 @@ import {
     /**
      * Track from cart data map (convenience method)
      */
-    public trackCartAdd(cartData: any, quantity = 1): void {
+    public trackCartAdd(cartData: CartItemData, quantity = 1): void {
       try {
         this.trackAddToCart({
           productId: cartData.productId,
