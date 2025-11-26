@@ -224,6 +224,7 @@ export async function GET(
       colorImages: safeColorImages(data.colorImages),
       videoUrl: data.videoUrl?.toString() || null,
       attributes: attributes,
+      relatedProductIds: safeStringArray(data.relatedProductIds),
       // Add reference information for sale preferences loading
       reference: {
         id: doc.id,

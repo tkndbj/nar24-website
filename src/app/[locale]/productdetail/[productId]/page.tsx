@@ -1346,6 +1346,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                 productId={product.id}
                 category={product.category}
                 subcategory={product.subcategory}
+                relatedProductIds={product.relatedProductIds}
                 isDarkMode={isDarkMode}
                 localization={localization}
               />
@@ -1428,63 +1429,70 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
       {/* Description Modal */}
       {showDescriptionModal && product.description && (
-        <div className="fixed top-4 right-4 z-[100] max-w-md w-[calc(100vw-2rem)] animate-slideInFromTop">
+        <>
+          {/* Backdrop for click-outside dismiss */}
           <div
-            className={`rounded-lg shadow-2xl border overflow-hidden ${
-              isDarkMode
-                ? "bg-gray-800 border-gray-700"
-                : "bg-white border-gray-200"
-            }`}
-            style={{
-              animation: "slideInFromTop 0.3s ease-out forwards",
-            }}
-          >
+            className="fixed inset-0 z-[999]"
+            onClick={() => setShowDescriptionModal(false)}
+          />
+          <div className="fixed top-20 right-4 z-[1000] max-w-md w-[calc(100vw-2rem)]">
             <div
-              className={`flex items-center justify-between p-3 border-b ${
-                isDarkMode ? "border-gray-700" : "border-gray-200"
+              className={`rounded-lg shadow-2xl border overflow-hidden ${
+                isDarkMode
+                  ? "bg-gray-800 border-gray-700"
+                  : "bg-white border-gray-200"
               }`}
+              style={{
+                animation: "slideInFromTop 0.3s ease-out forwards",
+              }}
             >
-              <h3
-                className={`text-sm sm:text-base font-bold ${
-                  isDarkMode ? "text-white" : "text-gray-900"
+              <div
+                className={`flex items-center justify-between p-3 border-b ${
+                  isDarkMode ? "border-gray-700" : "border-gray-200"
                 }`}
               >
-                {t("productDescription")}
-              </h3>
-              <button
-                onClick={() => setShowDescriptionModal(false)}
-                className={`p-1 rounded-lg transition-colors ${
-                  isDarkMode
-                    ? "hover:bg-gray-700 text-gray-400"
-                    : "hover:bg-gray-100 text-gray-600"
+                <h3
+                  className={`text-sm sm:text-base font-bold ${
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  }`}
+                >
+                  {t("productDescription")}
+                </h3>
+                <button
+                  onClick={() => setShowDescriptionModal(false)}
+                  className={`p-1 rounded-lg transition-colors ${
+                    isDarkMode
+                      ? "hover:bg-gray-700 text-gray-400"
+                      : "hover:bg-gray-100 text-gray-600"
+                  }`}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div
+                className={`p-3 max-h-[70vh] overflow-y-auto ${
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
                 }`}
               >
-                <X className="w-5 h-5" />
-              </button>
+                <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap">
+                  {product.description}
+                </p>
+              </div>
             </div>
-            <div
-              className={`p-3 max-h-[70vh] overflow-y-auto ${
-                isDarkMode ? "text-gray-300" : "text-gray-700"
-              }`}
-            >
-              <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap">
-                {product.description}
-              </p>
-            </div>
+            <style jsx>{`
+              @keyframes slideInFromTop {
+                0% {
+                  transform: translateY(-100%);
+                  opacity: 0;
+                }
+                100% {
+                  transform: translateY(0);
+                  opacity: 1;
+                }
+              }
+            `}</style>
           </div>
-          <style jsx>{`
-            @keyframes slideInFromTop {
-              0% {
-                transform: translateY(-100%);
-                opacity: 0;
-              }
-              100% {
-                transform: translateY(0);
-                opacity: 1;
-              }
-            }
-          `}</style>
-        </div>
+        </>
       )}
     </div>
   );

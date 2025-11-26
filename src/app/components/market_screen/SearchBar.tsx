@@ -94,14 +94,17 @@ export default function SearchBar({
     }
 
     const updatePosition = () => {
-      if (searchContainerRef.current) {
-        const rect = searchContainerRef.current.getBoundingClientRect();
-        setDropdownPosition({
-          top: rect.bottom + 8, // 8px gap (mt-2)
-          left: rect.left,
-          width: rect.width,
-        });
-      }
+      // Use requestAnimationFrame to ensure layout is complete
+      requestAnimationFrame(() => {
+        if (searchContainerRef.current) {
+          const rect = searchContainerRef.current.getBoundingClientRect();
+          setDropdownPosition({
+            top: rect.bottom + 8, // 8px gap (mt-2)
+            left: rect.left,
+            width: rect.width,
+          });
+        }
+      });
     };
 
     updatePosition();

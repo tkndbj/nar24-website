@@ -8,6 +8,7 @@ import { useTranslations } from "next-intl";
 
 interface ProductDetailRelatedProductsProps {
   productId?: string;
+  relatedProductIds?: string[];
   category?: string;
   subcategory?: string;
   isLoading?: boolean;
@@ -63,7 +64,7 @@ const LoadingSkeleton: React.FC<{
 
 const ProductDetailRelatedProducts: React.FC<
   ProductDetailRelatedProductsProps
-> = ({ productId, isDarkMode = false, localization }) => {
+> = ({ productId, relatedProductIds: preloadedIds, isDarkMode = false, localization }) => {
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingInitiated, setLoadingInitiated] = useState(false);
@@ -177,72 +178,54 @@ const ProductDetailRelatedProducts: React.FC<
     }
   }, [relatedProducts, checkScrollPosition]);
 
-  // ✅ LAZY LOADING: Fetch related products only when widget becomes visible
-  // Matches Flutter's loadRelatedProductsIfNeeded() approach
   const fetchRelatedProducts = useCallback(async () => {
-    if (!productId || productId.trim() === "" || loadingInitiated) {
+    if (loadingInitiated) return;
+    
+    // Need either preloaded IDs or productId to fetch
+    if (!preloadedIds?.length && (!productId || productId.trim() === "")) {
       return;
     }
-
+  
     setLoadingInitiated(true);
     setLoading(true);
-
+  
     try {
       setError(null);
-
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-      const response = await fetch(`/api/relatedproducts/${productId}`, {
+  
+      let url: string;
+      
+      // ✅ If we have pre-loaded IDs, use batch endpoint (faster)
+      if (preloadedIds && preloadedIds.length > 0) {
+        url = `/api/products/batch?ids=${preloadedIds.slice(0, 10).join(',')}`;
+      } else {
+        // Fallback to original endpoint
+        url = `/api/relatedproducts/${productId}`;
+      }
+  
+      const response = await fetch(url, {
         method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         signal: controller.signal,
       });
-
+  
       clearTimeout(timeoutId);
-
+  
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error("API Error Response:", errorText);
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-
+  
       const data = await response.json();
-
-      if (data.error && (!data.products || data.products.length === 0)) {
-        console.warn("API returned error:", data.error);
-        setError(data.error);
-        setRelatedProducts([]);
-      } else {
-        setRelatedProducts(data.products || []);
-        console.log(
-          `Loaded ${data.products?.length || 0} related products (${
-            data.source
-          })`
-        );
-      }
+      setRelatedProducts(data.products || []);
     } catch (err) {
       console.error("Error fetching related products:", err);
-
-      if (err instanceof Error) {
-        if (err.name === "AbortError") {
-          setError(t("requestTimeout"));
-        } else if (err.message.includes("Failed to fetch")) {
-          setError(t("networkError"));
-        } else {
-          setError(err.message);
-        }
-      } else {
-        setError(t("failedToLoadRelated"));
-      }
-
+      setError(err instanceof Error ? err.message : t("failedToLoadRelated"));
       setRelatedProducts([]);
     } finally {
       setLoading(false);
     }
-  }, [productId, loadingInitiated, t]);
+  }, [productId, preloadedIds, loadingInitiated, t]);
 
   // ✅ LAZY LOADING: Setup intersection observer
   // Matches Flutter's WidgetsBinding.instance.addPostFrameCallback approach
