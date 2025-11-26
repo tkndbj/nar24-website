@@ -31,6 +31,7 @@ import ProductOptionSelector from "@/app/components/ProductOptionSelector";
 import { Product } from "@/app/models/Product";
 import { analyticsBatcher } from "@/app/utils/analyticsBatcher";
 import { useProductCache } from "@/context/ProductCacheProvider";
+import { userActivityService } from '@/services/userActivity';
 
 interface ProductCardProps {
   product: Product;
@@ -470,6 +471,17 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
     }
 
     lastNavigationTimeRef.current = now;
+
+    userActivityService.trackClick({
+      productId: product.id,
+      shopId: product.shopId,
+      productName: product.productName,
+      category: product.category,
+      subcategory: product.subcategory,
+      subsubcategory: product.subsubcategory,
+      brand: product.brandModel,
+      price: product.price,      
+    });
 
     // Record click analytics (matches Flutter's market.incrementClickCount)
     analyticsBatcher.recordClick(product.id, product.shopId);

@@ -38,6 +38,7 @@ import { db } from "@/lib/firebase";
 import { useUser } from "./UserProvider";
 import redisService from "@/services/redis_service";
 import metricsEventService from "@/services/cartfavoritesmetricsEventService";
+import { userActivityService } from '@/services/userActivity';
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -432,6 +433,57 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
     []
   );
 
+  const getProductMetadata = useCallback(
+    async (productId: string): Promise<{
+      shopId?: string;
+      productName?: string;
+      category?: string;
+      subcategory?: string;
+      subsubcategory?: string;
+      brand?: string;
+    }> => {
+      try {
+        // ✅ Fetch BOTH collections in parallel
+        const [productDoc, shopProductDoc] = await Promise.all([
+          getDoc(doc(db, "products", productId)),
+          getDoc(doc(db, "shop_products", productId)),
+        ]);
+  
+        // Prefer products collection if it exists
+        if (productDoc.exists()) {
+          const data = productDoc.data();
+          return {
+            shopId: data?.shopId as string | undefined,
+            productName: data?.productName as string | undefined,
+            category: data?.category as string | undefined,
+            subcategory: data?.subcategory as string | undefined,
+            subsubcategory: data?.subsubcategory as string | undefined,
+            brand: data?.brandModel as string | undefined,
+          };
+        }
+  
+        // Fall back to shop_products
+        if (shopProductDoc.exists()) {
+          const data = shopProductDoc.data();
+          return {
+            shopId: data?.shopId as string | undefined,
+            productName: data?.productName as string | undefined,
+            category: data?.category as string | undefined,
+            subcategory: data?.subcategory as string | undefined,
+            subsubcategory: data?.subsubcategory as string | undefined,
+            brand: data?.brandModel as string | undefined,
+          };
+        }
+  
+        return {};
+      } catch (error) {
+        console.warn("⚠️ Failed to get product metadata:", error);
+        return {};
+      }
+    },
+    []
+  );
+
   const showErrorToast = useCallback((message: string) => {
     console.error("❌", message);
     // TODO: Implement toast notification
@@ -650,6 +702,15 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
             // STEP 2: Delete from Firestore
             await deleteDoc(existingSnap.docs[0].ref);
 
+            const metadata = await getProductMetadata(productId);
+userActivityService.trackUnfavorite({
+  productId,
+  shopId: metadata.shopId || undefined,
+  productName: metadata.productName || undefined,
+  category: metadata.category || undefined,
+  brand: metadata.brand || undefined,
+});
+
             // ✅ STEP 3: Get shopId and log metrics
             const shopId = await getProductShopId(productId);
             metricsEventService.logFavoriteRemoved({
@@ -693,6 +754,17 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
             await addDoc(collection(db, collectionPath), favoriteData);
 
+            const metadata = await getProductMetadata(productId);
+            userActivityService.trackFavorite({
+              productId,
+              shopId: metadata.shopId || undefined,
+              productName: metadata.productName || undefined,
+              category: metadata.category || undefined,
+              subcategory: metadata.subcategory || undefined,
+              subsubcategory: metadata.subsubcategory || undefined,
+              brand: metadata.brand || undefined,
+              price: undefined, // We don't have price here
+            });
             // ✅ STEP 2.5: FETCH AND ADD PRODUCT TO PAGINATED LIST (NEW!)
             try {
               // Fetch product details from BOTH collections

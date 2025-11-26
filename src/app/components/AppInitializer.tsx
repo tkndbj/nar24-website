@@ -3,6 +3,7 @@
 import { useEffect, ReactNode } from "react";
 import { memoryManager } from "@/app/utils/memoryManager";
 import redisService from "@/services/redis_service";
+import { userActivityService } from "@/services/userActivity"; // ✅ ADD THIS
 
 /**
  * AppInitializer - Handles global app initialization
@@ -24,10 +25,16 @@ export function AppInitializer({ children }: { children: ReactNode }) {
       console.warn("⚠️ Redis not configured - caching disabled");
     }
 
+    // ✅ ADD THIS - Initialize UserActivityService
+    userActivityService.initialize();
+    console.log("✅ UserActivityService initialized");
+
     // Cleanup on unmount
     return () => {
       memoryManager.dispose();
       redisService.dispose();
+      userActivityService.dispose(); // ✅ ADD THIS
+      console.log("✅ UserActivityService disposed");
     };
   }, []);
 

@@ -38,6 +38,7 @@ import { ProductUtils, Product } from "@/app/models/Product";
 import RedisService from "@/services/redis_service";
 import { httpsCallable, Functions } from "firebase/functions";
 import metricsEventService from "@/services/cartfavoritesmetricsEventService";
+import { userActivityService } from '@/services/userActivity';
 
 // ============================================================================
 // TYPES - Matching Flutter implementation
@@ -1179,6 +1180,18 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           updatedAt: serverTimestamp(),
         });
 
+        userActivityService.trackAddToCart({
+          productId: product.id,
+          shopId: product.shopId,
+          productName: product.productName,
+          category: product.category,
+          subcategory: product.subcategory,
+          subsubcategory: product.subsubcategory,
+          brand: product.brandModel,
+          price: product.price,
+          quantity,
+        });
+
         // Metrics logging
         const shopId = await getProductShopId(product.id);
         metricsEventService.logCartAdded({
@@ -1319,6 +1332,13 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         const shopId = await getProductShopId(productId);
 
         await deleteDoc(doc(db, "users", user.uid, "cart", productId));
+
+        userActivityService.trackRemoveFromCart({
+          productId,
+          shopId: shopId || undefined,
+          // Note: We don't have productName/category here unless we fetch from cartItems
+          // You can optionally find it from cartItems state before deletion
+        });
 
         // ✅ ADD METRICS LOGGING (NEW)
         metricsEventService.logCartRemoved({

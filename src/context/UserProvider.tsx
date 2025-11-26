@@ -19,6 +19,7 @@ import { requestDeduplicator } from "@/app/utils/requestDeduplicator";
 import { debouncer } from "@/app/utils/debouncer";
 import { impressionBatcher } from "@/app/utils/impressionBatcher";
 import { clearPreferenceProductsCache } from "@/app/components/market_screen/PreferenceProduct";
+import { analyticsBatcher } from "@/app/utils/analyticsBatcher";
 interface ProfileData {
   displayName?: string;
   email?: string;
@@ -175,13 +176,13 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   // Initialize auth state listener
   useEffect(() => {
     if (typeof window === "undefined") return;
-
+  
     const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
       if (firebaseUser) {
         setInternalFirebaseUser(firebaseUser);
-
+  
         const needs2FA = await check2FARequirement(firebaseUser);
-
+  
         if (needs2FA) {
           setPending2FA(true);
           setUser(null);
@@ -189,7 +190,10 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
           setUser(firebaseUser);
           setPending2FA(false);
         }
-
+  
+        // ✅ Only sync analyticsBatcher (userActivityService syncs itself)
+        analyticsBatcher.setCurrentUserId(firebaseUser.uid);
+  
         // Fetch profile data
         try {
           const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
@@ -208,18 +212,21 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         setProfileData(null);
         setIsAdmin(false);
         setPending2FA(false);
-
-        // ✅ NEW: Clear all caches on logout
+  
+        // ✅ Only clear analyticsBatcher (userActivityService clears itself)
+        analyticsBatcher.setCurrentUserId(null);
+  
+        // Clear all caches on logout (existing)
         cacheManager.clearAll();
         clearPreferenceProductsCache();
         requestDeduplicator.cancelAll();
         debouncer.cancelAll();
         console.log("🧹 Cleared all caches and pending operations on logout");
       }
-
+  
       setIsLoading(false);
     });
-
+  
     return () => unsubscribe();
   }, [check2FARequirement]);
 

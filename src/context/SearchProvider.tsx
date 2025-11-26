@@ -13,6 +13,7 @@ import { circuitBreaker, CIRCUITS } from "@/app/utils/circuitBreaker";
 import { requestDeduplicator } from "@/app/utils/requestDeduplicator";
 import { debouncer, DEBOUNCE_DELAYS } from "@/app/utils/debouncer";
 import { cacheManager, CACHE_NAMES } from "@/app/utils/cacheManager";
+import { userActivityService } from '@/services/userActivity';
 
 interface SearchContextType {
   term: string;
@@ -211,6 +212,11 @@ const performSearch = useCallback(
         clearResults();
         return;
       }
+
+      userActivityService.trackSearch({
+        query: trimmed,
+        // resultCount will be added after we get results
+      });
 
       setLoadingState();
       await performSearch(trimmed);
