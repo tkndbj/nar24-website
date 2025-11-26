@@ -36,8 +36,7 @@ export interface Product {
   subcategory: string;
   subsubcategory: string;
   quantity: number;
-  bestSellerRank?: number;
-  sold: boolean;
+  bestSellerRank?: number;  
   clickCount: number;
   clickCountAtStart: number;
   favoritesCount: number;
@@ -306,7 +305,7 @@ export class ProductUtils {
         json.bestSellerRank != null
           ? ProductUtils.safeInt(json.bestSellerRank)
           : undefined,
-      sold: Boolean(json.sold),
+      
       clickCount: ProductUtils.safeInt(json.clickCount),
       clickCountAtStart: ProductUtils.safeInt(json.clickCountAtStart),
       favoritesCount: ProductUtils.safeInt(json.favoritesCount),
@@ -372,7 +371,7 @@ export class ProductUtils {
       subsubcategory: product.subsubcategory,
       quantity: product.quantity,
       bestSellerRank: product.bestSellerRank,
-      sold: product.sold,
+      
       clickCount: product.clickCount,
       clickCountAtStart: product.clickCountAtStart,
       favoritesCount: product.favoritesCount,
@@ -497,7 +496,7 @@ export class ProductUtils {
       subsubcategory: product.subsubcategory,
       quantity: product.quantity,
       bestSellerRank: product.bestSellerRank,
-      sold: product.sold,
+      
       clickCount: product.clickCount,
       clickCountAtStart: product.clickCountAtStart,
       favoritesCount: product.favoritesCount,
