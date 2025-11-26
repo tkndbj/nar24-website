@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { createPortal } from "react-dom";
 import {
   Search,
   Clock,
@@ -51,6 +52,13 @@ export default function SearchBar({
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Track if component is mounted (for portal)
+  useEffect(() => {
+    setIsMounted(true);
+    return () => setIsMounted(false);
+  }, []);
 
   const {
     isLoading,
@@ -369,8 +377,8 @@ export default function SearchBar({
         </button>
       </div>
 
-      {/* Search Dropdown - Fixed positioning to escape stacking context */}
-      {isSearching && dropdownPosition && (
+      {/* Search Dropdown - Portal to escape stacking context completely */}
+      {isMounted && isSearching && dropdownPosition && createPortal(
         <div
           ref={dropdownRef}
           style={{
@@ -625,7 +633,8 @@ export default function SearchBar({
               </p>
             </div>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

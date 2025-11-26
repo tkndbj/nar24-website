@@ -402,6 +402,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
   const [isHovered, setIsHovered] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [showEnlargedImage, setShowEnlargedImage] = useState(false);
+  const [enlargedImagePosition, setEnlargedImagePosition] = useState<{ top: number; left: number } | null>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // ✅ CRITICAL: Only show selector for CART operations, not favorites
@@ -890,10 +891,44 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
     [currentImageUrls.length]
   );
 
+  const imageContainerRef = useRef<HTMLDivElement>(null);
+
   const handleImageHover = useCallback(() => {
     setIsHovered(true);
     // Set timeout to show enlarged image after 1 second
     hoverTimeoutRef.current = setTimeout(() => {
+      if (imageContainerRef.current) {
+        const rect = imageContainerRef.current.getBoundingClientRect();
+        const enlargedWidth = 550;
+        const enlargedHeight = 550;
+        const padding = 16;
+
+        // Try to position to the right of the card
+        let left = rect.right + padding;
+        let top = rect.top + (rect.height / 2) - (enlargedHeight / 2);
+
+        // If it would go off the right edge, position to the left
+        if (left + enlargedWidth > window.innerWidth - padding) {
+          left = rect.left - enlargedWidth - padding;
+        }
+
+        // If it would go off the left edge, fallback to right side overlapping
+        if (left < padding) {
+          left = rect.right + padding;
+        }
+
+        // Ensure it doesn't go above the viewport
+        if (top < padding) {
+          top = padding;
+        }
+
+        // Ensure it doesn't go below the viewport
+        if (top + enlargedHeight > window.innerHeight - padding) {
+          top = window.innerHeight - enlargedHeight - padding;
+        }
+
+        setEnlargedImagePosition({ top, left });
+      }
       setShowEnlargedImage(true);
     }, 1000);
   }, []);
@@ -916,6 +951,46 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
       }
     };
   }, []);
+
+  // ✅ Global mouse position check to ensure enlarged image dismisses properly
+  useEffect(() => {
+    if (!showEnlargedImage) return;
+
+    const handleGlobalMouseMove = (e: MouseEvent) => {
+      if (!imageContainerRef.current) {
+        setShowEnlargedImage(false);
+        return;
+      }
+
+      const rect = imageContainerRef.current.getBoundingClientRect();
+      const buffer = 20; // Small buffer zone
+
+      const isOutside =
+        e.clientX < rect.left - buffer ||
+        e.clientX > rect.right + buffer ||
+        e.clientY < rect.top - buffer ||
+        e.clientY > rect.bottom + buffer;
+
+      if (isOutside) {
+        setShowEnlargedImage(false);
+        setIsHovered(false);
+        if (hoverTimeoutRef.current) {
+          clearTimeout(hoverTimeoutRef.current);
+          hoverTimeoutRef.current = null;
+        }
+      }
+    };
+
+    // Add listener with a small delay to avoid immediate dismissal
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('mousemove', handleGlobalMouseMove);
+    }, 100);
+
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('mousemove', handleGlobalMouseMove);
+    };
+  }, [showEnlargedImage]);
 
   // ✅ Determine active dot for pagination (matches Flutter logic)
   const getActiveDotIndex = useCallback(() => {
@@ -954,6 +1029,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
         <div className="flex flex-col w-full">
           {/* Image Section */}
           <div
+            ref={imageContainerRef}
             className="relative group h-[28vh] md:h-[38vh]"
             style={imageHeight ? { height: imageHeight } : {}}
             onMouseEnter={handleImageHover}
@@ -1269,14 +1345,13 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
       </div>
       </div>
 
-      {/* Enlarged Image Preview - Positioned near the product */}
-      {showEnlargedImage && currentImageUrl && (
+      {/* Enlarged Image Preview - Positioned near the product card */}
+      {showEnlargedImage && currentImageUrl && enlargedImagePosition && (
         <div
           className="fixed z-[99999]"
           style={{
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-30%, -50%)',
+            top: enlargedImagePosition.top,
+            left: enlargedImagePosition.left,
             pointerEvents: 'none',
           }}
         >
