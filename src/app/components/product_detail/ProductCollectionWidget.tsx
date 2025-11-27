@@ -27,6 +27,7 @@ interface ProductCollectionWidgetProps {
   isLoading?: boolean;
   isDarkMode?: boolean;
   localization?: ReturnType<typeof useTranslations>;
+  prefetchedData?: CollectionData | null;
 }
 
 interface CollectionProductCardProps {
@@ -52,9 +53,11 @@ const CollectionProductCard: React.FC<CollectionProductCardProps> = ({
       onClick={() => onProductClick(product.id)}
     >
       {/* Product image */}
-      <div className={`w-28 h-28 flex-shrink-0 relative ${
-        isDarkMode ? "bg-gray-800" : "bg-gray-100"
-      }`}>
+      <div
+        className={`w-28 h-28 flex-shrink-0 relative ${
+          isDarkMode ? "bg-gray-800" : "bg-gray-100"
+        }`}
+      >
         {product.imageUrls.length > 0 && !imageError ? (
           <Image
             src={product.imageUrls[0]}
@@ -64,29 +67,39 @@ const CollectionProductCard: React.FC<CollectionProductCardProps> = ({
             onError={() => setImageError(true)}
           />
         ) : (
-          <div className={`w-full h-full flex items-center justify-center ${
-            isDarkMode ? "bg-gray-800" : "bg-gray-100"
-          }`}>
-            <Package className={`w-8 h-8 md:w-8 md:h-8 w-6 h-6 ${
-              isDarkMode ? "text-gray-600" : "text-gray-400"
-            }`} />
+          <div
+            className={`w-full h-full flex items-center justify-center ${
+              isDarkMode ? "bg-gray-800" : "bg-gray-100"
+            }`}
+          >
+            <Package
+              className={`w-8 h-8 md:w-8 md:h-8 w-6 h-6 ${
+                isDarkMode ? "text-gray-600" : "text-gray-400"
+              }`}
+            />
           </div>
         )}
-        
+
         {/* Overlay gradient */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
       </div>
 
       {/* Product details */}
       <div className="flex-1 p-4 md:p-4 p-3 flex flex-col justify-center min-w-0">
-        <h4 className={`text-sm md:text-sm text-xs font-semibold line-clamp-2 mb-2 md:mb-2 mb-1 leading-tight transition-colors ${
-          isDarkMode ? "text-white group-hover:text-orange-400" : "text-gray-900 group-hover:text-orange-600"
-        }`}>
+        <h4
+          className={`text-sm md:text-sm text-xs font-semibold line-clamp-2 mb-2 md:mb-2 mb-1 leading-tight transition-colors ${
+            isDarkMode
+              ? "text-white group-hover:text-orange-400"
+              : "text-gray-900 group-hover:text-orange-600"
+          }`}
+        >
           {product.productName}
         </h4>
-        <p className={`text-base md:text-base text-sm font-bold ${
-          isDarkMode ? "text-orange-400" : "text-orange-600"
-        }`}>
+        <p
+          className={`text-base md:text-base text-sm font-bold ${
+            isDarkMode ? "text-orange-400" : "text-orange-600"
+          }`}
+        >
           {product.price} {product.currency}
         </p>
       </div>
@@ -94,28 +107,34 @@ const CollectionProductCard: React.FC<CollectionProductCardProps> = ({
   );
 };
 
-const LoadingSkeleton: React.FC<{ isDarkMode?: boolean }> = ({ 
-  isDarkMode = false 
+const LoadingSkeleton: React.FC<{ isDarkMode?: boolean }> = ({
+  isDarkMode = false,
 }) => (
-  <div className={`rounded-2xl md:rounded-2xl rounded-none -mx-3 px-3 py-4 sm:mx-0 sm:p-6 border-0 sm:border shadow-none sm:shadow-sm ${
-    isDarkMode 
-      ? "bg-gray-800 border-gray-700" 
-      : "bg-white border-gray-200"
-  }`}>
+  <div
+    className={`rounded-2xl md:rounded-2xl rounded-none -mx-3 px-3 py-4 sm:mx-0 sm:p-6 border-0 sm:border shadow-none sm:shadow-sm ${
+      isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+    }`}
+  >
     <div className="space-y-6 md:space-y-6 space-y-4">
       {/* Header skeleton */}
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-3 md:gap-3 gap-2">
-          <div className={`w-10 h-10 md:w-10 md:h-10 w-8 h-8 rounded-xl animate-pulse ${
-            isDarkMode ? "bg-gray-700" : "bg-gray-200"
-          }`} />
-          <div className={`w-40 md:w-40 w-32 h-6 md:h-6 h-5 rounded animate-pulse ${
-            isDarkMode ? "bg-gray-700" : "bg-gray-200"
-          }`} />
+          <div
+            className={`w-10 h-10 md:w-10 md:h-10 w-8 h-8 rounded-xl animate-pulse ${
+              isDarkMode ? "bg-gray-700" : "bg-gray-200"
+            }`}
+          />
+          <div
+            className={`w-40 md:w-40 w-32 h-6 md:h-6 h-5 rounded animate-pulse ${
+              isDarkMode ? "bg-gray-700" : "bg-gray-200"
+            }`}
+          />
         </div>
-        <div className={`w-16 md:w-16 w-12 h-4 rounded animate-pulse ${
-          isDarkMode ? "bg-gray-700" : "bg-gray-200"
-        }`} />
+        <div
+          className={`w-16 md:w-16 w-12 h-4 rounded animate-pulse ${
+            isDarkMode ? "bg-gray-700" : "bg-gray-200"
+          }`}
+        />
       </div>
 
       {/* Products list skeleton */}
@@ -139,9 +158,12 @@ const ProductCollectionWidget: React.FC<ProductCollectionWidgetProps> = ({
   isLoading = false,
   isDarkMode = false,
   localization,
+  prefetchedData,
 }) => {
   const router = useRouter();
-  const [collectionData, setCollectionData] = useState<CollectionData | null>(null);
+  const [collectionData, setCollectionData] = useState<CollectionData | null>(
+    null
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -149,37 +171,41 @@ const ProductCollectionWidget: React.FC<ProductCollectionWidgetProps> = ({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // ✅ FIXED: Proper nested translation function that uses JSON files
-  const t = useCallback((key: string) => {
-    if (!localization) {
-      return key;
-    }
+  const t = useCallback(
+    (key: string) => {
+      if (!localization) {
+        return key;
+      }
 
-    try {
-      // Try to get the nested ProductCollectionWidget translation
-      const translation = localization(`ProductCollectionWidget.${key}`);
-      
-      // Check if we got a valid translation (not the same as the key we requested)
-      if (translation && translation !== `ProductCollectionWidget.${key}`) {
-        return translation;
+      try {
+        // Try to get the nested ProductCollectionWidget translation
+        const translation = localization(`ProductCollectionWidget.${key}`);
+
+        // Check if we got a valid translation (not the same as the key we requested)
+        if (translation && translation !== `ProductCollectionWidget.${key}`) {
+          return translation;
+        }
+
+        // If nested translation doesn't exist, try direct key
+        const directTranslation = localization(key);
+        if (directTranslation && directTranslation !== key) {
+          return directTranslation;
+        }
+
+        // Return the key as fallback
+        return key;
+      } catch (error) {
+        console.warn(`Translation error for key: ${key}`, error);
+        return key;
       }
-      
-      // If nested translation doesn't exist, try direct key
-      const directTranslation = localization(key);
-      if (directTranslation && directTranslation !== key) {
-        return directTranslation;
-      }
-      
-      // Return the key as fallback
-      return key;
-    } catch (error) {
-      console.warn(`Translation error for key: ${key}`, error);
-      return key;
-    }
-  }, [localization]);
+    },
+    [localization]
+  );
 
   const checkScrollPosition = useCallback(() => {
     if (scrollContainerRef.current) {
-      const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
+      const { scrollLeft, scrollWidth, clientWidth } =
+        scrollContainerRef.current;
       setCanScrollLeft(scrollLeft > 0);
       setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1);
     }
@@ -207,6 +233,15 @@ const ProductCollectionWidget: React.FC<ProductCollectionWidgetProps> = ({
   }, [collectionData, checkScrollPosition]);
 
   useEffect(() => {
+    // ✅ PRIORITY 1: Use prefetched data (INSTANT)
+    if (prefetchedData) {
+      console.log("✅ Collection: Using prefetched data");
+      setCollectionData(prefetchedData);
+      setLoading(false);
+      return;
+    }
+
+    // ✅ PRIORITY 2: Fetch from API (fallback)
     const fetchProductCollection = async () => {
       if (!shopId) {
         setLoading(false);
@@ -219,50 +254,46 @@ const ProductCollectionWidget: React.FC<ProductCollectionWidgetProps> = ({
 
         const response = await fetch(`/api/collections/by-product`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            productId,
-            shopId,
-          }),
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ productId, shopId }),
         });
 
-        // ✅ Handle 404 gracefully - it just means no collection exists
         if (response.status === 404) {
-          // This is normal - product is not in any collection
           setCollectionData(null);
           setLoading(false);
           return;
         }
 
         if (!response.ok) {
-          // Only throw for actual errors (500, network issues, etc.)
           throw new Error(t("failedToFetchCollection"));
         }
 
         const data = await response.json();
         setCollectionData(data);
       } catch (err) {
-        // Only log actual errors, not 404s
         console.error("Error fetching product collection:", err);
-        setError(err instanceof Error ? err.message : t("failedToLoadCollection"));
+        setError(
+          err instanceof Error ? err.message : t("failedToLoadCollection")
+        );
       } finally {
         setLoading(false);
       }
     };
 
     fetchProductCollection();
-  }, [productId, shopId, t]);
+  }, [productId, shopId, t, prefetchedData]);
 
-  const handleProductClick = useCallback((clickedProductId: string) => {
-    router.push(`/productdetail/${clickedProductId}`);
-  }, [router]);
+  const handleProductClick = useCallback(
+    (clickedProductId: string) => {
+      router.push(`/productdetail/${clickedProductId}`);
+    },
+    [router]
+  );
 
   const handleViewAll = useCallback(() => {
     if (collectionData && shopId) {
-      sessionStorage.setItem('collectionShopId', shopId);
-      sessionStorage.setItem('collectionName', collectionData.name);
+      sessionStorage.setItem("collectionShopId", shopId);
+      sessionStorage.setItem("collectionName", collectionData.name);
       router.push(`/collections/${collectionData.id}`);
     }
   }, [collectionData, shopId, router]);
@@ -276,36 +307,42 @@ const ProductCollectionWidget: React.FC<ProductCollectionWidgetProps> = ({
   }
 
   return (
-    <div className={`rounded-2xl md:rounded-2xl rounded-none -mx-3 px-3 py-4 sm:mx-0 sm:p-6 border md:border border-0 shadow-sm md:shadow-sm shadow-none ${
-      isDarkMode 
-        ? "bg-gray-800 border-gray-700" 
-        : "bg-white border-gray-200"
-    }`}>
+    <div
+      className={`rounded-2xl md:rounded-2xl rounded-none -mx-3 px-3 py-4 sm:mx-0 sm:p-6 border md:border border-0 shadow-sm md:shadow-sm shadow-none ${
+        isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+      }`}
+    >
       <div className="space-y-6 md:space-y-6 space-y-4">
         {/* Header */}
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-3 md:gap-3 gap-2">
-            <div className={`p-2 md:p-2 p-1.5 rounded-xl ${
-              isDarkMode 
-                ? "bg-orange-900/20 text-orange-400" 
-                : "bg-orange-100 text-orange-600"
-            }`}>
+            <div
+              className={`p-2 md:p-2 p-1.5 rounded-xl ${
+                isDarkMode
+                  ? "bg-orange-900/20 text-orange-400"
+                  : "bg-orange-100 text-orange-600"
+              }`}
+            >
               <Package className="w-5 h-5 md:w-5 md:h-5 w-4 h-4" />
             </div>
             <div>
-              <h3 className={`text-xl md:text-xl text-lg font-bold ${
-                isDarkMode ? "text-white" : "text-gray-900"
-              }`}>
+              <h3
+                className={`text-xl md:text-xl text-lg font-bold ${
+                  isDarkMode ? "text-white" : "text-gray-900"
+                }`}
+              >
                 {t("title")}
               </h3>
-              <p className={`text-sm md:text-sm text-xs ${
-                isDarkMode ? "text-gray-400" : "text-gray-600"
-              }`}>
+              <p
+                className={`text-sm md:text-sm text-xs ${
+                  isDarkMode ? "text-gray-400" : "text-gray-600"
+                }`}
+              >
                 {collectionData.name}
               </p>
             </div>
           </div>
-          
+
           <button
             onClick={handleViewAll}
             className={`flex items-center gap-2 md:gap-2 gap-1.5 px-4 md:px-4 px-3 py-2 md:py-2 py-1.5 rounded-xl font-semibold text-sm md:text-sm text-xs transition-all duration-200 hover:scale-105 ${

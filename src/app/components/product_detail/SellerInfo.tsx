@@ -1,7 +1,15 @@
 // src/components/productdetail/ProductDetailSellerInfo.tsx
 
 import React, { useState, useEffect, useCallback } from "react";
-import { ChevronRight, Verified, Store, User, Star, Package, MessageCircle } from "lucide-react";
+import {
+  ChevronRight,
+  Verified,
+  Store,
+  User,
+  Star,
+  Package,
+  MessageCircle,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 
@@ -21,31 +29,40 @@ interface ProductDetailSellerInfoProps {
   isLoading?: boolean;
   isDarkMode?: boolean;
   localization?: ReturnType<typeof useTranslations>;
+  prefetchedData?: SellerInfo | null;
 }
 
-const LoadingSkeleton: React.FC<{ isDarkMode?: boolean }> = ({ 
-  isDarkMode = false 
+const LoadingSkeleton: React.FC<{ isDarkMode?: boolean }> = ({
+  isDarkMode = false,
 }) => (
-  <div className={`rounded-2xl p-6 border animate-pulse ${
-    isDarkMode 
-      ? "bg-gray-800 border-gray-700" 
-      : "bg-white border-gray-200"
-  }`}>
+  <div
+    className={`rounded-2xl p-6 border animate-pulse ${
+      isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+    }`}
+  >
     <div className="flex items-center gap-4">
-      <div className={`w-12 h-12 rounded-full ${
-        isDarkMode ? "bg-gray-700" : "bg-gray-200"
-      }`} />
+      <div
+        className={`w-12 h-12 rounded-full ${
+          isDarkMode ? "bg-gray-700" : "bg-gray-200"
+        }`}
+      />
       <div className="flex-1 space-y-2">
-        <div className={`w-32 h-4 rounded ${
-          isDarkMode ? "bg-gray-700" : "bg-gray-200"
-        }`} />
-        <div className={`w-24 h-3 rounded ${
-          isDarkMode ? "bg-gray-700" : "bg-gray-200"
-        }`} />
+        <div
+          className={`w-32 h-4 rounded ${
+            isDarkMode ? "bg-gray-700" : "bg-gray-200"
+          }`}
+        />
+        <div
+          className={`w-24 h-3 rounded ${
+            isDarkMode ? "bg-gray-700" : "bg-gray-200"
+          }`}
+        />
       </div>
-      <div className={`w-6 h-6 rounded ${
-        isDarkMode ? "bg-gray-700" : "bg-gray-200"
-      }`} />
+      <div
+        className={`w-6 h-6 rounded ${
+          isDarkMode ? "bg-gray-700" : "bg-gray-200"
+        }`}
+      />
     </div>
   </div>
 );
@@ -57,6 +74,7 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
   isLoading = false,
   isDarkMode = false,
   localization,
+  prefetchedData,
 }) => {
   const router = useRouter();
   const [sellerInfo, setSellerInfo] = useState<SellerInfo | null>(null);
@@ -64,37 +82,49 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   // ✅ FIXED: Proper nested translation function that uses JSON files
-  const t = useCallback((key: string) => {
-    if (!localization) {
-      return key;
-    }
+  const t = useCallback(
+    (key: string) => {
+      if (!localization) {
+        return key;
+      }
 
-    try {
-      // Try to get the nested ProductDetailSellerInfo translation
-      const translation = localization(`ProductDetailSellerInfo.${key}`);
-      
-      // Check if we got a valid translation (not the same as the key we requested)
-      if (translation && translation !== `ProductDetailSellerInfo.${key}`) {
-        return translation;
+      try {
+        // Try to get the nested ProductDetailSellerInfo translation
+        const translation = localization(`ProductDetailSellerInfo.${key}`);
+
+        // Check if we got a valid translation (not the same as the key we requested)
+        if (translation && translation !== `ProductDetailSellerInfo.${key}`) {
+          return translation;
+        }
+
+        // If nested translation doesn't exist, try direct key
+        const directTranslation = localization(key);
+        if (directTranslation && directTranslation !== key) {
+          return directTranslation;
+        }
+
+        // Return the key as fallback
+        return key;
+      } catch (error) {
+        console.warn(`Translation error for key: ${key}`, error);
+        return key;
       }
-      
-      // If nested translation doesn't exist, try direct key
-      const directTranslation = localization(key);
-      if (directTranslation && directTranslation !== key) {
-        return directTranslation;
-      }
-      
-      // Return the key as fallback
-      return key;
-    } catch (error) {
-      console.warn(`Translation error for key: ${key}`, error);
-      return key;
-    }
-  }, [localization]);
+    },
+    [localization]
+  );
 
   const isShop = shopId && shopId.trim().length > 0;
 
   useEffect(() => {
+    // ✅ PRIORITY 1: Use prefetched data (INSTANT)
+    if (prefetchedData) {
+      console.log("✅ SellerInfo: Using prefetched data");
+      setSellerInfo(prefetchedData);
+      setLoading(false);
+      return;
+    }
+
+    // ✅ PRIORITY 2: Fetch from API (fallback)
     const fetchSellerInfo = async () => {
       if (!sellerId) {
         setLoading(false);
@@ -120,7 +150,6 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
         setError(
           err instanceof Error ? err.message : t("failedToLoadSellerInfo")
         );
-
         setSellerInfo({
           sellerName: sellerName || t("unknownSeller"),
           sellerAverageRating: 0,
@@ -135,7 +164,7 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
     };
 
     fetchSellerInfo();
-  }, [sellerId, shopId, sellerName, t]);
+  }, [sellerId, shopId, sellerName, t, prefetchedData]);
 
   const handleSellerClick = useCallback(() => {
     if (isShop && shopId) {
@@ -168,33 +197,33 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
   const canNavigate = (isShop && shopId) || sellerId;
 
   return (
-    <div className={`rounded-2xl p-6 border shadow-sm transition-all duration-200 hover:shadow-md ${
-      isDarkMode 
-        ? "bg-gray-800 border-gray-700" 
-        : "bg-white border-gray-200"
-    }`}>
+    <div
+      className={`rounded-2xl p-6 border shadow-sm transition-all duration-200 hover:shadow-md ${
+        isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+      }`}
+    >
       <button
         onClick={handleSellerClick}
         disabled={!canNavigate}
         className={`w-full group ${
-          canNavigate 
-            ? "cursor-pointer"
-            : "cursor-default"
+          canNavigate ? "cursor-pointer" : "cursor-default"
         }`}
       >
         <div className="flex items-center gap-4">
           {/* Seller Avatar/Icon */}
-          <div className={`relative p-3 rounded-full transition-all duration-200 ${
-            isDarkMode 
-              ? "bg-gradient-to-br from-orange-900/20 to-orange-800/20 text-orange-400" 
-              : "bg-gradient-to-br from-orange-100 to-orange-200 text-orange-600"
-          } ${canNavigate ? "group-hover:scale-105" : ""}`}>
+          <div
+            className={`relative p-3 rounded-full transition-all duration-200 ${
+              isDarkMode
+                ? "bg-gradient-to-br from-orange-900/20 to-orange-800/20 text-orange-400"
+                : "bg-gradient-to-br from-orange-100 to-orange-200 text-orange-600"
+            } ${canNavigate ? "group-hover:scale-105" : ""}`}
+          >
             {isShop ? (
               <Store className="w-6 h-6" />
             ) : (
               <User className="w-6 h-6" />
             )}
-            
+
             {sellerInfo.sellerIsVerified && (
               <div className="absolute -top-1 -right-1 bg-blue-500 rounded-full p-1">
                 <Verified className="w-3 h-3 text-white" fill="currentColor" />
@@ -205,15 +234,19 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
           {/* Seller Info */}
           <div className="flex-1 text-left">
             <div className="flex items-center gap-2 mb-1">
-              <h4 className={`font-bold text-lg truncate ${
-                isDarkMode ? "text-white" : "text-gray-900"
-              }`}>
+              <h4
+                className={`font-bold text-lg truncate ${
+                  isDarkMode ? "text-white" : "text-gray-900"
+                }`}
+              >
                 {displayName || t("unknownSeller")}
               </h4>
-              
-              <span className={`text-sm ${
-                isDarkMode ? "text-gray-400" : "text-gray-600"
-              }`}>
+
+              <span
+                className={`text-sm ${
+                  isDarkMode ? "text-gray-400" : "text-gray-600"
+                }`}
+              >
                 {isShop ? t("officialStore") : t("individualSeller")}
               </span>
             </div>
@@ -223,17 +256,21 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
               <div className="flex items-center gap-1">
                 <div className="flex items-center gap-1">
                   <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-                  <span className={`font-semibold ${
-                    isDarkMode ? "text-white" : "text-gray-900"
-                  }`}>
+                  <span
+                    className={`font-semibold ${
+                      isDarkMode ? "text-white" : "text-gray-900"
+                    }`}
+                  >
                     {displayRating.toFixed(1)}
                   </span>
                 </div>
-                
+
                 {sellerInfo.totalReviews > 0 && (
-                  <span className={`${
-                    isDarkMode ? "text-gray-400" : "text-gray-500"
-                  }`}>
+                  <span
+                    className={`${
+                      isDarkMode ? "text-gray-400" : "text-gray-500"
+                    }`}
+                  >
                     ({sellerInfo.totalReviews})
                   </span>
                 )}
@@ -242,9 +279,11 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
               {sellerInfo.totalProductsSold > 0 && (
                 <div className="flex items-center gap-1">
                   <Package className="w-3 h-3" />
-                  <span className={`${
-                    isDarkMode ? "text-gray-400" : "text-gray-500"
-                  }`}>
+                  <span
+                    className={`${
+                      isDarkMode ? "text-gray-400" : "text-gray-500"
+                    }`}
+                  >
                     {sellerInfo.totalProductsSold} {t("sold")}
                   </span>
                 </div>
@@ -254,11 +293,13 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
 
           {/* Arrow Icon */}
           {canNavigate && (
-            <div className={`transition-all duration-200 ${
-              isDarkMode 
-                ? "text-gray-400 group-hover:text-orange-400" 
-                : "text-gray-400 group-hover:text-orange-600"
-            } group-hover:translate-x-1`}>
+            <div
+              className={`transition-all duration-200 ${
+                isDarkMode
+                  ? "text-gray-400 group-hover:text-orange-400"
+                  : "text-gray-400 group-hover:text-orange-600"
+              } group-hover:translate-x-1`}
+            >
               <ChevronRight className="w-5 h-5" />
             </div>
           )}
@@ -266,20 +307,24 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
 
         {/* Trust Indicators */}
         <div className="mt-4 flex items-center gap-3">
-          <div className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${
-            isDarkMode 
-              ? "bg-green-900/20 text-green-400 border border-green-800" 
-              : "bg-green-50 text-green-700 border border-green-200"
-          }`}>
+          <div
+            className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${
+              isDarkMode
+                ? "bg-green-900/20 text-green-400 border border-green-800"
+                : "bg-green-50 text-green-700 border border-green-200"
+            }`}
+          >
             <Verified className="w-3 h-3" />
             {t("verified")} {isShop ? t("store") : t("seller")}
           </div>
-          
-          <div className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${
-            isDarkMode 
-              ? "bg-blue-900/20 text-blue-400 border border-blue-800" 
-              : "bg-blue-50 text-blue-700 border border-blue-200"
-          }`}>
+
+          <div
+            className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${
+              isDarkMode
+                ? "bg-blue-900/20 text-blue-400 border border-blue-800"
+                : "bg-blue-50 text-blue-700 border border-blue-200"
+            }`}
+          >
             <MessageCircle className="w-3 h-3" />
             {t("fastResponse")}
           </div>

@@ -14,6 +14,7 @@ interface ProductDetailRelatedProductsProps {
   isLoading?: boolean;
   isDarkMode?: boolean;
   localization?: ReturnType<typeof useTranslations>;
+  prefetchedProducts?: Product[] | null;
 }
 
 const LoadingSkeleton: React.FC<{
@@ -32,39 +33,45 @@ const LoadingSkeleton: React.FC<{
           }`}
           style={{ height: isMobile ? "420px" : "380px" }}
         >
-        <div className="p-3 sm:p-4 space-y-2 sm:space-y-3 h-full flex flex-col">
-          <div
-            className={`flex-1 rounded-lg sm:rounded-xl ${
-              isDarkMode ? "bg-gray-600" : "bg-gray-300"
-            }`}
-          />
-          <div className="space-y-1.5 sm:space-y-2">
+          <div className="p-3 sm:p-4 space-y-2 sm:space-y-3 h-full flex flex-col">
             <div
-              className={`h-2.5 sm:h-3 rounded w-full ${
+              className={`flex-1 rounded-lg sm:rounded-xl ${
                 isDarkMode ? "bg-gray-600" : "bg-gray-300"
               }`}
             />
-            <div
-              className={`h-2.5 sm:h-3 rounded w-3/4 ${
-                isDarkMode ? "bg-gray-600" : "bg-gray-300"
-              }`}
-            />
-            <div
-              className={`h-3 sm:h-4 rounded w-1/2 ${
-                isDarkMode ? "bg-gray-600" : "bg-gray-300"
-              }`}
-            />
+            <div className="space-y-1.5 sm:space-y-2">
+              <div
+                className={`h-2.5 sm:h-3 rounded w-full ${
+                  isDarkMode ? "bg-gray-600" : "bg-gray-300"
+                }`}
+              />
+              <div
+                className={`h-2.5 sm:h-3 rounded w-3/4 ${
+                  isDarkMode ? "bg-gray-600" : "bg-gray-300"
+                }`}
+              />
+              <div
+                className={`h-3 sm:h-4 rounded w-1/2 ${
+                  isDarkMode ? "bg-gray-600" : "bg-gray-300"
+                }`}
+              />
+            </div>
           </div>
         </div>
-      </div>
-    ))}
-  </div>
+      ))}
+    </div>
   );
 };
 
 const ProductDetailRelatedProducts: React.FC<
   ProductDetailRelatedProductsProps
-> = ({ productId, relatedProductIds: preloadedIds, isDarkMode = false, localization }) => {
+> = ({
+  productId,
+  relatedProductIds: preloadedIds,
+  isDarkMode = false,
+  localization,
+  prefetchedProducts,
+}) => {
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingInitiated, setLoadingInitiated] = useState(false);
@@ -170,6 +177,15 @@ const ProductDetailRelatedProducts: React.FC<
   }, [cardWidth, gap]);
 
   useEffect(() => {
+    if (prefetchedProducts && prefetchedProducts.length > 0) {
+      console.log("✅ RelatedProducts: Using prefetched data");
+      setRelatedProducts(prefetchedProducts);
+      setLoadingInitiated(true);
+      setLoading(false);
+    }
+  }, [prefetchedProducts]);
+
+  useEffect(() => {
     const container = scrollContainerRef.current;
     if (container) {
       checkScrollPosition();
@@ -179,43 +195,48 @@ const ProductDetailRelatedProducts: React.FC<
   }, [relatedProducts, checkScrollPosition]);
 
   const fetchRelatedProducts = useCallback(async () => {
+    // ✅ Skip if we already have prefetched products
+    if (prefetchedProducts && prefetchedProducts.length > 0) {
+      return;
+    }
+
     if (loadingInitiated) return;
-    
+
     // Need either preloaded IDs or productId to fetch
     if (!preloadedIds?.length && (!productId || productId.trim() === "")) {
       return;
     }
-  
+
     setLoadingInitiated(true);
     setLoading(true);
-  
+
     try {
       setError(null);
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
-  
+
       let url: string;
-      
+
       // ✅ If we have pre-loaded IDs, use batch endpoint (faster)
       if (preloadedIds && preloadedIds.length > 0) {
-        url = `/api/products/batch?ids=${preloadedIds.slice(0, 10).join(',')}`;
+        url = `/api/products/batch?ids=${preloadedIds.slice(0, 10).join(",")}`;
       } else {
         // Fallback to original endpoint
         url = `/api/relatedproducts/${productId}`;
       }
-  
+
       const response = await fetch(url, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
         signal: controller.signal,
       });
-  
+
       clearTimeout(timeoutId);
-  
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-  
+
       const data = await response.json();
       setRelatedProducts(data.products || []);
     } catch (err) {
@@ -225,7 +246,7 @@ const ProductDetailRelatedProducts: React.FC<
     } finally {
       setLoading(false);
     }
-  }, [productId, preloadedIds, loadingInitiated, t]);
+  }, [productId, preloadedIds, loadingInitiated, t, prefetchedProducts]);
 
   // ✅ LAZY LOADING: Setup intersection observer
   // Matches Flutter's WidgetsBinding.instance.addPostFrameCallback approach
@@ -268,10 +289,7 @@ const ProductDetailRelatedProducts: React.FC<
   }
 
   return (
-    <div
-      ref={containerRef}
-      className="py-2 sm:py-3"
-    >
+    <div ref={containerRef} className="py-2 sm:py-3">
       <div className="space-y-2 sm:space-y-3">
         {/* Header */}
         <div className="flex justify-between items-center">
@@ -391,7 +409,12 @@ const ProductDetailRelatedProducts: React.FC<
                     style={{
                       width: `${cardWidth}px`,
                       minWidth: `${cardWidth}px`,
-                      marginRight: index < relatedProducts.length - 1 ? (isMobile ? "0px" : "-20px") : "0px",
+                      marginRight:
+                        index < relatedProducts.length - 1
+                          ? isMobile
+                            ? "0px"
+                            : "-20px"
+                          : "0px",
                     }}
                   >
                     <ProductCard

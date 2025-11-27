@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
-import { useRouter } from "next/navigation"
+import { useRouter } from "next/navigation";
 
 interface Review {
   id: string;
@@ -31,6 +31,7 @@ interface ProductDetailReviewsTabProps {
   isLoading?: boolean;
   isDarkMode?: boolean;
   localization?: ReturnType<typeof useTranslations>;
+  prefetchedData?: { reviews: Review[]; totalCount: number } | null;
 }
 
 interface ReviewTileProps {
@@ -76,11 +77,11 @@ interface FullScreenImageModalProps {
   t: (key: string) => string;
 }
 
-const FullScreenImageModal: React.FC<FullScreenImageModalProps> = ({ 
-  imageUrl, 
-  isOpen, 
-  onClose, 
-  t 
+const FullScreenImageModal: React.FC<FullScreenImageModalProps> = ({
+  imageUrl,
+  isOpen,
+  onClose,
+  t,
 }) => {
   if (!isOpen) return null;
 
@@ -117,7 +118,7 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
   const [translatedText, setTranslatedText] = useState("");
   const [isTranslating, setIsTranslating] = useState(false);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
-  
+
   const isLiked = currentUserId ? review.likes.includes(currentUserId) : false;
   const likeCount = review.likes.length;
   const isLongReview = review.review.length > 150;
@@ -164,25 +165,33 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
 
   return (
     <>
-      <div className={`group min-w-72 w-72 sm:min-w-80 sm:w-80 rounded-2xl sm:rounded-none p-4 sm:p-5 border transition-all duration-300 hover:shadow-lg ${
-        isDarkMode
-          ? "bg-gradient-to-br from-gray-800 to-gray-850 border-gray-700 hover:border-orange-500"
-          : "bg-gradient-to-br from-white to-gray-50 border-gray-200 hover:border-orange-300"
-      }`}>
+      <div
+        className={`group min-w-72 w-72 sm:min-w-80 sm:w-80 rounded-2xl sm:rounded-none p-4 sm:p-5 border transition-all duration-300 hover:shadow-lg ${
+          isDarkMode
+            ? "bg-gradient-to-br from-gray-800 to-gray-850 border-gray-700 hover:border-orange-500"
+            : "bg-gradient-to-br from-white to-gray-50 border-gray-200 hover:border-orange-300"
+        }`}
+      >
         {/* Header with rating, date, and verified badge */}
         <div className="flex items-start justify-between mb-3 sm:mb-4">
           <div className="flex items-center gap-2 sm:gap-3">
             <StarRating rating={review.rating} size={14} />
-            <span className={`text-xs sm:text-sm font-medium ${
-              isDarkMode ? "text-gray-400" : "text-gray-500"
-            }`}>
+            <span
+              className={`text-xs sm:text-sm font-medium ${
+                isDarkMode ? "text-gray-400" : "text-gray-500"
+              }`}
+            >
               {formatDate(review.timestamp)}
             </span>
           </div>
-          
-          <div className={`flex items-center gap-1 px-2 py-0.5 sm:px-3 sm:py-1 rounded-full ${
-            isDarkMode ? "bg-green-900/20 text-green-400 border border-green-800" : "bg-green-50 text-green-700 border border-green-200"
-          }`}>
+
+          <div
+            className={`flex items-center gap-1 px-2 py-0.5 sm:px-3 sm:py-1 rounded-full ${
+              isDarkMode
+                ? "bg-green-900/20 text-green-400 border border-green-800"
+                : "bg-green-50 text-green-700 border border-green-200"
+            }`}
+          >
             <Shield className="w-3 h-3" />
             <span className="text-xs font-medium">{t("verified")}</span>
           </div>
@@ -207,10 +216,16 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
               </div>
             ))}
             {review.imageUrls.length > 4 && (
-              <div className={`flex-shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-xl flex items-center justify-center border-2 border-dashed cursor-pointer hover:scale-105 transition-transform ${
-                isDarkMode ? "border-gray-600 text-gray-400" : "border-gray-300 text-gray-500"
-              }`}>
-                <span className="text-xs font-medium">+{review.imageUrls.length - 4}</span>
+              <div
+                className={`flex-shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-xl flex items-center justify-center border-2 border-dashed cursor-pointer hover:scale-105 transition-transform ${
+                  isDarkMode
+                    ? "border-gray-600 text-gray-400"
+                    : "border-gray-300 text-gray-500"
+                }`}
+              >
+                <span className="text-xs font-medium">
+                  +{review.imageUrls.length - 4}
+                </span>
               </div>
             )}
           </div>
@@ -218,9 +233,11 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
 
         {/* Review text */}
         <div className="mb-3 sm:mb-4">
-          <p className={`text-xs sm:text-sm leading-relaxed ${isLongReview ? 'line-clamp-4' : ''} ${
-            isDarkMode ? "text-gray-300" : "text-gray-700"
-          }`}>
+          <p
+            className={`text-xs sm:text-sm leading-relaxed ${
+              isLongReview ? "line-clamp-4" : ""
+            } ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}
+          >
             {isTranslated ? translatedText : review.review}
           </p>
         </div>
@@ -259,18 +276,22 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
                   : "bg-gray-100 text-gray-600 hover:bg-blue-50 hover:text-blue-600"
               }`}
             >
-              <ThumbsUp className={`w-3 h-3 ${isLiked ? "fill-blue-600" : ""}`} />
+              <ThumbsUp
+                className={`w-3 h-3 ${isLiked ? "fill-blue-600" : ""}`}
+              />
               {likeCount}
             </button>
           </div>
 
           {/* Read more link */}
           {isLongReview && (
-            <button className={`text-xs font-semibold underline transition-colors ${
-              isDarkMode
-                ? "text-orange-400 hover:text-orange-300"
-                : "text-orange-600 hover:text-orange-700"
-            }`}>
+            <button
+              className={`text-xs font-semibold underline transition-colors ${
+                isDarkMode
+                  ? "text-orange-400 hover:text-orange-300"
+                  : "text-orange-600 hover:text-orange-700"
+              }`}
+            >
               {t("readMore")}
             </button>
           )}
@@ -289,28 +310,34 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
   );
 };
 
-const LoadingSkeleton: React.FC<{ isDarkMode?: boolean }> = ({ 
-  isDarkMode = false 
+const LoadingSkeleton: React.FC<{ isDarkMode?: boolean }> = ({
+  isDarkMode = false,
 }) => (
-  <div className={`rounded-none sm:rounded-none p-4 sm:p-6 border shadow-sm -mx-4 sm:mx-0 ${
-    isDarkMode 
-      ? "bg-gray-800 border-gray-700" 
-      : "bg-white border-gray-200"
-  }`}>
+  <div
+    className={`rounded-none sm:rounded-none p-4 sm:p-6 border shadow-sm -mx-4 sm:mx-0 ${
+      isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+    }`}
+  >
     <div className="space-y-4 sm:space-y-6">
       {/* Header skeleton */}
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-2 sm:gap-3">
-          <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl animate-pulse ${
-            isDarkMode ? "bg-gray-700" : "bg-gray-200"
-          }`} />
-          <div className={`w-24 sm:w-32 h-5 sm:h-6 rounded animate-pulse ${
-            isDarkMode ? "bg-gray-700" : "bg-gray-200"
-          }`} />
+          <div
+            className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl animate-pulse ${
+              isDarkMode ? "bg-gray-700" : "bg-gray-200"
+            }`}
+          />
+          <div
+            className={`w-24 sm:w-32 h-5 sm:h-6 rounded animate-pulse ${
+              isDarkMode ? "bg-gray-700" : "bg-gray-200"
+            }`}
+          />
         </div>
-        <div className={`w-20 h-6 sm:w-24 sm:h-8 rounded-xl animate-pulse ${
-          isDarkMode ? "bg-gray-700" : "bg-gray-200"
-        }`} />
+        <div
+          className={`w-20 h-6 sm:w-24 sm:h-8 rounded-xl animate-pulse ${
+            isDarkMode ? "bg-gray-700" : "bg-gray-200"
+          }`}
+        />
       </div>
 
       {/* Reviews skeleton */}
@@ -333,6 +360,7 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
   isLoading = false,
   isDarkMode = false,
   localization,
+  prefetchedData,
 }) => {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
@@ -343,37 +371,41 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
   const router = useRouter();
 
   // ✅ FIXED: Proper nested translation function that uses JSON files
-  const t = useCallback((key: string) => {
-    if (!localization) {
-      return key;
-    }
+  const t = useCallback(
+    (key: string) => {
+      if (!localization) {
+        return key;
+      }
 
-    try {
-      // Try to get the nested ProductDetailReviewsTab translation
-      const translation = localization(`ProductDetailReviewsTab.${key}`);
-      
-      // Check if we got a valid translation (not the same as the key we requested)
-      if (translation && translation !== `ProductDetailReviewsTab.${key}`) {
-        return translation;
+      try {
+        // Try to get the nested ProductDetailReviewsTab translation
+        const translation = localization(`ProductDetailReviewsTab.${key}`);
+
+        // Check if we got a valid translation (not the same as the key we requested)
+        if (translation && translation !== `ProductDetailReviewsTab.${key}`) {
+          return translation;
+        }
+
+        // If nested translation doesn't exist, try direct key
+        const directTranslation = localization(key);
+        if (directTranslation && directTranslation !== key) {
+          return directTranslation;
+        }
+
+        // Return the key as fallback
+        return key;
+      } catch (error) {
+        console.warn(`Translation error for key: ${key}`, error);
+        return key;
       }
-      
-      // If nested translation doesn't exist, try direct key
-      const directTranslation = localization(key);
-      if (directTranslation && directTranslation !== key) {
-        return directTranslation;
-      }
-      
-      // Return the key as fallback
-      return key;
-    } catch (error) {
-      console.warn(`Translation error for key: ${key}`, error);
-      return key;
-    }
-  }, [localization]);
+    },
+    [localization]
+  );
 
   const checkScrollPosition = useCallback(() => {
     if (scrollContainerRef.current) {
-      const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
+      const { scrollLeft, scrollWidth, clientWidth } =
+        scrollContainerRef.current;
       setCanScrollLeft(scrollLeft > 0);
       setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1);
     }
@@ -401,12 +433,21 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
   }, [reviews, checkScrollPosition]);
 
   useEffect(() => {
+    // ✅ PRIORITY 1: Use prefetched data (INSTANT)
+    if (prefetchedData) {
+      console.log("✅ Reviews: Using prefetched data");
+      setReviews(prefetchedData.reviews || []);
+      setTotalReviewCount(prefetchedData.totalCount || 0);
+      setLoading(false);
+      return;
+    }
+
+    // ✅ PRIORITY 2: Fetch from API (fallback)
     const fetchReviews = async () => {
       if (!productId) return;
 
       try {
         setLoading(true);
-
         const response = await fetch(`/api/reviews/${productId}`);
         if (!response.ok) {
           throw new Error(t("failedToFetchReviews"));
@@ -425,37 +466,40 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
     };
 
     fetchReviews();
-  }, [productId, t]);
+  }, [productId, t, prefetchedData]);
 
-  const handleLike = useCallback(async (reviewId: string) => {
-    try {
-      const response = await fetch("/api/reviews/toggle-like", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reviewId, productId }),
-      });
+  const handleLike = useCallback(
+    async (reviewId: string) => {
+      try {
+        const response = await fetch("/api/reviews/toggle-like", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reviewId, productId }),
+        });
 
-      if (response.ok) {
-        setReviews((prev) =>
-          prev.map((review) => {
-            if (review.id === reviewId) {
-              const currentUserId = "current-user";
-              const isLiked = review.likes.includes(currentUserId);
-              return {
-                ...review,
-                likes: isLiked
-                  ? review.likes.filter((id) => id !== currentUserId)
-                  : [...review.likes, currentUserId],
-              };
-            }
-            return review;
-          })
-        );
+        if (response.ok) {
+          setReviews((prev) =>
+            prev.map((review) => {
+              if (review.id === reviewId) {
+                const currentUserId = "current-user";
+                const isLiked = review.likes.includes(currentUserId);
+                return {
+                  ...review,
+                  likes: isLiked
+                    ? review.likes.filter((id) => id !== currentUserId)
+                    : [...review.likes, currentUserId],
+                };
+              }
+              return review;
+            })
+          );
+        }
+      } catch (error) {
+        console.error("Error toggling like:", error);
       }
-    } catch (error) {
-      console.error("Error toggling like:", error);
-    }
-  }, [productId]);
+    },
+    [productId]
+  );
 
   const handleSeeAllReviews = useCallback(() => {
     router.push(`/all-reviews?productId=${productId}`);
@@ -470,36 +514,42 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
   }
 
   return (
-    <div className={`rounded-none sm:rounded-none p-4 sm:p-6 border shadow-sm -mx-4 sm:mx-0 ${
-      isDarkMode 
-        ? "bg-gray-800 border-gray-700" 
-        : "bg-white border-gray-200"
-    }`}>
+    <div
+      className={`rounded-none sm:rounded-none p-4 sm:p-6 border shadow-sm -mx-4 sm:mx-0 ${
+        isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+      }`}
+    >
       <div className="space-y-4 sm:space-y-6">
         {/* Header */}
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className={`p-1.5 sm:p-2 rounded-xl ${
-              isDarkMode 
-                ? "bg-orange-900/20 text-orange-400" 
-                : "bg-orange-100 text-orange-600"
-            }`}>
+            <div
+              className={`p-1.5 sm:p-2 rounded-xl ${
+                isDarkMode
+                  ? "bg-orange-900/20 text-orange-400"
+                  : "bg-orange-100 text-orange-600"
+              }`}
+            >
               <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
-              <h3 className={`text-lg sm:text-xl font-bold ${
-                isDarkMode ? "text-white" : "text-gray-900"
-              }`}>
+              <h3
+                className={`text-lg sm:text-xl font-bold ${
+                  isDarkMode ? "text-white" : "text-gray-900"
+                }`}
+              >
                 {t("title")}
               </h3>
-              <p className={`text-xs sm:text-sm ${
-                isDarkMode ? "text-gray-400" : "text-gray-600"
-              }`}>
+              <p
+                className={`text-xs sm:text-sm ${
+                  isDarkMode ? "text-gray-400" : "text-gray-600"
+                }`}
+              >
                 {totalReviewCount} {t("verifiedReviews")}
               </p>
             </div>
           </div>
-          
+
           <button
             onClick={handleSeeAllReviews}
             className={`flex items-center gap-1 sm:gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl font-semibold text-xs sm:text-sm transition-all duration-200 hover:scale-105 ${

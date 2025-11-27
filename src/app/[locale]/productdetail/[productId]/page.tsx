@@ -1,4 +1,22 @@
-// src/app/product/[productId]/page.tsx
+// src/app/product/[productId]/page.tsx - OPTIMIZED VERSION
+//
+// ═══════════════════════════════════════════════════════════════════════════
+// PERFORMANCE OPTIMIZATIONS - Matching Flutter's Instant Load Pattern
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// KEY CHANGES:
+// 1. Uses batch API endpoint for all data in ONE call
+// 2. Instant display from cache (if available)
+// 3. Progressive rendering with cached data
+// 4. Background refresh for stale data
+// 5. No waterfall API calls
+//
+// LOADING STRATEGY:
+// - Stage 1 (0ms): Product from cache → instant display
+// - Stage 2 (background): Batch API call → updates all sections
+// - Stage 3 (on scroll): Heavy components lazy loaded
+//
+// ═══════════════════════════════════════════════════════════════════════════
 
 "use client";
 
@@ -36,7 +54,7 @@ import { useFavorites } from "@/context/FavoritesProvider";
 import { Product, ProductUtils } from "@/app/models/Product";
 import { useProductCache } from "@/context/ProductCacheProvider";
 
-// ✅ LAZY LOAD: Heavy components that aren't immediately visible
+// ✅ LAZY LOAD: Heavy components
 const ProductCollectionWidget = lazy(
   () => import("../../../components/product_detail/ProductCollectionWidget")
 );
@@ -59,12 +77,128 @@ const AskToSellerBubble = lazy(
   () => import("@/app/components/product_detail/AskToSeller")
 );
 
+// ============= TYPES =============
+
 interface ProductDetailPageProps {
   params: Promise<{ productId: string }>;
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
-// Enhanced helper function to check if product has selectable options
+interface SellerInfo {
+  sellerName: string;
+  sellerAverageRating: number;
+  shopAverageRating: number;
+  sellerIsVerified: boolean;
+  totalProductsSold: number;
+  totalReviews: number;
+  cargoAgreement: Record<string, unknown> | null;
+}
+
+interface Review {
+  id: string;
+  rating: number;
+  review: string;
+  timestamp: string;
+  imageUrls: string[];
+  likes: string[];
+  userId: string;
+}
+
+interface Question {
+  id: string;
+  questionText: string;
+  answerText: string;
+  timestamp: string;
+  askerName: string;
+  askerNameVisible: boolean;
+  answered: boolean;
+  productId: string;
+}
+
+interface CollectionProduct {
+  id: string;
+  productName: string;
+  price: number;
+  currency: string;
+  imageUrls: string[];
+}
+
+interface CollectionData {
+  id: string;
+  name: string;
+  imageUrl?: string;
+  products: CollectionProduct[];
+}
+
+interface BundleData {
+  bundleId: string;
+  product: Product;
+  bundlePrice: number;
+  originalPrice: number;
+  discountPercentage: number;
+  currency: string;
+  isMainProduct: boolean;
+}
+
+interface SellerInfo {
+  sellerName: string;
+  sellerAverageRating: number;
+  shopAverageRating: number;
+  sellerIsVerified: boolean;
+  totalProductsSold: number;
+  totalReviews: number;
+}
+
+// ✅ PROPERLY TYPED Batch Response
+interface ProductDetailBatchResponse {
+  product: Record<string, unknown>;
+  seller: SellerInfo | null;
+  reviews: Review[];
+  reviewsTotal: number;
+  questions: Question[];
+  questionsTotal: number;
+  relatedProducts: Product[];
+  collection: CollectionData | null;
+  bundles: BundleData[];
+  fetchedAt: number;
+  timings?: Record<string, number>;
+  source?: string;
+}
+
+// ============= BATCH DATA CACHE =============
+// Static cache for batch data (persists across navigations)
+const batchDataCache = new Map<
+  string,
+  { data: ProductDetailBatchResponse; timestamp: number }
+>();
+const BATCH_CACHE_TTL = 2 * 60 * 1000; // 2 minutes
+
+function getCachedBatchData(
+  productId: string
+): ProductDetailBatchResponse | null {
+  const cached = batchDataCache.get(productId);
+  if (!cached) return null;
+
+  if (Date.now() - cached.timestamp > BATCH_CACHE_TTL) {
+    batchDataCache.delete(productId);
+    return null;
+  }
+
+  return cached.data;
+}
+
+function cacheBatchData(productId: string, data: ProductDetailBatchResponse) {
+  batchDataCache.set(productId, { data, timestamp: Date.now() });
+
+  // Limit cache size
+  if (batchDataCache.size > 30) {
+    const firstKey = batchDataCache.keys().next().value;
+    if (firstKey) batchDataCache.delete(firstKey);
+  }
+}
+
+// ============= HELPER FUNCTIONS =============
+
 const hasSelectableOptions = (product: Product | null): boolean => {
   if (!product) return false;
 
@@ -95,7 +229,8 @@ const hasSelectableOptions = (product: Product | null): boolean => {
   return selectableAttrs.length > 0;
 };
 
-// ✅ LOADING SKELETON: Memoized component outside main component
+// ============= LOADING SKELETON =============
+
 const LoadingSkeleton = React.memo(
   ({ isDarkMode }: { isDarkMode: boolean }) => (
     <div
@@ -150,105 +285,28 @@ const LoadingSkeleton = React.memo(
 );
 LoadingSkeleton.displayName = "LoadingSkeleton";
 
+// ============= MAIN COMPONENT =============
+
 const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   const router = useRouter();
   const locale = useLocale();
   const localization = useTranslations();
   const { getProduct, setProduct: setProductCache } = useProductCache();
+
+  // ============= STATE =============
   const [productId, setProductId] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [product, setProduct] = useState<Product | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    let mounted = true;
-
-    params.then((resolvedParams) => {
-      if (!mounted) return;
-
-      const id = resolvedParams.productId;
-      setProductId(id);
-
-      // ✅ Synchronous cache check
-      const cached = getProduct(id);
-      if (cached) {
-        console.log("✅ INSTANT: In-memory cache");
-        setProduct(cached);
-        setIsLoading(false);
-        fetchFreshData(id);
-        return;
-      }
-
-      // ✅ Synchronous sessionStorage check
-      try {
-        const stored = sessionStorage.getItem(`product_${id}`);
-        const time = sessionStorage.getItem(`product_${id}_timestamp`);
-
-        if (stored && time && Date.now() - parseInt(time) < 300000) {
-          console.log("✅ FAST: sessionStorage");
-          const parsed = ProductUtils.fromJson(JSON.parse(stored));
-          setProduct(parsed);
-          setIsLoading(false);
-          setProductCache(id, parsed);
-          fetchFreshData(id);
-          return;
-        }
-      } catch (e) {
-        console.error("Cache error:", e);
-      }
-
-      // ✅ Network fallback
-      console.log("⏳ SLOW: Network fetch");
-      fetchProduct(id);
-    });
-
-    return () => {
-      mounted = false;
-    };
-  }, [params, getProduct, setProductCache]);
-
-  // ✅ OPTIMIZED: Translation function with better caching
-  const t = useCallback(
-    (key: string) => {
-      if (!localization) return key;
-
-      try {
-        const translation = localization(`ProductDetailPage.${key}`);
-
-        if (translation && translation !== `ProductDetailPage.${key}`) {
-          return translation;
-        }
-
-        const directTranslation = localization(key);
-        if (directTranslation && directTranslation !== key) {
-          return directTranslation;
-        }
-
-        return key;
-      } catch {
-        return key;
-      }
-    },
-    [localization]
+  // ✅ NEW: Batch data state
+  const [batchData, setBatchData] = useState<ProductDetailBatchResponse | null>(
+    null
   );
+  const [, setIsBatchLoading] = useState(false);
 
-  // Cart and user hooks
-  const { addProductToCart, removeFromCart, cartProductIds } = useCart();
-  const { user } = useUser();
-  const { addToFavorites, removeMultipleFromFavorites, isFavorite } =
-    useFavorites();
-
-  // Animation states
-  const [cartButtonState, setCartButtonState] = useState<
-    "idle" | "adding" | "added" | "removing" | "removed"
-  >("idle");
-
-  // Option selector state
-  const [showCartOptionSelector, setShowCartOptionSelector] = useState(false);
-
-  // UI states
+  // UI States
   const [isDarkMode, setIsDarkMode] = useState(false);
-
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [previousImageIndex, setPreviousImageIndex] = useState(0);
   const [slideDirection, setSlideDirection] = useState<"left" | "right">(
@@ -258,22 +316,193 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [showDescriptionModal, setShowDescriptionModal] = useState(false);
   const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
-
-  // ✅ NEW: Track if user has scrolled down to lazy load components
   const [hasScrolled, setHasScrolled] = useState(false);
-
-  // ✅ NEW: Track if viewport is large enough to show components without scrolling
   const [isLargeScreen, setIsLargeScreen] = useState(false);
-
-  // ✅ NEW: Track if user has scrolled past action buttons
   const [showHeaderButtons, setShowHeaderButtons] = useState(false);
+
+  // Cart states
+  const [cartButtonState, setCartButtonState] = useState<
+    "idle" | "adding" | "added" | "removing" | "removed"
+  >("idle");
+  const [showCartOptionSelector, setShowCartOptionSelector] = useState(false);
+  const [showBuyNowOptionSelector, setShowBuyNowOptionSelector] =
+    useState(false);
+
+  // Refs
   const actionButtonsRef = useRef<HTMLDivElement>(null);
 
-  // ✅ OPTIMIZED: Dark mode detection with debouncing
+  // Hooks
+  const { addProductToCart, removeFromCart, cartProductIds } = useCart();
+  const { user } = useUser();
+  const { addToFavorites, removeMultipleFromFavorites, isFavorite } =
+    useFavorites();
+
+  // ============= TRANSLATION HELPER =============
+  const t = useCallback(
+    (key: string) => {
+      if (!localization) return key;
+      try {
+        const translation = localization(`ProductDetailPage.${key}`);
+        if (translation && translation !== `ProductDetailPage.${key}`) {
+          return translation;
+        }
+        const directTranslation = localization(key);
+        if (directTranslation && directTranslation !== key) {
+          return directTranslation;
+        }
+        return key;
+      } catch {
+        return key;
+      }
+    },
+    [localization]
+  );
+
+  // ============= BATCH DATA FETCHING =============
+  const fetchBatchData = useCallback(
+    async (id: string) => {
+      // Check batch cache first
+      const cachedBatch = getCachedBatchData(id);
+      if (cachedBatch) {
+        console.log("✅ INSTANT: Batch data from cache");
+        setBatchData(cachedBatch);
+        return;
+      }
+
+      setIsBatchLoading(true);
+
+      try {
+        const response = await fetch(`/api/product-detail-batch/${id}`);
+
+        if (response.ok) {
+          const data: ProductDetailBatchResponse = await response.json();
+          console.log(
+            `✅ Batch data fetched in ${
+              data.timings?.total || "?"
+            }ms (source: ${data.source || "api"})`
+          );
+
+          setBatchData(data);
+          cacheBatchData(id, data);
+
+          // Also update product cache with fresh data
+          if (data.product) {
+            const freshProduct = ProductUtils.fromJson(data.product);
+            setProduct(freshProduct);
+            setProductCache(id, freshProduct);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching batch data:", error);
+      } finally {
+        setIsBatchLoading(false);
+      }
+    },
+    [setProductCache]
+  );
+
+  // ============= MAIN INITIALIZATION =============
+  useEffect(() => {
+    let mounted = true;
+
+    params.then((resolvedParams) => {
+      if (!mounted) return;
+
+      const id = resolvedParams.productId;
+      setProductId(id);
+
+      // ✅ STAGE 1: Check in-memory cache for INSTANT display
+      const cached = getProduct(id);
+      if (cached) {
+        console.log("✅ INSTANT: Product from in-memory cache");
+        setProduct(cached);
+        setIsLoading(false);
+
+        // ✅ STAGE 2: Fetch batch data in background
+        fetchBatchData(id);
+        return;
+      }
+
+      // ✅ Check sessionStorage
+      try {
+        const stored = sessionStorage.getItem(`product_${id}`);
+        const time = sessionStorage.getItem(`product_${id}_timestamp`);
+
+        if (stored && time && Date.now() - parseInt(time) < 300000) {
+          console.log("✅ FAST: Product from sessionStorage");
+          const parsed = ProductUtils.fromJson(JSON.parse(stored));
+          setProduct(parsed);
+          setIsLoading(false);
+          setProductCache(id, parsed);
+
+          // Fetch batch data in background
+          fetchBatchData(id);
+          return;
+        }
+      } catch (e) {
+        console.error("Cache error:", e);
+      }
+
+      // ✅ STAGE 3: Full network fetch (batch endpoint)
+      console.log("⏳ NETWORK: Fetching from batch API");
+      setIsBatchLoading(true);
+
+      fetch(`/api/product-detail-batch/${id}`)
+        .then((response) => {
+          if (!response.ok) throw new Error("Product not found");
+          return response.json();
+        })
+        .then((data: ProductDetailBatchResponse) => {
+          if (!mounted) return;
+
+          console.log(
+            `✅ Batch data fetched in ${data.timings?.total || "?"}ms`
+          );
+
+          // Set product
+          if (data.product) {
+            const product = ProductUtils.fromJson(data.product);
+            setProduct(product);
+            setProductCache(id, product);
+
+            // Cache to sessionStorage
+            sessionStorage.setItem(
+              `product_${id}`,
+              JSON.stringify(data.product)
+            );
+            sessionStorage.setItem(
+              `product_${id}_timestamp`,
+              Date.now().toString()
+            );
+          }
+
+          // Set batch data
+          setBatchData(data);
+          cacheBatchData(id, data);
+          setIsLoading(false);
+        })
+        .catch((err) => {
+          if (!mounted) return;
+          console.error("Error fetching product:", err);
+          setError(
+            err instanceof Error ? err.message : "Failed to load product"
+          );
+          setIsLoading(false);
+        })
+        .finally(() => {
+          if (mounted) setIsBatchLoading(false);
+        });
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, [params, getProduct, setProductCache, fetchBatchData]);
+
+  // ============= DARK MODE DETECTION =============
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // Initialize theme from localStorage
     const savedTheme = localStorage.getItem("theme");
     const systemPrefersDark = window.matchMedia(
       "(prefers-color-scheme: dark)"
@@ -301,7 +530,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           darkModeMediaQuery.matches;
 
         setIsDarkMode(isDark);
-      }, 50); // Debounce by 50ms
+      }, 50);
     };
 
     detectDarkMode();
@@ -322,140 +551,56 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     };
   }, []);
 
-  // ✅ NEW: Large screen detection for immediate component loading
+  // ============= LARGE SCREEN DETECTION =============
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     const checkLargeScreen = () => {
-      // Load components immediately on large screens (lg breakpoint: 1024px width, 900px height)
       const isLarge = window.innerWidth >= 1024 && window.innerHeight >= 900;
       setIsLargeScreen(isLarge);
     };
 
-    // Check immediately
     checkLargeScreen();
-
-    // Listen for resize
     window.addEventListener("resize", checkLargeScreen);
     return () => window.removeEventListener("resize", checkLargeScreen);
   }, []);
 
-  // ✅ NEW: Scroll detection for lazy loading below-the-fold content
+  // ============= SCROLL DETECTION =============
   useEffect(() => {
     const handleScroll = () => {
       if (window.scrollY > 300 && !hasScrolled) {
         setHasScrolled(true);
       }
 
-      // Check if user has scrolled past the action buttons
       if (actionButtonsRef.current) {
         const buttonRect = actionButtonsRef.current.getBoundingClientRect();
-        // Responsive header height: mobile has smaller headers
         const isMobileView = window.innerWidth < 640;
-        const marketHeaderHeight = 64; // MarketHeader height
-        const productHeaderHeight = isMobileView ? 48 : 52; // Product detail header
+        const marketHeaderHeight = 64;
+        const productHeaderHeight = isMobileView ? 48 : 52;
         const headerHeight = marketHeaderHeight + productHeaderHeight;
 
-        // Show header buttons when original buttons scroll above viewport + header
-        if (buttonRect.bottom < headerHeight) {
-          setShowHeaderButtons(true);
-        } else {
-          setShowHeaderButtons(false);
-        }
+        setShowHeaderButtons(buttonRect.bottom < headerHeight);
       }
     };
 
-    // Check immediately in case already scrolled
     handleScroll();
-
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, [hasScrolled]);
 
-  // Scroll to top when product changes
+  // ============= SCROLL TO TOP ON PRODUCT CHANGE =============
   useEffect(() => {
     if (productId) {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   }, [productId]);
 
-  const fetchProduct = useCallback(
-    async (id: string) => {
-      const abortController = new AbortController();
+  // ============= EVENT HANDLERS =============
 
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        const response = await fetch(`/api/products/${id}`, {
-          signal: abortController.signal,
-        });
-
-        if (!response.ok) {
-          throw new Error(t("productNotFound"));
-        }
-
-        const productData = await response.json();
-        const parsedProduct = ProductUtils.fromJson(productData);
-        setProduct(parsedProduct);
-      } catch (err) {
-        if (err instanceof Error && err.name === "AbortError") {
-          return;
-        }
-        console.error("Error fetching product:", err);
-        setError(err instanceof Error ? err.message : t("failedToLoadProduct"));
-      } finally {
-        setIsLoading(false);
-      }
-
-      return () => {
-        abortController.abort();
-      };
-    },
-    [t]
-  );
-
-  const fetchFreshData = useCallback(async (id: string) => {
-    try {
-      const response = await fetch(`/api/products/${id}`);
-
-      if (response.ok) {
-        const productData = await response.json();
-        const freshProduct = ProductUtils.fromJson(productData);
-
-        // Update if data changed
-        setProduct((prevProduct) => {
-          if (!prevProduct) return freshProduct;
-
-          // Compare prices, stock, etc. - update if different
-          if (
-            prevProduct.price !== freshProduct.price ||
-            prevProduct.quantity !== freshProduct.quantity
-          ) {
-            return freshProduct;
-          }
-
-          return prevProduct;
-        });
-
-        // Update cache
-        sessionStorage.setItem(`product_${id}`, JSON.stringify(productData));
-        sessionStorage.setItem(
-          `product_${id}_timestamp`,
-          Date.now().toString()
-        );
-      }
-    } catch (error) {
-      console.error("Error fetching fresh data:", error);
-    }
-  }, []);
-
-  // Image error handling
   const handleImageError = useCallback((index: number) => {
     setImageErrors((prev) => new Set(prev).add(index));
   }, []);
 
-  // Share functionality
   const handleShare = useCallback(async () => {
     try {
       if (navigator.share && product) {
@@ -472,7 +617,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     }
   }, [product, t]);
 
-  // ✅ OPTIMIZED: Favorite toggle with FavoritesProvider
   const handleToggleFavorite = useCallback(async () => {
     if (!product?.id) return;
     if (!user) {
@@ -484,10 +628,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
     try {
       if (isCurrentlyFavorite) {
-        // Remove from favorites
         await removeMultipleFromFavorites([product.id]);
       } else {
-        // Add to favorites
         await addToFavorites(product.id);
       }
     } catch (error) {
@@ -506,7 +648,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     (selectedOptions: { quantity?: number; [key: string]: unknown }) => {
       if (!product) return;
 
-      // ✅ STEP 1: Build selectedAttributes map
       const selectedAttributes: Record<string, unknown> = {};
 
       Object.entries(selectedOptions).forEach(([key, value]) => {
@@ -520,28 +661,21 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         }
       });
 
-      // ✅ STEP 2: Use buildProductDataForCart to get product metadata
       const productData = buildProductDataForCart(
         product,
         selectedOptions.selectedColor as string | undefined,
-        undefined // ✅ Don't pass attributes here!
+        undefined
       );
 
-      // ✅ STEP 3: Build Buy Now item matching Cart structure
       const buyNowItem = {
         ...productData,
         quantity: selectedOptions.quantity || 1,
-
-        // ✅ CRITICAL: Wrap attributes in selectedAttributes map (matching Cart)
         selectedAttributes:
           Object.keys(selectedAttributes).length > 0
             ? selectedAttributes
             : undefined,
       };
 
-      console.log("✅ Buy Now Item (matching cart):", buyNowItem);
-
-      // Navigate
       const encodedData = btoa(JSON.stringify(buyNowItem));
       router.push(`/${locale}/productpayment?buyNowData=${encodedData}`);
     },
@@ -557,7 +691,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
       if (!product) return;
 
-      // ✅ Prevent double-clicks
       if (cartButtonState === "adding" || cartButtonState === "removing") {
         return;
       }
@@ -565,22 +698,18 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
       const productInCart = cartProductIds.has(product.id);
       const isAdding = !productInCart;
 
-      // ✅ Handle options modal FIRST (if needed)
       if (isAdding && hasSelectableOptions(product) && !selectedOptions) {
         setShowCartOptionSelector(true);
         return;
       }
 
       try {
-        // ✅ Set button state BEFORE operation
         setCartButtonState(isAdding ? "adding" : "removing");
 
-        // ✅ Haptic feedback
         if (isAdding && navigator.vibrate) {
           navigator.vibrate(10);
         }
 
-        // ✅ Perform operation
         let result: string;
 
         if (isAdding) {
@@ -616,23 +745,15 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           result = await removeFromCart(product.id);
         }
 
-        // ✅ Check result
         if (
           result.includes("Added") ||
           result.includes("Removed") ||
           result.includes("cart")
         ) {
-          // Success
           setCartButtonState(isAdding ? "added" : "removed");
-
-          // Reset after animation
-          setTimeout(() => {
-            setCartButtonState("idle");
-          }, 1500);
+          setTimeout(() => setCartButtonState("idle"), 1500);
         } else {
-          // Failed
           setCartButtonState("idle");
-
           if (result === "Please log in first") {
             router.push("/login");
           }
@@ -656,18 +777,14 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   const handleCartOptionSelectorConfirm = useCallback(
     async (selectedOptions: { quantity?: number; [key: string]: unknown }) => {
       setShowCartOptionSelector(false);
-      // ✅ Pass the selected options to handleAddToCart
       await handleAddToCart(selectedOptions);
     },
-    [handleAddToCart] // ✅ Fixed dependency
+    [handleAddToCart]
   );
 
   const handleCartOptionSelectorClose = useCallback(() => {
     setShowCartOptionSelector(false);
   }, []);
-
-  const [showBuyNowOptionSelector, setShowBuyNowOptionSelector] =
-    useState(false);
 
   const handleBuyNow = useCallback(() => {
     if (!user) {
@@ -677,15 +794,10 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
     if (!product) return;
 
-    // ✅ Check if product has selectable options
     if (hasSelectableOptions(product)) {
-      // Show option selector for Buy Now
       setShowBuyNowOptionSelector(true);
     } else {
-      // No options needed - navigate directly with default values
-      navigateToBuyNow({
-        quantity: 1,
-      });
+      navigateToBuyNow({ quantity: 1 });
     }
   }, [user, product, router, navigateToBuyNow]);
 
@@ -697,10 +809,11 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     [navigateToBuyNow]
   );
 
-  // ✅ ADD: Handler for Buy Now option selector close
   const handleBuyNowOptionSelectorClose = useCallback(() => {
     setShowBuyNowOptionSelector(false);
   }, []);
+
+  // ============= COMPUTED VALUES =============
 
   const cartButtonContent = useMemo(() => {
     if (!product) {
@@ -712,7 +825,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
     const productInCart = cartProductIds.has(product.id);
 
-    // Show state based on button state first, then actual cart state
     if (cartButtonState === "adding") {
       return {
         icon: (
@@ -745,7 +857,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
       };
     }
 
-    // Default state based on actual cart
     if (productInCart) {
       return {
         icon: <Minus className="w-4 h-4 sm:w-5 sm:h-5" />,
@@ -759,16 +870,13 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     };
   }, [product, cartProductIds, cartButtonState, t]);
 
-  // Check if add to cart button should be disabled
   const isAddToCartDisabled = useMemo(() => {
     if (!product) return false;
 
-    // Disable while processing
     if (cartButtonState === "adding" || cartButtonState === "removing") {
       return true;
     }
 
-    // Disable if no stock and no color options
     const hasNoStock = product.quantity === 0;
     const hasColorOptions =
       product.colorQuantities &&
@@ -776,6 +884,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
     return hasNoStock && !hasColorOptions;
   }, [product, cartButtonState]);
+
+  // ============= RENDER =============
 
   if (isLoading) {
     return <LoadingSkeleton isDarkMode={isDarkMode} />;
@@ -818,6 +928,9 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   const isProcessing =
     cartButtonState === "adding" || cartButtonState === "removing";
 
+  // ✅ Extract seller info from batch data
+  const sellerInfo = batchData?.seller;
+
   return (
     <div
       className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
@@ -844,19 +957,16 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               <ArrowLeft className="w-5 h-5" />
             </button>
 
-            {/* Spacer to push buttons to the right */}
             <div className="flex-1"></div>
 
-            {/* Action Buttons - Show when scrolled past original buttons */}
+            {/* Action Buttons in Header */}
             <div
               className={`flex items-center gap-1.5 sm:gap-2 transition-all duration-500 ease-in-out overflow-hidden ${
                 showHeaderButtons
                   ? "max-w-[400px] sm:max-w-[420px] opacity-100"
                   : "max-w-0 opacity-0"
               }`}
-              style={{
-                transitionProperty: "max-width, opacity",
-              }}
+              style={{ transitionProperty: "max-width, opacity" }}
             >
               <button
                 onClick={() => handleAddToCart()}
@@ -888,7 +998,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
               <button
                 onClick={handleBuyNow}
-                className={`py-2 px-3 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white rounded-lg font-semibold text-xs transition-all duration-300 flex items-center justify-center whitespace-nowrap shadow-lg flex-shrink-0`}
+                className="py-2 px-3 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white rounded-lg font-semibold text-xs transition-all duration-300 flex items-center justify-center whitespace-nowrap shadow-lg flex-shrink-0"
               >
                 {t("buyNow")}
               </button>
@@ -937,7 +1047,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               {product.imageUrls.length > 0 &&
               !imageErrors.has(currentImageIndex) ? (
                 <div className="relative w-full h-full overflow-hidden">
-                  {/* Previous Image - Sliding Out */}
                   {previousImageIndex !== currentImageIndex && (
                     <div className="absolute inset-0">
                       <Image
@@ -957,7 +1066,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                     </div>
                   )}
 
-                  {/* Current Image - Sliding In */}
                   <div className="absolute inset-0">
                     <Image
                       key={`current-${currentImageIndex}`}
@@ -1127,9 +1235,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                 {product.productName}
               </h1>
 
-              <div
-                className={`text-lg sm:text-xl lg:text-2xl font-bold text-orange-600`}
-              >
+              <div className="text-lg sm:text-xl lg:text-2xl font-bold text-orange-600">
                 {product.price} {product.currency}
               </div>
             </div>
@@ -1205,13 +1311,15 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               </button>
             </div>
 
-            {/* Seller Info */}
+            {/* ✅ OPTIMIZED: Seller Info with batch data */}
             <ProductDetailSellerInfo
               sellerId={product.userId}
               sellerName={product.sellerName}
               shopId={product.shopId}
               isDarkMode={isDarkMode}
               localization={localization}
+              // ✅ Pass pre-fetched data
+              prefetchedData={sellerInfo}
             />
 
             {/* Attributes Widget */}
@@ -1272,9 +1380,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           </div>
         </div>
 
-        {/* ✅ OPTIMIZED: Bottom sections lazy loaded */}
+        {/* ✅ OPTIMIZED: Bottom sections with prefetched data */}
         <div className="mt-4 sm:mt-6 space-y-3 sm:space-y-4">
-          {/* ✅ LAZY LOADED: Heavy components below the fold (load immediately on large screens) */}
           {(hasScrolled || isLargeScreen) && (
             <Suspense
               fallback={
@@ -1286,6 +1393,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                 shopId={product.shopId}
                 isDarkMode={isDarkMode}
                 localization={localization}
+                prefetchedData={batchData?.collection}
               />
             </Suspense>
           )}
@@ -1301,6 +1409,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                 shopId={product.shopId}
                 isDarkMode={isDarkMode}
                 localization={localization}
+                prefetchedData={batchData?.bundles}
               />
             </Suspense>
           )}
@@ -1315,6 +1424,14 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                 productId={product.id}
                 isDarkMode={isDarkMode}
                 localization={localization}
+                prefetchedData={
+                  batchData
+                    ? {
+                        reviews: batchData.reviews,
+                        totalCount: batchData.reviewsTotal,
+                      }
+                    : null
+                }
               />
             </Suspense>
           )}
@@ -1332,6 +1449,14 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                 isShop={!!product.shopId}
                 isDarkMode={isDarkMode}
                 localization={localization}
+                prefetchedData={
+                  batchData
+                    ? {
+                        questions: batchData.questions,
+                        totalCount: batchData.questionsTotal,
+                      }
+                    : null
+                }
               />
             </Suspense>
           )}
@@ -1349,6 +1474,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                 relatedProductIds={product.relatedProductIds}
                 isDarkMode={isDarkMode}
                 localization={localization}
+                prefetchedProducts={batchData?.relatedProducts}
               />
             </Suspense>
           )}
@@ -1357,7 +1483,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         <div className="h-20 sm:h-24" />
       </div>
 
-      {/* ✅ LAZY LOADED: Modals */}
+      {/* Modals */}
       {showFullScreenViewer && (
         <Suspense fallback={null}>
           <FullScreenImageViewer
@@ -1399,6 +1525,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           localization={localization}
         />
       )}
+
       {product && (
         <ProductOptionSelector
           product={product}
@@ -1430,7 +1557,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
       {/* Description Modal */}
       {showDescriptionModal && product.description && (
         <>
-          {/* Backdrop for click-outside dismiss */}
           <div
             className="fixed inset-0 z-[999]"
             onClick={() => setShowDescriptionModal(false)}
@@ -1442,9 +1568,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                   ? "bg-gray-800 border-gray-700"
                   : "bg-white border-gray-200"
               }`}
-              style={{
-                animation: "slideInFromTop 0.3s ease-out forwards",
-              }}
+              style={{ animation: "slideInFromTop 0.3s ease-out forwards" }}
             >
               <div
                 className={`flex items-center justify-between p-3 border-b ${

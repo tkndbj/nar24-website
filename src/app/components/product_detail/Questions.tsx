@@ -1,7 +1,13 @@
 // src/components/productdetail/ProductQuestionsWidget.tsx
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { ChevronLeft, ChevronRight, User, HelpCircle, MessageCircle } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  User,
+  HelpCircle,
+  MessageCircle,
+} from "lucide-react";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
@@ -30,6 +36,11 @@ interface ProductQuestionsWidgetProps {
   isLoading?: boolean;
   isDarkMode?: boolean;
   localization?: ReturnType<typeof useTranslations>;
+  prefetchedData?: {
+    questions: Question[];
+    totalCount: number;
+    sellerInfo?: SellerInfo;
+  } | null;
 }
 
 interface QuestionAnswerCardProps {
@@ -58,29 +69,39 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
   const isLongAnswer = question.answerText.length > 120;
 
   return (
-    <div className={`group min-w-80 w-80 rounded-2xl sm:rounded-2xl rounded-none p-4 sm:p-5 border transition-all duration-300 hover:shadow-lg ${
-      isDarkMode
-        ? "bg-gradient-to-br from-gray-800 to-gray-850 border-gray-700 hover:border-orange-500"
-        : "bg-gradient-to-br from-white to-gray-50 border-gray-200 hover:border-orange-300"
-    }`}>
+    <div
+      className={`group min-w-80 w-80 rounded-2xl sm:rounded-2xl rounded-none p-4 sm:p-5 border transition-all duration-300 hover:shadow-lg ${
+        isDarkMode
+          ? "bg-gradient-to-br from-gray-800 to-gray-850 border-gray-700 hover:border-orange-500"
+          : "bg-gradient-to-br from-white to-gray-50 border-gray-200 hover:border-orange-300"
+      }`}
+    >
       {/* Header with date and asker */}
       <div className="flex justify-between items-start mb-3 sm:mb-4">
         <div className="flex items-center gap-2">
-          <div className={`p-1 sm:p-1.5 rounded-lg ${
-            isDarkMode ? "bg-blue-900/20 text-blue-400" : "bg-blue-50 text-blue-600"
-          }`}>
+          <div
+            className={`p-1 sm:p-1.5 rounded-lg ${
+              isDarkMode
+                ? "bg-blue-900/20 text-blue-400"
+                : "bg-blue-50 text-blue-600"
+            }`}
+          >
             <User className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
           </div>
-          <span className={`text-xs sm:text-sm font-semibold ${
-            isDarkMode ? "text-white" : "text-gray-900"
-          }`}>
+          <span
+            className={`text-xs sm:text-sm font-semibold ${
+              isDarkMode ? "text-white" : "text-gray-900"
+            }`}
+          >
             {displayName}
           </span>
         </div>
-        
-        <span className={`text-xs ${
-          isDarkMode ? "text-gray-400" : "text-gray-500"
-        }`}>
+
+        <span
+          className={`text-xs ${
+            isDarkMode ? "text-gray-400" : "text-gray-500"
+          }`}
+        >
           {formatDate(question.timestamp)}
         </span>
       </div>
@@ -88,21 +109,29 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
       {/* Question section */}
       <div className="mb-3 sm:mb-4">
         <div className="flex items-start gap-2 mb-2">
-          <HelpCircle className={`w-3.5 h-3.5 sm:w-4 sm:h-4 mt-0.5 flex-shrink-0 ${
-            isDarkMode ? "text-orange-400" : "text-orange-600"
-          }`} />
-          <p className={`text-xs sm:text-sm font-medium leading-relaxed ${
-            isDarkMode ? "text-gray-300" : "text-gray-700"
-          }`}>
+          <HelpCircle
+            className={`w-3.5 h-3.5 sm:w-4 sm:h-4 mt-0.5 flex-shrink-0 ${
+              isDarkMode ? "text-orange-400" : "text-orange-600"
+            }`}
+          />
+          <p
+            className={`text-xs sm:text-sm font-medium leading-relaxed ${
+              isDarkMode ? "text-gray-300" : "text-gray-700"
+            }`}
+          >
             {question.questionText}
           </p>
         </div>
       </div>
 
       {/* Answer section */}
-      <div className={`rounded-xl p-3 sm:p-4 border ${
-        isDarkMode ? "bg-gray-700/50 border-gray-600" : "bg-gray-50 border-gray-100"
-      }`}>
+      <div
+        className={`rounded-xl p-3 sm:p-4 border ${
+          isDarkMode
+            ? "bg-gray-700/50 border-gray-600"
+            : "bg-gray-50 border-gray-100"
+        }`}
+      >
         <div className="flex gap-2 sm:gap-3">
           {/* Seller avatar */}
           <div className="flex-shrink-0">
@@ -115,9 +144,13 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
                 className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover"
               />
             ) : (
-              <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center ${
-                isDarkMode ? "bg-orange-900/20 text-orange-400" : "bg-orange-100 text-orange-600"
-              }`}>
+              <div
+                className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center ${
+                  isDarkMode
+                    ? "bg-orange-900/20 text-orange-400"
+                    : "bg-orange-100 text-orange-600"
+                }`}
+              >
                 <User className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
             )}
@@ -126,24 +159,32 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
           {/* Answer content */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1.5 sm:mb-2">
-              <span className={`text-xs font-semibold ${
-                isDarkMode ? "text-orange-400" : "text-orange-600"
-              }`}>
+              <span
+                className={`text-xs font-semibold ${
+                  isDarkMode ? "text-orange-400" : "text-orange-600"
+                }`}
+              >
                 {t("sellerReply")}
               </span>
-              <div className={`w-1 h-1 rounded-full ${
-                isDarkMode ? "bg-gray-600" : "bg-gray-300"
-              }`} />
-              <span className={`text-xs ${
-                isDarkMode ? "text-gray-400" : "text-gray-500"
-              }`}>
+              <div
+                className={`w-1 h-1 rounded-full ${
+                  isDarkMode ? "bg-gray-600" : "bg-gray-300"
+                }`}
+              />
+              <span
+                className={`text-xs ${
+                  isDarkMode ? "text-gray-400" : "text-gray-500"
+                }`}
+              >
                 {t("officialResponse")}
               </span>
             </div>
-            
-            <p className={`text-xs sm:text-sm leading-relaxed ${isLongAnswer ? 'line-clamp-3' : ''} ${
-              isDarkMode ? "text-gray-300" : "text-gray-700"
-            }`}>
+
+            <p
+              className={`text-xs sm:text-sm leading-relaxed ${
+                isLongAnswer ? "line-clamp-3" : ""
+              } ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}
+            >
               {question.answerText}
             </p>
 
@@ -166,28 +207,34 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
   );
 };
 
-const LoadingSkeleton: React.FC<{ isDarkMode?: boolean }> = ({ 
-  isDarkMode = false 
+const LoadingSkeleton: React.FC<{ isDarkMode?: boolean }> = ({
+  isDarkMode = false,
 }) => (
-  <div className={`rounded-2xl sm:rounded-2xl rounded-none p-4 sm:p-6 border shadow-sm ${
-    isDarkMode 
-      ? "bg-gray-800 border-gray-700" 
-      : "bg-white border-gray-200"
-  }`}>
+  <div
+    className={`rounded-2xl sm:rounded-2xl rounded-none p-4 sm:p-6 border shadow-sm ${
+      isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+    }`}
+  >
     <div className="space-y-4 sm:space-y-6">
       {/* Header skeleton */}
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-2 sm:gap-3">
-          <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl animate-pulse ${
-            isDarkMode ? "bg-gray-700" : "bg-gray-200"
-          }`} />
-          <div className={`w-32 h-5 sm:w-40 sm:h-6 rounded animate-pulse ${
-            isDarkMode ? "bg-gray-700" : "bg-gray-200"
-          }`} />
+          <div
+            className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl animate-pulse ${
+              isDarkMode ? "bg-gray-700" : "bg-gray-200"
+            }`}
+          />
+          <div
+            className={`w-32 h-5 sm:w-40 sm:h-6 rounded animate-pulse ${
+              isDarkMode ? "bg-gray-700" : "bg-gray-200"
+            }`}
+          />
         </div>
-        <div className={`w-20 h-7 sm:w-24 sm:h-8 rounded-xl animate-pulse ${
-          isDarkMode ? "bg-gray-700" : "bg-gray-200"
-        }`} />
+        <div
+          className={`w-20 h-7 sm:w-24 sm:h-8 rounded-xl animate-pulse ${
+            isDarkMode ? "bg-gray-700" : "bg-gray-200"
+          }`}
+        />
       </div>
 
       {/* Questions skeleton */}
@@ -213,6 +260,7 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
   isLoading = false,
   isDarkMode = false,
   localization,
+  prefetchedData,
 }) => {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [sellerInfo, setSellerInfo] = useState<SellerInfo | null>(null);
@@ -223,37 +271,41 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   // ✅ FIXED: Proper nested translation function that uses JSON files
-  const t = useCallback((key: string) => {
-    if (!localization) {
-      return key;
-    }
+  const t = useCallback(
+    (key: string) => {
+      if (!localization) {
+        return key;
+      }
 
-    try {
-      // Try to get the nested ProductQuestionsWidget translation
-      const translation = localization(`ProductQuestionsWidget.${key}`);
-      
-      // Check if we got a valid translation (not the same as the key we requested)
-      if (translation && translation !== `ProductQuestionsWidget.${key}`) {
-        return translation;
+      try {
+        // Try to get the nested ProductQuestionsWidget translation
+        const translation = localization(`ProductQuestionsWidget.${key}`);
+
+        // Check if we got a valid translation (not the same as the key we requested)
+        if (translation && translation !== `ProductQuestionsWidget.${key}`) {
+          return translation;
+        }
+
+        // If nested translation doesn't exist, try direct key
+        const directTranslation = localization(key);
+        if (directTranslation && directTranslation !== key) {
+          return directTranslation;
+        }
+
+        // Return the key as fallback
+        return key;
+      } catch (error) {
+        console.warn(`Translation error for key: ${key}`, error);
+        return key;
       }
-      
-      // If nested translation doesn't exist, try direct key
-      const directTranslation = localization(key);
-      if (directTranslation && directTranslation !== key) {
-        return directTranslation;
-      }
-      
-      // Return the key as fallback
-      return key;
-    } catch (error) {
-      console.warn(`Translation error for key: ${key}`, error);
-      return key;
-    }
-  }, [localization]);
+    },
+    [localization]
+  );
 
   const checkScrollPosition = useCallback(() => {
     if (scrollContainerRef.current) {
-      const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
+      const { scrollLeft, scrollWidth, clientWidth } =
+        scrollContainerRef.current;
       setCanScrollLeft(scrollLeft > 0);
       setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1);
     }
@@ -281,6 +333,17 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
   }, [questions, checkScrollPosition]);
 
   useEffect(() => {
+    // ✅ PRIORITY 1: Use prefetched data (INSTANT)
+    if (prefetchedData) {
+      console.log("✅ Questions: Using prefetched data");
+      setQuestions(prefetchedData.questions || []);
+      setTotalQuestions(prefetchedData.totalCount || 0);
+      setSellerInfo(prefetchedData.sellerInfo || null);
+      setLoading(false);
+      return;
+    }
+
+    // ✅ PRIORITY 2: Fetch from API (fallback)
     const fetchData = async () => {
       if (!productId || !sellerId) return;
 
@@ -289,7 +352,11 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
 
         const [questionsResponse, sellerResponse] = await Promise.all([
           fetch(`/api/questions/${productId}?isShop=${isShop}&limit=5`),
-          fetch(`/api/seller/${sellerId}${isShop && shopId ? `?shopId=${shopId}` : ""}`),
+          fetch(
+            `/api/seller/${sellerId}${
+              isShop && shopId ? `?shopId=${shopId}` : ""
+            }`
+          ),
         ]);
 
         if (questionsResponse.ok) {
@@ -312,10 +379,12 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
     };
 
     fetchData();
-  }, [productId, sellerId, shopId, isShop]);
+  }, [productId, sellerId, shopId, isShop, prefetchedData]);
 
   const handleViewAllQuestions = useCallback(() => {
-    router.push(`/all-questions?productId=${productId}&sellerId=${sellerId}&isShop=${isShop}`);
+    router.push(
+      `/all-questions?productId=${productId}&sellerId=${sellerId}&isShop=${isShop}`
+    );
   }, [productId, sellerId, isShop, router]);
 
   const handleReadAll = useCallback(() => {
@@ -335,36 +404,42 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
     : sellerInfo?.profileImage;
 
   return (
-    <div className={`sm:rounded-2xl rounded-none p-4 sm:p-6 border shadow-sm -mx-4 sm:mx-0 ${
-      isDarkMode 
-        ? "bg-gray-800 border-gray-700" 
-        : "bg-white border-gray-200"
-    }`}>
+    <div
+      className={`sm:rounded-2xl rounded-none p-4 sm:p-6 border shadow-sm -mx-4 sm:mx-0 ${
+        isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+      }`}
+    >
       <div className="space-y-4 sm:space-y-6">
         {/* Header */}
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className={`p-1.5 sm:p-2 rounded-xl ${
-              isDarkMode 
-                ? "bg-orange-900/20 text-orange-400" 
-                : "bg-orange-100 text-orange-600"
-            }`}>
+            <div
+              className={`p-1.5 sm:p-2 rounded-xl ${
+                isDarkMode
+                  ? "bg-orange-900/20 text-orange-400"
+                  : "bg-orange-100 text-orange-600"
+              }`}
+            >
               <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
-              <h3 className={`text-lg sm:text-xl font-bold ${
-                isDarkMode ? "text-white" : "text-gray-900"
-              }`}>
+              <h3
+                className={`text-lg sm:text-xl font-bold ${
+                  isDarkMode ? "text-white" : "text-gray-900"
+                }`}
+              >
                 {t("title")}
               </h3>
-              <p className={`text-xs sm:text-sm ${
-                isDarkMode ? "text-gray-400" : "text-gray-600"
-              }`}>
+              <p
+                className={`text-xs sm:text-sm ${
+                  isDarkMode ? "text-gray-400" : "text-gray-600"
+                }`}
+              >
                 {totalQuestions} {t("answeredQuestions")}
               </p>
             </div>
           </div>
-          
+
           <button
             onClick={handleViewAllQuestions}
             className={`flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl font-semibold text-xs sm:text-sm transition-all duration-200 hover:scale-105 ${
