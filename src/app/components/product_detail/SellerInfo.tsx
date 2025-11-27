@@ -141,7 +141,7 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
     if (isShop && shopId) {
       router.push(`/shopdetail/${shopId}`);
     } else if (sellerId) {
-      router.push(`/seller/${sellerId}/reviews`);
+      router.push(`/normal-seller-info/${sellerId}`);
     }
   }, [isShop, shopId, sellerId, router]);
 
