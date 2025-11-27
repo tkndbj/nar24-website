@@ -173,18 +173,23 @@ const batchDataCache = new Map<
 >();
 const BATCH_CACHE_TTL = 2 * 60 * 1000; // 2 minutes
 
-function getCachedBatchData(
-  productId: string
-): ProductDetailBatchResponse | null {
+function getCachedBatchData(productId: string): {
+  data: ProductDetailBatchResponse | null;
+  isStale: boolean;
+} {
   const cached = batchDataCache.get(productId);
-  if (!cached) return null;
+  if (!cached) return { data: null, isStale: false };
 
-  if (Date.now() - cached.timestamp > BATCH_CACHE_TTL) {
+  const age = Date.now() - cached.timestamp;
+  const isStale = age > BATCH_CACHE_TTL / 2; // Stale at 50% of TTL
+  const isExpired = age > BATCH_CACHE_TTL;
+
+  if (isExpired) {
     batchDataCache.delete(productId);
-    return null;
+    return { data: null, isStale: false };
   }
 
-  return cached.data;
+  return { data: cached.data, isStale };
 }
 
 function cacheBatchData(productId: string, data: ProductDetailBatchResponse) {
@@ -303,7 +308,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   const [batchData, setBatchData] = useState<ProductDetailBatchResponse | null>(
     null
   );
-  const [, setIsBatchLoading] = useState(false);
 
   // UI States
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -358,44 +362,59 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     [localization]
   );
 
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   // ============= BATCH DATA FETCHING =============
   const fetchBatchData = useCallback(
     async (id: string) => {
-      // Check batch cache first
-      const cachedBatch = getCachedBatchData(id);
+      // Check client-side cache first with stale check
+      const { data: cachedBatch, isStale } = getCachedBatchData(id);
+
       if (cachedBatch) {
-        console.log("✅ INSTANT: Batch data from cache");
+        console.log(
+          `✅ Client cache ${isStale ? "(stale)" : "(fresh)"} for ${id}`
+        );
         setBatchData(cachedBatch);
-        return;
+
+        // If fresh, no need to fetch
+        if (!isStale) return;
+        // If stale, continue to revalidate below
       }
 
-      setIsBatchLoading(true);
-
       try {
-        const response = await fetch(`/api/product-detail-batch/${id}`);
+        const response = await fetch(`/api/product-detail-batch/${id}`, {
+          signal: abortControllerRef.current?.signal,
+        });
 
-        if (response.ok) {
-          const data: ProductDetailBatchResponse = await response.json();
-          console.log(
-            `✅ Batch data fetched in ${
-              data.timings?.total || "?"
-            }ms (source: ${data.source || "api"})`
-          );
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
 
-          setBatchData(data);
-          cacheBatchData(id, data);
+        const data: ProductDetailBatchResponse = await response.json();
 
-          // Also update product cache with fresh data
-          if (data.product) {
-            const freshProduct = ProductUtils.fromJson(data.product);
-            setProduct(freshProduct);
-            setProductCache(id, freshProduct);
-          }
+        console.log(
+          `✅ Batch data fetched (source: ${data.source || "unknown"}, ${
+            data.timings?.total || "?"
+          }ms)`
+        );
+
+        setBatchData(data);
+        cacheBatchData(id, data);
+
+        // Update product if we got fresh data
+        if (data.product) {
+          const freshProduct = ProductUtils.fromJson(data.product);
+          setProduct(freshProduct);
+          setProductCache(id, freshProduct);
         }
       } catch (error) {
-        console.error("Error fetching batch data:", error);
-      } finally {
-        setIsBatchLoading(false);
+        // Ignore abort errors
+        if (error instanceof Error && error.name === "AbortError") {
+          console.log("Request aborted for:", id);
+          return;
+        }
+        console.error("Batch fetch error:", error);
+        // Don't clear existing data on error - graceful degradation
       }
     },
     [setProductCache]
@@ -403,6 +422,10 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
   // ============= MAIN INITIALIZATION =============
   useEffect(() => {
+    // Cancel any previous request
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = new AbortController();
+
     let mounted = true;
 
     params.then((resolvedParams) => {
@@ -411,19 +434,24 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
       const id = resolvedParams.productId;
       setProductId(id);
 
+      // Reset states for new product
+      setError(null);
+      setBatchData(null);
+      setCurrentImageIndex(0);
+      setPreviousImageIndex(0);
+      setImageErrors(new Set());
+
       // ✅ STAGE 1: Check in-memory cache for INSTANT display
       const cached = getProduct(id);
       if (cached) {
         console.log("✅ INSTANT: Product from in-memory cache");
         setProduct(cached);
         setIsLoading(false);
-
-        // ✅ STAGE 2: Fetch batch data in background
         fetchBatchData(id);
         return;
       }
 
-      // ✅ Check sessionStorage
+      // ✅ STAGE 2: Check sessionStorage
       try {
         const stored = sessionStorage.getItem(`product_${id}`);
         const time = sessionStorage.getItem(`product_${id}_timestamp`);
@@ -434,68 +462,81 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           setProduct(parsed);
           setIsLoading(false);
           setProductCache(id, parsed);
-
-          // Fetch batch data in background
           fetchBatchData(id);
           return;
         }
       } catch (e) {
-        console.error("Cache error:", e);
+        console.error("SessionStorage error:", e);
       }
 
-      // ✅ STAGE 3: Full network fetch (batch endpoint)
+      // ✅ STAGE 3: Full network fetch
       console.log("⏳ NETWORK: Fetching from batch API");
-      setIsBatchLoading(true);
+      setIsLoading(true);
 
-      fetch(`/api/product-detail-batch/${id}`)
+      fetch(`/api/product-detail-batch/${id}`, {
+        signal: abortControllerRef.current?.signal,
+      })
         .then((response) => {
-          if (!response.ok) throw new Error("Product not found");
+          if (!response.ok) {
+            if (response.status === 404) {
+              throw new Error("Product not found");
+            }
+            throw new Error(`HTTP ${response.status}`);
+          }
           return response.json();
         })
         .then((data: ProductDetailBatchResponse) => {
           if (!mounted) return;
 
           console.log(
-            `✅ Batch data fetched in ${data.timings?.total || "?"}ms`
+            `✅ Batch data fetched (source: ${data.source}, ${
+              data.timings?.total || "?"
+            }ms)`
           );
 
-          // Set product
           if (data.product) {
             const product = ProductUtils.fromJson(data.product);
             setProduct(product);
             setProductCache(id, product);
 
             // Cache to sessionStorage
-            sessionStorage.setItem(
-              `product_${id}`,
-              JSON.stringify(data.product)
-            );
-            sessionStorage.setItem(
-              `product_${id}_timestamp`,
-              Date.now().toString()
-            );
+            try {
+              sessionStorage.setItem(
+                `product_${id}`,
+                JSON.stringify(data.product)
+              );
+              sessionStorage.setItem(
+                `product_${id}_timestamp`,
+                Date.now().toString()
+              );
+            } catch (e) {
+              console.warn("SessionStorage write failed:", e);
+            }
           }
 
-          // Set batch data
           setBatchData(data);
           cacheBatchData(id, data);
           setIsLoading(false);
         })
         .catch((err) => {
           if (!mounted) return;
+
+          // Ignore abort errors
+          if (err instanceof Error && err.name === "AbortError") {
+            return;
+          }
+
           console.error("Error fetching product:", err);
           setError(
             err instanceof Error ? err.message : "Failed to load product"
           );
           setIsLoading(false);
-        })
-        .finally(() => {
-          if (mounted) setIsBatchLoading(false);
         });
     });
 
     return () => {
       mounted = false;
+      abortControllerRef.current?.abort();
     };
   }, [params, getProduct, setProductCache, fetchBatchData]);
 
