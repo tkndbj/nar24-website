@@ -4288,5 +4288,25 @@
     "endOfRecommendations": "Tüm önerilerini gördün!",
     "endOfRecommendationsHint": "Daha fazla kişiselleştirilmiş seçim için daha sonra tekrar kontrol et.",
     "scrollToTop": "Başa dön"
+  },
+  "SellerInfo": {
+    "sellerReviews": "Satıcı Değerlendirmeleri",
+    "verifiedSeller": "Doğrulanmış Satıcı",
+    "reviews": "Değerlendirmeler",
+    "viewProfile": "Profili Görüntüle",
+    "allReviews": "Tüm Değerlendirmeler",
+    "noReviewsYet": "Henüz değerlendirme yok",
+    "report": "Şikayet Et",
+    "inappropriateProducts": "Uygunsuz Ürünler",
+    "inappropriateName": "Uygunsuz İsim",
+    "inappropriateProductInformation": "Uygunsuz Ürün Bilgisi",
+    "unsuccessfulDelivery": "Başarısız Teslimat",
+    "pleaseLogin": "Devam etmek için lütfen giriş yapın",
+    "pleaseLoginToLike": "Beğenmek için lütfen giriş yapın",
+    "reportSubmittedSuccessfully": "Şikayet başarıyla gönderildi",
+    "errorSubmittingReport": "Şikayet gönderilirken hata oluştu. Lütfen tekrar deneyin.",
+    "translate": "Çevir",
+    "seeOriginal": "Orijinali Gör",
+    "translationError": "Değerlendirme çevrilirken hata oluştu. Lütfen tekrar deneyin."
   }
 }

@@ -4276,5 +4276,25 @@
     "endOfRecommendations": "You've seen all your recommendations!",
     "endOfRecommendationsHint": "Check back later for more personalized picks.",
     "scrollToTop": "Scroll to top"
+  },
+  "SellerInfo": {
+    "sellerReviews": "Seller Reviews",
+    "verifiedSeller": "Verified Seller",
+    "reviews": "Reviews",
+    "viewProfile": "View Profile",
+    "allReviews": "All Reviews",
+    "noReviewsYet": "No reviews yet",
+    "report": "Report",
+    "inappropriateProducts": "Inappropriate Products",
+    "inappropriateName": "Inappropriate Name",
+    "inappropriateProductInformation": "Inappropriate Product Information",
+    "unsuccessfulDelivery": "Unsuccessful Delivery",
+    "pleaseLogin": "Please log in to continue",
+    "pleaseLoginToLike": "Please log in to like reviews",
+    "reportSubmittedSuccessfully": "Report submitted successfully",
+    "errorSubmittingReport": "Error submitting report. Please try again.",
+    "translate": "Translate",
+    "seeOriginal": "See Original",
+    "translationError": "Error translating review. Please try again."
   }
 }
