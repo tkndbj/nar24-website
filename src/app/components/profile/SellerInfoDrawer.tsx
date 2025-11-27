@@ -436,7 +436,7 @@ export const SellerInfoDrawer: React.FC<SellerInfoDrawerProps> = ({
 
   const drawerContent = (
     <>
-      <div className="fixed inset-0 z-50 overflow-hidden">
+      <div className="fixed inset-0 z-[1000] overflow-hidden">
         {/* Backdrop */}
         <div
           className={`absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${
