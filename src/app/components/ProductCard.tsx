@@ -404,6 +404,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
   const [showEnlargedImage, setShowEnlargedImage] = useState(false);
   const [enlargedImagePosition, setEnlargedImagePosition] = useState<{ top: number; left: number } | null>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
 
   // ✅ CRITICAL: Only show selector for CART operations, not favorites
   const [showCartOptionSelector, setShowCartOptionSelector] = useState(false);
@@ -518,6 +519,19 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
       });
     }
     return () => observer.disconnect();
+  }, []);
+
+  // ✅ Detect mobile/touch devices to disable hover zoom
+  useEffect(() => {
+    const checkMobile = () => {
+      const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      const isSmallScreen = window.innerWidth < 768;
+      setIsMobile(isTouchDevice || isSmallScreen);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
   // Reset image index when color changes (matches Flutter's didUpdateWidget)
