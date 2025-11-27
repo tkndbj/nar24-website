@@ -853,7 +853,7 @@ export const SellerInfoDrawer: React.FC<SellerInfoDrawerProps> = ({
       {/* Add/Edit Seller Info Modal */}
       {showAddModal && (
         <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] p-6"
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[1001] p-6"
           style={{
             display: "flex",
             alignItems: "center",
