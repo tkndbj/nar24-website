@@ -181,38 +181,95 @@ interface RotatingTextProps {
   className?: string;
 }
 
-const RotatingText = memo<RotatingTextProps>(
+export const RotatingText = memo<RotatingTextProps>(
   ({ children, duration = 1500, className = "" }) => {
     const [currentIndex, setCurrentIndex] = useState(0);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const lastUpdateRef = useRef<number>(0);
+    const rafIdRef = useRef<number | null>(null);
+    const isVisibleRef = useRef(true);
 
     useEffect(() => {
       if (children.length <= 1) return;
 
-      const timer = setInterval(() => {
-        setCurrentIndex((prev) => (prev + 1) % children.length);
-      }, duration);
+      // ✅ OPTIMIZATION 1: Use Intersection Observer for visibility (like Flutter's ticker)
+      const observer = new IntersectionObserver(
+        (entries) => {
+          isVisibleRef.current = entries[0]?.isIntersecting ?? false;
+        },
+        { threshold: 0.1 }
+      );
 
-      return () => clearInterval(timer);
+      if (containerRef.current) {
+        observer.observe(containerRef.current);
+      }
+
+      // ✅ OPTIMIZATION 2: Use requestAnimationFrame instead of setInterval
+      // This syncs with the browser's repaint cycle (similar to vsync)
+      const animate = (timestamp: number) => {
+        // Only update if visible (mimics Flutter's ticker pause behavior)
+        if (isVisibleRef.current) {
+          if (timestamp - lastUpdateRef.current >= duration) {
+            setCurrentIndex((prev) => (prev + 1) % children.length);
+            lastUpdateRef.current = timestamp;
+          }
+        } else {
+          // Reset timer when becoming visible again
+          lastUpdateRef.current = timestamp;
+        }
+
+        rafIdRef.current = requestAnimationFrame(animate);
+      };
+
+      rafIdRef.current = requestAnimationFrame(animate);
+
+      // ✅ OPTIMIZATION 3: Handle page visibility (pause when tab is hidden)
+      const handleVisibilityChange = () => {
+        if (document.hidden) {
+          if (rafIdRef.current) {
+            cancelAnimationFrame(rafIdRef.current);
+            rafIdRef.current = null;
+          }
+        } else {
+          lastUpdateRef.current = performance.now();
+          rafIdRef.current = requestAnimationFrame(animate);
+        }
+      };
+
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+
+      return () => {
+        if (rafIdRef.current) {
+          cancelAnimationFrame(rafIdRef.current);
+        }
+        observer.disconnect();
+        document.removeEventListener("visibilitychange", handleVisibilityChange);
+      };
     }, [children.length, duration]);
 
     if (children.length === 0) return null;
-    if (children.length === 1)
+    if (children.length === 1) {
       return <div className={className}>{children[0]}</div>;
+    }
 
     return (
       <div
+        ref={containerRef}
         className={`relative overflow-hidden ${className}`}
         style={{ height: "16px" }}
       >
         {children.map((child, index) => (
           <div
             key={index}
-            className={`absolute w-full h-4 flex items-center transition-all duration-500 ease-in-out ${
+            className={`absolute w-full transition-all duration-500 ease-in-out ${
               index === currentIndex
                 ? "opacity-100 translate-y-0"
                 : "opacity-0 translate-y-4"
             }`}
-            style={{ lineHeight: "16px" }}
+            style={{ 
+              // ✅ OPTIMIZATION 4: Use will-change for GPU acceleration
+              willChange: index === currentIndex ? "opacity, transform" : "auto",
+            }}
           >
             {child}
           </div>
@@ -221,6 +278,7 @@ const RotatingText = memo<RotatingTextProps>(
     );
   }
 );
+
 RotatingText.displayName = "RotatingText";
 
 // ✅ Optimized rotating banner
@@ -230,26 +288,76 @@ interface RotatingBannerProps {
   height?: number;
 }
 
-const RotatingBanner = memo<RotatingBannerProps>(
+export const RotatingBanner = memo<RotatingBannerProps>(
   ({ children, duration = 2000, height = 20 }) => {
     const [currentIndex, setCurrentIndex] = useState(0);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const lastUpdateRef = useRef<number>(0);
+    const rafIdRef = useRef<number | null>(null);
+    const isVisibleRef = useRef(true);
 
     useEffect(() => {
       if (children.length <= 1) return;
 
-      const timer = setInterval(() => {
-        setCurrentIndex((prev) => (prev + 1) % children.length);
-      }, duration);
+      const observer = new IntersectionObserver(
+        (entries) => {
+          isVisibleRef.current = entries[0]?.isIntersecting ?? false;
+        },
+        { threshold: 0.1 }
+      );
 
-      return () => clearInterval(timer);
+      if (containerRef.current) {
+        observer.observe(containerRef.current);
+      }
+
+      const animate = (timestamp: number) => {
+        if (isVisibleRef.current) {
+          if (timestamp - lastUpdateRef.current >= duration) {
+            setCurrentIndex((prev) => (prev + 1) % children.length);
+            lastUpdateRef.current = timestamp;
+          }
+        } else {
+          lastUpdateRef.current = timestamp;
+        }
+        rafIdRef.current = requestAnimationFrame(animate);
+      };
+
+      rafIdRef.current = requestAnimationFrame(animate);
+
+      const handleVisibilityChange = () => {
+        if (document.hidden) {
+          if (rafIdRef.current) {
+            cancelAnimationFrame(rafIdRef.current);
+            rafIdRef.current = null;
+          }
+        } else {
+          lastUpdateRef.current = performance.now();
+          rafIdRef.current = requestAnimationFrame(animate);
+        }
+      };
+
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+
+      return () => {
+        if (rafIdRef.current) {
+          cancelAnimationFrame(rafIdRef.current);
+        }
+        observer.disconnect();
+        document.removeEventListener("visibilitychange", handleVisibilityChange);
+      };
     }, [children.length, duration]);
 
     if (children.length === 0) return null;
-    if (children.length === 1)
+    if (children.length === 1) {
       return <div style={{ height }}>{children[0]}</div>;
+    }
 
     return (
-      <div style={{ height }} className="relative overflow-hidden">
+      <div
+        ref={containerRef}
+        style={{ height }}
+        className="relative overflow-hidden"
+      >
         {children.map((child, index) => (
           <div
             key={index}
@@ -258,7 +366,10 @@ const RotatingBanner = memo<RotatingBannerProps>(
                 ? "opacity-100 translate-y-0"
                 : "opacity-0 translate-y-full"
             }`}
-            style={{ height }}
+            style={{ 
+              height,
+              willChange: index === currentIndex ? "opacity, transform" : "auto",
+            }}
           >
             {child}
           </div>
@@ -267,6 +378,7 @@ const RotatingBanner = memo<RotatingBannerProps>(
     );
   }
 );
+
 RotatingBanner.displayName = "RotatingBanner";
 
 // ✅ Star rating component
