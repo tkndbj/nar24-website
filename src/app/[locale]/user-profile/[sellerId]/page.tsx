@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   doc,
@@ -14,9 +14,7 @@ import {
   arrayUnion,
   arrayRemove,
   serverTimestamp,
-  
   limit,
-  
   DocumentSnapshot,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -38,7 +36,6 @@ import {
   Package,
   Verified,
 } from "lucide-react";
-
 
 interface UserData {
   displayName: string;
@@ -100,11 +97,14 @@ export default function UserProfilePage() {
   // Check if viewing own profile
   const isCurrentUser = user?.uid === userId;
 
-  const getDateFromTimestamp = (timestamp: any): Date => {
+  const getDateFromTimestamp = (
+    timestamp: Date | { toDate: () => Date } | number | null | undefined
+  ): Date => {
     if (!timestamp) return new Date(0);
     if (timestamp instanceof Date) return timestamp;
-    if (typeof timestamp?.toDate === 'function') return timestamp.toDate();
-    if (typeof timestamp === 'number') return new Date(timestamp);
+    if (typeof (timestamp as { toDate: () => Date }).toDate === "function")
+      return (timestamp as { toDate: () => Date }).toDate();
+    if (typeof timestamp === "number") return new Date(timestamp);
     return new Date(0);
   };
 
@@ -126,31 +126,31 @@ export default function UserProfilePage() {
 
   useEffect(() => {
     if (!userId) {
-        // Wait for params to be available (don't log error, just wait)
-        return;
-      }
-  
+      // Wait for params to be available (don't log error, just wait)
+      return;
+    }
+
     let isMounted = true;
-  
+
     const loadAllData = async () => {
       setIsLoading(true);
       lastDocRef.current = null;
-  
+
       try {
         // 1. Fetch user data
         const userDocSnap = await getDoc(doc(db, "users", userId));
         if (!isMounted) return;
-  
+
         if (!userDocSnap.exists()) {
           setUserData(null);
           setIsLoading(false);
           return;
         }
-        
+
         setUserData(userDocSnap.data() as UserData);
         const userDataFromDoc = userDocSnap.data();
         const totalProductsSold = userDataFromDoc?.totalProductsSold || 0;
-  
+
         // 2. Fetch reviews for stats
         let averageRating = 0;
         let reviewCount = 0;
@@ -159,7 +159,7 @@ export default function UserProfilePage() {
             collection(db, "users", userId, "reviews")
           );
           if (!isMounted) return;
-  
+
           let totalRating = 0;
           reviewCount = reviewsSnapshot.size;
           reviewsSnapshot.docs.forEach((docSnap) => {
@@ -169,11 +169,11 @@ export default function UserProfilePage() {
         } catch (reviewError) {
           console.error("Error fetching reviews:", reviewError);
         }
-  
+
         // 3. Fetch products - IMPORTANT: Try without orderBy first to avoid index issues
         let fetchedProducts: Product[] = [];
         let totalListings = 0;
-        
+
         try {
           // First, try the simple query without ordering
           const simpleQuery = query(
@@ -181,45 +181,47 @@ export default function UserProfilePage() {
             where("userId", "==", userId),
             limit(PRODUCTS_PER_PAGE)
           );
-  
+
           const productsSnapshot = await getDocs(simpleQuery);
           if (!isMounted) return;
-  
+
           fetchedProducts = productsSnapshot.docs.map((docSnap) => ({
             id: docSnap.id,
             ...docSnap.data(),
           })) as Product[];
-  
+
           // Sort client-side if needed
           fetchedProducts.sort((a, b) => {
             const dateA = getDateFromTimestamp(a.createdAt);
             const dateB = getDateFromTimestamp(b.createdAt);
             return dateB.getTime() - dateA.getTime();
           });
-  
+
           if (productsSnapshot.docs.length > 0) {
-            lastDocRef.current = productsSnapshot.docs[productsSnapshot.docs.length - 1];
+            lastDocRef.current =
+              productsSnapshot.docs[productsSnapshot.docs.length - 1];
           }
-          setHasMoreProducts(productsSnapshot.docs.length === PRODUCTS_PER_PAGE);
+          setHasMoreProducts(
+            productsSnapshot.docs.length === PRODUCTS_PER_PAGE
+          );
           totalListings = productsSnapshot.size;
-          
         } catch (productError) {
           console.error("Error fetching products:", productError);
           // Check console for Firestore index error link
         }
-  
+
         if (!isMounted) return;
-  
+
         setSellerStats({
           averageRating,
           reviewCount,
           totalProductsSold,
           totalListings,
         });
-  
+
         setProducts(fetchedProducts);
         setFilteredProducts(fetchedProducts);
-  
+
         // 4. Check follow status (don't let this block loading)
         if (user?.uid && user.uid !== userId) {
           try {
@@ -240,56 +242,59 @@ export default function UserProfilePage() {
         }
       }
     };
-  
+
     loadAllData();
-  
+
     return () => {
       isMounted = false;
     };
   }, [userId, user?.uid]);
 
-  const loadMoreProducts = async () => {
+  const loadMoreProducts = useCallback(async () => {
     if (!userId || isLoadingMore || !hasMoreProducts) return;
-  
+
     setIsLoadingMore(true);
-  
+
     try {
       // Simple query without orderBy to avoid index issues
       const productsQuery = query(
         collection(db, "products"),
         where("userId", "==", userId),
-        limit(PRODUCTS_PER_PAGE * (Math.ceil(products.length / PRODUCTS_PER_PAGE) + 1))
+        limit(
+          PRODUCTS_PER_PAGE *
+            (Math.ceil(products.length / PRODUCTS_PER_PAGE) + 1)
+        )
       );
-  
+
       const snapshot = await getDocs(productsQuery);
-      let allProducts: Product[] = snapshot.docs.map((docSnap) => ({
+      const allProducts: Product[] = snapshot.docs.map((docSnap) => ({
         id: docSnap.id,
         ...docSnap.data(),
       })) as Product[];
-  
+
       // Sort client-side
       allProducts.sort((a, b) => {
         const dateA = getDateFromTimestamp(a.createdAt);
         const dateB = getDateFromTimestamp(b.createdAt);
         return dateB.getTime() - dateA.getTime();
       });
-  
+
       // Get only new products
-      const existingIds = new Set(products.map(p => p.id));
-      const newProducts = allProducts.filter(p => !existingIds.has(p.id));
-  
+      const existingIds = new Set(products.map((p) => p.id));
+      const newProducts = allProducts.filter((p) => !existingIds.has(p.id));
+
       if (newProducts.length > 0) {
         setProducts((prev) => [...prev, ...newProducts]);
         setFilteredProducts((prev) => [...prev, ...newProducts]);
       }
-      
+
       setHasMoreProducts(newProducts.length >= PRODUCTS_PER_PAGE);
     } catch (error) {
       console.error("Error loading more products:", error);
     } finally {
       setIsLoadingMore(false);
     }
-  };
+  }, [userId, isLoadingMore, hasMoreProducts, products]);
 
   // Search filtering with debounce
   useEffect(() => {
@@ -336,7 +341,7 @@ export default function UserProfilePage() {
 
     container.addEventListener("scroll", handleScroll);
     return () => container.removeEventListener("scroll", handleScroll);
-  }, [isLoadingMore, hasMoreProducts, userId]);
+  }, [isLoadingMore, hasMoreProducts, loadMoreProducts]);
 
   // Toggle follow
   const handleToggleFollow = async () => {
