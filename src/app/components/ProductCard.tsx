@@ -192,7 +192,6 @@ export const RotatingText = memo<RotatingTextProps>(
     useEffect(() => {
       if (children.length <= 1) return;
 
-      // ✅ OPTIMIZATION 1: Use Intersection Observer for visibility (like Flutter's ticker)
       const observer = new IntersectionObserver(
         (entries) => {
           isVisibleRef.current = entries[0]?.isIntersecting ?? false;
@@ -204,17 +203,13 @@ export const RotatingText = memo<RotatingTextProps>(
         observer.observe(containerRef.current);
       }
 
-      // ✅ OPTIMIZATION 2: Use requestAnimationFrame instead of setInterval
-      // This syncs with the browser's repaint cycle (similar to vsync)
       const animate = (timestamp: number) => {
-        // Only update if visible (mimics Flutter's ticker pause behavior)
         if (isVisibleRef.current) {
           if (timestamp - lastUpdateRef.current >= duration) {
             setCurrentIndex((prev) => (prev + 1) % children.length);
             lastUpdateRef.current = timestamp;
           }
         } else {
-          // Reset timer when becoming visible again
           lastUpdateRef.current = timestamp;
         }
 
@@ -223,7 +218,6 @@ export const RotatingText = memo<RotatingTextProps>(
 
       rafIdRef.current = requestAnimationFrame(animate);
 
-      // ✅ OPTIMIZATION 3: Handle page visibility (pause when tab is hidden)
       const handleVisibilityChange = () => {
         if (document.hidden) {
           if (rafIdRef.current) {
@@ -256,7 +250,7 @@ export const RotatingText = memo<RotatingTextProps>(
       <div
         ref={containerRef}
         className={`relative overflow-hidden ${className}`}
-        style={{ height: "16px" }}
+        style={{ height: "18px" }}  // ✅ Increased from 16px to 18px
       >
         {children.map((child, index) => (
           <div
@@ -266,9 +260,10 @@ export const RotatingText = memo<RotatingTextProps>(
                 ? "opacity-100 translate-y-0"
                 : "opacity-0 translate-y-4"
             }`}
-            style={{ 
-              // ✅ OPTIMIZATION 4: Use will-change for GPU acceleration
+            style={{
               willChange: index === currentIndex ? "opacity, transform" : "auto",
+              lineHeight: "18px",  // ✅ Added explicit line-height to match container
+              height: "18px",      // ✅ Added explicit height
             }}
           >
             {child}
