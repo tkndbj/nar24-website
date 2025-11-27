@@ -404,7 +404,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
   const [showEnlargedImage, setShowEnlargedImage] = useState(false);
   const [enlargedImagePosition, setEnlargedImagePosition] = useState<{ top: number; left: number } | null>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const [isMobile, setIsMobile] = useState(false);
+  const [, setIsMobile] = useState(false);
 
   // ✅ CRITICAL: Only show selector for CART operations, not favorites
   const [showCartOptionSelector, setShowCartOptionSelector] = useState(false);
