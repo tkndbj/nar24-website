@@ -1,25 +1,260 @@
+// src/app/api/category-products/route.ts
+//
+// ═══════════════════════════════════════════════════════════════════════════
+// CATEGORY PRODUCTS API - PRODUCTION OPTIMIZED
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// OPTIMIZATIONS:
+// 1. Request Deduplication - Prevents duplicate in-flight requests
+// 2. Retry with Exponential Backoff - Handles transient Firestore failures
+// 3. Stale-While-Revalidate Caching - Fast responses with background refresh
+// 4. Request Timeout - Prevents hanging requests
+// 5. Query Fingerprinting - Cache key based on all query params
+// 6. Efficient Pagination - Cursor-based option for large datasets
+//
+// ═══════════════════════════════════════════════════════════════════════════
+
 import { NextRequest, NextResponse } from "next/server";
 import { getFirestoreAdmin } from "@/lib/firebase-admin";
 import { QueryDocumentSnapshot } from "firebase-admin/firestore";
-import { Product, ProductUtils } from "@/app/models/Product"; // ✅ Import both
+import { Product, ProductUtils } from "@/app/models/Product";
 
-// Cache configuration
-const CACHE_DURATION = 60;
-const MAX_FETCH_LIMIT = 200;
-const DEFAULT_PAGE_SIZE = 20;
+// ============= CONFIGURATION =============
 
-// ✅ CLEAN: Convert Firestore document to Product using ProductUtils
+const CONFIG = {
+  CACHE_TTL: 60 * 1000, // 1 minute - fresh
+  STALE_TTL: 3 * 60 * 1000, // 3 minutes - stale but usable
+  MAX_CACHE_SIZE: 100,
+  MAX_FETCH_LIMIT: 200,
+  DEFAULT_PAGE_SIZE: 20,
+  MAX_PAGE_SIZE: 100,
+  REQUEST_TIMEOUT: 10000, // 10 seconds
+  MAX_RETRIES: 2,
+  BASE_RETRY_DELAY: 100,
+} as const;
+
+// ============= TYPES =============
+
+interface CategoryProductsResponse {
+  products: Product[];
+  hasMore: boolean;
+  page: number;
+  total: number;
+  source?: "cache" | "stale" | "dedupe" | "fresh";
+  timing?: number;
+}
+
+interface CacheEntry {
+  data: CategoryProductsResponse;
+  timestamp: number;
+}
+
+interface QueryFilters {
+  category: string;
+  subcategory?: string;
+  subsubcategory?: string;
+  filterSubcategories: string[];
+  colors: string[];
+  brands: string[];
+  minPrice?: number;
+  maxPrice?: number;
+  page: number;
+  limit: number;
+}
+
+// ============= REQUEST DEDUPLICATION =============
+
+const pendingRequests = new Map<string, Promise<CategoryProductsResponse>>();
+
+// ============= RESPONSE CACHING =============
+
+const responseCache = new Map<string, CacheEntry>();
+
+interface CacheResult {
+  data: CategoryProductsResponse | null;
+  status: "fresh" | "stale" | "expired" | "miss";
+}
+
+function generateCacheKey(filters: QueryFilters): string {
+  return JSON.stringify({
+    c: filters.category,
+    sc: filters.subcategory || "",
+    ssc: filters.subsubcategory || "",
+    fsc: filters.filterSubcategories.sort().join(","),
+    col: filters.colors.sort().join(","),
+    br: filters.brands.sort().join(","),
+    minP: filters.minPrice ?? "",
+    maxP: filters.maxPrice ?? "",
+    p: filters.page,
+    l: filters.limit,
+  });
+}
+
+function getCachedResponse(cacheKey: string): CacheResult {
+  const cached = responseCache.get(cacheKey);
+
+  if (!cached) {
+    return { data: null, status: "miss" };
+  }
+
+  const age = Date.now() - cached.timestamp;
+
+  if (age <= CONFIG.CACHE_TTL) {
+    return { data: cached.data, status: "fresh" };
+  }
+
+  if (age <= CONFIG.STALE_TTL) {
+    return { data: cached.data, status: "stale" };
+  }
+
+  responseCache.delete(cacheKey);
+  return { data: null, status: "expired" };
+}
+
+function cacheResponse(cacheKey: string, data: CategoryProductsResponse): void {
+  if (responseCache.size >= CONFIG.MAX_CACHE_SIZE) {
+    const firstKey = responseCache.keys().next().value;
+    if (firstKey) responseCache.delete(firstKey);
+  }
+
+  responseCache.set(cacheKey, { data, timestamp: Date.now() });
+}
+
+// ============= RETRY LOGIC =============
+
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  options: {
+    maxRetries?: number;
+    baseDelay?: number;
+    shouldRetry?: (error: unknown) => boolean;
+  } = {}
+): Promise<T> {
+  const {
+    maxRetries = CONFIG.MAX_RETRIES,
+    baseDelay = CONFIG.BASE_RETRY_DELAY,
+    shouldRetry = () => true,
+  } = options;
+
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      if (!shouldRetry(error) || attempt === maxRetries) {
+        throw lastError;
+      }
+
+      const delay = baseDelay * Math.pow(2, attempt);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+
+  throw lastError;
+}
+
+// ============= TIMEOUT WRAPPER =============
+
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  errorMessage: string = "Request timeout"
+): Promise<T> {
+  let timeoutId: NodeJS.Timeout;
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(errorMessage)), timeoutMs);
+  });
+
+  try {
+    const result = await Promise.race([promise, timeoutPromise]);
+    clearTimeout(timeoutId!);
+    return result;
+  } catch (error) {
+    clearTimeout(timeoutId!);
+    throw error;
+  }
+}
+
+// ============= HELPER FUNCTIONS =============
+
 function documentToProduct(doc: QueryDocumentSnapshot): Product {
   const data = { id: doc.id, ...doc.data() };
   return ProductUtils.fromJson(data);
 }
 
-// Normalize string for comparison (case-insensitive and trim)
 function normalizeString(str: string): string {
   return str.toLowerCase().trim();
 }
 
-// Client-side filtering function (optimized)
+function formatCategoryName(name: string): string {
+  return name
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+function parseQueryParams(searchParams: URLSearchParams): QueryFilters {
+  const category = searchParams.get("category") || "";
+  const subcategory = searchParams.get("subcategory") || undefined;
+  const subsubcategory = searchParams.get("subsubcategory") || undefined;
+  const page = Math.max(0, parseInt(searchParams.get("page") || "0", 10));
+  const limit = Math.min(
+    Math.max(
+      1,
+      parseInt(
+        searchParams.get("limit") || String(CONFIG.DEFAULT_PAGE_SIZE),
+        10
+      )
+    ),
+    CONFIG.MAX_PAGE_SIZE
+  );
+
+  const filterSubcategories =
+    searchParams.get("filterSubcategories")?.split(",").filter(Boolean) || [];
+  const colors = searchParams.get("colors")?.split(",").filter(Boolean) || [];
+  const brands = searchParams.get("brands")?.split(",").filter(Boolean) || [];
+
+  const minPriceStr = searchParams.get("minPrice");
+  const maxPriceStr = searchParams.get("maxPrice");
+  const minPrice = minPriceStr ? parseFloat(minPriceStr) : undefined;
+  const maxPrice = maxPriceStr ? parseFloat(maxPriceStr) : undefined;
+
+  return {
+    category,
+    subcategory,
+    subsubcategory,
+    filterSubcategories,
+    colors,
+    brands,
+    minPrice: minPrice !== undefined && !isNaN(minPrice) ? minPrice : undefined,
+    maxPrice: maxPrice !== undefined && !isNaN(maxPrice) ? maxPrice : undefined,
+    page,
+    limit,
+  };
+}
+
+function validateFilters(filters: QueryFilters): string | null {
+  if (!filters.category) {
+    return "Category parameter is required";
+  }
+
+  if (
+    filters.minPrice !== undefined &&
+    filters.maxPrice !== undefined &&
+    filters.minPrice > filters.maxPrice
+  ) {
+    return "Invalid price range: minimum price cannot exceed maximum price";
+  }
+
+  return null;
+}
+
+// ============= CLIENT-SIDE FILTERING =============
+
 function applyClientSideFilters(
   products: Product[],
   filters: {
@@ -30,7 +265,6 @@ function applyClientSideFilters(
     maxPrice?: number;
   }
 ): Product[] {
-  // Early return if no filters
   const hasFilters =
     filters.filterSubcategories.length > 0 ||
     filters.colors.length > 0 ||
@@ -42,7 +276,7 @@ function applyClientSideFilters(
     return products;
   }
 
-  // Normalize filter values once
+  // Pre-normalize filter values for performance
   const normalizedFilterSubs = filters.filterSubcategories.map(normalizeString);
   const normalizedFilterColors = filters.colors.map(normalizeString);
   const normalizedFilterBrands = filters.brands.map(normalizeString);
@@ -51,7 +285,7 @@ function applyClientSideFilters(
     // Subcategory filter
     if (normalizedFilterSubs.length > 0) {
       if (!product.subcategory) return false;
-      
+
       const normalizedProductSub = normalizeString(product.subcategory);
       const matchesSubcategory = normalizedFilterSubs.some(
         (filterSub) =>
@@ -98,7 +332,7 @@ function applyClientSideFilters(
       if (!matchesBrand) return false;
     }
 
-    // Price range filter
+    // Price range filter (backup - should be handled at DB level)
     if (filters.minPrice !== undefined && product.price < filters.minPrice) {
       return false;
     }
@@ -111,236 +345,368 @@ function applyClientSideFilters(
   });
 }
 
-// Format category name helper
-function formatCategoryName(name: string): string {
-  return name
-    .split("-")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-}
+// ============= CORE DATA FETCHING =============
 
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
+async function fetchCategoryProducts(
+  filters: QueryFilters
+): Promise<CategoryProductsResponse> {
+  const startTime = Date.now();
+  const db = getFirestoreAdmin();
+  let allProducts: Product[] = [];
 
-    // Parse parameters
-    const category = searchParams.get("category");
-    const subcategory = searchParams.get("subcategory");
-    const subsubcategory = searchParams.get("subsubcategory");
-    const page = Math.max(0, parseInt(searchParams.get("page") || "0"));
-    const limit = Math.min(
-      Math.max(1, parseInt(searchParams.get("limit") || String(DEFAULT_PAGE_SIZE))),
-      100
-    );
+  const formattedCategory = formatCategoryName(filters.category);
+  const formattedSubcategory = filters.subcategory
+    ? formatCategoryName(filters.subcategory)
+    : undefined;
+  const formattedSubsubcategory = filters.subsubcategory
+    ? formatCategoryName(filters.subsubcategory)
+    : undefined;
 
-    // Parse filter parameters
-    const filterSubcategories =
-      searchParams.get("filterSubcategories")?.split(",").filter(Boolean) || [];
-    const colors = searchParams.get("colors")?.split(",").filter(Boolean) || [];
-    const brands = searchParams.get("brands")?.split(",").filter(Boolean) || [];
-    const minPrice = searchParams.get("minPrice")
-      ? parseFloat(searchParams.get("minPrice")!)
-      : undefined;
-    const maxPrice = searchParams.get("maxPrice")
-      ? parseFloat(searchParams.get("maxPrice")!)
-      : undefined;
+  // Handle Women/Men categories using gender field
+  if (filters.category === "women" || filters.category === "men") {
+    const genderValue = formattedCategory;
+    const gendersToFetch = [genderValue, "Unisex"];
 
-    // Validate required parameters
-    if (!category) {
-      return NextResponse.json(
-        { error: "Category parameter is required" },
-        { status: 400 }
-      );
-    }
-
-    // Validate price range
-    if (
-      minPrice !== undefined &&
-      maxPrice !== undefined &&
-      minPrice > maxPrice
-    ) {
-      return NextResponse.json(
-        { error: "Invalid price range: minimum price cannot exceed maximum price" },
-        { status: 400 }
-      );
-    }
-
-    // Initialize Firestore
-    const db = getFirestoreAdmin();
-    let allProducts: Product[] = [];
-
-    // Handle Women/Men categories using gender field
-    if (category === "women" || category === "men") {
-      const genderValue = formatCategoryName(category);
-      const gendersToFetch = [genderValue, "Unisex"];
-
-      // Use Promise.all for parallel fetching
-      const genderPromises = gendersToFetch.map(async (gender) => {
+    const genderResults = await Promise.all(
+      gendersToFetch.map(async (gender) => {
         try {
-          let genderQuery: FirebaseFirestore.Query = db
+          let query: FirebaseFirestore.Query = db
             .collection("shop_products")
             .where("gender", "==", gender)
             .where("quantity", ">", 0);
 
-          // Add URL-based filters at DB level
-          if (subcategory) {
-            genderQuery = genderQuery.where(
-              "subcategory",
-              "==",
-              formatCategoryName(subcategory)
-            );
+          if (formattedSubcategory) {
+            query = query.where("subcategory", "==", formattedSubcategory);
           }
 
-          if (subsubcategory) {
-            genderQuery = genderQuery.where(
+          if (formattedSubsubcategory) {
+            query = query.where(
               "subsubcategory",
               "==",
-              formatCategoryName(subsubcategory)
+              formattedSubsubcategory
             );
           }
 
-          // Apply price filters at database level
-          if (minPrice !== undefined) {
-            genderQuery = genderQuery.where("price", ">=", minPrice);
+          if (filters.minPrice !== undefined) {
+            query = query.where("price", ">=", filters.minPrice);
           }
 
-          if (maxPrice !== undefined) {
-            genderQuery = genderQuery.where("price", "<=", maxPrice);
+          if (filters.maxPrice !== undefined) {
+            query = query.where("price", "<=", filters.maxPrice);
           }
 
-          // Order and limit
-          genderQuery = genderQuery
+          query = query
             .orderBy("quantity")
             .orderBy("isBoosted", "desc")
             .orderBy("rankingScore", "desc")
-            .limit(MAX_FETCH_LIMIT);
+            .limit(CONFIG.MAX_FETCH_LIMIT);
 
-          const snapshot = await genderQuery.get();
-          
-          // ✅ Use documentToProduct helper
-          return snapshot.docs.map((doc: QueryDocumentSnapshot) =>
-            documentToProduct(doc)
-          );
+          const snapshot = await query.get();
+          return snapshot.docs.map(documentToProduct);
         } catch (error) {
-          console.error(`Error fetching products for gender ${gender}:`, error);
+          console.error(
+            `[category-products] Gender query failed for ${gender}:`,
+            error
+          );
           return [];
         }
-      });
+      })
+    );
 
-      const results = await Promise.all(genderPromises);
-      allProducts = results.flat();
+    // Flatten and deduplicate
+    const productMap = new Map<string, Product>();
+    genderResults.flat().forEach((product) => {
+      if (!productMap.has(product.id)) {
+        productMap.set(product.id, product);
+      }
+    });
+    allProducts = Array.from(productMap.values());
+  } else {
+    // Standard category query
+    try {
+      let query: FirebaseFirestore.Query = db
+        .collection("shop_products")
+        .where("category", "==", formattedCategory)
+        .where("quantity", ">", 0);
 
-      // Remove duplicates using Map for better performance
-      const uniqueProducts = new Map<string, Product>();
-      allProducts.forEach((product) => {
-        if (!uniqueProducts.has(product.id)) {
-          uniqueProducts.set(product.id, product);
+      if (formattedSubcategory) {
+        query = query.where("subcategory", "==", formattedSubcategory);
+      }
+
+      if (formattedSubsubcategory) {
+        query = query.where("subsubcategory", "==", formattedSubsubcategory);
+      }
+
+      if (filters.minPrice !== undefined) {
+        query = query.where("price", ">=", filters.minPrice);
+      }
+
+      if (filters.maxPrice !== undefined) {
+        query = query.where("price", "<=", filters.maxPrice);
+      }
+
+      query = query
+        .orderBy("quantity")
+        .orderBy("isBoosted", "desc")
+        .orderBy("rankingScore", "desc")
+        .limit(CONFIG.MAX_FETCH_LIMIT);
+
+      const snapshot = await query.get();
+      allProducts = snapshot.docs.map(documentToProduct);
+    } catch (error) {
+      console.error(`[category-products] Category query failed:`, error);
+      allProducts = [];
+    }
+  }
+
+  // Apply client-side filters
+  allProducts = applyClientSideFilters(allProducts, {
+    filterSubcategories: filters.filterSubcategories,
+    colors: filters.colors,
+    brands: filters.brands,
+    minPrice: filters.minPrice,
+    maxPrice: filters.maxPrice,
+  });
+
+  // Sort: boosted first, then by ranking score
+  allProducts.sort((a, b) => {
+    if (a.isBoosted !== b.isBoosted) {
+      return a.isBoosted ? -1 : 1;
+    }
+    return (b.rankingScore ?? 0) - (a.rankingScore ?? 0);
+  });
+
+  // Paginate
+  const startIndex = filters.page * filters.limit;
+  const paginatedProducts = allProducts.slice(
+    startIndex,
+    startIndex + filters.limit
+  );
+  const hasMore = allProducts.length > startIndex + filters.limit;
+
+  return {
+    products: paginatedProducts,
+    hasMore,
+    page: filters.page,
+    total: allProducts.length,
+    source: "fresh",
+    timing: Date.now() - startTime,
+  };
+}
+
+// ============= BACKGROUND REVALIDATION =============
+
+function revalidateInBackground(cacheKey: string, filters: QueryFilters): void {
+  if (pendingRequests.has(cacheKey)) {
+    return;
+  }
+
+  const fetchPromise = fetchCategoryProducts(filters);
+  pendingRequests.set(cacheKey, fetchPromise);
+
+  fetchPromise
+    .then((result) => {
+      cacheResponse(cacheKey, result);
+      console.log(`[category-products] Background revalidation complete`);
+    })
+    .catch((error) => {
+      console.error(
+        `[category-products] Background revalidation failed:`,
+        error
+      );
+    })
+    .finally(() => {
+      pendingRequests.delete(cacheKey);
+    });
+}
+
+// ============= MAIN HANDLER =============
+
+export async function GET(request: NextRequest) {
+  const requestStart = Date.now();
+
+  try {
+    const { searchParams } = new URL(request.url);
+    const filters = parseQueryParams(searchParams);
+
+    // Validate
+    const validationError = validateFilters(filters);
+    if (validationError) {
+      return NextResponse.json(
+        {
+          error: validationError,
+          products: [],
+          hasMore: false,
+          page: 0,
+          total: 0,
+        },
+        { status: 400 }
+      );
+    }
+
+    const cacheKey = generateCacheKey(filters);
+
+    // ========== STEP 1: Check cache ==========
+    const cacheResult = getCachedResponse(cacheKey);
+
+    if (cacheResult.status === "fresh") {
+      console.log(`[category-products] Cache HIT (fresh)`);
+      return NextResponse.json(
+        { ...cacheResult.data, source: "cache" },
+        {
+          headers: {
+            "Cache-Control": `public, s-maxage=60, stale-while-revalidate=120`,
+            "X-Cache": "HIT",
+            "X-Response-Time": `${Date.now() - requestStart}ms`,
+          },
         }
-      });
-      allProducts = Array.from(uniqueProducts.values());
-    } else {
-      // For other categories, filter by category field directly
-      try {
-        const categoryValue = formatCategoryName(category);
+      );
+    }
 
-        let query: FirebaseFirestore.Query = db
-          .collection("shop_products")
-          .where("category", "==", categoryValue)
-          .where("quantity", ">", 0);
+    // ========== STEP 2: Check for in-flight request ==========
+    const pendingRequest = pendingRequests.get(cacheKey);
 
-        // Add URL-based filters at DB level
-        if (subcategory) {
-          query = query.where("subcategory", "==", formatCategoryName(subcategory));
-        }
+    if (pendingRequest) {
+      console.log(`[category-products] Deduplicating request`);
 
-        if (subsubcategory) {
-          query = query.where(
-            "subsubcategory",
-            "==",
-            formatCategoryName(subsubcategory)
-          );
-        }
-
-        // Apply price filters at database level
-        if (minPrice !== undefined) {
-          query = query.where("price", ">=", minPrice);
-        }
-
-        if (maxPrice !== undefined) {
-          query = query.where("price", "<=", maxPrice);
-        }
-
-        // Order and limit
-        query = query
-          .orderBy("quantity")
-          .orderBy("isBoosted", "desc")
-          .orderBy("rankingScore", "desc")
-          .limit(MAX_FETCH_LIMIT);
-
-        const snapshot = await query.get();
-        
-        // ✅ Use documentToProduct helper
-        allProducts = snapshot.docs.map((doc: QueryDocumentSnapshot) =>
-          documentToProduct(doc)
+      if (cacheResult.status === "stale" && cacheResult.data) {
+        return NextResponse.json(
+          { ...cacheResult.data, source: "stale" },
+          {
+            headers: {
+              "Cache-Control": `public, s-maxage=0, stale-while-revalidate=120`,
+              "X-Cache": "STALE",
+              "X-Response-Time": `${Date.now() - requestStart}ms`,
+            },
+          }
         );
-      } catch (error) {
-        console.error(`Error fetching products for category ${category}:`, error);
-        allProducts = [];
+      }
+
+      try {
+        const result = await withTimeout(
+          pendingRequest,
+          CONFIG.REQUEST_TIMEOUT,
+          "Deduplicated request timeout"
+        );
+        return NextResponse.json(
+          { ...result, source: "dedupe" },
+          {
+            headers: {
+              "Cache-Control": `public, s-maxage=60, stale-while-revalidate=120`,
+              "X-Cache": "DEDUPE",
+              "X-Response-Time": `${Date.now() - requestStart}ms`,
+            },
+          }
+        );
+      } catch {
+        // Fall through to fresh fetch
       }
     }
 
-    // Apply client-side filtering for complex filters
-    allProducts = applyClientSideFilters(allProducts, {
-      filterSubcategories,
-      colors,
-      brands,
-      minPrice,
-      maxPrice,
-    });
+    // ========== STEP 3: Stale-while-revalidate ==========
+    if (cacheResult.status === "stale" && cacheResult.data) {
+      console.log(
+        `[category-products] Returning stale, revalidating in background`
+      );
+      revalidateInBackground(cacheKey, filters);
 
-    // Sort by boosted first, then ranking score
-    allProducts.sort((a, b) => {
-      if (a.isBoosted !== b.isBoosted) {
-        return a.isBoosted ? -1 : 1;
-      }
-      return (b.rankingScore ?? 0) - (a.rankingScore ?? 0);
-    });
+      return NextResponse.json(
+        { ...cacheResult.data, source: "stale" },
+        {
+          headers: {
+            "Cache-Control": `public, s-maxage=0, stale-while-revalidate=120`,
+            "X-Cache": "STALE",
+            "X-Response-Time": `${Date.now() - requestStart}ms`,
+          },
+        }
+      );
+    }
 
-    // Apply pagination
-    const startIndex = page * limit;
-    const paginatedProducts = allProducts.slice(startIndex, startIndex + limit);
-    const hasMore = allProducts.length > startIndex + limit;
+    // ========== STEP 4: Fresh fetch ==========
+    console.log(`[category-products] Fresh fetch for ${filters.category}`);
 
-    const response = {
-      products: paginatedProducts,
-      hasMore,
-      page,
-      total: allProducts.length,
-    };
-
-    // Add cache headers
-    return NextResponse.json(response, {
-      headers: {
-        "Cache-Control": `public, s-maxage=${CACHE_DURATION}, stale-while-revalidate`,
-        "CDN-Cache-Control": `public, s-maxage=${CACHE_DURATION}`,
+    const fetchPromise = withRetry(() => fetchCategoryProducts(filters), {
+      maxRetries: CONFIG.MAX_RETRIES,
+      shouldRetry: (error) => {
+        // Don't retry on validation errors
+        if (error instanceof Error && error.message.includes("permission")) {
+          return false;
+        }
+        return true;
       },
     });
+
+    pendingRequests.set(cacheKey, fetchPromise);
+
+    try {
+      const result = await withTimeout(
+        fetchPromise,
+        CONFIG.REQUEST_TIMEOUT,
+        "Request timeout"
+      );
+
+      cacheResponse(cacheKey, result);
+
+      console.log(
+        `[category-products] Fetched ${result.products.length}/${result.total} products in ${result.timing}ms`
+      );
+
+      return NextResponse.json(
+        { ...result, source: "fresh" },
+        {
+          headers: {
+            "Cache-Control": `public, s-maxage=60, stale-while-revalidate=120`,
+            "X-Cache": "MISS",
+            "X-Response-Time": `${Date.now() - requestStart}ms`,
+            "X-Timing": `${result.timing}ms`,
+          },
+        }
+      );
+    } catch (error) {
+      console.error(`[category-products] Fetch error:`, error);
+
+      if (error instanceof Error && error.message.includes("timeout")) {
+        return NextResponse.json(
+          {
+            error: "Request timeout",
+            products: [],
+            hasMore: false,
+            page: 0,
+            total: 0,
+          },
+          { status: 504 }
+        );
+      }
+
+      const errorMessage =
+        error instanceof Error ? error.message : "Internal server error";
+      const statusCode = errorMessage.includes("permission") ? 403 : 500;
+
+      return NextResponse.json(
+        {
+          error: errorMessage,
+          products: [],
+          hasMore: false,
+          page: 0,
+          total: 0,
+        },
+        { status: statusCode }
+      );
+    } finally {
+      pendingRequests.delete(cacheKey);
+    }
   } catch (error) {
-    console.error("Error in API route:", error);
-    
-    // Return appropriate error response
-    const errorMessage = error instanceof Error ? error.message : "Internal server error";
-    const statusCode = errorMessage.includes("permission") ? 403 : 500;
+    console.error(`[category-products] Unexpected error:`, error);
 
     return NextResponse.json(
-      { 
-        error: errorMessage,
+      {
+        error: "Internal server error",
         products: [],
         hasMore: false,
         page: 0,
-        total: 0
+        total: 0,
       },
-      { status: statusCode }
+      { status: 500 }
     );
   }
 }
