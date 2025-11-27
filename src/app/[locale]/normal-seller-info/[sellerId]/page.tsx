@@ -234,7 +234,7 @@ export default function SellerInfoPage() {
 
             <div className="flex items-center gap-2">
               <Link
-                href={`/user_profile/${sellerId}`}
+                href={`/user-profile/${sellerId}`}
                 className={`p-2 rounded-full transition-colors ${
                   isDarkMode
                     ? "bg-gray-700 hover:bg-gray-600"

@@ -1,12 +1,6 @@
 "use client";
 
-import React, {
-  useState,
-  useEffect,
-  useCallback,
-  
-  useRef,
-} from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   doc,
@@ -20,9 +14,9 @@ import {
   arrayUnion,
   arrayRemove,
   serverTimestamp,
-  orderBy,
+  
   limit,
-  startAfter,
+  
   DocumentSnapshot,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -41,11 +35,10 @@ import {
   ListX,
   X,
   Loader2,
- 
   Package,
-  
   Verified,
 } from "lucide-react";
+
 
 interface UserData {
   displayName: string;
@@ -68,7 +61,7 @@ export default function UserProfilePage() {
   const router = useRouter();
   const t = useTranslations();
   const { user } = useUser();
-  const userId = params?.userId as string;
+  const userId = params?.sellerId as string;
 
   // State
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -83,8 +76,8 @@ export default function UserProfilePage() {
     totalListings: 0,
   });
 
-  // Pagination state
-  const [lastDoc, setLastDoc] = useState<DocumentSnapshot | null>(null);
+  // Pagination state - using ref to avoid dependency issues
+  const lastDocRef = useRef<DocumentSnapshot | null>(null);
   const [hasMoreProducts, setHasMoreProducts] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
@@ -107,6 +100,14 @@ export default function UserProfilePage() {
   // Check if viewing own profile
   const isCurrentUser = user?.uid === userId;
 
+  const getDateFromTimestamp = (timestamp: any): Date => {
+    if (!timestamp) return new Date(0);
+    if (timestamp instanceof Date) return timestamp;
+    if (typeof timestamp?.toDate === 'function') return timestamp.toDate();
+    if (typeof timestamp === 'number') return new Date(timestamp);
+    return new Date(0);
+  };
+
   // Theme detection
   useEffect(() => {
     const updateTheme = () => {
@@ -123,156 +124,172 @@ export default function UserProfilePage() {
     return () => observer.disconnect();
   }, []);
 
-  // Fetch user data
-  const fetchUserData = useCallback(async () => {
-    if (!userId) return;
-
-    try {
-      const userDoc = await getDoc(doc(db, "users", userId));
-      if (userDoc.exists()) {
-        setUserData(userDoc.data() as UserData);
-      } else {
-        setUserData(null);
+  useEffect(() => {
+    if (!userId) {
+        // Wait for params to be available (don't log error, just wait)
+        return;
       }
-    } catch (error) {
-      console.error("Error fetching user data:", error);
-      setUserData(null);
-    }
-  }, [userId]);
-
-  // Fetch seller stats (rating, reviews, products sold)
-  const fetchSellerStats = useCallback(async () => {
-    if (!userId) return;
-
-    try {
-      // Fetch reviews for rating
-      const reviewsSnapshot = await getDocs(
-        collection(db, "users", userId, "reviews")
-      );
-
-      let totalRating = 0;
-      const reviewCount = reviewsSnapshot.size;
-
-      reviewsSnapshot.docs.forEach((doc) => {
-        const data = doc.data();
-        totalRating += data.rating || 0;
-      });
-
-      const averageRating = reviewCount > 0 ? totalRating / reviewCount : 0;
-
-      // Fetch seller stats from user document or orders
-      const userDoc = await getDoc(doc(db, "users", userId));
-      const userData = userDoc.data();
-      const totalProductsSold = userData?.totalProductsSold || 0;
-
-      setSellerStats((prev) => ({
-        ...prev,
-        averageRating,
-        reviewCount,
-        totalProductsSold,
-      }));
-    } catch (error) {
-      console.error("Error fetching seller stats:", error);
-    }
-  }, [userId]);
-
-  // Fetch products
-  const fetchProducts = useCallback(
-    async (isInitial = true) => {
-      if (!userId) return;
-
+  
+    let isMounted = true;
+  
+    const loadAllData = async () => {
+      setIsLoading(true);
+      lastDocRef.current = null;
+  
       try {
-        if (isInitial) {
-          setIsLoading(true);
-        } else {
-          setIsLoadingMore(true);
+        // 1. Fetch user data
+        const userDocSnap = await getDoc(doc(db, "users", userId));
+        if (!isMounted) return;
+  
+        if (!userDocSnap.exists()) {
+          setUserData(null);
+          setIsLoading(false);
+          return;
         }
-
-        let productsQuery = query(
-          collection(db, "products"),
-          where("userId", "==", userId),
-          where("isActive", "==", true),
-          orderBy("createdAt", "desc"),
-          limit(PRODUCTS_PER_PAGE)
-        );
-
-        if (!isInitial && lastDoc) {
-          productsQuery = query(
+        
+        setUserData(userDocSnap.data() as UserData);
+        const userDataFromDoc = userDocSnap.data();
+        const totalProductsSold = userDataFromDoc?.totalProductsSold || 0;
+  
+        // 2. Fetch reviews for stats
+        let averageRating = 0;
+        let reviewCount = 0;
+        try {
+          const reviewsSnapshot = await getDocs(
+            collection(db, "users", userId, "reviews")
+          );
+          if (!isMounted) return;
+  
+          let totalRating = 0;
+          reviewCount = reviewsSnapshot.size;
+          reviewsSnapshot.docs.forEach((docSnap) => {
+            totalRating += docSnap.data().rating || 0;
+          });
+          averageRating = reviewCount > 0 ? totalRating / reviewCount : 0;
+        } catch (reviewError) {
+          console.error("Error fetching reviews:", reviewError);
+        }
+  
+        // 3. Fetch products - IMPORTANT: Try without orderBy first to avoid index issues
+        let fetchedProducts: Product[] = [];
+        let totalListings = 0;
+        
+        try {
+          // First, try the simple query without ordering
+          const simpleQuery = query(
             collection(db, "products"),
             where("userId", "==", userId),
-            where("isActive", "==", true),
-            orderBy("createdAt", "desc"),
-            startAfter(lastDoc),
             limit(PRODUCTS_PER_PAGE)
           );
+  
+          const productsSnapshot = await getDocs(simpleQuery);
+          if (!isMounted) return;
+  
+          fetchedProducts = productsSnapshot.docs.map((docSnap) => ({
+            id: docSnap.id,
+            ...docSnap.data(),
+          })) as Product[];
+  
+          // Sort client-side if needed
+          fetchedProducts.sort((a, b) => {
+            const dateA = getDateFromTimestamp(a.createdAt);
+            const dateB = getDateFromTimestamp(b.createdAt);
+            return dateB.getTime() - dateA.getTime();
+          });
+  
+          if (productsSnapshot.docs.length > 0) {
+            lastDocRef.current = productsSnapshot.docs[productsSnapshot.docs.length - 1];
+          }
+          setHasMoreProducts(productsSnapshot.docs.length === PRODUCTS_PER_PAGE);
+          totalListings = productsSnapshot.size;
+          
+        } catch (productError) {
+          console.error("Error fetching products:", productError);
+          // Check console for Firestore index error link
         }
-
-        const snapshot = await getDocs(productsQuery);
-        const fetchedProducts: Product[] = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Product[];
-
-        if (isInitial) {
-          setProducts(fetchedProducts);
-          setFilteredProducts(fetchedProducts);
-        } else {
-          setProducts((prev) => [...prev, ...fetchedProducts]);
-          setFilteredProducts((prev) => [...prev, ...fetchedProducts]);
-        }
-
-        // Update pagination state
-        if (snapshot.docs.length > 0) {
-          setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
-        }
-        setHasMoreProducts(snapshot.docs.length === PRODUCTS_PER_PAGE);
-
-        // Update total listings in stats
-        if (isInitial) {
-          // Get total count
-          const countQuery = query(
-            collection(db, "products"),
-            where("userId", "==", userId),
-            where("isActive", "==", true)
-          );
-          const countSnapshot = await getDocs(countQuery);
-          setSellerStats((prev) => ({
-            ...prev,
-            totalListings: countSnapshot.size,
-          }));
+  
+        if (!isMounted) return;
+  
+        setSellerStats({
+          averageRating,
+          reviewCount,
+          totalProductsSold,
+          totalListings,
+        });
+  
+        setProducts(fetchedProducts);
+        setFilteredProducts(fetchedProducts);
+  
+        // 4. Check follow status (don't let this block loading)
+        if (user?.uid && user.uid !== userId) {
+          try {
+            const currentUserDoc = await getDoc(doc(db, "users", user.uid));
+            if (isMounted && currentUserDoc.exists()) {
+              const following = currentUserDoc.data()?.following || [];
+              setIsFollowing(following.includes(userId));
+            }
+          } catch (followError) {
+            console.error("Error checking follow status:", followError);
+          }
         }
       } catch (error) {
-        console.error("Error fetching products:", error);
+        console.error("Error loading user profile data:", error);
       } finally {
-        setIsLoading(false);
-        setIsLoadingMore(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
-    },
-    [userId, lastDoc]
-  );
+    };
+  
+    loadAllData();
+  
+    return () => {
+      isMounted = false;
+    };
+  }, [userId, user?.uid]);
 
-  // Check if current user is following this profile
-  const checkFollowStatus = useCallback(async () => {
-    if (!user?.uid || !userId || isCurrentUser) return;
-
+  const loadMoreProducts = async () => {
+    if (!userId || isLoadingMore || !hasMoreProducts) return;
+  
+    setIsLoadingMore(true);
+  
     try {
-      const currentUserDoc = await getDoc(doc(db, "users", user.uid));
-      if (currentUserDoc.exists()) {
-        const following = currentUserDoc.data()?.following || [];
-        setIsFollowing(following.includes(userId));
+      // Simple query without orderBy to avoid index issues
+      const productsQuery = query(
+        collection(db, "products"),
+        where("userId", "==", userId),
+        limit(PRODUCTS_PER_PAGE * (Math.ceil(products.length / PRODUCTS_PER_PAGE) + 1))
+      );
+  
+      const snapshot = await getDocs(productsQuery);
+      let allProducts: Product[] = snapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...docSnap.data(),
+      })) as Product[];
+  
+      // Sort client-side
+      allProducts.sort((a, b) => {
+        const dateA = getDateFromTimestamp(a.createdAt);
+        const dateB = getDateFromTimestamp(b.createdAt);
+        return dateB.getTime() - dateA.getTime();
+      });
+  
+      // Get only new products
+      const existingIds = new Set(products.map(p => p.id));
+      const newProducts = allProducts.filter(p => !existingIds.has(p.id));
+  
+      if (newProducts.length > 0) {
+        setProducts((prev) => [...prev, ...newProducts]);
+        setFilteredProducts((prev) => [...prev, ...newProducts]);
       }
+      
+      setHasMoreProducts(newProducts.length >= PRODUCTS_PER_PAGE);
     } catch (error) {
-      console.error("Error checking follow status:", error);
+      console.error("Error loading more products:", error);
+    } finally {
+      setIsLoadingMore(false);
     }
-  }, [user?.uid, userId, isCurrentUser]);
-
-  // Initial data fetch
-  useEffect(() => {
-    fetchUserData();
-    fetchSellerStats();
-    fetchProducts(true);
-    checkFollowStatus();
-  }, [fetchUserData, fetchSellerStats, fetchProducts, checkFollowStatus]);
+  };
 
   // Search filtering with debounce
   useEffect(() => {
@@ -284,12 +301,12 @@ export default function UserProfilePage() {
       if (searchQuery.trim() === "") {
         setFilteredProducts(products);
       } else {
-        const query = searchQuery.toLowerCase();
+        const searchTerm = searchQuery.toLowerCase();
         const filtered = products.filter(
           (product) =>
-            product.productName.toLowerCase().includes(query) ||
-            product.brandModel?.toLowerCase().includes(query) ||
-            product.category?.toLowerCase().includes(query)
+            product.productName.toLowerCase().includes(searchTerm) ||
+            product.brandModel?.toLowerCase().includes(searchTerm) ||
+            product.category?.toLowerCase().includes(searchTerm)
         );
         setFilteredProducts(filtered);
       }
@@ -303,24 +320,23 @@ export default function UserProfilePage() {
   }, [searchQuery, products]);
 
   // Infinite scroll handler
-  const handleScroll = useCallback(() => {
-    if (!scrollContainerRef.current || isLoadingMore || !hasMoreProducts) return;
-
-    const { scrollTop, scrollHeight, clientHeight } =
-      scrollContainerRef.current;
-
-    if (scrollTop + clientHeight >= scrollHeight * 0.8) {
-      fetchProducts(false);
-    }
-  }, [fetchProducts, isLoadingMore, hasMoreProducts]);
-
   useEffect(() => {
     const container = scrollContainerRef.current;
-    if (container) {
-      container.addEventListener("scroll", handleScroll);
-      return () => container.removeEventListener("scroll", handleScroll);
-    }
-  }, [handleScroll]);
+    if (!container) return;
+
+    const handleScroll = () => {
+      if (isLoadingMore || !hasMoreProducts) return;
+
+      const { scrollTop, scrollHeight, clientHeight } = container;
+
+      if (scrollTop + clientHeight >= scrollHeight * 0.8) {
+        loadMoreProducts();
+      }
+    };
+
+    container.addEventListener("scroll", handleScroll);
+    return () => container.removeEventListener("scroll", handleScroll);
+  }, [isLoadingMore, hasMoreProducts, userId]);
 
   // Toggle follow
   const handleToggleFollow = async () => {
@@ -564,11 +580,7 @@ export default function UserProfilePage() {
 
       <div className="max-w-6xl mx-auto">
         {/* Seller Info Card - Matches Flutter SellerInfoCard */}
-        <div
-          className={`${
-            isDarkMode ? "bg-[#211f31]" : "bg-white"
-          } mt-2`}
-        >
+        <div className={`${isDarkMode ? "bg-[#211f31]" : "bg-white"} mt-2`}>
           <div className="py-4 px-2">
             <div className="grid grid-cols-4 divide-x divide-gray-300">
               {/* Rating */}

@@ -4308,5 +4308,25 @@
     "translate": "Çevir",
     "seeOriginal": "Orijinali Gör",
     "translationError": "Değerlendirme çevrilirken hata oluştu. Lütfen tekrar deneyin."
-  }
+  },
+  "UserProfile": {
+      "userProfile": "Kullanıcı Profili",
+      "noUserName": "İsim Yok",
+      "userNotFound": "Kullanıcı bulunamadı",
+      "goBack": "Geri Dön",
+      "rating": "Puan",
+      "productsSold": "Satılan Ürün",
+      "totalListings": "Toplam İlan",
+      "userReviews": "Değerlendirme",
+      "searchProducts": "Ürünlerde ara...",
+      "noProductsFound": "Ürün bulunamadı",
+      "noProductsYet": "Henüz ürün yok",
+      "endOfProducts": "Sona ulaştınız",
+      "report": "Şikayet Et",
+      "inappropriateProfileImage": "Uygunsuz Profil Resmi",
+      "inappropriateListings": "Uygunsuz İlanlar",
+      "pleaseLoginFirst": "Lütfen önce giriş yapın",
+      "reportSubmittedSuccessfully": "Şikayet başarıyla gönderildi",
+      "errorSubmittingReport": "Şikayet gönderilirken hata oluştu. Lütfen tekrar deneyin."
+    }
 }

@@ -4296,5 +4296,25 @@
     "translate": "Translate",
     "seeOriginal": "See Original",
     "translationError": "Error translating review. Please try again."
+  },
+  "UserProfile": {
+    "userProfile": "User Profile",
+    "noUserName": "No Name",
+    "userNotFound": "User not found",
+    "goBack": "Go Back",
+    "rating": "Rating",
+    "productsSold": "Products Sold",
+    "totalListings": "Total Listings",
+    "userReviews": "Reviews",
+    "searchProducts": "Search products...",
+    "noProductsFound": "No products found",
+    "noProductsYet": "No products yet",
+    "endOfProducts": "You've reached the end",
+    "report": "Report",
+    "inappropriateProfileImage": "Inappropriate Profile Image",
+    "inappropriateListings": "Inappropriate Listings",
+    "pleaseLoginFirst": "Please log in first",
+    "reportSubmittedSuccessfully": "Report submitted successfully",
+    "errorSubmittingReport": "Error submitting report. Please try again."
   }
 }
