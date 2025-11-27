@@ -264,19 +264,19 @@ export default function MarketBannerGrid() {
         switch (item.linkType) {
           case "shop":
             console.log("Navigating to shop:", item.linkId);
-            window.location.href = `/shop_detail/${item.linkId}`;
+            window.location.href = `/shopdetail/${item.linkId}`;
             break;
           case "product":
             console.log("Navigating to product:", item.linkId);
-            window.location.href = `/product_detail/${item.linkId}`;
+            window.location.href = `/productdetail/${item.linkId}`;
             break;
           case "shop_product":
             console.log("Navigating to shop_product:", item.linkId);
-            window.location.href = `/product_detail/${item.linkId}`;
+            window.location.href = `/productdetail/${item.linkId}`;
             break;
           default:
             console.log("Unknown link type:", item.linkType);
-            window.location.href = `/product_detail/${item.linkId}`;
+            window.location.href = `/productdetail/${item.linkId}`;
         }
       } catch (e) {
         console.error("Navigation error:", e);

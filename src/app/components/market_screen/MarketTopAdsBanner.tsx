@@ -250,13 +250,13 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
         switch (item.linkType) {
           case 'shop':
             console.log('Navigating to shop:', item.linkId);
-            router.push(`/shop_detail/${item.linkId}`);
+            router.push(`/shopdetail/${item.linkId}`);
             break;
           case 'product':
           case 'shop_product':
           default:
             console.log('Navigating to product:', item.linkId);
-            router.push(`/product_detail/${item.linkId}`);
+            router.push(`/productdetail/${item.linkId}`);
             break;
         }
       } catch (error) {
