@@ -337,7 +337,7 @@ export default function SellerInfoPage() {
               </div>
 
               <Link
-                href={`/user_profile/${sellerId}`}
+                href={`/user-profile/${sellerId}`}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium hover:opacity-90 transition-opacity"
               >
                 <span>{t("SellerInfo.viewProfile")}</span>
