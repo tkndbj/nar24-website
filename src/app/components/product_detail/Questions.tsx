@@ -7,6 +7,8 @@ import {
   User,
   HelpCircle,
   MessageCircle,
+  Languages,
+  AlertCircle,
 } from "lucide-react";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
@@ -51,6 +53,43 @@ interface QuestionAnswerCardProps {
   t: (key: string) => string;
 }
 
+// ============= TEXT SHIMMER COMPONENT =============
+const TextShimmer: React.FC<{
+  lines?: number;
+  isDarkMode?: boolean;
+  className?: string;
+}> = ({ lines = 2, isDarkMode = false, className = "" }) => {
+  return (
+    <div className={`space-y-1.5 ${className}`}>
+      {Array.from({ length: lines }).map((_, i) => (
+        <div
+          key={i}
+          className={`h-3 rounded animate-pulse ${
+            isDarkMode ? "bg-gray-600" : "bg-gray-200"
+          } ${i === lines - 1 ? "w-3/4" : "w-full"}`}
+          style={{
+            animation: "shimmer 1.5s ease-in-out infinite",
+            animationDelay: `${i * 0.1}s`,
+          }}
+        />
+      ))}
+      <style jsx>{`
+        @keyframes shimmer {
+          0% {
+            opacity: 0.5;
+          }
+          50% {
+            opacity: 1;
+          }
+          100% {
+            opacity: 0.5;
+          }
+        }
+      `}</style>
+    </div>
+  );
+};
+
 const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
   question,
   sellerImageUrl,
@@ -58,6 +97,13 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
   isDarkMode = false,
   t,
 }) => {
+  // Translation states
+  const [isTranslated, setIsTranslated] = useState(false);
+  const [translatedQuestion, setTranslatedQuestion] = useState("");
+  const [translatedAnswer, setTranslatedAnswer] = useState("");
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [translationError, setTranslationError] = useState<string | null>(null);
+
   const formatDate = (timestamp: string) => {
     const date = new Date(timestamp);
     return date.toLocaleDateString("en-GB");
@@ -67,6 +113,86 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
     ? question.askerName
     : t("anonymous");
   const isLongAnswer = question.answerText.length > 120;
+
+  // Calculate shimmer lines based on text length
+  const questionShimmerLines = Math.min(
+    Math.ceil(question.questionText.length / 40),
+    3
+  );
+  const answerShimmerLines = Math.min(
+    Math.ceil(question.answerText.length / 40),
+    4
+  );
+
+  const handleTranslate = async () => {
+    if (isTranslating) return;
+
+    // Toggle back to original
+    if (isTranslated) {
+      setIsTranslated(false);
+      setTranslationError(null);
+      return;
+    }
+
+    // Use cached translation if available
+    if (translatedQuestion && translatedAnswer) {
+      setIsTranslated(true);
+      setTranslationError(null);
+      return;
+    }
+
+    setIsTranslating(true);
+    setTranslationError(null);
+
+    try {
+      const targetLanguage = navigator.language.split("-")[0];
+
+      // Translate both question and answer in parallel
+      const [questionResponse, answerResponse] = await Promise.all([
+        fetch("/api/translate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            text: question.questionText,
+            targetLanguage,
+          }),
+        }),
+        fetch("/api/translate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            text: question.answerText,
+            targetLanguage,
+          }),
+        }),
+      ]);
+
+      if (questionResponse.ok && answerResponse.ok) {
+        const questionData = await questionResponse.json();
+        const answerData = await answerResponse.json();
+
+        if (questionData.translatedText && answerData.translatedText) {
+          setTranslatedQuestion(questionData.translatedText);
+          setTranslatedAnswer(answerData.translatedText);
+          setIsTranslated(true);
+        } else {
+          setTranslationError(t("translationFailed"));
+        }
+      } else if (
+        questionResponse.status === 429 ||
+        answerResponse.status === 429
+      ) {
+        setTranslationError(t("rateLimitExceeded"));
+      } else {
+        setTranslationError(t("translationFailed"));
+      }
+    } catch (error) {
+      console.error("Translation error:", error);
+      setTranslationError(t("translationFailed"));
+    } finally {
+      setIsTranslating(false);
+    }
+  };
 
   return (
     <div
@@ -114,13 +240,22 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
               isDarkMode ? "text-orange-400" : "text-orange-600"
             }`}
           />
-          <p
-            className={`text-xs sm:text-sm font-medium leading-relaxed ${
-              isDarkMode ? "text-gray-300" : "text-gray-700"
-            }`}
-          >
-            {question.questionText}
-          </p>
+          <div className="flex-1 min-h-[20px]">
+            {isTranslating ? (
+              <TextShimmer
+                lines={questionShimmerLines}
+                isDarkMode={isDarkMode}
+              />
+            ) : (
+              <p
+                className={`text-xs sm:text-sm font-medium leading-relaxed ${
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                }`}
+              >
+                {isTranslated ? translatedQuestion : question.questionText}
+              </p>
+            )}
+          </div>
         </div>
       </div>
 
@@ -180,15 +315,36 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
               </span>
             </div>
 
-            <p
-              className={`text-xs sm:text-sm leading-relaxed ${
-                isLongAnswer ? "line-clamp-3" : ""
-              } ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}
-            >
-              {question.answerText}
-            </p>
+            <div className="min-h-[36px]">
+              {isTranslating ? (
+                <TextShimmer
+                  lines={answerShimmerLines}
+                  isDarkMode={isDarkMode}
+                />
+              ) : (
+                <p
+                  className={`text-xs sm:text-sm leading-relaxed ${
+                    isLongAnswer ? "line-clamp-3" : ""
+                  } ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}
+                >
+                  {isTranslated ? translatedAnswer : question.answerText}
+                </p>
+              )}
+            </div>
 
-            {isLongAnswer && (
+            {/* Error message */}
+            {translationError && !isTranslating && (
+              <div
+                className={`flex items-center gap-1.5 mt-2 text-xs ${
+                  isDarkMode ? "text-red-400" : "text-red-500"
+                }`}
+              >
+                <AlertCircle className="w-3 h-3" />
+                <span>{translationError}</span>
+              </div>
+            )}
+
+            {isLongAnswer && !isTranslating && (
               <button
                 onClick={onReadAll}
                 className={`mt-2 text-xs font-semibold underline transition-colors ${
@@ -202,6 +358,36 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
             )}
           </div>
         </div>
+      </div>
+
+      {/* Translation button */}
+      <div className="mt-3 sm:mt-4 flex justify-end">
+        <button
+          onClick={handleTranslate}
+          disabled={isTranslating}
+          className={`flex items-center gap-1.5 px-2 py-1 sm:px-3 rounded-lg text-xs font-medium transition-all duration-200 hover:scale-105 ${
+            isTranslating ? "opacity-50 cursor-not-allowed" : ""
+          } ${
+            isTranslated
+              ? isDarkMode
+                ? "bg-orange-900/30 text-orange-400 border border-orange-700"
+                : "bg-orange-100 text-orange-600 border border-orange-300"
+              : isDarkMode
+              ? "bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-orange-400"
+              : "bg-gray-100 text-gray-600 hover:bg-orange-50 hover:text-orange-600"
+          }`}
+        >
+          <Languages
+            className={`w-3 h-3 ${isTranslating ? "animate-pulse" : ""}`}
+          />
+          <span>
+            {isTranslating
+              ? t("translating")
+              : isTranslated
+              ? t("original")
+              : t("translate")}
+          </span>
+        </button>
       </div>
     </div>
   );
@@ -270,11 +456,20 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
   const [canScrollRight, setCanScrollRight] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+
   // ✅ FIXED: Proper nested translation function that uses JSON files
   const t = useCallback(
     (key: string) => {
       if (!localization) {
-        return key;
+        // Fallback translations for critical keys
+        const fallbacks: Record<string, string> = {
+          translating: "Translating...",
+          translate: "Translate",
+          original: "Original",
+          translationFailed: "Translation failed",
+          rateLimitExceeded: "Too many requests. Try again later.",
+        };
+        return fallbacks[key] || key;
       }
 
       try {

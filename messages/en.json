@@ -2606,7 +2606,12 @@
     "seller": "Seller",
     "sellerReply": "Seller Reply",
     "officialResponse": "Official Response",
-    "readFullAnswer": "Read Full Answer"
+    "readFullAnswer": "Read Full Answer",
+    "translating": "Translating...",
+    "translate": "Translate",
+    "original": "Original",
+    "translationFailed": "Translation failed",
+    "rateLimitExceeded": "Too many requests. Try again later."
   },
   "ProductDetailRelatedProducts": {
     "title": "You Might Also Like",
@@ -2629,7 +2634,9 @@
     "original": "Original",
     "translate": "Translate",
     "readMore": "Read More",
-    "failedToFetchReviews": "Failed to fetch reviews"
+    "failedToFetchReviews": "Failed to fetch reviews",  
+    "translationFailed": "Translation failed",
+    "rateLimitExceeded": "Too many requests. Try again later."
   },
   "ProductDetailSellerInfo": {
     "failedToFetchSellerInfo": "Failed to fetch seller info",

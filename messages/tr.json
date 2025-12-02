@@ -2642,7 +2642,12 @@
     "seller": "Satıcı",
     "sellerReply": "Satıcı Yanıtı",
     "officialResponse": "Resmi Yanıt",
-    "readFullAnswer": "Tam Yanıtı Oku"
+    "readFullAnswer": "Tam Yanıtı Oku",
+    "translating": "Tercüme Ediliyor...",
+    "translate": "Çevir",
+    "original": "Orijinal",
+    "translationFailed": "Çeviri başarısız",
+    "rateLimitExceeded": "Çok fazla istek gönderdiniz. Lütfen birazdan tekrar deneyiniz."
   },
   "ProductDetailRelatedProducts": {
     "title": "Beğenebileceğiniz Ürünler",
@@ -2665,7 +2670,9 @@
     "original": "Orijinal",
     "translate": "Çevir",
     "readMore": "Devamını Oku",
-    "failedToFetchReviews": "Yorumlar alınamadı"
+    "failedToFetchReviews": "Yorumlar alınamadı",
+     "translationFailed": "Çevirme başarısız",
+    "rateLimitExceeded": "Çok fazla istek gönderdiniz. Lütfen birazdan tekrar deneyiniz."
   },
   "ProductDetailSellerInfo": {
     "failedToFetchSellerInfo": "Satıcı bilgisi alınamadı",

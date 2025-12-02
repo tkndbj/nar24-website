@@ -41,6 +41,8 @@ import {
   Check,
   Minus,
   Heart,
+  Languages,
+  AlertCircle,
 } from "lucide-react";
 import Image from "next/image";
 import { useLocale } from "next-intl";
@@ -320,6 +322,12 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [showDescriptionModal, setShowDescriptionModal] = useState(false);
   const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
+
+  // Description translation states
+  const [isDescriptionTranslated, setIsDescriptionTranslated] = useState(false);
+  const [translatedDescription, setTranslatedDescription] = useState("");
+  const [isDescriptionTranslating, setIsDescriptionTranslating] = useState(false);
+  const [descriptionTranslationError, setDescriptionTranslationError] = useState<string | null>(null);
   const [hasScrolled, setHasScrolled] = useState(false);
   const [isLargeScreen, setIsLargeScreen] = useState(false);
   const [showHeaderButtons, setShowHeaderButtons] = useState(false);
@@ -854,6 +862,67 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     setShowBuyNowOptionSelector(false);
   }, []);
 
+  // ============= DESCRIPTION TRANSLATION =============
+  const handleTranslateDescription = useCallback(async () => {
+    if (isDescriptionTranslating || !product?.description) return;
+
+    // Toggle back to original
+    if (isDescriptionTranslated) {
+      setIsDescriptionTranslated(false);
+      setDescriptionTranslationError(null);
+      return;
+    }
+
+    // Use cached translation if available
+    if (translatedDescription) {
+      setIsDescriptionTranslated(true);
+      setDescriptionTranslationError(null);
+      return;
+    }
+
+    setIsDescriptionTranslating(true);
+    setDescriptionTranslationError(null);
+
+    try {
+      const response = await fetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: product.description,
+          targetLanguage: navigator.language.split("-")[0],
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.translatedText) {
+          setTranslatedDescription(data.translatedText);
+          setIsDescriptionTranslated(true);
+        } else {
+          setDescriptionTranslationError(t("translationFailed"));
+        }
+      } else if (response.status === 429) {
+        setDescriptionTranslationError(t("rateLimitExceeded"));
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        setDescriptionTranslationError(errorData.error || t("translationFailed"));
+      }
+    } catch (error) {
+      console.error("Translation error:", error);
+      setDescriptionTranslationError(t("translationFailed"));
+    } finally {
+      setIsDescriptionTranslating(false);
+    }
+  }, [product?.description, isDescriptionTranslating, isDescriptionTranslated, translatedDescription, t]);
+
+  // Reset translation state when product changes
+  useEffect(() => {
+    setIsDescriptionTranslated(false);
+    setTranslatedDescription("");
+    setDescriptionTranslationError(null);
+    setIsDescriptionTranslating(false);
+  }, [productId]);
+
   // ============= COMPUTED VALUES =============
 
   const cartButtonContent = useMemo(() => {
@@ -1379,32 +1448,107 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                     : "bg-white border-gray-200"
                 }`}
               >
-                <h3
-                  className={`text-xs sm:text-sm font-bold mb-1.5 sm:mb-2 ${
-                    isDarkMode ? "text-white" : "text-gray-900"
-                  }`}
-                >
-                  {t("productDescription")}
-                </h3>
-                <div className="relative">
-                  <p
-                    className={`leading-relaxed text-xs sm:text-sm ${
-                      isDarkMode ? "text-gray-300" : "text-gray-700"
-                    } line-clamp-[6]`}
+                <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+                  <h3
+                    className={`text-xs sm:text-sm font-bold ${
+                      isDarkMode ? "text-white" : "text-gray-900"
+                    }`}
                   >
-                    {product.description}
-                  </p>
-                  {product.description.length > 250 && (
-                    <div
-                      className={`absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t ${
-                        isDarkMode
-                          ? "from-gray-800 via-gray-800/80 to-transparent"
-                          : "from-white via-white/80 to-transparent"
-                      } pointer-events-none`}
+                    {t("productDescription")}
+                  </h3>
+                  {/* Translation button */}
+                  <button
+                    onClick={handleTranslateDescription}
+                    disabled={isDescriptionTranslating}
+                    className={`flex items-center gap-1.5 px-2 py-1 sm:px-3 rounded-lg text-xs font-medium transition-all duration-200 hover:scale-105 ${
+                      isDescriptionTranslating
+                        ? "opacity-50 cursor-not-allowed"
+                        : ""
+                    } ${
+                      isDescriptionTranslated
+                        ? isDarkMode
+                          ? "bg-orange-900/30 text-orange-400 border border-orange-700"
+                          : "bg-orange-100 text-orange-600 border border-orange-300"
+                        : isDarkMode
+                        ? "bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-orange-400"
+                        : "bg-gray-100 text-gray-600 hover:bg-orange-50 hover:text-orange-600"
+                    }`}
+                  >
+                    <Languages
+                      className={`w-3 h-3 ${
+                        isDescriptionTranslating ? "animate-pulse" : ""
+                      }`}
                     />
+                    <span>
+                      {isDescriptionTranslating
+                        ? t("translating")
+                        : isDescriptionTranslated
+                        ? t("original")
+                        : t("translate")}
+                    </span>
+                  </button>
+                </div>
+
+                {/* Description content */}
+                <div className="relative">
+                  {isDescriptionTranslating ? (
+                    // Shimmer loading effect
+                    <div className="space-y-2">
+                      {Array.from({ length: Math.min(Math.ceil(product.description.length / 60), 5) }).map((_, i) => (
+                        <div
+                          key={i}
+                          className={`h-3 rounded animate-pulse ${
+                            isDarkMode ? "bg-gray-600" : "bg-gray-200"
+                          } ${i === Math.min(Math.ceil(product.description.length / 60), 5) - 1 ? "w-3/4" : "w-full"}`}
+                          style={{
+                            animation: "shimmer 1.5s ease-in-out infinite",
+                            animationDelay: `${i * 0.1}s`,
+                          }}
+                        />
+                      ))}
+                      <style jsx>{`
+                        @keyframes shimmer {
+                          0% { opacity: 0.5; }
+                          50% { opacity: 1; }
+                          100% { opacity: 0.5; }
+                        }
+                      `}</style>
+                    </div>
+                  ) : (
+                    <>
+                      <p
+                        className={`leading-relaxed text-xs sm:text-sm ${
+                          isDarkMode ? "text-gray-300" : "text-gray-700"
+                        } line-clamp-[6]`}
+                      >
+                        {isDescriptionTranslated ? translatedDescription : product.description}
+                      </p>
+                      {product.description.length > 250 && !isDescriptionTranslating && (
+                        <div
+                          className={`absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t ${
+                            isDarkMode
+                              ? "from-gray-800 via-gray-800/80 to-transparent"
+                              : "from-white via-white/80 to-transparent"
+                          } pointer-events-none`}
+                        />
+                      )}
+                    </>
                   )}
                 </div>
-                {product.description.length > 250 && (
+
+                {/* Translation error message */}
+                {descriptionTranslationError && !isDescriptionTranslating && (
+                  <div
+                    className={`flex items-center gap-1.5 mt-2 text-xs ${
+                      isDarkMode ? "text-red-400" : "text-red-500"
+                    }`}
+                  >
+                    <AlertCircle className="w-3 h-3" />
+                    <span>{descriptionTranslationError}</span>
+                  </div>
+                )}
+
+                {product.description.length > 250 && !isDescriptionTranslating && (
                   <button
                     onClick={() => setShowDescriptionModal(true)}
                     className={`mt-2 text-xs sm:text-sm font-semibold transition-colors ${
@@ -1623,25 +1767,89 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                 >
                   {t("productDescription")}
                 </h3>
-                <button
-                  onClick={() => setShowDescriptionModal(false)}
-                  className={`p-1 rounded-lg transition-colors ${
-                    isDarkMode
-                      ? "hover:bg-gray-700 text-gray-400"
-                      : "hover:bg-gray-100 text-gray-600"
-                  }`}
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                <div className="flex items-center gap-2">
+                  {/* Translation button in modal */}
+                  <button
+                    onClick={handleTranslateDescription}
+                    disabled={isDescriptionTranslating}
+                    className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium transition-all duration-200 hover:scale-105 ${
+                      isDescriptionTranslating
+                        ? "opacity-50 cursor-not-allowed"
+                        : ""
+                    } ${
+                      isDescriptionTranslated
+                        ? isDarkMode
+                          ? "bg-orange-900/30 text-orange-400 border border-orange-700"
+                          : "bg-orange-100 text-orange-600 border border-orange-300"
+                        : isDarkMode
+                        ? "bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-orange-400"
+                        : "bg-gray-100 text-gray-600 hover:bg-orange-50 hover:text-orange-600"
+                    }`}
+                  >
+                    <Languages
+                      className={`w-3 h-3 ${
+                        isDescriptionTranslating ? "animate-pulse" : ""
+                      }`}
+                    />
+                    <span>
+                      {isDescriptionTranslating
+                        ? t("translating")
+                        : isDescriptionTranslated
+                        ? t("original")
+                        : t("translate")}
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => setShowDescriptionModal(false)}
+                    className={`p-1 rounded-lg transition-colors ${
+                      isDarkMode
+                        ? "hover:bg-gray-700 text-gray-400"
+                        : "hover:bg-gray-100 text-gray-600"
+                    }`}
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
               <div
                 className={`p-3 max-h-[70vh] overflow-y-auto ${
                   isDarkMode ? "text-gray-300" : "text-gray-700"
                 }`}
               >
-                <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap">
-                  {product.description}
-                </p>
+                {isDescriptionTranslating ? (
+                  // Shimmer loading effect in modal
+                  <div className="space-y-2">
+                    {Array.from({ length: Math.min(Math.ceil(product.description.length / 50), 8) }).map((_, i) => (
+                      <div
+                        key={i}
+                        className={`h-3 rounded animate-pulse ${
+                          isDarkMode ? "bg-gray-600" : "bg-gray-200"
+                        } ${i === Math.min(Math.ceil(product.description.length / 50), 8) - 1 ? "w-3/4" : "w-full"}`}
+                        style={{
+                          animation: "shimmer 1.5s ease-in-out infinite",
+                          animationDelay: `${i * 0.1}s`,
+                        }}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap">
+                      {isDescriptionTranslated ? translatedDescription : product.description}
+                    </p>
+                    {/* Translation error message */}
+                    {descriptionTranslationError && (
+                      <div
+                        className={`flex items-center gap-1.5 mt-3 text-xs ${
+                          isDarkMode ? "text-red-400" : "text-red-500"
+                        }`}
+                      >
+                        <AlertCircle className="w-3 h-3" />
+                        <span>{descriptionTranslationError}</span>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             </div>
             <style jsx>{`
@@ -1654,6 +1862,11 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                   transform: translateY(0);
                   opacity: 1;
                 }
+              }
+              @keyframes shimmer {
+                0% { opacity: 0.5; }
+                50% { opacity: 1; }
+                100% { opacity: 0.5; }
               }
             `}</style>
           </div>

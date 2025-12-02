@@ -11,6 +11,7 @@ import {
   X,
   MessageSquare,
   Shield,
+  AlertCircle,
 } from "lucide-react";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
@@ -107,6 +108,43 @@ const FullScreenImageModal: React.FC<FullScreenImageModalProps> = ({
   );
 };
 
+// ============= TEXT SHIMMER COMPONENT =============
+const TextShimmer: React.FC<{ 
+  lines?: number; 
+  isDarkMode?: boolean;
+  className?: string;
+}> = ({ lines = 3, isDarkMode = false, className = "" }) => {
+  return (
+    <div className={`space-y-2 ${className}`}>
+      {Array.from({ length: lines }).map((_, i) => (
+        <div
+          key={i}
+          className={`h-3 rounded animate-pulse ${
+            isDarkMode ? "bg-gray-600" : "bg-gray-200"
+          } ${i === lines - 1 ? "w-3/4" : "w-full"}`}
+          style={{
+            animation: "shimmer 1.5s ease-in-out infinite",
+            animationDelay: `${i * 0.1}s`,
+          }}
+        />
+      ))}
+      <style jsx>{`
+        @keyframes shimmer {
+          0% {
+            opacity: 0.5;
+          }
+          50% {
+            opacity: 1;
+          }
+          100% {
+            opacity: 0.5;
+          }
+        }
+      `}</style>
+    </div>
+  );
+};
+
 const ReviewTile: React.FC<ReviewTileProps> = ({
   review,
   onLike,
@@ -117,6 +155,7 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
   const [isTranslated, setIsTranslated] = useState(false);
   const [translatedText, setTranslatedText] = useState("");
   const [isTranslating, setIsTranslating] = useState(false);
+  const [translationError, setTranslationError] = useState<string | null>(null);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
 
   const isLiked = currentUserId ? review.likes.includes(currentUserId) : false;
@@ -131,12 +170,23 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
   const handleTranslate = async () => {
     if (isTranslating) return;
 
+    // Toggle back to original
     if (isTranslated) {
       setIsTranslated(false);
+      setTranslationError(null);
+      return;
+    }
+
+    // Use cached translation if available
+    if (translatedText) {
+      setIsTranslated(true);
+      setTranslationError(null);
       return;
     }
 
     setIsTranslating(true);
+    setTranslationError(null);
+
     try {
       const response = await fetch("/api/translate", {
         method: "POST",
@@ -149,11 +199,21 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
 
       if (response.ok) {
         const data = await response.json();
-        setTranslatedText(data.translatedText);
-        setIsTranslated(true);
+        if (data.translatedText) {
+          setTranslatedText(data.translatedText);
+          setIsTranslated(true);
+        } else {
+          setTranslationError(t("translationFailed"));
+        }
+      } else if (response.status === 429) {
+        setTranslationError(t("rateLimitExceeded"));
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        setTranslationError(errorData.error || t("translationFailed"));
       }
     } catch (error) {
       console.error("Translation error:", error);
+      setTranslationError(t("translationFailed"));
     } finally {
       setIsTranslating(false);
     }
@@ -162,6 +222,9 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
   const handleImageClick = (imageUrl: string) => {
     setSelectedImageUrl(imageUrl);
   };
+
+  // Calculate shimmer lines based on text length
+  const shimmerLines = Math.min(Math.ceil(review.review.length / 50), 4);
 
   return (
     <>
@@ -231,15 +294,40 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
           </div>
         )}
 
-        {/* Review text */}
-        <div className="mb-3 sm:mb-4">
-          <p
-            className={`text-xs sm:text-sm leading-relaxed ${
-              isLongReview ? "line-clamp-4" : ""
-            } ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}
-          >
-            {isTranslated ? translatedText : review.review}
-          </p>
+        {/* Review text with shimmer during translation */}
+        <div className="mb-3 sm:mb-4 min-h-[48px]">
+          {isTranslating ? (
+            <TextShimmer 
+              lines={shimmerLines} 
+              isDarkMode={isDarkMode} 
+            />
+          ) : translationError ? (
+            <div className="space-y-2">
+              <p
+                className={`text-xs sm:text-sm leading-relaxed ${
+                  isLongReview ? "line-clamp-4" : ""
+                } ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}
+              >
+                {review.review}
+              </p>
+              <div
+                className={`flex items-center gap-1.5 text-xs ${
+                  isDarkMode ? "text-red-400" : "text-red-500"
+                }`}
+              >
+                <AlertCircle className="w-3 h-3" />
+                <span>{translationError}</span>
+              </div>
+            </div>
+          ) : (
+            <p
+              className={`text-xs sm:text-sm leading-relaxed ${
+                isLongReview ? "line-clamp-4" : ""
+              } ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}
+            >
+              {isTranslated ? translatedText : review.review}
+            </p>
+          )}
         </div>
 
         {/* Actions */}
@@ -250,12 +338,20 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
               onClick={handleTranslate}
               disabled={isTranslating}
               className={`flex items-center gap-1.5 px-2 py-1 sm:px-3 rounded-lg text-xs font-medium transition-all duration-200 hover:scale-105 ${
-                isDarkMode
+                isTranslating
+                  ? "opacity-50 cursor-not-allowed"
+                  : ""
+              } ${
+                isTranslated
+                  ? isDarkMode
+                    ? "bg-orange-900/30 text-orange-400 border border-orange-700"
+                    : "bg-orange-100 text-orange-600 border border-orange-300"
+                  : isDarkMode
                   ? "bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-orange-400"
                   : "bg-gray-100 text-gray-600 hover:bg-orange-50 hover:text-orange-600"
               }`}
             >
-              <Languages className="w-3 h-3" />
+              <Languages className={`w-3 h-3 ${isTranslating ? "animate-pulse" : ""}`} />
               <span className="hidden sm:inline">
                 {isTranslating
                   ? t("translating")
@@ -284,7 +380,7 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
           </div>
 
           {/* Read more link */}
-          {isLongReview && (
+          {isLongReview && !isTranslating && (
             <button
               className={`text-xs font-semibold underline transition-colors ${
                 isDarkMode
@@ -374,7 +470,15 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
   const t = useCallback(
     (key: string) => {
       if (!localization) {
-        return key;
+        // Fallback translations for critical keys
+        const fallbacks: Record<string, string> = {
+          translating: "Translating...",
+          translate: "Translate",
+          original: "Original",
+          translationFailed: "Translation failed",
+          rateLimitExceeded: "Too many requests. Try again later.",
+        };
+        return fallbacks[key] || key;
       }
 
       try {
