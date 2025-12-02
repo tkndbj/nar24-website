@@ -4,13 +4,14 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import {
   ArrowLeft,
   MessageCircle,
   Calendar,
   User,
   Loader2,
+  Languages,
 } from "lucide-react";
 import Image from "next/image";
 import { format } from "date-fns";
@@ -44,6 +45,7 @@ const AllQuestionsPage: React.FC<AllQuestionsPageProps> = ({}) => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const localization = useTranslations();
+  const locale = useLocale();
 
   // Extract query parameters
   const productId = searchParams.get("productId") || "";
@@ -58,6 +60,10 @@ const AllQuestionsPage: React.FC<AllQuestionsPageProps> = ({}) => {
   const [hasMore, setHasMore] = useState(true);
   const [lastDocId, setLastDocId] = useState<string | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // Translation states
+  const [translatedQuestions, setTranslatedQuestions] = useState<Record<string, { question: string; answer: string }>>({});
+  const [translatingIds, setTranslatingIds] = useState<Set<string>>(new Set());
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
@@ -232,6 +238,75 @@ const AllQuestionsPage: React.FC<AllQuestionsPageProps> = ({}) => {
     router.push(`/asktoseller?${params}`);
   }, [productId, sellerId, isShop, router]);
 
+  // Translate question and answer
+  const translateQuestion = useCallback(async (questionId: string, questionText: string, answerText?: string) => {
+    if (translatedQuestions[questionId]) {
+      // Toggle off translation
+      setTranslatedQuestions(prev => {
+        const newTranslations = { ...prev };
+        delete newTranslations[questionId];
+        return newTranslations;
+      });
+      return;
+    }
+
+    setTranslatingIds(prev => new Set(prev).add(questionId));
+
+    try {
+      // Translate both question and answer in parallel
+      const requests = [
+        fetch("/api/translate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            text: questionText,
+            targetLanguage: locale,
+          }),
+        }),
+      ];
+
+      if (answerText) {
+        requests.push(
+          fetch("/api/translate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              text: answerText,
+              targetLanguage: locale,
+            }),
+          })
+        );
+      }
+
+      const responses = await Promise.all(requests);
+
+      if (responses[0].ok) {
+        const questionData = await responses[0].json();
+        let answerData = { translatedText: "" };
+
+        if (responses[1] && responses[1].ok) {
+          answerData = await responses[1].json();
+        }
+
+        setTranslatedQuestions(prev => ({
+          ...prev,
+          [questionId]: {
+            question: questionData.translatedText,
+            answer: answerData.translatedText || "",
+          },
+        }));
+      }
+    } catch (error) {
+      console.error("Error translating question:", error);
+    } finally {
+      setTranslatingIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(questionId);
+        return newSet;
+      });
+    }
+  }, [translatedQuestions, locale]);
+
   // Colors based on theme
   const colors = {
     background: isDarkMode ? "bg-gray-900" : "bg-gray-50",
@@ -275,6 +350,15 @@ const AllQuestionsPage: React.FC<AllQuestionsPageProps> = ({}) => {
     const answererImage =
       question.answererProfileImage || sellerInfo?.profileImageUrl;
 
+    const isTranslated = !!translatedQuestions[question.id];
+    const isTranslating = translatingIds.has(question.id);
+    const displayQuestionText = isTranslated
+      ? translatedQuestions[question.id].question
+      : question.questionText;
+    const displayAnswerText = isTranslated && translatedQuestions[question.id].answer
+      ? translatedQuestions[question.id].answer
+      : question.answerText;
+
     return (
       <div
         className={`${colors.containerBg} rounded-xl shadow-sm border ${colors.border} overflow-hidden transition-all hover:shadow-md`}
@@ -309,7 +393,7 @@ const AllQuestionsPage: React.FC<AllQuestionsPageProps> = ({}) => {
                 <p
                   className={`${colors.text} text-base leading-relaxed break-words`}
                 >
-                  {question.questionText}
+                  {displayQuestionText}
                 </p>
               </div>
             </div>
@@ -348,12 +432,36 @@ const AllQuestionsPage: React.FC<AllQuestionsPageProps> = ({}) => {
                   <p
                     className={`${colors.text} text-base leading-relaxed break-words`}
                   >
-                    {question.answerText}
+                    {displayAnswerText}
                   </p>
                 </div>
               </div>
             </div>
           )}
+
+          {/* Translation button */}
+          <div className="flex justify-end pt-2">
+            <button
+              onClick={() => translateQuestion(question.id, question.questionText, question.answerText)}
+              disabled={isTranslating}
+              className={`flex items-center gap-1.5 text-sm transition-colors ${
+                isTranslating
+                  ? "opacity-50 cursor-not-allowed"
+                  : ""
+              } ${
+                isTranslated
+                  ? "text-orange-600"
+                  : colors.textSecondary
+              } hover:text-orange-600`}
+            >
+              {isTranslating ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Languages className="w-4 h-4" />
+              )}
+              <span>{isTranslated ? t("original") : t("translate")}</span>
+            </button>
+          </div>
         </div>
       </div>
     );

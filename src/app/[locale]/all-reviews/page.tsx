@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import {
   ArrowLeft,
   Star,
@@ -56,6 +56,7 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const localization = useTranslations();
+  const locale = useLocale();
   const { user } = useUser();
 
   // Extract query parameters
@@ -291,9 +292,9 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
       const response = await fetch("/api/translate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           text,
-          targetLanguage: navigator.language.split("-")[0],
+          targetLanguage: locale,
         }),
       });
 
