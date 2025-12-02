@@ -2671,7 +2671,7 @@
     "translate": "Çevir",
     "readMore": "Devamını Oku",
     "failedToFetchReviews": "Yorumlar alınamadı",
-     "translationFailed": "Çevirme başarısız",
+    "translationFailed": "Çevirme başarısız",
     "rateLimitExceeded": "Çok fazla istek gönderdiniz. Lütfen birazdan tekrar deneyiniz."
   },
   "ProductDetailSellerInfo": {
@@ -2723,6 +2723,8 @@
     "allQuestionsTitle": "Tüm Sorular",
     "anonymous": "Anonim",
     "seller": "Satıcı",
+    "translate": "Çevir",
+    "original": "Orijinal",
     "noQuestionsFound": "Henüz Soru Yok",
     "beFirstToAsk": "Bu ürün hakkında ilk soruyu soran siz olun",
     "askFirstQuestion": "İlk Soruyu Sor",
@@ -4317,23 +4319,23 @@
     "translationError": "Değerlendirme çevrilirken hata oluştu. Lütfen tekrar deneyin."
   },
   "UserProfile": {
-      "userProfile": "Kullanıcı Profili",
-      "noUserName": "İsim Yok",
-      "userNotFound": "Kullanıcı bulunamadı",
-      "goBack": "Geri Dön",
-      "rating": "Puan",
-      "productsSold": "Satılan Ürün",
-      "totalListings": "Toplam İlan",
-      "userReviews": "Değerlendirme",
-      "searchProducts": "Ürünlerde ara...",
-      "noProductsFound": "Ürün bulunamadı",
-      "noProductsYet": "Henüz ürün yok",
-      "endOfProducts": "Sona ulaştınız",
-      "report": "Şikayet Et",
-      "inappropriateProfileImage": "Uygunsuz Profil Resmi",
-      "inappropriateListings": "Uygunsuz İlanlar",
-      "pleaseLoginFirst": "Lütfen önce giriş yapın",
-      "reportSubmittedSuccessfully": "Şikayet başarıyla gönderildi",
-      "errorSubmittingReport": "Şikayet gönderilirken hata oluştu. Lütfen tekrar deneyin."
-    }
+    "userProfile": "Kullanıcı Profili",
+    "noUserName": "İsim Yok",
+    "userNotFound": "Kullanıcı bulunamadı",
+    "goBack": "Geri Dön",
+    "rating": "Puan",
+    "productsSold": "Satılan Ürün",
+    "totalListings": "Toplam İlan",
+    "userReviews": "Değerlendirme",
+    "searchProducts": "Ürünlerde ara...",
+    "noProductsFound": "Ürün bulunamadı",
+    "noProductsYet": "Henüz ürün yok",
+    "endOfProducts": "Sona ulaştınız",
+    "report": "Şikayet Et",
+    "inappropriateProfileImage": "Uygunsuz Profil Resmi",
+    "inappropriateListings": "Uygunsuz İlanlar",
+    "pleaseLoginFirst": "Lütfen önce giriş yapın",
+    "reportSubmittedSuccessfully": "Şikayet başarıyla gönderildi",
+    "errorSubmittingReport": "Şikayet gönderilirken hata oluştu. Lütfen tekrar deneyin."
+  }
 }

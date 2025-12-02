@@ -2634,7 +2634,7 @@
     "original": "Original",
     "translate": "Translate",
     "readMore": "Read More",
-    "failedToFetchReviews": "Failed to fetch reviews",  
+    "failedToFetchReviews": "Failed to fetch reviews",
     "translationFailed": "Translation failed",
     "rateLimitExceeded": "Too many requests. Try again later."
   },
@@ -2711,6 +2711,8 @@
     "allQuestionsTitle": "All Questions",
     "anonymous": "Anonymous",
     "seller": "Seller",
+    "translate": "Translate",
+    "original": "Original",
     "noQuestionsFound": "No Questions Yet",
     "beFirstToAsk": "Be the first to ask a question about this product",
     "askFirstQuestion": "Ask the First Question",
