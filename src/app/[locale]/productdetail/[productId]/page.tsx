@@ -889,7 +889,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           text: product.description,
-          targetLanguage: navigator.language.split("-")[0],
+          targetLanguage: locale,
         }),
       });
 
@@ -1609,6 +1609,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                 productId={product.id}
                 isDarkMode={isDarkMode}
                 localization={localization}
+                locale={locale}
                 prefetchedData={
                   batchData
                     ? {
@@ -1634,6 +1635,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                 isShop={!!product.shopId}
                 isDarkMode={isDarkMode}
                 localization={localization}
+                locale={locale}
                 prefetchedData={
                   batchData
                     ? {

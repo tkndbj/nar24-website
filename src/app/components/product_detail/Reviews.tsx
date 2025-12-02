@@ -33,6 +33,7 @@ interface ProductDetailReviewsTabProps {
   isDarkMode?: boolean;
   localization?: ReturnType<typeof useTranslations>;
   prefetchedData?: { reviews: Review[]; totalCount: number } | null;
+  locale?: string;
 }
 
 interface ReviewTileProps {
@@ -41,6 +42,7 @@ interface ReviewTileProps {
   currentUserId?: string;
   isDarkMode?: boolean;
   t: (key: string) => string;
+  locale?: string;
 }
 
 const StarRating: React.FC<{ rating: number; size?: number }> = ({
@@ -151,6 +153,7 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
   currentUserId,
   isDarkMode = false,
   t,
+  locale,
 }) => {
   const [isTranslated, setIsTranslated] = useState(false);
   const [translatedText, setTranslatedText] = useState("");
@@ -188,12 +191,15 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
     setTranslationError(null);
 
     try {
+      // Use app locale, fallback to browser language
+      const targetLanguage = locale || navigator.language.split("-")[0];
+
       const response = await fetch("/api/translate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           text: review.review,
-          targetLanguage: navigator.language.split("-")[0],
+          targetLanguage,
         }),
       });
 
@@ -457,6 +463,7 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
   isDarkMode = false,
   localization,
   prefetchedData,
+  locale,
 }) => {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
@@ -716,6 +723,7 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
                 currentUserId="current-user"
                 isDarkMode={isDarkMode}
                 t={t}
+                locale={locale}
               />
             ))}
           </div>

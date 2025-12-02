@@ -43,6 +43,7 @@ interface ProductQuestionsWidgetProps {
     totalCount: number;
     sellerInfo?: SellerInfo;
   } | null;
+  locale?: string;
 }
 
 interface QuestionAnswerCardProps {
@@ -51,6 +52,7 @@ interface QuestionAnswerCardProps {
   onReadAll: () => void;
   isDarkMode?: boolean;
   t: (key: string) => string;
+  locale?: string;
 }
 
 // ============= TEXT SHIMMER COMPONENT =============
@@ -96,6 +98,7 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
   onReadAll,
   isDarkMode = false,
   t,
+  locale,
 }) => {
   // Translation states
   const [isTranslated, setIsTranslated] = useState(false);
@@ -145,7 +148,8 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
     setTranslationError(null);
 
     try {
-      const targetLanguage = navigator.language.split("-")[0];
+      // Use app locale, fallback to browser language
+      const targetLanguage = locale || navigator.language.split("-")[0];
 
       // Translate both question and answer in parallel
       const [questionResponse, answerResponse] = await Promise.all([
@@ -447,6 +451,7 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
   isDarkMode = false,
   localization,
   prefetchedData,
+  locale,
 }) => {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [sellerInfo, setSellerInfo] = useState<SellerInfo | null>(null);
@@ -695,6 +700,7 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
                 onReadAll={handleReadAll}
                 isDarkMode={isDarkMode}
                 t={t}
+                locale={locale}
               />
             ))}
           </div>
