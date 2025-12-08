@@ -17,7 +17,7 @@ import {
 import { CompactBundleWidget } from "../CompactBundle";
 import { useCart, CartTotals, CartItemTotal } from "@/context/CartProvider";
 import { useUser } from "@/context/UserProvider";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/navigation";
 import { useTranslations } from "next-intl";
 import { AttributeLocalizationUtils } from "@/constants/AttributeLocalization";
 import { db } from "@/lib/firebase";
