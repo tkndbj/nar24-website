@@ -78,21 +78,33 @@ function LoginContent() {
     setTwoFAPending(isPending2FA);
   }, [isPending2FA]);
 
-  // Handle theme detection
+  // Handle theme detection and initialization
   useEffect(() => {
-    const checkTheme = () => {
-      if (typeof document !== "undefined") {
-        setIsDark(document.documentElement.classList.contains("dark"));
-      }
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    if (typeof document !== "undefined") {
-      observer.observe(document.documentElement, {
-        attributes: true,
-        attributeFilter: ["class"],
-      });
+    if (typeof window === "undefined") return;
+
+    // Initialize theme from localStorage or system preference on mount
+    const savedTheme = localStorage.getItem("theme");
+    const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+
+    if (savedTheme === "dark" || (!savedTheme && systemPrefersDark)) {
+      document.documentElement.classList.add("dark");
+      setIsDark(true);
+    } else {
+      document.documentElement.classList.remove("dark");
+      setIsDark(false);
     }
+
+    // Watch for theme changes via MutationObserver
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains("dark"));
+    };
+
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+
     return () => observer.disconnect();
   }, []);
 
@@ -306,9 +318,6 @@ function LoginContent() {
         }
       }
     } catch (error: unknown) {
-      // Always reset loading state on error
-      setIsLoading(false);
-
       let message = t("LoginPage.loginError");
       const errorMessage = error instanceof Error ? error.message : "";
       const authError = error as AuthError;
@@ -316,35 +325,27 @@ function LoginContent() {
       // Handle timeout error
       if (errorMessage === "AUTH_TIMEOUT") {
         message = t("LoginPage.authTimeout");
-        toast.error(message, {
-          style: {
-            borderRadius: "10px",
-            background: "#EF4444",
-            color: "#fff",
-          },
-        });
-        return;
-      }
-
-      switch (authError.code) {
-        case "auth/user-not-found":
-          message = t("LoginPage.userNotFound");
-          break;
-        case "auth/wrong-password":
-          message = t("LoginPage.wrongPassword");
-          break;
-        case "auth/invalid-email":
-          message = t("LoginPage.invalidEmail");
-          break;
-        case "auth/network-request-failed":
-          message = t("LoginPage.networkError");
-          break;
-        case "auth/too-many-requests":
-          message = t("LoginPage.tooManyRequests");
-          break;
-        case "auth/invalid-credential":
-          message = t("LoginPage.invalidCredentials");
-          break;
+      } else {
+        switch (authError.code) {
+          case "auth/user-not-found":
+            message = t("LoginPage.userNotFound");
+            break;
+          case "auth/wrong-password":
+            message = t("LoginPage.wrongPassword");
+            break;
+          case "auth/invalid-email":
+            message = t("LoginPage.invalidEmail");
+            break;
+          case "auth/network-request-failed":
+            message = t("LoginPage.networkError");
+            break;
+          case "auth/too-many-requests":
+            message = t("LoginPage.tooManyRequests");
+            break;
+          case "auth/invalid-credential":
+            message = t("LoginPage.invalidCredentials");
+            break;
+        }
       }
 
       toast.error(message, {
@@ -355,6 +356,7 @@ function LoginContent() {
         },
       });
     } finally {
+      // Always reset loading state
       setIsLoading(false);
     }
   }, [email, password, t, twoFactorService, router, checkAndHandle2FA]);
@@ -397,9 +399,6 @@ function LoginContent() {
         // If 2FA is needed, user will be redirected to 2FA page
       }
     } catch (error: unknown) {
-      // Always reset loading state on error
-      setIsLoading(false);
-
       const errorMessage = error instanceof Error ? error.message : "";
       const authError = error as AuthError;
 
@@ -412,52 +411,44 @@ function LoginContent() {
             color: "#fff",
           },
         });
-        return;
-      }
-
-      // Handle popup-specific errors silently or with appropriate messages
-      switch (authError.code) {
-        case "auth/popup-closed-by-user":
-        case "auth/cancelled-popup-request":
-          // User cancelled - don't show error
-          return;
-        case "auth/popup-blocked":
-          toast.error(t("LoginPage.popupBlocked"), {
-            style: {
-              borderRadius: "10px",
-              background: "#EF4444",
-              color: "#fff",
-            },
-          });
-          return;
-        case "auth/network-request-failed":
-          toast.error(t("LoginPage.networkError"), {
-            style: {
-              borderRadius: "10px",
-              background: "#EF4444",
-              color: "#fff",
-            },
-          });
-          return;
-        case "auth/account-exists-with-different-credential":
-          toast.error(t("LoginPage.accountExistsWithDifferentCredential"), {
-            style: {
-              borderRadius: "10px",
-              background: "#EF4444",
-              color: "#fff",
-            },
-          });
-          return;
-        default:
-          toast.error(t("LoginPage.googleLoginError"), {
-            style: {
-              borderRadius: "10px",
-              background: "#EF4444",
-              color: "#fff",
-            },
-          });
+        // Don't return early - let finally handle loading state
+      } else if (authError.code === "auth/popup-closed-by-user" || authError.code === "auth/cancelled-popup-request") {
+        // User cancelled - don't show error, just reset loading
+      } else if (authError.code === "auth/popup-blocked") {
+        toast.error(t("LoginPage.popupBlocked"), {
+          style: {
+            borderRadius: "10px",
+            background: "#EF4444",
+            color: "#fff",
+          },
+        });
+      } else if (authError.code === "auth/network-request-failed") {
+        toast.error(t("LoginPage.networkError"), {
+          style: {
+            borderRadius: "10px",
+            background: "#EF4444",
+            color: "#fff",
+          },
+        });
+      } else if (authError.code === "auth/account-exists-with-different-credential") {
+        toast.error(t("LoginPage.accountExistsWithDifferentCredential"), {
+          style: {
+            borderRadius: "10px",
+            background: "#EF4444",
+            color: "#fff",
+          },
+        });
+      } else {
+        toast.error(t("LoginPage.googleLoginError"), {
+          style: {
+            borderRadius: "10px",
+            background: "#EF4444",
+            color: "#fff",
+          },
+        });
       }
     } finally {
+      // Always reset loading state - this runs after catch block completes
       setIsLoading(false);
     }
   }, [t, twoFactorService, router, checkAndHandle2FA]);
