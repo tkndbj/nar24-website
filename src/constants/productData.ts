@@ -28,6 +28,7 @@ export class AllInOneCategoryData {
     { key: "Pet Supplies" },
     { key: "Automotive" },
     { key: "Health & Wellness" },
+    { key: "Flowers & Gifts" },
   ];
 
   // ------------------------------------------------------
@@ -194,6 +195,20 @@ export class AllInOneCategoryData {
       "first aid",
       "mobility aids",
     ],
+    "Flowers & Gifts": [
+      "flowers",
+      "bouquets",
+      "arrangements",
+      "plants",
+      "gifts",
+      "chocolate",
+      "wreaths",
+      "centerpieces",
+      "floral",
+      "potted plants",
+      "flower delivery",
+      "occasions",
+    ],
   };
 
   // ------------------------------------------------------
@@ -348,6 +363,13 @@ export class AllInOneCategoryData {
       "Mobility & Daily Living",
       "Alternative Medicine",
       "Personal Care",
+    ],
+    "Flowers & Gifts": [
+      "Bouquets & Arrangements",
+      "Potted Plants",
+      "Gift Arrangements",
+      "Flower Accessories",
+      "Wreaths & Centerpieces",
     ],
   };
 
@@ -1434,6 +1456,45 @@ export class AllInOneCategoryData {
           "Skin Care",
         ],
       },
+      "Flowers & Gifts": {
+        "Bouquets & Arrangements": [
+          "Bouquets",
+          "Flower Arrangements",
+          "Mixed Arrangements",
+          "Single Flower Types",
+          "Seasonal Arrangements",
+        ],
+        "Potted Plants": [
+          "Indoor Plants",
+          "Outdoor Plants",
+          "Succulents",
+          "Orchids",
+          "Bonsai",
+          "Cacti",
+        ],
+        "Gift Arrangements": [
+          "Chocolate Arrangements",
+          "Edible Arrangements",
+          "Fruit Baskets",
+          "Gift Combos",
+          "Balloon Arrangements",
+        ],
+        "Flower Accessories": [
+          "Vases",
+          "Planters & Pots",
+          "Floral Foam",
+          "Ribbons & Wraps",
+          "Plant Care Products",
+          "Decorative Accessories",
+        ],
+        "Wreaths & Centerpieces": [
+          "Funeral Wreaths",
+          "Decorative Wreaths",
+          "Table Centerpieces",
+          "Event Decorations",
+          "Seasonal Wreaths",
+        ],
+      },
     };
 
   // ------------------------------------------------------
@@ -1568,6 +1629,18 @@ export class AllInOneCategoryData {
       "health monitoring": "Health Monitoring",
       mobility: "Mobility & Daily Living",
     },
+    "Flowers & Gifts": {
+      bouquet: "Bouquets & Arrangements",
+      arrangement: "Bouquets & Arrangements",
+      plant: "Potted Plants",
+      potted: "Potted Plants",
+      chocolate: "Gift Arrangements",
+      gift: "Gift Arrangements",
+      vase: "Flower Accessories",
+      pot: "Flower Accessories",
+      wreath: "Wreaths & Centerpieces",
+      centerpiece: "Wreaths & Centerpieces",
+    },
   };
 
   // ------------------------------------------------------
@@ -1608,6 +1681,8 @@ export class AllInOneCategoryData {
     "Leather",
     "Linen",
     "Nylon",
+    "Viscose",
+    "Modal",
   ];
 
   // ------------------------------------------------------
@@ -1705,6 +1780,10 @@ export class AllInOneCategoryData {
         return l10n.clothingTypeLinen;
       case "Nylon":
         return l10n.clothingTypeNylon;
+      case "Viscose":
+        return l10n.clothingTypeViscose;
+      case "Modal":
+        return l10n.clothingTypeModal;
       default:
         return rawType;
     }
@@ -1743,6 +1822,8 @@ export class AllInOneCategoryData {
         return l10n.categoryAutomotive ?? "Automotive";
       case "Health & Wellness":
         return l10n.categoryHealthWellness ?? "Health & Wellness";
+      case "Flowers & Gifts":
+        return l10n.categoryFlowersGifts ?? "Flowers & Gifts";
       default:
         return rawKey;
     }
@@ -2107,6 +2188,24 @@ export class AllInOneCategoryData {
             );
           case "Personal Care":
             return l10n.subcategoryPersonalCare ?? "Personal Care";
+        }
+        break;
+      case "Flowers & Gifts":
+        switch (subKey) {
+          case "Bouquets & Arrangements":
+            return (
+              l10n.subcategoryBouquetsArrangements ?? "Bouquets & Arrangements"
+            );
+          case "Potted Plants":
+            return l10n.subcategoryPottedPlants ?? "Potted Plants";
+          case "Gift Arrangements":
+            return l10n.subcategoryGiftArrangements ?? "Gift Arrangements";
+          case "Flower Accessories":
+            return l10n.subcategoryFlowerAccessories ?? "Flower Accessories";
+          case "Wreaths & Centerpieces":
+            return (
+              l10n.subcategoryWreathsCenterpieces ?? "Wreaths & Centerpieces"
+            );
         }
         break;
     }
@@ -4560,6 +4659,112 @@ export class AllInOneCategoryData {
             break;
         }
         break;
+      case "Flowers & Gifts":
+        switch (parentSubcategoryKey) {
+          case "Bouquets & Arrangements":
+            switch (subSubKey) {
+              case "Bouquets":
+                return l10n.subSubcategoryBouquets ?? "Bouquets";
+              case "Flower Arrangements":
+                return (
+                  l10n.subSubcategoryFlowerArrangements ?? "Flower Arrangements"
+                );
+              case "Mixed Arrangements":
+                return (
+                  l10n.subSubcategoryMixedArrangements ?? "Mixed Arrangements"
+                );
+              case "Single Flower Types":
+                return (
+                  l10n.subSubcategorySingleFlowerTypes ?? "Single Flower Types"
+                );
+              case "Seasonal Arrangements":
+                return (
+                  l10n.subSubcategorySeasonalArrangements ??
+                  "Seasonal Arrangements"
+                );
+            }
+            break;
+          case "Potted Plants":
+            switch (subSubKey) {
+              case "Indoor Plants":
+                return l10n.subSubcategoryIndoorPlants ?? "Indoor Plants";
+              case "Outdoor Plants":
+                return l10n.subSubcategoryOutdoorPlants ?? "Outdoor Plants";
+              case "Succulents":
+                return l10n.subSubcategorySucculents ?? "Succulents";
+              case "Orchids":
+                return l10n.subSubcategoryOrchids ?? "Orchids";
+              case "Bonsai":
+                return l10n.subSubcategoryBonsai ?? "Bonsai";
+              case "Cacti":
+                return l10n.subSubcategoryCacti ?? "Cacti";
+            }
+            break;
+          case "Gift Arrangements":
+            switch (subSubKey) {
+              case "Chocolate Arrangements":
+                return (
+                  l10n.subSubcategoryChocolateArrangements ??
+                  "Chocolate Arrangements"
+                );
+              case "Edible Arrangements":
+                return (
+                  l10n.subSubcategoryEdibleArrangements ?? "Edible Arrangements"
+                );
+              case "Fruit Baskets":
+                return l10n.subSubcategoryFruitBaskets ?? "Fruit Baskets";
+              case "Gift Combos":
+                return l10n.subSubcategoryGiftCombos ?? "Gift Combos";
+              case "Balloon Arrangements":
+                return (
+                  l10n.subSubcategoryBalloonArrangements ??
+                  "Balloon Arrangements"
+                );
+            }
+            break;
+          case "Flower Accessories":
+            switch (subSubKey) {
+              case "Vases":
+                return l10n.subSubcategoryVases ?? "Vases";
+              case "Planters & Pots":
+                return l10n.subSubcategoryPlantersPots ?? "Planters & Pots";
+              case "Floral Foam":
+                return l10n.subSubcategoryFloralFoam ?? "Floral Foam";
+              case "Ribbons & Wraps":
+                return l10n.subSubcategoryRibbonsWraps ?? "Ribbons & Wraps";
+              case "Plant Care Products":
+                return (
+                  l10n.subSubcategoryPlantCareProducts ?? "Plant Care Products"
+                );
+              case "Decorative Accessories":
+                return (
+                  l10n.subSubcategoryDecorativeAccessories ??
+                  "Decorative Accessories"
+                );
+            }
+            break;
+          case "Wreaths & Centerpieces":
+            switch (subSubKey) {
+              case "Funeral Wreaths":
+                return l10n.subSubcategoryFuneralWreaths ?? "Funeral Wreaths";
+              case "Decorative Wreaths":
+                return (
+                  l10n.subSubcategoryDecorativeWreaths ?? "Decorative Wreaths"
+                );
+              case "Table Centerpieces":
+                return (
+                  l10n.subSubcategoryTableCenterpieces ?? "Table Centerpieces"
+                );
+              case "Event Decorations":
+                return (
+                  l10n.subSubcategoryEventDecorations ?? "Event Decorations"
+                );
+              case "Seasonal Wreaths":
+                return l10n.subSubcategorySeasonalWreaths ?? "Seasonal Wreaths";
+            }
+            break;
+        }
+        break;
     }
     return subSubKey;
   }
@@ -4801,6 +5006,8 @@ export class AllInOneCategoryData {
     Automotive: AllInOneCategoryData._getSubSubcategories("Automotive"),
     "Health & Wellness":
       AllInOneCategoryData._getSubSubcategories("Health & Wellness"),
+    "Flowers & Gifts":
+      AllInOneCategoryData._getSubSubcategories("Flowers & Gifts"),
   };
 
   static _getSubSubcategories(category: string): Record<string, string[]> {
