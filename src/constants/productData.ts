@@ -4781,6 +4781,7 @@ export class AllInOneCategoryData {
     { key: "Pet Supplies", image: "pet_supplies.jpg" },
     { key: "Automotive", image: "automotive.jpg" },
     { key: "Health & Wellness", image: "health_wellness.jpg" },
+    { key: "Flowers & Gifts", image: "flowers_gifts.jpg" },
   ];
 
   /// Buyer-focused subcategories structure
@@ -4884,6 +4885,13 @@ export class AllInOneCategoryData {
       "Mobility & Daily Living",
       "Alternative Medicine",
       "Personal Care",
+    ],
+    "Flowers & Gifts": [
+      "Bouquets & Arrangements",
+      "Potted Plants",
+      "Gift Arrangements",
+      "Flower Accessories",
+      "Wreaths & Centerpieces",
     ],
   };
 

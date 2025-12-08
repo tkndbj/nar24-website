@@ -19,6 +19,7 @@ import {
   Car,
   BookOpen,
   X,
+  Flower2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { AllInOneCategoryData } from "@/constants/productData";
@@ -81,6 +82,7 @@ const categoryIconMap: Record<
   "Tools & Hardware": Wrench,
   "Health & Wellness": Heart,
   Automotive: Car,
+  "Flowers & Gifts": Flower2,
 };
 
 // Category mapping from URL-friendly to Firestore values
@@ -99,6 +101,7 @@ const CATEGORY_MAPPING: { [key: string]: string } = {
   "pet-supplies": "Pet Supplies",
   automotive: "Automotive",
   "health-wellness": "Health & Wellness",
+  "flowers-gifts": "Flowers & Gifts",
 };
 
 // Reverse mapping from Firestore to URL-friendly
