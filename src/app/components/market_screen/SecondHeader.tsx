@@ -656,12 +656,12 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
         <div
           ref={categoriesMenuRef}
           className={`
-            fixed min-h-[400px] max-h-[600px] z-[9999]
+            fixed h-[450px] z-[9999]
             ${isDark ? "bg-gray-900" : "bg-white"}
             border-b border-l border-r
             ${isDark ? "border-gray-700" : "border-gray-200"}
             shadow-2xl backdrop-blur-xl
-            overflow-hidden rounded-b-lg
+            rounded-b-lg
           `}
           style={{
             top: headerRef.current
@@ -681,24 +681,24 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
           onMouseEnter={handleMenuMouseEnter}
           onMouseLeave={handleMenuMouseLeave}
         >
-          <div className="flex h-full min-h-[400px]">
+          <div className="flex h-full">
             {/* Left side - Main categories */}
             <div
               className={`
-              w-1/3 border-r ${isDark ? "border-gray-700" : "border-gray-200"}
+              w-1/3 h-full border-r ${isDark ? "border-gray-700" : "border-gray-200"}
               ${isDark ? "bg-gray-800/50" : "bg-gray-50"} overflow-y-auto
             `}
             >
-              <div className="p-4">
+              <div className="p-3">
                 <h3
                   className={`
-                  text-sm font-semibold mb-3
+                  text-sm font-semibold mb-2
                   ${isDark ? "text-gray-200" : "text-gray-800"}
                 `}
                 >
                   TÜM KATEGORİLER
                 </h3>
-                <div className="space-y-1">
+                <div className="space-y-0.5">
                   {buyerCategories.map((buyerCategory) => {
                     const CategoryIcon = buyerCategory.icon;
                     const isHovered = hoveredCategory === buyerCategory.key;
@@ -711,7 +711,7 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
                           setHoveredCategory(buyerCategory.key)
                         }
                         className={`
-                          w-full flex items-center space-x-3 p-3 rounded-lg
+                          w-full flex items-center space-x-2 py-2 px-2.5 rounded-lg
                           transition-all duration-200 text-left
                           ${
                             isHovered
@@ -725,19 +725,19 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
                         `}
                       >
                         <CategoryIcon
-                          size={18}
+                          size={16}
                           className={`
-                            transition-colors duration-200
+                            transition-colors duration-200 flex-shrink-0
                             ${isHovered ? "text-orange-500" : "text-current"}
                           `}
                         />
-                        <span className="text-sm font-medium flex-1">
+                        <span className="text-xs font-medium flex-1">
                           {buyerCategory.name}
                         </span>
                         <ChevronRight
-                          size={14}
+                          size={12}
                           className={`
-                            transition-colors duration-200
+                            transition-colors duration-200 flex-shrink-0
                             ${isDark ? "text-gray-500" : "text-gray-400"}
                           `}
                         />
@@ -749,7 +749,8 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
             </div>
 
             {/* Right side - Subcategories */}
-            <div className="w-2/3 p-4 min-h-[400px]">
+            <div className="w-2/3 h-full overflow-y-auto">
+              <div className="p-4">
               {hoveredCategory && (
                 <div>
                   {(() => {
@@ -923,7 +924,7 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
               {!hoveredCategory && (
                 <div
                   className={`
-                  flex items-center justify-center h-full
+                  flex items-center justify-center h-full min-h-[350px]
                   ${isDark ? "text-gray-500" : "text-gray-400"}
                 `}
                 >
@@ -933,6 +934,7 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
                   </div>
                 </div>
               )}
+              </div>
             </div>
           </div>
         </div>
