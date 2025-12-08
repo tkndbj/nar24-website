@@ -1872,7 +1872,9 @@
     "resendInSeconds": "Resend in {seconds}s",
     "sendingEmail": "Sending...",
     "resetEmailSent": "Password reset email sent! Please check your inbox.",
-    "resetEmailFailed": "Failed to send reset email. Please try again."
+    "resetEmailFailed": "Failed to send reset email. Please try again.",
+    "authTimeout": "Login is taking too long. Please check your connection and try again.",
+    "popupBlocked": "Popup was blocked. Please allow popups for this site and try again."
   },
   "Collection": {
     "collection": "Collection",

@@ -22,6 +22,9 @@ class TwoFactorService {
   private currentMethod: "totp" | "email" | null = null;
   private otpauthUri: string | null = null;
 
+  // Track if a flow is in progress to prevent concurrent operations
+  private isFlowInProgress = false;
+
   private constructor() {}
 
   public static getInstance(): TwoFactorService {
@@ -29,6 +32,11 @@ class TwoFactorService {
       TwoFactorService.instance = new TwoFactorService();
     }
     return TwoFactorService.instance;
+  }
+
+  // Check if a flow is currently in progress
+  public get isInProgress(): boolean {
+    return this.isFlowInProgress;
   }
 
   // Public getters
@@ -140,7 +148,10 @@ class TwoFactorService {
     const user = auth.currentUser;
     if (!user) throw new Error("User not authenticated");
 
+    // Reset any previous state before starting new flow
+    this.reset();
     this.currentType = "setup";
+    this.isFlowInProgress = true;
 
     try {
       const createTotpSecret = httpsCallable(
@@ -179,6 +190,7 @@ class TwoFactorService {
         const verifyTotp = httpsCallable(this.totpFunctions, "verifyTotp");
         await verifyTotp({ code });
         this.otpauthUri = null; // Sensitive cleanup
+        this.isFlowInProgress = false; // Flow completed
         return { success: true, message: "twoFactorEnabledSuccess" };
       } catch (error) {
         console.error("Error verifying TOTP:", error);
@@ -187,7 +199,11 @@ class TwoFactorService {
     }
 
     // Email flow for setup should use 'setup' as action
-    return await this.verifyEmail2FA(code, "setup");
+    const result = await this.verifyEmail2FA(code, "setup");
+    if (result.success) {
+      this.isFlowInProgress = false; // Flow completed
+    }
+    return result;
   }
 
   // LOGIN FLOW
@@ -195,7 +211,10 @@ class TwoFactorService {
     const user = auth.currentUser;
     if (!user) throw new Error("User not authenticated");
 
+    // Reset any previous state before starting new flow
+    this.reset();
     this.currentType = "login";
+    this.isFlowInProgress = true;
 
     if (await this.isTotpEnabled()) {
       this.currentMethod = "totp";
@@ -221,6 +240,7 @@ class TwoFactorService {
       try {
         const verifyTotp = httpsCallable(this.totpFunctions, "verifyTotp");
         await verifyTotp({ code });
+        this.isFlowInProgress = false; // Flow completed
         return { success: true, message: "twoFactorLoginSuccess" };
       } catch (error) {
         console.error("Error verifying TOTP:", error);
@@ -229,7 +249,11 @@ class TwoFactorService {
     }
 
     // For email verification during login, pass 'login' as action
-    return await this.verifyEmail2FA(code, "login");
+    const result = await this.verifyEmail2FA(code, "login");
+    if (result.success) {
+      this.isFlowInProgress = false; // Flow completed
+    }
+    return result;
   }
 
   // DISABLE FLOW
@@ -237,7 +261,10 @@ class TwoFactorService {
     const user = auth.currentUser;
     if (!user) throw new Error("User not authenticated");
 
+    // Reset any previous state before starting new flow
+    this.reset();
     this.currentType = "disable";
+    this.isFlowInProgress = true;
 
     if (await this.isTotpEnabled()) {
       this.currentMethod = "totp";
@@ -266,6 +293,7 @@ class TwoFactorService {
         const disableTotp = httpsCallable(this.totpFunctions, "disableTotp");
         await disableTotp({});
 
+        this.isFlowInProgress = false; // Flow completed
         return { success: true, message: "twoFactorDisabledSuccess" };
       } catch (error) {
         console.error("Error disabling TOTP:", error);
@@ -274,7 +302,11 @@ class TwoFactorService {
     }
 
     // Email flow for disable uses 'disable' as action
-    return await this.verifyEmail2FA(code, "disable");
+    const result = await this.verifyEmail2FA(code, "disable");
+    if (result.success) {
+      this.isFlowInProgress = false; // Flow completed
+    }
+    return result;
   }
 
   // RESEND
@@ -328,6 +360,7 @@ class TwoFactorService {
     this.currentType = null;
     this.currentMethod = null;
     this.otpauthUri = null;
+    this.isFlowInProgress = false;
   }
 
   // FALLBACK

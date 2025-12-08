@@ -1872,7 +1872,9 @@
     "resendInSeconds": "{seconds}s sonra tekrar gönder",
     "sendingEmail": "Gönderiliyor...",
     "resetEmailSent": "Şifre sıfırlama e-postası gönderildi! Lütfen gelen kutunuzu kontrol edin.",
-    "resetEmailFailed": "Sıfırlama e-postası gönderilemedi. Lütfen tekrar deneyin."
+    "resetEmailFailed": "Sıfırlama e-postası gönderilemedi. Lütfen tekrar deneyin.",
+    "authTimeout": "Giriş çok uzun sürüyor. Lütfen bağlantınızı kontrol edip tekrar deneyin.",
+    "popupBlocked": "Açılır pencere engellendi. Lütfen bu site için açılır pencerelere izin verin ve tekrar deneyin."
   },
   "Collection": {
     "collection": "Koleksiyon",

@@ -173,61 +173,86 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     }
   }, [user, internalFirebaseUser]);
 
-  // Initialize auth state listener
+  // Initialize auth state listener with proper race condition handling
   useEffect(() => {
     if (typeof window === "undefined") return;
-  
+
+    // Track the current auth operation to prevent race conditions
+    let currentAuthOperationId = 0;
+    let isMounted = true;
+
     const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
+      // Increment operation ID to track this specific auth state change
+      const operationId = ++currentAuthOperationId;
+
       if (firebaseUser) {
+        // Immediately set internal user (synchronous)
         setInternalFirebaseUser(firebaseUser);
-  
-        const needs2FA = await check2FARequirement(firebaseUser);
-  
-        if (needs2FA) {
-          setPending2FA(true);
-          setUser(null);
-        } else {
-          setUser(firebaseUser);
-          setPending2FA(false);
-        }
-  
-        // ✅ Only sync analyticsBatcher (userActivityService syncs itself)
         analyticsBatcher.setCurrentUserId(firebaseUser.uid);
-  
-        // Fetch profile data
+
+        // Perform async operations with stale check
         try {
+          const needs2FA = await check2FARequirement(firebaseUser);
+
+          // Check if this operation is still current (no newer auth state change occurred)
+          if (!isMounted || operationId !== currentAuthOperationId) {
+            return; // Stale operation - discard results
+          }
+
+          if (needs2FA) {
+            setPending2FA(true);
+            setUser(null);
+          } else {
+            setUser(firebaseUser);
+            setPending2FA(false);
+          }
+
+          // Fetch profile data
           const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+
+          // Check again after async operation
+          if (!isMounted || operationId !== currentAuthOperationId) {
+            return; // Stale operation - discard results
+          }
+
           if (userDoc.exists()) {
             const data = userDoc.data();
             setProfileData(data);
             setIsAdmin(data.isAdmin === true);
           }
         } catch (error) {
-          console.error("Error fetching initial user data:", error);
+          // Only log error if this is still the current operation
+          if (isMounted && operationId === currentAuthOperationId) {
+            console.error("Error during auth state initialization:", error);
+          }
         }
       } else {
-        // User logged out
+        // User logged out - these are synchronous state updates
         setUser(null);
         setInternalFirebaseUser(null);
         setProfileData(null);
         setIsAdmin(false);
         setPending2FA(false);
-  
-        // ✅ Only clear analyticsBatcher (userActivityService clears itself)
+
         analyticsBatcher.setCurrentUserId(null);
-  
-        // Clear all caches on logout (existing)
+
+        // Clear all caches on logout
         cacheManager.clearAll();
         clearPreferenceProductsCache();
         requestDeduplicator.cancelAll();
         debouncer.cancelAll();
-        console.log("🧹 Cleared all caches and pending operations on logout");
       }
-  
-      setIsLoading(false);
+
+      // Only update loading state if this is still the current operation
+      if (isMounted && operationId === currentAuthOperationId) {
+        setIsLoading(false);
+      }
     });
-  
-    return () => unsubscribe();
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, [check2FARequirement]);
 
   useEffect(() => {

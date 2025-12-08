@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useRef, Suspense } from "react";
+import React, { useState, useEffect, useRef, Suspense, useCallback } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import {
   signInWithEmailAndPassword,
   signInWithPopup,
   GoogleAuthProvider,
   sendPasswordResetEmail,
+  AuthError,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import {
@@ -20,12 +21,27 @@ import {
   GlobeAltIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
-import { AuthError } from "firebase/auth";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { useTranslations, useLocale } from "next-intl";
 import TwoFactorService from "@/services/TwoFactorService";
-// 🔥 CRITICAL: Import useUser to properly handle 2FA state
 import { useUser } from "@/context/UserProvider";
+
+// Constants for timeouts
+const AUTH_TIMEOUT_MS = 30000; // 30 seconds timeout for auth operations
+
+// Helper to create a timeout promise
+const withTimeout = <T,>(
+  promise: Promise<T>,
+  ms: number,
+  errorMessage: string
+): Promise<T> => {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(errorMessage)), ms)
+    ),
+  ]);
+};
 
 // Create a separate component for the login content that uses useSearchParams
 function LoginContent() {
@@ -191,9 +207,13 @@ function LoginContent() {
   };
 
   // Check if user needs 2FA after successful login
-  const checkAndHandle2FA = async (): Promise<boolean> => {
+  const checkAndHandle2FA = useCallback(async (): Promise<boolean> => {
     try {
-      const needs2FA = await twoFactorService.is2FAEnabled();
+      const needs2FA = await withTimeout(
+        twoFactorService.is2FAEnabled(),
+        10000, // 10 second timeout for 2FA check
+        "2FA_CHECK_TIMEOUT"
+      );
 
       if (needs2FA) {
         setTwoFAPending(true);
@@ -211,10 +231,10 @@ function LoginContent() {
       setTwoFAPending(false);
       return true; // If error checking 2FA, proceed with login
     }
-  };
+  }, [twoFactorService, router]);
 
   // Handle email/password login
-  const handleLoginWithPassword = async (e: React.FormEvent) => {
+  const handleLoginWithPassword = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!email.trim()) {
@@ -237,13 +257,15 @@ function LoginContent() {
       return;
     }
 
+    // Reset TwoFactorService state before new login attempt
+    twoFactorService.reset();
     setIsLoading(true);
 
     try {
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        email.trim(),
-        password
+      const userCredential = await withTimeout(
+        signInWithEmailAndPassword(auth, email.trim(), password),
+        AUTH_TIMEOUT_MS,
+        "AUTH_TIMEOUT"
       );
       const user = userCredential.user;
 
@@ -284,9 +306,27 @@ function LoginContent() {
         }
       }
     } catch (error: unknown) {
-      let message = t("LoginPage.loginError");
+      // Always reset loading state on error
+      setIsLoading(false);
 
-      switch ((error as AuthError).code) {
+      let message = t("LoginPage.loginError");
+      const errorMessage = error instanceof Error ? error.message : "";
+      const authError = error as AuthError;
+
+      // Handle timeout error
+      if (errorMessage === "AUTH_TIMEOUT") {
+        message = t("LoginPage.authTimeout");
+        toast.error(message, {
+          style: {
+            borderRadius: "10px",
+            background: "#EF4444",
+            color: "#fff",
+          },
+        });
+        return;
+      }
+
+      switch (authError.code) {
         case "auth/user-not-found":
           message = t("LoginPage.userNotFound");
           break;
@@ -317,10 +357,12 @@ function LoginContent() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [email, password, t, twoFactorService, router, checkAndHandle2FA]);
 
   // Handle Google sign-in
-  const handleGoogleSignIn = async () => {
+  const handleGoogleSignIn = useCallback(async () => {
+    // Reset TwoFactorService state before new login attempt
+    twoFactorService.reset();
     setIsLoading(true);
 
     try {
@@ -329,7 +371,11 @@ function LoginContent() {
         prompt: "select_account",
       });
 
-      const result = await signInWithPopup(auth, provider);
+      const result = await withTimeout(
+        signInWithPopup(auth, provider),
+        AUTH_TIMEOUT_MS,
+        "AUTH_TIMEOUT"
+      );
       const user = result.user;
 
       if (user) {
@@ -351,30 +397,70 @@ function LoginContent() {
         // If 2FA is needed, user will be redirected to 2FA page
       }
     } catch (error: unknown) {
-      let message = t("LoginPage.googleLoginError");
+      // Always reset loading state on error
+      setIsLoading(false);
 
-      switch ((error as AuthError).code) {
-        case "auth/network-request-failed":
-          message = t("LoginPage.networkError");
-          break;
-        case "auth/account-exists-with-different-credential":
-          message = t("LoginPage.accountExistsWithDifferentCredential");
-          break;
-        case "auth/popup-closed-by-user":
-          return; // Don't show error for user-cancelled popup
+      const errorMessage = error instanceof Error ? error.message : "";
+      const authError = error as AuthError;
+
+      // Handle timeout error
+      if (errorMessage === "AUTH_TIMEOUT") {
+        toast.error(t("LoginPage.authTimeout"), {
+          style: {
+            borderRadius: "10px",
+            background: "#EF4444",
+            color: "#fff",
+          },
+        });
+        return;
       }
 
-      toast.error(message, {
-        style: {
-          borderRadius: "10px",
-          background: "#EF4444",
-          color: "#fff",
-        },
-      });
+      // Handle popup-specific errors silently or with appropriate messages
+      switch (authError.code) {
+        case "auth/popup-closed-by-user":
+        case "auth/cancelled-popup-request":
+          // User cancelled - don't show error
+          return;
+        case "auth/popup-blocked":
+          toast.error(t("LoginPage.popupBlocked"), {
+            style: {
+              borderRadius: "10px",
+              background: "#EF4444",
+              color: "#fff",
+            },
+          });
+          return;
+        case "auth/network-request-failed":
+          toast.error(t("LoginPage.networkError"), {
+            style: {
+              borderRadius: "10px",
+              background: "#EF4444",
+              color: "#fff",
+            },
+          });
+          return;
+        case "auth/account-exists-with-different-credential":
+          toast.error(t("LoginPage.accountExistsWithDifferentCredential"), {
+            style: {
+              borderRadius: "10px",
+              background: "#EF4444",
+              color: "#fff",
+            },
+          });
+          return;
+        default:
+          toast.error(t("LoginPage.googleLoginError"), {
+            style: {
+              borderRadius: "10px",
+              background: "#EF4444",
+              color: "#fff",
+            },
+          });
+      }
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [t, twoFactorService, router, checkAndHandle2FA]);
 
   // Resend verification email
   const resendVerificationCode = async () => {
