@@ -1,0 +1,14 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "TEAM_ID.com.ects.nar24",
+        "paths": [
+          "/productdetail/*",
+          "/shared-favorites/*"
+        ]
+      }
+    ]
+  }
+}
