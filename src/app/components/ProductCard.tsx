@@ -139,41 +139,43 @@ const hasSelectableOptionsForCart = (product: Product | null): boolean => {
   return selectableAttrs.length > 0;
 };
 
-// ✅ Enhanced image preloader with caching
+// ✅ Enhanced image preloader with caching and stable state management
 const useImagePreloader = (urls: string[]) => {
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
+  const preloadedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!urls.length) return;
 
-    const preloadImages = async () => {
-      const promises = urls.map((url) => {
-        return new Promise<{ url: string; success: boolean }>((resolve) => {
-          const img = new window.Image();
-          img.onload = () => resolve({ url, success: true });
-          img.onerror = () => resolve({ url, success: false });
-          img.src = url;
+    // Filter out already processed URLs to avoid redundant work
+    const urlsToProcess = urls.filter(
+      (url) => !preloadedRef.current.has(url)
+    );
+
+    if (urlsToProcess.length === 0) return;
+
+    urlsToProcess.forEach((url) => {
+      // Mark as being processed
+      preloadedRef.current.add(url);
+
+      const img = new window.Image();
+      img.onload = () => {
+        setLoadedImages((prev) => {
+          const next = new Set(prev);
+          next.add(url);
+          return next;
         });
-      });
-
-      const results = await Promise.all(promises);
-      const loaded = new Set<string>();
-      const failed = new Set<string>();
-
-      results.forEach(({ url, success }) => {
-        if (success) {
-          loaded.add(url);
-        } else {
-          failed.add(url);
-        }
-      });
-
-      setLoadedImages(loaded);
-      setFailedImages(failed);
-    };
-
-    preloadImages();
+      };
+      img.onerror = () => {
+        setFailedImages((prev) => {
+          const next = new Set(prev);
+          next.add(url);
+          return next;
+        });
+      };
+      img.src = url;
+    });
   }, [urls]);
 
   return { loadedImages, failedImages };
@@ -521,6 +523,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
   >(selectedColor || null);
   const [isHovered, setIsHovered] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const [showEnlargedImage, setShowEnlargedImage] = useState(false);
   const [enlargedImagePosition, setEnlargedImagePosition] = useState<{
     top: number;
@@ -662,6 +665,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
   useEffect(() => {
     setCurrentImageIndex(0);
     setImageError(false);
+    setImageLoaded(false);
   }, [internalSelectedColor, selectedColor]);
 
   // Update internal selected color when prop changes
@@ -1144,8 +1148,18 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
   }, [currentImageUrls.length, currentImageIndex]);
 
   const currentImageUrl = currentImageUrls[currentImageIndex];
-  const isImageLoaded = currentImageUrl && loadedImages.has(currentImageUrl);
+  // Use failedImages from preloader as a hint, but rely on the Image component's own error handling
   const isImageFailed = currentImageUrl && failedImages.has(currentImageUrl);
+
+  // Reset imageLoaded state when currentImageUrl changes
+  const prevImageUrlRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (prevImageUrlRef.current !== currentImageUrl) {
+      setImageLoaded(false);
+      setImageError(false);
+      prevImageUrlRef.current = currentImageUrl;
+    }
+  }, [currentImageUrl]);
 
   const cartButtonContent = getCartButtonContent();
   const favoriteButtonContent = getFavoriteButtonContent();
@@ -1175,30 +1189,43 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
             onMouseEnter={handleImageHover}
             onMouseLeave={handleImageLeave}
           >
-            <div className="w-full h-full rounded-t-xl overflow-hidden bg-gray-200 relative">
-              {currentImageUrls.length > 0 ? (
+            <div className="w-full h-full rounded-t-xl overflow-hidden relative">
+              {currentImageUrls.length > 0 && currentImageUrl ? (
                 <div className="relative w-full h-full">
-                  <div className="relative w-full h-full">
-                    {isImageLoaded && !imageError ? (
-                      <Image
-                        src={currentImageUrl}
-                        alt={product.productName}
-                        fill
-                        className="object-cover transition-opacity duration-300"
-                        onError={() => setImageError(true)}
-                        sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
-                        priority={currentImageIndex === 0}
-                      />
-                    ) : isImageFailed || imageError ? (
-                      <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                        <ImageOff size={32} className="text-gray-400" />
-                      </div>
+                  {/* Background placeholder - always visible until image loads */}
+                  <div
+                    className={`absolute inset-0 flex items-center justify-center bg-gray-100 transition-opacity duration-300 ${
+                      imageLoaded && !imageError ? 'opacity-0' : 'opacity-100'
+                    }`}
+                    style={{ zIndex: 1 }}
+                  >
+                    {imageError || isImageFailed ? (
+                      <ImageOff size={32} className="text-gray-400" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                        <LogoPlaceholder size={80} />
-                      </div>
+                      <LogoPlaceholder size={80} />
                     )}
                   </div>
+
+                  {/* Main image - always rendered, uses opacity for smooth transition */}
+                  {!imageError && !isImageFailed && (
+                    <Image
+                      key={currentImageUrl}
+                      src={currentImageUrl}
+                      alt={product.productName}
+                      fill
+                      className={`object-cover transition-opacity duration-300 ${
+                        imageLoaded ? 'opacity-100' : 'opacity-0'
+                      }`}
+                      style={{ zIndex: 2 }}
+                      onLoad={() => setImageLoaded(true)}
+                      onError={() => {
+                        setImageError(true);
+                        setImageLoaded(false);
+                      }}
+                      sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
+                      priority={currentImageIndex === 0}
+                    />
+                  )}
 
                   {/* Navigation buttons */}
                   {currentImageUrls.length > 1 && !isFantasy && (
@@ -1207,6 +1234,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
                         className={`absolute left-2 top-1/2 transform -translate-y-1/2 w-8 h-8 bg-black bg-opacity-50 rounded-full flex items-center justify-center text-white transition-opacity duration-150 ${
                           isHovered ? "opacity-100" : "opacity-0"
                         }`}
+                        style={{ zIndex: 5 }}
                         onClick={handlePrevImage}
                       >
                         <ChevronLeft size={16} />
@@ -1215,6 +1243,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
                         className={`absolute right-2 top-1/2 transform -translate-y-1/2 w-8 h-8 bg-black bg-opacity-50 rounded-full flex items-center justify-center text-white transition-opacity duration-150 ${
                           isHovered ? "opacity-100" : "opacity-0"
                         }`}
+                        style={{ zIndex: 5 }}
                         onClick={handleNextImage}
                       >
                         <ChevronRight size={16} />
@@ -1229,13 +1258,17 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
                       style={{
                         backdropFilter: "blur(15px)",
                         WebkitBackdropFilter: "blur(15px)",
+                        zIndex: 3,
                       }}
                     />
                   )}
 
                   {/* +18 Label for fantasy products */}
                   {isFantasy && (
-                    <div className="absolute inset-0 flex items-center justify-center">
+                    <div
+                      className="absolute inset-0 flex items-center justify-center"
+                      style={{ zIndex: 4 }}
+                    >
                       <div
                         className="px-6 py-3 bg-red-600/90 rounded-xl border-2 border-white"
                         style={{
@@ -1256,7 +1289,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
                   )}
                 </div>
               ) : (
-                <div className="w-full h-full flex items-center justify-center">
+                <div className="w-full h-full flex items-center justify-center bg-gray-100">
                   <LogoPlaceholder size={80} />
                 </div>
               )}
