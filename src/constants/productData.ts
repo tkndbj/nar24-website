@@ -997,7 +997,7 @@ export class AllInOneCategoryData {
         ],
         "Home Appliances": [
           "Kitchen Appliances",
-          "Home Appliances",
+          "White Goods",
           "Air Conditioning",
           "Heating",
         ],
@@ -3560,8 +3560,8 @@ export class AllInOneCategoryData {
                   l10n.subSubcategoryKitchenAppliancesElectronics ??
                   "Kitchen Appliances"
                 );
-              case "Home Appliances":
-                return l10n.subcategoryHomeAppliances ?? "Home Appliances";
+              case "White Goods":
+                return l10n.subSubcategoryWhiteGoods ?? "White Goods";
               case "Air Conditioning":
                 return l10n.subSubcategoryAirConditioning ?? "Air Conditioning";
               case "Heating":
