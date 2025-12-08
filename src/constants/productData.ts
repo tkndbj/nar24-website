@@ -5320,6 +5320,8 @@ export class AllInOneCategoryData {
         return l10n.categoryAutomotive ?? "Automotive";
       case "Health & Wellness":
         return l10n.categoryHealthWellness ?? "Health & Wellness";
+      case "Flowers & Gifts":
+        return l10n.categoryFlowersGifts ?? "Flowers & Gifts";
       default:
         return rawKey;
     }

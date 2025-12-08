@@ -656,9 +656,9 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
         <div
           ref={categoriesMenuRef}
           className={`
-            fixed min-h-[400px] max-h-[600px] overflow-y-auto z-[9999]
+            fixed min-h-[400px] max-h-[600px] z-[9999]
             ${isDark ? "bg-gray-900" : "bg-white"}
-            border-b border-l border-r 
+            border-b border-l border-r
             ${isDark ? "border-gray-700" : "border-gray-200"}
             shadow-2xl backdrop-blur-xl
             overflow-hidden rounded-b-lg
@@ -681,12 +681,12 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
           onMouseEnter={handleMenuMouseEnter}
           onMouseLeave={handleMenuMouseLeave}
         >
-          <div className="flex h-full">
+          <div className="flex h-full min-h-[400px]">
             {/* Left side - Main categories */}
             <div
               className={`
               w-1/3 border-r ${isDark ? "border-gray-700" : "border-gray-200"}
-              ${isDark ? "bg-gray-800/50" : "bg-gray-50"}
+              ${isDark ? "bg-gray-800/50" : "bg-gray-50"} overflow-y-auto
             `}
             >
               <div className="p-4">
@@ -749,7 +749,7 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
             </div>
 
             {/* Right side - Subcategories */}
-            <div className="w-2/3 p-4">
+            <div className="w-2/3 p-4 min-h-[400px]">
               {hoveredCategory && (
                 <div>
                   {(() => {
