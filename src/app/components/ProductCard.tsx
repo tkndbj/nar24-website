@@ -149,9 +149,7 @@ const useImagePreloader = (urls: string[]) => {
     if (!urls.length) return;
 
     // Filter out already processed URLs to avoid redundant work
-    const urlsToProcess = urls.filter(
-      (url) => !preloadedRef.current.has(url)
-    );
+    const urlsToProcess = urls.filter((url) => !preloadedRef.current.has(url));
 
     if (urlsToProcess.length === 0) return;
 
@@ -582,7 +580,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
   ]);
 
   // Preload all images
-  const { loadedImages, failedImages } = useImagePreloader(currentImageUrls);
+  const { failedImages } = useImagePreloader(currentImageUrls);
 
   // ✅ Cache product on mount (matches Flutter's ProductDetailProvider pattern)
   useEffect(() => {
@@ -1195,7 +1193,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
                   {/* Background placeholder - always visible until image loads */}
                   <div
                     className={`absolute inset-0 flex items-center justify-center bg-gray-100 transition-opacity duration-300 ${
-                      imageLoaded && !imageError ? 'opacity-0' : 'opacity-100'
+                      imageLoaded && !imageError ? "opacity-0" : "opacity-100"
                     }`}
                     style={{ zIndex: 1 }}
                   >
@@ -1214,7 +1212,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
                       alt={product.productName}
                       fill
                       className={`object-cover transition-opacity duration-300 ${
-                        imageLoaded ? 'opacity-100' : 'opacity-0'
+                        imageLoaded ? "opacity-100" : "opacity-0"
                       }`}
                       style={{ zIndex: 2 }}
                       onLoad={() => setImageLoaded(true)}
