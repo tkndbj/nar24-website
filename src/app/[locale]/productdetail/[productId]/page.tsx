@@ -49,7 +49,12 @@ import { useLocale } from "next-intl";
 import ProductDetailActionsRow from "../../../components/product_detail/ProductDetailActionsRow";
 import DynamicAttributesWidget from "../../../components/product_detail/DynamicAttributesWidget";
 import ProductDetailSellerInfo from "../../../components/product_detail/SellerInfo";
-import ProductOptionSelector from "@/app/components/ProductOptionSelector";
+import dynamic from "next/dynamic";
+
+const ProductOptionSelector = dynamic(
+  () => import("@/app/components/ProductOptionSelector"),
+  { ssr: false }
+);
 import { useCart } from "@/context/CartProvider";
 import { useUser } from "@/context/UserProvider";
 import { useFavorites } from "@/context/FavoritesProvider";

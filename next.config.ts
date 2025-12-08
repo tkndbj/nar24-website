@@ -12,23 +12,33 @@ const nextConfig: NextConfig = {
         pathname: "/**",
       },
     ],
-    // ✅ Image optimization settings
-    formats: ["image/webp", "image/avif"], // Modern formats for better compression
-    deviceSizes: [640, 750, 828, 1080, 1200, 1920], // Responsive sizes
-    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384], // Icon/small image sizes
-    minimumCacheTTL: 60 * 60 * 24 * 30, // Cache for 30 days
-    dangerouslyAllowSVG: false, // Security: block SVG uploads
+    formats: ["image/webp", "image/avif"],
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+    minimumCacheTTL: 60 * 60 * 24 * 30,
+    dangerouslyAllowSVG: false,
   },
-  // ✅ Compiler optimizations
   compiler: {
     removeConsole: process.env.NODE_ENV === "production" ? {
-      exclude: ["error", "warn"], // Keep error/warn logs in production
+      exclude: ["error", "warn"],
     } : false,
   },
-  // ✅ Production optimizations
-  swcMinify: true, // Use SWC for faster minification
-  poweredByHeader: false, // Remove X-Powered-By header for security
-  reactStrictMode: true, // Enable React strict mode
+  experimental: {
+    optimizePackageImports: [
+      "firebase",
+      "firebase/app",
+      "firebase/auth",
+      "firebase/firestore",
+      "firebase/storage",
+      "firebase/functions",
+      "@heroicons/react",
+      "lucide-react",
+      "framer-motion",
+      "date-fns",
+    ],
+  },
+  poweredByHeader: false,
+  reactStrictMode: true,
 };
 
 export default withNextIntl(nextConfig);

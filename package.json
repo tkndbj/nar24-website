@@ -8,6 +8,14 @@
     "start": "next start",
     "lint": "next lint"
   },
+  "browserslist": [
+    "Chrome >= 92",
+    "Firefox >= 90",
+    "Safari >= 15.4",
+    "Edge >= 92",
+    "iOS >= 15.4",
+    "not dead"
+  ],
   "dependencies": {
     "@heroicons/react": "^2.2.0",
     "@types/google.maps": "^3.58.1",

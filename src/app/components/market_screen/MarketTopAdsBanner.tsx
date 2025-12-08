@@ -73,29 +73,14 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
     setIsClient(true);
   }, []);
 
-  // ✅ RESTORED: Original design dimensions
-  const screenInfo = useMemo(() => {
+  // Screen size detection for conditional rendering (arrows, sizes)
+  const isLargerScreen = useMemo(() => {
     if (typeof window === "undefined" || !isClient) {
-      return { isLarger: false, bannerHeight: 220 };
+      return false;
     }
-
     const { innerWidth, innerHeight } = window;
     const shortestSide = Math.min(innerWidth, innerHeight);
-    const isLarger = shortestSide >= 600 || innerWidth >= 900;
-
-    let bannerHeight = 220; // Default height
-    if (!isLarger) {
-      bannerHeight = 150;
-    } else {
-      const isPortrait = innerHeight > innerWidth;
-      if (isPortrait) {
-        bannerHeight = Math.max(300, Math.min(350, innerWidth * 0.4));
-      } else {
-        bannerHeight = Math.max(300, Math.min(350, innerHeight * 0.5));
-      }
-    }
-
-    return { isLarger, bannerHeight };
+    return shortestSide >= 600 || innerWidth >= 900;
   }, [isClient]);
 
   // ✅ OPTIMIZED: Background color handler with localStorage caching
@@ -328,17 +313,14 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
     };
   }, []);
 
-  // ✅ RESTORED: Loading skeleton with original design
+  // Loading skeleton with CSS-based responsive height (prevents CLS)
   if (isLoading || banners.length === 0) {
     return (
       <div
-        className="w-full bg-gray-200 flex items-center justify-center animate-pulse"
-        style={{ height: screenInfo.bannerHeight }}
+        className="w-full bg-gray-200 flex items-center justify-center animate-pulse h-[150px] min-[600px]:h-[300px] lg:h-[350px]"
       >
         <div
-          className={`bg-gray-300 rounded-full ${
-            screenInfo.isLarger ? "w-10 h-10" : "w-8 h-8"
-          }`}
+          className="bg-gray-300 rounded-full w-8 h-8 min-[600px]:w-10 min-[600px]:h-10"
         />
       </div>
     );
@@ -346,8 +328,7 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
 
   return (
     <div
-      className="relative w-full overflow-hidden"
-      style={{ height: screenInfo.bannerHeight }}
+      className="relative w-full overflow-hidden h-[150px] min-[600px]:h-[300px] lg:h-[350px]"
     >
       {/* Banner Container */}
       <div
@@ -380,7 +361,7 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
                   fill
                   className="object-fill"
                   priority={index === 0}
-                  sizes={screenInfo.isLarger ? "90vw" : "100vw"}
+                  sizes="(min-width: 600px) 90vw, 100vw"
                   quality={isActive ? 85 : 75}
                   loading={index === 0 ? "eager" : "lazy"}
                   onError={() => handleImageError(index)}
@@ -389,9 +370,7 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
                 // Error placeholder
                 <div className="absolute inset-0 bg-gray-200 flex items-center justify-center">
                   <svg
-                    className={`text-gray-400 ${
-                      screenInfo.isLarger ? "w-8 h-8" : "w-6 h-6"
-                    }`}
+                    className="text-gray-400 w-6 h-6 min-[600px]:w-8 min-[600px]:h-8"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -415,18 +394,22 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
         })}
       </div>
 
-      {/* Navigation Dots */}
+      {/* Navigation Dots - using transform for GPU-accelerated animations */}
       {banners.length > 1 && (
         <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2 z-10">
           {banners.map((_, index) => (
             <button
               key={index}
               onClick={() => goToSlide(index)}
-              className={`transition-all duration-200 ${
+              className={`h-2 rounded-full transition-all duration-200 ${
                 index === currentIndex
-                  ? "w-6 h-2 bg-white rounded-full shadow-lg"
-                  : "w-2 h-2 bg-white/50 hover:bg-white/75 rounded-full"
+                  ? "w-6 bg-white shadow-lg"
+                  : "w-2 bg-white/50 hover:bg-white/75"
               }`}
+              style={{
+                transform: index === currentIndex ? 'scaleX(1)' : 'scaleX(1)',
+                willChange: 'transform, opacity'
+              }}
               aria-label={`Go to slide ${index + 1}`}
             />
           ))}
@@ -434,7 +417,7 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
       )}
 
       {/* Navigation Arrows for Desktop */}
-      {banners.length > 1 && screenInfo.isLarger && (
+      {banners.length > 1 && isLargerScreen && (
         <>
           <button
             onClick={goToPrevious}

@@ -27,7 +27,12 @@ import { useTranslations } from "next-intl";
 import { useCart } from "@/context/CartProvider";
 import { useFavorites } from "@/context/FavoritesProvider";
 import { useUser } from "@/context/UserProvider";
-import ProductOptionSelector from "@/app/components/ProductOptionSelector";
+import dynamic from "next/dynamic";
+
+const ProductOptionSelector = dynamic(
+  () => import("@/app/components/ProductOptionSelector"),
+  { ssr: false }
+);
 import { Product } from "@/app/models/Product";
 import { analyticsBatcher } from "@/app/utils/analyticsBatcher";
 import { useProductCache } from "@/context/ProductCacheProvider";

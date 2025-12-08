@@ -5,7 +5,12 @@ import { Heart, Star, StarHalf, Shield, Truck, Award} from "lucide-react";
 import { useFavorites } from "@/context/FavoritesProvider";
 import { useTranslations } from "next-intl";
 
-import ProductOptionSelector from "@/app/components/ProductOptionSelector";
+import dynamic from "next/dynamic";
+
+const ProductOptionSelector = dynamic(
+  () => import("@/app/components/ProductOptionSelector"),
+  { ssr: false }
+);
 import { Product } from "@/app/models/Product";
 
 interface ProductDetailActionsRowProps {

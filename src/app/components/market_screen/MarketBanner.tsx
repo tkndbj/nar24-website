@@ -21,26 +21,26 @@ interface MarketBannerItem {
   id: string;
 }
 
-// Shimmer loading component
+// Shimmer loading component with fixed aspect ratio to prevent CLS
 const ShimmerCard = ({ isDarkMode }: { isDarkMode: boolean }) => {
   return (
     <div
-      className={`animate-pulse rounded-none lg:rounded-lg overflow-hidden ${
+      className={`animate-pulse rounded-none lg:rounded-lg overflow-hidden aspect-[2.5/1] ${
         isDarkMode ? "bg-gray-800" : "bg-gray-300"
       }`}
     >
       <div
-        className={`h-40 w-full ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`}
+        className={`h-full w-full ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`}
       ></div>
     </div>
   );
 };
 
-// Error placeholder component
+// Error placeholder component with fixed aspect ratio
 const ErrorCard = ({ isDarkMode }: { isDarkMode: boolean }) => {
   return (
     <div
-      className={`h-40 w-full rounded-none lg:rounded-lg flex items-center justify-center ${
+      className={`aspect-[2.5/1] w-full rounded-none lg:rounded-lg flex items-center justify-center ${
         isDarkMode ? "bg-gray-800" : "bg-gray-200"
       }`}
     >
@@ -361,7 +361,7 @@ export default function MarketBannerGrid() {
                     {imageErrors.has(banner.id) ? (
                       <ErrorCard isDarkMode={isDarkMode} />
                     ) : (
-                      <div className="relative w-full h-40">
+                      <div className="relative w-full aspect-[2.5/1]">
                         <NextImage
                           src={banner.url}
                           alt={`Banner ${banner.id}`}
