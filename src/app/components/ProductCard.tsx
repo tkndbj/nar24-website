@@ -139,45 +139,6 @@ const hasSelectableOptionsForCart = (product: Product | null): boolean => {
   return selectableAttrs.length > 0;
 };
 
-// ✅ Enhanced image preloader with caching and stable state management
-const useImagePreloader = (urls: string[]) => {
-  const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
-  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
-  const preloadedRef = useRef<Set<string>>(new Set());
-
-  useEffect(() => {
-    if (!urls.length) return;
-
-    // Filter out already processed URLs to avoid redundant work
-    const urlsToProcess = urls.filter((url) => !preloadedRef.current.has(url));
-
-    if (urlsToProcess.length === 0) return;
-
-    urlsToProcess.forEach((url) => {
-      // Mark as being processed
-      preloadedRef.current.add(url);
-
-      const img = new window.Image();
-      img.onload = () => {
-        setLoadedImages((prev) => {
-          const next = new Set(prev);
-          next.add(url);
-          return next;
-        });
-      };
-      img.onerror = () => {
-        setFailedImages((prev) => {
-          const next = new Set(prev);
-          next.add(url);
-          return next;
-        });
-      };
-      img.src = url;
-    });
-  }, [urls]);
-
-  return { loadedImages, failedImages };
-};
 
 // ✅ Optimized rotating text component
 interface RotatingTextProps {
@@ -521,7 +482,6 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
   >(selectedColor || null);
   const [isHovered, setIsHovered] = useState(false);
   const [imageError, setImageError] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
   const [showEnlargedImage, setShowEnlargedImage] = useState(false);
   const [enlargedImagePosition, setEnlargedImagePosition] = useState<{
     top: number;
@@ -579,8 +539,6 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
     product.imageUrls,
   ]);
 
-  // Preload all images
-  const { failedImages } = useImagePreloader(currentImageUrls);
 
   // ✅ Cache product on mount (matches Flutter's ProductDetailProvider pattern)
   useEffect(() => {
@@ -663,7 +621,6 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
   useEffect(() => {
     setCurrentImageIndex(0);
     setImageError(false);
-    setImageLoaded(false);
   }, [internalSelectedColor, selectedColor]);
 
   // Update internal selected color when prop changes
@@ -1146,18 +1103,6 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
   }, [currentImageUrls.length, currentImageIndex]);
 
   const currentImageUrl = currentImageUrls[currentImageIndex];
-  // Use failedImages from preloader as a hint, but rely on the Image component's own error handling
-  const isImageFailed = currentImageUrl && failedImages.has(currentImageUrl);
-
-  // Reset imageLoaded state when currentImageUrl changes
-  const prevImageUrlRef = useRef<string | undefined>(undefined);
-  useEffect(() => {
-    if (prevImageUrlRef.current !== currentImageUrl) {
-      setImageLoaded(false);
-      setImageError(false);
-      prevImageUrlRef.current = currentImageUrl;
-    }
-  }, [currentImageUrl]);
 
   const cartButtonContent = getCartButtonContent();
   const favoriteButtonContent = getFavoriteButtonContent();
@@ -1187,42 +1132,27 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
             onMouseEnter={handleImageHover}
             onMouseLeave={handleImageLeave}
           >
-            <div className="w-full h-full rounded-t-xl overflow-hidden relative">
+            <div className="w-full h-full rounded-t-xl overflow-hidden relative bg-gray-100">
               {currentImageUrls.length > 0 && currentImageUrl ? (
                 <div className="relative w-full h-full">
-                  {/* Background placeholder - always visible until image loads */}
-                  <div
-                    className={`absolute inset-0 flex items-center justify-center bg-gray-100 transition-opacity duration-300 ${
-                      imageLoaded && !imageError ? "opacity-0" : "opacity-100"
-                    }`}
-                    style={{ zIndex: 1 }}
-                  >
-                    {imageError || isImageFailed ? (
-                      <ImageOff size={32} className="text-gray-400" />
-                    ) : (
-                      <LogoPlaceholder size={80} />
-                    )}
-                  </div>
-
-                  {/* Main image - always rendered, uses opacity for smooth transition */}
-                  {!imageError && !isImageFailed && (
+                  {/* Main image - always rendered */}
+                  {!imageError ? (
                     <Image
                       key={currentImageUrl}
                       src={currentImageUrl}
                       alt={product.productName}
                       fill
-                      className={`object-cover transition-opacity duration-300 ${
-                        imageLoaded ? "opacity-100" : "opacity-0"
-                      }`}
-                      style={{ zIndex: 2 }}
-                      onLoad={() => setImageLoaded(true)}
-                      onError={() => {
-                        setImageError(true);
-                        setImageLoaded(false);
-                      }}
+                      className="object-cover"
+                      onError={() => setImageError(true)}
                       sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
                       priority={currentImageIndex === 0}
+                      placeholder="blur"
+                      blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFgABAQEAAAAAAAAAAAAAAAAAAAUH/8QAIhAAAQMDBAMBAAAAAAAAAAAAAQIDBAAFEQYSITEHE0FR/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAZEQACAwEAAAAAAAAAAAAAAAABAgADESH/2gAMAwEAAhEDEEA/AJOg9R3nTFyhXKwzo0GfBktvxZDYJU260oKQoA9EEA4PBGa1y3+T/I0S1wYMW7OtxosdmMyhKEhKUIQEgDjrgCulKMrLF9nqy3wrf//Z"
                     />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <ImageOff size={32} className="text-gray-400" />
+                    </div>
                   )}
 
                   {/* Navigation buttons */}
