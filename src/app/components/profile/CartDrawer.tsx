@@ -303,6 +303,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
         "isOptimistic",
         "selectedColorImage",
         "salePreferences",
+        "salePreferenceInfo",
         "sellerContactNo",
         "ourComission",
         "unitPrice",
@@ -312,40 +313,44 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
         "showSellerHeader",
       ];
 
-      const attributes: Record<string, unknown> = {};
+      const displayValues: string[] = [];
 
+      // Handle selected color from cartData
+      if (
+        item.cartData?.selectedColor &&
+        item.cartData.selectedColor !== "default"
+      ) {
+        displayValues.push(item.cartData.selectedColor);
+      }
+
+      // Handle selected size from cartData
+      if (item.cartData?.selectedSize) {
+        displayValues.push(item.cartData.selectedSize);
+      }
+
+      // Process other attributes - only include primitive values (string/number)
       Object.entries(item).forEach(([key, value]) => {
         if (
           !excludedKeys.includes(key) &&
           value !== undefined &&
           value !== null &&
           value !== "" &&
-          typeof value !== "boolean"
+          typeof value !== "boolean" &&
+          typeof value !== "object" && // Skip objects and arrays
+          !Array.isArray(value)
         ) {
-          attributes[key] = value;
-        }
-      });
-
-      // Handle selected color
-      if (
-        item.cartData?.selectedColor &&
-        item.cartData.selectedColor !== "default"
-      ) {
-        attributes["selectedColor"] = item.cartData.selectedColor;
-      }
-
-      if (Object.keys(attributes).length === 0) return "";
-
-      const displayValues: string[] = [];
-      Object.entries(attributes).forEach(([key, value]) => {
-        const localizedValue =
-          AttributeLocalizationUtils.getLocalizedAttributeValue(
-            key,
-            value,
-            localization
-          );
-        if (localizedValue.trim() !== "") {
-          displayValues.push(localizedValue);
+          // Only include string or number values
+          if (typeof value === "string" || typeof value === "number") {
+            const localizedValue =
+              AttributeLocalizationUtils.getLocalizedAttributeValue(
+                key,
+                value,
+                localization
+              );
+            if (localizedValue.trim() !== "" && !displayValues.includes(localizedValue)) {
+              displayValues.push(localizedValue);
+            }
+          }
         }
       });
 
