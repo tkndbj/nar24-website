@@ -539,7 +539,7 @@ export default function CreateShopPage() {
         className={`min-h-screen transition-colors duration-300 ${
           isDarkMode
             ? "bg-gray-900"
-            : "bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/20"
+            : "bg-gray-50"
         }`}
       >
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
