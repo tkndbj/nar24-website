@@ -25,7 +25,6 @@
     "date-fns": "^4.1.0",
     "firebase": "^11.10.0",
     "firebase-admin": "^13.4.0",
-    "framer-motion": "^12.18.0",
     "lucide-react": "^0.514.0",
     "lz-string": "^1.5.0",
     "next": "15.3.6",

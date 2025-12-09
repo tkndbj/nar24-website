@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   X,
   Plus,
@@ -992,176 +991,198 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
   }, [currentProduct.quantity, currentProduct.colorQuantities]);
 
   // ============================================================================
+  // ANIMATION STATE FOR CSS TRANSITIONS
+  // ============================================================================
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [shouldRender, setShouldRender] = useState(false);
+  const backdropRef = useRef<HTMLDivElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  // Handle open/close animations
+  useEffect(() => {
+    if (isOpen) {
+      setShouldRender(true);
+      // Small delay to ensure DOM is ready for animation
+      requestAnimationFrame(() => {
+        setIsAnimating(true);
+      });
+    } else if (shouldRender) {
+      setIsAnimating(false);
+      // Wait for exit animation to complete before unmounting
+      const timer = setTimeout(() => {
+        setShouldRender(false);
+      }, 250); // Match exit animation duration
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, shouldRender]);
+
+  // ============================================================================
   // MAIN RENDER
   // ============================================================================
   if (!user) return null;
 
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 z-[9998] bg-black/50"
-          />
+  if (!shouldRender) return null;
 
-          {/* Modal */}
-          <motion.div
-            initial={{ opacity: 0, y: 100 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 100 }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed inset-x-0 bottom-0 z-[9999] max-h-[90vh]"
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        ref={backdropRef}
+        onClick={onClose}
+        className={`fixed inset-0 z-[9998] bg-black/50 ${
+          isAnimating ? "modal-backdrop-enter" : "modal-backdrop-exit"
+        }`}
+      />
+
+      {/* Modal */}
+      <div
+        ref={modalRef}
+        className={`fixed inset-x-0 bottom-0 z-[9999] max-h-[90vh] ${
+          isAnimating ? "modal-content-enter" : "modal-content-exit"
+        }`}
+      >
+        <div
+          className={`rounded-t-2xl shadow-2xl max-w-lg mx-auto ${
+            isDarkMode ? "bg-gray-900" : "bg-white"
+          }`}
+        >
+          {/* Header */}
+          <div
+            className={`flex items-center justify-between p-4 border-b ${
+              isDarkMode ? "border-gray-700" : "border-gray-200"
+            }`}
           >
-            <div
-              className={`rounded-t-2xl shadow-2xl max-w-lg mx-auto ${
-                isDarkMode ? "bg-gray-900" : "bg-white"
+            <h2
+              className={`text-base font-semibold ${
+                isDarkMode ? "text-white" : "text-gray-900"
               }`}
             >
-              {/* Header */}
-              <div
-                className={`flex items-center justify-between p-4 border-b ${
-                  isDarkMode ? "border-gray-700" : "border-gray-200"
+              {t("selectOptions")}
+            </h2>
+            <button
+              onClick={onClose}
+              className={`p-1 rounded-full transition-colors ${
+                isDarkMode
+                  ? "hover:bg-gray-800 text-gray-400"
+                  : "hover:bg-gray-100 text-gray-500"
+              }`}
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Content */}
+          <div className="max-h-[60vh] overflow-y-auto">
+            {/* Loading state */}
+            {isLoadingProduct ? (
+              <LoadingShimmer isDarkMode={isDarkMode} />
+            ) : /* Error state */ loadError ? (
+              <div className="p-6 flex flex-col items-center">
+                <AlertCircle size={48} className="text-red-500 mb-4" />
+                <p
+                  className={`text-base font-medium text-center ${
+                    isDarkMode ? "text-gray-300" : "text-gray-600"
+                  }`}
+                >
+                  {loadError}
+                </p>
+              </div>
+            ) : /* Out of stock */ totalStock <= 0 ? (
+              <div className="p-6 flex flex-col items-center">
+                <div
+                  className={`p-3 rounded-full mb-4 ${
+                    isDarkMode ? "bg-gray-800" : "bg-gray-100"
+                  }`}
+                >
+                  <ShoppingBag size={32} className="text-gray-500" />
+                </div>
+                <p
+                  className={`text-base font-medium text-center ${
+                    isDarkMode ? "text-gray-300" : "text-gray-600"
+                  }`}
+                >
+                  {t("productOutOfStock")}
+                </p>
+              </div>
+            ) : (
+              /* Main content */
+              <div className="p-4">
+                {renderColorSelector()}
+
+                {Object.entries(getSelectableAttributes).map(
+                  ([key, options]) => renderAttributeSelector(key, options)
+                )}
+
+                {isCurtain
+                  ? renderCurtainDimensionsInput()
+                  : renderQuantitySelector()}
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          {!isLoadingProduct && !loadError && totalStock > 0 && (
+            <div
+              className={`p-4 border-t ${
+                isDarkMode ? "border-gray-700" : "border-gray-200"
+              }`}
+            >
+              <button
+                onClick={handleConfirm}
+                disabled={!isConfirmEnabled}
+                className={`
+                  w-full py-3 px-4 rounded-lg font-semibold transition-all duration-200 text-base
+                  ${
+                    isConfirmEnabled
+                      ? `${
+                          isDarkMode ? "text-white" : "text-white"
+                        } bg-orange-500 hover:bg-orange-600`
+                      : `${
+                          isDarkMode
+                            ? "bg-gray-700 text-gray-500"
+                            : "bg-gray-300 text-gray-500"
+                        } cursor-not-allowed`
+                  }
+                `}
+              >
+                {t("confirm")}
+              </button>
+
+              <button
+                onClick={onClose}
+                className={`w-full py-2 mt-2 text-sm transition-colors ${
+                  isDarkMode
+                    ? "text-gray-400 hover:text-gray-200"
+                    : "text-gray-600 hover:text-gray-800"
                 }`}
               >
-                <h2
-                  className={`text-base font-semibold ${
-                    isDarkMode ? "text-white" : "text-gray-900"
-                  }`}
-                >
-                  {t("selectOptions")}
-                </h2>
-                <button
-                  onClick={onClose}
-                  className={`p-1 rounded-full transition-colors ${
-                    isDarkMode
-                      ? "hover:bg-gray-800 text-gray-400"
-                      : "hover:bg-gray-100 text-gray-500"
-                  }`}
-                >
-                  <X size={20} />
-                </button>
-              </div>
-
-              {/* Content */}
-              <div className="max-h-[60vh] overflow-y-auto">
-                {/* ✅ LOADING STATE (matches Flutter shimmer) */}
-                {isLoadingProduct ? (
-                  <LoadingShimmer isDarkMode={isDarkMode} />
-                ) : /* ✅ ERROR STATE (matches Flutter error display) */ loadError ? (
-                  <div className="p-6 flex flex-col items-center">
-                    <AlertCircle size={48} className="text-red-500 mb-4" />
-                    <p
-                      className={`text-base font-medium text-center ${
-                        isDarkMode ? "text-gray-300" : "text-gray-600"
-                      }`}
-                    >
-                      {loadError}
-                    </p>
-                  </div>
-                ) : /* ✅ OUT OF STOCK (matches Flutter out of stock display) */ totalStock <=
-                  0 ? (
-                  <div className="p-6 flex flex-col items-center">
-                    <div
-                      className={`p-3 rounded-full mb-4 ${
-                        isDarkMode ? "bg-gray-800" : "bg-gray-100"
-                      }`}
-                    >
-                      <ShoppingBag size={32} className="text-gray-500" />
-                    </div>
-                    <p
-                      className={`text-base font-medium text-center ${
-                        isDarkMode ? "text-gray-300" : "text-gray-600"
-                      }`}
-                    >
-                      {t("productOutOfStock")}
-                    </p>
-                  </div>
-                ) : (
-                  /* ✅ MAIN CONTENT */
-                  <div className="p-4">
-                    {renderColorSelector()}
-
-                    {Object.entries(getSelectableAttributes).map(
-                      ([key, options]) => renderAttributeSelector(key, options)
-                    )}
-
-                    {isCurtain
-                      ? renderCurtainDimensionsInput()
-                      : renderQuantitySelector()}
-                  </div>
-                )}
-              </div>
-
-              {/* Footer */}
-              {!isLoadingProduct && !loadError && totalStock > 0 && (
-                <div
-                  className={`p-4 border-t ${
-                    isDarkMode ? "border-gray-700" : "border-gray-200"
-                  }`}
-                >
-                  <button
-                    onClick={handleConfirm}
-                    disabled={!isConfirmEnabled}
-                    className={`
-                      w-full py-3 px-4 rounded-lg font-semibold transition-all duration-200 text-base
-                      ${
-                        isConfirmEnabled
-                          ? `${
-                              isDarkMode ? "text-white" : "text-white"
-                            } bg-orange-500 hover:bg-orange-600`
-                          : `${
-                              isDarkMode
-                                ? "bg-gray-700 text-gray-500"
-                                : "bg-gray-300 text-gray-500"
-                            } cursor-not-allowed`
-                      }
-                    `}
-                  >
-                    {t("confirm")}
-                  </button>
-
-                  <button
-                    onClick={onClose}
-                    className={`w-full py-2 mt-2 text-sm transition-colors ${
-                      isDarkMode
-                        ? "text-gray-400 hover:text-gray-200"
-                        : "text-gray-600 hover:text-gray-800"
-                    }`}
-                  >
-                    {t("cancel")}
-                  </button>
-                </div>
-              )}
-
-              {/* Error/Loading footer */}
-              {(isLoadingProduct || loadError || totalStock <= 0) && (
-                <div
-                  className={`p-4 border-t ${
-                    isDarkMode ? "border-gray-700" : "border-gray-200"
-                  }`}
-                >
-                  <button
-                    onClick={onClose}
-                    className={`w-full py-3 px-4 rounded-lg font-medium transition-colors ${
-                      isDarkMode
-                        ? "bg-gray-800 text-gray-300 hover:bg-gray-700"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    }`}
-                  >
-                    {t("close")}
-                  </button>
-                </div>
-              )}
+                {t("cancel")}
+              </button>
             </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+          )}
+
+          {/* Error/Loading footer */}
+          {(isLoadingProduct || loadError || totalStock <= 0) && (
+            <div
+              className={`p-4 border-t ${
+                isDarkMode ? "border-gray-700" : "border-gray-200"
+              }`}
+            >
+              <button
+                onClick={onClose}
+                className={`w-full py-3 px-4 rounded-lg font-medium transition-colors ${
+                  isDarkMode
+                    ? "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                {t("close")}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
   );
 };
 

@@ -1574,29 +1574,28 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
           }}
         >
           <div
+            className="relative"
             style={{
               backgroundColor: "rgba(0, 0, 0, 0.3)",
               backdropFilter: "blur(4px)",
               borderRadius: "12px",
               padding: "8px",
-              display: "inline-block",
+              width: "550px",
+              height: "550px",
             }}
           >
-            <img
+            <Image
               src={currentImageUrl}
               alt={product.productName}
+              fill
+              className="object-contain rounded-lg"
               style={{
-                objectFit: "contain",
-                maxWidth: "550px",
-                maxHeight: "550px",
-                width: "auto",
-                height: "auto",
-                display: "block",
-                borderRadius: "8px",
                 boxShadow: "0 20px 40px rgba(0, 0, 0, 0.6)",
                 border: "3px solid white",
               }}
-              loading="eager"
+              sizes="550px"
+              priority
+              unoptimized={currentImageUrl.includes('firebasestorage')}
             />
           </div>
         </div>

@@ -33,7 +33,6 @@ const nextConfig: NextConfig = {
       "firebase/functions",
       "@heroicons/react",
       "lucide-react",
-      "framer-motion",
       "date-fns",
     ],
   },

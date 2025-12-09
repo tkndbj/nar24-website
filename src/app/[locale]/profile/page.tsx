@@ -32,10 +32,24 @@ import {
   Folder,
 } from "lucide-react";
 import Image from "next/image";
-import { SavedPaymentMethodsDrawer } from "@/app/components/profile/SavedPaymentMethodsDrawer";
+import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
-import { SellerInfoDrawer } from "@/app/components/profile/SellerInfoDrawer";
-import { SavedAddressesDrawer } from "@/app/components/profile/AddressesDrawer";
+
+// Dynamic imports for heavy drawer components - only loaded when needed
+const SavedPaymentMethodsDrawer = dynamic(
+  () => import("@/app/components/profile/SavedPaymentMethodsDrawer").then((mod) => ({ default: mod.SavedPaymentMethodsDrawer })),
+  { ssr: false }
+);
+
+const SellerInfoDrawer = dynamic(
+  () => import("@/app/components/profile/SellerInfoDrawer").then((mod) => ({ default: mod.SellerInfoDrawer })),
+  { ssr: false }
+);
+
+const SavedAddressesDrawer = dynamic(
+  () => import("@/app/components/profile/AddressesDrawer").then((mod) => ({ default: mod.SavedAddressesDrawer })),
+  { ssr: false }
+);
 
 interface ActionButton {
   icon: React.ElementType;

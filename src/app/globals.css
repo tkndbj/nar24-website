@@ -104,3 +104,89 @@ body {
 .animate-progress {
   animation: progress 2s ease-in-out infinite;
 }
+
+/* Modal animations - GPU-accelerated replacements for framer-motion */
+@keyframes modal-backdrop-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modal-backdrop-exit {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes modal-slide-up-enter {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes modal-slide-up-exit {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+}
+
+/* Modal backdrop */
+.modal-backdrop-enter {
+  animation: modal-backdrop-enter 0.2s ease-out forwards;
+}
+
+.modal-backdrop-exit {
+  animation: modal-backdrop-exit 0.2s ease-in forwards;
+}
+
+/* Modal content with spring-like easing */
+.modal-content-enter {
+  animation: modal-slide-up-enter 0.3s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+.modal-content-exit {
+  animation: modal-slide-up-exit 0.2s ease-in forwards;
+}
+
+/* Drawer animations for side panels */
+@keyframes drawer-slide-right-enter {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes drawer-slide-right-exit {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.drawer-enter {
+  animation: drawer-slide-right-enter 0.3s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+.drawer-exit {
+  animation: drawer-slide-right-exit 0.25s ease-in forwards;
+}

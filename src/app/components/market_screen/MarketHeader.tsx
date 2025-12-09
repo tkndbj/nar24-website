@@ -24,10 +24,24 @@ import { useUser } from "@/context/UserProvider";
 import { useBadgeProvider } from "@/context/BadgeProvider";
 import { useCart } from "@/context/CartProvider";
 import { useFavorites } from "@/context/FavoritesProvider";
-import { FavoritesDrawer } from "../FavoritesDrawer";
-import { NotificationDrawer } from "../NotificationDrawer";
-import { CartDrawer } from "../profile/CartDrawer";
+import dynamic from "next/dynamic";
 import SearchBar from "./SearchBar";
+
+// Dynamic imports for heavy drawer components - only loaded when needed
+const FavoritesDrawer = dynamic(
+  () => import("../FavoritesDrawer").then((mod) => ({ default: mod.FavoritesDrawer })),
+  { ssr: false }
+);
+
+const NotificationDrawer = dynamic(
+  () => import("../NotificationDrawer").then((mod) => ({ default: mod.NotificationDrawer })),
+  { ssr: false }
+);
+
+const CartDrawer = dynamic(
+  () => import("../profile/CartDrawer").then((mod) => ({ default: mod.CartDrawer })),
+  { ssr: false }
+);
 
 interface MarketHeaderProps {
   className?: string;
