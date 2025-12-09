@@ -9,12 +9,12 @@ import { PreferenceProduct } from "../components/market_screen/PreferenceProduct
 // ✅ LAZY LOAD: Heavy components below the fold
 const MarketBanner = lazy(() => import("../components/market_screen/MarketBanner"));
 const DynamicHorizontalList = lazy(() => import("../components/market_screen/DynamicHorizontalList"));
-const AdsBanner = lazy(() => import("../components/market_screen/MarketTopAdsBanner").then(mod => ({ default: mod.AdsBanner })));
+// const AdsBanner = lazy(() => import("../components/market_screen/MarketTopAdsBanner").then(mod => ({ default: mod.AdsBanner })));
 
 // ✅ OPTIMIZED: Simple loading fallback component
 const ComponentLoader = ({ isDark }: { isDark: boolean }) => (
   <div className="w-full">
-    <div className="max-w-6xl mx-auto px-4">
+    <div className="max-w-7xl mx-auto px-4">
       <div className={`w-full h-40 rounded-lg animate-pulse ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
     </div>
   </div>
@@ -74,21 +74,7 @@ export default function Home() {
       <SecondHeader />
 
       {/* ✅ LAZY LOADED: AdsBanner */}
-      <Suspense fallback={<ComponentLoader isDark={isDarkMode} />}>
-        <div className={`w-full ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}>
-          {/* Mobile: full width */}
-          <div className="block lg:hidden">
-            <AdsBanner />
-          </div>
-
-          {/* Desktop: centered layout */}
-          <div className="hidden lg:block">
-            <div className="mx-auto px-4" style={{ maxWidth: "1120px" }}>
-              <AdsBanner />
-            </div>
-          </div>
-        </div>
-      </Suspense>
+    
 
       <div
         className={`min-h-screen w-full ${
@@ -102,7 +88,7 @@ export default function Home() {
               isDarkMode ? "bg-gray-900" : "bg-gray-50"
             }`}
           >
-            <div className="max-w-6xl mx-auto px-4">
+            <div className="max-w-7xl mx-auto px-4">
               <MarketBubbles
                 onNavItemTapped={handleNavigation}
                 locale={locale}
@@ -128,7 +114,7 @@ export default function Home() {
 
             {/* Desktop: centered layout */}
             <div className="hidden lg:block">
-              <div className="max-w-6xl mx-auto px-4">
+              <div className="max-w-7xl mx-auto">
                 <PreferenceProduct keyPrefix="desktop-" />
               </div>
             </div>

@@ -478,7 +478,7 @@ export default function DynamicHorizontalList({ keyPrefix = '' }: DynamicHorizon
   if (!isClient) {
     return (
       <div className="w-full">
-        <div className="max-w-6xl mx-auto">
+        <div className="max-w-7xl mx-auto">
           {Array.from({ length: 2 }, (_, index) => (
             <div
               key={index}
@@ -522,7 +522,7 @@ export default function DynamicHorizontalList({ keyPrefix = '' }: DynamicHorizon
   if (loading) {
     return (
       <div className="w-full">
-        <div className="max-w-6xl mx-auto">
+        <div className="max-w-7xl mx-auto">
           {Array.from({ length: 2 }, (_, index) => (
             <div
               key={index}
@@ -578,7 +578,7 @@ export default function DynamicHorizontalList({ keyPrefix = '' }: DynamicHorizon
   // Render dynamic lists
   return (
     <div className="w-full">
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         {dynamicLists.map((listData, index) => (
           <div key={`${keyPrefix}${listData.id}`}>
             <DynamicList
