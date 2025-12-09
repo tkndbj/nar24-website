@@ -114,7 +114,7 @@ export default function Home() {
 
             {/* Desktop: centered layout */}
             <div className="hidden lg:block">
-              <div className="max-w-7xl mx-auto">
+              <div className="max-w-[1400px] mx-auto">
                 <PreferenceProduct keyPrefix="desktop-" />
               </div>
             </div>

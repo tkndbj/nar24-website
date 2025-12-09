@@ -256,7 +256,9 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
               {/* Logo */}
               <button
                 onClick={() => router.push("/")}
-                className="text-xl font-bold bg-gradient-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent hover:opacity-80 transition-opacity"
+                className={`text-xl font-bold hover:opacity-80 transition-opacity cursor-pointer font-[family-name:var(--font-figtree)] ${
+                  isDark ? "text-white" : "bg-gradient-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent"
+                }`}
               >
                 Nar24
               </button>
@@ -415,7 +417,9 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
             <div className="absolute left-1/2 transform -translate-x-1/2 -ml-127 z-10">
               <button
                 onClick={() => router.push("/")}
-                className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent hover:opacity-80 transition-opacity"
+                className={`text-3xl font-bold hover:opacity-80 transition-opacity cursor-pointer font-[family-name:var(--font-figtree)] ${
+                  isDark ? "text-white" : "bg-gradient-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent"
+                }`}
               >
                 Nar24
               </button>

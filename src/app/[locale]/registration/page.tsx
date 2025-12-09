@@ -589,9 +589,12 @@ function RegistrationContent() {
 
             {/* Logo Section */}
             <div className="text-center mb-8 relative">
-              <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-r from-green-500 to-emerald-600 shadow-lg mb-4 relative">
-                <UserIcon className="w-10 h-10 text-white" />
-                <div className="absolute inset-0 rounded-full bg-gradient-to-r from-green-500 to-emerald-600 animate-ping opacity-20"></div>
+              <div className="inline-flex items-center justify-center mb-4">
+                <img
+                  src={isDark ? "/images/beyazlogo.png" : "/images/siyahlogo.png"}
+                  alt="Logo"
+                  className="w-20 h-20 object-contain"
+                />
               </div>
               <h1
                 className={`text-3xl font-bold bg-gradient-to-r bg-clip-text text-transparent mb-2 ${
@@ -602,13 +605,7 @@ function RegistrationContent() {
               >
                 {t("RegistrationPage.createAccount")}
               </h1>
-              <p
-                className={`font-medium ${
-                  isDark ? "text-gray-400" : "text-gray-600"
-                }`}
-              >
-                {t("RegistrationPage.joinUsToday")}
-              </p>
+             
             </div>
 
             {/* Registration Form */}

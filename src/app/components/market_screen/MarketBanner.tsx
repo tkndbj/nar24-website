@@ -25,7 +25,7 @@ interface MarketBannerItem {
 const ShimmerCard = ({ isDarkMode }: { isDarkMode: boolean }) => {
   return (
     <div
-      className={`animate-pulse rounded-none lg:rounded-lg overflow-hidden aspect-[2.5/1] ${
+      className={`animate-pulse rounded-none md:rounded-lg overflow-hidden aspect-[2.5/1] ${
         isDarkMode ? "bg-gray-800" : "bg-gray-300"
       }`}
     >
@@ -40,7 +40,7 @@ const ShimmerCard = ({ isDarkMode }: { isDarkMode: boolean }) => {
 const ErrorCard = ({ isDarkMode }: { isDarkMode: boolean }) => {
   return (
     <div
-      className={`aspect-[2.5/1] w-full rounded-none lg:rounded-lg flex items-center justify-center ${
+      className={`aspect-[2.5/1] w-full rounded-none md:rounded-lg flex items-center justify-center ${
         isDarkMode ? "bg-gray-800" : "bg-gray-200"
       }`}
     >
@@ -327,10 +327,10 @@ export default function MarketBannerGrid() {
 
   return (
     <div className={`w-full ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}>
-      <div className="max-w-4xl mx-auto px-0 lg:px-4 py-0 lg:py-6">
+      <div className="max-w-[1400px] mx-auto px-0 md:px-4 py-0 md:py-6">
         {/* Initial loading state with shimmer (matches Flutter) */}
         {isLoading && banners.length === 0 ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 lg:gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0 md:gap-4">
             {Array.from({ length: 6 }, (_, index) => (
               <ShimmerCard key={index} isDarkMode={isDarkMode} />
             ))}
@@ -338,14 +338,14 @@ export default function MarketBannerGrid() {
         ) : (
           <>
             {/* Banner grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 lg:gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0 md:gap-4">
               {banners.map((banner) => (
                 <div
                   key={banner.id}
                   className="cursor-pointer transform transition-transform duration-200 hover:scale-105"
                   onClick={() => handleBannerTap(banner)}
                 >
-                  <div className="relative rounded-none lg:rounded-lg overflow-hidden shadow-none lg:shadow-md">
+                  <div className="relative rounded-none md:rounded-lg overflow-hidden shadow-none md:shadow-md">
                     {/* Loading placeholder */}
                     {loadingImages.has(banner.id) && (
                       <div
@@ -370,7 +370,7 @@ export default function MarketBannerGrid() {
                           onLoad={() => handleImageLoad(banner.id)}
                           onError={() => handleImageError(banner.id)}
                           loading="lazy"
-                          sizes="(max-width: 1024px) 100vw, 50vw"
+                          sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
                           quality={85}
                         />
                       </div>
@@ -384,7 +384,7 @@ export default function MarketBannerGrid() {
             {hasMore && (
               <div
                 ref={loadMoreRef}
-                className="flex justify-center mt-0 lg:mt-6 py-6 lg:py-4"
+                className="flex justify-center mt-0 md:mt-6 py-6 md:py-4"
               >
                 {isLoading && (
                   <div className="flex items-center space-x-2">
