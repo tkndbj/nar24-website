@@ -57,6 +57,7 @@ interface ProductCardProps {
   isInCart?: boolean;
   isDarkMode?: boolean;
   localization?: ReturnType<typeof useTranslations>;
+  priority?: boolean; // For LCP optimization - load image with priority
 }
 
 // ✅ Static constants for performance
@@ -456,6 +457,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
   onAddToCart,
   isDarkMode: isDarkModeProp,
   localization,
+  priority = false,
 }) => {
   const router = useRouter();
   const { setProduct } = useProductCache();
@@ -1258,8 +1260,8 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
                       onError={handleImageError}
                       onLoad={handleImageLoad}
                       sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
-                      priority={currentImageIndex === 0}
-                      loading={currentImageIndex === 0 ? "eager" : "lazy"}
+                      priority={priority || currentImageIndex === 0}
+                      loading={priority || currentImageIndex === 0 ? "eager" : "lazy"}
                       unoptimized={imageRetryCount > 0} // Bypass cache on retry
                     />
                   ) : (

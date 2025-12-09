@@ -131,6 +131,8 @@ export const MarketBubbles: React.FC<MarketBubblesProps> = ({}) => {
                   fill
                   className="object-contain"
                   sizes="(max-width: 1024px) 44px, 48px"
+                  priority={index < 3}
+                  loading={index < 3 ? "eager" : "lazy"}
                 />
               </div>
             </div>

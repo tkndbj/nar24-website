@@ -16,7 +16,7 @@ import {
 } from "firebase/firestore";
 import type { Product } from "@/app/models/Product";
 
-// Shimmer loading component - matches ProductCard structure with new shimmer effect
+// GPU-accelerated shimmer loading component
 const ShimmerCard = React.memo(
   ({
     portraitImageHeight,
@@ -33,12 +33,26 @@ const ShimmerCard = React.memo(
     const imageHeight = portraitImageHeight * scaleFactor;
     const infoHeight = infoAreaHeight * scaleFactor;
 
+    // GPU-accelerated shimmer styles using transform instead of left
+    const shimmerStyle = {
+      position: 'absolute' as const,
+      top: 0,
+      left: 0,
+      width: '100%',
+      height: '100%',
+      background: isDarkMode
+        ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)'
+        : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)',
+      animation: 'shimmerTransform 1.2s ease-in-out infinite',
+      willChange: 'transform',
+    };
+
     return (
       <>
         <style jsx global>{`
-          @keyframes shimmerEffect {
-            0% { left: -100%; }
-            100% { left: 100%; }
+          @keyframes shimmerTransform {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
           }
         `}</style>
         <div
@@ -56,19 +70,7 @@ const ShimmerCard = React.memo(
               backgroundColor: isDarkMode ? '#374151' : '#f3f4f6'
             }}
           >
-            <div
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: '-100%',
-                width: '100%',
-                height: '100%',
-                background: isDarkMode
-                  ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)'
-                  : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)',
-                animation: 'shimmerEffect 1s infinite',
-              }}
-            />
+            <div style={shimmerStyle} />
           </div>
 
           {/* Info area */}
@@ -78,37 +80,13 @@ const ShimmerCard = React.memo(
               className="h-3 rounded w-3/4 relative overflow-hidden"
               style={{ backgroundColor: isDarkMode ? '#374151' : '#e5e7eb' }}
             >
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: '-100%',
-                  width: '100%',
-                  height: '100%',
-                  background: isDarkMode
-                    ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)'
-                    : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)',
-                  animation: 'shimmerEffect 1s infinite',
-                }}
-              />
+              <div style={shimmerStyle} />
             </div>
             <div
               className="h-3 rounded w-1/2 relative overflow-hidden"
               style={{ backgroundColor: isDarkMode ? '#374151' : '#e5e7eb' }}
             >
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: '-100%',
-                  width: '100%',
-                  height: '100%',
-                  background: isDarkMode
-                    ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)'
-                    : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)',
-                  animation: 'shimmerEffect 1s infinite',
-                }}
-              />
+              <div style={shimmerStyle} />
             </div>
 
             {/* Price skeleton */}
@@ -116,19 +94,7 @@ const ShimmerCard = React.memo(
               className="h-4 rounded w-2/5 mt-auto relative overflow-hidden"
               style={{ backgroundColor: isDarkMode ? '#374151' : '#e5e7eb' }}
             >
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: '-100%',
-                  width: '100%',
-                  height: '100%',
-                  background: isDarkMode
-                    ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)'
-                    : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)',
-                  animation: 'shimmerEffect 1s infinite',
-                }}
-              />
+              <div style={shimmerStyle} />
             </div>
           </div>
         </div>
@@ -523,7 +489,7 @@ export const PreferenceProduct = React.memo(
                   onScroll={checkScrollPosition}
                 >
                   <div className="flex gap-0 px-0 lg:px-2 h-full pr-0 lg:pr-2 -ml-2 lg:ml-0 -space-x-2">
-                    {products.map((product) => (
+                    {products.map((product, index) => (
                       <div
                         key={`${keyPrefix}${product.id}`}
                         className="flex-shrink-0"
@@ -536,6 +502,7 @@ export const PreferenceProduct = React.memo(
                           portraitImageHeight={portraitImageHeight}
                           overrideInternalScaleFactor={overrideInnerScale}
                           showCartIcon={false}
+                          priority={index < 4}
                         />
                       </div>
                     ))}
