@@ -27,14 +27,30 @@ export const metadata: Metadata = {
   },
 };
 
+// Inline script to prevent theme flash - runs before React hydration
+const themeScript = `
+  (function() {
+    try {
+      var theme = localStorage.getItem('theme');
+      if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    } catch (e) {}
+  })();
+`;
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <html className={`${inter.variable} ${figtree.variable}`}>
+    <html className={`${inter.variable} ${figtree.variable}`} suppressHydrationWarning>
       <head>
+        {/* Theme script - must run before React to prevent flash */}
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         {/* Preconnect to critical third-party domains for faster loading */}
         <link rel="preconnect" href="https://firebasestorage.googleapis.com" />
         <link rel="preconnect" href="https://www.googleapis.com" />
