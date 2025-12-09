@@ -72,7 +72,7 @@ export const MarketBubbles: React.FC<MarketBubblesProps> = ({}) => {
       showComingSoon: false,
     },
     {
-      label: t("showcase"),
+      label: "Vitrin",
       image: "/images/vitrinbubble.png",
       borderColor: "#22c55e", // green-500
       backgroundColor: "rgba(34, 197, 94, 0.2)", // green-500 with opacity
