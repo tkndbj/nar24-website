@@ -2184,6 +2184,14 @@
     "failedToLoadRecommendations": "Failed to load recommendations",
     "tryAgain": "Try Again"
   },
+  "MarketBubbles": {
+    "shops": "Shops",
+    "becomeASeller": "Become a Seller",
+    "showcase": "Showcase",
+    "food": "Food",
+    "market": "Market",
+    "comingSoon": "Coming Soon"
+  },
   "IsbankPayment": {
     "securePayment": "Secure Payment",
     "loadingPaymentPage": "Loading Payment Page",

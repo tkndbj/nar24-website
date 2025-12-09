@@ -62,6 +62,9 @@ interface ProductCardProps {
 // ✅ Static constants for performance
 const NAVIGATION_THROTTLE = 500;
 const JADE_GREEN = "#00A86B";
+const IMAGE_LOAD_TIMEOUT = 10000; // 10 seconds timeout for image loading
+const MAX_IMAGE_RETRIES = 3; // Maximum number of retry attempts
+const RETRY_DELAYS = [1000, 2000, 4000]; // Exponential backoff delays
 
 // ✅ Static color map (computed once)
 const COLOR_MAP: Record<string, string> = {
@@ -483,6 +486,9 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
   const [isHovered, setIsHovered] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
+  const [imageRetryCount, setImageRetryCount] = useState(0);
+  const [imageKey, setImageKey] = useState(0); // Force re-render of image
+  const imageLoadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [showEnlargedImage, setShowEnlargedImage] = useState(false);
   const [enlargedImagePosition, setEnlargedImagePosition] = useState<{
     top: number;
@@ -618,11 +624,18 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Reset image index when color changes (matches Flutter's didUpdateWidget)
+  // Reset image state when color changes (matches Flutter's didUpdateWidget)
   useEffect(() => {
     setCurrentImageIndex(0);
     setImageError(false);
     setImageLoading(true);
+    setImageRetryCount(0);
+    setImageKey((prev) => prev + 1);
+    // Clear any pending timeout
+    if (imageLoadTimeoutRef.current) {
+      clearTimeout(imageLoadTimeoutRef.current);
+      imageLoadTimeoutRef.current = null;
+    }
   }, [internalSelectedColor, selectedColor]);
 
   // Update internal selected color when prop changes
@@ -978,6 +991,10 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
       setCurrentImageIndex((prev) =>
         prev === currentImageUrls.length - 1 ? 0 : prev + 1
       );
+      // Reset image loading state for new image
+      setImageLoading(true);
+      setImageError(false);
+      setImageRetryCount(0);
     },
     [currentImageUrls.length]
   );
@@ -988,6 +1005,10 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
       setCurrentImageIndex((prev) =>
         prev === 0 ? currentImageUrls.length - 1 : prev - 1
       );
+      // Reset image loading state for new image
+      setImageLoading(true);
+      setImageError(false);
+      setImageRetryCount(0);
     },
     [currentImageUrls.length]
   );
@@ -1044,13 +1065,85 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
     setShowEnlargedImage(false);
   }, []);
 
-  // Cleanup timeout on unmount
+  // Cleanup timeouts on unmount
   useEffect(() => {
     return () => {
       if (hoverTimeoutRef.current) {
         clearTimeout(hoverTimeoutRef.current);
       }
+      if (imageLoadTimeoutRef.current) {
+        clearTimeout(imageLoadTimeoutRef.current);
+      }
     };
+  }, []);
+
+  // ✅ Image load timeout and retry logic
+  const currentImageUrl = currentImageUrls[currentImageIndex];
+
+  // Start timeout when image starts loading
+  useEffect(() => {
+    if (!currentImageUrl || !imageLoading || imageError) return;
+
+    // Clear any existing timeout
+    if (imageLoadTimeoutRef.current) {
+      clearTimeout(imageLoadTimeoutRef.current);
+    }
+
+    // Set timeout for image loading
+    imageLoadTimeoutRef.current = setTimeout(() => {
+      if (imageLoading && imageRetryCount < MAX_IMAGE_RETRIES) {
+        // Image is still loading after timeout, trigger retry
+        console.log(`Image load timeout for ${product.id}, retry ${imageRetryCount + 1}/${MAX_IMAGE_RETRIES}`);
+        const retryDelay = RETRY_DELAYS[imageRetryCount] || RETRY_DELAYS[RETRY_DELAYS.length - 1];
+
+        setTimeout(() => {
+          setImageRetryCount((prev) => prev + 1);
+          setImageKey((prev) => prev + 1); // Force image re-render
+          setImageLoading(true);
+        }, retryDelay);
+      } else if (imageLoading && imageRetryCount >= MAX_IMAGE_RETRIES) {
+        // Max retries reached, show error state
+        console.log(`Max retries reached for ${product.id}, showing error`);
+        setImageError(true);
+        setImageLoading(false);
+      }
+    }, IMAGE_LOAD_TIMEOUT);
+
+    return () => {
+      if (imageLoadTimeoutRef.current) {
+        clearTimeout(imageLoadTimeoutRef.current);
+      }
+    };
+  }, [currentImageUrl, imageLoading, imageError, imageRetryCount, product.id]);
+
+  // ✅ Image error handler with retry
+  const handleImageError = useCallback(() => {
+    if (imageRetryCount < MAX_IMAGE_RETRIES) {
+      console.log(`Image error for ${product.id}, retry ${imageRetryCount + 1}/${MAX_IMAGE_RETRIES}`);
+      const retryDelay = RETRY_DELAYS[imageRetryCount] || RETRY_DELAYS[RETRY_DELAYS.length - 1];
+
+      setTimeout(() => {
+        setImageRetryCount((prev) => prev + 1);
+        setImageKey((prev) => prev + 1); // Force image re-render
+        setImageLoading(true);
+        setImageError(false);
+      }, retryDelay);
+    } else {
+      console.log(`Max retries reached for ${product.id} after error`);
+      setImageError(true);
+      setImageLoading(false);
+    }
+  }, [imageRetryCount, product.id]);
+
+  // ✅ Image load success handler
+  const handleImageLoad = useCallback(() => {
+    // Clear timeout on successful load
+    if (imageLoadTimeoutRef.current) {
+      clearTimeout(imageLoadTimeoutRef.current);
+      imageLoadTimeoutRef.current = null;
+    }
+    setImageLoading(false);
+    setImageError(false);
   }, []);
 
   // ✅ Global mouse position check to ensure enlarged image dismisses properly
@@ -1103,8 +1196,6 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
     if (currentImageIndex === imageCount - 1) return 2;
     return 1;
   }, [currentImageUrls.length, currentImageIndex]);
-
-  const currentImageUrl = currentImageUrls[currentImageIndex];
 
   const cartButtonContent = getCartButtonContent();
   const favoriteButtonContent = getFavoriteButtonContent();
@@ -1159,15 +1250,17 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
                   {/* Main image - always rendered */}
                   {!imageError ? (
                     <Image
-                      key={currentImageUrl}
+                      key={`${currentImageUrl}-${imageKey}`}
                       src={currentImageUrl}
                       alt={product.productName}
                       fill
                       className={`object-cover transition-opacity duration-300 ${imageLoading ? 'opacity-0' : 'opacity-100'}`}
-                      onError={() => setImageError(true)}
-                      onLoad={() => setImageLoading(false)}
+                      onError={handleImageError}
+                      onLoad={handleImageLoad}
                       sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
                       priority={currentImageIndex === 0}
+                      loading={currentImageIndex === 0 ? "eager" : "lazy"}
+                      unoptimized={imageRetryCount > 0} // Bypass cache on retry
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">

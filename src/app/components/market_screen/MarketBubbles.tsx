@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 
 interface MarketBubblesProps {
   onNavItemTapped: (index: number) => void;
@@ -20,6 +21,7 @@ interface BubbleData {
 export const MarketBubbles: React.FC<MarketBubblesProps> = ({}) => {
   const router = useRouter();
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const t = useTranslations("MarketBubbles");
 
   // Handle theme detection - same logic as other components
   useEffect(() => {
@@ -56,28 +58,35 @@ export const MarketBubbles: React.FC<MarketBubblesProps> = ({}) => {
 
   const bubbles: BubbleData[] = [
     {
-      label: "Mağazalar",
+      label: t("shops"),
       image: "/images/shopbubble.png",
       borderColor: "#f97316", // orange-500
       backgroundColor: "rgba(249, 115, 22, 0.2)", // orange-500 with opacity
       showComingSoon: false,
     },
     {
-      label: "Vitrin",
+      label: t("becomeASeller"),
+      image: "/images/createshop.png",
+      borderColor: "#8b5cf6", // purple-500
+      backgroundColor: "rgba(139, 92, 246, 0.2)", // purple-500 with opacity
+      showComingSoon: false,
+    },
+    {
+      label: t("showcase"),
       image: "/images/vitrinbubble.png",
       borderColor: "#22c55e", // green-500
       backgroundColor: "rgba(34, 197, 94, 0.2)", // green-500 with opacity
       showComingSoon: false,
     },
     {
-      label: "Yemek",
+      label: t("food"),
       image: "/images/foodbubble.png",
       borderColor: "#3b82f6", // blue-500
       backgroundColor: "rgba(59, 130, 246, 0.2)", // blue-500 with opacity
       showComingSoon: true,
     },
     {
-      label: "Market",
+      label: t("market"),
       image: "/images/marketbubble.png",
       borderColor: "#ec4899", // pink-500
       backgroundColor: "rgba(236, 72, 153, 0.2)", // pink-500 with opacity
@@ -87,9 +96,11 @@ export const MarketBubbles: React.FC<MarketBubblesProps> = ({}) => {
 
   const handleBubbleClick = (index: number) => {
     if (index === 0) {
-      router.push("/shops"); // Navigate to /shop for Mağazalar bubble
+      router.push("/shops"); // Navigate to /shops for Shops bubble
     } else if (index === 1) {
-      router.push("/dynamicteras"); // Navigate to /shop for Mağazalar bubble
+      router.push("/createshop"); // Navigate to /create-shop for Become a Seller bubble
+    } else if (index === 2) {
+      router.push("/dynamicteras"); // Navigate to /dynamicteras for Showcase bubble
     }
   };
 
@@ -130,7 +141,7 @@ export const MarketBubbles: React.FC<MarketBubblesProps> = ({}) => {
                 className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 px-1.5 py-0.5 lg:px-2 lg:py-1 rounded-lg text-white text-xs font-semibold whitespace-nowrap"
                 style={{ backgroundColor: bubble.borderColor }}
               >
-                Yakında
+                {t("comingSoon")}
               </div>
             )}
           </div>

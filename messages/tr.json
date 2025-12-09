@@ -2259,6 +2259,14 @@
     "failedToLoadRecommendations": "Öneriler yüklenemedi",
     "tryAgain": "Tekrar Dene"
   },
+  "MarketBubbles": {
+    "shops": "Mağazalar",
+    "becomeASeller": "Satıcı Ol",
+    "showcase": "Vitrin",
+    "food": "Yemek",
+    "market": "Market",
+    "comingSoon": "Yakında"
+  },
   "IsbankPayment": {
     "securePayment": "Güvenli Ödeme",
     "loadingPaymentPage": "Ödeme Sayfası Yükleniyor",
