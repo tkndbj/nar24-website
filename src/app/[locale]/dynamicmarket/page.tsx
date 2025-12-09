@@ -1239,7 +1239,7 @@ export default function DynamicMarketPage() {
             <div className="px-4 pb-8">
               {/* Loading state with shimmer skeletons - ONLY show when loading and no products */}
               {loading && products.length === 0 && !error && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 lg:gap-4">
                   {[...Array(8)].map((_, index) => (
                     <ProductCardSkeleton key={index} />
                   ))}
@@ -1280,7 +1280,7 @@ export default function DynamicMarketPage() {
 
               {/* Products grid - show when we have products OR when still loading with existing products */}
               {products.length > 0 && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 lg:gap-4">
                   {products.map((product) => (
                     <div key={product.id} className="w-full">
                       <ProductCard

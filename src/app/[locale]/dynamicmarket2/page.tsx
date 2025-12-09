@@ -1521,7 +1521,7 @@ const DynamicMarketPage: React.FC = () => {
           <div className="p-4 relative">
             {/* Initial Loading - Show shimmer skeletons */}
             {isInitialLoading && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 lg:gap-4">
                 {Array.from({ length: 8 }).map((_, i) => (
                   <ProductCardSkeleton key={i} />
                 ))}
@@ -1563,7 +1563,7 @@ const DynamicMarketPage: React.FC = () => {
                       {t("DynamicMarket.featuredProducts")}
                     </h3>
                   </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     {boostedProducts.map((product) => (
                       <div key={`boosted-${product.id}`} className="w-full">
                         <ProductCard
@@ -1618,7 +1618,7 @@ const DynamicMarketPage: React.FC = () => {
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 lg:gap-4">
                   {/* ✅ Render streamed products progressively */}
                   {streamedProducts.map((product) => (
                     <div key={product.id} className="w-full">

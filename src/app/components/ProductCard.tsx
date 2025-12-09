@@ -1220,7 +1220,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
           {/* Image Section */}
           <div
             ref={imageContainerRef}
-            className="relative group h-[28vh] md:h-[38vh]"
+            className="relative group h-[28vh] md:h-[42vh] lg:h-[38vh]"
             style={imageHeight ? { height: imageHeight } : {}}
             onMouseEnter={handleImageHover}
             onMouseLeave={handleImageLeave}

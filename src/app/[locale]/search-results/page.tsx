@@ -67,7 +67,7 @@ const LoadingShimmer: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => {
     : "bg-gray-300 animate-pulse";
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4">
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 p-4">
       {Array.from({ length: 12 }, (_, i) => (
         <div key={i} className="space-y-3">
           <div
@@ -1107,7 +1107,7 @@ const SearchResultsContent: React.FC = () => {
 
       {/* Enhanced Products Grid */}
       {!isEmpty && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 px-4">
           {filteredProducts.map((product, index) => (
             <ProductCard
               key={`${product.id}-${index}`}

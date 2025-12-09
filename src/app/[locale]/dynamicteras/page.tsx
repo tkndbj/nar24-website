@@ -1795,7 +1795,7 @@ const DynamicMarketPage: React.FC = () => {
           <div className="p-4 relative">
             {/* Initial Loading - Show shimmer skeletons */}
             {isInitialLoading && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 {Array.from({ length: 8 }).map((_, i) => (
                   <ProductCardSkeleton key={i} />
                 ))}
@@ -1804,7 +1804,7 @@ const DynamicMarketPage: React.FC = () => {
 
             {/* Subsequent loading - Show shimmer skeletons */}
             {!isInitialLoading && isProductsLoading && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 {Array.from({ length: 8 }).map((_, i) => (
                   <ProductCardSkeleton key={i} />
                 ))}
@@ -1844,7 +1844,7 @@ const DynamicMarketPage: React.FC = () => {
                     </span>
                   )}
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                   {/* Boosted products first */}
                   {boostedProducts.map((product) => (
                     <div key={`boosted-${product.id}`} className="w-full">

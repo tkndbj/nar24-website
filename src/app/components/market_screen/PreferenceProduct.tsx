@@ -522,7 +522,7 @@ export const PreferenceProduct = React.memo(
                   }}
                   onScroll={checkScrollPosition}
                 >
-                  <div className="flex gap-0 px-0 lg:px-2 h-full pr-0 lg:pr-2 -ml-2 lg:ml-0">
+                  <div className="flex gap-0 px-0 lg:px-2 h-full pr-0 lg:pr-2 -ml-2 lg:ml-0 -space-x-2">
                     {products.map((product) => (
                       <div
                         key={`${keyPrefix}${product.id}`}
