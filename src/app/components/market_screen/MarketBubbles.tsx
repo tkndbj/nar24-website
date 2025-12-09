@@ -105,11 +105,11 @@ export const MarketBubbles: React.FC<MarketBubblesProps> = ({}) => {
   };
 
   return (
-    <div className="flex justify-center items-center w-full px-4 gap-3 lg:gap-0 lg:justify-evenly">
+    <div className="flex w-full px-4 gap-4 lg:gap-0 lg:justify-evenly overflow-x-auto lg:overflow-x-visible scrollbar-hide pb-2 lg:pb-0">
       {bubbles.map((bubble, index) => (
         <div
           key={index}
-          className={`flex flex-col items-center cursor-pointer transition-transform duration-200 hover:scale-105 ${
+          className={`flex flex-col items-center cursor-pointer transition-transform duration-200 hover:scale-105 flex-shrink-0 ${
             bubble.showComingSoon ? "cursor-default opacity-75" : ""
           }`}
           onClick={() => !bubble.showComingSoon && handleBubbleClick(index)}
@@ -262,11 +262,11 @@ export const MarketBubblesWithIcons: React.FC<MarketBubblesProps> = ({
   };
 
   return (
-    <div className="flex justify-center items-center w-full px-4 gap-3 lg:gap-0 lg:justify-evenly">
+    <div className="flex w-full px-4 gap-4 lg:gap-0 lg:justify-evenly overflow-x-auto lg:overflow-x-visible scrollbar-hide pb-2 lg:pb-0">
       {bubbles.map((bubble, index) => (
         <div
           key={index}
-          className={`flex flex-col items-center cursor-pointer transition-transform duration-200 hover:scale-105 ${
+          className={`flex flex-col items-center cursor-pointer transition-transform duration-200 hover:scale-105 flex-shrink-0 ${
             bubble.showComingSoon ? "cursor-default opacity-75" : ""
           }`}
           onClick={() => !bubble.showComingSoon && handleBubbleClick(index)}
