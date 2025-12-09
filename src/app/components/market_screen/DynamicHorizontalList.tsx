@@ -32,7 +32,7 @@ interface DynamicListData {
   limit?: number;  
 }
 
-// Shimmer loading component - matches ProductCard structure with new shimmer effect
+// Shimmer loading component - matches ProductCard structure with GPU-accelerated shimmer
 const ShimmerCard: React.FC<{
   portraitImageHeight: number;
   infoAreaHeight: number;
@@ -42,107 +42,52 @@ const ShimmerCard: React.FC<{
   const cardHeight = (portraitImageHeight + infoAreaHeight) * scaleFactor;
   const imageHeight = portraitImageHeight * scaleFactor;
   const infoHeight = infoAreaHeight * scaleFactor;
+  const shimmerClass = `shimmer-effect ${isDarkMode ? 'shimmer-effect-dark' : 'shimmer-effect-light'}`;
 
   return (
-    <>
-      <style jsx global>{`
-        @keyframes shimmerEffect {
-          0% { left: -100%; }
-          100% { left: 100%; }
-        }
-      `}</style>
+    <div
+      className="rounded-xl overflow-hidden shadow-sm"
+      style={{
+        height: `${cardHeight}px`,
+        backgroundColor: isDarkMode ? '#1f2937' : '#ffffff'
+      }}
+    >
+      {/* Image area with shimmer */}
       <div
-        className="rounded-xl overflow-hidden shadow-sm"
+        className="w-full relative overflow-hidden"
         style={{
-          height: `${cardHeight}px`,
-          backgroundColor: isDarkMode ? '#1f2937' : '#ffffff'
+          height: `${imageHeight}px`,
+          backgroundColor: isDarkMode ? '#374151' : '#f3f4f6'
         }}
       >
-        {/* Image area with shimmer */}
+        <div className={shimmerClass} />
+      </div>
+
+      {/* Info area */}
+      <div className="p-2 space-y-2" style={{ height: `${infoHeight}px` }}>
+        {/* Title skeleton */}
         <div
-          className="w-full relative overflow-hidden"
-          style={{
-            height: `${imageHeight}px`,
-            backgroundColor: isDarkMode ? '#374151' : '#f3f4f6'
-          }}
+          className="h-3 rounded w-3/4 relative overflow-hidden"
+          style={{ backgroundColor: isDarkMode ? '#374151' : '#e5e7eb' }}
         >
-          <div
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: '-100%',
-              width: '100%',
-              height: '100%',
-              background: isDarkMode
-                ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)'
-                : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)',
-              animation: 'shimmerEffect 1s infinite',
-            }}
-          />
+          <div className={shimmerClass} />
+        </div>
+        <div
+          className="h-3 rounded w-1/2 relative overflow-hidden"
+          style={{ backgroundColor: isDarkMode ? '#374151' : '#e5e7eb' }}
+        >
+          <div className={shimmerClass} />
         </div>
 
-        {/* Info area */}
-        <div className="p-2 space-y-2" style={{ height: `${infoHeight}px` }}>
-          {/* Title skeleton */}
-          <div
-            className="h-3 rounded w-3/4 relative overflow-hidden"
-            style={{ backgroundColor: isDarkMode ? '#374151' : '#e5e7eb' }}
-          >
-            <div
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: '-100%',
-                width: '100%',
-                height: '100%',
-                background: isDarkMode
-                  ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)'
-                  : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)',
-                animation: 'shimmerEffect 1s infinite',
-              }}
-            />
-          </div>
-          <div
-            className="h-3 rounded w-1/2 relative overflow-hidden"
-            style={{ backgroundColor: isDarkMode ? '#374151' : '#e5e7eb' }}
-          >
-            <div
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: '-100%',
-                width: '100%',
-                height: '100%',
-                background: isDarkMode
-                  ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)'
-                  : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)',
-                animation: 'shimmerEffect 1s infinite',
-              }}
-            />
-          </div>
-
-          {/* Price skeleton */}
-          <div
-            className="h-4 rounded w-2/5 mt-auto relative overflow-hidden"
-            style={{ backgroundColor: isDarkMode ? '#374151' : '#e5e7eb' }}
-          >
-            <div
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: '-100%',
-                width: '100%',
-                height: '100%',
-                background: isDarkMode
-                  ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)'
-                  : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)',
-                animation: 'shimmerEffect 1s infinite',
-              }}
-            />
-          </div>
+        {/* Price skeleton */}
+        <div
+          className="h-4 rounded w-2/5 mt-auto relative overflow-hidden"
+          style={{ backgroundColor: isDarkMode ? '#374151' : '#e5e7eb' }}
+        >
+          <div className={shimmerClass} />
         </div>
       </div>
-    </>
+    </div>
   );
 };
 
@@ -578,12 +523,6 @@ export default function DynamicHorizontalList({ keyPrefix = '' }: DynamicHorizon
   if (!isClient) {
     return (
       <div className="w-full">
-        <style jsx global>{`
-          @keyframes shimmerEffect {
-            0% { left: -100%; }
-            100% { left: 100%; }
-          }
-        `}</style>
         <div className="max-w-[1400px] mx-auto">
           {Array.from({ length: 2 }, (_, index) => (
             <div
@@ -605,10 +544,10 @@ export default function DynamicHorizontalList({ keyPrefix = '' }: DynamicHorizon
                   <div className="px-0 lg:px-2 mb-2">
                     <div className="flex justify-between items-center">
                       <div className="h-5 bg-white bg-opacity-30 rounded w-48 relative overflow-hidden">
-                        <div style={{ position: 'absolute', top: 0, left: '-100%', width: '100%', height: '100%', background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%)', animation: 'shimmerEffect 1s infinite' }} />
+                        <div className="shimmer-effect shimmer-effect-light" />
                       </div>
                       <div className="h-4 bg-white bg-opacity-30 rounded w-16 relative overflow-hidden">
-                        <div style={{ position: 'absolute', top: 0, left: '-100%', width: '100%', height: '100%', background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%)', animation: 'shimmerEffect 1s infinite' }} />
+                        <div className="shimmer-effect shimmer-effect-light" />
                       </div>
                     </div>
                   </div>
@@ -633,12 +572,6 @@ export default function DynamicHorizontalList({ keyPrefix = '' }: DynamicHorizon
   if (loading) {
     return (
       <div className="w-full">
-        <style jsx global>{`
-          @keyframes shimmerEffect {
-            0% { left: -100%; }
-            100% { left: 100%; }
-          }
-        `}</style>
         <div className="max-w-[1400px] mx-auto">
           {Array.from({ length: 2 }, (_, index) => (
             <div
@@ -660,10 +593,10 @@ export default function DynamicHorizontalList({ keyPrefix = '' }: DynamicHorizon
                   <div className="px-0 lg:px-2 mb-2">
                     <div className="flex justify-between items-center">
                       <div className="h-5 bg-white bg-opacity-30 rounded w-48 relative overflow-hidden">
-                        <div style={{ position: 'absolute', top: 0, left: '-100%', width: '100%', height: '100%', background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%)', animation: 'shimmerEffect 1s infinite' }} />
+                        <div className="shimmer-effect shimmer-effect-light" />
                       </div>
                       <div className="h-4 bg-white bg-opacity-30 rounded w-16 relative overflow-hidden">
-                        <div style={{ position: 'absolute', top: 0, left: '-100%', width: '100%', height: '100%', background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%)', animation: 'shimmerEffect 1s infinite' }} />
+                        <div className="shimmer-effect shimmer-effect-light" />
                       </div>
                     </div>
                   </div>

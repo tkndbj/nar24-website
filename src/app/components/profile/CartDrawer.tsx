@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
+import dynamic from "next/dynamic";
 import {
   X,
   ShoppingCart,
@@ -23,7 +24,12 @@ import { AttributeLocalizationUtils } from "@/constants/AttributeLocalization";
 import { db } from "@/lib/firebase";
 import Image from "next/image";
 import { Product } from "@/app/models/Product";
-import CartValidationDialog from "../CartValidationDialog";
+
+// Lazy load CartValidationDialog - only shown when validation needed
+const CartValidationDialog = dynamic(
+  () => import("../CartValidationDialog"),
+  { ssr: false }
+);
 
 interface ValidationMessage {
   key: string;

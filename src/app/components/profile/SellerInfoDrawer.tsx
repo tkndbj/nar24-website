@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
+import dynamic from "next/dynamic";
 import {
   X,
   User,
@@ -20,7 +21,12 @@ import { useRouter } from "next/navigation";
 import { doc, getDoc, setDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useTranslations } from "next-intl";
-import { LocationPickerModal } from "./LocationPickerModal";
+
+// Lazy load LocationPickerModal - Google Maps modal, heavy third-party dependency
+const LocationPickerModal = dynamic(
+  () => import("./LocationPickerModal").then(mod => ({ default: mod.LocationPickerModal })),
+  { ssr: false }
+);
 
 interface SellerInfo {
   ibanOwnerName: string;

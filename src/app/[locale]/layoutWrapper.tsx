@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { NextIntlClientProvider } from "next-intl";
 import { UserProvider, useUser } from "../../context/UserProvider";
 import { CartProvider } from "../../context/CartProvider";
@@ -11,13 +12,18 @@ import { SearchProvider } from "@/context/SearchProvider";
 import ConditionalHeader from "../components/ConditionalHeader";
 import { SearchHistoryProvider } from "@/context/SearchHistoryProvider";
 import ConditionalFooter from "../components/ConditionalFooter";
-import CookieConsent from "../components/CookieConsent";
 import { AppInitializer } from "@/app/components/AppInitializer";
 import { AnalyticsInitializer } from "@/app/components/AnalyticsInitializer";
 import { getFirebaseDb, getFirebaseFunctions } from "@/lib/firebase-lazy";
 import { ProductCacheProvider } from "@/context/ProductCacheProvider";
 import type { Firestore } from "firebase/firestore";
 import type { Functions } from "firebase/functions";
+
+// Lazy load CookieConsent - only shown conditionally, not needed on initial render
+const CookieConsent = dynamic(
+  () => import("../components/CookieConsent"),
+  { ssr: false }
+);
 
 // Inner component that has access to user context and lazy-loaded Firebase
 function AppProviders({

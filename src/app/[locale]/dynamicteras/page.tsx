@@ -736,15 +736,11 @@ const DynamicMarketPage: React.FC = () => {
     }
   };
 
-  // Shimmer component for loading skeleton
-  const ProductCardSkeleton = () => (
-    <>
-      <style jsx global>{`
-        @keyframes shimmerEffect {
-          0% { left: -100%; }
-          100% { left: 100%; }
-        }
-      `}</style>
+  // Shimmer component for loading skeleton - GPU-accelerated
+  const ProductCardSkeleton = () => {
+    const shimmerClass = `shimmer-effect ${isDarkMode ? 'shimmer-effect-dark' : 'shimmer-effect-light'}`;
+
+    return (
       <div className="w-full">
         <div
           className="rounded-lg overflow-hidden"
@@ -758,19 +754,7 @@ const DynamicMarketPage: React.FC = () => {
               backgroundColor: isDarkMode ? '#374151' : '#f3f4f6'
             }}
           >
-            <div
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: '-100%',
-                width: '100%',
-                height: '100%',
-                background: isDarkMode
-                  ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)'
-                  : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)',
-                animation: 'shimmerEffect 1s infinite',
-              }}
-            />
+            <div className={shimmerClass} />
           </div>
 
           {/* Content skeleton */}
@@ -784,19 +768,7 @@ const DynamicMarketPage: React.FC = () => {
                   backgroundColor: isDarkMode ? '#374151' : '#e5e7eb'
                 }}
               >
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: '-100%',
-                    width: '100%',
-                    height: '100%',
-                    background: isDarkMode
-                      ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)'
-                      : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)',
-                    animation: 'shimmerEffect 1s infinite',
-                  }}
-                />
+                <div className={shimmerClass} />
               </div>
               <div
                 className="h-3.5 rounded relative overflow-hidden"
@@ -805,19 +777,7 @@ const DynamicMarketPage: React.FC = () => {
                   backgroundColor: isDarkMode ? '#374151' : '#e5e7eb'
                 }}
               >
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: '-100%',
-                    width: '100%',
-                    height: '100%',
-                    background: isDarkMode
-                      ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)'
-                      : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)',
-                    animation: 'shimmerEffect 1s infinite',
-                  }}
-                />
+                <div className={shimmerClass} />
               </div>
             </div>
 
@@ -829,19 +789,7 @@ const DynamicMarketPage: React.FC = () => {
                 backgroundColor: isDarkMode ? '#374151' : '#e5e7eb'
               }}
             >
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: '-100%',
-                  width: '100%',
-                  height: '100%',
-                  background: isDarkMode
-                    ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)'
-                    : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)',
-                  animation: 'shimmerEffect 1s infinite',
-                }}
-              />
+              <div className={shimmerClass} />
             </div>
 
             {/* Rating and colors */}
@@ -853,19 +801,7 @@ const DynamicMarketPage: React.FC = () => {
                   backgroundColor: isDarkMode ? '#374151' : '#e5e7eb'
                 }}
               >
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: '-100%',
-                    width: '100%',
-                    height: '100%',
-                    background: isDarkMode
-                      ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)'
-                      : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)',
-                    animation: 'shimmerEffect 1s infinite',
-                  }}
-                />
+                <div className={shimmerClass} />
               </div>
               <div className="flex gap-1">
                 {[...Array(3)].map((_, i) => (
@@ -874,19 +810,7 @@ const DynamicMarketPage: React.FC = () => {
                     className="w-4 h-4 rounded-full relative overflow-hidden"
                     style={{ backgroundColor: isDarkMode ? '#374151' : '#e5e7eb' }}
                   >
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: '-100%',
-                        width: '100%',
-                        height: '100%',
-                        background: isDarkMode
-                          ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)'
-                          : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)',
-                        animation: 'shimmerEffect 1s infinite',
-                      }}
-                    />
+                    <div className={shimmerClass} />
                   </div>
                 ))}
               </div>
@@ -894,8 +818,8 @@ const DynamicMarketPage: React.FC = () => {
           </div>
         </div>
       </div>
-    </>
-  );
+    );
+  };
 
   return (
     <div
