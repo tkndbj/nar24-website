@@ -32,37 +32,117 @@ interface DynamicListData {
   limit?: number;  
 }
 
-// Shimmer loading component - matches ProductCard structure
+// Shimmer loading component - matches ProductCard structure with new shimmer effect
 const ShimmerCard: React.FC<{
   portraitImageHeight: number;
   infoAreaHeight: number;
   scaleFactor: number;
-}> = ({ portraitImageHeight, infoAreaHeight, scaleFactor }) => {
+  isDarkMode: boolean;
+}> = ({ portraitImageHeight, infoAreaHeight, scaleFactor, isDarkMode }) => {
   const cardHeight = (portraitImageHeight + infoAreaHeight) * scaleFactor;
   const imageHeight = portraitImageHeight * scaleFactor;
   const infoHeight = infoAreaHeight * scaleFactor;
 
   return (
-    <div
-      className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-sm"
-      style={{ height: `${cardHeight}px` }}
-    >
-      {/* Image area */}
+    <>
+      <style jsx global>{`
+        @keyframes shimmerEffect {
+          0% { left: -100%; }
+          100% { left: 100%; }
+        }
+      `}</style>
       <div
-        className="w-full bg-gray-200 dark:bg-gray-700 animate-pulse"
-        style={{ height: `${imageHeight}px` }}
-      />
+        className="rounded-xl overflow-hidden shadow-sm"
+        style={{
+          height: `${cardHeight}px`,
+          backgroundColor: isDarkMode ? '#1f2937' : '#ffffff'
+        }}
+      >
+        {/* Image area with shimmer */}
+        <div
+          className="w-full relative overflow-hidden"
+          style={{
+            height: `${imageHeight}px`,
+            backgroundColor: isDarkMode ? '#374151' : '#f3f4f6'
+          }}
+        >
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: '-100%',
+              width: '100%',
+              height: '100%',
+              background: isDarkMode
+                ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)'
+                : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)',
+              animation: 'shimmerEffect 1s infinite',
+            }}
+          />
+        </div>
 
-      {/* Info area */}
-      <div className="p-2 space-y-2" style={{ height: `${infoHeight}px` }}>
-        {/* Title skeleton */}
-        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-3/4" />
-        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-1/2" />
+        {/* Info area */}
+        <div className="p-2 space-y-2" style={{ height: `${infoHeight}px` }}>
+          {/* Title skeleton */}
+          <div
+            className="h-3 rounded w-3/4 relative overflow-hidden"
+            style={{ backgroundColor: isDarkMode ? '#374151' : '#e5e7eb' }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: '-100%',
+                width: '100%',
+                height: '100%',
+                background: isDarkMode
+                  ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)'
+                  : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)',
+                animation: 'shimmerEffect 1s infinite',
+              }}
+            />
+          </div>
+          <div
+            className="h-3 rounded w-1/2 relative overflow-hidden"
+            style={{ backgroundColor: isDarkMode ? '#374151' : '#e5e7eb' }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: '-100%',
+                width: '100%',
+                height: '100%',
+                background: isDarkMode
+                  ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)'
+                  : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)',
+                animation: 'shimmerEffect 1s infinite',
+              }}
+            />
+          </div>
 
-        {/* Price skeleton */}
-        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-2/5 mt-auto" />
+          {/* Price skeleton */}
+          <div
+            className="h-4 rounded w-2/5 mt-auto relative overflow-hidden"
+            style={{ backgroundColor: isDarkMode ? '#374151' : '#e5e7eb' }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: '-100%',
+                width: '100%',
+                height: '100%',
+                background: isDarkMode
+                  ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)'
+                  : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)',
+                animation: 'shimmerEffect 1s infinite',
+              }}
+            />
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 
@@ -72,12 +152,14 @@ const ShimmerList: React.FC<{
   portraitImageHeight: number;
   infoAreaHeight: number;
   scaleFactor: number;
+  isDarkMode: boolean;
 }> = ({
   height,
   count = 5,
   portraitImageHeight,
   infoAreaHeight,
   scaleFactor,
+  isDarkMode,
 }) => {
   return (
     <div
@@ -90,6 +172,7 @@ const ShimmerList: React.FC<{
             portraitImageHeight={portraitImageHeight}
             infoAreaHeight={infoAreaHeight}
             scaleFactor={scaleFactor}
+            isDarkMode={isDarkMode}
           />
         </div>
       ))}
@@ -104,7 +187,8 @@ const DynamicList: React.FC<{
   infoAreaHeight: number;
   rowHeight: number;
   keyPrefix?: string;
-}> = ({ listData, portraitImageHeight, infoAreaHeight, rowHeight, keyPrefix = '' }) => {
+  isDarkMode: boolean;
+}> = ({ listData, portraitImageHeight, infoAreaHeight, rowHeight, keyPrefix = '', isDarkMode }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -298,6 +382,7 @@ const DynamicList: React.FC<{
               portraitImageHeight={portraitImageHeight}
               infoAreaHeight={infoAreaHeight}
               scaleFactor={scaleFactor}
+              isDarkMode={isDarkMode}
             />
           ) : products.length === 0 ? (
             <div
@@ -402,6 +487,7 @@ export default function DynamicHorizontalList({ keyPrefix = '' }: DynamicHorizon
   const [dynamicLists, setDynamicLists] = useState<DynamicListData[]>([]);
   const [loading, setLoading] = useState(true);
   const [isClient, setIsClient] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
   // Fixed dimensions
   const portraitImageHeight = 380;
@@ -411,6 +497,20 @@ export default function DynamicHorizontalList({ keyPrefix = '' }: DynamicHorizon
   // Set client flag after component mounts
   useEffect(() => {
     setIsClient(true);
+  }, []);
+
+  // Detect app theme
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDarkMode(document.documentElement.classList.contains("dark"));
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => observer.disconnect();
   }, []);
 
   // Fetch dynamic lists from Firestore
@@ -478,6 +578,12 @@ export default function DynamicHorizontalList({ keyPrefix = '' }: DynamicHorizon
   if (!isClient) {
     return (
       <div className="w-full">
+        <style jsx global>{`
+          @keyframes shimmerEffect {
+            0% { left: -100%; }
+            100% { left: 100%; }
+          }
+        `}</style>
         <div className="max-w-7xl mx-auto">
           {Array.from({ length: 2 }, (_, index) => (
             <div
@@ -498,8 +604,12 @@ export default function DynamicHorizontalList({ keyPrefix = '' }: DynamicHorizon
                 <div className="relative py-3">
                   <div className="px-0 lg:px-2 mb-2">
                     <div className="flex justify-between items-center">
-                      <div className="h-5 bg-white bg-opacity-30 rounded animate-pulse w-48" />
-                      <div className="h-4 bg-white bg-opacity-30 rounded animate-pulse w-16" />
+                      <div className="h-5 bg-white bg-opacity-30 rounded w-48 relative overflow-hidden">
+                        <div style={{ position: 'absolute', top: 0, left: '-100%', width: '100%', height: '100%', background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%)', animation: 'shimmerEffect 1s infinite' }} />
+                      </div>
+                      <div className="h-4 bg-white bg-opacity-30 rounded w-16 relative overflow-hidden">
+                        <div style={{ position: 'absolute', top: 0, left: '-100%', width: '100%', height: '100%', background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%)', animation: 'shimmerEffect 1s infinite' }} />
+                      </div>
                     </div>
                   </div>
                   <ShimmerList
@@ -508,6 +618,7 @@ export default function DynamicHorizontalList({ keyPrefix = '' }: DynamicHorizon
                     portraitImageHeight={portraitImageHeight}
                     infoAreaHeight={infoAreaHeight}
                     scaleFactor={0.88}
+                    isDarkMode={isDarkMode}
                   />
                 </div>
               </div>
@@ -522,6 +633,12 @@ export default function DynamicHorizontalList({ keyPrefix = '' }: DynamicHorizon
   if (loading) {
     return (
       <div className="w-full">
+        <style jsx global>{`
+          @keyframes shimmerEffect {
+            0% { left: -100%; }
+            100% { left: 100%; }
+          }
+        `}</style>
         <div className="max-w-7xl mx-auto">
           {Array.from({ length: 2 }, (_, index) => (
             <div
@@ -542,8 +659,12 @@ export default function DynamicHorizontalList({ keyPrefix = '' }: DynamicHorizon
                 <div className="relative py-3">
                   <div className="px-0 lg:px-2 mb-2">
                     <div className="flex justify-between items-center">
-                      <div className="h-5 bg-white bg-opacity-30 rounded animate-pulse w-48" />
-                      <div className="h-4 bg-white bg-opacity-30 rounded animate-pulse w-16" />
+                      <div className="h-5 bg-white bg-opacity-30 rounded w-48 relative overflow-hidden">
+                        <div style={{ position: 'absolute', top: 0, left: '-100%', width: '100%', height: '100%', background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%)', animation: 'shimmerEffect 1s infinite' }} />
+                      </div>
+                      <div className="h-4 bg-white bg-opacity-30 rounded w-16 relative overflow-hidden">
+                        <div style={{ position: 'absolute', top: 0, left: '-100%', width: '100%', height: '100%', background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%)', animation: 'shimmerEffect 1s infinite' }} />
+                      </div>
                     </div>
                   </div>
                   <ShimmerList
@@ -552,6 +673,7 @@ export default function DynamicHorizontalList({ keyPrefix = '' }: DynamicHorizon
                     portraitImageHeight={portraitImageHeight}
                     infoAreaHeight={infoAreaHeight}
                     scaleFactor={0.88}
+                    isDarkMode={isDarkMode}
                   />
                 </div>
               </div>
@@ -587,6 +709,7 @@ export default function DynamicHorizontalList({ keyPrefix = '' }: DynamicHorizon
               infoAreaHeight={infoAreaHeight}
               rowHeight={rowHeight}
               keyPrefix={keyPrefix}
+              isDarkMode={isDarkMode}
             />
             {/* Add spacing between lists except after the last one */}
             {index < dynamicLists.length - 1 && <div className="h-3" />}

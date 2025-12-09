@@ -16,42 +16,123 @@ import {
 } from "firebase/firestore";
 import type { Product } from "@/app/models/Product";
 
-// Shimmer loading component - matches ProductCard structure
+// Shimmer loading component - matches ProductCard structure with new shimmer effect
 const ShimmerCard = React.memo(
   ({
     portraitImageHeight,
     infoAreaHeight,
     scaleFactor,
+    isDarkMode,
   }: {
     portraitImageHeight: number;
     infoAreaHeight: number;
     scaleFactor: number;
+    isDarkMode: boolean;
   }) => {
     const cardHeight = (portraitImageHeight + infoAreaHeight) * scaleFactor;
     const imageHeight = portraitImageHeight * scaleFactor;
     const infoHeight = infoAreaHeight * scaleFactor;
 
     return (
-      <div
-        className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-sm"
-        style={{ height: `${cardHeight}px` }}
-      >
-        {/* Image area */}
+      <>
+        <style jsx global>{`
+          @keyframes shimmerEffect {
+            0% { left: -100%; }
+            100% { left: 100%; }
+          }
+        `}</style>
         <div
-          className="w-full bg-gray-200 dark:bg-gray-700 animate-pulse"
-          style={{ height: `${imageHeight}px` }}
-        />
+          className="rounded-xl overflow-hidden shadow-sm"
+          style={{
+            height: `${cardHeight}px`,
+            backgroundColor: isDarkMode ? '#1f2937' : '#ffffff'
+          }}
+        >
+          {/* Image area with shimmer */}
+          <div
+            className="w-full relative overflow-hidden"
+            style={{
+              height: `${imageHeight}px`,
+              backgroundColor: isDarkMode ? '#374151' : '#f3f4f6'
+            }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: '-100%',
+                width: '100%',
+                height: '100%',
+                background: isDarkMode
+                  ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)'
+                  : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)',
+                animation: 'shimmerEffect 1s infinite',
+              }}
+            />
+          </div>
 
-        {/* Info area */}
-        <div className="p-2 space-y-2" style={{ height: `${infoHeight}px` }}>
-          {/* Title skeleton */}
-          <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-3/4" />
-          <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-1/2" />
+          {/* Info area */}
+          <div className="p-2 space-y-2" style={{ height: `${infoHeight}px` }}>
+            {/* Title skeleton */}
+            <div
+              className="h-3 rounded w-3/4 relative overflow-hidden"
+              style={{ backgroundColor: isDarkMode ? '#374151' : '#e5e7eb' }}
+            >
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: '-100%',
+                  width: '100%',
+                  height: '100%',
+                  background: isDarkMode
+                    ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)'
+                    : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)',
+                  animation: 'shimmerEffect 1s infinite',
+                }}
+              />
+            </div>
+            <div
+              className="h-3 rounded w-1/2 relative overflow-hidden"
+              style={{ backgroundColor: isDarkMode ? '#374151' : '#e5e7eb' }}
+            >
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: '-100%',
+                  width: '100%',
+                  height: '100%',
+                  background: isDarkMode
+                    ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)'
+                    : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)',
+                  animation: 'shimmerEffect 1s infinite',
+                }}
+              />
+            </div>
 
-          {/* Price skeleton */}
-          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-2/5 mt-auto" />
+            {/* Price skeleton */}
+            <div
+              className="h-4 rounded w-2/5 mt-auto relative overflow-hidden"
+              style={{ backgroundColor: isDarkMode ? '#374151' : '#e5e7eb' }}
+            >
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: '-100%',
+                  width: '100%',
+                  height: '100%',
+                  background: isDarkMode
+                    ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)'
+                    : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)',
+                  animation: 'shimmerEffect 1s infinite',
+                }}
+              />
+            </div>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 );
@@ -64,11 +145,13 @@ const ShimmerList = React.memo(
     portraitImageHeight,
     infoAreaHeight,
     scaleFactor,
+    isDarkMode,
   }: {
     rowHeight: number;
     portraitImageHeight: number;
     infoAreaHeight: number;
     scaleFactor: number;
+    isDarkMode: boolean;
   }) => {
     return (
       <div
@@ -81,6 +164,7 @@ const ShimmerList = React.memo(
               portraitImageHeight={portraitImageHeight}
               infoAreaHeight={infoAreaHeight}
               scaleFactor={scaleFactor}
+              isDarkMode={isDarkMode}
             />
           </div>
         ))}
@@ -105,10 +189,25 @@ export const PreferenceProduct = React.memo(
     const [error, setError] = useState<string | null>(null);
     const [canScrollLeft, setCanScrollLeft] = useState(false);
     const [canScrollRight, setCanScrollRight] = useState(false);
+    const [isDarkMode, setIsDarkMode] = useState(false);
 
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const router = useRouter();
     const t = useTranslations("MarketScreen");
+
+    // Detect app theme
+    useEffect(() => {
+      const checkTheme = () => {
+        setIsDarkMode(document.documentElement.classList.contains("dark"));
+      };
+      checkTheme();
+      const observer = new MutationObserver(checkTheme);
+      observer.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["class"],
+      });
+      return () => observer.disconnect();
+    }, []);
 
     // Fixed dimensions (matches Flutter)
     const portraitImageHeight = 380;
@@ -352,6 +451,7 @@ export const PreferenceProduct = React.memo(
                 portraitImageHeight={portraitImageHeight}
                 infoAreaHeight={infoAreaHeight}
                 scaleFactor={scaleFactor}
+                isDarkMode={isDarkMode}
               />
             ) : error && products.length === 0 ? (
               // Error state

@@ -404,7 +404,7 @@ const LogoPlaceholder = memo<{ size?: number }>(({ size = 120 }) => {
   if (imageError) {
     return (
       <div
-        className="flex items-center justify-center bg-gray-100 rounded-lg"
+        className="flex items-center justify-center rounded-lg"
         style={{ width: size, height: size }}
       >
         <div className="w-8 h-8 text-gray-400">
@@ -418,7 +418,7 @@ const LogoPlaceholder = memo<{ size?: number }>(({ size = 120 }) => {
 
   return (
     <div
-      className="flex items-center justify-center bg-gray-100 rounded-lg relative"
+      className="flex items-center justify-center rounded-lg relative"
       style={{ width: size, height: size }}
     >
       <Image
@@ -426,7 +426,7 @@ const LogoPlaceholder = memo<{ size?: number }>(({ size = 120 }) => {
         alt="Narsiyah Logo"
         width={size * 0.8}
         height={size * 0.8}
-        className="object-contain"
+        className="object-contain opacity-40"
         onError={() => setImageError(true)}
         priority={false}
         sizes={`${Math.round(size * 0.8)}px`}
@@ -482,6 +482,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
   >(selectedColor || null);
   const [isHovered, setIsHovered] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [imageLoading, setImageLoading] = useState(true);
   const [showEnlargedImage, setShowEnlargedImage] = useState(false);
   const [enlargedImagePosition, setEnlargedImagePosition] = useState<{
     top: number;
@@ -621,6 +622,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
   useEffect(() => {
     setCurrentImageIndex(0);
     setImageError(false);
+    setImageLoading(true);
   }, [internalSelectedColor, selectedColor]);
 
   // Update internal selected color when prop changes
@@ -1132,9 +1134,28 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
             onMouseEnter={handleImageHover}
             onMouseLeave={handleImageLeave}
           >
-            <div className="w-full h-full rounded-t-xl overflow-hidden relative bg-gray-100">
+            <div
+                className="w-full h-full rounded-t-xl overflow-hidden relative"
+                style={{ backgroundColor: isDarkMode ? '#1f2937' : '#f3f4f6' }}
+              >
               {currentImageUrls.length > 0 && currentImageUrl ? (
                 <div className="relative w-full h-full">
+                  {/* Loading placeholder with narsiyah logo (no shimmer) */}
+                  {imageLoading && (
+                    <div
+                      className="absolute inset-0 flex items-center justify-center z-10"
+                      style={{ backgroundColor: isDarkMode ? '#1f2937' : '#f3f4f6' }}
+                    >
+                      <Image
+                        src="/images/narsiyah.png"
+                        alt="Loading"
+                        width={60}
+                        height={60}
+                        className="object-contain opacity-40"
+                        priority
+                      />
+                    </div>
+                  )}
                   {/* Main image - always rendered */}
                   {!imageError ? (
                     <Image
@@ -1142,12 +1163,11 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
                       src={currentImageUrl}
                       alt={product.productName}
                       fill
-                      className="object-cover"
+                      className={`object-cover transition-opacity duration-300 ${imageLoading ? 'opacity-0' : 'opacity-100'}`}
                       onError={() => setImageError(true)}
+                      onLoad={() => setImageLoading(false)}
                       sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
                       priority={currentImageIndex === 0}
-                      placeholder="blur"
-                      blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFgABAQEAAAAAAAAAAAAAAAAAAAUH/8QAIhAAAQMDBAMBAAAAAAAAAAAAAQIDBAAFEQYSITEHE0FR/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAZEQACAwEAAAAAAAAAAAAAAAABAgADESH/2gAMAwEAAhEDEEA/AJOg9R3nTFyhXKwzo0GfBktvxZDYJU260oKQoA9EEA4PBGa1y3+T/I0S1wYMW7OtxosdmMyhKEhKUIQEgDjrgCulKMrLF9nqy3wrf//Z"
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
@@ -1217,7 +1237,10 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
                   )}
                 </div>
               ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                <div
+                  className="w-full h-full flex items-center justify-center"
+                  style={{ backgroundColor: isDarkMode ? '#1f2937' : '#f3f4f6' }}
+                >
                   <LogoPlaceholder size={80} />
                 </div>
               )}

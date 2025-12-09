@@ -642,85 +642,163 @@ export default function DynamicMarketPage() {
 
   // Shimmer component for loading skeleton
   const ProductCardSkeleton = () => (
-    <div className="w-full">
-      <div
-        className={`rounded-lg overflow-hidden ${
-          isDarkMode ? "bg-gray-800" : "bg-gray-200"
-        }`}
-      >
-        {/* Image skeleton with shimmer effect */}
+    <>
+      <style jsx global>{`
+        @keyframes shimmerEffect {
+          0% { left: -100%; }
+          100% { left: 100%; }
+        }
+      `}</style>
+      <div className="w-full">
         <div
-          className={`w-full relative overflow-hidden ${
-            isDarkMode ? "bg-gray-700" : "bg-gray-300"
-          }`}
-          style={{ height: "320px" }}
+          className="rounded-lg overflow-hidden"
+          style={{ backgroundColor: isDarkMode ? '#1f2937' : '#ffffff' }}
         >
+          {/* Image skeleton with shimmer effect */}
           <div
-            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"
+            className="w-full relative overflow-hidden"
             style={{
-              backgroundSize: "200% 100%",
+              height: "320px",
+              backgroundColor: isDarkMode ? '#374151' : '#f3f4f6'
             }}
-          />
-        </div>
-
-        {/* Content skeleton */}
-        <div className="p-3 space-y-2.5">
-          {/* Title lines */}
-          <div className="space-y-2">
-            <div
-              className={`h-3.5 rounded ${
-                isDarkMode ? "bg-gray-700" : "bg-gray-300"
-              } relative overflow-hidden`}
-              style={{ width: "85%" }}
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
-            </div>
-            <div
-              className={`h-3.5 rounded ${
-                isDarkMode ? "bg-gray-700" : "bg-gray-300"
-              } relative overflow-hidden`}
-              style={{ width: "60%" }}
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
-            </div>
-          </div>
-
-          {/* Price */}
-          <div
-            className={`h-5 rounded ${
-              isDarkMode ? "bg-gray-700" : "bg-gray-300"
-            } relative overflow-hidden`}
-            style={{ width: "45%" }}
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: '-100%',
+                width: '100%',
+                height: '100%',
+                background: isDarkMode
+                  ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)'
+                  : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)',
+                animation: 'shimmerEffect 1s infinite',
+              }}
+            />
           </div>
 
-          {/* Rating and colors */}
-          <div className="flex items-center justify-between pt-1">
-            <div
-              className={`h-3 rounded ${
-                isDarkMode ? "bg-gray-700" : "bg-gray-300"
-              } relative overflow-hidden`}
-              style={{ width: "40%" }}
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
-            </div>
-            <div className="flex gap-1">
-              {[...Array(3)].map((_, i) => (
+          {/* Content skeleton */}
+          <div className="p-3 space-y-2.5">
+            {/* Title lines */}
+            <div className="space-y-2">
+              <div
+                className="h-3.5 rounded relative overflow-hidden"
+                style={{
+                  width: "85%",
+                  backgroundColor: isDarkMode ? '#374151' : '#e5e7eb'
+                }}
+              >
                 <div
-                  key={i}
-                  className={`w-4 h-4 rounded-full ${
-                    isDarkMode ? "bg-gray-700" : "bg-gray-300"
-                  } relative overflow-hidden`}
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
-                </div>
-              ))}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: '-100%',
+                    width: '100%',
+                    height: '100%',
+                    background: isDarkMode
+                      ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)'
+                      : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)',
+                    animation: 'shimmerEffect 1s infinite',
+                  }}
+                />
+              </div>
+              <div
+                className="h-3.5 rounded relative overflow-hidden"
+                style={{
+                  width: "60%",
+                  backgroundColor: isDarkMode ? '#374151' : '#e5e7eb'
+                }}
+              >
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: '-100%',
+                    width: '100%',
+                    height: '100%',
+                    background: isDarkMode
+                      ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)'
+                      : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)',
+                    animation: 'shimmerEffect 1s infinite',
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Price */}
+            <div
+              className="h-5 rounded relative overflow-hidden"
+              style={{
+                width: "45%",
+                backgroundColor: isDarkMode ? '#374151' : '#e5e7eb'
+              }}
+            >
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: '-100%',
+                  width: '100%',
+                  height: '100%',
+                  background: isDarkMode
+                    ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)'
+                    : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)',
+                  animation: 'shimmerEffect 1s infinite',
+                }}
+              />
+            </div>
+
+            {/* Rating and colors */}
+            <div className="flex items-center justify-between pt-1">
+              <div
+                className="h-3 rounded relative overflow-hidden"
+                style={{
+                  width: "40%",
+                  backgroundColor: isDarkMode ? '#374151' : '#e5e7eb'
+                }}
+              >
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: '-100%',
+                    width: '100%',
+                    height: '100%',
+                    background: isDarkMode
+                      ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)'
+                      : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)',
+                    animation: 'shimmerEffect 1s infinite',
+                  }}
+                />
+              </div>
+              <div className="flex gap-1">
+                {[...Array(3)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="w-4 h-4 rounded-full relative overflow-hidden"
+                    style={{ backgroundColor: isDarkMode ? '#374151' : '#e5e7eb' }}
+                  >
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: '-100%',
+                        width: '100%',
+                        height: '100%',
+                        background: isDarkMode
+                          ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)'
+                          : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)',
+                        animation: 'shimmerEffect 1s infinite',
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 
   if (!category) {
