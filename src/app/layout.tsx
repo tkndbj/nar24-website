@@ -34,8 +34,18 @@ export default function RootLayout({
 }) {
   return (
     <html className={`${inter.variable} ${figtree.variable}`}>
+      <head>
+        {/* Preconnect to critical third-party domains for faster loading */}
+        <link rel="preconnect" href="https://firebasestorage.googleapis.com" />
+        <link rel="preconnect" href="https://www.googleapis.com" />
+        <link rel="preconnect" href="https://identitytoolkit.googleapis.com" />
+        <link rel="dns-prefetch" href="https://firebasestorage.googleapis.com" />
+        <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
+        {/* Algolia search */}
+        <link rel="preconnect" href="https://algolia.net" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://algolia.net" />
+      </head>
       <body className={`${inter.className} antialiased`}>
-        
         {children}
       </body>
     </html>

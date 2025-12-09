@@ -9,10 +9,11 @@ import React, {
   ReactNode,
   useCallback,
   useMemo,
+  useRef,
 } from "react";
-import { User } from "firebase/auth";
-import { doc, updateDoc, getDoc, Timestamp } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import type { User } from "firebase/auth";
+import type { Timestamp } from "firebase/firestore";
+import { getFirebaseAuth, getFirebaseDb } from "@/lib/firebase-lazy";
 import TwoFactorService from "@/services/TwoFactorService";
 import { cacheManager } from "@/app/utils/cacheManager";
 import { requestDeduplicator } from "@/app/utils/requestDeduplicator";
@@ -20,6 +21,7 @@ import { debouncer } from "@/app/utils/debouncer";
 import { impressionBatcher } from "@/app/utils/impressionBatcher";
 import { clearPreferenceProductsCache } from "@/app/components/market_screen/PreferenceProduct";
 import { analyticsBatcher } from "@/app/utils/analyticsBatcher";
+
 interface ProfileData {
   displayName?: string;
   email?: string;
@@ -83,13 +85,14 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
-  const [profileComplete, setProfileCompleteState] = useState<boolean | null>(
-    null
-  );
+  const [profileComplete, setProfileCompleteState] = useState<boolean | null>(null);
   const [pending2FA, setPending2FA] = useState(false);
-  const [internalFirebaseUser, setInternalFirebaseUser] = useState<User | null>(
-    null
-  );
+  const [internalFirebaseUser, setInternalFirebaseUser] = useState<User | null>(null);
+
+  // Store Firebase instances after lazy load
+  const authRef = useRef<import("firebase/auth").Auth | null>(null);
+  const dbRef = useRef<import("firebase/firestore").Firestore | null>(null);
+  const firestoreModuleRef = useRef<typeof import("firebase/firestore") | null>(null);
 
   const twoFactorService = useMemo(() => TwoFactorService.getInstance(), []);
 
@@ -122,17 +125,16 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
         const needs2FA = await twoFactorService.is2FAEnabled();
 
-        if (needs2FA) {
-          const userDocRef = doc(db, "users", firebaseUser.uid);
+        if (needs2FA && dbRef.current && firestoreModuleRef.current) {
+          const { doc, getDoc } = firestoreModuleRef.current;
+          const userDocRef = doc(dbRef.current, "users", firebaseUser.uid);
           const userDoc = await getDoc(userDocRef);
 
           if (userDoc.exists()) {
             const userData = userDoc.data();
-            const lastVerification =
-              userData?.lastTwoFactorVerification?.toDate?.();
+            const lastVerification = userData?.lastTwoFactorVerification?.toDate?.();
 
             if (lastVerification) {
-              // Reduced from 5 minutes to 2 minutes for better security
               const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
               if (lastVerification > twoMinutesAgo) {
                 return false;
@@ -155,14 +157,15 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   // Fetch user data
   const fetchUserData = useCallback(async () => {
     const currentUser = user || internalFirebaseUser;
-    if (!currentUser) return;
+    if (!currentUser || !dbRef.current || !firestoreModuleRef.current) return;
 
     try {
-      const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+      const { doc, getDoc } = firestoreModuleRef.current;
+      const userDoc = await getDoc(doc(dbRef.current, "users", currentUser.uid));
 
       if (userDoc.exists()) {
         const data = userDoc.data();
-        setProfileData(data);
+        setProfileData(data as ProfileData);
         setIsAdmin(data.isAdmin === true);
 
         const complete = !!(data.gender && data.birthDate && data.languageCode);
@@ -173,111 +176,121 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     }
   }, [user, internalFirebaseUser]);
 
-  // Initialize auth state listener with proper race condition handling
+  // Initialize auth state listener with lazy Firebase loading
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // Track the current auth operation to prevent race conditions
     let currentAuthOperationId = 0;
     let isMounted = true;
+    let unsubscribe: (() => void) | null = null;
 
-    const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
-      // Increment operation ID to track this specific auth state change
-      const operationId = ++currentAuthOperationId;
+    const initializeAuth = async () => {
+      try {
+        // Lazy load Firebase Auth and Firestore in parallel
+        const [auth, db, firestoreModule] = await Promise.all([
+          getFirebaseAuth(),
+          getFirebaseDb(),
+          import("firebase/firestore"),
+        ]);
 
-      if (firebaseUser) {
-        // Immediately set internal user (synchronous)
-        setInternalFirebaseUser(firebaseUser);
-        analyticsBatcher.setCurrentUserId(firebaseUser.uid);
+        if (!isMounted) return;
 
-        // Perform async operations with stale check
-        try {
-          const needs2FA = await check2FARequirement(firebaseUser);
+        // Store references
+        authRef.current = auth;
+        dbRef.current = db;
+        firestoreModuleRef.current = firestoreModule;
 
-          // Check if this operation is still current (no newer auth state change occurred)
-          if (!isMounted || operationId !== currentAuthOperationId) {
-            return; // Stale operation - discard results
-          }
+        // Set up auth state listener
+        unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
+          const operationId = ++currentAuthOperationId;
 
-          if (needs2FA) {
-            setPending2FA(true);
-            setUser(null);
+          if (firebaseUser) {
+            setInternalFirebaseUser(firebaseUser);
+            analyticsBatcher.setCurrentUserId(firebaseUser.uid);
+
+            try {
+              const needs2FA = await check2FARequirement(firebaseUser);
+
+              if (!isMounted || operationId !== currentAuthOperationId) return;
+
+              if (needs2FA) {
+                setPending2FA(true);
+                setUser(null);
+              } else {
+                setUser(firebaseUser);
+                setPending2FA(false);
+              }
+
+              // Fetch profile data
+              const { doc, getDoc } = firestoreModule;
+              const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+
+              if (!isMounted || operationId !== currentAuthOperationId) return;
+
+              if (userDoc.exists()) {
+                const data = userDoc.data();
+                setProfileData(data as ProfileData);
+                setIsAdmin(data.isAdmin === true);
+              }
+            } catch (error) {
+              if (isMounted && operationId === currentAuthOperationId) {
+                console.error("Error during auth state initialization:", error);
+              }
+            }
           } else {
-            setUser(firebaseUser);
+            setUser(null);
+            setInternalFirebaseUser(null);
+            setProfileData(null);
+            setIsAdmin(false);
             setPending2FA(false);
+
+            analyticsBatcher.setCurrentUserId(null);
+
+            cacheManager.clearAll();
+            clearPreferenceProductsCache();
+            requestDeduplicator.cancelAll();
+            debouncer.cancelAll();
           }
 
-          // Fetch profile data
-          const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
-
-          // Check again after async operation
-          if (!isMounted || operationId !== currentAuthOperationId) {
-            return; // Stale operation - discard results
-          }
-
-          if (userDoc.exists()) {
-            const data = userDoc.data();
-            setProfileData(data);
-            setIsAdmin(data.isAdmin === true);
-          }
-        } catch (error) {
-          // Only log error if this is still the current operation
           if (isMounted && operationId === currentAuthOperationId) {
-            console.error("Error during auth state initialization:", error);
+            setIsLoading(false);
           }
+        });
+      } catch (error) {
+        console.error("Failed to initialize Firebase Auth:", error);
+        if (isMounted) {
+          setIsLoading(false);
         }
-      } else {
-        // User logged out - these are synchronous state updates
-        setUser(null);
-        setInternalFirebaseUser(null);
-        setProfileData(null);
-        setIsAdmin(false);
-        setPending2FA(false);
-
-        analyticsBatcher.setCurrentUserId(null);
-
-        // Clear all caches on logout
-        cacheManager.clearAll();
-        clearPreferenceProductsCache();
-        requestDeduplicator.cancelAll();
-        debouncer.cancelAll();
       }
+    };
 
-      // Only update loading state if this is still the current operation
-      if (isMounted && operationId === currentAuthOperationId) {
-        setIsLoading(false);
-      }
-    });
+    initializeAuth();
 
     return () => {
       isMounted = false;
-      unsubscribe();
+      if (unsubscribe) {
+        unsubscribe();
+      }
     };
   }, [check2FARequirement]);
 
   useEffect(() => {
     if (user) {
-      // User is logged in and past 2FA
       impressionBatcher.setUserId(user.uid);
-      console.log(`👤 ImpressionBatcher: Synced with user ${user.uid}`);
     } else if (internalFirebaseUser && pending2FA) {
-      // User is in 2FA state, use internal user
       impressionBatcher.setUserId(internalFirebaseUser.uid);
-      console.log(
-        `👤 ImpressionBatcher: Synced with pending 2FA user ${internalFirebaseUser.uid}`
-      );
     } else {
-      // No user logged in
       impressionBatcher.setUserId(null);
-      console.log("👤 ImpressionBatcher: Synced with anonymous user");
     }
   }, [user, internalFirebaseUser, pending2FA]);
 
   // Refresh user
   const refreshUser = useCallback(async () => {
-    await auth.currentUser?.reload();
-    if (auth.currentUser) {
-      setUser(auth.currentUser);
+    if (!authRef.current) return;
+
+    await authRef.current.currentUser?.reload();
+    if (authRef.current.currentUser) {
+      setUser(authRef.current.currentUser);
       await fetchUserData();
     }
   }, [fetchUserData]);
@@ -286,19 +299,21 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const updateProfileData = useCallback(
     async (updates: Partial<ProfileData>) => {
       const currentUser = user || internalFirebaseUser;
-      if (!currentUser) return;
+      if (!currentUser || !dbRef.current || !firestoreModuleRef.current) return;
 
       try {
+        const { doc, updateDoc } = firestoreModuleRef.current;
+
         await debouncer.debounce(
           "update-profile",
           async () => {
-            await updateDoc(doc(db, "users", currentUser.uid), updates);
+            await updateDoc(doc(dbRef.current!, "users", currentUser.uid), updates);
           },
-          300 // 300ms debounce
+          300
         )();
 
         const updatedProfileData = { ...(profileData || {}), ...updates };
-        setProfileData(updatedProfileData);
+        setProfileData(updatedProfileData as ProfileData);
         setIsAdmin(updatedProfileData.isAdmin === true);
 
         const complete = !!(
@@ -319,7 +334,6 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const getIdToken = useCallback(async (): Promise<string | null> => {
     const currentUser = user || internalFirebaseUser;
     if (!currentUser) {
-      console.log("No user logged in to fetch ID token.");
       return null;
     }
     try {
@@ -376,8 +390,8 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
   // Cancel 2FA
   const cancel2FA = useCallback(async () => {
-    if (internalFirebaseUser) {
-      await auth.signOut();
+    if (internalFirebaseUser && authRef.current) {
+      await authRef.current.signOut();
     }
     setUser(null);
     setInternalFirebaseUser(null);

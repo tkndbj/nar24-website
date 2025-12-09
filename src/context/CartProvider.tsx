@@ -254,8 +254,8 @@ const QUANTITY_UPDATE_COOLDOWN = 200; // 200ms like Flutter
 interface CartProviderProps {
   children: ReactNode;
   user: CartUser | User | null;
-  db: Firestore;
-  functions: Functions;
+  db: Firestore | null;
+  functions: Functions | null;
 }
 
 export const buildProductDataForCart = (
@@ -446,6 +446,8 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
   const getProductShopId = useCallback(
     async (productId: string): Promise<string | null> => {
+      if (!db) return null; // Guard for lazy loading
+
       try {
         // Try shop_products collection first
         const shopProductDoc = await getDoc(
@@ -919,7 +921,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   );
 
   const enableLiveUpdates = useCallback(() => {
-    if (!user) return;
+    if (!user || !db) return; // Guard for lazy loading
 
     // Cancel existing listener
     if (unsubscribeCartRef.current) {
@@ -981,7 +983,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   );
 
   const initializeCartIfNeeded = useCallback(async () => {
-    if (!user || isInitialized) return;
+    if (!user || !db || isInitialized) return; // Guard for lazy loading
 
     if (pendingFetchesRef.current.has("init")) {
       console.log("⏳ Already initializing, waiting...");
@@ -1154,6 +1156,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       attributes?: CartAttributes
     ): Promise<string> => {
       if (!user) return "Please log in first";
+      if (!db) return "Loading..."; // Guard for lazy loading
       if (!isInitialized) {
         await initializeCartIfNeeded();
       }
@@ -1235,6 +1238,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       attributes?: CartAttributes
     ): Promise<string> => {
       if (!user) return "Please log in first";
+      if (!db) return "Loading..."; // Guard for lazy loading
 
       try {
         const productDoc = await getDoc(doc(db, "shop_products", productId));
@@ -1302,7 +1306,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       }
 
       // Force refresh from Firestore
-      if (user) {
+      if (user && db) {
         try {
           const docSnap = await getDoc(
             doc(db, "users", user.uid, "cart", productId)
@@ -1324,6 +1328,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   const removeFromCart = useCallback(
     async (productId: string): Promise<string> => {
       if (!user) return "Please log in first";
+      if (!db) return "Loading..."; // Guard for lazy loading
 
       try {
         applyOptimisticRemove(productId);
@@ -1405,6 +1410,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   const updateQuantity = useCallback(
     async (productId: string, newQuantity: number): Promise<string> => {
       if (!user) return "Please log in first";
+      if (!db) return "Loading..."; // Guard for lazy loading
 
       if (newQuantity < 1) {
         return removeFromCart(productId);
@@ -1467,6 +1473,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   const removeMultipleFromCart = useCallback(
     async (productIds: string[]): Promise<string> => {
       if (!user) return "Please log in first";
+      if (!db) return "Loading..."; // Guard for lazy loading
       if (productIds.length === 0) return "No items selected";
 
       try {
@@ -1518,7 +1525,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   // ========================================================================
 
   const refresh = useCallback(async () => {
-    if (!user) return;
+    if (!user || !db) return; // Guard for lazy loading
 
     // Reset pagination
     lastDocumentRef.current = null;
@@ -1581,7 +1588,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
   const calculateCartTotals = useCallback(
     async (selectedProductIds?: string[]): Promise<CartTotals> => {
-      if (!user) {
+      if (!user || !functions) {
         return { total: 0, items: [], currency: "TL" };
       }
 
@@ -1696,6 +1703,15 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       warnings: Record<string, ValidationMessage>;
       validatedItems: ValidatedCartItem[];
     }> => {
+      if (!functions) {
+        return {
+          isValid: false,
+          errors: { _system: { key: "firebase_not_ready", params: {} } },
+          warnings: {},
+          validatedItems: [],
+        };
+      }
+
       try {
         const itemsToValidate = cartItems
           .filter((item) => selectedProductIds.includes(item.productId))
@@ -1750,7 +1766,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
   const updateCartCacheFromValidation = useCallback(
     async (validatedItems: ValidatedCartItem[]): Promise<boolean> => {
-      if (!user) return false;
+      if (!user || !functions) return false;
 
       try {
         console.log(
@@ -1802,7 +1818,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   // ========================================================================
 
   const loadMoreItems = useCallback(async () => {
-    if (!user || !hasMore || isLoadingMore) return;
+    if (!user || !db || !hasMore || isLoadingMore) return; // Guard for lazy loading
 
     if (pendingFetchesRef.current.has("loadMore")) {
       console.log("⏳ Already loading more...");
