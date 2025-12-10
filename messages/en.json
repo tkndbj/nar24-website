@@ -4158,6 +4158,38 @@
       "description": "For exercising your right of withdrawal, you can use the withdrawal form by contacting our customer service or downloading it from our website. The form should include: Order date or delivery date, goods or services subject to withdrawal, price, buyer's name and surname, ID/passport number, telephone, address, and signature (if sent on paper)."
     }
   },
+  "completeProfile": {
+    "title": "Complete Your Profile",
+    "subtitle": "Please fill in the missing fields to continue",
+    "infoMessage": "Complete your profile to access all features",
+    "form": {
+      "gender": "Gender",
+      "selectGender": "Select Gender",
+      "male": "Male",
+      "female": "Female",
+      "other": "Other",
+      "birthDate": "Birth Date",
+      "language": "Language",
+      "selectLanguage": "Select Language",
+      "turkish": "Turkish",
+      "english": "English",
+      "russian": "Russian",
+      "agreementsTitle": "Terms & Agreements",
+      "iAccept": "I accept the",
+      "membershipAgreement": "Membership Agreement",
+      "personalDataProtection": "Personal Data Protection Policy",
+      "termsAndConditions": "Terms and Conditions",
+      "saveButton": "Save & Continue",
+      "saving": "Saving..."
+    },
+    "errors": {
+      "genderRequired": "Please select your gender",
+      "birthDateRequired": "Please select your birth date",
+      "languageRequired": "Please select a language",
+      "agreementRequired": "You must accept all agreements to continue",
+      "updateFailed": "Failed to update profile. Please try again."
+    }
+  },
   "personalDataProtection": {
     "title": "Personal Data Protection Policy",
     "lastUpdated": "Last Updated",

@@ -4268,6 +4268,38 @@
       }
     }
   },
+  "completeProfile": {
+    "title": "Profilini Tamamla",
+    "subtitle": "Devam etmek için lütfen eksik alanları doldurun",
+    "infoMessage": "Tüm özelliklere erişmek için profilini tamamla",
+    "form": {
+      "gender": "Cinsiyet",
+      "selectGender": "Cinsiyet Seç",
+      "male": "Erkek",
+      "female": "Kadın",
+      "other": "Diğer",
+      "birthDate": "Doğum Tarihi",
+      "language": "Dil",
+      "selectLanguage": "Dil Seç",
+      "turkish": "Türkçe",
+      "english": "İngilizce",
+      "russian": "Rusça",
+      "agreementsTitle": "Sözleşmeler",
+      "iAccept": "Kabul ediyorum:",
+      "membershipAgreement": "Üyelik Sözleşmesi",
+      "personalDataProtection": "Kişisel Verilerin Korunması Politikası",
+      "termsAndConditions": "Kullanım Koşulları",
+      "saveButton": "Kaydet & Devam Et",
+      "saving": "Kaydediliyor..."
+    },
+    "errors": {
+      "genderRequired": "Lütfen cinsiyetinizi seçin",
+      "birthDateRequired": "Lütfen doğum tarihinizi seçin",
+      "languageRequired": "Lütfen bir dil seçin",
+      "agreementRequired": "Devam etmek için tüm sözleşmeleri kabul etmelisiniz",
+      "updateFailed": "Profil güncellenemedi. Lütfen tekrar deneyin."
+    }
+  },
   "RefundForm": {
     "title": "İade Talebi",
     "headerTitle": "İade Talebi Oluştur",

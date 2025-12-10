@@ -361,27 +361,25 @@ function RegistrationContent() {
   // Handle Google registration
   const handleGoogleRegistration = async () => {
     setIsLoading(true);
-
+  
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({
         prompt: "select_account",
       });
-
+  
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
-
-      // Check if user document already exists to determine if it's a new user
-      const userDocRef = doc(db, "users", user.uid);
-      const userDoc = await getDoc(userDocRef);
-      const isNewUser = !userDoc.exists();
-
+  
       if (user) {
-        if (isNewUser) {
-          // Create user document for new Google user
+        // Check if user document already exists
+        const userDocRef = doc(db, "users", user.uid);
+        const userDoc = await getDoc(userDocRef);
+  
+        if (!userDoc.exists()) {
+          // ✅ New user - create document and redirect to complete profile
           await createUserDocument(user, true);
-
-          // New Google user should complete profile
+  
           toast.success(t("RegistrationPage.googleRegistrationSuccess"), {
             icon: "🚀",
             style: {
@@ -390,10 +388,19 @@ function RegistrationContent() {
               color: "#fff",
             },
           });
-
+  
           router.push("/complete-profile");
-        } else {
-          // Existing Google user
+          return;
+        }
+  
+        // ✅ ADD: Existing user - check if profile is complete
+        const userData = userDoc.data();
+        const isProfileIncomplete =
+          !userData.gender ||
+          !userData.birthDate ||
+          !userData.languageCode;
+  
+        if (isProfileIncomplete) {
           toast.success(t("RegistrationPage.googleSignInSuccess"), {
             icon: "🚀",
             style: {
@@ -402,9 +409,22 @@ function RegistrationContent() {
               color: "#fff",
             },
           });
-
-          router.push("/");
+  
+          router.push("/complete-profile");
+          return;
         }
+  
+        // ✅ Profile is complete - go to home
+        toast.success(t("RegistrationPage.googleSignInSuccess"), {
+          icon: "🚀",
+          style: {
+            borderRadius: "10px",
+            background: "#10B981",
+            color: "#fff",
+          },
+        });
+  
+        router.push("/");
       }
     } catch (error: unknown) {
       let message = t("RegistrationPage.googleRegistrationError");

@@ -9,7 +9,7 @@ import {
   sendPasswordResetEmail,
   AuthError,
 } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import {
   EyeIcon,
   EyeSlashIcon,
@@ -25,6 +25,7 @@ import { getFunctions, httpsCallable } from "firebase/functions";
 import { useTranslations, useLocale } from "next-intl";
 import TwoFactorService from "@/services/TwoFactorService";
 import { useUser } from "@/context/UserProvider";
+import { doc, getDoc } from "firebase/firestore";
 
 // Constants for timeouts
 const AUTH_TIMEOUT_MS = 30000; // 30 seconds timeout for auth operations
@@ -366,24 +367,65 @@ function LoginContent() {
     // Reset TwoFactorService state before new login attempt
     twoFactorService.reset();
     setIsLoading(true);
-
+  
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({
         prompt: "select_account",
       });
-
+  
       const result = await withTimeout(
         signInWithPopup(auth, provider),
         AUTH_TIMEOUT_MS,
         "AUTH_TIMEOUT"
       );
       const user = result.user;
-
+  
       if (user) {
-        // Check if 2FA verification is needed
-        const loginComplete = await checkAndHandle2FA();
 
+        // ✅ ADD: Check Firestore document for profile completion
+        const userDocRef = doc(db, "users", user.uid);
+        const userDoc = await getDoc(userDocRef);
+  
+        // ✅ ADD: Check if document exists
+        if (!userDoc.exists()) {
+          // New user - no document yet, redirect to complete profile
+          toast.success(t("LoginPage.googleLoginSuccess"), {
+            icon: "🚀",
+            style: {
+              borderRadius: "10px",
+              background: "#10B981",
+              color: "#fff",
+            },
+          });
+          router.push("/complete-profile");
+          return;
+        }
+  
+        const userData = userDoc.data();
+  
+        // ✅ ADD: Check if profile is complete - same logic as Flutter
+        const isProfileIncomplete =
+          !userData.gender ||
+          !userData.birthDate ||
+          !userData.languageCode;
+  
+        if (isProfileIncomplete) {
+          toast.success(t("LoginPage.googleLoginSuccess"), {
+            icon: "🚀",
+            style: {
+              borderRadius: "10px",
+              background: "#10B981",
+              color: "#fff",
+            },
+          });
+          router.push("/complete-profile");
+          return;
+        }
+  
+        // ✅ Profile is complete - continue with 2FA check
+        const loginComplete = await checkAndHandle2FA();
+  
         if (loginComplete) {
           // No 2FA needed or 2FA check failed - complete login
           toast.success(t("LoginPage.googleLoginSuccess"), {

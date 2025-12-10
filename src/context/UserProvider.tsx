@@ -275,6 +275,28 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   }, [check2FARequirement]);
 
   useEffect(() => {
+    // Only run on client side
+    if (typeof window === "undefined") return;
+    
+    // Skip if still loading or no user
+    if (isLoading || !user) return;
+    
+    // Skip if profile is complete
+    if (isProfileComplete) return;
+    
+    // Skip if already on complete-profile page
+    if (window.location.pathname.includes("/complete-profile")) return;
+    
+    // Skip if on public pages (login, registration, etc.)
+    const publicPaths = ["/login", "/registration", "/email-verification", "/"];
+    if (publicPaths.some(path => window.location.pathname === path || window.location.pathname.endsWith(path))) return;
+    
+    // Redirect to complete profile
+    console.log("Profile incomplete, redirecting to complete-profile");
+    window.location.href = "/complete-profile";
+  }, [user, isLoading, isProfileComplete]);
+
+  useEffect(() => {
     if (user) {
       impressionBatcher.setUserId(user.uid);
     } else if (internalFirebaseUser && pending2FA) {
