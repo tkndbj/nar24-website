@@ -3644,7 +3644,10 @@
       "Corduroy": "Corduroy",
       "Chino": "Chino",
       "Viscose": "Viscose",
-      "Modal": "Modal"
+      "Modal": "Modal",
+      "Lycra": "Lycra",
+      "Cashmere": "Cashmere",
+      "Chiffon": "Chiffon"
     }
   },
   "computerComponentsStep": {

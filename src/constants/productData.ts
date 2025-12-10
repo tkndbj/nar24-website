@@ -1673,32 +1673,35 @@ export class AllInOneCategoryData {
   ];
 
   static readonly kClothingTypes: string[] = [
-   'Cotton',
-  'Polyester',
-  'Wool',
-  'Silk',
-  'Denim',
-  'Leather',
-  'Linen',
-  'Nylon',
-  'Viscose',
-  'Modal',
-  'Lyocell',
-  'Organic Cotton',
-  'Recycled Cotton',
-  'Canvas',
-  'Jersey',
-  'Gabardine',
-  'Satin',
-  'Rayon',
-  'Elastane', 
-  'Bamboo',
-  'Velvet',
-  'Fleece',
-  'Spandex',
-  'Tweed',
-  'Corduroy',
-  'Chino',
+    'Cotton',
+    'Polyester',
+    'Wool',
+    'Silk',
+    'Denim',
+    'Leather',
+    'Linen',
+    'Nylon',
+    'Viscose',
+    'Lycra',
+    'Modal',
+    'Lyocell',
+    'Cashmere',
+    'Chiffon',
+    'Organic Cotton',
+    'Recycled Cotton',
+    'Canvas',
+    'Jersey',
+    'Gabardine',
+    'Satin',
+    'Rayon',
+    'Elastane',  
+    'Bamboo',
+    'Velvet',
+    'Fleece',
+    'Spandex',
+    'Tweed',
+    'Corduroy',
+    'Chino',
   ];
 
   // ------------------------------------------------------
@@ -1802,6 +1805,12 @@ export class AllInOneCategoryData {
         return l10n.clothingTypeModal;
       case 'Lyocell':
         return l10n.clothingTypeLyocell;
+      case 'Lycra':
+        return l10n.clothingTypeLycra;
+      case 'Cashmere':
+        return l10n.clothingTypeCashmere;
+      case 'Chiffon':
+        return l10n.clothingTypeChiffon;
       case 'Organic Cotton':
         return l10n.clothingTypeOrganicCotton;
       case 'Recycled Cotton':
@@ -1817,7 +1826,7 @@ export class AllInOneCategoryData {
       case 'Rayon':
         return l10n.clothingTypeRayon;
       case 'Elastane':
-        return l10n.clothingTypeElastane;     
+        return l10n.clothingTypeElastane;  
       case 'Bamboo':
         return l10n.clothingTypeBamboo;
       case 'Velvet':

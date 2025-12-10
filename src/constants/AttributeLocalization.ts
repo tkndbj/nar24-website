@@ -270,6 +270,12 @@ export class AttributeLocalizationUtils {
         return t('pantFabricTypeElastane') || 'Elastane';     
       case 'Bamboo':
         return t('pantFabricTypeBamboo') || 'Bamboo';
+      case 'Lycra':
+        return t('pantFabricTypeLycra') || 'Lycra';
+      case 'Cashmere':
+        return t('pantFabricTypeCashmere') || 'Cashmere';
+      case 'Chiffon':
+        return t('pantFabricTypeChiffon') || 'Chiffon';
       default:
         return type;
     }
@@ -331,6 +337,12 @@ export class AttributeLocalizationUtils {
         return t('pantFabricTypeElastane') || 'Elastane';      
       case 'Bamboo':
         return t('pantFabricTypeBamboo') || 'Bamboo';
+      case 'Lycra':
+        return t('pantFabricTypeLycra') || 'Lycra';
+      case 'Cashmere':
+        return t('pantFabricTypeCashmere') || 'Cashmere';
+      case 'Chiffon':
+        return t('pantFabricTypeChiffon') || 'Chiffon';
       default:
         return type;
     }
