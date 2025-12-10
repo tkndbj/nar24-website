@@ -289,7 +289,9 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     
     // Skip if on public pages (login, registration, etc.)
     const publicPaths = ["/login", "/registration", "/email-verification", "/"];
+    const publicPrefixes = ["/agreements"];
     if (publicPaths.some(path => window.location.pathname === path || window.location.pathname.endsWith(path))) return;
+    if (publicPrefixes.some(prefix => window.location.pathname.includes(prefix))) return; // ✅ ADD this check
     
     // Redirect to complete profile
     console.log("Profile incomplete, redirecting to complete-profile");
