@@ -334,7 +334,7 @@ export class AttributeLocalizationUtils {
       case 'Rayon':
         return t('pantFabricTypeRayon') || 'Rayon';
       case 'Elastane':
-        return t('pantFabricTypeElastane') || 'Elastane';      
+        return t('pantFabricTypeElastane') || 'Elastane';     
       case 'Bamboo':
         return t('pantFabricTypeBamboo') || 'Bamboo';
       case 'Lycra':
