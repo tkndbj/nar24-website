@@ -55,7 +55,7 @@ export default function CompleteProfilePage() {
   // Redirect if user is not authenticated
   useEffect(() => {
     if (!user) {
-      router.push(buildLocalizedUrl("/"));
+      router.push(buildLocalizedUrl("/login"));
     }
   }, [user, router]);
 
@@ -69,7 +69,7 @@ export default function CompleteProfilePage() {
   const handleBackToLogin = async () => {
     try {
       await signOut(auth);
-      router.push(buildLocalizedUrl("/"));
+      router.push(buildLocalizedUrl("/login"));
     } catch (error) {
       console.error("Failed to sign out:", error);
     }
@@ -139,7 +139,7 @@ export default function CompleteProfilePage() {
       }
 
       // Navigate to dashboard
-      router.push(buildLocalizedUrl("/dashboard"));
+      router.push(buildLocalizedUrl("/"));
     } catch (err: unknown) {
       console.error("Profile update failed:", err);
       setError(t("errors.updateFailed"));
