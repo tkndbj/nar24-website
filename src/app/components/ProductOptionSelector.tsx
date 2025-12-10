@@ -272,10 +272,25 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
 
   const getSelectableAttributes = useMemo((): Record<string, string[]> => {
     const selectableAttrs: Record<string, string[]> = {};
-
+  
+    // ✅ ADD: Keys that should NOT be selectable by buyers
+    const nonSelectableKeys = new Set([
+      'clothingType',
+      'clothingTypes',
+      'pantFabricType',
+      'pantFabricTypes',
+      'gender',
+      'clothingFit',
+    ]);
+  
     Object.entries(currentProduct.attributes || {}).forEach(([key, value]) => {
+      // ✅ ADD: Skip non-selectable attributes
+      if (nonSelectableKeys.has(key)) {
+        return;
+      }
+  
       let options: string[] = [];
-
+  
       if (Array.isArray(value)) {
         options = value
           .map((item) => item?.toString() || "")
@@ -286,13 +301,13 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
           .map((item) => item.trim())
           .filter((item) => item !== "");
       }
-
+  
       // Only include attributes with multiple options
       if (options.length > 1) {
         selectableAttrs[key] = options;
       }
     });
-
+  
     return selectableAttrs;
   }, [currentProduct.attributes]);
 
