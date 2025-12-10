@@ -217,65 +217,70 @@ export class AttributeLocalizationUtils {
 
   static localizeClothingType(type: string, t: TranslationFunction): string {
     switch (type) {
-      case 'Denim':
-        return t('pantFabricTypeDenim') || 'Denim';
       case 'Cotton':
-        return t('pantFabricTypeCotton') || 'Cotton';
-      case 'Chino':
-        return t('pantFabricTypeChino') || 'Chino';
-      case 'Corduroy':
-        return t('pantFabricTypeCorduroy') || 'Corduroy';
-      case 'Linen':
-        return t('pantFabricTypeLinen') || 'Linen';
-      case 'Wool':
-        return t('pantFabricTypeWool') || 'Wool';
+        return t('clothingTypeCotton') || 'Cotton';
       case 'Polyester':
-        return t('pantFabricTypePolyester') || 'Polyester';
-      case 'Leather':
-        return t('pantFabricTypeLeather') || 'Leather';
-      case 'Velvet':
-        return t('pantFabricTypeVelvet') || 'Velvet';
-      case 'Fleece':
-        return t('pantFabricTypeFleece') || 'Fleece';
+        return t('clothingTypePolyester') || 'Polyester';
       case 'Nylon':
-        return t('pantFabricTypeNylon') || 'Nylon';
-      case 'Spandex':
-        return t('pantFabricTypeSpandex') || 'Spandex';
-      case 'Tweed':
-        return t('pantFabricTypeTweed') || 'Tweed';
+        return t('clothingTypeNylon') || 'Nylon';
+      case 'Wool':
+        return t('clothingTypeWool') || 'Wool';
       case 'Silk':
-        return t('pantFabricTypeSilk') || 'Silk';
+        return t('clothingTypeSilk') || 'Silk';
+      case 'Linen':
+        return t('clothingTypeLinen') || 'Linen';
+      case 'Denim':
+        return t('clothingTypeDenim') || 'Denim';
+      case 'Leather':
+        return t('clothingTypeLeather') || 'Leather';
+      case 'Chino':
+        return t('clothingTypeChino') || 'Chino';
+      case 'Corduroy':
+        return t('clothingTypeCorduroy') || 'Corduroy';
+      case 'Velvet':
+        return t('clothingTypeVelvet') || 'Velvet';
+      case 'Fleece':
+        return t('clothingTypeFleece') || 'Fleece';
+      case 'Spandex':
+        return t('clothingTypeSpandex') || 'Spandex';
+      case 'Tweed':
+        return t('clothingTypeTweed') || 'Tweed';
       case 'Viscose':
-        return t('pantFabricTypeViscose') || 'Viscose';
+        return t('clothingTypeViscose') || 'Viscose';
       case 'Modal':
-        return t('pantFabricTypeModal') || 'Modal';
+        return t('clothingTypeModal') || 'Modal';
       case 'Lyocell':
-        return t('pantFabricTypeLyocell') || 'Lyocell';
+        return t('clothingTypeLyocell') || 'Lyocell';
+        case 'Lycra':
+          return t('clothingTypeLycra') || 'Lycra';
+          case 'Cashmere':
+            return t('clothingTypeCashmere') || 'Cashmere';
+            case 'Chiffon':
+              return t('clothingTypeChiffon') || 'Şifon';
       case 'Organic Cotton':
-        return t('pantFabricTypeOrganicCotton') || 'Organic Cotton';
+        return t('clothingTypeOrganicCotton') || 'Organic Cotton';
       case 'Recycled Cotton':
-        return t('pantFabricTypeRecycledCotton') || 'Recycled Cotton';
-      // ✅ Additional options to consider
+        return t('clothingTypeRecycledCotton') || 'Recycled Cotton';
       case 'Canvas':
-        return t('pantFabricTypeCanvas') || 'Canvas';
+        return t('clothingTypeCanvas') || 'Canvas';
       case 'Jersey':
-        return t('pantFabricTypeJersey') || 'Jersey';
+        return t('clothingTypeJersey') || 'Jersey';
       case 'Gabardine':
-        return t('pantFabricTypeGabardine') || 'Gabardine';
+        return t('clothingTypeGabardine') || 'Gabardine';
       case 'Satin':
-        return t('pantFabricTypeSatin') || 'Satin';
+        return t('clothingTypeSatin') || 'Satin';
       case 'Rayon':
-        return t('pantFabricTypeRayon') || 'Rayon';
+        return t('clothingTypeRayon') || 'Rayon';
       case 'Elastane':
-        return t('pantFabricTypeElastane') || 'Elastane';     
+        return t('clothingTypeElastane') || 'Elastane';
       case 'Bamboo':
-        return t('pantFabricTypeBamboo') || 'Bamboo';
+        return t('clothingTypeBamboo') || 'Bamboo';
       case 'Lycra':
-        return t('pantFabricTypeLycra') || 'Lycra';
+        return t('clothingTypeLycra') || 'Lycra';
       case 'Cashmere':
-        return t('pantFabricTypeCashmere') || 'Cashmere';
+        return t('clothingTypeCashmere') || 'Cashmere';
       case 'Chiffon':
-        return t('pantFabricTypeChiffon') || 'Chiffon';
+        return t('clothingTypeChiffon') || 'Chiffon';
       default:
         return type;
     }
