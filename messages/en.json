@@ -2068,6 +2068,7 @@
 "clothingTypeRayon": "Rayon",
 "clothingTypeElastane": "Elastane",
 "clothingTypeBamboo": "Bamboo",
+"fabricType": "Fabric Type",
   "jewelryTypeNecklace": "Necklace",
   "jewelryTypeEarring": "Earring",
   "jewelryTypePiercing": "Piercing",
