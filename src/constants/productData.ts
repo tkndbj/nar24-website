@@ -1691,8 +1691,7 @@ export class AllInOneCategoryData {
   'Gabardine',
   'Satin',
   'Rayon',
-  'Elastane',
-  'Hemp',
+  'Elastane', 
   'Bamboo',
   'Velvet',
   'Fleece',
@@ -1818,9 +1817,7 @@ export class AllInOneCategoryData {
       case 'Rayon':
         return l10n.clothingTypeRayon;
       case 'Elastane':
-        return l10n.clothingTypeElastane;
-      case 'Hemp':
-        return l10n.clothingTypeHemp;
+        return l10n.clothingTypeElastane;     
       case 'Bamboo':
         return l10n.clothingTypeBamboo;
       case 'Velvet':
