@@ -19,7 +19,8 @@ export default function ConditionalHeader() {
 
   const shouldHideHeader =
     hideHeaderRoutes.includes(pathname) ||
-    hideHeaderRoutes.some((route) => pathname.endsWith(route));
+    hideHeaderRoutes.some((route) => pathname.endsWith(route)) ||
+    pathname.includes("/agreements");
 
   if (shouldHideHeader) {
     return null;

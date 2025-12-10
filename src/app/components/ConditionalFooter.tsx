@@ -19,7 +19,8 @@ export default function ConditionalFooter() {
 
   const shouldHideFooter =
     hideFooterRoutes.includes(pathname) ||
-    hideFooterRoutes.some((route) => pathname.endsWith(route));
+    hideFooterRoutes.some((route) => pathname.endsWith(route)) ||
+    pathname.includes("/agreements");
 
   if (shouldHideFooter) {
     return null;
