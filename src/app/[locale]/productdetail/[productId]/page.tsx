@@ -701,37 +701,48 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   const navigateToBuyNow = useCallback(
     (selectedOptions: { quantity?: number; [key: string]: unknown }) => {
       if (!product) return;
-
-      const selectedAttributes: Record<string, unknown> = {};
-
-      Object.entries(selectedOptions).forEach(([key, value]) => {
-        if (
-          key !== "quantity" &&
-          value !== undefined &&
-          value !== null &&
-          value !== ""
-        ) {
-          selectedAttributes[key] = value;
-        }
-      });
-
-      const productData = buildProductDataForCart(
-        product,
-        selectedOptions.selectedColor as string | undefined,
-        undefined
-      );
-
-      const buyNowItem = {
-        ...productData,
-        quantity: selectedOptions.quantity || 1,
-        selectedAttributes:
-          Object.keys(selectedAttributes).length > 0
-            ? selectedAttributes
-            : undefined,
-      };
-
-      const encodedData = btoa(JSON.stringify(buyNowItem));
-      router.push(`/${locale}/productpayment?buyNowData=${encodedData}`);
+  
+      try {
+        const selectedAttributes: Record<string, unknown> = {};
+  
+        Object.entries(selectedOptions).forEach(([key, value]) => {
+          if (
+            key !== "quantity" &&
+            value !== undefined &&
+            value !== null &&
+            value !== ""
+          ) {
+            selectedAttributes[key] = value;
+          }
+        });
+  
+        const productData = buildProductDataForCart(
+          product,
+          selectedOptions.selectedColor as string | undefined,
+          undefined
+        );
+  
+        const buyNowItem = {
+          ...productData,
+          quantity: selectedOptions.quantity || 1,
+          selectedAttributes:
+            Object.keys(selectedAttributes).length > 0
+              ? selectedAttributes
+              : undefined,
+        };
+  
+        // ✅ FIX: Use encodeURIComponent for Unicode-safe encoding
+        const jsonString = JSON.stringify(buyNowItem);
+        const encodedData = encodeURIComponent(jsonString);
+        
+        console.log("🛒 Navigating to payment with data:", buyNowItem);
+        
+        router.push(`/${locale}/productpayment?buyNowData=${encodedData}`);
+      } catch (error) {
+        console.error("❌ Navigation error:", error);
+        // Fallback: navigate without encoded data
+        router.push(`/${locale}/productpayment`);
+      }
     },
     [product, router, locale]
   );
