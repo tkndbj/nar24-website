@@ -542,42 +542,39 @@ export default function ProductPaymentPage() {
     const itemsParam = searchParams.get("items");
 
     // ✅ CASE 1: Buy Now - Single Product Purchase
-    if (buyNowData) {
-      try {
-        console.log("🛒 Buy Now Mode - Decoding buyNowData...");
-        const decodedItem = JSON.parse(atob(buyNowData));
+   // ✅ CASE 1: Buy Now - Single Product Purchase
+if (buyNowData) {
+  try {
+    console.log("🛒 Buy Now Mode - Decoding buyNowData...");
+    
+    // ✅ FIX: Use decodeURIComponent instead of atob for Unicode support
+    const decodedItem = JSON.parse(decodeURIComponent(buyNowData));
 
-        console.log("✅ Decoded Buy Now Item:", decodedItem);
+    console.log("✅ Decoded Buy Now Item:", decodedItem);
 
-        // ✅ FIX: Add calculated prices for Buy Now items
-        // The payment page expects calculatedUnitPrice and calculatedTotal
-        const itemWithCalculatedPrices = {
-          ...decodedItem,
-          calculatedUnitPrice: decodedItem.unitPrice, // ✅ Map unitPrice to calculatedUnitPrice
-          calculatedTotal: decodedItem.unitPrice * decodedItem.quantity, // ✅ Calculate total
-          price: decodedItem.unitPrice, // ✅ Also set price for fallback
-        };
+    // ✅ FIX: Add calculated prices for Buy Now items
+    const itemWithCalculatedPrices = {
+      ...decodedItem,
+      calculatedUnitPrice: decodedItem.unitPrice,
+      calculatedTotal: decodedItem.unitPrice * decodedItem.quantity,
+      price: decodedItem.unitPrice,
+    };
 
-        // Convert single item to array format (matching cart structure)
-        setCartItems([itemWithCalculatedPrices]);
+    setCartItems([itemWithCalculatedPrices]);
 
-        // Calculate total from the item
-        const itemTotal = decodedItem.unitPrice * decodedItem.quantity;
-        setTotalPrice(itemTotal);
+    const itemTotal = decodedItem.unitPrice * decodedItem.quantity;
+    setTotalPrice(itemTotal);
 
-        console.log("💰 Buy Now Total:", itemTotal);
-        console.log(
-          "✅ Item with calculated prices:",
-          itemWithCalculatedPrices
-        );
-        return;
-      } catch (error) {
-        console.error("❌ Failed to parse buyNowData:", error);
-        alert("Invalid buy now data. Redirecting to cart...");
-        router.push("/cart");
-        return;
-      }
-    }
+    console.log("💰 Buy Now Total:", itemTotal);
+    console.log("✅ Item with calculated prices:", itemWithCalculatedPrices);
+    return;
+  } catch (error) {
+    console.error("❌ Failed to parse buyNowData:", error);
+    alert("Invalid buy now data. Redirecting to cart...");
+    router.push("/cart");
+    return;
+  }
+}
 
     // ✅ CASE 2: Regular Cart Checkout - Multiple Products
     if (totalParam && itemsParam) {
