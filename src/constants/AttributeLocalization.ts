@@ -43,7 +43,9 @@ export class AttributeLocalizationUtils {
       case 'clothingFit':
         return t('clothingFit') || 'Clothing Fit';
       case 'clothingType':
-        return t('clothingType') || 'Clothing Type';
+        return t('fabricType') || 'Fabric Type';
+      case 'clothingTypes':  // ✅ ADD: New array key
+        return t('fabricType') || 'Fabric Type';
       
       // Footwear attributes
       case 'footwearSizes':
@@ -52,6 +54,10 @@ export class AttributeLocalizationUtils {
       // Pant attributes
       case 'pantSizes':
         return t('selectAvailableSizes') || 'Pant Sizes';
+      case 'pantFabricType':  // ✅ ADD: Legacy key
+        return t('fabricType') || 'Fabric Type';
+      case 'pantFabricTypes':  // ✅ ADD: New array key
+        return t('fabricType') || 'Fabric Type';
       
       // Jewelry attributes
       case 'jewelryType':
@@ -121,7 +127,12 @@ export class AttributeLocalizationUtils {
         return this.localizeClothingFit(stringValue, t);
       
       case 'clothingType':
+      case 'clothingTypes':  // ✅ ADD: Handle new array key
         return this.localizeClothingType(stringValue, t);
+      
+      case 'pantFabricType':   // ✅ ADD: Handle legacy key
+      case 'pantFabricTypes':  // ✅ ADD: Handle new array key
+        return this.localizePantFabricType(stringValue, t);
       
       case 'jewelryType':
         return this.localizeJewelryType(stringValue, t);
@@ -165,7 +176,6 @@ export class AttributeLocalizationUtils {
   }
 
   static localizeClothingSize(size: string, t: TranslationFunction): string {
-    // You can integrate with your AllInOneCategoryData equivalent here
     switch (size.toUpperCase()) {
       case 'XXS':
         return t('clothingSizeXXS') || 'XXS';
@@ -207,22 +217,124 @@ export class AttributeLocalizationUtils {
 
   static localizeClothingType(type: string, t: TranslationFunction): string {
     switch (type) {
-      case 'Cotton':
-        return t('clothingTypeCotton') || 'Cotton';
-      case 'Polyester':
-        return t('clothingTypePolyester') || 'Polyester';
-      case 'Nylon':
-        return t('clothingTypeNylon') || 'Nylon';
-      case 'Wool':
-        return t('clothingTypeWool') || 'Wool';
-      case 'Silk':
-        return t('clothingTypeSilk') || 'Silk';
-      case 'Linen':
-        return t('clothingTypeLinen') || 'Linen';
       case 'Denim':
-        return t('clothingTypeDenim') || 'Denim';
+        return t('pantFabricTypeDenim') || 'Denim';
+      case 'Cotton':
+        return t('pantFabricTypeCotton') || 'Cotton';
+      case 'Chino':
+        return t('pantFabricTypeChino') || 'Chino';
+      case 'Corduroy':
+        return t('pantFabricTypeCorduroy') || 'Corduroy';
+      case 'Linen':
+        return t('pantFabricTypeLinen') || 'Linen';
+      case 'Wool':
+        return t('pantFabricTypeWool') || 'Wool';
+      case 'Polyester':
+        return t('pantFabricTypePolyester') || 'Polyester';
       case 'Leather':
-        return t('clothingTypeLeather') || 'Leather';
+        return t('pantFabricTypeLeather') || 'Leather';
+      case 'Velvet':
+        return t('pantFabricTypeVelvet') || 'Velvet';
+      case 'Fleece':
+        return t('pantFabricTypeFleece') || 'Fleece';
+      case 'Nylon':
+        return t('pantFabricTypeNylon') || 'Nylon';
+      case 'Spandex':
+        return t('pantFabricTypeSpandex') || 'Spandex';
+      case 'Tweed':
+        return t('pantFabricTypeTweed') || 'Tweed';
+      case 'Silk':
+        return t('pantFabricTypeSilk') || 'Silk';
+      case 'Viscose':
+        return t('pantFabricTypeViscose') || 'Viscose';
+      case 'Modal':
+        return t('pantFabricTypeModal') || 'Modal';
+      case 'Lyocell':
+        return t('pantFabricTypeLyocell') || 'Lyocell';
+      case 'Organic Cotton':
+        return t('pantFabricTypeOrganicCotton') || 'Organic Cotton';
+      case 'Recycled Cotton':
+        return t('pantFabricTypeRecycledCotton') || 'Recycled Cotton';
+      // ✅ Additional options to consider
+      case 'Canvas':
+        return t('pantFabricTypeCanvas') || 'Canvas';
+      case 'Jersey':
+        return t('pantFabricTypeJersey') || 'Jersey';
+      case 'Gabardine':
+        return t('pantFabricTypeGabardine') || 'Gabardine';
+      case 'Satin':
+        return t('pantFabricTypeSatin') || 'Satin';
+      case 'Rayon':
+        return t('pantFabricTypeRayon') || 'Rayon';
+      case 'Elastane':
+        return t('pantFabricTypeElastane') || 'Elastane';
+      case 'Hemp':
+        return t('pantFabricTypeHemp') || 'Hemp';
+      case 'Bamboo':
+        return t('pantFabricTypeBamboo') || 'Bamboo';
+      default:
+        return type;
+    }
+  }
+
+  // ✅ ADD: New method for pant fabric types
+  static localizePantFabricType(type: string, t: TranslationFunction): string {
+    switch (type) {
+      case 'Denim':
+        return t('pantFabricTypeDenim') || 'Denim';
+      case 'Cotton':
+        return t('pantFabricTypeCotton') || 'Cotton';
+      case 'Chino':
+        return t('pantFabricTypeChino') || 'Chino';
+      case 'Corduroy':
+        return t('pantFabricTypeCorduroy') || 'Corduroy';
+      case 'Linen':
+        return t('pantFabricTypeLinen') || 'Linen';
+      case 'Wool':
+        return t('pantFabricTypeWool') || 'Wool';
+      case 'Polyester':
+        return t('pantFabricTypePolyester') || 'Polyester';
+      case 'Leather':
+        return t('pantFabricTypeLeather') || 'Leather';
+      case 'Velvet':
+        return t('pantFabricTypeVelvet') || 'Velvet';
+      case 'Fleece':
+        return t('pantFabricTypeFleece') || 'Fleece';
+      case 'Nylon':
+        return t('pantFabricTypeNylon') || 'Nylon';
+      case 'Spandex':
+        return t('pantFabricTypeSpandex') || 'Spandex';
+      case 'Tweed':
+        return t('pantFabricTypeTweed') || 'Tweed';
+      case 'Silk':
+        return t('pantFabricTypeSilk') || 'Silk';
+      case 'Viscose':
+        return t('pantFabricTypeViscose') || 'Viscose';
+      case 'Modal':
+        return t('pantFabricTypeModal') || 'Modal';
+      case 'Lyocell':
+        return t('pantFabricTypeLyocell') || 'Lyocell';
+      case 'Organic Cotton':
+        return t('pantFabricTypeOrganicCotton') || 'Organic Cotton';
+      case 'Recycled Cotton':
+        return t('pantFabricTypeRecycledCotton') || 'Recycled Cotton';
+      // ✅ Additional options to consider
+      case 'Canvas':
+        return t('pantFabricTypeCanvas') || 'Canvas';
+      case 'Jersey':
+        return t('pantFabricTypeJersey') || 'Jersey';
+      case 'Gabardine':
+        return t('pantFabricTypeGabardine') || 'Gabardine';
+      case 'Satin':
+        return t('pantFabricTypeSatin') || 'Satin';
+      case 'Rayon':
+        return t('pantFabricTypeRayon') || 'Rayon';
+      case 'Elastane':
+        return t('pantFabricTypeElastane') || 'Elastane';
+      case 'Hemp':
+        return t('pantFabricTypeHemp') || 'Hemp';
+      case 'Bamboo':
+        return t('pantFabricTypeBamboo') || 'Bamboo';
       default:
         return type;
     }

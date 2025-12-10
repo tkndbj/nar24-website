@@ -1673,16 +1673,33 @@ export class AllInOneCategoryData {
   ];
 
   static readonly kClothingTypes: string[] = [
-    "Cotton",
-    "Polyester",
-    "Wool",
-    "Silk",
-    "Denim",
-    "Leather",
-    "Linen",
-    "Nylon",
-    "Viscose",
-    "Modal",
+   'Cotton',
+  'Polyester',
+  'Wool',
+  'Silk',
+  'Denim',
+  'Leather',
+  'Linen',
+  'Nylon',
+  'Viscose',
+  'Modal',
+  'Lyocell',
+  'Organic Cotton',
+  'Recycled Cotton',
+  'Canvas',
+  'Jersey',
+  'Gabardine',
+  'Satin',
+  'Rayon',
+  'Elastane',
+  'Hemp',
+  'Bamboo',
+  'Velvet',
+  'Fleece',
+  'Spandex',
+  'Tweed',
+  'Corduroy',
+  'Chino',
   ];
 
   // ------------------------------------------------------
@@ -1764,26 +1781,60 @@ export class AllInOneCategoryData {
 
   static localizeClothingType(rawType: string, l10n: AppLocalizations): string {
     switch (rawType) {
-      case "Cotton":
+      case 'Cotton':
         return l10n.clothingTypeCotton;
-      case "Polyester":
+      case 'Polyester':
         return l10n.clothingTypePolyester;
-      case "Wool":
+      case 'Wool':
         return l10n.clothingTypeWool;
-      case "Silk":
+      case 'Silk':
         return l10n.clothingTypeSilk;
-      case "Denim":
+      case 'Denim':
         return l10n.clothingTypeDenim;
-      case "Leather":
+      case 'Leather':
         return l10n.clothingTypeLeather;
-      case "Linen":
+      case 'Linen':
         return l10n.clothingTypeLinen;
-      case "Nylon":
+      case 'Nylon':
         return l10n.clothingTypeNylon;
-      case "Viscose":
+      case 'Viscose':
         return l10n.clothingTypeViscose;
-      case "Modal":
+      case 'Modal':
         return l10n.clothingTypeModal;
+      case 'Lyocell':
+        return l10n.clothingTypeLyocell;
+      case 'Organic Cotton':
+        return l10n.clothingTypeOrganicCotton;
+      case 'Recycled Cotton':
+        return l10n.clothingTypeRecycledCotton;
+      case 'Canvas':
+        return l10n.clothingTypeCanvas;
+      case 'Jersey':
+        return l10n.clothingTypeJersey;
+      case 'Gabardine':
+        return l10n.clothingTypeGabardine;
+      case 'Satin':
+        return l10n.clothingTypeSatin;
+      case 'Rayon':
+        return l10n.clothingTypeRayon;
+      case 'Elastane':
+        return l10n.clothingTypeElastane;
+      case 'Hemp':
+        return l10n.clothingTypeHemp;
+      case 'Bamboo':
+        return l10n.clothingTypeBamboo;
+      case 'Velvet':
+        return l10n.clothingTypeVelvet;
+      case 'Fleece':
+        return l10n.clothingTypeFleece;
+      case 'Spandex':
+        return l10n.clothingTypeSpandex;
+      case 'Tweed':
+        return l10n.clothingTypeTweed;
+      case 'Corduroy':
+        return l10n.clothingTypeCorduroy;
+      case 'Chino':
+        return l10n.clothingTypeChino;
       default:
         return rawType;
     }
