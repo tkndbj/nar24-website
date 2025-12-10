@@ -274,13 +274,7 @@ export class AttributeLocalizationUtils {
       case 'Elastane':
         return t('clothingTypeElastane') || 'Elastane';
       case 'Bamboo':
-        return t('clothingTypeBamboo') || 'Bamboo';
-      case 'Lycra':
-        return t('clothingTypeLycra') || 'Lycra';
-      case 'Cashmere':
-        return t('clothingTypeCashmere') || 'Cashmere';
-      case 'Chiffon':
-        return t('clothingTypeChiffon') || 'Chiffon';
+        return t('clothingTypeBamboo') || 'Bamboo';     
       default:
         return type;
     }
