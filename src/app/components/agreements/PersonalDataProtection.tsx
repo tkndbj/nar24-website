@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
-import { Shield, ChevronDown, ChevronUp } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Shield, ChevronDown, ChevronUp, ArrowLeft } from "lucide-react";
 
 interface Section {
   id: string;
@@ -14,6 +15,7 @@ export default function PersonalDataProtection() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [expandedSections, setExpandedSections] = useState<string[]>([]);
   const t = useTranslations("personalDataProtection");
+  const router = useRouter();
 
   useEffect(() => {
     const checkTheme = () => {
@@ -92,7 +94,18 @@ export default function PersonalDataProtection() {
     >
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="text-center mb-12">
+        <div className="relative text-center mb-12">
+          <button
+            onClick={() => router.back()}
+            className={`absolute left-0 top-0 p-2 rounded-full transition-colors ${
+              isDarkMode
+                ? "bg-gray-800 hover:bg-gray-700 text-gray-300"
+                : "bg-white hover:bg-gray-100 text-gray-700"
+            } shadow-md`}
+            aria-label="Go back"
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </button>
           <div className="inline-flex items-center justify-center p-3 bg-gradient-to-r from-green-500 to-emerald-500 rounded-2xl mb-6">
             <Shield className="w-8 h-8 text-white" />
           </div>
