@@ -45,7 +45,7 @@ function AppProviders({
             <SearchProvider>
               <SearchHistoryProvider>
                 <ConditionalHeader />
-                <main>{children}</main>
+                <main className="isolate">{children}</main>
                 <ConditionalFooter />
                 <CookieConsent />
               </SearchHistoryProvider>
