@@ -250,7 +250,7 @@ const hasSelectableOptions = (product: Product | null): boolean => {
 const LoadingSkeleton = React.memo(
   ({ isDarkMode }: { isDarkMode: boolean }) => (
     <div
-      className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
+      className={`min-h-screen isolate ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
     >
       <div
         className={`sticky top-0 z-10 border-b ${
@@ -1068,7 +1068,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
   return (
     <div
-      className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
+      className={`min-h-screen isolate ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
     >
       {/* Header */}
       <div

@@ -730,7 +730,7 @@ export default function DynamicMarketPage() {
       <>
         <SecondHeader />
         <div
-          className={`min-h-screen flex items-center justify-center ${
+          className={`min-h-screen flex items-center justify-center isolate ${
             isDarkMode ? "bg-gray-900" : "bg-gray-50"
           }`}
         >
@@ -757,7 +757,7 @@ export default function DynamicMarketPage() {
       <SecondHeader />
 
       <div
-        className={`min-h-screen w-full ${
+        className={`min-h-screen w-full isolate ${
           isDarkMode ? "bg-gray-900" : "bg-gray-50"
         }`}
       >

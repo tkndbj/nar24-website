@@ -994,7 +994,7 @@ export default function ReviewsPage() {
   return (
     <>
       <div
-        className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
+        className={`min-h-screen isolate ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
       >
         {/* Header */}
         <div
