@@ -2,8 +2,7 @@
 
 import { useEffect, ReactNode } from "react";
 import { memoryManager } from "@/app/utils/memoryManager";
-import redisService from "@/services/redis_service";
-import { userActivityService } from "@/services/userActivity"; // ✅ ADD THIS
+import { userActivityService } from "@/services/userActivity";
 
 /**
  * AppInitializer - Handles global app initialization
@@ -15,26 +14,15 @@ export function AppInitializer({ children }: { children: ReactNode }) {
     memoryManager.setupMemoryManagement();
     console.log("✅ Memory manager initialized");
 
-    // Initialize Redis service
-    const redisUrl = process.env.NEXT_PUBLIC_UPSTASH_REDIS_REST_URL;
-    const redisToken = process.env.NEXT_PUBLIC_UPSTASH_REDIS_REST_TOKEN;
-
-    if (redisUrl && redisToken) {
-      redisService.initialize({ url: redisUrl, token: redisToken });
-    } else {
-      console.warn("⚠️ Redis not configured - caching disabled");
-    }
-
-    // ✅ ADD THIS - Initialize UserActivityService
+    // Initialize UserActivityService
     userActivityService.initialize();
     console.log("✅ UserActivityService initialized");
 
     // Cleanup on unmount
     return () => {
       memoryManager.dispose();
-      redisService.dispose();
-      userActivityService.dispose(); // ✅ ADD THIS
-      console.log("✅ UserActivityService disposed");
+      userActivityService.dispose();
+      console.log("✅ Services disposed");
     };
   }, []);
 

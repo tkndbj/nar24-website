@@ -13,6 +13,11 @@ import {
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
+import translationService, {
+  RateLimitException,
+  TranslationException,
+} from "@/services/translation_service";
+import { useUser } from "@/context/UserProvider";
 
 interface Question {
   id: string;
@@ -53,6 +58,7 @@ interface QuestionAnswerCardProps {
   isDarkMode?: boolean;
   t: (key: string) => string;
   locale?: string;
+  isAuthenticated?: boolean;
 }
 
 // ============= TEXT SHIMMER COMPONENT =============
@@ -99,6 +105,7 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
   isDarkMode = false,
   t,
   locale,
+  isAuthenticated = false,
 }) => {
   // Translation states
   const [isTranslated, setIsTranslated] = useState(false);
@@ -144,6 +151,12 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
       return;
     }
 
+    // Check if user is authenticated
+    if (!isAuthenticated) {
+      setTranslationError(t("loginRequired"));
+      return;
+    }
+
     setIsTranslating(true);
     setTranslationError(null);
 
@@ -151,48 +164,28 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
       // Use app locale, fallback to browser language
       const targetLanguage = locale || navigator.language.split("-")[0];
 
-      // Translate both question and answer in parallel
-      const [questionResponse, answerResponse] = await Promise.all([
-        fetch("/api/translate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            text: question.questionText,
-            targetLanguage,
-          }),
-        }),
-        fetch("/api/translate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            text: question.answerText,
-            targetLanguage,
-          }),
-        }),
-      ]);
+      // Translate both question and answer using batch translation
+      const translations = await translationService.translateBatch(
+        [question.questionText, question.answerText],
+        targetLanguage
+      );
 
-      if (questionResponse.ok && answerResponse.ok) {
-        const questionData = await questionResponse.json();
-        const answerData = await answerResponse.json();
-
-        if (questionData.translatedText && answerData.translatedText) {
-          setTranslatedQuestion(questionData.translatedText);
-          setTranslatedAnswer(answerData.translatedText);
-          setIsTranslated(true);
-        } else {
-          setTranslationError(t("translationFailed"));
-        }
-      } else if (
-        questionResponse.status === 429 ||
-        answerResponse.status === 429
-      ) {
-        setTranslationError(t("rateLimitExceeded"));
+      if (translations.length === 2) {
+        setTranslatedQuestion(translations[0]);
+        setTranslatedAnswer(translations[1]);
+        setIsTranslated(true);
       } else {
         setTranslationError(t("translationFailed"));
       }
     } catch (error) {
       console.error("Translation error:", error);
-      setTranslationError(t("translationFailed"));
+      if (error instanceof RateLimitException) {
+        setTranslationError(t("rateLimitExceeded"));
+      } else if (error instanceof TranslationException) {
+        setTranslationError(error.message || t("translationFailed"));
+      } else {
+        setTranslationError(t("translationFailed"));
+      }
     } finally {
       setIsTranslating(false);
     }
@@ -461,6 +454,12 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
   const [canScrollRight, setCanScrollRight] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const { user: firebaseUser } = useUser();
+
+  // Set up translation service with current user
+  useEffect(() => {
+    translationService.setUser(firebaseUser);
+  }, [firebaseUser]);
 
   // ✅ FIXED: Proper nested translation function that uses JSON files
   const t = useCallback(
@@ -701,6 +700,7 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
                 isDarkMode={isDarkMode}
                 t={t}
                 locale={locale}
+                isAuthenticated={!!firebaseUser}
               />
             ))}
           </div>

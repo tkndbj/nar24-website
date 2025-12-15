@@ -16,6 +16,11 @@ import {
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
+import translationService, {
+  RateLimitException,
+  TranslationException,
+} from "@/services/translation_service";
+import { useUser } from "@/context/UserProvider";
 
 interface Review {
   id: string;
@@ -43,6 +48,7 @@ interface ReviewTileProps {
   isDarkMode?: boolean;
   t: (key: string) => string;
   locale?: string;
+  isAuthenticated?: boolean;
 }
 
 const StarRating: React.FC<{ rating: number; size?: number }> = ({
@@ -154,6 +160,7 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
   isDarkMode = false,
   t,
   locale,
+  isAuthenticated = false,
 }) => {
   const [isTranslated, setIsTranslated] = useState(false);
   const [translatedText, setTranslatedText] = useState("");
@@ -187,6 +194,12 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
       return;
     }
 
+    // Check if user is authenticated
+    if (!isAuthenticated) {
+      setTranslationError(t("loginRequired"));
+      return;
+    }
+
     setIsTranslating(true);
     setTranslationError(null);
 
@@ -194,32 +207,26 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
       // Use app locale, fallback to browser language
       const targetLanguage = locale || navigator.language.split("-")[0];
 
-      const response = await fetch("/api/translate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: review.review,
-          targetLanguage,
-        }),
-      });
+      const translation = await translationService.translate(
+        review.review,
+        targetLanguage
+      );
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.translatedText) {
-          setTranslatedText(data.translatedText);
-          setIsTranslated(true);
-        } else {
-          setTranslationError(t("translationFailed"));
-        }
-      } else if (response.status === 429) {
-        setTranslationError(t("rateLimitExceeded"));
+      if (translation) {
+        setTranslatedText(translation);
+        setIsTranslated(true);
       } else {
-        const errorData = await response.json().catch(() => ({}));
-        setTranslationError(errorData.error || t("translationFailed"));
+        setTranslationError(t("translationFailed"));
       }
     } catch (error) {
       console.error("Translation error:", error);
-      setTranslationError(t("translationFailed"));
+      if (error instanceof RateLimitException) {
+        setTranslationError(t("rateLimitExceeded"));
+      } else if (error instanceof TranslationException) {
+        setTranslationError(error.message || t("translationFailed"));
+      } else {
+        setTranslationError(t("translationFailed"));
+      }
     } finally {
       setIsTranslating(false);
     }
@@ -472,6 +479,12 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
   const [canScrollRight, setCanScrollRight] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const { user: firebaseUser } = useUser();
+
+  // Set up translation service with current user
+  useEffect(() => {
+    translationService.setUser(firebaseUser);
+  }, [firebaseUser]);
 
   // ✅ FIXED: Proper nested translation function that uses JSON files
   const t = useCallback(
@@ -724,6 +737,7 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
                 isDarkMode={isDarkMode}
                 t={t}
                 locale={locale}
+                isAuthenticated={!!firebaseUser}
               />
             ))}
           </div>

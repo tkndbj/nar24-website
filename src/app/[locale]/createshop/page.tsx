@@ -10,6 +10,7 @@ import { db, storage } from "../../../lib/firebase";
 import { useUser } from "@/context/UserProvider";
 import SecondHeader from "../../components/market_screen/SecondHeader";
 import { AllInOneCategoryData } from "../../../constants/productData";
+import { sanitizeShopApplication } from "@/lib/sanitize";
 import {
   XMarkIcon,
   ChevronRightIcon,
@@ -333,6 +334,20 @@ export default function CreateShopPage() {
       return;
     }
 
+    // Sanitize and validate input before submission
+    let sanitizedData;
+    try {
+      sanitizedData = sanitizeShopApplication({
+        name: shopName,
+        email: email,
+        contactNo: contactNo,
+        address: address,
+      });
+    } catch (validationError) {
+      alert(validationError instanceof Error ? validationError.message : t("enterAllFields"));
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -352,19 +367,19 @@ export default function CreateShopPage() {
         "tax_plate_certificate"
       );
 
-      // Save to Firestore
+      // Save to Firestore with sanitized data
       await addDoc(collection(db, "shopApplications"), {
         ownerId: user.uid,
-        name: shopName.trim(),
-        email: email.trim(),
-        contactNo: contactNo.trim(),
-        address: address.trim(),
+        name: sanitizedData.name,
+        email: sanitizedData.email,
+        contactNo: sanitizedData.contactNo,
+        address: sanitizedData.address,
         categories: selectedCategories.map((cat) => cat.code),
         categoryNames: selectedCategories.map((cat) => cat.name),
         profileImageUrl,
         coverImageUrl: coverImageUrls.join(","),
         taxPlateCertificateUrl: taxCertificateUrl,
-        latitude: coordinates.latitude, // ADD THIS
+        latitude: coordinates.latitude,
         longitude: coordinates.longitude,
         createdAt: serverTimestamp(),
         status: "pending",

@@ -3,6 +3,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getFirestoreAdmin } from "@/lib/firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
+import {
+  sanitizeText,
+  sanitizeReviewInput,
+} from "@/lib/sanitize";
 
 interface ReviewData {
   rating: number;
@@ -225,39 +229,48 @@ export async function POST(
     const { productId } = await params;
     const body = await request.json();
 
-    const { 
-      userId,
-      userName,
-      userImage,
-      rating,
-      review,
-      imageUrls,
-      verified
-    } = body;
-
-    // Validate required fields
-    if (!productId || !userId || !rating || !review) {
+    // Sanitize and validate all input using the sanitization library
+    let sanitizedInput;
+    try {
+      sanitizedInput = sanitizeReviewInput({
+        userId: body.userId,
+        userName: body.userName,
+        userImage: body.userImage,
+        rating: body.rating,
+        review: body.review,
+        imageUrls: body.imageUrls,
+        verified: body.verified,
+      });
+    } catch (validationError) {
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { error: validationError instanceof Error ? validationError.message : "Invalid input" },
         { status: 400 }
       );
     }
 
-    if (rating < 1 || rating > 5) {
+    // Validate productId
+    if (!productId) {
       return NextResponse.json(
-        { error: "Rating must be between 1 and 5" },
+        { error: "Product ID is required" },
         { status: 400 }
       );
     }
 
-    // Normalize productId
-    let rawId = productId.trim();
+    // Normalize productId (sanitize first)
+    let rawId = sanitizeText(productId.trim());
     const p1 = "products_";
     const p2 = "shop_products_";
     if (rawId.startsWith(p1)) {
       rawId = rawId.substring(p1.length);
     } else if (rawId.startsWith(p2)) {
       rawId = rawId.substring(p2.length);
+    }
+
+    if (!rawId) {
+      return NextResponse.json(
+        { error: "Invalid product ID" },
+        { status: 400 }
+      );
     }
 
     // Determine which collection to use
@@ -276,7 +289,7 @@ export async function POST(
       );
     }
 
-    // Create review document
+    // Create review document with sanitized data
     const reviewRef = db
       .collection(baseCollection)
       .doc(rawId)
@@ -285,16 +298,16 @@ export async function POST(
 
     const reviewData = {
       productId: rawId,
-      userId,
-      userName: userName || "Anonymous",
-      userImage: userImage || null,
-      rating: Number(rating),
-      review: review.trim(),
-      imageUrls: imageUrls || [],
+      userId: sanitizedInput.userId,
+      userName: sanitizedInput.userName,
+      userImage: sanitizedInput.userImage,
+      rating: sanitizedInput.rating,
+      review: sanitizedInput.review,
+      imageUrls: sanitizedInput.imageUrls,
       timestamp: new Date(),
       likes: [],
       helpful: 0,
-      verified: verified || false,
+      verified: sanitizedInput.verified,
     };
 
     await reviewRef.set(reviewData);

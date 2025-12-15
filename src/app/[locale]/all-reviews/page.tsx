@@ -23,6 +23,10 @@ import {
 import Image from "next/image";
 import { format } from "date-fns";
 import { useUser } from "@/context/UserProvider";
+import translationService, {
+  RateLimitException,
+  TranslationException,
+} from "@/services/translation_service";
 
 interface Review {
   id: string;
@@ -74,8 +78,15 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
   const [filterRating, setFilterRating] = useState<number | null>(null);
   const [translatedReviews, setTranslatedReviews] = useState<Record<string, string>>({});
   const [translatingIds, setTranslatingIds] = useState<Set<string>>(new Set());
-  
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [translationError, setTranslationError] = useState<string | null>(null);
+
   const [imageGallery, setImageGallery] = useState<{ urls: string[], index: number } | null>(null);
+
+  // Set up translation service with current user
+  useEffect(() => {
+    translationService.setUser(user);
+  }, [user]);
 
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
@@ -283,27 +294,34 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
         delete newTranslations[reviewId];
         return newTranslations;
       });
+      setTranslationError(null);
+      return;
+    }
+
+    // Check if user is authenticated
+    if (!user) {
+      setTranslationError(t("loginRequired"));
       return;
     }
 
     setTranslatingIds(prev => new Set(prev).add(reviewId));
+    setTranslationError(null);
 
     try {
-      const response = await fetch("/api/translate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text,
-          targetLanguage: locale,
-        }),
-      });
+      const translatedText = await translationService.translate(text, locale);
 
-      if (response.ok) {
-        const { translatedText } = await response.json();
+      if (translatedText) {
         setTranslatedReviews(prev => ({ ...prev, [reviewId]: translatedText }));
       }
     } catch (error) {
       console.error("Error translating review:", error);
+      if (error instanceof RateLimitException) {
+        setTranslationError(t("rateLimitExceeded"));
+      } else if (error instanceof TranslationException) {
+        setTranslationError(error.message || t("translationFailed"));
+      } else {
+        setTranslationError(t("translationFailed"));
+      }
     } finally {
       setTranslatingIds(prev => {
         const newSet = new Set(prev);
@@ -311,7 +329,7 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
         return newSet;
       });
     }
-  }, [translatedReviews]);
+  }, [translatedReviews, locale, user, t]);
 
   // Rating statistics
   const ratingStats = React.useMemo(() => {

@@ -60,6 +60,10 @@ import { useUser } from "@/context/UserProvider";
 import { useFavorites } from "@/context/FavoritesProvider";
 import { Product, ProductUtils } from "@/app/models/Product";
 import { useProductCache } from "@/context/ProductCacheProvider";
+import translationService, {
+  RateLimitException,
+  TranslationException,
+} from "@/services/translation_service";
 
 // ✅ LAZY LOAD: Heavy components
 const ProductCollectionWidget = lazy(
@@ -353,6 +357,11 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   const { user } = useUser();
   const { addToFavorites, removeMultipleFromFavorites, isFavorite } =
     useFavorites();
+
+  // Set up translation service with current user
+  useEffect(() => {
+    translationService.setUser(user);
+  }, [user]);
 
   // ============= TRANSLATION HELPER =============
   const t = useCallback(
@@ -896,40 +905,40 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
       return;
     }
 
+    // Check if user is authenticated
+    if (!user) {
+      setDescriptionTranslationError(t("loginRequired"));
+      return;
+    }
+
     setIsDescriptionTranslating(true);
     setDescriptionTranslationError(null);
 
     try {
-      const response = await fetch("/api/translate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: product.description,
-          targetLanguage: locale,
-        }),
-      });
+      const translation = await translationService.translate(
+        product.description,
+        locale
+      );
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.translatedText) {
-          setTranslatedDescription(data.translatedText);
-          setIsDescriptionTranslated(true);
-        } else {
-          setDescriptionTranslationError(t("translationFailed"));
-        }
-      } else if (response.status === 429) {
-        setDescriptionTranslationError(t("rateLimitExceeded"));
+      if (translation) {
+        setTranslatedDescription(translation);
+        setIsDescriptionTranslated(true);
       } else {
-        const errorData = await response.json().catch(() => ({}));
-        setDescriptionTranslationError(errorData.error || t("translationFailed"));
+        setDescriptionTranslationError(t("translationFailed"));
       }
     } catch (error) {
       console.error("Translation error:", error);
-      setDescriptionTranslationError(t("translationFailed"));
+      if (error instanceof RateLimitException) {
+        setDescriptionTranslationError(t("rateLimitExceeded"));
+      } else if (error instanceof TranslationException) {
+        setDescriptionTranslationError(error.message || t("translationFailed"));
+      } else {
+        setDescriptionTranslationError(t("translationFailed"));
+      }
     } finally {
       setIsDescriptionTranslating(false);
     }
-  }, [product?.description, isDescriptionTranslating, isDescriptionTranslated, translatedDescription, t]);
+  }, [product?.description, isDescriptionTranslating, isDescriptionTranslated, translatedDescription, t, user, locale]);
 
   // Reset translation state when product changes
   useEffect(() => {

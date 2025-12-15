@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getFirestoreAdmin } from "@/lib/firebase-admin";
+import { sanitizeText, sanitizeQuestionInput } from "@/lib/sanitize";
 
 export async function GET(
   request: NextRequest,
@@ -114,25 +115,27 @@ export async function POST(
     const db = getFirestoreAdmin();
     const body = await request.json();
     const { productId } = await params;
-    
-    const { 
-      sellerId, 
-      isShop, 
-      questionText, 
-      askerNameVisible 
-    } = body;
 
-    // Validate required fields
-    if (!productId || !sellerId || !questionText || typeof isShop !== "boolean") {
+    // Sanitize and validate all input using the sanitization library
+    let sanitizedInput;
+    try {
+      sanitizedInput = sanitizeQuestionInput({
+        sellerId: body.sellerId,
+        isShop: body.isShop,
+        questionText: body.questionText,
+        askerNameVisible: body.askerNameVisible,
+      });
+    } catch (validationError) {
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { error: validationError instanceof Error ? validationError.message : "Invalid input" },
         { status: 400 }
       );
     }
 
-    if (questionText.trim().length === 0 || questionText.length > 150) {
+    // Validate productId
+    if (!productId) {
       return NextResponse.json(
-        { error: "Invalid question text" },
+        { error: "Product ID is required" },
         { status: 400 }
       );
     }
@@ -141,8 +144,8 @@ export async function POST(
     const mockUserId = "current-user-id";
     const mockUserName = "Test User";
 
-    // Normalize productId (same logic as your GET method)
-    let rawId = productId.trim();
+    // Normalize productId (sanitize first)
+    let rawId = sanitizeText(productId.trim());
     const p1 = "products_";
     const p2 = "shop_products_";
     if (rawId.startsWith(p1)) {
@@ -151,8 +154,15 @@ export async function POST(
       rawId = rawId.substring(p2.length);
     }
 
-    // Determine collection
-    const productCollection = isShop ? "shop_products" : "products";
+    if (!rawId) {
+      return NextResponse.json(
+        { error: "Invalid product ID" },
+        { status: 400 }
+      );
+    }
+
+    // Determine collection using sanitized input
+    const productCollection = sanitizedInput.isShop ? "shop_products" : "products";
 
     // Get product data
     const productDoc = await db.collection(productCollection).doc(rawId).get();
@@ -161,15 +171,15 @@ export async function POST(
     }
     const productData = productDoc.data()!;
 
-    // Get seller data
-    const sellerCollection = isShop ? "shops" : "users";
-    const sellerDoc = await db.collection(sellerCollection).doc(sellerId).get();
+    // Get seller data using sanitized sellerId
+    const sellerCollection = sanitizedInput.isShop ? "shops" : "users";
+    const sellerDoc = await db.collection(sellerCollection).doc(sanitizedInput.sellerId).get();
     if (!sellerDoc.exists) {
       return NextResponse.json({ error: "Seller not found" }, { status: 404 });
     }
     const sellerData = sellerDoc.data()!;
 
-    // Create question document
+    // Create question document with sanitized data
     const questionRef = db
       .collection(productCollection)
       .doc(rawId)
@@ -181,17 +191,17 @@ export async function POST(
       productId: rawId,
       askerId: mockUserId,
       askerName: mockUserName,
-      askerNameVisible: askerNameVisible === true,
-      questionText: questionText.trim(),
+      askerNameVisible: sanitizedInput.askerNameVisible,
+      questionText: sanitizedInput.questionText,
       timestamp: new Date(),
       answered: false,
       productName: productData.productName || "",
       productImage: (productData.imageUrls && productData.imageUrls[0]) || "",
       productPrice: productData.price || 0,
       productRating: productData.averageRating || 0,
-      sellerId,
-      sellerName: isShop ? (sellerData.name || "") : (sellerData.displayName || ""),
-      sellerImage: isShop ? (sellerData.profileImageUrl || "") : (sellerData.profileImage || ""),
+      sellerId: sanitizedInput.sellerId,
+      sellerName: sanitizedInput.isShop ? (sellerData.name || "") : (sellerData.displayName || ""),
+      sellerImage: sanitizedInput.isShop ? (sellerData.profileImageUrl || "") : (sellerData.profileImage || ""),
     };
 
     // Save question

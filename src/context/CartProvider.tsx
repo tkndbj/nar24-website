@@ -35,10 +35,10 @@ import {
 } from "firebase/firestore";
 import { User } from "firebase/auth";
 import { ProductUtils, Product } from "@/app/models/Product";
-import RedisService from "@/services/redis_service";
 import { httpsCallable, Functions } from "firebase/functions";
+import cartTotalsCache from "@/services/cart_totals_cache";
 import metricsEventService from "@/services/cartfavoritesmetricsEventService";
-import { userActivityService } from '@/services/userActivity';
+import { userActivityService } from "@/services/userActivity";
 
 // ============================================================================
 // TYPES - Matching Flutter implementation
@@ -436,9 +436,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     new Map()
   );
   const pendingFetchesRef = useRef<Map<string, Promise<unknown>>>(new Map());
-
-  // Redis service instance
-  const redisRef = useRef(RedisService);
 
   // ========================================================================
   // HELPER FUNCTIONS
@@ -871,9 +868,8 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         return uniqueItems;
       });
 
-      // Invalidate Redis cache
       if (user) {
-        redisRef.current.invalidateCartTotals(user.uid);
+        cartTotalsCache.invalidateForUser(user.uid);
       }
     },
     [
@@ -1205,7 +1201,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         console.log("✅ Added to cart:", product.id);
 
         // Invalidate totals cache
-        redisRef.current.invalidateCartTotals(user.uid);
+        cartTotalsCache.invalidateForUser(user.uid);
 
         // Background refresh totals
         backgroundRefreshTotals();
@@ -1351,6 +1347,8 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           shopId,
         });
 
+        cartTotalsCache.invalidateForUser(user.uid);
+
         // Background refresh totals
         backgroundRefreshTotals();
 
@@ -1440,7 +1438,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           console.log("✅ Updated quantity:", productId, "=", newQuantity);
 
           // Invalidate totals cache
-          redisRef.current.invalidateCartTotals(user.uid);
+          cartTotalsCache.invalidateForUser(user.uid);
 
           // Background refresh totals
           backgroundRefreshTotals();
@@ -1500,7 +1498,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         });
 
         console.log(`✅ Removed ${productIds.length} items`);
-        redisRef.current.invalidateCartTotals(user.uid);
+        cartTotalsCache.invalidateForUser(user.uid);
 
         // Background refresh totals
         backgroundRefreshTotals();
@@ -1554,7 +1552,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   }, [user, db, buildCartItemsFromDocs]);
 
   // ========================================================================
-  // TOTALS CALCULATION - With Redis caching
+  // TOTALS CALCULATION
   // ========================================================================
 
   const deepConvertMap = (map: unknown): Record<string, unknown> => {
@@ -1599,17 +1597,20 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         return { total: 0, items: [], currency: "TL" };
       }
 
-      // Check Redis cache first
-      const cached = await redisRef.current.getCachedTotals(
-        user.uid,
-        productsToCalculate
-      );
+      // ✅ Check local cache first (instead of Redis)
+      const cached = cartTotalsCache.get(user.uid, productsToCalculate);
       if (cached) {
         console.log("⚡ Cache hit - instant total");
         return {
-          total: cached.total ?? 0,
-          currency: cached.currency ?? "TL",
-          items: cached.items ?? [],
+          total: cached.total,
+          currency: cached.currency,
+          items: cached.items.map((i) => ({
+            productId: i.productId,
+            unitPrice: i.unitPrice,
+            total: i.total,
+            quantity: i.quantity,
+            isBundleItem: i.isBundleItem,
+          })),
         };
       }
 
@@ -1662,12 +1663,18 @@ export const CartProvider: React.FC<CartProviderProps> = ({
             }),
           };
 
-          // Cache result in Redis
-          await redisRef.current.cacheTotals(
-            user.uid,
-            productsToCalculate,
-            totalsData
-          );
+          // ✅ Cache result locally (instead of Redis)
+          cartTotalsCache.set(user.uid, productsToCalculate, {
+            total: totals.total,
+            currency: totals.currency,
+            items: totals.items.map((i) => ({
+              productId: i.productId,
+              unitPrice: i.unitPrice,
+              total: i.total,
+              quantity: i.quantity,
+              isBundleItem: i.isBundleItem ?? false,
+            })),
+          });
 
           console.log(
             `✅ Total calculated: ${totals.total} ${totals.currency}`
@@ -1929,6 +1936,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         optimisticTimeoutsRef.current.forEach((timer) => clearTimeout(timer));
         optimisticTimeoutsRef.current.clear();
         quantityUpdateLocksRef.current.clear();
+        cartTotalsCache.clearAll();
       }
       return;
     }
@@ -1946,6 +1954,16 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, isInitialized]);
+
+  // Initialize cache on mount
+  useEffect(() => {
+    cartTotalsCache.initialize();
+
+    return () => {
+      // Note: Don't dispose on unmount as it's a singleton
+      // Only dispose if truly shutting down the app
+    };
+  }, []);
 
   // Cleanup on unmount
   useEffect(() => {

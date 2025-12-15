@@ -36,9 +36,9 @@ import {
 
 import { db } from "@/lib/firebase";
 import { useUser } from "./UserProvider";
-import redisService from "@/services/redis_service";
+
 import metricsEventService from "@/services/cartfavoritesmetricsEventService";
-import { userActivityService } from '@/services/userActivity';
+import { userActivityService } from "@/services/userActivity";
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -434,7 +434,9 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   );
 
   const getProductMetadata = useCallback(
-    async (productId: string): Promise<{
+    async (
+      productId: string
+    ): Promise<{
       shopId?: string;
       productName?: string;
       category?: string;
@@ -448,7 +450,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
           getDoc(doc(db, "products", productId)),
           getDoc(doc(db, "shop_products", productId)),
         ]);
-  
+
         // Prefer products collection if it exists
         if (productDoc.exists()) {
           const data = productDoc.data();
@@ -461,7 +463,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
             brand: data?.brandModel as string | undefined,
           };
         }
-  
+
         // Fall back to shop_products
         if (shopProductDoc.exists()) {
           const data = shopProductDoc.data();
@@ -474,7 +476,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
             brand: data?.brandModel as string | undefined,
           };
         }
-  
+
         return {};
       } catch (error) {
         console.warn("⚠️ Failed to get product metadata:", error);
@@ -508,19 +510,6 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
     try {
       const basketId = selectedBasketIdRef.current;
 
-      // Try Redis cache first
-      const cached = await redisService.getCachedFavoriteIds(
-        user.uid,
-        basketId
-      );
-
-      if (cached) {
-        console.log("⚡ Favorites cache hit:", cached.size, "items");
-        setFavoriteIds(cached);
-        setFavoriteCount(cached.size);
-        return;
-      }
-
       // Fetch from Firestore
       const collectionPath = basketId
         ? `users/${user.uid}/favorite_baskets/${basketId}/favorites`
@@ -538,9 +527,6 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
       setFavoriteIds(ids);
       setFavoriteCount(ids.size);
-
-      // Cache in Redis
-      await redisService.cacheFavoriteIds(user.uid, ids, basketId);
     } catch (error) {
       console.error("❌ Load favorites error:", error);
     }
@@ -613,10 +599,6 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         setFavoriteIds(ids);
         setFavoriteCount(ids.size);
 
-        // Invalidate Redis cache
-        if (user) {
-          redisService.invalidateFavorites(user.uid);
-        }
       },
       (error) => console.error("❌ Listener error:", error)
     );
@@ -703,13 +685,13 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
             await deleteDoc(existingSnap.docs[0].ref);
 
             const metadata = await getProductMetadata(productId);
-userActivityService.trackUnfavorite({
-  productId,
-  shopId: metadata.shopId || undefined,
-  productName: metadata.productName || undefined,
-  category: metadata.category || undefined,
-  brand: metadata.brand || undefined,
-});
+            userActivityService.trackUnfavorite({
+              productId,
+              shopId: metadata.shopId || undefined,
+              productName: metadata.productName || undefined,
+              category: metadata.category || undefined,
+              brand: metadata.brand || undefined,
+            });
 
             // ✅ STEP 3: Get shopId and log metrics
             const shopId = await getProductShopId(productId);
@@ -717,9 +699,6 @@ userActivityService.trackUnfavorite({
               productId,
               shopId,
             });
-
-            // STEP 4: Invalidate cache
-            await redisService.invalidateFavorites(user.uid);
 
             circuitBreaker.current.recordSuccess();
             showDebouncedRemoveToast();
@@ -826,9 +805,6 @@ userActivityService.trackUnfavorite({
               shopId,
             });
 
-            // STEP 4: Invalidate cache
-            await redisService.invalidateFavorites(user.uid);
-
             circuitBreaker.current.recordSuccess();
             showSuccessToast("Added to favorites");
             return "Added to favorites";
@@ -923,9 +899,6 @@ userActivityService.trackUnfavorite({
           productIds,
           shopIds,
         });
-
-        // STEP 5: Invalidate cache
-        await redisService.invalidateFavorites(user.uid);
 
         return "Products removed from favorites";
       } catch (error) {
@@ -1023,9 +996,6 @@ userActivityService.trackUnfavorite({
           shopId,
         });
 
-        // STEP 5: Invalidate cache
-        await redisService.invalidateFavorites(user.uid);
-
         console.log("✅ Removed", productId, "from all favorites");
         return "Removed from all favorites";
       } catch (error) {
@@ -1096,12 +1066,11 @@ userActivityService.trackUnfavorite({
         // Remove from current location
         await deleteDoc(itemSnapshot.docs[0].ref);
 
-        // Update cache
+        // Update local cache
         paginatedFavoritesMap.current.delete(productId);
         setPaginatedFavorites(
           Array.from(paginatedFavoritesMap.current.values())
         );
-        await redisService.invalidateFavorites(user.uid);
 
         console.log(
           "✅ Transferred",
@@ -1158,9 +1127,6 @@ userActivityService.trackUnfavorite({
         if (selectedBasketIdRef.current === basketId) {
           setSelectedBasket(null);
         }
-
-        // Invalidate cache
-        await redisService.invalidateFavorites(user.uid);
 
         showSuccessToast("Basket deleted");
         return "Basket deleted";

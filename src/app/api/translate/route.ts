@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
+import { sanitizeForTranslation } from "@/lib/sanitize";
 
 // Simple in-memory rate limiting by IP
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
@@ -83,7 +84,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { text, targetLanguage } = body;
 
-    // Input validation
+    // Input validation with sanitization
     if (!text || typeof text !== "string") {
       return NextResponse.json(
         { error: "Text is required" },
@@ -91,21 +92,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (text.length > 2000) {
+    // Sanitize input to prevent XSS and prompt injection
+    const sanitizedText = sanitizeForTranslation(text, 2000);
+    if (!sanitizedText) {
       return NextResponse.json(
-        { error: "Text too long (max 2000 characters)" },
+        { error: "Invalid or empty text (max 2000 characters)" },
         { status: 400 }
       );
     }
 
-    if (!targetLanguage || !SUPPORTED_LANGUAGES.includes(targetLanguage)) {
+    // Validate target language (strict whitelist)
+    if (!targetLanguage || typeof targetLanguage !== "string" || !SUPPORTED_LANGUAGES.includes(targetLanguage)) {
       return NextResponse.json(
         { error: "Invalid target language" },
         { status: 400 }
       );
     }
 
-    // Call OpenAI
+    // Call OpenAI with sanitized input
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       max_tokens: 1000,
@@ -116,7 +120,7 @@ export async function POST(req: NextRequest) {
         },
         {
           role: "user",
-          content: text,
+          content: sanitizedText,
         },
       ],
     });

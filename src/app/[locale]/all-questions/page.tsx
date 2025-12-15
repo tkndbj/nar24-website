@@ -15,6 +15,11 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { format } from "date-fns";
+import translationService, {
+  RateLimitException,
+  TranslationException,
+} from "@/services/translation_service";
+import { useUser } from "@/context/UserProvider";
 
 interface Question {
   id: string;
@@ -46,6 +51,7 @@ const AllQuestionsPage: React.FC<AllQuestionsPageProps> = ({}) => {
   const searchParams = useSearchParams();
   const localization = useTranslations();
   const locale = useLocale();
+  const { user } = useUser();
 
   // Extract query parameters
   const productId = searchParams.get("productId") || "";
@@ -64,6 +70,13 @@ const AllQuestionsPage: React.FC<AllQuestionsPageProps> = ({}) => {
   // Translation states
   const [translatedQuestions, setTranslatedQuestions] = useState<Record<string, { question: string; answer: string }>>({});
   const [translatingIds, setTranslatingIds] = useState<Set<string>>(new Set());
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [translationError, setTranslationError] = useState<string | null>(null);
+
+  // Set up translation service with current user
+  useEffect(() => {
+    translationService.setUser(user);
+  }, [user]);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
@@ -247,57 +260,48 @@ const AllQuestionsPage: React.FC<AllQuestionsPageProps> = ({}) => {
         delete newTranslations[questionId];
         return newTranslations;
       });
+      setTranslationError(null);
+      return;
+    }
+
+    // Check if user is authenticated
+    if (!user) {
+      setTranslationError(t("loginRequired"));
       return;
     }
 
     setTranslatingIds(prev => new Set(prev).add(questionId));
+    setTranslationError(null);
 
     try {
-      // Translate both question and answer in parallel
-      const requests = [
-        fetch("/api/translate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            text: questionText,
-            targetLanguage: locale,
-          }),
-        }),
-      ];
+      // Build texts array for batch translation
+      const textsToTranslate = answerText
+        ? [questionText, answerText]
+        : [questionText];
 
-      if (answerText) {
-        requests.push(
-          fetch("/api/translate", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              text: answerText,
-              targetLanguage: locale,
-            }),
-          })
-        );
-      }
+      const translations = await translationService.translateBatch(
+        textsToTranslate,
+        locale
+      );
 
-      const responses = await Promise.all(requests);
-
-      if (responses[0].ok) {
-        const questionData = await responses[0].json();
-        let answerData = { translatedText: "" };
-
-        if (responses[1] && responses[1].ok) {
-          answerData = await responses[1].json();
-        }
-
+      if (translations.length > 0) {
         setTranslatedQuestions(prev => ({
           ...prev,
           [questionId]: {
-            question: questionData.translatedText,
-            answer: answerData.translatedText || "",
+            question: translations[0],
+            answer: translations[1] || "",
           },
         }));
       }
     } catch (error) {
       console.error("Error translating question:", error);
+      if (error instanceof RateLimitException) {
+        setTranslationError(t("rateLimitExceeded"));
+      } else if (error instanceof TranslationException) {
+        setTranslationError(error.message || t("translationFailed"));
+      } else {
+        setTranslationError(t("translationFailed"));
+      }
     } finally {
       setTranslatingIds(prev => {
         const newSet = new Set(prev);
@@ -305,7 +309,7 @@ const AllQuestionsPage: React.FC<AllQuestionsPageProps> = ({}) => {
         return newSet;
       });
     }
-  }, [translatedQuestions, locale]);
+  }, [translatedQuestions, locale, user, t]);
 
   // Colors based on theme
   const colors = {
