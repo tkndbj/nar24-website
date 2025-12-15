@@ -600,8 +600,8 @@ export default function ProfilePage() {
             }`}
           >
             <div className="space-y-2 md:space-y-2.5">
-              {/* Pickup Points */}
-              <button
+              Pickup Points
+              {/* <button
                 onClick={() => handleNavigation("/pickup-points")}
                 className={`w-full flex items-center gap-2.5 md:gap-3 p-2.5 md:p-3 rounded-lg transition-colors text-left ${
                   isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"
@@ -624,14 +624,12 @@ export default function ProfilePage() {
                     isDarkMode ? "text-gray-600" : "text-gray-400"
                   }`}
                 />
-              </button>
-
-              <div
+              </button> */}
+              {/* <div
                 className={`border-t ${
                   isDarkMode ? "border-gray-700" : "border-gray-200"
                 }`}
-              ></div>
-
+              ></div> */}
               {/* My Receipts */}
               <button
                 onClick={() => handleNavigation("/receipts")}
@@ -657,13 +655,11 @@ export default function ProfilePage() {
                   }`}
                 />
               </button>
-
               <div
                 className={`border-t ${
                   isDarkMode ? "border-gray-700" : "border-gray-200"
                 }`}
               ></div>
-
               {/* Refund Form */}
               <button
                 onClick={() => handleNavigation("/refundform")}
@@ -689,13 +685,11 @@ export default function ProfilePage() {
                   }`}
                 />
               </button>
-
               <div
                 className={`border-t ${
                   isDarkMode ? "border-gray-700" : "border-gray-200"
                 }`}
               ></div>
-
               {/* Become a Seller */}
               <button
                 onClick={() => handleNavigation("/createshop")}
@@ -721,13 +715,11 @@ export default function ProfilePage() {
                   }`}
                 />
               </button>
-
               <div
                 className={`border-t ${
                   isDarkMode ? "border-gray-700" : "border-gray-200"
                 }`}
               ></div>
-
               {/* Account Settings */}
               <button
                 onClick={() => handleNavigation("/account-settings")}
@@ -753,13 +745,11 @@ export default function ProfilePage() {
                   }`}
                 />
               </button>
-
               <div
                 className={`border-t ${
                   isDarkMode ? "border-gray-700" : "border-gray-200"
                 }`}
               ></div>
-
               {/* Support and FAQ */}
               <button
                 onClick={() => handleNavigation("/support-and-faq")}
@@ -785,13 +775,11 @@ export default function ProfilePage() {
                   }`}
                 />
               </button>
-
               <div
                 className={`border-t ${
                   isDarkMode ? "border-gray-700" : "border-gray-200"
                 }`}
               ></div>
-
               {/* Logout */}
               <button
                 onClick={handleLogout}

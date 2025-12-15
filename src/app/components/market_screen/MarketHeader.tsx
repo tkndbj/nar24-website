@@ -220,8 +220,8 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
     return (
       <header
         className={`sticky top-0 z-[100] ${
-          isDark ? "bg-gray-900/95" : "bg-white/95"
-        } backdrop-blur-xl border-b ${
+          isDark ? "bg-gray-900" : "bg-white/95 backdrop-blur-xl"
+        } border-b ${
           isDark ? "border-gray-700/50" : "border-gray-200/50"
         } ${className}`}
       >
@@ -256,10 +256,10 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
         sticky top-0 z-[900]
         ${
           isDark
-            ? "bg-gray-900/95 border-gray-700/50"
-            : "bg-white/95 border-gray-200/50"
+            ? "bg-gray-900 border-gray-700/50"
+            : "bg-white/95 backdrop-blur-xl border-gray-200/50"
         }
-        backdrop-blur-xl border-b shadow-sm ${className}
+        border-b shadow-sm ${className}
       `}
       >
         <div className="safe-area-top">
@@ -295,7 +295,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                         absolute right-0 top-full mt-2 w-32
                         ${isDark ? "bg-gray-800" : "bg-white"}
                         border ${isDark ? "border-gray-700" : "border-gray-200"}
-                        rounded-lg shadow-xl backdrop-blur-xl z-50
+                        rounded-lg shadow-xl z-50
                         overflow-hidden
                       `}
                     >
@@ -471,7 +471,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
                       absolute right-0 top-full mt-2 w-32
                       ${isDark ? "bg-gray-800" : "bg-white"}
                       border ${isDark ? "border-gray-700" : "border-gray-200"}
-                      rounded-lg shadow-xl backdrop-blur-xl z-50
+                      rounded-lg shadow-xl z-50
                       overflow-hidden
                     `}
                   >
