@@ -14,7 +14,7 @@ import {
   Mail,
   MapPin,
   Package,
-  CreditCard,
+  // CreditCard,
   ShoppingCart,
   Upload,
   Star,
@@ -36,18 +36,24 @@ import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
 
 // Dynamic imports for heavy drawer components - only loaded when needed
-const SavedPaymentMethodsDrawer = dynamic(
-  () => import("@/app/components/profile/SavedPaymentMethodsDrawer").then((mod) => ({ default: mod.SavedPaymentMethodsDrawer })),
-  { ssr: false }
-);
+// const SavedPaymentMethodsDrawer = dynamic(
+//   () => import("@/app/components/profile/SavedPaymentMethodsDrawer").then((mod) => ({ default: mod.SavedPaymentMethodsDrawer })),
+//   { ssr: false }
+// );
 
 const SellerInfoDrawer = dynamic(
-  () => import("@/app/components/profile/SellerInfoDrawer").then((mod) => ({ default: mod.SellerInfoDrawer })),
+  () =>
+    import("@/app/components/profile/SellerInfoDrawer").then((mod) => ({
+      default: mod.SellerInfoDrawer,
+    })),
   { ssr: false }
 );
 
 const SavedAddressesDrawer = dynamic(
-  () => import("@/app/components/profile/AddressesDrawer").then((mod) => ({ default: mod.SavedAddressesDrawer })),
+  () =>
+    import("@/app/components/profile/AddressesDrawer").then((mod) => ({
+      default: mod.SavedAddressesDrawer,
+    })),
   { ssr: false }
 );
 
@@ -77,8 +83,8 @@ export default function ProfilePage() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isPaymentMethodsDrawerOpen, setIsPaymentMethodsDrawerOpen] =
-    useState(false);
+  // const [isPaymentMethodsDrawerOpen, setIsPaymentMethodsDrawerOpen] =
+  //   useState(false);
   const [isSellerInfoDrawerOpen, setIsSellerInfoDrawerOpen] = useState(false);
   const [isAddressesDrawerOpen, setIsAddressesDrawerOpen] = useState(false);
   const t = useTranslations();
@@ -230,12 +236,12 @@ export default function ProfilePage() {
       path: "/myproducts",
       gradient: "from-blue-500 to-blue-600",
     },
-    {
-      icon: CreditCard,
-      label: t("ProfilePage.paymentMethods"),
-      action: () => setIsPaymentMethodsDrawerOpen(true),
-      gradient: "from-green-500 to-green-600",
-    },
+    // {
+    //   icon: CreditCard,
+    //   label: t("ProfilePage.paymentMethods"),
+    //   action: () => setIsPaymentMethodsDrawerOpen(true),
+    //   gradient: "from-green-500 to-green-600",
+    // },
     {
       icon: MapPin,
       label: t("ProfilePage.myAddresses"),
@@ -309,9 +315,9 @@ export default function ProfilePage() {
         isDarkMode ? "bg-gray-900" : "bg-gray-50"
       }`}
       style={{
-        transform: 'translateZ(0)',
-        backfaceVisibility: 'hidden',
-        WebkitFontSmoothing: 'antialiased'
+        transform: "translateZ(0)",
+        backfaceVisibility: "hidden",
+        WebkitFontSmoothing: "antialiased",
       }}
     >
       <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
@@ -856,12 +862,12 @@ export default function ProfilePage() {
       </div>
 
       {/* Drawers */}
-      <SavedPaymentMethodsDrawer
+      {/* <SavedPaymentMethodsDrawer
         isOpen={isPaymentMethodsDrawerOpen}
         onClose={() => setIsPaymentMethodsDrawerOpen(false)}
         isDarkMode={isDarkMode}
         localization={t}
-      />
+      /> */}
       <SellerInfoDrawer
         isOpen={isSellerInfoDrawerOpen}
         onClose={() => setIsSellerInfoDrawerOpen(false)}

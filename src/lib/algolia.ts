@@ -1,5 +1,5 @@
 // lib/algolia.ts - Enhanced Production-Grade Implementation
-import { algoliasearch, SearchClient } from 'algoliasearch';
+import { algoliasearch, SearchClient } from "algoliasearch";
 
 export interface Suggestion {
   id: string;
@@ -166,37 +166,37 @@ class RetryHelper {
     maxAttempts: number = 3,
     delayFactor: number = 200
   ): Promise<T> {
-    let lastError: Error = new Error('Unknown error');
-    
+    let lastError: Error = new Error("Unknown error");
+
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         return await fn();
       } catch (error) {
         lastError = error as Error;
         console.warn(`Attempt ${attempt}/${maxAttempts} failed:`, error);
-        
+
         // Don't retry on certain errors
-        if (error instanceof Error && error.message.includes('4')) {
+        if (error instanceof Error && error.message.includes("4")) {
           throw error; // Client errors (400-499)
         }
-        
+
         if (attempt < maxAttempts) {
           const delay = delayFactor * Math.pow(2, attempt - 1);
-          await new Promise(resolve => setTimeout(resolve, delay));
+          await new Promise((resolve) => setTimeout(resolve, delay));
         }
       }
     }
-    
+
     throw lastError;
   }
 }
 
 class AlgoliaServiceManager {
   private static instance: AlgoliaServiceManager;
-  private readonly applicationId = process.env.NEXT_PUBLIC_ALGOLIA_APP_ID || '3QVVGQH4ME';
-  private readonly apiKey = process.env.NEXT_PUBLIC_ALGOLIA_API_KEY || 'dcca6685e21c2baed748ccea7a6ddef1';
+  private readonly applicationId = process.env.NEXT_PUBLIC_ALGOLIA_APP_ID;
+  private readonly apiKey = process.env.NEXT_PUBLIC_ALGOLIA_API_KEY;
   private client: SearchClient;
-  
+
   // Enhanced caching
   private cache = new Map<string, CacheEntry<CacheableData>>();
   private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
@@ -204,7 +204,7 @@ class AlgoliaServiceManager {
 
   private constructor() {
     if (!this.applicationId || !this.apiKey) {
-      throw new Error('Missing Algolia configuration');
+      throw new Error("Missing Algolia configuration");
     }
     this.client = algoliasearch(this.applicationId, this.apiKey);
   }
@@ -218,13 +218,15 @@ class AlgoliaServiceManager {
 
   private getCacheKey(
     indexName: string,
-    query: string, 
-    page: number, 
-    hitsPerPage: number, 
+    query: string,
+    page: number,
+    hitsPerPage: number,
     filters?: string,
     sortOption?: string
   ): string {
-    return `${indexName}-${query}-${page}-${hitsPerPage}-${filters || ''}-${sortOption || ''}`;
+    return `${indexName}-${query}-${page}-${hitsPerPage}-${filters || ""}-${
+      sortOption || ""
+    }`;
   }
 
   private isValidCache(timestamp: number): boolean {
@@ -250,7 +252,7 @@ class AlgoliaServiceManager {
         this.cache.delete(oldestKey);
       }
     }
-    
+
     this.cache.set(key, { data: data as CacheableData, timestamp: Date.now() });
   }
 
@@ -274,17 +276,17 @@ class AlgoliaServiceManager {
 
   private buildFilters(filterType?: string): string | undefined {
     if (!filterType) return undefined;
-    
+
     switch (filterType) {
-      case 'deals':
-        return 'discountPercentage>0';
-      case 'boosted':
-        return 'isBoosted:true';
-      case 'trending':
-        return 'dailyClickCount>=10';
-      case 'fiveStar':
-        return 'averageRating=5';
-      case 'bestSellers':
+      case "deals":
+        return "discountPercentage>0";
+      case "boosted":
+        return "isBoosted:true";
+      case "trending":
+        return "dailyClickCount>=10";
+      case "fiveStar":
+        return "averageRating=5";
+      case "bestSellers":
         // This should use a specific replica index
         return undefined;
       default:
@@ -296,31 +298,70 @@ class AlgoliaServiceManager {
     return {
       id: hit.objectID || `unknown-${Math.random().toString(36).substr(2, 9)}`,
       productName: hit.productName || "Unknown Product",
-      price: hit.price ? (typeof hit.price === 'string' ? parseFloat(hit.price) : hit.price) || 0 : 0,
-      originalPrice: hit.originalPrice ? (typeof hit.originalPrice === 'string' ? parseFloat(hit.originalPrice) : hit.originalPrice) : undefined,
-      discountPercentage: hit.discountPercentage ? (typeof hit.discountPercentage === 'string' ? parseFloat(hit.discountPercentage) : hit.discountPercentage) || 0 : 0,
+      price: hit.price
+        ? (typeof hit.price === "string" ? parseFloat(hit.price) : hit.price) ||
+          0
+        : 0,
+      originalPrice: hit.originalPrice
+        ? typeof hit.originalPrice === "string"
+          ? parseFloat(hit.originalPrice)
+          : hit.originalPrice
+        : undefined,
+      discountPercentage: hit.discountPercentage
+        ? (typeof hit.discountPercentage === "string"
+            ? parseFloat(hit.discountPercentage)
+            : hit.discountPercentage) || 0
+        : 0,
       currency: hit.currency || "TL",
       imageUrls: Array.isArray(hit.imageUrls) ? hit.imageUrls : [],
-      colorImages: hit.colorImages as Record<string, string[]> || {},
+      colorImages: (hit.colorImages as Record<string, string[]>) || {},
       description: hit.description || "",
       brandModel: hit.brandModel,
       condition: hit.condition || "new",
-      quantity: hit.quantity ? (typeof hit.quantity === 'string' ? parseInt(hit.quantity) : hit.quantity) : undefined,
-      averageRating: hit.averageRating ? (typeof hit.averageRating === 'string' ? parseFloat(hit.averageRating) : hit.averageRating) || 0 : 0,
+      quantity: hit.quantity
+        ? typeof hit.quantity === "string"
+          ? parseInt(hit.quantity)
+          : hit.quantity
+        : undefined,
+      averageRating: hit.averageRating
+        ? (typeof hit.averageRating === "string"
+            ? parseFloat(hit.averageRating)
+            : hit.averageRating) || 0
+        : 0,
       isBoosted: Boolean(hit.isBoosted),
       deliveryOption: hit.deliveryOption,
       campaignName: hit.campaignName,
-      dailyClickCount: hit.dailyClickCount ? (typeof hit.dailyClickCount === 'string' ? parseInt(hit.dailyClickCount) : hit.dailyClickCount) || 0 : 0,
-      purchaseCount: hit.purchaseCount ? (typeof hit.purchaseCount === 'string' ? parseInt(hit.purchaseCount) : hit.purchaseCount) || 0 : 0,
+      dailyClickCount: hit.dailyClickCount
+        ? (typeof hit.dailyClickCount === "string"
+            ? parseInt(hit.dailyClickCount)
+            : hit.dailyClickCount) || 0
+        : 0,
+      purchaseCount: hit.purchaseCount
+        ? (typeof hit.purchaseCount === "string"
+            ? parseInt(hit.purchaseCount)
+            : hit.purchaseCount) || 0
+        : 0,
       createdAt: hit.createdAt || new Date().toISOString(),
       category: hit.category,
       subcategory: hit.subcategory,
       subsubcategory: hit.subsubcategory,
       userId: hit.userId,
       sellerName: hit.sellerName,
-      reviewCount: hit.reviewCount ? (typeof hit.reviewCount === 'string' ? parseInt(hit.reviewCount) : hit.reviewCount) : undefined,
-      clickCount: hit.clickCount ? (typeof hit.clickCount === 'string' ? parseInt(hit.clickCount) : hit.clickCount) : undefined,
-      rankingScore: hit.rankingScore ? (typeof hit.rankingScore === 'string' ? parseFloat(hit.rankingScore) : hit.rankingScore) : undefined,
+      reviewCount: hit.reviewCount
+        ? typeof hit.reviewCount === "string"
+          ? parseInt(hit.reviewCount)
+          : hit.reviewCount
+        : undefined,
+      clickCount: hit.clickCount
+        ? typeof hit.clickCount === "string"
+          ? parseInt(hit.clickCount)
+          : hit.clickCount
+        : undefined,
+      rankingScore: hit.rankingScore
+        ? typeof hit.rankingScore === "string"
+          ? parseFloat(hit.rankingScore)
+          : hit.rankingScore
+        : undefined,
       collection: hit.collection,
       shopId: hit.shopId,
     };
@@ -336,23 +377,47 @@ class AlgoliaServiceManager {
   ): Promise<Product[]> {
     const replicaIndex = this.getReplicaIndexName(indexName, sortOption);
     const filters = this.buildFilters(filterType);
-    
+
     const searchParams: SearchParams = {
       query,
       page,
       hitsPerPage,
       attributesToRetrieve: [
-        "objectID", "productName", "price", "originalPrice", "discountPercentage", "currency",
-        "imageUrls", "colorImages", "description", "brandModel", "condition", "quantity",
-        "averageRating", "isBoosted", "deliveryOption", "campaignName", "dailyClickCount",
-        "purchaseCount", "createdAt", "category", "subcategory", "subsubcategory",
-        "userId", "sellerName", "reviewCount", "clickCount", "rankingScore", "collection", "shopId"
+        "objectID",
+        "productName",
+        "price",
+        "originalPrice",
+        "discountPercentage",
+        "currency",
+        "imageUrls",
+        "colorImages",
+        "description",
+        "brandModel",
+        "condition",
+        "quantity",
+        "averageRating",
+        "isBoosted",
+        "deliveryOption",
+        "campaignName",
+        "dailyClickCount",
+        "purchaseCount",
+        "createdAt",
+        "category",
+        "subcategory",
+        "subsubcategory",
+        "userId",
+        "sellerName",
+        "reviewCount",
+        "clickCount",
+        "rankingScore",
+        "collection",
+        "shopId",
       ],
       attributesToHighlight: [],
       distinct: 0,
       analytics: false,
       clickAnalytics: false,
-      facets: []
+      facets: [],
     };
 
     if (filters) {
@@ -362,10 +427,10 @@ class AlgoliaServiceManager {
     return RetryHelper.retry(async () => {
       const searchResult = await this.client.searchSingleIndex({
         indexName: replicaIndex,
-        searchParams
+        searchParams,
       });
 
-      return searchResult.hits.map((hit: AlgoliaProductHit) => 
+      return searchResult.hits.map((hit: AlgoliaProductHit) =>
         this.mapAlgoliaHitToProduct(hit)
       );
     });
@@ -384,8 +449,15 @@ class AlgoliaServiceManager {
   ): Promise<Product[]> {
     if (!query.trim()) return [];
 
-    const cacheKey = this.getCacheKey(indexName, query, page, hitsPerPage, filterType, sortOption);
-    
+    const cacheKey = this.getCacheKey(
+      indexName,
+      query,
+      page,
+      hitsPerPage,
+      filterType,
+      sortOption
+    );
+
     // Check cache first
     const cached = this.getFromCache<Product[]>(cacheKey);
     if (cached) {
@@ -400,11 +472,11 @@ class AlgoliaServiceManager {
       let mainResults: Product[] = [];
       try {
         mainResults = await this.searchSingleIndex(
-          indexName, 
-          query, 
-          page, 
-          hitsPerPage, 
-          filterType, 
+          indexName,
+          query,
+          page,
+          hitsPerPage,
+          filterType,
           sortOption
         );
         console.log(`✅ Found ${mainResults.length} products in ${indexName}`);
@@ -414,18 +486,23 @@ class AlgoliaServiceManager {
 
       // Strategy 2: Search shop_products index if primary failed or returned few results
       let shopResults: Product[] = [];
-      if (indexName !== 'shop_products' && (mainResults.length === 0 || mainResults.length < hitsPerPage / 2)) {
+      if (
+        indexName !== "shop_products" &&
+        (mainResults.length === 0 || mainResults.length < hitsPerPage / 2)
+      ) {
         try {
           console.log(`🔍 Searching shop_products as fallback/supplement`);
           shopResults = await this.searchSingleIndex(
-            'shop_products', 
-            query, 
-            page, 
-            hitsPerPage, 
-            filterType, 
+            "shop_products",
+            query,
+            page,
+            hitsPerPage,
+            filterType,
             sortOption
           );
-          console.log(`✅ Found ${shopResults.length} products in shop_products`);
+          console.log(
+            `✅ Found ${shopResults.length} products in shop_products`
+          );
         } catch (error) {
           console.warn(`❌ Shop products index failed:`, error);
         }
@@ -434,14 +511,14 @@ class AlgoliaServiceManager {
       // Merge and deduplicate results (mimicking Flutter logic)
       const merged: Product[] = [];
       const seen = new Set<string>();
-      
+
       // Add main results first
       for (const product of mainResults) {
         if (seen.has(product.id)) continue;
         seen.add(product.id);
         merged.push(product);
       }
-      
+
       // Add shop results
       for (const product of shopResults) {
         if (seen.has(product.id)) continue;
@@ -451,13 +528,12 @@ class AlgoliaServiceManager {
 
       // Cache the result
       this.setCache(cacheKey, merged);
-      
+
       console.log(`✅ Final merged results: ${merged.length} products`);
       return merged;
-
     } catch (error: unknown) {
       console.error(`❌ Complete search failure for "${query}":`, error);
-      
+
       // Return empty array instead of throwing to prevent app crashes
       return [];
     }
@@ -475,7 +551,7 @@ class AlgoliaServiceManager {
   ): Promise<Suggestion[]> {
     const replicaIndex = this.getReplicaIndexName(indexName, sortOption);
     const cacheKey = this.getCacheKey(replicaIndex, query, page, hitsPerPage);
-    
+
     const cached = this.getFromCache<Suggestion[]>(cacheKey);
     if (cached) {
       console.log(`🎯 Suggestion cache hit for: ${cacheKey}`);
@@ -493,16 +569,26 @@ class AlgoliaServiceManager {
           hitsPerPage,
           attributesToRetrieve: ["objectID", "productName", "price"],
           attributesToHighlight: [],
-        }
+        },
       });
 
-      console.log(`✅ ${replicaIndex} returned ${searchResult.hits.length} suggestion hits`);
+      console.log(
+        `✅ ${replicaIndex} returned ${searchResult.hits.length} suggestion hits`
+      );
 
-      const suggestions = searchResult.hits.map((hit: AlgoliaSuggestionHit) => ({
-        id: hit.objectID || `unknown-${Math.random().toString(36).substr(2, 9)}`,
-        name: hit.productName || "Unknown Product",
-        price: hit.price ? (typeof hit.price === 'string' ? parseFloat(hit.price) : hit.price) || 0 : 0,
-      }));
+      const suggestions = searchResult.hits.map(
+        (hit: AlgoliaSuggestionHit) => ({
+          id:
+            hit.objectID ||
+            `unknown-${Math.random().toString(36).substr(2, 9)}`,
+          name: hit.productName || "Unknown Product",
+          price: hit.price
+            ? (typeof hit.price === "string"
+                ? parseFloat(hit.price)
+                : hit.price) || 0
+            : 0,
+        })
+      );
 
       this.setCache(cacheKey, suggestions);
       return suggestions;
@@ -520,8 +606,14 @@ class AlgoliaServiceManager {
     hitsPerPage: number = 15,
     languageCode?: string
   ): Promise<CategorySuggestion[]> {
-    const cacheKey = this.getCacheKey('categories', query, 0, hitsPerPage, languageCode || 'all');
-    
+    const cacheKey = this.getCacheKey(
+      "categories",
+      query,
+      0,
+      hitsPerPage,
+      languageCode || "all"
+    );
+
     const cached = this.getFromCache<CategorySuggestion[]>(cacheKey);
     if (cached) {
       console.log(`🎯 Category cache hit for: ${cacheKey}`);
@@ -535,8 +627,14 @@ class AlgoliaServiceManager {
         query,
         hitsPerPage,
         attributesToRetrieve: [
-          "objectID", "categoryKey", "subcategoryKey", "subsubcategoryKey",
-          "displayName", "type", "level", "languageCode"
+          "objectID",
+          "categoryKey",
+          "subcategoryKey",
+          "subsubcategoryKey",
+          "displayName",
+          "type",
+          "level",
+          "languageCode",
         ],
         attributesToHighlight: ["displayName", "searchableText"],
         typoTolerance: true,
@@ -547,14 +645,16 @@ class AlgoliaServiceManager {
       }
 
       const searchResult = await this.client.searchSingleIndex({
-        indexName: 'categories',
-        searchParams
+        indexName: "categories",
+        searchParams,
       });
 
       console.log(`✅ Categories returned ${searchResult.hits.length} hits`);
 
       const categories = searchResult.hits.map((hit: AlgoliaCategoryHit) => ({
-        id: hit.objectID || `unknown-category-${Math.random().toString(36).substr(2, 9)}`,
+        id:
+          hit.objectID ||
+          `unknown-category-${Math.random().toString(36).substr(2, 9)}`,
         categoryKey: hit.categoryKey,
         subcategoryKey: hit.subcategoryKey,
         subsubcategoryKey: hit.subsubcategoryKey,
@@ -575,118 +675,168 @@ class AlgoliaServiceManager {
   /**
    * Search for shops
    */
- /**
- * Search for shops
- */
-async searchShops(
-  query: string,
-  hitsPerPage: number = 100,
-  page: number = 0,
-  filters?: string  // Add this parameter
-): Promise<Shop[]> {
-  const cacheKey = this.getCacheKey('shops', query, page, hitsPerPage, filters);
-
-  const cached = this.getFromCache<Shop[]>(cacheKey);
-  if (cached) {
-    console.log(`🎯 Shop cache hit for: ${cacheKey}`);
-    return cached;
-  }
-
-  try {
-    console.log(`🔍 Searching shops with query: "${query}"${filters ? ` with filters: ${filters}` : ''}`);
-
-    const searchParams: SearchParams = {
+  /**
+   * Search for shops
+   */
+  async searchShops(
+    query: string,
+    hitsPerPage: number = 100,
+    page: number = 0,
+    filters?: string // Add this parameter
+  ): Promise<Shop[]> {
+    const cacheKey = this.getCacheKey(
+      "shops",
       query,
       page,
       hitsPerPage,
-      attributesToRetrieve: [
-        "objectID", "name", "profileImageUrl", "coverImageUrls", "homeImageUrls",
-        "address", "averageRating", "reviewCount", "followerCount", "clickCount",
-        "categories", "contactNo", "ownerId", "isBoosted", "createdAt", "isActive"  // Add isActive here
-      ],
-      attributesToHighlight: ["name", "address"],
-      typoTolerance: true,
-      distinct: 0,
-      analytics: false,
-      clickAnalytics: false,
-      facets: []
-    };
+      filters
+    );
 
-    // Add filters if provided
-    if (filters) {
-      searchParams.filters = filters;
+    const cached = this.getFromCache<Shop[]>(cacheKey);
+    if (cached) {
+      console.log(`🎯 Shop cache hit for: ${cacheKey}`);
+      return cached;
     }
 
-    const searchResult = await this.client.searchSingleIndex({
-      indexName: 'shops',
-      searchParams
-    });
+    try {
+      console.log(
+        `🔍 Searching shops with query: "${query}"${
+          filters ? ` with filters: ${filters}` : ""
+        }`
+      );
 
-    console.log(`✅ Shops returned ${searchResult.hits.length} hits`);
-
-    // Debug: Log first hit to see what we're getting
-    if (searchResult.hits.length > 0) {
-      const firstHit = searchResult.hits[0] as AlgoliaShopHit;
-      console.log('🔍 First shop hit - ALL fields:', firstHit);
-      console.log('🔍 First shop hit - image fields:', {
-        objectID: firstHit.objectID,
-        name: firstHit.name,
-        coverImageUrls: firstHit.coverImageUrls,
-        homeImageUrls: firstHit.homeImageUrls,
-        profileImageUrl: firstHit.profileImageUrl,
-      });
-    }
-
-    const shops = searchResult.hits.map((hit: AlgoliaShopHit) => {
-      // Handle coverImageUrls - could be array, single string, or might need fallback to homeImageUrls
-      let coverUrls: string[] = [];
-
-      // Try coverImageUrls first
-      if (Array.isArray(hit.coverImageUrls) && hit.coverImageUrls.length > 0) {
-        coverUrls = hit.coverImageUrls;
-      } else if (typeof hit.coverImageUrls === 'string' && hit.coverImageUrls) {
-        coverUrls = [hit.coverImageUrls];
-      }
-      // Fallback to homeImageUrls if coverImageUrls is empty
-      else if (Array.isArray(hit.homeImageUrls) && hit.homeImageUrls.length > 0) {
-        coverUrls = hit.homeImageUrls;
-      } else if (typeof hit.homeImageUrls === 'string' && hit.homeImageUrls) {
-        coverUrls = [hit.homeImageUrls];
-      }
-
-      return {
-        id: hit.objectID || `unknown-shop-${Math.random().toString(36).substr(2, 9)}`,
-        name: hit.name || "Unknown Shop",
-        profileImageUrl: hit.profileImageUrl || "",
-        coverImageUrls: coverUrls,
-        address: hit.address || "",
-        averageRating: hit.averageRating ? (typeof hit.averageRating === 'string' ? parseFloat(hit.averageRating) : hit.averageRating) || 0 : 0,
-        reviewCount: hit.reviewCount ? (typeof hit.reviewCount === 'string' ? parseInt(hit.reviewCount) : hit.reviewCount) || 0 : 0,
-        followerCount: hit.followerCount ? (typeof hit.followerCount === 'string' ? parseInt(hit.followerCount) : hit.followerCount) || 0 : 0,
-        clickCount: hit.clickCount ? (typeof hit.clickCount === 'string' ? parseInt(hit.clickCount) : hit.clickCount) || 0 : 0,
-        categories: Array.isArray(hit.categories) ? hit.categories : [],
-        contactNo: hit.contactNo || "",
-        ownerId: hit.ownerId || "",
-        isBoosted: Boolean(hit.isBoosted),
-        createdAt: hit.createdAt || new Date().toISOString(),
-        isActive: hit.isActive !== undefined ? Boolean(hit.isActive) : true,
+      const searchParams: SearchParams = {
+        query,
+        page,
+        hitsPerPage,
+        attributesToRetrieve: [
+          "objectID",
+          "name",
+          "profileImageUrl",
+          "coverImageUrls",
+          "homeImageUrls",
+          "address",
+          "averageRating",
+          "reviewCount",
+          "followerCount",
+          "clickCount",
+          "categories",
+          "contactNo",
+          "ownerId",
+          "isBoosted",
+          "createdAt",
+          "isActive", // Add isActive here
+        ],
+        attributesToHighlight: ["name", "address"],
+        typoTolerance: true,
+        distinct: 0,
+        analytics: false,
+        clickAnalytics: false,
+        facets: [],
       };
-    });
 
-    this.setCache(cacheKey, shops);
-    return shops;
-  } catch (error) {
-    console.error("❌ Shop search error:", error);
-    return [];
+      // Add filters if provided
+      if (filters) {
+        searchParams.filters = filters;
+      }
+
+      const searchResult = await this.client.searchSingleIndex({
+        indexName: "shops",
+        searchParams,
+      });
+
+      console.log(`✅ Shops returned ${searchResult.hits.length} hits`);
+
+      // Debug: Log first hit to see what we're getting
+      if (searchResult.hits.length > 0) {
+        const firstHit = searchResult.hits[0] as AlgoliaShopHit;
+        console.log("🔍 First shop hit - ALL fields:", firstHit);
+        console.log("🔍 First shop hit - image fields:", {
+          objectID: firstHit.objectID,
+          name: firstHit.name,
+          coverImageUrls: firstHit.coverImageUrls,
+          homeImageUrls: firstHit.homeImageUrls,
+          profileImageUrl: firstHit.profileImageUrl,
+        });
+      }
+
+      const shops = searchResult.hits.map((hit: AlgoliaShopHit) => {
+        // Handle coverImageUrls - could be array, single string, or might need fallback to homeImageUrls
+        let coverUrls: string[] = [];
+
+        // Try coverImageUrls first
+        if (
+          Array.isArray(hit.coverImageUrls) &&
+          hit.coverImageUrls.length > 0
+        ) {
+          coverUrls = hit.coverImageUrls;
+        } else if (
+          typeof hit.coverImageUrls === "string" &&
+          hit.coverImageUrls
+        ) {
+          coverUrls = [hit.coverImageUrls];
+        }
+        // Fallback to homeImageUrls if coverImageUrls is empty
+        else if (
+          Array.isArray(hit.homeImageUrls) &&
+          hit.homeImageUrls.length > 0
+        ) {
+          coverUrls = hit.homeImageUrls;
+        } else if (typeof hit.homeImageUrls === "string" && hit.homeImageUrls) {
+          coverUrls = [hit.homeImageUrls];
+        }
+
+        return {
+          id:
+            hit.objectID ||
+            `unknown-shop-${Math.random().toString(36).substr(2, 9)}`,
+          name: hit.name || "Unknown Shop",
+          profileImageUrl: hit.profileImageUrl || "",
+          coverImageUrls: coverUrls,
+          address: hit.address || "",
+          averageRating: hit.averageRating
+            ? (typeof hit.averageRating === "string"
+                ? parseFloat(hit.averageRating)
+                : hit.averageRating) || 0
+            : 0,
+          reviewCount: hit.reviewCount
+            ? (typeof hit.reviewCount === "string"
+                ? parseInt(hit.reviewCount)
+                : hit.reviewCount) || 0
+            : 0,
+          followerCount: hit.followerCount
+            ? (typeof hit.followerCount === "string"
+                ? parseInt(hit.followerCount)
+                : hit.followerCount) || 0
+            : 0,
+          clickCount: hit.clickCount
+            ? (typeof hit.clickCount === "string"
+                ? parseInt(hit.clickCount)
+                : hit.clickCount) || 0
+            : 0,
+          categories: Array.isArray(hit.categories) ? hit.categories : [],
+          contactNo: hit.contactNo || "",
+          ownerId: hit.ownerId || "",
+          isBoosted: Boolean(hit.isBoosted),
+          createdAt: hit.createdAt || new Date().toISOString(),
+          isActive: hit.isActive !== undefined ? Boolean(hit.isActive) : true,
+        };
+      });
+
+      this.setCache(cacheKey, shops);
+      return shops;
+    } catch (error) {
+      console.error("❌ Shop search error:", error);
+      return [];
+    }
   }
-}
 
   /**
    * Clear all cached data
    */
   clearCache(): void {
     this.cache.clear();
-    console.log('🧹 Algolia cache cleared');
+    console.log("🧹 Algolia cache cleared");
   }
 
   /**
