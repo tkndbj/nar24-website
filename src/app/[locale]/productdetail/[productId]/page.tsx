@@ -386,6 +386,18 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  const isOutOfStock = useMemo(() => {
+    if (!product) return false;
+  
+    const hasNoBaseStock = product.quantity === 0;
+    const colorQuantities = product.colorQuantities || {};
+    const allColorQuantitiesZero = Object.values(colorQuantities).every(
+      (qty) => (qty as number) === 0
+    );
+  
+    return hasNoBaseStock && allColorQuantitiesZero;
+  }, [product]);
+
   // ============= BATCH DATA FETCHING =============
   const fetchBatchData = useCallback(
     async (id: string) => {
@@ -1132,11 +1144,14 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               </button>
 
               <button
-                onClick={handleBuyNow}
-                className="py-2 px-3 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white rounded-lg font-semibold text-xs transition-all duration-300 flex items-center justify-center whitespace-nowrap shadow-lg flex-shrink-0"
-              >
-                {t("buyNow")}
-              </button>
+  onClick={handleBuyNow}
+  disabled={isOutOfStock}  // ← ADD THIS
+  className={`py-2 px-3 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white rounded-lg font-semibold text-xs transition-all duration-300 flex items-center justify-center whitespace-nowrap shadow-lg flex-shrink-0 ${
+    isOutOfStock ? "opacity-50 cursor-not-allowed" : ""  // ← ADD THIS
+  }`}
+>
+  {isOutOfStock ? t("outOfStock") : t("buyNow")}  {/* ← MODIFY THIS */}
+</button>
             </div>
 
             <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
@@ -1439,11 +1454,14 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               </button>
 
               <button
-                onClick={handleBuyNow}
-                className="flex-1 py-2 px-3 sm:py-2.5 sm:px-4 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white rounded-lg font-semibold text-xs sm:text-sm transition-all duration-300 flex items-center justify-center gap-1.5 sm:gap-2 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-              >
-                {t("buyNow")}
-              </button>
+  onClick={handleBuyNow}
+  disabled={isOutOfStock}  // ← ADD THIS
+  className={`flex-1 py-2 px-3 sm:py-2.5 sm:px-4 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white rounded-lg font-semibold text-xs sm:text-sm transition-all duration-300 flex items-center justify-center gap-1.5 sm:gap-2 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 ${
+    isOutOfStock ? "opacity-50 cursor-not-allowed !from-gray-400 !to-gray-500" : ""  // ← ADD THIS
+  }`}
+>
+  {isOutOfStock ? t("outOfStock") : t("buyNow")}  {/* ← MODIFY THIS */}
+</button>
             </div>
 
             {/* ✅ OPTIMIZED: Seller Info with batch data */}
