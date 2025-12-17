@@ -1019,7 +1019,7 @@ export default function ProductPaymentPage() {
                     totalPrice >=
                     (deliverySettings?.normal.freeThreshold ?? 2000)
                       ? 0
-                      : deliverySettings?.normal.price ?? 50
+                      : deliverySettings?.normal.price ?? 150
                   }
                   selected={selectedDeliveryOption === "normal"}
                   onSelect={() => setSelectedDeliveryOption("normal")}
@@ -1036,7 +1036,7 @@ export default function ProductPaymentPage() {
                     totalPrice >=
                     (deliverySettings?.express.freeThreshold ?? 10000)
                       ? 0
-                      : deliverySettings?.express.price ?? 100
+                      : deliverySettings?.express.price ?? 350
                   }
                   selected={selectedDeliveryOption === "express"}
                   onSelect={() => setSelectedDeliveryOption("express")}
