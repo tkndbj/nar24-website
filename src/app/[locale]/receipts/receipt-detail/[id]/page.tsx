@@ -173,7 +173,7 @@ const [isRetryingQR, setIsRetryingQR] = useState(false);
     };
 
     fetchReceiptDetails();
-  }, [user, receiptId]);
+  }, [user, id]);
 
   const retryQRGeneration = async () => {
     if (!receipt) return;
@@ -220,7 +220,7 @@ const [isRetryingQR, setIsRetryingQR] = useState(false);
           text: shareText,
           url: deliveryQRUrl,
         });
-      } catch (error) {
+      } catch {
         // User cancelled or share failed
         console.log("Share cancelled");
       }
