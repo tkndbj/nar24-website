@@ -69,12 +69,10 @@ const securityHeaders = [
       "font-src 'self' https://fonts.gstatic.com data:",
   
       // Connect (API calls): self and all required services
-      // ✅ FIXED: https://*.google-analytics.com (wildcard for region subdomains)
       "connect-src 'self' https://*.googleapis.com https://*.google.com https://*.firebaseio.com https://*.cloudfunctions.net https://*.algolia.net https://*.algolianet.com wss://*.firebaseio.com https://firebasestorage.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://*.google-analytics.com https://*.vercel-insights.com https://*.vercel-analytics.com https://sanalpos.isbank.com.tr https://*.isbank.com.tr",
   
-      // Frames: Google Maps, Firebase Auth, Payment Gateways
-      // ✅ ADDED: https://*.bkm.com.tr for 3D Secure verification
-      "frame-src 'self' https://*.google.com https://*.firebaseapp.com https://accounts.google.com https://sanalpos.isbank.com.tr https://*.isbank.com.tr https://*.bkm.com.tr",
+      // Frames: Google Maps, Firebase Auth, Payment Gateways (Turkish 3D Secure - all major banks)
+      "frame-src 'self' https://*.google.com https://*.firebaseapp.com https://accounts.google.com https://*.isbank.com.tr https://*.bkm.com.tr https://*.garanti.com.tr https://*.yapikredi.com.tr https://*.akbank.com https://*.ziraatbank.com.tr https://*.halkbank.com.tr https://*.vakifbank.com.tr https://*.qnbfinansbank.com https://*.teb.com.tr https://*.denizbank.com https://*.ingbank.com.tr https://*.hsbc.com.tr https://*.finansbank.com.tr https://*.kuveytturk.com.tr https://*.albaraka.com.tr https://*.odeabank.com.tr https://*.sekerbank.com.tr https://*.anadolubank.com.tr https://*.intertech.com.tr",
   
       // Media (video/audio)
       "media-src 'self' https://firebasestorage.googleapis.com",
