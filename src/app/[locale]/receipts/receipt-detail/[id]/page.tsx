@@ -72,10 +72,10 @@ const [isQRModalOpen, setIsQRModalOpen] = useState(false);
 const [isRetryingQR, setIsRetryingQR] = useState(false);
   const { user } = useUser();
   const router = useRouter();
-  const searchParams = useSearchParams();
+  
   const t = useTranslations();
 
-  const receiptId = searchParams.get("id");
+  
 
   useEffect(() => {
     const checkTheme = () => {
