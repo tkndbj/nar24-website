@@ -55,40 +55,43 @@ const securityHeaders = [
     value: [
       // Default: only allow from same origin
       "default-src 'self'",
-
+  
       // Scripts: self, inline (needed for Next.js), and trusted domains
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://maps.googleapis.com https://www.googletagmanager.com https://www.google-analytics.com https://*.firebaseapp.com",
-
+  
       // Styles: self, inline (needed for styled-components/tailwind), Google Fonts
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-
+  
       // Images: self, data URIs, blobs, and trusted domains
       "img-src 'self' data: blob: https://firebasestorage.googleapis.com https://*.googleapis.com https://*.gstatic.com https://*.google.com https://*.algolia.net",
-
+  
       // Fonts: self and Google Fonts
       "font-src 'self' https://fonts.gstatic.com data:",
-
+  
       // Connect (API calls): self and all required services
-      "connect-src 'self' https://*.googleapis.com https://*.google.com https://*.firebaseio.com https://*.cloudfunctions.net https://*.algolia.net https://*.algolianet.com wss://*.firebaseio.com https://firebasestorage.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.google-analytics.com https://*.vercel-insights.com https://*.vercel-analytics.com",
-
+      // ✅ ADDED: https://sanalpos.isbank.com.tr https://*.isbank.com.tr
+      "connect-src 'self' https://*.googleapis.com https://*.google.com https://*.firebaseio.com https://*.cloudfunctions.net https://*.algolia.net https://*.algolianet.com wss://*.firebaseio.com https://firebasestorage.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.google-analytics.com https://*.vercel-insights.com https://*.vercel-analytics.com https://sanalpos.isbank.com.tr https://*.isbank.com.tr",
+  
       // Frames: Google Maps, Firebase Auth
-      "frame-src 'self' https://*.google.com https://*.firebaseapp.com https://accounts.google.com",
-
+      // ✅ ADDED: https://sanalpos.isbank.com.tr https://*.isbank.com.tr
+      "frame-src 'self' https://*.google.com https://*.firebaseapp.com https://accounts.google.com https://sanalpos.isbank.com.tr https://*.isbank.com.tr",
+  
       // Media (video/audio)
       "media-src 'self' https://firebasestorage.googleapis.com",
-
+  
       // Object/embed: none
       "object-src 'none'",
-
+  
       // Base URI: self only
       "base-uri 'self'",
-
+  
       // Form actions: self only
-      "form-action 'self'",
-
+      // ✅ CHANGED: Added İşbank domains
+      "form-action 'self' https://sanalpos.isbank.com.tr https://*.isbank.com.tr",
+  
       // Frame ancestors: none (prevents embedding)
       "frame-ancestors 'none'",
-
+  
       // Upgrade insecure requests
       "upgrade-insecure-requests",
     ].join("; "),

@@ -223,8 +223,21 @@ const hasSelectableOptions = (product: Product | null): boolean => {
   const hasColors = Object.keys(product.colorImages || {}).length > 0;
   if (hasColors) return true;
 
+  // Keys that should NOT be selectable by buyers (same as ProductOptionSelector)
+  const nonSelectableKeys = new Set([
+    'clothingType',
+    'clothingTypes',
+    'pantFabricType',
+    'pantFabricTypes',
+    'gender',
+    'clothingFit',
+  ]);
+
   const selectableAttrs = Object.entries(product.attributes || {}).filter(
-    ([, value]) => {
+    ([key, value]) => {
+      // Skip non-selectable attributes
+      if (nonSelectableKeys.has(key)) return false;
+
       let options: string[] = [];
 
       if (Array.isArray(value)) {
@@ -351,6 +364,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
   // Refs
   const actionButtonsRef = useRef<HTMLDivElement>(null);
+  const isCartOperationInProgress = useRef(false);
 
   // Hooks
   const { addProductToCart, removeFromCart, cartProductIds } = useCart();
@@ -667,6 +681,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   useEffect(() => {
     if (productId) {
       window.scrollTo({ top: 0, behavior: "smooth" });
+      // Reset cart operation lock when product changes
+      isCartOperationInProgress.current = false;
     }
   }, [productId]);
 
@@ -777,6 +793,12 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
       if (!product) return;
 
+      // Use ref to prevent race conditions from rapid clicks
+      // This is more reliable than state because refs update synchronously
+      if (isCartOperationInProgress.current) {
+        return;
+      }
+
       if (cartButtonState === "adding" || cartButtonState === "removing") {
         return;
       }
@@ -784,10 +806,26 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
       const productInCart = cartProductIds.has(product.id);
       const isAdding = !productInCart;
 
-      if (isAdding && hasSelectableOptions(product) && !selectedOptions) {
-        setShowCartOptionSelector(true);
-        return;
+      // CRITICAL: If adding to cart and product has selectable options,
+      // ALWAYS show the option selector unless options were already selected
+      if (isAdding && !selectedOptions) {
+        const productHasOptions = hasSelectableOptions(product);
+        if (productHasOptions) {
+          // Set the lock before showing selector to prevent race conditions
+          // from rapid clicks while the modal is opening
+          isCartOperationInProgress.current = true;
+          setShowCartOptionSelector(true);
+          // Release the lock after a short delay to allow the modal to open
+          // The modal will handle its own flow from here
+          setTimeout(() => {
+            isCartOperationInProgress.current = false;
+          }, 300);
+          return;
+        }
       }
+
+      // Lock to prevent concurrent operations
+      isCartOperationInProgress.current = true;
 
       try {
         setCartButtonState(isAdding ? "adding" : "removing");
@@ -847,6 +885,9 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
       } catch (error) {
         console.error("Cart operation error:", error);
         setCartButtonState("idle");
+      } finally {
+        // Always release the lock
+        isCartOperationInProgress.current = false;
       }
     },
     [
@@ -870,6 +911,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
   const handleCartOptionSelectorClose = useCallback(() => {
     setShowCartOptionSelector(false);
+    // Ensure lock is released when selector is closed without confirming
+    isCartOperationInProgress.current = false;
   }, []);
 
   const handleBuyNow = useCallback(() => {
