@@ -1509,7 +1509,14 @@
     "loading": "Yükleniyor...",
     "noOrders": "Sipariş bulunamadı",
     "orderNumber": "Sipariş #",
-    "viewDetails": "Detayları Görüntüle"
+    "viewDetails": "Detayları Görüntüle",
+    "shipmentPending": "Beklemede",
+    "shipmentCollecting": "Toplanıyor",
+    "shipmentInTransit": "Yolda",
+    "shipmentAtWarehouse": "Depoda",
+    "shipmentOutForDelivery": "Dağıtımda",
+    "shipmentDelivered": "Teslim Edildi",
+    "shipmentFailed": "Başarısız"
   },
   "SoldProducts": {
     "title": "Satılan Ürünler",
@@ -2641,7 +2648,20 @@
     "purchasedItems": "Satın Alınan Ürünler",
     "deliveryOption1": "Gel Al",
     "deliveryOption2": "Ekspres Teslimat",
-    "deliveryOption3": "Normal Teslimat"
+    "deliveryOption3": "Normal Teslimat",
+    "deliveryQRCode": "Teslimat QR Kodu",
+    "showThisToDelivery": "Bunu teslimatçıya gösterin",
+    "shareQRCode": "QR Kodunu Paylaş",
+    "orderQRCode": "Sipariş QR Kodu",
+    "qrGenerating": "QR Kodu oluşturuluyor...",
+    "pleaseWaitQR": "Lütfen bir an bekleyin...",
+    "qrGenerationFailed": "QR oluşturma başarısız oldu",
+    "tapToRetryQR": "Tekrar denemek için dokunun",
+    "qrNotReady": "QR Kodu henüz hazır değil",
+    "qrWillBeReady": "Kısa süre içinde hazır olacak",
+    "retrying": "Yeniden deneniyor...",
+    "retry": "Tekrar Dene",
+    "close": "Kapat"
   },
   "ProductDetailPage": {
     "productNotFound": "Ürün Bulunamadı",

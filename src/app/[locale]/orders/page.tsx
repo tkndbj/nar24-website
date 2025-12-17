@@ -9,6 +9,13 @@ import {
   RefreshCw,
   X,
   ChevronRight,
+  Clock,
+  UserCheck,
+  Truck,
+  Warehouse,
+  Bike,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 import { useUser } from "@/context/UserProvider";
 import { useRouter } from "next/navigation";
@@ -27,6 +34,89 @@ import { db } from "@/lib/firebase";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
 
+type BuyerShipmentStatus = 
+  | "pending"
+  | "collecting"
+  | "inTransit"
+  | "atWarehouse"
+  | "outForDelivery"
+  | "delivered"
+  | "failed";
+
+// Helper function to determine shipment status from data
+const getShipmentStatus = (data: Record<string, unknown>): BuyerShipmentStatus => {
+  const gatheringStatus = data.gatheringStatus as string | undefined;
+  
+  // Check for failures first
+  if (gatheringStatus === "failed") {
+    return "failed";
+  }
+  
+  // Check if item was delivered
+  const deliveredInPartial = (data.deliveredInPartial as boolean) ?? false;
+  const deliveryStatus = data.deliveryStatus as string | undefined;
+  
+  if (
+    gatheringStatus === "delivered" ||
+    deliveredInPartial ||
+    deliveryStatus === "delivered"
+  ) {
+    return "delivered";
+  }
+  
+  // Check gathering status
+  switch (gatheringStatus) {
+    case "at_warehouse":
+      return "atWarehouse";
+    case "gathered":
+      return "inTransit";
+    case "assigned":
+      return "collecting";
+    case "pending":
+    default:
+      return "pending";
+  }
+};
+
+// Get status color classes
+const getStatusColor = (status: BuyerShipmentStatus): { bg: string; text: string; border: string } => {
+  switch (status) {
+    case "pending":
+      return { bg: "bg-gray-100 dark:bg-gray-700", text: "text-gray-600 dark:text-gray-300", border: "border-gray-300 dark:border-gray-600" };
+    case "collecting":
+      return { bg: "bg-orange-100 dark:bg-orange-900/30", text: "text-orange-600 dark:text-orange-400", border: "border-orange-300 dark:border-orange-700" };
+    case "inTransit":
+      return { bg: "bg-blue-100 dark:bg-blue-900/30", text: "text-blue-600 dark:text-blue-400", border: "border-blue-300 dark:border-blue-700" };
+    case "atWarehouse":
+      return { bg: "bg-purple-100 dark:bg-purple-900/30", text: "text-purple-600 dark:text-purple-400", border: "border-purple-300 dark:border-purple-700" };
+    case "outForDelivery":
+      return { bg: "bg-indigo-100 dark:bg-indigo-900/30", text: "text-indigo-600 dark:text-indigo-400", border: "border-indigo-300 dark:border-indigo-700" };
+    case "delivered":
+      return { bg: "bg-green-100 dark:bg-green-900/30", text: "text-green-600 dark:text-green-400", border: "border-green-300 dark:border-green-700" };
+    case "failed":
+      return { bg: "bg-red-100 dark:bg-red-900/30", text: "text-red-600 dark:text-red-400", border: "border-red-300 dark:border-red-700" };
+  }
+};
+
+const getStatusIcon = (status: BuyerShipmentStatus) => {
+  switch (status) {
+    case "pending":
+      return Clock;
+    case "collecting":
+      return UserCheck;
+    case "inTransit":
+      return Truck;
+    case "atWarehouse":
+      return Warehouse;
+    case "outForDelivery":
+      return Bike;
+    case "delivered":
+      return CheckCircle2;
+    case "failed":
+      return XCircle;
+  }
+};
+
 // Types
 interface Transaction {
   id: string;
@@ -44,6 +134,9 @@ interface Transaction {
   orderId: string;
   timestamp: Timestamp;
   isShopProduct: boolean;
+  gatheringStatus?: string;
+  deliveredInPartial?: boolean;
+  deliveryStatus?: string;
 }
 
 interface FilterOptions {
@@ -271,6 +364,9 @@ export default function OrdersPage() {
               orderId: data.orderId || "",
               timestamp: data.timestamp,
               isShopProduct: false,
+              gatheringStatus: data.gatheringStatus as string | undefined,
+              deliveredInPartial: data.deliveredInPartial as boolean | undefined,
+              deliveryStatus: data.deliveryStatus as string | undefined,
             });
           }
         });
@@ -306,6 +402,44 @@ export default function OrdersPage() {
     },
     [user, filters, soldLoading, soldLastDoc, soldHasMore]
   );
+
+  const ShipmentStatusBadge = ({ transaction }: { transaction: Transaction }) => {
+    const status = getShipmentStatus({
+      gatheringStatus: transaction.gatheringStatus,
+      deliveredInPartial: transaction.deliveredInPartial,
+      deliveryStatus: transaction.deliveryStatus,
+    });
+    
+    const colors = getStatusColor(status);
+    const StatusIcon = getStatusIcon(status);
+    
+    // Get localized status text
+    const getStatusText = (status: BuyerShipmentStatus): string => {
+      switch (status) {
+        case "pending":
+          return t("shipmentPending") || "Pending";
+        case "collecting":
+          return t("shipmentCollecting") || "Collecting";
+        case "inTransit":
+          return t("shipmentInTransit") || "In Transit";
+        case "atWarehouse":
+          return t("shipmentAtWarehouse") || "At Warehouse";
+        case "outForDelivery":
+          return t("shipmentOutForDelivery") || "Out for Delivery";
+        case "delivered":
+          return t("shipmentDelivered") || "Delivered";
+        case "failed":
+          return t("shipmentFailed") || "Failed";
+      }
+    };
+    
+    return (
+      <div className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium border ${colors.bg} ${colors.text} ${colors.border}`}>
+        <StatusIcon size={12} />
+        <span>{getStatusText(status)}</span>
+      </div>
+    );
+  };
 
   // Load bought orders
   const loadBoughtOrders = useCallback(
@@ -460,15 +594,16 @@ export default function OrdersPage() {
   const getCurrentInitialLoading = () =>
     activeTab === "sold" ? soldInitialLoading : boughtInitialLoading;
 
-  // Product Card Component
-  const ProductCard = ({ transaction }: { transaction: Transaction }) => {
-    const imageUrl =
-      transaction.selectedColorImage ||
-      transaction.productImage ||
-      "/placeholder-product.png";
+ // Product Card Component
+const ProductCard = ({ transaction, showStatus = false }: { transaction: Transaction; showStatus?: boolean }) => {
+  const imageUrl =
+    transaction.selectedColorImage ||
+    transaction.productImage ||
+    "/placeholder-product.png";
 
-    return (
-      <div className="flex space-x-3">
+  return (
+    <div className="flex space-x-3">
+      <div className="flex flex-col items-center">
         <div className="relative w-16 h-16 flex-shrink-0">
           <Image
             src={imageUrl}
@@ -477,49 +612,56 @@ export default function OrdersPage() {
             className="object-cover rounded-lg"
           />
         </div>
-        <div className="flex-1 min-w-0">
-          <h4
-            className={`font-medium text-sm line-clamp-2 ${
-              isDarkMode ? "text-white" : "text-gray-900"
+        {/* Shipment status badge under image for bought products */}
+        {showStatus && (
+          <div className="mt-2">
+            <ShipmentStatusBadge transaction={transaction} />
+          </div>
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <h4
+          className={`font-medium text-sm line-clamp-2 ${
+            isDarkMode ? "text-white" : "text-gray-900"
+          }`}
+        >
+          {transaction.productName}
+        </h4>
+        {transaction.selectedColor && (
+          <p
+            className={`text-xs mt-1 ${
+              isDarkMode ? "text-gray-400" : "text-gray-600"
             }`}
           >
-            {transaction.productName}
-          </h4>
-          {transaction.selectedColor && (
-            <p
-              className={`text-xs mt-1 ${
-                isDarkMode ? "text-gray-400" : "text-gray-600"
-              }`}
-            >
-              {t("color")}: {transaction.selectedColor}
-            </p>
+            {t("color")}: {transaction.selectedColor}
+          </p>
+        )}
+        <div className="flex items-center space-x-2 mt-1">
+          <span
+            className={`font-bold text-sm ${
+              isDarkMode ? "text-green-400" : "text-green-600"
+            }`}
+          >
+            {transaction.currency === "TL" ? "₺" : "₺"}
+            {transaction.price.toLocaleString()}
+          </span>
+          {(transaction.averageRating ?? 0) > 0 && (
+            <div className="flex items-center space-x-1">
+              <span className="text-yellow-400">★</span>
+              <span
+                className={`text-xs ${
+                  isDarkMode ? "text-gray-400" : "text-gray-600"
+                }`}
+              >
+                {(transaction.averageRating ?? 0).toFixed(1)}
+              </span>
+            </div>
           )}
-          <div className="flex items-center space-x-2 mt-1">
-            <span
-              className={`font-bold text-sm ${
-                isDarkMode ? "text-green-400" : "text-green-600"
-              }`}
-            >
-              {transaction.currency === "TL" ? "₺" : "₺"}
-              {transaction.price.toLocaleString()}
-            </span>
-            {(transaction.averageRating ?? 0) > 0 && (
-              <div className="flex items-center space-x-1">
-                <span className="text-yellow-400">★</span>
-                <span
-                  className={`text-xs ${
-                    isDarkMode ? "text-gray-400" : "text-gray-600"
-                  }`}
-                >
-                  {(transaction.averageRating ?? 0).toFixed(1)}
-                </span>
-              </div>
-            )}
-          </div>
         </div>
       </div>
-    );
-  };
+    </div>
+  );
+};
 
   // Loading Skeleton
   const LoadingSkeleton = () => (
@@ -823,7 +965,10 @@ export default function OrdersPage() {
               >
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
-                    <ProductCard transaction={transaction} />
+                  <ProductCard 
+  transaction={transaction} 
+  showStatus={activeTab === "bought"}  // Show status only for bought products
+/>
                     <div className="mt-2 flex items-center justify-between">
                       <span
                         className={`

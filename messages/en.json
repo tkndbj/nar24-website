@@ -1508,7 +1508,14 @@
     "loading": "Loading...",
     "noOrders": "No orders found",
     "orderNumber": "Order #",
-    "viewDetails": "View Details"
+    "viewDetails": "View Details",
+    "shipmentPending": "Pending",
+    "shipmentCollecting": "Collecting",
+    "shipmentInTransit": "In Transit",
+    "shipmentAtWarehouse": "At Warehouse",
+    "shipmentOutForDelivery": "Out for Delivery",
+    "shipmentDelivered": "Delivered",
+    "shipmentFailed": "Failed"
   },
   "SoldProducts": {
     "title": "Sold Products",
@@ -2604,7 +2611,20 @@
     "purchasedItems": "Purchased Items",
     "deliveryOption1": "Pick Up",
     "deliveryOption2": "Express Delivery",
-    "deliveryOption3": "Normal Delivery"
+    "deliveryOption3": "Normal Delivery",
+    "deliveryQRCode": "Delivery QR Code",
+    "showThisToDelivery": "Show this to the delivery person",
+    "shareQRCode": "Share QR Code",
+    "orderQRCode": "Order QR Code",
+    "qrGenerating": "Generating QR Code...",
+    "pleaseWaitQR": "Please wait a moment...",
+    "qrGenerationFailed": "QR generation failed",
+    "tapToRetryQR": "Tap to retry",
+    "qrNotReady": "QR Code not ready yet",
+    "qrWillBeReady": "It will be ready shortly",
+    "retrying": "Retrying...",
+    "retry": "Retry",
+    "close": "Close"
   },
   "ProductDetailPage": {
     "productNotFound": "Product Not Found",

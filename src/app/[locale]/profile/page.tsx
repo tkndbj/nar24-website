@@ -600,7 +600,7 @@ export default function ProfilePage() {
             }`}
           >
             <div className="space-y-2 md:space-y-2.5">
-              Pickup Points
+              {/* Pickup Points */}
               {/* <button
                 onClick={() => handleNavigation("/pickup-points")}
                 className={`w-full flex items-center gap-2.5 md:gap-3 p-2.5 md:p-3 rounded-lg transition-colors text-left ${

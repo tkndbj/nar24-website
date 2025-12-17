@@ -20,6 +20,9 @@ import {
   MapPin,
   User,
   LogIn,
+  QrCode,  
+  RefreshCw,
+  X
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 
@@ -63,7 +66,10 @@ export default function ReceiptDetailPage() {
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [copySuccess, setCopySuccess] = useState(false);
-
+  const [deliveryQRUrl, setDeliveryQRUrl] = useState<string | null>(null);
+const [qrGenerationStatus, setQrGenerationStatus] = useState<string | null>(null);
+const [isQRModalOpen, setIsQRModalOpen] = useState(false);
+const [isRetryingQR, setIsRetryingQR] = useState(false);
   const { user } = useUser();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -129,7 +135,14 @@ export default function ReceiptDetailPage() {
         // Fetch order details
         const orderDoc = await getDoc(doc(db, "orders", receiptObj.orderId));
         if (orderDoc.exists()) {
-          setOrderData(orderDoc.data() as OrderData);
+          const data = orderDoc.data();
+          setOrderData(data as OrderData);
+          
+          // Extract QR URL (same as Flutter)
+          if (data.deliveryQR?.url) {
+            setDeliveryQRUrl(data.deliveryQR.url);
+          }
+          setQrGenerationStatus(data.qrGenerationStatus || null);
         }
 
         // Fetch order items
@@ -161,6 +174,61 @@ export default function ReceiptDetailPage() {
 
     fetchReceiptDetails();
   }, [user, receiptId]);
+
+  const retryQRGeneration = async () => {
+    if (!receipt) return;
+    
+    setIsRetryingQR(true);
+    try {
+      const { getFunctions, httpsCallable } = await import("firebase/functions");
+      const functions = getFunctions(undefined, "europe-west3");
+      const retryQR = httpsCallable(functions, "retryQRGeneration");
+      
+      const result = await retryQR({ orderId: receipt.orderId });
+      const data = result.data as { success: boolean };
+      
+      if (data.success) {
+        // Refresh order data after a short delay
+        setTimeout(async () => {
+          const orderDoc = await getDoc(doc(db, "orders", receipt.orderId));
+          if (orderDoc.exists()) {
+            const orderData = orderDoc.data();
+            if (orderData.deliveryQR?.url) {
+              setDeliveryQRUrl(orderData.deliveryQR.url);
+            }
+            setQrGenerationStatus(orderData.qrGenerationStatus || null);
+          }
+        }, 3000);
+      }
+    } catch (error) {
+      console.error("Error retrying QR generation:", error);
+    } finally {
+      setIsRetryingQR(false);
+    }
+  };
+  
+  // Share QR code
+  const shareQRCode = async () => {
+    if (!deliveryQRUrl || !receipt) return;
+    
+    const shareText = `${l("ReceiptDetail.orderQRCode") || "Order QR Code"} #${receipt.orderId.substring(0, 8).toUpperCase()}`;
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: l("ReceiptDetail.deliveryQRCode") || "Delivery QR Code",
+          text: shareText,
+          url: deliveryQRUrl,
+        });
+      } catch (error) {
+        // User cancelled or share failed
+        console.log("Share cancelled");
+      }
+    } else {
+      // Fallback: open QR in new tab
+      window.open(deliveryQRUrl, "_blank");
+    }
+  };
 
   // Format date
   const formatDate = (timestamp: Date): string => {
@@ -515,6 +583,148 @@ export default function ReceiptDetailPage() {
 
   const groupedItems = groupItemsBySeller(orderItems);
 
+  // QR Code Modal Component
+const QRCodeModal = () => {
+  if (!isQRModalOpen) return null;
+  
+  const hasQR = deliveryQRUrl && deliveryQRUrl.length > 0;
+  
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+      {/* Backdrop */}
+      <div 
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={() => setIsQRModalOpen(false)}
+      />
+      
+      {/* Modal */}
+      <div className={`relative w-full sm:max-w-md mx-auto sm:mx-4 rounded-t-3xl sm:rounded-2xl ${
+        isDarkMode ? "bg-gray-800" : "bg-white"
+      } p-6 animate-in slide-in-from-bottom sm:slide-in-from-bottom-0 sm:zoom-in-95`}>
+        
+        {/* Handle bar (mobile) */}
+        <div className="sm:hidden w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-4" />
+        
+        {/* Header */}
+        <div className="flex items-start space-x-4 mb-6">
+          <div className="p-3 rounded-xl bg-gradient-to-br from-orange-500 to-pink-500">
+            <QrCode className="w-5 h-5 text-white" />
+          </div>
+          <div className="flex-1">
+            <h3 className={`text-lg font-semibold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+              {l("ReceiptDetail.deliveryQRCode") || "Delivery QR Code"}
+            </h3>
+            <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+              {l("ReceiptDetail.showThisToDelivery") || "Show this to the delivery person"}
+            </p>
+          </div>
+          <button
+            onClick={() => setIsQRModalOpen(false)}
+            className={`p-2 rounded-lg ${isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
+          >
+            <X className={`w-5 h-5 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`} />
+          </button>
+        </div>
+        
+        {/* Order badge */}
+        <div className="flex justify-center mb-6">
+          <span className="px-4 py-2 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 text-sm font-medium rounded-full">
+            {l("ReceiptDetail.orders") || "Order"} #{receipt?.orderId.substring(0, 8).toUpperCase()}
+          </span>
+        </div>
+        
+        {/* QR Code Display */}
+        {hasQR ? (
+          <>
+            <div className="flex justify-center mb-6">
+              <div className="p-4 bg-white rounded-2xl shadow-lg">
+                <img
+                  src={deliveryQRUrl}
+                  alt="Delivery QR Code"
+                  className="w-64 h-64 object-contain"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+              </div>
+            </div>
+            
+            {/* Share button */}
+            <button
+              onClick={shareQRCode}
+              className="w-full py-3 px-4 bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600 text-white font-medium rounded-xl flex items-center justify-center space-x-2 transition-all"
+            >
+              <Share2 className="w-5 h-5" />
+              <span>{l("ReceiptDetail.shareQRCode") || "Share QR Code"}</span>
+            </button>
+          </>
+        ) : (
+          /* QR not available state */
+          <div className={`p-8 rounded-2xl text-center ${isDarkMode ? "bg-gray-700" : "bg-gray-100"}`}>
+            {qrGenerationStatus === "processing" ? (
+              <>
+                <div className="animate-spin w-16 h-16 mx-auto mb-4 border-4 border-orange-500 border-t-transparent rounded-full" />
+                <h4 className={`font-semibold mb-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                  {l("ReceiptDetail.qrGenerating") || "Generating QR Code..."}
+                </h4>
+                <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                  {l("ReceiptDetail.pleaseWaitQR") || "Please wait a moment..."}
+                </p>
+              </>
+            ) : qrGenerationStatus === "failed" ? (
+              <>
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                  <X className="w-8 h-8 text-red-500" />
+                </div>
+                <h4 className={`font-semibold mb-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                  {l("ReceiptDetail.qrGenerationFailed") || "QR generation failed"}
+                </h4>
+                <p className={`text-sm mb-4 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                  {l("ReceiptDetail.tapToRetryQR") || "Tap to retry"}
+                </p>
+                <button
+                  onClick={retryQRGeneration}
+                  disabled={isRetryingQR}
+                  className="px-4 py-2 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 text-white rounded-lg flex items-center space-x-2 mx-auto transition-colors"
+                >
+                  {isRetryingQR ? (
+                    <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                  ) : (
+                    <RefreshCw className="w-4 h-4" />
+                  )}
+                  <span>{isRetryingQR ? (l("ReceiptDetail.retrying") || "Retrying...") : (l("ReceiptDetail.retry") || "Retry")}</span>
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+                  <QrCode className="w-8 h-8 text-orange-500" />
+                </div>
+                <h4 className={`font-semibold mb-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                  {l("ReceiptDetail.qrNotReady") || "QR Code not ready yet"}
+                </h4>
+                <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                  {l("ReceiptDetail.qrWillBeReady") || "It will be ready shortly"}
+                </p>
+              </>
+            )}
+          </div>
+        )}
+        
+        {/* Close button */}
+        <button
+          onClick={() => setIsQRModalOpen(false)}
+          className={`w-full mt-4 py-3 px-4 border ${
+            isDarkMode ? "border-gray-600 text-gray-300 hover:bg-gray-700" : "border-gray-300 text-gray-700 hover:bg-gray-50"
+          } font-medium rounded-xl transition-colors`}
+        >
+          {l("ReceiptDetail.close") || "Close"}
+        </button>
+      </div>
+    </div>
+  );
+};
+
   return (
     <div
       className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
@@ -548,6 +758,20 @@ export default function ReceiptDetailPage() {
             </h1>
 
             <div className="flex items-center space-x-2">
+  {/* QR Code Button */}
+  <button
+    onClick={() => setIsQRModalOpen(true)}
+    className={`p-2 rounded-lg transition-colors ${
+      isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"
+    }`}
+    title={l("ReceiptDetail.deliveryQRCode") || "Delivery QR Code"}
+  >
+    <QrCode
+      className={`w-5 h-5 ${
+        isDarkMode ? "text-white" : "text-gray-900"
+      }`}
+    />
+  </button>
               <button
                 onClick={shareReceipt}
                 className={`p-2 rounded-lg transition-colors ${
@@ -856,8 +1080,11 @@ export default function ReceiptDetailPage() {
               </p>
             </div>
           </div>
+          
         </div>
       </div>
+       {/* QR Code Modal - ADD IT HERE */}
+       <QRCodeModal />
     </div>
   );
 }
