@@ -716,7 +716,7 @@ const localizeDeliveryOption = (deliveryOption: string): string => {
               </div>
             )}
 
-            {/* Order Summary */}
+     {/* Order Summary */}
 {orderData && (
   <div
     className={`
@@ -749,10 +749,7 @@ const localizeDeliveryOption = (deliveryOption: string): string => {
       {/* Subtotal */}
       <SummaryRow
         label={t("subtotal") || "Subtotal"}
-        value={formatCurrency(
-          orderData.totalPrice - (orderData.deliveryPrice || 0),
-          orderData.currency
-        )}
+        value={formatCurrency(orderData.totalPrice, orderData.currency)}
       />
 
       {/* Delivery with option badge */}
@@ -802,7 +799,7 @@ const localizeDeliveryOption = (deliveryOption: string): string => {
       <SummaryRow
         label={t("total") || "Total"}
         value={formatCurrency(
-          orderData.totalPrice,
+          orderData.totalPrice + (orderData.deliveryPrice || 0),
           orderData.currency
         )}
         isTotal
