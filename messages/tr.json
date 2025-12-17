@@ -2680,7 +2680,8 @@
     "bestSeller": "En Çok Satan",
     "productImage": "Ürün resmi",
     "productDescription": "Ürün Açıklaması",
-    "readAll": "Tümünü Oku"
+    "readAll": "Tümünü Oku",
+    "outOfStock": "Stokta Yok"
   },
   "DynamicAttributesWidget": {
     "title": "Ürün Özellikleri",

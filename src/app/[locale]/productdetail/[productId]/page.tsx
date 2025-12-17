@@ -1460,7 +1460,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     isOutOfStock ? "opacity-50 cursor-not-allowed !from-gray-400 !to-gray-500" : ""  // ← ADD THIS
   }`}
 >
-  {isOutOfStock ? t("outOfStock") : t("buyNow")}  {/* ← MODIFY THIS */}
+  {isOutOfStock ? t("ProductDetailPage.outOfStock") : t("ProductDetailPage.buyNow")}  {/* ← MODIFY THIS */}
 </button>
             </div>
 
