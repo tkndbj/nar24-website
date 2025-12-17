@@ -469,6 +469,13 @@ export default function ProductPaymentPage() {
   const [selectedDeliveryOption, setSelectedDeliveryOption] =
     useState<string>("normal");
 
+  // Delivery settings from Firestore
+  const [deliverySettings, setDeliverySettings] = useState<{
+    normal: { price: number; freeThreshold: number; estimatedDays: string };
+    express: { price: number; freeThreshold: number; estimatedDays: string };
+  } | null>(null);
+  const [, setIsLoadingDeliverySettings] = useState(true);
+
   const [formData, setFormData] = useState<FormData>({
     addressLine1: "",
     addressLine2: "",
@@ -492,6 +499,37 @@ export default function ProductPaymentPage() {
   const [mapsLoaded, setMapsLoaded] = useState(false);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const fetchDeliverySettings = async () => {
+      try {
+        const { doc, getDoc } = await import("firebase/firestore");
+        const docSnap = await getDoc(doc(db, "settings", "delivery"));
+
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setDeliverySettings({
+            normal: {
+              price: data.normal?.price ?? 50,
+              freeThreshold: data.normal?.freeThreshold ?? 2000,
+              estimatedDays: data.normal?.estimatedDays ?? "3-5",
+            },
+            express: {
+              price: data.express?.price ?? 100,
+              freeThreshold: data.express?.freeThreshold ?? 10000,
+              estimatedDays: data.express?.estimatedDays ?? "1-2",
+            },
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching delivery settings:", error);
+      } finally {
+        setIsLoadingDeliverySettings(false);
+      }
+    };
+
+    fetchDeliverySettings();
+  }, []);
 
   // Dark mode detection
   useEffect(() => {
@@ -542,39 +580,42 @@ export default function ProductPaymentPage() {
     const itemsParam = searchParams.get("items");
 
     // ✅ CASE 1: Buy Now - Single Product Purchase
-   // ✅ CASE 1: Buy Now - Single Product Purchase
-if (buyNowData) {
-  try {
-    console.log("🛒 Buy Now Mode - Decoding buyNowData...");
-    
-    // ✅ FIX: Use decodeURIComponent instead of atob for Unicode support
-    const decodedItem = JSON.parse(decodeURIComponent(buyNowData));
+    // ✅ CASE 1: Buy Now - Single Product Purchase
+    if (buyNowData) {
+      try {
+        console.log("🛒 Buy Now Mode - Decoding buyNowData...");
 
-    console.log("✅ Decoded Buy Now Item:", decodedItem);
+        // ✅ FIX: Use decodeURIComponent instead of atob for Unicode support
+        const decodedItem = JSON.parse(decodeURIComponent(buyNowData));
 
-    // ✅ FIX: Add calculated prices for Buy Now items
-    const itemWithCalculatedPrices = {
-      ...decodedItem,
-      calculatedUnitPrice: decodedItem.unitPrice,
-      calculatedTotal: decodedItem.unitPrice * decodedItem.quantity,
-      price: decodedItem.unitPrice,
-    };
+        console.log("✅ Decoded Buy Now Item:", decodedItem);
 
-    setCartItems([itemWithCalculatedPrices]);
+        // ✅ FIX: Add calculated prices for Buy Now items
+        const itemWithCalculatedPrices = {
+          ...decodedItem,
+          calculatedUnitPrice: decodedItem.unitPrice,
+          calculatedTotal: decodedItem.unitPrice * decodedItem.quantity,
+          price: decodedItem.unitPrice,
+        };
 
-    const itemTotal = decodedItem.unitPrice * decodedItem.quantity;
-    setTotalPrice(itemTotal);
+        setCartItems([itemWithCalculatedPrices]);
 
-    console.log("💰 Buy Now Total:", itemTotal);
-    console.log("✅ Item with calculated prices:", itemWithCalculatedPrices);
-    return;
-  } catch (error) {
-    console.error("❌ Failed to parse buyNowData:", error);
-    alert("Invalid buy now data. Redirecting to cart...");
-    router.push("/cart");
-    return;
-  }
-}
+        const itemTotal = decodedItem.unitPrice * decodedItem.quantity;
+        setTotalPrice(itemTotal);
+
+        console.log("💰 Buy Now Total:", itemTotal);
+        console.log(
+          "✅ Item with calculated prices:",
+          itemWithCalculatedPrices
+        );
+        return;
+      } catch (error) {
+        console.error("❌ Failed to parse buyNowData:", error);
+        alert("Invalid buy now data. Redirecting to cart...");
+        router.push("/cart");
+        return;
+      }
+    }
 
     // ✅ CASE 2: Regular Cart Checkout - Multiple Products
     if (totalParam && itemsParam) {
@@ -679,15 +720,18 @@ if (buyNowData) {
   };
 
   const getDeliveryPrice = () => {
+    const normalPrice = deliverySettings?.normal.price ?? 50;
+    const normalThreshold = deliverySettings?.normal.freeThreshold ?? 2000;
+    const expressPrice = deliverySettings?.express.price ?? 100;
+    const expressThreshold = deliverySettings?.express.freeThreshold ?? 10000;
+
     switch (selectedDeliveryOption) {
-      case "pickup":
-        return 60.0;
       case "normal":
-        return totalPrice >= 2000.0 ? 0.0 : 1.0;
+        return totalPrice >= normalThreshold ? 0 : normalPrice;
       case "express":
-        return totalPrice >= 10000.0 ? 0.0 : 349.0;
+        return totalPrice >= expressThreshold ? 0 : expressPrice;
       default:
-        return 0.0;
+        return 0;
     }
   };
 
@@ -968,8 +1012,15 @@ if (buyNowData) {
                 <DeliveryOption
                   id="normal"
                   title={t("standardDelivery")}
-                  description={t("standardDeliveryDesc")}
-                  price={totalPrice >= 2000 ? 0 : 5}
+                  description={`${
+                    deliverySettings?.normal.estimatedDays ?? "3-5"
+                  } ${t("days")}`}
+                  price={
+                    totalPrice >=
+                    (deliverySettings?.normal.freeThreshold ?? 2000)
+                      ? 0
+                      : deliverySettings?.normal.price ?? 50
+                  }
                   selected={selectedDeliveryOption === "normal"}
                   onSelect={() => setSelectedDeliveryOption("normal")}
                   isDarkMode={isDarkMode}
@@ -978,8 +1029,15 @@ if (buyNowData) {
                 <DeliveryOption
                   id="express"
                   title={t("expressDelivery")}
-                  description={t("expressDeliveryDesc")}
-                  price={totalPrice >= 10000 ? 0 : 349}
+                  description={`${
+                    deliverySettings?.express.estimatedDays ?? "1-2"
+                  } ${t("days")}`}
+                  price={
+                    totalPrice >=
+                    (deliverySettings?.express.freeThreshold ?? 10000)
+                      ? 0
+                      : deliverySettings?.express.price ?? 100
+                  }
                   selected={selectedDeliveryOption === "express"}
                   onSelect={() => setSelectedDeliveryOption("express")}
                   isDarkMode={isDarkMode}
