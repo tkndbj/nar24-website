@@ -69,12 +69,12 @@ const securityHeaders = [
       "font-src 'self' https://fonts.gstatic.com data:",
   
       // Connect (API calls): self and all required services
-      // ✅ ADDED: https://sanalpos.isbank.com.tr https://*.isbank.com.tr
-      "connect-src 'self' https://*.googleapis.com https://*.google.com https://*.firebaseio.com https://*.cloudfunctions.net https://*.algolia.net https://*.algolianet.com wss://*.firebaseio.com https://firebasestorage.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.google-analytics.com https://*.vercel-insights.com https://*.vercel-analytics.com https://sanalpos.isbank.com.tr https://*.isbank.com.tr",
+      // ✅ FIXED: https://*.google-analytics.com (wildcard for region subdomains)
+      "connect-src 'self' https://*.googleapis.com https://*.google.com https://*.firebaseio.com https://*.cloudfunctions.net https://*.algolia.net https://*.algolianet.com wss://*.firebaseio.com https://firebasestorage.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://*.google-analytics.com https://*.vercel-insights.com https://*.vercel-analytics.com https://sanalpos.isbank.com.tr https://*.isbank.com.tr",
   
-      // Frames: Google Maps, Firebase Auth
-      // ✅ ADDED: https://sanalpos.isbank.com.tr https://*.isbank.com.tr
-      "frame-src 'self' https://*.google.com https://*.firebaseapp.com https://accounts.google.com https://sanalpos.isbank.com.tr https://*.isbank.com.tr",
+      // Frames: Google Maps, Firebase Auth, Payment Gateways
+      // ✅ ADDED: https://*.bkm.com.tr for 3D Secure verification
+      "frame-src 'self' https://*.google.com https://*.firebaseapp.com https://accounts.google.com https://sanalpos.isbank.com.tr https://*.isbank.com.tr https://*.bkm.com.tr",
   
       // Media (video/audio)
       "media-src 'self' https://firebasestorage.googleapis.com",
@@ -86,7 +86,6 @@ const securityHeaders = [
       "base-uri 'self'",
   
       // Form actions: self only
-      // ✅ CHANGED: Added İşbank domains
       "form-action 'self' https://sanalpos.isbank.com.tr https://*.isbank.com.tr",
   
       // Frame ancestors: none (prevents embedding)

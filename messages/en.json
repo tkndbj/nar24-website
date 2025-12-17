@@ -2644,7 +2644,7 @@
     "productImage": "Product image",
     "productDescription": "Product Description",
     "readAll": "Read All",
-    "outOfStock": "Out of Stock"
+    "outOfStock": "Out of Stock"    
   },
   "DynamicAttributesWidget": {
     "title": "Product Specifications",
