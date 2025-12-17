@@ -1609,7 +1609,12 @@
     "reportIssue": "Sorun Bildir",
     "returnRequest": "İade Talebi",
     "exchangeRequest": "Değişim Talebi",
-    "trackOrder": "Siparişi Takip Et"
+    "trackOrder": "Siparişi Takip Et",
+    "subtotal": "Ara Toplam",
+    "delivery": "Teslimat",
+    "deliveryOption1": "Gel Al",
+    "deliveryOption2": "Ekspres",
+    "deliveryOption3": "Normal"
   },
   "Boosts": {
     "ads": "Ürün Yükselt",

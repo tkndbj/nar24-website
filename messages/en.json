@@ -1608,7 +1608,12 @@
     "reportIssue": "Report Issue",
     "returnRequest": "Return Request",
     "exchangeRequest": "Exchange Request",
-    "trackOrder": "Track Order"
+    "trackOrder": "Track Order",
+    "subtotal": "Subtotal",
+    "delivery": "Delivery",
+    "deliveryOption1": "Pick Up",
+    "deliveryOption2": "Express",
+    "deliveryOption3": "Normal"
   },
   "Boosts": {
     "ads": "Boost Products",
