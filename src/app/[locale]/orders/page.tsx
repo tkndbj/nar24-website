@@ -509,6 +509,9 @@ export default function OrdersPage() {
               orderId: data.orderId || "",
               timestamp: data.timestamp,
               isShopProduct: !!data.shopId,
+              gatheringStatus: data.gatheringStatus as string | undefined,
+              deliveredInPartial: data.deliveredInPartial as boolean | undefined,
+              deliveryStatus: data.deliveryStatus as string | undefined,
             });
           }
         });
