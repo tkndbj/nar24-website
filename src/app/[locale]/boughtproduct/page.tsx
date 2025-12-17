@@ -36,6 +36,8 @@ interface OrderData {
   totalQuantity: number;
   currency: string;
   paymentMethod: string;
+  deliveryOption?: string;    // ADD
+  deliveryPrice?: number;
   timestamp: Timestamp;
   address?: {
     addressLine1: string;
@@ -128,6 +130,32 @@ export default function BoughtProductsPage() {
       loadOrderDetails();
     }
   }, [user, orderId]);
+
+  // Get delivery option color
+const getDeliveryOptionColor = (deliveryOption: string): string => {
+  switch (deliveryOption) {
+    case "express":
+      return "#F97316"; // orange-500
+    case "gelal":
+      return "#3B82F6"; // blue-500
+    case "normal":
+    default:
+      return "#10B981"; // green-500
+  }
+};
+
+// Localize delivery option
+const localizeDeliveryOption = (deliveryOption: string): string => {
+  switch (deliveryOption) {
+    case "express":
+      return t("deliveryOption2") || "Express Delivery";
+    case "gelal":
+      return t("deliveryOption1") || "Pick Up";
+    case "normal":
+    default:
+      return t("deliveryOption3") || "Normal Delivery";
+  }
+};
 
   // Load order details
   const loadOrderDetails = useCallback(async () => {
@@ -689,67 +717,99 @@ export default function BoughtProductsPage() {
             )}
 
             {/* Order Summary */}
-            {orderData && (
-              <div
-                className={`
-                  rounded-lg border p-4
-                  ${
-                    isDarkMode
-                      ? "bg-gray-800 border-gray-700"
-                      : "bg-white border-gray-200"
-                  }
-                `}
-              >
-                <div className="flex items-center space-x-3 mb-3">
-                  <div className="w-12 h-12 rounded-lg bg-indigo-100 flex items-center justify-center">
-                    <Receipt size={20} className="text-indigo-600" />
-                  </div>
-                  <h4
-                    className={`font-semibold text-sm ${
-                      isDarkMode ? "text-white" : "text-gray-900"
-                    }`}
-                  >
-                    {t("orderSummary") || "Order Summary"}
-                  </h4>
-                </div>
+{orderData && (
+  <div
+    className={`
+      rounded-lg border p-4
+      ${
+        isDarkMode
+          ? "bg-gray-800 border-gray-700"
+          : "bg-white border-gray-200"
+      }
+    `}
+  >
+    <div className="flex items-center space-x-3 mb-3">
+      <div className="w-12 h-12 rounded-lg bg-indigo-100 flex items-center justify-center">
+        <Receipt size={20} className="text-indigo-600" />
+      </div>
+      <h4
+        className={`font-semibold text-sm ${
+          isDarkMode ? "text-white" : "text-gray-900"
+        }`}
+      >
+        {t("orderSummary") || "Order Summary"}
+      </h4>
+    </div>
 
-                <div
-                  className={`p-3 rounded-lg space-y-3 ${
-                    isDarkMode ? "bg-gray-700" : "bg-gray-50"
-                  }`}
-                >
-                  <SummaryRow
-                    label={`${t("items") || "Items"} (${
-                      orderData.totalQuantity
-                    })`}
-                    value={formatCurrency(
-                      orderData.totalPrice,
-                      orderData.currency
-                    )}
-                  />
-                  <SummaryRow
-                    label={t("shipping") || "Shipping"}
-                    value={t("free") || "Free"}
-                    valueColor="#10B981"
-                  />
+    <div
+      className={`p-3 rounded-lg space-y-3 ${
+        isDarkMode ? "bg-gray-700" : "bg-gray-50"
+      }`}
+    >
+      {/* Subtotal */}
+      <SummaryRow
+        label={t("subtotal") || "Subtotal"}
+        value={formatCurrency(
+          orderData.totalPrice - (orderData.deliveryPrice || 0),
+          orderData.currency
+        )}
+      />
 
-                  <div
-                    className={`h-px ${
-                      isDarkMode ? "bg-gray-600" : "bg-gray-200"
-                    }`}
-                  />
+      {/* Delivery with option badge */}
+      <div className="flex justify-between items-center">
+        <div className="flex items-center space-x-2">
+          <span
+            className={`text-xs font-medium ${
+              isDarkMode ? "text-gray-400" : "text-gray-600"
+            }`}
+          >
+            {t("delivery") || "Delivery"}
+          </span>
+          <span
+            className="text-[9px] font-semibold px-1.5 py-0.5 rounded"
+            style={{
+              backgroundColor: `${getDeliveryOptionColor(orderData.deliveryOption || "normal")}20`,
+              color: getDeliveryOptionColor(orderData.deliveryOption || "normal"),
+            }}
+          >
+            {localizeDeliveryOption(orderData.deliveryOption || "normal")}
+          </span>
+        </div>
+        <span
+          className="text-xs font-semibold"
+          style={{
+            color:
+              (orderData.deliveryPrice || 0) === 0
+                ? "#10B981"
+                : isDarkMode
+                ? "#FFFFFF"
+                : "#1A1A1A",
+          }}
+        >
+          {(orderData.deliveryPrice || 0) === 0
+            ? t("free") || "Free"
+            : formatCurrency(orderData.deliveryPrice || 0, orderData.currency)}
+        </span>
+      </div>
 
-                  <SummaryRow
-                    label={t("total") || "Total"}
-                    value={formatCurrency(
-                      orderData.totalPrice,
-                      orderData.currency
-                    )}
-                    isTotal
-                  />
-                </div>
-              </div>
-            )}
+      <div
+        className={`h-px ${
+          isDarkMode ? "bg-gray-600" : "bg-gray-200"
+        }`}
+      />
+
+      {/* Total */}
+      <SummaryRow
+        label={t("total") || "Total"}
+        value={formatCurrency(
+          orderData.totalPrice,
+          orderData.currency
+        )}
+        isTotal
+      />
+    </div>
+  </div>
+)}
           </div>
         )}
       </div>
