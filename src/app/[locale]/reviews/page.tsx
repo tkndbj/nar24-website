@@ -201,7 +201,9 @@ export default function ReviewsPage() {
       try {
         let q = query(
           collectionGroup(db, "items"),
-          where("buyerId", "==", user.uid)
+          where("buyerId", "==", user.uid),
+          where("deliveryStatus", "==", "delivered"),
+          where("needsAnyReview", "==", true)
         );
 
         // Apply filters
