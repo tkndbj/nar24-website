@@ -3,12 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
-import {
-  ShoppingBag,
-  Mail,
-  Phone,
-  MapPin,  
-} from "lucide-react";
+import { ShoppingBag, Mail, Phone, MapPin } from "lucide-react";
 
 export default function Footer() {
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -54,7 +49,6 @@ export default function Footer() {
 
   const supportLinks = [
     { label: t("helpCenter"), href: "/support-and-faq" },
-    { label: t("pickupPoints"), href: "/pickup-points" },
     { label: t("shipping"), href: "/shippinginfo" },
     { label: t("returns"), href: "/refundform" },
   ];
@@ -65,13 +59,13 @@ export default function Footer() {
     { label: t("personalData"), href: "/agreements/personal-data" },
     { label: t("cancelAndReturnPolicy"), href: "/agreements/refund" },
     { label: t("sellerAgreement"), href: "/agreements/seller" },
-    { label: t("distanceSelling"), href: "/agreements/distance-selling" },    
+    { label: t("distanceSelling"), href: "/agreements/distance-selling" },
     {
       label: t("cookiePolicy"),
       href: "/cookies",
       action: "openCookieSettings",
     },
-  ]; 
+  ];
 
   return (
     <footer
@@ -243,8 +237,7 @@ export default function Footer() {
             isDarkMode ? "border-gray-800" : "border-gray-200"
           }`}
         >
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">            
-
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <span
                 className={`text-sm ${
