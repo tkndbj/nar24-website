@@ -626,13 +626,13 @@ useEffect(() => {
           try {
             freshTotals = await calculateCartTotals(selectedIds);
             break;
-          } catch (error: any) {
-            if (error?.message?.includes("Too many requests") && retries > 1) {
+          } catch (error) {
+            if (error instanceof Error && error.message.includes("Too many requests") && retries > 1) {
               console.log(`⏳ Rate limited, waiting 2s... (${retries - 1} retries left)`);
               await new Promise((resolve) => setTimeout(resolve, 2000));
               retries--;
             } else {
-              throw error;
+              throw new Error("Failed to calculate fresh totals");
             }
           }
         }
