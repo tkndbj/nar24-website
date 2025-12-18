@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import dynamic from "next/dynamic";
 import {
   X,
@@ -130,6 +130,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   const [salesPaused, setSalesPaused] = useState(false);
 const [pauseReason, setPauseReason] = useState("");
 const [showSalesPausedDialog, setShowSalesPausedDialog] = useState(false);
+const totalsVerificationTimer = useRef<NodeJS.Timeout | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<
     Record<string, boolean>
   >({});
@@ -165,6 +166,58 @@ const [showSalesPausedDialog, setShowSalesPausedDialog] = useState(false);
     },
     [localization]
   );
+
+  const calculateOptimisticTotals = useCallback((): CartTotals => {
+    const selectedIds = Object.entries(selectedProducts)
+      .filter(([, selected]) => selected)
+      .map(([id]) => id);
+  
+    if (selectedIds.length === 0) {
+      return { total: 0, currency: "TL", items: [] };
+    }
+  
+    const selectedItems = cartItems.filter((item) =>
+      selectedIds.includes(item.productId)
+    );
+  
+    let total = 0;
+    const currency = selectedItems[0]?.product?.currency || "TL";
+    const items: CartItemTotal[] = [];
+  
+    for (const item of selectedItems) {
+      const quantity = item.quantity || 1;
+      let unitPrice = item.product?.price || 0;
+  
+      // Apply bulk discount if applicable
+      const discountThreshold = item.salePreferences?.discountThreshold;
+      const bulkDiscountPercentage = item.salePreferences?.bulkDiscountPercentage;
+  
+      if (
+        discountThreshold &&
+        bulkDiscountPercentage &&
+        quantity >= discountThreshold
+      ) {
+        unitPrice = unitPrice * (1 - bulkDiscountPercentage / 100);
+      }
+  
+      const itemTotal = unitPrice * quantity;
+      total += itemTotal;
+  
+      items.push({
+        productId: item.productId,
+        unitPrice,
+        total: itemTotal,
+        quantity,
+        isBundleItem: false,
+      });
+    }
+  
+    return {
+      total: Math.round(total * 100) / 100,
+      currency,
+      items,
+    };
+  }, [cartItems, selectedProducts]);
 
   // Listen to sales config in real-time
 useEffect(() => {
@@ -251,31 +304,54 @@ useEffect(() => {
     }
   }, [cartItems]);
 
+  useEffect(() => {
+    return () => {
+      if (totalsVerificationTimer.current) {
+        clearTimeout(totalsVerificationTimer.current);
+      }
+    };
+  }, []);
+
   // Calculate totals when selections change
   useEffect(() => {
-    const calculateTotals = async () => {
-      const selectedIds = Object.entries(selectedProducts)
-        .filter(([, selected]) => selected)
-        .map(([id]) => id);
-
-      if (selectedIds.length === 0) {
-        setCalculatedTotals({ total: 0, currency: "TL", items: [] });
-        return;
-      }
-
-      setIsCalculatingTotals(true);
+    const selectedIds = Object.entries(selectedProducts)
+      .filter(([, selected]) => selected)
+      .map(([id]) => id);
+  
+    // Step 1: Immediate optimistic update
+    const optimistic = calculateOptimisticTotals();
+    setCalculatedTotals(optimistic);
+  
+    if (selectedIds.length === 0) {
+      return;
+    }
+  
+    // Step 2: Debounced server verification
+    setIsCalculatingTotals(true);
+  
+    // Clear previous timer
+    if (totalsVerificationTimer.current) {
+      clearTimeout(totalsVerificationTimer.current);
+    }
+  
+    totalsVerificationTimer.current = setTimeout(async () => {
       try {
-        const totals = await calculateCartTotals(selectedIds);
-        setCalculatedTotals(totals);
+        const serverTotals = await calculateCartTotals(selectedIds);
+        setCalculatedTotals(serverTotals);
       } catch (error) {
-        console.error("Failed to calculate totals:", error);
+        console.error("Server totals failed, using optimistic:", error);
+        // Keep optimistic value on error - don't reset to 0
       } finally {
         setIsCalculatingTotals(false);
       }
+    }, 500); // 500ms debounce (matches Flutter)
+  
+    return () => {
+      if (totalsVerificationTimer.current) {
+        clearTimeout(totalsVerificationTimer.current);
+      }
     };
-
-    calculateTotals();
-  }, [selectedProducts, cartItems, calculateCartTotals]);
+  }, [selectedProducts, cartItems, calculateCartTotals, calculateOptimisticTotals]);
 
   // Get available stock for item (matching Flutter logic)
   const getAvailableStock = useCallback((item: CartItem): number => {
@@ -525,38 +601,59 @@ useEffect(() => {
     const selectedIds = Object.entries(selectedProducts)
       .filter(([, selected]) => selected)
       .map(([id]) => id);
-
+  
     if (selectedIds.length === 0) return;
-
+  
     if (salesPaused) {
       setShowSalesPausedDialog(true);
       return;
     }
-
+  
     setIsValidating(true);
-
+  
     try {
-      // ✅ STEP 1: Validate cart
+      // STEP 1: Validate cart
       const validation = await validateForPayment(selectedIds, false);
-
-      setIsValidating(false);
-
+  
       if (validation.isValid && Object.keys(validation.warnings).length === 0) {
-        // ✅ STEP 2: Calculate FRESH totals (like Flutter)
+        // STEP 2: Calculate FRESH totals with retry
         console.log("💰 Calculating fresh totals before payment...");
-        const freshTotals = await calculateCartTotals(selectedIds);
+        
+        let freshTotals: CartTotals | null = null;  // ✅ Initialize as null
+        let retries = 3;
+        
+        while (retries > 0) {
+          try {
+            freshTotals = await calculateCartTotals(selectedIds);
+            break;
+          } catch (error: any) {
+            if (error?.message?.includes("Too many requests") && retries > 1) {
+              console.log(`⏳ Rate limited, waiting 2s... (${retries - 1} retries left)`);
+              await new Promise((resolve) => setTimeout(resolve, 2000));
+              retries--;
+            } else {
+              throw error;
+            }
+          }
+        }
+  
+        // STEP 3: Validate totals before proceeding
+        if (!freshTotals || freshTotals.total <= 0) {
+          throw new Error("Invalid totals calculated");
+        }
+  
         console.log("💰 Fresh totals:", freshTotals);
-
-        // ✅ STEP 3: Proceed with fresh totals
+        setIsValidating(false);
         proceedToPayment(freshTotals);
       } else {
+        setIsValidating(false);
         setValidationResult(validation);
         setShowValidationDialog(true);
       }
     } catch (error) {
       setIsValidating(false);
-      console.error("❌ Checkout validation error:", error);
-      alert(t("validationFailed") || "Validation failed. Please try again.");
+      console.error("❌ Checkout error:", error);
+      alert(t("validationFailed") || "Checkout failed. Please wait a moment and try again.");
     }
   }, [
     selectedProducts,
