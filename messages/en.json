@@ -1942,7 +1942,12 @@
     "viewCart": "View Cart",
     "checkout": "Checkout",
     "save": "Save",
-    "noStock": "No Stock"
+    "noStock": "No Stock",
+    "salesPausedTitle": "Sales Temporarily Paused",
+    "salesPausedMessage": "We are currently not accepting orders. Please try again later.",
+    "salesTemporarilyPaused": "Sales are temporarily paused",
+    "checkoutPaused": "Checkout Paused",
+    "understood": "Understood"
   },
   "header": {
     "back": "Back",

@@ -1977,7 +1977,12 @@
     "viewCart": "Sepeti Görüntüle",
     "checkout": "Ödemeye Geç",
     "save": "Kaydet",
-    "noStock": "Stok Yok"
+    "noStock": "Stok Yok",
+    "salesPausedTitle": "Satışlar Geçici Olarak Durduruldu",
+    "salesPausedMessage": "Şu anda sipariş almıyoruz. Lütfen daha sonra tekrar deneyin.",
+    "salesTemporarilyPaused": "Satışlar geçici olarak durduruldu",
+    "checkoutPaused": "Ödeme Durduruldu",
+    "understood": "Anladım"
   },
   "FavoritesDrawer": {
     "title": "Favorilerim",

@@ -24,6 +24,7 @@ import { AttributeLocalizationUtils } from "@/constants/AttributeLocalization";
 import { db } from "@/lib/firebase";
 import Image from "next/image";
 import { Product } from "@/app/models/Product";
+import { doc, onSnapshot } from "firebase/firestore";
 
 // Lazy load CartValidationDialog - only shown when validation needed
 const CartValidationDialog = dynamic(
@@ -126,6 +127,9 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
   const [isAnimating, setIsAnimating] = useState(false);
   const [shouldRender, setShouldRender] = useState(false);
+  const [salesPaused, setSalesPaused] = useState(false);
+const [pauseReason, setPauseReason] = useState("");
+const [showSalesPausedDialog, setShowSalesPausedDialog] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState<
     Record<string, boolean>
   >({});
@@ -161,6 +165,29 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     },
     [localization]
   );
+
+  // Listen to sales config in real-time
+useEffect(() => {
+  const unsubscribe = onSnapshot(
+    doc(db, "settings", "salesConfig"),
+    (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        setSalesPaused(data.salesPaused || false);
+        setPauseReason(data.pauseReason || "");
+      } else {
+        setSalesPaused(false);
+        setPauseReason("");
+      }
+    },
+    (error) => {
+      console.error("Error listening to sales config:", error);
+      setSalesPaused(false);
+    }
+  );
+
+  return () => unsubscribe();
+}, []);
 
   // Handle drawer animation
   useEffect(() => {
@@ -501,6 +528,11 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
     if (selectedIds.length === 0) return;
 
+    if (salesPaused) {
+      setShowSalesPausedDialog(true);
+      return;
+    }
+
     setIsValidating(true);
 
     try {
@@ -531,8 +563,95 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     validateForPayment,
     calculateCartTotals,
     proceedToPayment,
+    salesPaused,
     t,
   ]);
+
+  // Sales Paused Dialog Component
+const SalesPausedDialog = () => {
+  if (!showSalesPausedDialog) return null;
+
+  return (
+    <div className="fixed inset-0 z-[1100] flex items-center justify-center">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={() => setShowSalesPausedDialog(false)}
+      />
+
+      {/* Dialog */}
+      <div
+        className={`
+          relative z-10 w-full max-w-sm mx-4 rounded-2xl overflow-hidden shadow-2xl
+          ${isDarkMode ? "bg-gray-800" : "bg-white"}
+        `}
+      >
+        {/* Header */}
+        <div className={`px-6 py-5 ${isDarkMode ? "bg-gray-700" : "bg-orange-50"}`}>
+          <div className="flex items-center space-x-3">
+            <div
+              className={`
+                w-12 h-12 rounded-full flex items-center justify-center
+                ${isDarkMode ? "bg-orange-500/20" : "bg-orange-100"}
+              `}
+            >
+              <svg
+                className="w-6 h-6 text-orange-500"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            </div>
+            <div>
+              <h3
+                className={`text-lg font-bold ${
+                  isDarkMode ? "text-white" : "text-gray-900"
+                }`}
+              >
+                {t("salesPausedTitle") || "Sales Temporarily Paused"}
+              </h3>
+            </div>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="px-6 py-5">
+          <p
+            className={`text-center ${
+              isDarkMode ? "text-gray-300" : "text-gray-600"
+            }`}
+          >
+            {pauseReason ||
+              t("salesPausedMessage") ||
+              "We are currently not accepting orders. Please try again later."}
+          </p>
+        </div>
+
+        {/* Footer */}
+        <div className={`px-6 py-4 ${isDarkMode ? "bg-gray-700/50" : "bg-gray-50"}`}>
+          <button
+            onClick={() => setShowSalesPausedDialog(false)}
+            className="
+              w-full py-3 px-4 rounded-xl font-medium transition-all duration-200
+              bg-gradient-to-r from-orange-500 to-pink-500 text-white
+              hover:from-orange-600 hover:to-pink-600
+              active:scale-95
+            "
+          >
+            {t("understood") || "Understood"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
   const handleValidationContinue = useCallback(async () => {
     if (!validationResult) return;
@@ -1081,18 +1200,50 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
           </div>
 
           {/* Footer */}
-          {user && cartCount > 0 && (
-            <div
-              className={`
-                sticky bottom-0 border-t px-6 py-4
-                ${
-                  isDarkMode
-                    ? "bg-gray-900 border-gray-700"
-                    : "bg-white border-gray-200"
-                }
-                backdrop-blur-xl bg-opacity-95
-              `}
-            >
+{user && cartCount > 0 && (
+  <div
+    className={`
+      sticky bottom-0 border-t px-6 py-4
+      ${
+        isDarkMode
+          ? "bg-gray-900 border-gray-700"
+          : "bg-white border-gray-200"
+      }
+      backdrop-blur-xl bg-opacity-95
+    `}
+  >
+    {/* ✅ ADD: Sales Paused Banner */}
+    {salesPaused && (
+      <div
+        className={`
+          mb-4 p-3 rounded-lg border flex items-start space-x-2
+          ${
+            isDarkMode
+              ? "bg-orange-500/10 border-orange-500/30"
+              : "bg-orange-50 border-orange-200"
+          }
+        `}
+      >
+        <svg
+          className="w-5 h-5 text-orange-500 flex-shrink-0 mt-0.5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+          />
+        </svg>
+        <p className="text-sm text-orange-600 dark:text-orange-400 font-medium">
+          {pauseReason ||
+            t("salesTemporarilyPaused") ||
+            "Sales are temporarily paused"}
+        </p>
+      </div>
+    )}
               {/* Total */}
               <div className="flex items-center justify-between mb-4">
                 <span
@@ -1135,34 +1286,54 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   {t("viewCart")}
                 </button>
                 <button
-                  onClick={handleCheckout}
-                  disabled={
-                    isCalculatingTotals ||
-                    isValidating || // ✅ ADD THIS
-                    Object.values(selectedProducts).filter((v) => v).length ===
-                      0
-                  }
-                  className="
+  onClick={handleCheckout}
+  disabled={
+    isCalculatingTotals ||
+    isValidating ||
+    salesPaused ||
+    Object.values(selectedProducts).filter((v) => v).length === 0
+  }
+  className={`
     py-3 px-4 rounded-xl font-medium transition-all duration-200
-    bg-gradient-to-r from-orange-500 to-pink-500 text-white
-    hover:from-orange-600 hover:to-pink-600
-    shadow-lg hover:shadow-xl active:scale-95
+    ${
+      salesPaused
+        ? "bg-gray-400"
+        : "bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600"
+    }
+    text-white shadow-lg hover:shadow-xl active:scale-95
     flex items-center justify-center space-x-2
     disabled:opacity-50 disabled:cursor-not-allowed
-  "
-                >
-                  {isValidating ? ( // ✅ ADD THIS
-                    <>
-                      <RefreshCw size={16} className="animate-spin" />
-                      <span>{t("validating")}</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>{t("checkout")}</span>
-                      <ArrowRight size={16} />
-                    </>
-                  )}
-                </button>
+  `}
+>
+  {isValidating ? (
+    <>
+      <RefreshCw size={16} className="animate-spin" />
+      <span>{t("validating")}</span>
+    </>
+  ) : salesPaused ? (
+    <>
+      <svg
+        className="w-4 h-4"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"
+        />
+      </svg>
+      <span>{t("checkoutPaused") || "Checkout Paused"}</span>
+    </>
+  ) : (
+    <>
+      <span>{t("checkout")}</span>
+      <ArrowRight size={16} />
+    </>
+  )}
+</button>
               </div>
             </div>
           )}
@@ -1183,6 +1354,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
           localization={localization}
         />
       )}
+      <SalesPausedDialog />
     </div>
   );
 };
