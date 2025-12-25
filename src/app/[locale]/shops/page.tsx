@@ -127,7 +127,6 @@ export default function ShopsPage() {
 
   const t = useTranslations("shops");
   const tRoot = useTranslations();
-  const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const searchAbortRef = useRef<boolean>(false);
@@ -497,55 +496,46 @@ export default function ShopsPage() {
   }, [selectedCategory, searchTerm]);
 
   // Intersection Observer for infinite scroll (only when not searching)
-  // Use refs for callback values to avoid recreating observer on every state change
-  const selectedCategoryRef = useRef(selectedCategory);
-  selectedCategoryRef.current = selectedCategory;
-
   useEffect(() => {
     // Disable infinite scroll when searching with Algolia
     if (searchTerm.trim()) {
-      if (observerRef.current) {
-        observerRef.current.disconnect();
-      }
       return;
     }
 
-    if (observerRef.current) {
-      observerRef.current.disconnect();
-    }
+    let debounceTimer: NodeJS.Timeout;
 
-    const handleIntersection = (entries: IntersectionObserverEntry[]) => {
-      const entry = entries[0];
-      if (
-        entry.isIntersecting &&
-        hasMoreRef.current &&
-        !isLoadingMoreRef.current &&
-        !isLoadingRef.current &&
-        !isFetchingRef.current
-      ) {
-        console.log("Loading more shops...");
-        fetchShops(true, selectedCategoryRef.current);
-      }
-    };
-
-    observerRef.current = new IntersectionObserver(
-      handleIntersection,
-      {
-        threshold: 0,
-        rootMargin: "100px" // Start loading before reaching the sentinel
-      }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (
+          entries[0].isIntersecting &&
+          hasMoreRef.current &&
+          !isLoadingMoreRef.current &&
+          !isFetchingRef.current
+        ) {
+          // Debounce to prevent rapid-fire requests
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => {
+            console.log("Loading more shops...");
+            fetchShops(true, selectedCategory);
+          }, 150);
+        }
+      },
+      { threshold: 0.1, rootMargin: "100px" }
     );
 
-    if (loadMoreRef.current) {
-      observerRef.current.observe(loadMoreRef.current);
+    const currentTarget = loadMoreRef.current;
+    if (currentTarget && shops.length > 0) {
+      observer.observe(currentTarget);
     }
 
     return () => {
-      if (observerRef.current) {
-        observerRef.current.disconnect();
+      clearTimeout(debounceTimer);
+      if (currentTarget) {
+        observer.unobserve(currentTarget);
       }
+      observer.disconnect();
     };
-  }, [searchTerm, fetchShops]);
+  }, [searchTerm, shops.length, hasMore, isLoadingMore, selectedCategory, fetchShops]);
 
   const handleRefresh = async () => {
     setShops([]);
@@ -890,20 +880,35 @@ export default function ShopsPage() {
 
               {/* Load More Trigger - only for Firebase pagination */}
               {!searchTerm.trim() && hasMore && (
-                <div
-                  ref={loadMoreRef}
-                  className="mt-6 min-h-[20px]"
-                >
-                  {isLoadingMore ? (
-                    <div className={`grid ${getGridCols()} gap-4`}>
+                <>
+                  {/* Invisible sentinel for IntersectionObserver */}
+                  {!isLoadingMore && <div ref={loadMoreRef} className="h-10" />}
+
+                  {/* Loading state */}
+                  {isLoadingMore && (
+                    <div className={`grid ${getGridCols()} gap-4 mt-6`}>
                       {Array.from({ length: 4 }).map((_, index) => (
                         <LoadingShopCard key={`loading-${index}`} isDarkMode={isDarkMode} />
                       ))}
                     </div>
-                  ) : (
-                    <div className="h-5" />
                   )}
-                </div>
+
+                  {/* Fallback Load More button */}
+                  {!isLoadingMore && (
+                    <div className="flex justify-center py-6">
+                      <button
+                        onClick={() => fetchShops(true, selectedCategory)}
+                        className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+                          isDarkMode
+                            ? "bg-gray-800 hover:bg-gray-700 text-white border border-gray-700"
+                            : "bg-white hover:bg-gray-50 text-gray-900 border border-gray-300"
+                        }`}
+                      >
+                        {t("loadMore") || "Load More"}
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
 
             </>
