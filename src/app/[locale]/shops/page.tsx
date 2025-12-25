@@ -111,8 +111,8 @@ export default function ShopsPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [lastDocument, setLastDocument] =
-    useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  // Use ref for lastDocument to avoid stale closure issues in IntersectionObserver
+  const lastDocumentRef = useRef<QueryDocumentSnapshot<DocumentData> | null>(null);
 
   // Algolia search states
   const [isSearching, setIsSearching] = useState(false);
@@ -355,46 +355,34 @@ export default function ShopsPage() {
         return Promise.resolve();
       }
 
+      // For load more, check if we have a cursor document
+      if (isLoadMore && !lastDocumentRef.current) {
+        console.log("No more shops to load (no cursor)");
+        return Promise.resolve();
+      }
+
       isFetchingRef.current = true;
 
       try {
         if (!isLoadMore) {
-          // Only show full loading state if we have no shops yet
-          if (shops.length === 0) {
-            setIsLoading(true);
-          }
+          setIsLoading(true);
           setError(null);
         } else {
           setIsLoadingMore(true);
         }
 
-        let shopsQuery = query(
-          collection(db, "shops"),
-          where("isActive", "==", true),
-          orderBy("createdAt", "desc"),
-          limit(SHOPS_PER_PAGE)
-        );
+        // Build base query
+        let shopsQuery;
 
-        // Apply category filter
-        if (categoryFilter) {
-          shopsQuery = query(
-            collection(db, "shops"),
-            where("isActive", "==", true),
-            where("categories", "array-contains", categoryFilter),
-            orderBy("createdAt", "desc"),
-            limit(SHOPS_PER_PAGE)
-          );
-        }
-
-        // Add pagination
-        if (isLoadMore && lastDocument) {
+        if (isLoadMore && lastDocumentRef.current) {
+          // Paginated query with cursor
           if (categoryFilter) {
             shopsQuery = query(
               collection(db, "shops"),
               where("isActive", "==", true),
               where("categories", "array-contains", categoryFilter),
               orderBy("createdAt", "desc"),
-              startAfter(lastDocument),
+              startAfter(lastDocumentRef.current),
               limit(SHOPS_PER_PAGE)
             );
           } else {
@@ -402,7 +390,25 @@ export default function ShopsPage() {
               collection(db, "shops"),
               where("isActive", "==", true),
               orderBy("createdAt", "desc"),
-              startAfter(lastDocument),
+              startAfter(lastDocumentRef.current),
+              limit(SHOPS_PER_PAGE)
+            );
+          }
+        } else {
+          // Initial query (no cursor)
+          if (categoryFilter) {
+            shopsQuery = query(
+              collection(db, "shops"),
+              where("isActive", "==", true),
+              where("categories", "array-contains", categoryFilter),
+              orderBy("createdAt", "desc"),
+              limit(SHOPS_PER_PAGE)
+            );
+          } else {
+            shopsQuery = query(
+              collection(db, "shops"),
+              where("isActive", "==", true),
+              orderBy("createdAt", "desc"),
               limit(SHOPS_PER_PAGE)
             );
           }
@@ -413,6 +419,14 @@ export default function ShopsPage() {
           id: doc.id,
           ...doc.data(),
         })) as Shop[];
+
+        // Update cursor ref
+        const lastDoc = snapshot.docs[snapshot.docs.length - 1] || null;
+        lastDocumentRef.current = lastDoc;
+
+        // Determine if there are more results
+        const hasMoreResults = snapshot.docs.length === SHOPS_PER_PAGE;
+        setHasMore(hasMoreResults);
 
         if (isLoadMore) {
           // Deduplicate when adding more shops
@@ -427,9 +441,6 @@ export default function ShopsPage() {
             setShops(newShops);
           });
         }
-
-        setLastDocument(snapshot.docs[snapshot.docs.length - 1] || null);
-        setHasMore(snapshot.docs.length === SHOPS_PER_PAGE);
       } catch (err) {
         console.error("Error fetching shops:", err);
         setError("Failed to load shops. Please try again.");
@@ -439,7 +450,7 @@ export default function ShopsPage() {
         isFetchingRef.current = false;
       }
     },
-    [lastDocument, shops.length, startTransition]
+    [startTransition]
   );
 
   // Track initial mount to prevent filter effect from running
@@ -462,7 +473,7 @@ export default function ShopsPage() {
     if (!searchTerm.trim()) {
       // Clear shops immediately to prevent duplicates
       setShops([]);
-      setLastDocument(null);
+      lastDocumentRef.current = null;
       setHasMore(true);
       fetchShops(false, selectedCategory).finally(() => {
         setIsFiltering(false);
@@ -513,19 +524,19 @@ export default function ShopsPage() {
         observerRef.current.disconnect();
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     hasMore,
     isLoadingMore,
     isLoading,
     searchTerm,
     selectedCategory,
+    fetchShops,
   ]);
 
   const handleRefresh = async () => {
     setShops([]);
     setSearchResults([]);
-    setLastDocument(null);
+    lastDocumentRef.current = null;
     setHasMore(true);
 
     if (searchTerm.trim()) {
