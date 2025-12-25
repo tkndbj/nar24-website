@@ -135,6 +135,11 @@ export default function ShopsPage() {
   // Track if a fetch is in progress to prevent concurrent requests
   const isFetchingRef = useRef(false);
 
+  // Use refs for values needed in IntersectionObserver callback to avoid stale closures
+  const hasMoreRef = useRef(true);
+  const isLoadingMoreRef = useRef(false);
+  const isLoadingRef = useRef(true);
+
   const SHOPS_PER_PAGE = 20;
 
 
@@ -366,9 +371,11 @@ export default function ShopsPage() {
       try {
         if (!isLoadMore) {
           setIsLoading(true);
+          isLoadingRef.current = true;
           setError(null);
         } else {
           setIsLoadingMore(true);
+          isLoadingMoreRef.current = true;
         }
 
         // Build base query
@@ -427,6 +434,7 @@ export default function ShopsPage() {
         // Determine if there are more results
         const hasMoreResults = snapshot.docs.length === SHOPS_PER_PAGE;
         setHasMore(hasMoreResults);
+        hasMoreRef.current = hasMoreResults;
 
         if (isLoadMore) {
           // Deduplicate when adding more shops
@@ -446,7 +454,9 @@ export default function ShopsPage() {
         setError("Failed to load shops. Please try again.");
       } finally {
         setIsLoading(false);
+        isLoadingRef.current = false;
         setIsLoadingMore(false);
+        isLoadingMoreRef.current = false;
         isFetchingRef.current = false;
       }
     },
@@ -475,6 +485,7 @@ export default function ShopsPage() {
       setShops([]);
       lastDocumentRef.current = null;
       setHasMore(true);
+      hasMoreRef.current = true;
       fetchShops(false, selectedCategory).finally(() => {
         setIsFiltering(false);
       });
@@ -486,6 +497,10 @@ export default function ShopsPage() {
   }, [selectedCategory, searchTerm]);
 
   // Intersection Observer for infinite scroll (only when not searching)
+  // Use refs for callback values to avoid recreating observer on every state change
+  const selectedCategoryRef = useRef(selectedCategory);
+  selectedCategoryRef.current = selectedCategory;
+
   useEffect(() => {
     // Disable infinite scroll when searching with Algolia
     if (searchTerm.trim()) {
@@ -500,19 +515,25 @@ export default function ShopsPage() {
     }
 
     const handleIntersection = (entries: IntersectionObserverEntry[]) => {
+      const entry = entries[0];
       if (
-        entries[0].isIntersecting &&
-        hasMore &&
-        !isLoadingMore &&
-        !isLoading
+        entry.isIntersecting &&
+        hasMoreRef.current &&
+        !isLoadingMoreRef.current &&
+        !isLoadingRef.current &&
+        !isFetchingRef.current
       ) {
-        fetchShops(true, selectedCategory);
+        console.log("Loading more shops...");
+        fetchShops(true, selectedCategoryRef.current);
       }
     };
 
     observerRef.current = new IntersectionObserver(
       handleIntersection,
-      { threshold: 0.1 }
+      {
+        threshold: 0,
+        rootMargin: "100px" // Start loading before reaching the sentinel
+      }
     );
 
     if (loadMoreRef.current) {
@@ -524,20 +545,14 @@ export default function ShopsPage() {
         observerRef.current.disconnect();
       }
     };
-  }, [
-    hasMore,
-    isLoadingMore,
-    isLoading,
-    searchTerm,
-    selectedCategory,
-    fetchShops,
-  ]);
+  }, [searchTerm, fetchShops]);
 
   const handleRefresh = async () => {
     setShops([]);
     setSearchResults([]);
     lastDocumentRef.current = null;
     setHasMore(true);
+    hasMoreRef.current = true;
 
     if (searchTerm.trim()) {
       await performAlgoliaSearch(searchTerm, selectedCategory);
@@ -874,14 +889,19 @@ export default function ShopsPage() {
               </div>
 
               {/* Load More Trigger - only for Firebase pagination */}
-              {!searchTerm.trim() && (
-                <div ref={loadMoreRef} className="mt-6">
-                  {isLoadingMore && (
+              {!searchTerm.trim() && hasMore && (
+                <div
+                  ref={loadMoreRef}
+                  className="mt-6 min-h-[20px]"
+                >
+                  {isLoadingMore ? (
                     <div className={`grid ${getGridCols()} gap-4`}>
                       {Array.from({ length: 4 }).map((_, index) => (
                         <LoadingShopCard key={`loading-${index}`} isDarkMode={isDarkMode} />
                       ))}
                     </div>
+                  ) : (
+                    <div className="h-5" />
                   )}
                 </div>
               )}
