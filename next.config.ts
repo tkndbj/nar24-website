@@ -57,7 +57,7 @@ const securityHeaders = [
       "default-src 'self'",
   
       // Scripts: self, inline (needed for Next.js), and trusted domains
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://maps.googleapis.com https://www.googletagmanager.com https://www.google-analytics.com https://*.firebaseapp.com",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com https://accounts.google.com https://maps.googleapis.com https://www.googletagmanager.com https://www.google-analytics.com https://*.firebaseapp.com",
   
       // Styles: self, inline (needed for styled-components/tailwind), Google Fonts
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",

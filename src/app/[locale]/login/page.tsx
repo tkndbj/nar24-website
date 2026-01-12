@@ -364,21 +364,26 @@ function LoginContent() {
 
   // Handle Google sign-in
   const handleGoogleSignIn = useCallback(async () => {
+    console.log("🔵 handleGoogleSignIn called");
+
     // Reset TwoFactorService state before new login attempt
     twoFactorService.reset();
     setIsLoading(true);
-  
+
     try {
+      console.log("🔵 Creating GoogleAuthProvider...");
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({
         prompt: "select_account",
       });
-  
+
+      console.log("🔵 Calling signInWithPopup...");
       const result = await withTimeout(
         signInWithPopup(auth, provider),
         AUTH_TIMEOUT_MS,
         "AUTH_TIMEOUT"
       );
+      console.log("🟢 signInWithPopup succeeded");
       const user = result.user;
   
       if (user) {
@@ -441,6 +446,11 @@ function LoginContent() {
         // If 2FA is needed, user will be redirected to 2FA page
       }
     } catch (error: unknown) {
+      console.error("🔴 Google Sign-In Error:", error);
+      console.error("🔴 Error type:", typeof error);
+      console.error("🔴 Error code:", (error as AuthError)?.code);
+      console.error("🔴 Error message:", (error as Error)?.message);
+
       const errorMessage = error instanceof Error ? error.message : "";
       const authError = error as AuthError;
 
@@ -456,6 +466,7 @@ function LoginContent() {
         // Don't return early - let finally handle loading state
       } else if (authError.code === "auth/popup-closed-by-user" || authError.code === "auth/cancelled-popup-request") {
         // User cancelled - don't show error, just reset loading
+        console.log("🟡 User cancelled popup");
       } else if (authError.code === "auth/popup-blocked") {
         toast.error(t("LoginPage.popupBlocked"), {
           style: {
@@ -491,6 +502,7 @@ function LoginContent() {
       }
     } finally {
       // Always reset loading state - this runs after catch block completes
+      console.log("🔵 handleGoogleSignIn finally block - resetting loading");
       setIsLoading(false);
     }
   }, [t, twoFactorService, router, checkAndHandle2FA]);
