@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useUser } from "@/context/UserProvider";
+import { useCart } from "@/context/CartProvider";
 import { useTranslations } from "next-intl";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -45,10 +46,19 @@ interface CartItem {
   price?: number;
   productName?: string;
   currency?: string;
-  calculatedUnitPrice?: number; // ✅ Add this
-  calculatedTotal?: number; // ✅ Add this
-  isBundleItem?: boolean; // ✅ Add this
+  calculatedUnitPrice?: number;
+  calculatedTotal?: number;
+  isBundleItem?: boolean;
+  sellerName?: string;
+  sellerId?: string;
+  isShop?: boolean;
+  selectedColor?: string;
+  selectedSize?: string;
+  product?: Record<string, unknown>;
+  salePreferences?: Record<string, unknown> | null;
   cartData?: {
+    selectedColor?: string;
+    selectedSize?: string;
     attributes?: Record<string, unknown>;
     [key: string]: unknown;
   };
@@ -58,6 +68,7 @@ interface CartItem {
     | boolean
     | string[]
     | undefined
+    | null
     | Record<string, unknown>;
 }
 
@@ -461,9 +472,17 @@ export default function ProductPaymentPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, isLoading: userLoading } = useUser();
+  const {
+    cartItems: firebaseCartItems,
+    isInitialized: cartInitialized,
+    isLoading: cartLoading,
+    initializeCartIfNeeded,
+    calculateCartTotals,
+  } = useCart();
   const t = useTranslations("ProductPayment");
 
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [isLoadingCheckout, setIsLoadingCheckout] = useState(true);
   const [totalPrice, setTotalPrice] = useState(0);
   const [agreesToContract, setAgreesToContract] = useState(false);
   const [selectedDeliveryOption, setSelectedDeliveryOption] =
@@ -574,23 +593,28 @@ export default function ProductPaymentPage() {
     }
   }, []);
 
+  // Initialize cart when user is available
+  useEffect(() => {
+    if (user && !cartInitialized && !cartLoading) {
+      initializeCartIfNeeded();
+    }
+  }, [user, cartInitialized, cartLoading, initializeCartIfNeeded]);
+
+  // Handle checkout data initialization
   useEffect(() => {
     const buyNowData = searchParams.get("buyNowData");
-    const totalParam = searchParams.get("total");
-    const itemsParam = searchParams.get("items");
 
-    // ✅ CASE 1: Buy Now - Single Product Purchase
-    // ✅ CASE 1: Buy Now - Single Product Purchase
+    // ✅ CASE 1: Buy Now - Single Product Purchase (no Firebase needed)
     if (buyNowData) {
       try {
         console.log("🛒 Buy Now Mode - Decoding buyNowData...");
 
-        // ✅ FIX: Use decodeURIComponent instead of atob for Unicode support
+        // Use decodeURIComponent for Unicode support
         const decodedItem = JSON.parse(decodeURIComponent(buyNowData));
 
         console.log("✅ Decoded Buy Now Item:", decodedItem);
 
-        // ✅ FIX: Add calculated prices for Buy Now items
+        // Add calculated prices for Buy Now items
         const itemWithCalculatedPrices = {
           ...decodedItem,
           calculatedUnitPrice: decodedItem.unitPrice,
@@ -602,12 +626,9 @@ export default function ProductPaymentPage() {
 
         const itemTotal = decodedItem.unitPrice * decodedItem.quantity;
         setTotalPrice(itemTotal);
+        setIsLoadingCheckout(false);
 
         console.log("💰 Buy Now Total:", itemTotal);
-        console.log(
-          "✅ Item with calculated prices:",
-          itemWithCalculatedPrices
-        );
         return;
       } catch (error) {
         console.error("❌ Failed to parse buyNowData:", error);
@@ -617,46 +638,115 @@ export default function ProductPaymentPage() {
       }
     }
 
-    // ✅ CASE 2: Regular Cart Checkout - Multiple Products
-    if (totalParam && itemsParam) {
+    // ✅ CASE 2: Regular Cart Checkout - Fetch from Firebase
+    // Wait for cart to be initialized before proceeding
+    if (!cartInitialized || cartLoading) {
+      return; // Wait for cart to load
+    }
+
+    const loadCheckoutFromFirebase = async () => {
+      if (typeof window === "undefined") return;
+
+      const checkoutDataStr = sessionStorage.getItem("checkoutSelectedIds");
+      if (!checkoutDataStr) {
+        console.warn("⚠️ No checkout session found. Redirecting to cart...");
+        router.push("/cart");
+        return;
+      }
+
       try {
-        console.log("🛒 Cart Checkout Mode - Parsing items...");
-        const items = JSON.parse(decodeURIComponent(itemsParam));
-        const cfTotal = parseFloat(totalParam);
+        console.log("🛒 Cart Checkout Mode - Fetching from Firebase...");
+        const checkoutData = JSON.parse(checkoutDataStr);
 
-        console.log("💰 Cloud Function total:", cfTotal);
-        console.log("📦 Items from CF:", items);
-
-        // Verify items have calculated pricing
-        const validItems = items.every(
-          (item: PaymentItem) =>
-            typeof item.calculatedUnitPrice === "number" &&
-            typeof item.calculatedTotal === "number"
-        );
-
-        if (!validItems) {
-          console.error("❌ Items missing calculated pricing!");
-          console.error("Items:", items);
+        // Check if data is not stale (within 30 minutes)
+        const isStale = Date.now() - checkoutData.timestamp > 30 * 60 * 1000;
+        if (isStale) {
+          console.warn("⚠️ Checkout session expired, clearing...");
+          sessionStorage.removeItem("checkoutSelectedIds");
           router.push("/cart");
           return;
         }
 
-        setCartItems(items);
-        setTotalPrice(cfTotal);
-        return;
-      } catch (error) {
-        console.error("Error parsing cart data:", error);
-        router.push("/cart");
-        return;
-      }
-    }
+        const selectedIds: string[] = checkoutData.selectedIds;
+        console.log("📋 Selected product IDs:", selectedIds);
 
-    // ✅ CASE 3: No Valid Data - Redirect to Cart
-    console.warn(
-      "⚠️ No valid payment data (buyNowData, total, or items). Redirecting to cart..."
-    );
-    router.push("/cart");
-  }, [searchParams, router]);
+        if (!selectedIds || selectedIds.length === 0) {
+          console.error("❌ No selected items in checkout session!");
+          sessionStorage.removeItem("checkoutSelectedIds");
+          router.push("/cart");
+          return;
+        }
+
+        // Filter cart items by selected IDs (cart data comes from Firebase via CartProvider)
+        const selectedCartItems = firebaseCartItems.filter((item) =>
+          selectedIds.includes(item.productId)
+        );
+
+        if (selectedCartItems.length === 0) {
+          console.error("❌ Selected items not found in cart!");
+          sessionStorage.removeItem("checkoutSelectedIds");
+          router.push("/cart");
+          return;
+        }
+
+        console.log("📦 Cart items from Firebase:", selectedCartItems);
+
+        // Calculate fresh totals from server (Cloud Function)
+        console.log("💰 Calculating fresh totals from server...");
+        const freshTotals = await calculateCartTotals(selectedIds);
+        console.log("💰 Server totals:", freshTotals);
+
+        // Build pricing map from Cloud Function response
+        const pricingMap = new Map<string, { unitPrice: number; total: number; isBundleItem?: boolean }>();
+        freshTotals.items.forEach((itemTotal) => {
+          pricingMap.set(itemTotal.productId, {
+            unitPrice: itemTotal.unitPrice,
+            total: itemTotal.total,
+            isBundleItem: itemTotal.isBundleItem,
+          });
+        });
+
+        // Build cart items with calculated pricing
+        const itemsWithPricing: CartItem[] = selectedCartItems.map((item) => {
+          const pricing = pricingMap.get(item.productId);
+          return {
+            productId: item.productId,
+            quantity: item.quantity,
+            productName: item.product?.productName,
+            currency: item.product?.currency || "TL",
+            calculatedUnitPrice: pricing?.unitPrice || item.product?.price || 0,
+            calculatedTotal: pricing?.total || (item.product?.price || 0) * item.quantity,
+            isBundleItem: pricing?.isBundleItem || false,
+            // Include all other attributes needed for the order
+            sellerName: item.sellerName,
+            sellerId: item.sellerId,
+            isShop: item.isShop,
+            selectedColor: item.cartData?.selectedColor,
+            selectedSize: item.cartData?.selectedSize,
+            product: item.product,
+            salePreferences: item.salePreferences,
+            cartData: item.cartData,
+          };
+        });
+
+        console.log("✅ Items with server-calculated pricing:", itemsWithPricing);
+
+        setCartItems(itemsWithPricing);
+        setTotalPrice(freshTotals.total);
+        setIsLoadingCheckout(false);
+
+        // Clear the sessionStorage after successful load (one-time use)
+        sessionStorage.removeItem("checkoutSelectedIds");
+      } catch (error) {
+        console.error("❌ Error loading checkout from Firebase:", error);
+        sessionStorage.removeItem("checkoutSelectedIds");
+        alert("Failed to load checkout data. Please try again.");
+        router.push("/cart");
+      }
+    };
+
+    loadCheckoutFromFirebase();
+  }, [searchParams, router, cartInitialized, cartLoading, firebaseCartItems, calculateCartTotals]);
 
   useEffect(() => {
     if (user) {
@@ -876,7 +966,7 @@ export default function ProductPaymentPage() {
     }
   };
 
-  if (userLoading || cartItems.length === 0) {
+  if (userLoading || isLoadingCheckout || cartItems.length === 0) {
     return (
       <div
         className={`min-h-screen flex items-center justify-center ${

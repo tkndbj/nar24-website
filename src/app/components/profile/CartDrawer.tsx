@@ -577,12 +577,20 @@ useEffect(() => {
       console.log("✅ Proceeding with items:", paymentItems);
       console.log("✅ Total:", freshTotals.total);
 
-      // Pass complete items + total via URL
-      const itemsJson = encodeURIComponent(JSON.stringify(paymentItems));
+      // Store only selected product IDs in sessionStorage (small data)
+      // Payment page will fetch cart data directly from Firebase
+      const selectedIds = paymentItems.map((item) => item.productId);
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem(
+          "checkoutSelectedIds",
+          JSON.stringify({
+            selectedIds,
+            timestamp: Date.now(),
+          })
+        );
+      }
 
-      router.push(
-        `/productpayment?total=${freshTotals.total}&items=${itemsJson}`
-      );
+      router.push("/productpayment");
       onClose();
     },
     [cartItems, selectedProducts, onClose, router, t]
