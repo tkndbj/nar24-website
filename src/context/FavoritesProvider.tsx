@@ -1062,12 +1062,17 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         setHasMoreData(cached.hasMore);
         setIsInitialLoadComplete(true);
       } else {
-        // No cache or expired, reset pagination
+        // No cache or expired, inline reset pagination logic
         console.log("🔄 No cache for basket:", newCacheKey, "- loading fresh");
-        resetPagination();
+        lastDocument.current = null;
+        setHasMoreData(true);
+        setIsLoadingMore(false);
+        paginatedFavoritesMap.current.clear();
+        setPaginatedFavorites([]);
+        setIsInitialLoadComplete(false);
       }
     }
-  }, [hasMoreData, resetPagination]);
+  }, [hasMoreData]);
 
   const transferToBasket = useCallback(
     async (
