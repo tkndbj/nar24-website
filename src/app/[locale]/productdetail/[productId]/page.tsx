@@ -490,7 +490,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
       setCurrentImageIndex(0);
       setPreviousImageIndex(0);
       setImageErrors(new Set());
-      setShouldLoadBottomSections(false); // Reset so Intersection Observer works for new product
+      setShouldLoadBottomSections(false); // Reset for new product
 
       // ✅ STAGE 1: Check in-memory cache for INSTANT display
       const cached = getProduct(id);
@@ -657,46 +657,21 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     return () => window.removeEventListener("resize", checkLargeScreen);
   }, []);
 
-  // ============= BOTTOM SECTIONS INTERSECTION OBSERVER =============
+  // ============= BOTTOM SECTIONS LOADING =============
+  // Simple and reliable: Load bottom sections shortly after product loads
   useEffect(() => {
     if (typeof window === "undefined" || !product) return;
 
-    // If already triggered, no need to observe
+    // If already loaded, skip
     if (shouldLoadBottomSections) return;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const [entry] = entries;
-        if (entry.isIntersecting) {
-          console.log("✅ Bottom sections entering viewport - loading components");
-          setShouldLoadBottomSections(true);
-          observer.disconnect();
-        }
-      },
-      {
-        // Start loading when within 500px of the viewport
-        rootMargin: "500px 0px",
-        threshold: 0,
-      }
-    );
+    // Load after a short delay to prioritize above-the-fold content
+    const timer = setTimeout(() => {
+      console.log("✅ Loading bottom sections");
+      setShouldLoadBottomSections(true);
+    }, 300); // 300ms delay for performance, but short enough to feel instant
 
-    // Observe the bottom sections container
-    if (bottomSectionsRef.current) {
-      observer.observe(bottomSectionsRef.current);
-    }
-
-    // Fallback: Load after 1 second regardless (ensures content loads on all devices)
-    const fallbackTimer = setTimeout(() => {
-      if (!shouldLoadBottomSections) {
-        console.log("✅ Fallback timer - loading bottom sections");
-        setShouldLoadBottomSections(true);
-      }
-    }, 1000);
-
-    return () => {
-      observer.disconnect();
-      clearTimeout(fallbackTimer);
-    };
+    return () => clearTimeout(timer);
   }, [product, shouldLoadBottomSections]);
 
   // ============= SCROLL DETECTION =============
