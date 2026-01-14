@@ -82,19 +82,10 @@ export async function GET(
       .doc(rawId)
       .collection("reviews");
 
-    // Apply rating filter if specified
-    if (filterRating !== null) {
-      // Filter for reviews with rating between filterRating and filterRating + 1
-      query = query
-        .where("rating", ">=", filterRating)
-        .where("rating", "<", filterRating + 1);
-    }
-
-    // Apply sorting
+    // Apply sorting first (needed for proper Firestore query structure)
     if (sortBy === "rating") {
       query = query.orderBy("rating", "desc").orderBy("timestamp", "desc");
     } else if (sortBy === "helpful") {
-      // First order by helpful count if the field exists
       query = query.orderBy("helpful", "desc").orderBy("timestamp", "desc");
     } else {
       // Default to recent (timestamp desc)
@@ -121,16 +112,18 @@ export async function GET(
       }
     }
 
-    // Apply limit
-    query = query.limit(limit);
+    // When filtering by rating, fetch more to account for filtered out items
+    // This ensures we have enough results after filtering
+    const fetchLimit = filterRating !== null ? limit * 5 : limit;
+    query = query.limit(fetchLimit);
 
     // Execute the query
     const reviewsSnapshot = await query.get();
 
-    // Map the reviews to the expected format
-    const reviews = reviewsSnapshot.docs.map((doc) => {
+    // Map and filter the reviews
+    let reviews = reviewsSnapshot.docs.map((doc) => {
       const data = doc.data() as ReviewData;
-      
+
       // Handle timestamp conversion
       let timestampStr = new Date().toISOString();
       if (data.timestamp) {
@@ -176,26 +169,39 @@ export async function GET(
       };
     });
 
-    // Get total count for the current filter
-    let countQuery: FirebaseFirestore.Query = db
-      .collection(baseCollection)
-      .doc(rawId)
-      .collection("reviews");
-
-    // Apply the same rating filter for count
+    // Apply rating filter server-side (handles both integer and decimal ratings)
+    // A "4 star" filter shows reviews with rating >= 4 and < 5
     if (filterRating !== null) {
-      countQuery = countQuery
-        .where("rating", ">=", filterRating)
-        .where("rating", "<", filterRating + 1);
+      reviews = reviews.filter(review => {
+        const rating = review.rating;
+        return rating >= filterRating && rating < filterRating + 1;
+      });
     }
 
-    const totalSnapshot = await countQuery.get();
-    const totalCount = totalSnapshot.size;
+    // Apply limit after filtering
+    const paginatedReviews = reviews.slice(0, limit);
+
+    // Get total count for the current filter
+    const allReviewsSnapshot = await db
+      .collection(baseCollection)
+      .doc(rawId)
+      .collection("reviews")
+      .get();
+
+    let totalCount = allReviewsSnapshot.size;
+
+    // If filtering, count only matching reviews
+    if (filterRating !== null) {
+      totalCount = allReviewsSnapshot.docs.filter(doc => {
+        const rating = doc.data().rating || 0;
+        return rating >= filterRating && rating < filterRating + 1;
+      }).length;
+    }
 
     return NextResponse.json({
-      reviews,
+      reviews: paginatedReviews,
       totalCount,
-      hasMore: reviews.length === limit,
+      hasMore: reviews.length > limit,
     });
 
   } catch (error) {
