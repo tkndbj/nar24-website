@@ -15,6 +15,11 @@ export default function ConditionalFooter() {
     "/two-factor-verification",
     "/email-verification",
     "/complete-profile",
+    "/dynamicteras",
+    "/dynamicmarket",
+    "/dynamicmarket2",
+    "/shopdetail",
+    "/search-results",
   ];
 
   const shouldHideFooter =
