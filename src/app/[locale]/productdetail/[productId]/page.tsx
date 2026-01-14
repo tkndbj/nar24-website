@@ -351,7 +351,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   const [isDescriptionTranslating, setIsDescriptionTranslating] = useState(false);
   const [descriptionTranslationError, setDescriptionTranslationError] = useState<string | null>(null);
   const [hasScrolled, setHasScrolled] = useState(false);
-  const [isLargeScreen, setIsLargeScreen] = useState(false);
+  const [, setIsLargeScreen] = useState(false);
   const [showHeaderButtons, setShowHeaderButtons] = useState(false);
   const [shouldLoadBottomSections, setShouldLoadBottomSections] = useState(false);
 
