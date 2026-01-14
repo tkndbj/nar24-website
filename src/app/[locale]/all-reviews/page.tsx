@@ -91,6 +91,8 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
 
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const isFetchingRef = useRef(false);
 
   const PAGE_SIZE = 20;
 
@@ -196,33 +198,95 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
     fetchProductInfo();
   }, [productId]);
 
-  // Fetch reviews - pass filter params explicitly to avoid stale closure issues
-  const fetchReviews = useCallback(async (
-    isInitial = false,
-    currentSortBy: string = sortBy,
-    currentFilterRating: number | null = filterRating,
-    currentLastDocId: string | null = lastDocId
-  ) => {
-    if (!productId || (!isInitial && !hasMore)) return;
+  // Initial fetch and refetch on filter change
+  useEffect(() => {
+    if (!productId) return;
+
+    // Abort any pending request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
+    const fetchInitialReviews = async () => {
+      isFetchingRef.current = true;
+      setIsLoading(true);
+      setReviews([]);
+      setLastDocId(null);
+      setHasMore(true);
+
+      try {
+        const params = new URLSearchParams({
+          limit: PAGE_SIZE.toString(),
+          sortBy,
+        });
+
+        if (filterRating) {
+          params.append("rating", filterRating.toString());
+        }
+
+        const response = await fetch(`/api/reviews/${productId}?${params}`, {
+          signal: abortController.signal,
+        });
+
+        if (!response.ok) throw new Error("Failed to fetch reviews");
+
+        const data = await response.json();
+        const newReviews = data.reviews.map((r: Review) => ({
+          ...r,
+          timestamp: new Date(r.timestamp),
+          sellerResponseDate: r.sellerResponseDate ? new Date(r.sellerResponseDate) : undefined,
+        }));
+
+        // Only update state if this request wasn't aborted
+        if (!abortController.signal.aborted) {
+          setReviews(newReviews);
+          setHasMore(newReviews.length === PAGE_SIZE);
+          if (newReviews.length > 0) {
+            setLastDocId(newReviews[newReviews.length - 1].id);
+          }
+        }
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") {
+          // Request was aborted, ignore
+          return;
+        }
+        console.error("Error fetching reviews:", error);
+      } finally {
+        if (!abortController.signal.aborted) {
+          setIsLoading(false);
+          isFetchingRef.current = false;
+        }
+      }
+    };
+
+    fetchInitialReviews();
+
+    return () => {
+      abortController.abort();
+    };
+  }, [productId, sortBy, filterRating]);
+
+  // Load more reviews (for infinite scroll)
+  const loadMoreReviews = useCallback(async () => {
+    if (!productId || !hasMore || isLoadingMore || isFetchingRef.current) return;
+
+    setIsLoadingMore(true);
 
     try {
-      if (isInitial) {
-        setIsLoading(true);
-      } else {
-        setIsLoadingMore(true);
-      }
-
       const params = new URLSearchParams({
         limit: PAGE_SIZE.toString(),
-        sortBy: currentSortBy,
+        sortBy,
       });
 
-      if (currentFilterRating) {
-        params.append("rating", currentFilterRating.toString());
+      if (filterRating) {
+        params.append("rating", filterRating.toString());
       }
 
-      if (currentLastDocId && !isInitial) {
-        params.append("lastDocId", currentLastDocId);
+      if (lastDocId) {
+        params.append("lastDocId", lastDocId);
       }
 
       const response = await fetch(`/api/reviews/${productId}?${params}`);
@@ -236,56 +300,42 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
         sellerResponseDate: r.sellerResponseDate ? new Date(r.sellerResponseDate) : undefined,
       }));
 
-      if (isInitial) {
-        setReviews(newReviews);
-      } else {
-        setReviews(prev => [...prev, ...newReviews]);
-      }
-
+      setReviews(prev => [...prev, ...newReviews]);
       setHasMore(newReviews.length === PAGE_SIZE);
 
       if (newReviews.length > 0) {
         setLastDocId(newReviews[newReviews.length - 1].id);
       }
     } catch (error) {
-      console.error("Error fetching reviews:", error);
+      console.error("Error loading more reviews:", error);
     } finally {
-      setIsLoading(false);
       setIsLoadingMore(false);
     }
-  }, [productId, sortBy, filterRating, lastDocId, hasMore]);
+  }, [productId, sortBy, filterRating, lastDocId, hasMore, isLoadingMore]);
 
-  // Initial fetch and refetch on filter change
+  // Infinite scroll observer
   useEffect(() => {
-    setReviews([]);
-    setLastDocId(null);
-    setHasMore(true);
-    // Pass current values explicitly to avoid stale closure
-    fetchReviews(true, sortBy, filterRating, null);
-  }, [productId, sortBy, filterRating, fetchReviews]);
-
-  // Infinite scroll
-  useEffect(() => {
-    if (!loadMoreTriggerRef.current) return;
+    const trigger = loadMoreTriggerRef.current;
+    if (!trigger) return;
 
     observerRef.current = new IntersectionObserver(
       (entries) => {
         const first = entries[0];
-        if (first.isIntersecting && hasMore && !isLoadingMore) {
-          fetchReviews(false);
+        if (first.isIntersecting && hasMore && !isLoadingMore && !isFetchingRef.current) {
+          loadMoreReviews();
         }
       },
       { threshold: 0.1, rootMargin: "100px" }
     );
 
-    observerRef.current.observe(loadMoreTriggerRef.current);
+    observerRef.current.observe(trigger);
 
     return () => {
       if (observerRef.current) {
         observerRef.current.disconnect();
       }
     };
-  }, [hasMore, isLoadingMore, fetchReviews]);
+  }, [hasMore, isLoadingMore, loadMoreReviews]);
 
   // Toggle like
   const toggleLike = useCallback(async (reviewId: string) => {
@@ -294,18 +344,21 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
       return;
     }
 
+    // Store previous state for rollback
+    const previousReviews = reviews;
+
     // Optimistic update
     setReviews(prev => prev.map(review => {
       if (review.id === reviewId) {
         const likes = [...review.likes];
         const userIndex = likes.indexOf(user.uid);
-        
+
         if (userIndex > -1) {
           likes.splice(userIndex, 1);
         } else {
           likes.push(user.uid);
         }
-        
+
         return { ...review, likes };
       }
       return review;
@@ -320,10 +373,10 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
       });
     } catch (error) {
       console.error("Error toggling like:", error);
-      // Revert on error - refetch with current filter params
-      fetchReviews(true, sortBy, filterRating, null);
+      // Revert optimistic update on error
+      setReviews(previousReviews);
     }
-  }, [user, router, fetchReviews, sortBy, filterRating]);
+  }, [user, router, reviews]);
 
   // Translate review
   const translateReview = useCallback(async (reviewId: string, text: string) => {
