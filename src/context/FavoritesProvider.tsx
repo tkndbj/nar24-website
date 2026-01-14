@@ -257,6 +257,16 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   const currentBasketId = useRef<string | null>(null);
   const selectedBasketIdRef = useRef<string | null>(null);
 
+  // Per-basket cache for fast switching
+  interface BasketCache {
+    favorites: PaginatedFavorite[];
+    lastDoc: DocumentSnapshot | null;
+    hasMore: boolean;
+    timestamp: number;
+  }
+  const basketCacheMap = useRef<Map<string, BasketCache>>(new Map());
+  const BASKET_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
   // Firestore listeners
   const favoriteSubscription = useRef<Unsubscribe | null>(null);
   const globalFavoriteSubscription = useRef<Unsubscribe | null>(null);
@@ -1016,13 +1026,48 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   // ========================================================================
 
   const setSelectedBasket = useCallback((basketId: string | null) => {
+    const previousBasketId = currentBasketId.current;
+
+    // Save current basket's data to cache before switching
+    if (previousBasketId !== basketId && paginatedFavoritesMap.current.size > 0) {
+      const cacheKey = previousBasketId ?? "__default__";
+      basketCacheMap.current.set(cacheKey, {
+        favorites: Array.from(paginatedFavoritesMap.current.values()),
+        lastDoc: lastDocument.current,
+        hasMore: hasMoreData,
+        timestamp: Date.now(),
+      });
+      console.log("💾 Saved cache for basket:", cacheKey, "items:", paginatedFavoritesMap.current.size);
+    }
+
     setSelectedBasketIdState(basketId);
     selectedBasketIdRef.current = basketId;
-    if (currentBasketId.current !== basketId) {
+
+    if (previousBasketId !== basketId) {
       currentBasketId.current = basketId;
-      resetPagination();
+
+      // Check for cached data for the new basket
+      const newCacheKey = basketId ?? "__default__";
+      const cached = basketCacheMap.current.get(newCacheKey);
+
+      if (cached && Date.now() - cached.timestamp < BASKET_CACHE_TTL) {
+        // Restore from cache
+        console.log("✅ Restored cache for basket:", newCacheKey, "items:", cached.favorites.length);
+        paginatedFavoritesMap.current.clear();
+        cached.favorites.forEach((item) => {
+          paginatedFavoritesMap.current.set(item.productId, item);
+        });
+        setPaginatedFavorites(cached.favorites);
+        lastDocument.current = cached.lastDoc;
+        setHasMoreData(cached.hasMore);
+        setIsInitialLoadComplete(true);
+      } else {
+        // No cache or expired, reset pagination
+        console.log("🔄 No cache for basket:", newCacheKey, "- loading fresh");
+        resetPagination();
+      }
     }
-  }, []);
+  }, [hasMoreData, resetPagination]);
 
   const transferToBasket = useCallback(
     async (
@@ -1320,8 +1365,22 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
   const shouldReloadFavorites = useCallback(
     (basketId: string | null): boolean => {
-      if (currentBasketId.current !== basketId) return true;
-      return paginatedFavorites.length === 0 && !isInitialLoadComplete;
+      // Check if we have current data
+      if (paginatedFavorites.length > 0 && isInitialLoadComplete) {
+        return false;
+      }
+
+      // Check cache for the target basket
+      const cacheKey = basketId ?? "__default__";
+      const cached = basketCacheMap.current.get(cacheKey);
+
+      if (cached && Date.now() - cached.timestamp < BASKET_CACHE_TTL) {
+        // Valid cache exists
+        return false;
+      }
+
+      // No cache or expired, need to reload
+      return true;
     },
     [paginatedFavorites.length, isInitialLoadComplete]
   );
@@ -1418,9 +1477,13 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
     setIsLoading(false);
     setSelectedBasketIdState(null);
     selectedBasketIdRef.current = null;
+    currentBasketId.current = null;
     paginatedFavoritesMap.current.clear();
+    basketCacheMap.current.clear(); // Clear per-basket cache
     setIsInitialLoadComplete(false);
     setFavoriteBaskets([]);
+    lastDocument.current = null;
+    setHasMoreData(true);
   }, []);
 
   const subscribeToBaskets = useCallback(() => {

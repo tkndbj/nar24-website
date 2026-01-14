@@ -134,9 +134,19 @@ function RegistrationContent() {
     setShowLanguageMenu(false);
   };
 
+  // Auto-capitalize first letter helper
+  const capitalizeFirstLetter = (str: string): string => {
+    if (!str) return str;
+    return str.charAt(0).toUpperCase() + str.slice(1);
+  };
+
   // Handle input changes
   const handleInputChange = (field: keyof FormData, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    // Auto-capitalize first letter for name and surname fields
+    const processedValue = (field === "name" || field === "surname")
+      ? capitalizeFirstLetter(value)
+      : value;
+    setFormData((prev) => ({ ...prev, [field]: processedValue }));
   };
 
   // Email validation

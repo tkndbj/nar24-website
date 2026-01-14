@@ -60,6 +60,7 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
     shouldReloadFavorites,
     enableLiveUpdates,
     disableLiveUpdates,
+    favoriteBaskets,
   } = useFavorites();
 
   const t = useCallback(
@@ -96,6 +97,8 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
   const [isAnimating, setIsAnimating] = useState(false);
   const [shouldRender, setShouldRender] = useState(false);
   const [showBottomSheet, setShowBottomSheet] = useState(false);
+  const [showTransferDialog, setShowTransferDialog] = useState(false);
+  const [isTransferring, setIsTransferring] = useState(false);
 
   // Refs
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -403,41 +406,52 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
     loadNextPageInternal,
   ]);
 
-  const showTransferBasketDialog = useCallback(async () => {
+  const showTransferBasketDialog = useCallback(() => {
     if (!selectedProductId || !user) return;
+    setShowTransferDialog(true);
+  }, [selectedProductId, user]);
 
-    // TODO: Implement basket transfer dialog with proper UI
-    // For now, just transfer to default
-    try {
-      // Optimistic: Remove from UI immediately
-      setSelectedProductId(null);
-      setShowBottomSheet(false);
+  const handleTransferToBasket = useCallback(
+    async (targetBasketId: string | null) => {
+      if (!selectedProductId || !user) return;
 
-      const result = await transferToBasket(selectedProductId, null);
+      setIsTransferring(true);
 
-      if (result !== "Transferred successfully") {
-        console.error("Failed to transfer:", result);
-        // Reload data on failure
+      try {
+        // Close dialogs first
+        setShowTransferDialog(false);
+        setSelectedProductId(null);
+        setShowBottomSheet(false);
+
+        const result = await transferToBasket(selectedProductId, targetBasketId);
+
+        if (result !== "Transferred successfully") {
+          console.error("Failed to transfer:", result);
+          // Reload data on failure
+          setIsInitialLoading(true);
+          resetPagination();
+          await loadNextPageInternal();
+        } else {
+          console.log("✅ Transferred successfully to", targetBasketId || "default favorites");
+        }
+      } catch (error) {
+        console.error("Error transferring to basket:", error);
+        // Reload data on error
         setIsInitialLoading(true);
         resetPagination();
         await loadNextPageInternal();
-      } else {
-        console.log("✅ Transferred successfully");
+      } finally {
+        setIsTransferring(false);
       }
-    } catch (error) {
-      console.error("Error transferring to basket:", error);
-      // Reload data on error
-      setIsInitialLoading(true);
-      resetPagination();
-      await loadNextPageInternal();
-    }
-  }, [
-    selectedProductId,
-    user,
-    transferToBasket,
-    resetPagination,
-    loadNextPageInternal,
-  ]);
+    },
+    [
+      selectedProductId,
+      user,
+      transferToBasket,
+      resetPagination,
+      loadNextPageInternal,
+    ]
+  );
 
   // ========================================================================
   // SELECTION HANDLING
@@ -468,34 +482,47 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
   const handleBasketChanged = useCallback(async () => {
     if (!user) return;
 
-    const shouldReload = shouldReloadFavorites(selectedBasketId);
-
-    console.log("🔄 Basket changed, shouldReload=", shouldReload); // ✅ ADD DEBUG
-
-    if (shouldReload) {
-      setIsInitialLoading(true);
-      startLoadingTimeout();
-      resetPagination();
-      await loadNextPageInternal();
-    } else {
-      // ✅ FORCE reload even if cache exists (basket switch should always reload)
-      console.log("🔄 Forcing reload due to basket switch");
-      setIsInitialLoading(true);
-      startLoadingTimeout();
-      resetPagination();
-      await loadNextPageInternal();
-    }
-
     // Clear selection on basket change
     setSelectedProductId(null);
     setShowBottomSheet(false);
+    setShowTransferDialog(false);
+
+    // Small delay to allow provider's setSelectedBasket to restore cache
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    const shouldReload = shouldReloadFavorites(selectedBasketId);
+    const hasCachedData = paginatedFavorites.length > 0;
+
+    console.log("🔄 Basket changed, shouldReload=", shouldReload, "hasCachedData=", hasCachedData, "items=", paginatedFavorites.length);
+
+    if (hasCachedData && !shouldReload) {
+      // Cache was restored by provider - just hide shimmer
+      console.log("✅ Using restored cache -", paginatedFavorites.length, "items");
+      setIsInitialLoading(false);
+      if (loadingTimeoutTimer.current) {
+        clearTimeout(loadingTimeoutTimer.current);
+      }
+    } else if (shouldReload) {
+      // No cache available, need to load fresh
+      console.log("🔄 Loading fresh data for basket");
+      setIsInitialLoading(true);
+      startLoadingTimeout();
+      // Don't call resetPagination here - provider already handled it
+      await loadNextPageInternal();
+    } else {
+      // Edge case - shouldn't happen but handle gracefully
+      setIsInitialLoading(false);
+      if (loadingTimeoutTimer.current) {
+        clearTimeout(loadingTimeoutTimer.current);
+      }
+    }
   }, [
     user,
     selectedBasketId,
     shouldReloadFavorites,
-    resetPagination,
     loadNextPageInternal,
     startLoadingTimeout,
+    paginatedFavorites.length,
   ]);
 
   // ========================================================================
@@ -998,6 +1025,147 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                 <span className="text-sm font-medium">
                   {t("addToCart") || "Add to Cart"}
                 </span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Transfer Basket Dialog */}
+        {showTransferDialog && selectedProductId && user && (
+          <div
+            className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowTransferDialog(false)}
+          >
+            <div
+              className={`
+                w-full max-w-sm rounded-xl p-5 shadow-2xl
+                ${isDarkMode ? "bg-gray-800" : "bg-white"}
+              `}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3
+                  className={`
+                    text-lg font-bold
+                    ${isDarkMode ? "text-white" : "text-gray-900"}
+                  `}
+                >
+                  {t("transferToBasket") || "Transfer to Basket"}
+                </h3>
+                <button
+                  onClick={() => setShowTransferDialog(false)}
+                  className={`
+                    p-1.5 rounded-full transition-colors
+                    ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-100 text-gray-500"}
+                  `}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <p
+                className={`
+                  text-sm mb-4
+                  ${isDarkMode ? "text-gray-400" : "text-gray-600"}
+                `}
+              >
+                {t("selectTargetBasket") || "Select where to move this item:"}
+              </p>
+
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {/* Default Favorites Option - only show if currently in a basket */}
+                {selectedBasketId && (
+                  <button
+                    onClick={() => handleTransferToBasket(null)}
+                    disabled={isTransferring}
+                    className={`
+                      w-full flex items-center justify-between px-4 py-3 rounded-lg
+                      transition-colors duration-200 text-left
+                      ${isDarkMode
+                        ? "bg-gray-700 hover:bg-gray-600 text-white"
+                        : "bg-gray-50 hover:bg-gray-100 text-gray-900"
+                      }
+                      ${isTransferring ? "opacity-50 cursor-not-allowed" : ""}
+                    `}
+                  >
+                    <span className="font-medium">
+                      {t("allFavorites") || "All Favorites"}
+                    </span>
+                    <ArrowRight size={16} className={isDarkMode ? "text-gray-400" : "text-gray-500"} />
+                  </button>
+                )}
+
+                {/* Basket Options - exclude currently selected basket */}
+                {favoriteBaskets
+                  .filter((basket) => basket.id !== selectedBasketId)
+                  .map((basket) => (
+                    <button
+                      key={basket.id}
+                      onClick={() => handleTransferToBasket(basket.id)}
+                      disabled={isTransferring}
+                      className={`
+                        w-full flex items-center justify-between px-4 py-3 rounded-lg
+                        transition-colors duration-200 text-left
+                        ${isDarkMode
+                          ? "bg-gray-700 hover:bg-gray-600 text-white"
+                          : "bg-gray-50 hover:bg-gray-100 text-gray-900"
+                        }
+                        ${isTransferring ? "opacity-50 cursor-not-allowed" : ""}
+                      `}
+                    >
+                      <span className="font-medium">{basket.name}</span>
+                      <ArrowRight size={16} className={isDarkMode ? "text-gray-400" : "text-gray-500"} />
+                    </button>
+                  ))}
+
+                {/* No baskets available message */}
+                {favoriteBaskets.length === 0 && !selectedBasketId && (
+                  <div
+                    className={`
+                      text-center py-6
+                      ${isDarkMode ? "text-gray-400" : "text-gray-500"}
+                    `}
+                  >
+                    <p className="text-sm mb-2">
+                      {t("noBaskets") || "No baskets available"}
+                    </p>
+                    <p className="text-xs">
+                      {t("createBasketFirst") || "Create a basket first to transfer items"}
+                    </p>
+                  </div>
+                )}
+
+                {/* Show message if only viewing from default and no baskets exist */}
+                {favoriteBaskets.length === 0 && selectedBasketId === null && (
+                  <div
+                    className={`
+                      text-center py-6
+                      ${isDarkMode ? "text-gray-400" : "text-gray-500"}
+                    `}
+                  >
+                    <p className="text-sm mb-2">
+                      {t("noBaskets") || "No baskets available"}
+                    </p>
+                    <p className="text-xs">
+                      {t("createBasketFirst") || "Create a basket first to transfer items"}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Cancel Button */}
+              <button
+                onClick={() => setShowTransferDialog(false)}
+                className={`
+                  w-full mt-4 py-2.5 px-4 rounded-lg font-medium
+                  transition-colors duration-200
+                  ${isDarkMode
+                    ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }
+                `}
+              >
+                {t("cancel") || "Cancel"}
               </button>
             </div>
           </div>

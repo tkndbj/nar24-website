@@ -63,8 +63,11 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
   const locale = useLocale();
   const { user } = useUser();
 
-  // Extract query parameters
+  // Extract query parameters - use URL as source of truth for server-side filtering
   const productId = searchParams.get("productId") || "";
+  const sortBy = (searchParams.get("sortBy") as "recent" | "helpful" | "rating") || "recent";
+  const filterRatingParam = searchParams.get("rating");
+  const filterRating = filterRatingParam ? parseInt(filterRatingParam, 10) : null;
 
   // States
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -74,8 +77,6 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
   const [hasMore, setHasMore] = useState(true);
   const [lastDocId, setLastDocId] = useState<string | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [sortBy, setSortBy] = useState<"recent" | "helpful" | "rating">("recent");
-  const [filterRating, setFilterRating] = useState<number | null>(null);
   const [translatedReviews, setTranslatedReviews] = useState<Record<string, string>>({});
   const [translatingIds, setTranslatingIds] = useState<Set<string>>(new Set());
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -101,6 +102,39 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
       return localization(key);
     }
   }, [localization]);
+
+  // URL update helpers for server-side filtering
+  const updateFilters = useCallback((newSortBy?: string, newRating?: number | null) => {
+    const params = new URLSearchParams(searchParams.toString());
+
+    if (newSortBy !== undefined) {
+      if (newSortBy === "recent") {
+        params.delete("sortBy"); // "recent" is the default, no need to include in URL
+      } else {
+        params.set("sortBy", newSortBy);
+      }
+    }
+
+    if (newRating !== undefined) {
+      if (newRating === null) {
+        params.delete("rating");
+      } else {
+        params.set("rating", newRating.toString());
+      }
+    }
+
+    router.replace(`/${locale}/all-reviews?${params.toString()}`, { scroll: false });
+  }, [searchParams, router, locale]);
+
+  const handleSortChange = useCallback((newSortBy: "recent" | "helpful" | "rating") => {
+    updateFilters(newSortBy, undefined);
+  }, [updateFilters]);
+
+  const handleRatingFilter = useCallback((rating: number) => {
+    // Toggle: if same rating is clicked, clear the filter
+    const newRating = filterRating === rating ? null : rating;
+    updateFilters(undefined, newRating);
+  }, [updateFilters, filterRating]);
 
   // Dark mode detection
   useEffect(() => {
@@ -162,8 +196,13 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
     fetchProductInfo();
   }, [productId]);
 
-  // Fetch reviews
-  const fetchReviews = useCallback(async (isInitial = false) => {
+  // Fetch reviews - pass filter params explicitly to avoid stale closure issues
+  const fetchReviews = useCallback(async (
+    isInitial = false,
+    currentSortBy: string = sortBy,
+    currentFilterRating: number | null = filterRating,
+    currentLastDocId: string | null = lastDocId
+  ) => {
     if (!productId || (!isInitial && !hasMore)) return;
 
     try {
@@ -173,21 +212,21 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
         setIsLoadingMore(true);
       }
 
-      const params = new URLSearchParams({        
+      const params = new URLSearchParams({
         limit: PAGE_SIZE.toString(),
-        sortBy,
+        sortBy: currentSortBy,
       });
 
-      if (filterRating) {
-        params.append("rating", filterRating.toString());
+      if (currentFilterRating) {
+        params.append("rating", currentFilterRating.toString());
       }
 
-      if (lastDocId && !isInitial) {
-        params.append("lastDocId", lastDocId);
+      if (currentLastDocId && !isInitial) {
+        params.append("lastDocId", currentLastDocId);
       }
 
       const response = await fetch(`/api/reviews/${productId}?${params}`);
-      
+
       if (!response.ok) throw new Error("Failed to fetch reviews");
 
       const data = await response.json();
@@ -204,7 +243,7 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
       }
 
       setHasMore(newReviews.length === PAGE_SIZE);
-      
+
       if (newReviews.length > 0) {
         setLastDocId(newReviews[newReviews.length - 1].id);
       }
@@ -221,8 +260,9 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
     setReviews([]);
     setLastDocId(null);
     setHasMore(true);
-    fetchReviews(true);
-  }, [productId, sortBy, filterRating]);
+    // Pass current values explicitly to avoid stale closure
+    fetchReviews(true, sortBy, filterRating, null);
+  }, [productId, sortBy, filterRating, fetchReviews]);
 
   // Infinite scroll
   useEffect(() => {
@@ -280,10 +320,10 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
       });
     } catch (error) {
       console.error("Error toggling like:", error);
-      // Revert on error
-      fetchReviews(true);
+      // Revert on error - refetch with current filter params
+      fetchReviews(true, sortBy, filterRating, null);
     }
-  }, [user, router]);
+  }, [user, router, fetchReviews, sortBy, filterRating]);
 
   // Translate review
   const translateReview = useCallback(async (reviewId: string, text: string) => {
@@ -569,7 +609,7 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
             {/* Sort buttons */}
             <select
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+              onChange={(e) => handleSortChange(e.target.value as "recent" | "helpful" | "rating")}
               className={`px-3 py-1.5 rounded-lg text-sm ${colors.cardBg} ${colors.text} border ${colors.border}`}
             >
               <option value="recent">{t("sortRecent")}</option>
@@ -582,7 +622,7 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
               {[5, 4, 3, 2, 1].map((rating) => (
                 <button
                   key={rating}
-                  onClick={() => setFilterRating(filterRating === rating ? null : rating)}
+                  onClick={() => handleRatingFilter(rating)}
                   className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 transition-colors ${
                     filterRating === rating
                       ? "bg-orange-600 text-white"
