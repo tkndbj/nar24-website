@@ -353,6 +353,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   const [hasScrolled, setHasScrolled] = useState(false);
   const [isLargeScreen, setIsLargeScreen] = useState(false);
   const [showHeaderButtons, setShowHeaderButtons] = useState(false);
+  const [shouldLoadBottomSections, setShouldLoadBottomSections] = useState(false);
 
   // Cart states
   const [cartButtonState, setCartButtonState] = useState<
@@ -365,6 +366,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   // Refs
   const actionButtonsRef = useRef<HTMLDivElement>(null);
   const isCartOperationInProgress = useRef(false);
+  const bottomSectionsRef = useRef<HTMLDivElement>(null);
 
   // Hooks
   const { addProductToCart, removeFromCart, cartProductIds } = useCart();
@@ -488,6 +490,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
       setCurrentImageIndex(0);
       setPreviousImageIndex(0);
       setImageErrors(new Set());
+      setShouldLoadBottomSections(false); // Reset so Intersection Observer works for new product
 
       // ✅ STAGE 1: Check in-memory cache for INSTANT display
       const cached = getProduct(id);
@@ -653,6 +656,48 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     window.addEventListener("resize", checkLargeScreen);
     return () => window.removeEventListener("resize", checkLargeScreen);
   }, []);
+
+  // ============= BOTTOM SECTIONS INTERSECTION OBSERVER =============
+  useEffect(() => {
+    if (typeof window === "undefined" || !product) return;
+
+    // If already triggered, no need to observe
+    if (shouldLoadBottomSections) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (entry.isIntersecting) {
+          console.log("✅ Bottom sections entering viewport - loading components");
+          setShouldLoadBottomSections(true);
+          observer.disconnect();
+        }
+      },
+      {
+        // Start loading when within 500px of the viewport
+        rootMargin: "500px 0px",
+        threshold: 0,
+      }
+    );
+
+    // Observe the bottom sections container
+    if (bottomSectionsRef.current) {
+      observer.observe(bottomSectionsRef.current);
+    }
+
+    // Fallback: Load after 1 second regardless (ensures content loads on all devices)
+    const fallbackTimer = setTimeout(() => {
+      if (!shouldLoadBottomSections) {
+        console.log("✅ Fallback timer - loading bottom sections");
+        setShouldLoadBottomSections(true);
+      }
+    }, 1000);
+
+    return () => {
+      observer.disconnect();
+      clearTimeout(fallbackTimer);
+    };
+  }, [product, shouldLoadBottomSections]);
 
   // ============= SCROLL DETECTION =============
   useEffect(() => {
@@ -1652,11 +1697,11 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         </div>
 
         {/* ✅ OPTIMIZED: Bottom sections with prefetched data */}
-        <div className="mt-4 sm:mt-6 space-y-3 sm:space-y-4">
-          {(hasScrolled || isLargeScreen) && (
+        <div ref={bottomSectionsRef} className="mt-4 sm:mt-6 space-y-3 sm:space-y-4">
+          {shouldLoadBottomSections && (
             <Suspense
               fallback={
-                <div className="h-40 animate-pulse bg-gray-200 rounded-lg" />
+                <div className={`h-40 animate-pulse rounded-lg ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`} />
               }
             >
               <ProductCollectionWidget
@@ -1669,10 +1714,10 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
             </Suspense>
           )}
 
-          {(hasScrolled || isLargeScreen) && (
+          {shouldLoadBottomSections && (
             <Suspense
               fallback={
-                <div className="h-40 animate-pulse bg-gray-200 rounded-lg" />
+                <div className={`h-40 animate-pulse rounded-lg ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`} />
               }
             >
               <BundleComponent
@@ -1685,10 +1730,10 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
             </Suspense>
           )}
 
-          {(hasScrolled || isLargeScreen) && (
+          {shouldLoadBottomSections && (
             <Suspense
               fallback={
-                <div className="h-40 animate-pulse bg-gray-200 rounded-lg" />
+                <div className={`h-40 animate-pulse rounded-lg ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`} />
               }
             >
               <ProductDetailReviewsTab
@@ -1708,10 +1753,10 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
             </Suspense>
           )}
 
-          {(hasScrolled || isLargeScreen) && (
+          {shouldLoadBottomSections && (
             <Suspense
               fallback={
-                <div className="h-40 animate-pulse bg-gray-200 rounded-lg" />
+                <div className={`h-40 animate-pulse rounded-lg ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`} />
               }
             >
               <ProductQuestionsWidget
@@ -1734,10 +1779,10 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
             </Suspense>
           )}
 
-          {(hasScrolled || isLargeScreen) && (
+          {shouldLoadBottomSections && (
             <Suspense
               fallback={
-                <div className="h-40 animate-pulse bg-gray-200 rounded-lg" />
+                <div className={`h-40 animate-pulse rounded-lg ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`} />
               }
             >
               <ProductDetailRelatedProducts
@@ -1810,7 +1855,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         />
       )}
 
-      {(hasScrolled || isLargeScreen) && (
+      {shouldLoadBottomSections && (
         <Suspense fallback={null}>
           <AskToSellerBubble
             onTap={() => {
