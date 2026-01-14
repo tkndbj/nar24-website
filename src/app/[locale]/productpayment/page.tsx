@@ -6,7 +6,7 @@ import {
   MapPin,
   ChevronDown,
   X,
-  Map,
+  Map as MapIcon,
   Loader2,
   Lock,
   Phone,
@@ -26,6 +26,7 @@ import { db } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/lib/firebase";
 import regionsList from "@/constants/regions";
+import type { Product } from "@/app/models/Product";
 
 // Types
 interface Address {
@@ -38,6 +39,19 @@ interface Address {
     latitude: number;
     longitude: number;
   };
+}
+
+interface SalePreferences {
+  discountThreshold?: number;
+  bulkDiscountPercentage?: number;
+  maxQuantity?: number;
+}
+
+interface CartData {
+  selectedColor?: string;
+  selectedSize?: string;
+  attributes?: Record<string, unknown>;
+  [key: string]: unknown;
 }
 
 interface CartItem {
@@ -54,14 +68,9 @@ interface CartItem {
   isShop?: boolean;
   selectedColor?: string;
   selectedSize?: string;
-  product?: Record<string, unknown>;
-  salePreferences?: Record<string, unknown> | null;
-  cartData?: {
-    selectedColor?: string;
-    selectedSize?: string;
-    attributes?: Record<string, unknown>;
-    [key: string]: unknown;
-  };
+  product?: Product;
+  salePreferences?: SalePreferences | null;
+  cartData?: CartData;
   [key: string]:
     | string
     | number
@@ -69,7 +78,10 @@ interface CartItem {
     | string[]
     | undefined
     | null
-    | Record<string, unknown>;
+    | Record<string, unknown>
+    | Product
+    | SalePreferences
+    | CartData;
 }
 
 interface FormData {
@@ -79,23 +91,6 @@ interface FormData {
   city: string;
   saveAddress: boolean;
   location: { latitude: number; longitude: number } | null;
-}
-
-interface PaymentItem {
-  productId: string;
-  quantity: number;
-  sellerName: string;
-  sellerId: string;
-  isShop: boolean;
-  selectedMetres?: number;
-  selectedColor?: string;
-  price?: number;
-  productName?: string;
-  currency?: string;
-  calculatedUnitPrice?: number;
-  calculatedTotal?: number;
-  isBundleItem?: boolean;
-  [key: string]: string | number | boolean | string[] | undefined;
 }
 
 interface PaymentItemPayload {
@@ -367,7 +362,7 @@ const LocationPickerModal: React.FC<{
               isDarkMode ? "text-gray-400" : "text-gray-600"
             }`}
           >
-            <Map size={14} className="sm:size-4" />
+            <MapIcon size={14} className="sm:size-4" />
             <span>{l("tapAnywhereToSetLocation")}</span>
           </p>
           <div className="flex space-x-2 sm:space-x-3">
@@ -723,7 +718,7 @@ export default function ProductPaymentPage() {
             isShop: item.isShop,
             selectedColor: item.cartData?.selectedColor,
             selectedSize: item.cartData?.selectedSize,
-            product: item.product,
+            product: item.product ?? undefined, // Convert null to undefined for type compatibility
             salePreferences: item.salePreferences,
             cartData: item.cartData,
           };
@@ -1515,7 +1510,7 @@ export default function ProductPaymentPage() {
                                 className="sm:size-6 text-green-500"
                               />
                             ) : (
-                              <Map
+                              <MapIcon
                                 size={20}
                                 className="sm:size-6 text-blue-500"
                               />
