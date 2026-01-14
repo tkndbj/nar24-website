@@ -579,7 +579,7 @@ useEffect(() => {
 
       // Store only selected product IDs in sessionStorage (small data)
       // Payment page will fetch cart data directly from Firebase
-      const selectedIds = paymentItems.map((item) => item.productId);
+      // Note: selectedIds already defined at line 480, reusing it here
       if (typeof window !== "undefined") {
         sessionStorage.setItem(
           "checkoutSelectedIds",
