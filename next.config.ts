@@ -57,7 +57,7 @@ const securityHeaders = [
       "default-src 'self'",
   
       // Scripts: self, inline (needed for Next.js), and trusted domains
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com https://accounts.google.com https://maps.googleapis.com https://www.googletagmanager.com https://www.google-analytics.com https://*.firebaseapp.com",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com https://accounts.google.com https://maps.googleapis.com https://www.googletagmanager.com https://www.google-analytics.com https://*.firebaseapp.com https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/",
   
       // Styles: self, inline (needed for styled-components/tailwind), Google Fonts
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
@@ -69,10 +69,10 @@ const securityHeaders = [
       "font-src 'self' https://fonts.gstatic.com data:",
   
       // Connect (API calls): self and all required services
-      "connect-src 'self' https://*.googleapis.com https://*.google.com https://*.firebaseio.com https://*.cloudfunctions.net https://*.algolia.net https://*.algolia.com https://*.algolianet.com wss://*.firebaseio.com https://firebasestorage.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://*.google-analytics.com https://*.vercel-insights.com https://*.vercel-analytics.com https://sanalpos.isbank.com.tr https://*.isbank.com.tr",
+      "connect-src 'self' https://*.googleapis.com https://*.google.com https://*.firebaseio.com https://*.cloudfunctions.net https://*.algolia.net https://*.algolia.com https://*.algolianet.com wss://*.firebaseio.com https://firebasestorage.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://*.google-analytics.com https://*.vercel-insights.com https://*.vercel-analytics.com https://sanalpos.isbank.com.tr https://*.isbank.com.tr https://recaptchaenterprise.googleapis.com",
   
-      // Frames: Google Maps, Firebase Auth, Payment Gateways (Turkish 3D Secure - all major banks)
-      "frame-src 'self' https:",
+      // Frames: Google Maps, Firebase Auth, Payment Gateways, reCAPTCHA
+      "frame-src 'self' https: https://www.google.com/recaptcha/ https://recaptcha.google.com/",
   
       // Media (video/audio)
       "media-src 'self' https://firebasestorage.googleapis.com",
@@ -123,6 +123,7 @@ const nextConfig: NextConfig = {
       "firebase/firestore",
       "firebase/storage",
       "firebase/functions",
+      "firebase/app-check",
       "@heroicons/react",
       "lucide-react",
       "date-fns",

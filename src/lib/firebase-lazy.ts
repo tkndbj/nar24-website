@@ -7,6 +7,7 @@ import type { Auth } from "firebase/auth";
 import type { Firestore } from "firebase/firestore";
 import type { FirebaseStorage } from "firebase/storage";
 import type { Functions } from "firebase/functions";
+import type { AppCheck } from "firebase/app-check";
 
 // Firebase configuration
 const firebaseConfig = {
@@ -21,6 +22,7 @@ const firebaseConfig = {
 
 // Singleton instances - cached after first initialization
 let _app: FirebaseApp | null = null;
+let _appCheck: AppCheck | null = null;
 let _auth: Auth | null = null;
 let _db: Firestore | null = null;
 let _storage: FirebaseStorage | null = null;
@@ -28,6 +30,7 @@ let _functions: Functions | null = null;
 
 // Initialization promises to prevent race conditions
 let _appPromise: Promise<FirebaseApp> | null = null;
+let _appCheckPromise: Promise<AppCheck | null> | null = null;
 let _authPromise: Promise<Auth> | null = null;
 let _dbPromise: Promise<Firestore> | null = null;
 let _storagePromise: Promise<FirebaseStorage> | null = null;
@@ -52,18 +55,58 @@ export async function getFirebaseApp(): Promise<FirebaseApp> {
 }
 
 /**
+ * Get or initialize Firebase App Check
+ * Must be initialized before using other Firebase services for security
+ * Only runs on client-side (returns null on server)
+ */
+export async function getFirebaseAppCheck(): Promise<AppCheck | null> {
+  // App Check only works in browser
+  if (typeof window === "undefined") return null;
+  if (_appCheck) return _appCheck;
+
+  if (!_appCheckPromise) {
+    _appCheckPromise = (async () => {
+      const [app, { initializeAppCheck, ReCaptchaV3Provider }] =
+        await Promise.all([getFirebaseApp(), import("firebase/app-check")]);
+
+      // Enable debug mode in development
+      if (process.env.NODE_ENV === "development") {
+        // @ts-expect-error - Debug token for development
+        self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+      }
+
+      _appCheck = initializeAppCheck(app, {
+        provider: new ReCaptchaV3Provider(
+          process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!
+        ),
+        isTokenAutoRefreshEnabled: true,
+      });
+
+      return _appCheck;
+    })();
+  }
+
+  return _appCheckPromise;
+}
+
+/**
  * Get or initialize Firebase Auth
  * Lazy loads the auth module only when needed
+ * Ensures App Check is initialized first for security
  */
 export async function getFirebaseAuth(): Promise<Auth> {
   if (_auth) return _auth;
 
   if (!_authPromise) {
     _authPromise = (async () => {
+      // Initialize App Check first (non-blocking, runs in parallel)
+      const appCheckPromise = getFirebaseAppCheck();
       const [app, { getAuth }] = await Promise.all([
         getFirebaseApp(),
-        import("firebase/auth")
+        import("firebase/auth"),
       ]);
+      // Wait for App Check to be ready before returning auth
+      await appCheckPromise;
       _auth = getAuth(app);
       return _auth;
     })();
@@ -75,16 +118,21 @@ export async function getFirebaseAuth(): Promise<Auth> {
 /**
  * Get or initialize Firestore
  * Lazy loads the firestore module only when needed
+ * Ensures App Check is initialized first for security
  */
 export async function getFirebaseDb(): Promise<Firestore> {
   if (_db) return _db;
 
   if (!_dbPromise) {
     _dbPromise = (async () => {
+      // Initialize App Check first (non-blocking, runs in parallel)
+      const appCheckPromise = getFirebaseAppCheck();
       const [app, { getFirestore }] = await Promise.all([
         getFirebaseApp(),
-        import("firebase/firestore")
+        import("firebase/firestore"),
       ]);
+      // Wait for App Check to be ready before returning db
+      await appCheckPromise;
       _db = getFirestore(app);
       return _db;
     })();
@@ -96,16 +144,21 @@ export async function getFirebaseDb(): Promise<Firestore> {
 /**
  * Get or initialize Firebase Storage
  * Lazy loads the storage module only when needed
+ * Ensures App Check is initialized first for security
  */
 export async function getFirebaseStorage(): Promise<FirebaseStorage> {
   if (_storage) return _storage;
 
   if (!_storagePromise) {
     _storagePromise = (async () => {
+      // Initialize App Check first (non-blocking, runs in parallel)
+      const appCheckPromise = getFirebaseAppCheck();
       const [app, { getStorage }] = await Promise.all([
         getFirebaseApp(),
-        import("firebase/storage")
+        import("firebase/storage"),
       ]);
+      // Wait for App Check to be ready before returning storage
+      await appCheckPromise;
       _storage = getStorage(app);
       return _storage;
     })();
@@ -117,20 +170,26 @@ export async function getFirebaseStorage(): Promise<FirebaseStorage> {
 /**
  * Get or initialize Firebase Functions
  * Lazy loads the functions module only when needed
+ * Ensures App Check is initialized first for security
  */
 export async function getFirebaseFunctions(): Promise<Functions> {
   if (_functions) return _functions;
 
   if (!_functionsPromise) {
     _functionsPromise = (async () => {
-      const [app, { getFunctions, connectFunctionsEmulator }] = await Promise.all([
-        getFirebaseApp(),
-        import("firebase/functions")
-      ]);
+      // Initialize App Check first (non-blocking, runs in parallel)
+      const appCheckPromise = getFirebaseAppCheck();
+      const [app, { getFunctions, connectFunctionsEmulator }] =
+        await Promise.all([getFirebaseApp(), import("firebase/functions")]);
+      // Wait for App Check to be ready before returning functions
+      await appCheckPromise;
       _functions = getFunctions(app, "europe-west3");
 
       // Connect to emulator in development
-      if (process.env.NODE_ENV === "development" && typeof window !== "undefined") {
+      if (
+        process.env.NODE_ENV === "development" &&
+        typeof window !== "undefined"
+      ) {
         try {
           connectFunctionsEmulator(_functions, "localhost", 5001);
         } catch {
@@ -150,8 +209,9 @@ export async function getFirebaseFunctions(): Promise<Functions> {
  * Call this when you know Firebase will be needed soon (e.g., on user interaction)
  */
 export function preloadFirebase(): void {
-  // Start loading all services in parallel
+  // Start loading App Check first, then other services in parallel
   // Don't await - just kick off the loading
+  getFirebaseAppCheck();
   getFirebaseAuth();
   getFirebaseDb();
 }
@@ -168,6 +228,10 @@ export function isFirebaseInitialized(): boolean {
  * Get cached instances synchronously (returns null if not yet loaded)
  * Use these only when you're sure Firebase has been initialized
  */
+export function getCachedAppCheck(): AppCheck | null {
+  return _appCheck;
+}
+
 export function getCachedAuth(): Auth | null {
   return _auth;
 }

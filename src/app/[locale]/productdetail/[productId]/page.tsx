@@ -60,6 +60,8 @@ import { useUser } from "@/context/UserProvider";
 import { useFavorites } from "@/context/FavoritesProvider";
 import { Product, ProductUtils } from "@/app/models/Product";
 import { useProductCache } from "@/context/ProductCacheProvider";
+import { db } from "@/lib/firebase";
+import { doc, onSnapshot } from "firebase/firestore";
 import translationService, {
   RateLimitException,
   TranslationException,
@@ -363,6 +365,11 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   const [showBuyNowOptionSelector, setShowBuyNowOptionSelector] =
     useState(false);
 
+  // Sales config states
+  const [salesPaused, setSalesPaused] = useState(false);
+  const [pauseReason, setPauseReason] = useState("");
+  const [showSalesPausedDialog, setShowSalesPausedDialog] = useState(false);
+
   // Refs
   const actionButtonsRef = useRef<HTMLDivElement>(null);
   const isCartOperationInProgress = useRef(false);
@@ -378,6 +385,29 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   useEffect(() => {
     translationService.setUser(user);
   }, [user]);
+
+  // Listen to sales config in real-time
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      doc(db, "settings", "salesConfig"),
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          setSalesPaused(data.salesPaused || false);
+          setPauseReason(data.pauseReason || "");
+        } else {
+          setSalesPaused(false);
+          setPauseReason("");
+        }
+      },
+      (error) => {
+        console.error("Error listening to sales config:", error);
+        setSalesPaused(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
 
   // ============= TRANSLATION HELPER =============
   const t = useCallback(
@@ -943,12 +973,17 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
     if (!product) return;
 
+    if (salesPaused) {
+      setShowSalesPausedDialog(true);
+      return;
+    }
+
     if (hasSelectableOptions(product)) {
       setShowBuyNowOptionSelector(true);
     } else {
       navigateToBuyNow({ quantity: 1 });
     }
-  }, [user, product, router, navigateToBuyNow]);
+  }, [user, product, router, navigateToBuyNow, salesPaused]);
 
   const handleBuyNowOptionSelectorConfirm = useCallback(
     (selectedOptions: { quantity?: number; [key: string]: unknown }) => {
@@ -1208,12 +1243,12 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
               <button
   onClick={handleBuyNow}
-  disabled={isOutOfStock}  // ← ADD THIS
+  disabled={isOutOfStock || salesPaused}
   className={`py-2 px-3 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white rounded-lg font-semibold text-xs transition-all duration-300 flex items-center justify-center whitespace-nowrap shadow-lg flex-shrink-0 ${
-    isOutOfStock ? "opacity-50 cursor-not-allowed" : ""  // ← ADD THIS
+    isOutOfStock || salesPaused ? "opacity-50 cursor-not-allowed" : ""
   }`}
 >
-  {isOutOfStock ? t("outOfStock") : t("buyNow")}  {/* ← MODIFY THIS */}
+  {isOutOfStock ? t("outOfStock") : salesPaused ? t("salesPaused") || "Sales Paused" : t("buyNow")}
 </button>
             </div>
 
@@ -1518,12 +1553,12 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
               <button
   onClick={handleBuyNow}
-  disabled={isOutOfStock}  // ← ADD THIS
+  disabled={isOutOfStock || salesPaused}
   className={`flex-1 py-2 px-3 sm:py-2.5 sm:px-4 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white rounded-lg font-semibold text-xs sm:text-sm transition-all duration-300 flex items-center justify-center gap-1.5 sm:gap-2 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 ${
-    isOutOfStock ? "opacity-50 cursor-not-allowed !from-gray-400 !to-gray-500" : ""  // ← ADD THIS
+    isOutOfStock || salesPaused ? "opacity-50 cursor-not-allowed !from-gray-400 !to-gray-500" : ""
   }`}
 >
-  {isOutOfStock ? t("ProductDetailPage.outOfStock") : t("ProductDetailPage.buyNow")}  {/* ← MODIFY THIS */}
+  {isOutOfStock ? t("ProductDetailPage.outOfStock") : salesPaused ? t("salesPaused") || "Sales Paused" : t("ProductDetailPage.buyNow")}
 </button>
             </div>
 
@@ -1979,6 +2014,88 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
             `}</style>
           </div>
         </>
+      )}
+
+      {/* Sales Paused Dialog */}
+      {showSalesPausedDialog && (
+        <div className="fixed inset-0 z-[1100] flex items-center justify-center">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowSalesPausedDialog(false)}
+          />
+
+          {/* Dialog */}
+          <div
+            className={`
+              relative z-10 w-full max-w-sm mx-4 rounded-2xl overflow-hidden shadow-2xl
+              ${isDarkMode ? "bg-gray-800" : "bg-white"}
+            `}
+          >
+            {/* Header */}
+            <div className={`px-6 py-5 ${isDarkMode ? "bg-gray-700" : "bg-orange-50"}`}>
+              <div className="flex items-center space-x-3">
+                <div
+                  className={`
+                    w-12 h-12 rounded-full flex items-center justify-center
+                    ${isDarkMode ? "bg-orange-500/20" : "bg-orange-100"}
+                  `}
+                >
+                  <svg
+                    className="w-6 h-6 text-orange-500"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                </div>
+                <div>
+                  <h3
+                    className={`text-lg font-bold ${
+                      isDarkMode ? "text-white" : "text-gray-900"
+                    }`}
+                  >
+                    {t("salesPausedTitle") || "Sales Temporarily Paused"}
+                  </h3>
+                </div>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="px-6 py-5">
+              <p
+                className={`text-center ${
+                  isDarkMode ? "text-gray-300" : "text-gray-600"
+                }`}
+              >
+                {pauseReason ||
+                  t("salesPausedMessage") ||
+                  "We are currently not accepting orders. Please try again later."}
+              </p>
+            </div>
+
+            {/* Footer */}
+            <div className={`px-6 py-4 ${isDarkMode ? "bg-gray-700/50" : "bg-gray-50"}`}>
+              <button
+                onClick={() => setShowSalesPausedDialog(false)}
+                className="
+                  w-full py-3 px-4 rounded-xl font-medium transition-all duration-200
+                  bg-gradient-to-r from-orange-500 to-pink-500 text-white
+                  hover:from-orange-600 hover:to-pink-600
+                  active:scale-95
+                "
+              >
+                {t("understood") || "Understood"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
