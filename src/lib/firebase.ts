@@ -4,11 +4,7 @@ import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
-import {
-  initializeAppCheck,
-  ReCaptchaV3Provider,
-  type AppCheck,
-} from "firebase/app-check";
+import { initializeAppCheckOnce, getCachedAppCheck } from "./firebase-appcheck";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
@@ -23,24 +19,13 @@ const firebaseConfig = {
 // Avoid re-initializing
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0];
 
-// Initialize App Check (must be done before using other Firebase services)
-let appCheck: AppCheck | null = null;
+// Initialize App Check (runs async, but starts immediately on client)
 if (typeof window !== "undefined") {
-  // Enable debug mode in development (set FIREBASE_APPCHECK_DEBUG_TOKEN in browser console)
-  if (process.env.NODE_ENV === "development") {
-    // @ts-expect-error - Debug token for development
-    self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
-  }
-
-  appCheck = initializeAppCheck(app, {
-    provider: new ReCaptchaV3Provider(
-      process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!
-    ),
-    isTokenAutoRefreshEnabled: true,
-  });
+  initializeAppCheckOnce(app);
 }
 
-export { appCheck };
+// Export getter for App Check
+export const getAppCheck = getCachedAppCheck;
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);

@@ -8,6 +8,10 @@ import type { Firestore } from "firebase/firestore";
 import type { FirebaseStorage } from "firebase/storage";
 import type { Functions } from "firebase/functions";
 import type { AppCheck } from "firebase/app-check";
+import {
+  initializeAppCheckOnce,
+  getCachedAppCheck,
+} from "./firebase-appcheck";
 
 // Firebase configuration
 const firebaseConfig = {
@@ -22,7 +26,6 @@ const firebaseConfig = {
 
 // Singleton instances - cached after first initialization
 let _app: FirebaseApp | null = null;
-let _appCheck: AppCheck | null = null;
 let _auth: Auth | null = null;
 let _db: Firestore | null = null;
 let _storage: FirebaseStorage | null = null;
@@ -30,11 +33,13 @@ let _functions: Functions | null = null;
 
 // Initialization promises to prevent race conditions
 let _appPromise: Promise<FirebaseApp> | null = null;
-let _appCheckPromise: Promise<AppCheck | null> | null = null;
 let _authPromise: Promise<Auth> | null = null;
 let _dbPromise: Promise<Firestore> | null = null;
 let _storagePromise: Promise<FirebaseStorage> | null = null;
 let _functionsPromise: Promise<Functions> | null = null;
+
+// Re-export App Check getter from shared module
+export { getCachedAppCheck };
 
 /**
  * Get or initialize the Firebase App instance
@@ -62,31 +67,9 @@ export async function getFirebaseApp(): Promise<FirebaseApp> {
 export async function getFirebaseAppCheck(): Promise<AppCheck | null> {
   // App Check only works in browser
   if (typeof window === "undefined") return null;
-  if (_appCheck) return _appCheck;
 
-  if (!_appCheckPromise) {
-    _appCheckPromise = (async () => {
-      const [app, { initializeAppCheck, ReCaptchaV3Provider }] =
-        await Promise.all([getFirebaseApp(), import("firebase/app-check")]);
-
-      // Enable debug mode in development
-      if (process.env.NODE_ENV === "development") {
-        // @ts-expect-error - Debug token for development
-        self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
-      }
-
-      _appCheck = initializeAppCheck(app, {
-        provider: new ReCaptchaV3Provider(
-          process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!
-        ),
-        isTokenAutoRefreshEnabled: true,
-      });
-
-      return _appCheck;
-    })();
-  }
-
-  return _appCheckPromise;
+  const app = await getFirebaseApp();
+  return initializeAppCheckOnce(app);
 }
 
 /**
@@ -227,11 +210,8 @@ export function isFirebaseInitialized(): boolean {
 /**
  * Get cached instances synchronously (returns null if not yet loaded)
  * Use these only when you're sure Firebase has been initialized
+ * Note: getCachedAppCheck is imported from firebase-appcheck.ts
  */
-export function getCachedAppCheck(): AppCheck | null {
-  return _appCheck;
-}
-
 export function getCachedAuth(): Auth | null {
   return _auth;
 }
