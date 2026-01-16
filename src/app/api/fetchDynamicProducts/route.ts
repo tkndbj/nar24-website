@@ -15,20 +15,8 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { NextRequest, NextResponse } from "next/server";
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  limit,
-  getDocs,
-  Query,
-  DocumentData,
-  QueryConstraint,
-  CollectionReference,
-  QuerySnapshot,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { getFirestoreAdmin } from "@/lib/firebase-admin";
+import type { Query, QuerySnapshot } from "firebase-admin/firestore";
 import { Product, ProductUtils } from "@/app/models/Product";
 
 // ============= CONFIGURATION =============
@@ -294,7 +282,7 @@ function extractQueryParams(searchParams: URLSearchParams): QueryParams {
   };
 }
 
-function parseProducts(snapshot: QuerySnapshot<DocumentData>): Product[] {
+function parseProducts(snapshot: QuerySnapshot): Product[] {
   const products: Product[] = [];
   const errorIds: string[] = [];
 
@@ -328,27 +316,26 @@ function parseProducts(snapshot: QuerySnapshot<DocumentData>): Product[] {
 function buildProductsQuery(
   params: QueryParams,
   firestoreCategory: string | null
-): Query<DocumentData, DocumentData> {
-  const collectionRef: CollectionReference<DocumentData, DocumentData> =
-    collection(db, "shop_products");
-  const constraints: QueryConstraint[] = [];
+): Query {
+  const db = getFirestoreAdmin();
+  let queryRef: Query = db.collection("shop_products");
 
   // Category filters
   if (firestoreCategory) {
-    constraints.push(where("category", "==", firestoreCategory));
+    queryRef = queryRef.where("category", "==", firestoreCategory);
   }
 
   if (params.subcategory) {
-    constraints.push(where("subcategory", "==", params.subcategory));
+    queryRef = queryRef.where("subcategory", "==", params.subcategory);
   }
 
   if (params.subsubcategory) {
-    constraints.push(where("subsubcategory", "==", params.subsubcategory));
+    queryRef = queryRef.where("subsubcategory", "==", params.subsubcategory);
   }
 
   // Gender filtering
   if (params.buyerCategory === "Women" || params.buyerCategory === "Men") {
-    constraints.push(where("gender", "in", [params.buyerCategory, "Unisex"]));
+    queryRef = queryRef.where("gender", "in", [params.buyerCategory, "Unisex"]);
   }
 
   // Dynamic filters (respect Firestore's 10-item limit)
@@ -357,92 +344,80 @@ function buildProductsQuery(
       0,
       CONFIG.MAX_ARRAY_FILTER_SIZE
     );
-    constraints.push(where("subsubcategory", "in", subcats));
+    queryRef = queryRef.where("subsubcategory", "in", subcats);
   }
 
   if (params.brands.length > 0) {
     const brands = params.brands.slice(0, CONFIG.MAX_ARRAY_FILTER_SIZE);
-    constraints.push(where("brandModel", "in", brands));
+    queryRef = queryRef.where("brandModel", "in", brands);
   }
 
   if (params.colors.length > 0) {
     const colors = params.colors.slice(0, CONFIG.MAX_ARRAY_FILTER_SIZE);
-    constraints.push(where("availableColors", "array-contains-any", colors));
+    queryRef = queryRef.where("availableColors", "array-contains-any", colors);
   }
 
   // Price filters
   if (params.minPrice !== null) {
-    constraints.push(where("price", ">=", params.minPrice));
+    queryRef = queryRef.where("price", ">=", params.minPrice);
   }
 
   if (params.maxPrice !== null) {
-    constraints.push(where("price", "<=", params.maxPrice));
+    queryRef = queryRef.where("price", "<=", params.maxPrice);
   }
 
   // Quick filters
-  applyQuickFilter(constraints, params.quickFilter);
+  queryRef = applyQuickFilter(queryRef, params.quickFilter);
 
   // Sorting
-  applySorting(constraints, params.sortOption, params.quickFilter);
+  queryRef = applySorting(queryRef, params.sortOption, params.quickFilter);
 
   // Limit
-  constraints.push(limit(CONFIG.DEFAULT_LIMIT));
+  queryRef = queryRef.limit(CONFIG.DEFAULT_LIMIT);
 
-  return query(collectionRef, ...constraints);
+  return queryRef;
 }
 
 function applyQuickFilter(
-  constraints: QueryConstraint[],
+  queryRef: Query,
   quickFilter: string | null
-): void {
-  if (!quickFilter) return;
+): Query {
+  if (!quickFilter) return queryRef;
 
   switch (quickFilter) {
     case "deals":
-      constraints.push(where("discountPercentage", ">", 0));
-      break;
+      return queryRef.where("discountPercentage", ">", 0);
     case "boosted":
-      constraints.push(where("isBoosted", "==", true));
-      break;
+      return queryRef.where("isBoosted", "==", true);
     case "trending":
-      constraints.push(where("dailyClickCount", ">=", 10));
-      break;
+      return queryRef.where("dailyClickCount", ">=", 10);
     case "fiveStar":
-      constraints.push(where("averageRating", "==", 5));
-      break;
+      return queryRef.where("averageRating", "==", 5);
     // bestSellers handled in sorting
+    default:
+      return queryRef;
   }
 }
 
 function applySorting(
-  constraints: QueryConstraint[],
+  queryRef: Query,
   sortOption: string,
   quickFilter: string | null
-): void {
+): Query {
   if (quickFilter === "bestSellers") {
-    constraints.push(orderBy("isBoosted", "desc"));
-    constraints.push(orderBy("purchaseCount", "desc"));
-    return;
+    return queryRef.orderBy("isBoosted", "desc").orderBy("purchaseCount", "desc");
   }
 
   switch (sortOption) {
     case "alphabetical":
-      constraints.push(orderBy("isBoosted", "desc"));
-      constraints.push(orderBy("productName", "asc"));
-      break;
+      return queryRef.orderBy("isBoosted", "desc").orderBy("productName", "asc");
     case "price_asc":
-      constraints.push(orderBy("isBoosted", "desc"));
-      constraints.push(orderBy("price", "asc"));
-      break;
+      return queryRef.orderBy("isBoosted", "desc").orderBy("price", "asc");
     case "price_desc":
-      constraints.push(orderBy("isBoosted", "desc"));
-      constraints.push(orderBy("price", "desc"));
-      break;
+      return queryRef.orderBy("isBoosted", "desc").orderBy("price", "desc");
     case "date":
     default:
-      constraints.push(orderBy("promotionScore", "desc"));
-      constraints.push(orderBy("createdAt", "desc"));
-      break;
+      return queryRef.orderBy("promotionScore", "desc").orderBy("createdAt", "desc");
   }
 }
 
@@ -458,16 +433,15 @@ async function fetchBoostedProducts(params: {
   minPrice: number | null;
   maxPrice: number | null;
 }): Promise<Product[]> {
-  const collectionRef = collection(db, "shop_products");
-  const constraints: QueryConstraint[] = [
-    where("isBoosted", "==", true),
-    where("category", "==", params.category),
-    where("subsubcategory", "==", params.subsubcategory),
-  ];
+  const db = getFirestoreAdmin();
+  let queryRef: Query = db.collection("shop_products")
+    .where("isBoosted", "==", true)
+    .where("category", "==", params.category)
+    .where("subsubcategory", "==", params.subsubcategory);
 
   // Gender filtering
   if (params.buyerCategory === "Women" || params.buyerCategory === "Men") {
-    constraints.push(where("gender", "in", [params.buyerCategory, "Unisex"]));
+    queryRef = queryRef.where("gender", "in", [params.buyerCategory, "Unisex"]);
   }
 
   // Dynamic filters
@@ -475,40 +449,36 @@ async function fetchBoostedProducts(params: {
     params.brands.length > 0 &&
     params.brands.length <= CONFIG.MAX_ARRAY_FILTER_SIZE
   ) {
-    constraints.push(where("brandModel", "in", params.brands));
+    queryRef = queryRef.where("brandModel", "in", params.brands);
   }
 
   if (
     params.colors.length > 0 &&
     params.colors.length <= CONFIG.MAX_ARRAY_FILTER_SIZE
   ) {
-    constraints.push(
-      where("availableColors", "array-contains-any", params.colors)
-    );
+    queryRef = queryRef.where("availableColors", "array-contains-any", params.colors);
   }
 
   if (
     params.filterSubcategories.length > 0 &&
     params.filterSubcategories.length <= CONFIG.MAX_ARRAY_FILTER_SIZE
   ) {
-    constraints.push(where("subsubcategory", "in", params.filterSubcategories));
+    queryRef = queryRef.where("subsubcategory", "in", params.filterSubcategories);
   }
 
   // Price filters
   if (params.minPrice !== null) {
-    constraints.push(where("price", ">=", params.minPrice));
+    queryRef = queryRef.where("price", ">=", params.minPrice);
   }
 
   if (params.maxPrice !== null) {
-    constraints.push(where("price", "<=", params.maxPrice));
+    queryRef = queryRef.where("price", "<=", params.maxPrice);
   }
 
   // Sorting and limit
-  constraints.push(orderBy("promotionScore", "desc"));
-  constraints.push(limit(20));
+  queryRef = queryRef.orderBy("promotionScore", "desc").limit(20);
 
-  const q = query(collectionRef, ...constraints);
-  const snapshot = await getDocs(q);
+  const snapshot = await queryRef.get();
 
   return parseProducts(snapshot);
 }
@@ -534,7 +504,7 @@ async function fetchDynamicProductsData(
     // Main products query with retry
     withRetry(async () => {
       const productsQuery = buildProductsQuery(params, firestoreCategory);
-      const snapshot = await getDocs(productsQuery);
+      const snapshot = await productsQuery.get();
       return parseProducts(snapshot);
     }),
 
