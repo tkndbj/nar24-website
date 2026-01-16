@@ -17,6 +17,7 @@
     "not dead"
   ],
   "dependencies": {
+    "@googlemaps/js-api-loader": "^2.0.2",
     "@heroicons/react": "^2.2.0",
     "@types/google.maps": "^3.58.1",
     "algoliasearch": "^5.35.0",
