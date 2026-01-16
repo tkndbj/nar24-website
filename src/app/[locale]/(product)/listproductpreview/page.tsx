@@ -171,12 +171,7 @@ export default function ListProductPreview() {
         videoUrl = await getDownloadURL(vidRef);
       }
 
-      // 3️⃣ upload each selected‐color image AND collect their URLs
-      const selectedColorsPayload: Record<
-        string,
-        { quantity: string; imageUrl: string | null }
-      > = {};
-
+      // 3️⃣ upload each selected-color image AND collect their URLs
       const colorImages: Record<string, string[]> = {};
       const colorQuantities: Record<string, number> = {};
       const availableColors = Object.keys(fullProductData.selectedColors || {});
@@ -198,17 +193,21 @@ export default function ListProductPreview() {
           }
         }
 
-        selectedColorsPayload[color] = {
-          quantity: info.quantity,
-          imageUrl,
-        };
-
         if (info.quantity && parseInt(info.quantity) > 0) {
           colorQuantities[color] = parseInt(info.quantity);
         }
       }
 
-      // 4️⃣ Create searchIndex as array
+      // 4️⃣ Extract gender from attributes (matching Flutter behavior)
+      let genderValue: string | null = null;
+      const cleanedAttributes = { ...fullProductData.attributes };
+
+      if (cleanedAttributes.gender) {
+        genderValue = cleanedAttributes.gender as string;
+        delete cleanedAttributes.gender; // Remove from attributes after extraction
+      }
+
+      // 5️⃣ Create searchIndex as array
       const searchTerms = [
         fullProductData.title.toLowerCase(),
         fullProductData.description.toLowerCase(),
@@ -216,7 +215,7 @@ export default function ListProductPreview() {
         fullProductData.subcategory.toLowerCase(),
         fullProductData.subsubcategory.toLowerCase(),
         fullProductData.brand?.toLowerCase(),
-        ...Object.values(fullProductData.attributes || {}).flatMap((value) => {
+        ...Object.values(cleanedAttributes || {}).flatMap((value) => {
           if (Array.isArray(value)) {
             return value.map((v) => v.toString().toLowerCase());
           }
@@ -229,7 +228,7 @@ export default function ListProductPreview() {
 
       const searchIndexArray = Array.from(new Set(searchTerms));
 
-      // 5️⃣ Get seller name
+      // 6️⃣ Get seller name
       let sellerName = t("unknownSeller");
       const userDoc = await getDoc(doc(db, "users", uid));
       const userData = userDoc.exists() ? userDoc.data() : {};
@@ -253,7 +252,7 @@ export default function ListProductPreview() {
         return isNaN(num) ? 0 : num;
       };
 
-      // 6️⃣ Build complete Firestore payload
+      // 7️⃣ Build complete Firestore payload (matching Flutter's structure)
       const applicationData = {
         id: productId,
         productName: ensureString(fullProductData.title),
@@ -269,20 +268,20 @@ export default function ListProductPreview() {
         imageUrls: mainImageUrls,
         videoUrl: videoUrl,
         colorImages: colorImages,
+        colorQuantities: colorQuantities,
         averageRating: 0.0,
         reviewCount: 0,
         userId: uid,
         ownerId: uid,
-        shopId: null,
+        shopId: null, // Always null for vitrin (normal users)
         ilanNo: productId,
         sellerName: sellerName,
         category: ensureString(fullProductData.category),
         subcategory: ensureString(fullProductData.subcategory),
         subsubcategory: ensureString(fullProductData.subsubcategory),
         quantity: ensureInteger(fullProductData.quantity),
-        colorQuantities: colorQuantities,        
-        gender: fullProductData.attributes?.gender || null,
-        attributes: fullProductData.attributes || {},
+        gender: genderValue, // Extracted from attributes
+        attributes: cleanedAttributes, // Gender removed from here
         deliveryOption: ensureString(fullProductData.deliveryOption),
         clickCount: 0,
         clickCountAtStart: 0,
@@ -295,18 +294,25 @@ export default function ListProductPreview() {
         boostedImpressionCount: 0,
         boostImpressionCountAtStart: 0,
         boostClickCountAtStart: 0,
-        rankingScore: 0.0,
-        promotionScore: 0.0,
+        rankingScore: 0,
+        promotionScore: 0,
         dailyClickCount: 0,
         boostStartTime: null,
         boostEndTime: null,
         lastClickDate: null,
         createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
         searchIndex: searchIndexArray,
         paused: false,
         bestSellerRank: null,
         needsSync: true,
-        updatedAt: serverTimestamp(),
+        // NEW: Add status field (matching Flutter)
+        status: "pending",
+        // NEW: Add related fields (matching Flutter)
+        relatedProductIds: [],
+        relatedLastUpdated: new Date(0), // Epoch date like Flutter
+        relatedCount: 0,
+        // Seller info
         phone: ensureString(fullProductData.phone),
         region: ensureString(fullProductData.region),
         address: ensureString(fullProductData.address),
@@ -315,7 +321,7 @@ export default function ListProductPreview() {
         iban: ensureString(fullProductData.iban),
       };
 
-      // 7️⃣ Validate critical fields
+      // 8️⃣ Validate critical fields
       if (!applicationData.productName) {
         throw new Error(t("validationErrors.productNameRequired"));
       }
@@ -332,10 +338,13 @@ export default function ListProductPreview() {
         throw new Error(t("validationErrors.imageRequired"));
       }
 
-      // 8️⃣ Write to Firestore
-      await setDoc(doc(db, "product_applications", productId), applicationData);
+      // 9️⃣ Write to Firestore - USE CORRECT COLLECTION
+      await setDoc(
+        doc(db, "vitrin_product_applications", productId),
+        applicationData
+      );
 
-      // 9️⃣ Clear context and navigate
+      // 🔟 Clear context and navigate
       clearProductData();
       sessionStorage.setItem("productFormReset", "true");
       router.push(buildLocalizedUrl("/success"));

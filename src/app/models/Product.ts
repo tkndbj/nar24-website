@@ -26,6 +26,11 @@ export interface Product {
   userId: string;
   rankingScore: number;
   promotionScore: number;
+  needsUpdate?: boolean;
+  archiveReason?: string;
+  archivedByAdmin?: boolean;
+  archivedByAdminAt?: Date;
+  archivedByAdminId?: string;
   campaign?: string;
   ownerId: string;
   shopId?: string;
@@ -36,7 +41,7 @@ export interface Product {
   subcategory: string;
   subsubcategory: string;
   quantity: number;
-  bestSellerRank?: number;  
+  bestSellerRank?: number;
   clickCount: number;
   clickCountAtStart: number;
   favoritesCount: number;
@@ -135,7 +140,9 @@ export class ProductUtils {
   }
 
   // ✅ ADDED: Safe bundle data parser matching Flutter's _safeBundleData
-  static safeBundleData(value: unknown): Array<Record<string, unknown>> | undefined {
+  static safeBundleData(
+    value: unknown
+  ): Array<Record<string, unknown>> | undefined {
     if (value == null) return undefined;
     if (!Array.isArray(value)) return undefined;
 
@@ -270,6 +277,13 @@ export class ProductUtils {
       colorQuantities: ProductUtils.safeColorQuantities(json.colorQuantities),
       boostClickCountAtStart: ProductUtils.safeInt(json.boostClickCountAtStart),
       availableColors: ProductUtils.safeStringArray(json.availableColors),
+      needsUpdate: json.needsUpdate === true ? true : undefined,
+      archiveReason: ProductUtils.safeStringNullable(json.archiveReason),
+      archivedByAdmin: json.archivedByAdmin === true ? true : undefined,
+      archivedByAdminAt: ProductUtils.safeDateNullable(json.archivedByAdminAt),
+      archivedByAdminId: ProductUtils.safeStringNullable(
+        json.archivedByAdminId
+      ),
       userId: ProductUtils.safeString(json.userId),
       maxQuantity:
         json.maxQuantity != null
@@ -298,14 +312,16 @@ export class ProductUtils {
       quantity: ProductUtils.safeInt(json.quantity),
       // ✅ FIXED: relatedProductIds should default to empty array, not undefined
       relatedProductIds: ProductUtils.safeStringArray(json.relatedProductIds),
-      relatedLastUpdated: ProductUtils.safeDateNullable(json.relatedLastUpdated),
+      relatedLastUpdated: ProductUtils.safeDateNullable(
+        json.relatedLastUpdated
+      ),
       // ✅ FIXED: relatedCount should default to 0, not undefined
       relatedCount: ProductUtils.safeInt(json.relatedCount),
       bestSellerRank:
         json.bestSellerRank != null
           ? ProductUtils.safeInt(json.bestSellerRank)
           : undefined,
-      
+
       clickCount: ProductUtils.safeInt(json.clickCount),
       clickCountAtStart: ProductUtils.safeInt(json.clickCountAtStart),
       favoritesCount: ProductUtils.safeInt(json.favoritesCount),
@@ -357,6 +373,11 @@ export class ProductUtils {
       boostClickCountAtStart: product.boostClickCountAtStart,
       userId: product.userId,
       bundleIds: product.bundleIds,
+      needsUpdate: product.needsUpdate,
+      archiveReason: product.archiveReason,
+      archivedByAdmin: product.archivedByAdmin,
+      archivedByAdminAt: product.archivedByAdminAt?.getTime(),
+      archivedByAdminId: product.archivedByAdminId,
       // ✅ ADDED: bundleData
       bundleData: product.bundleData,
       ownerId: product.ownerId,
@@ -371,7 +392,7 @@ export class ProductUtils {
       subsubcategory: product.subsubcategory,
       quantity: product.quantity,
       bestSellerRank: product.bestSellerRank,
-      
+
       clickCount: product.clickCount,
       clickCountAtStart: product.clickCountAtStart,
       favoritesCount: product.favoritesCount,
@@ -489,6 +510,11 @@ export class ProductUtils {
       shopId: product.shopId,
       ilan_no: product.ilanNo,
       gender: product.gender,
+      needsUpdate: product.needsUpdate,
+      archiveReason: product.archiveReason,
+      archivedByAdmin: product.archivedByAdmin,
+      archivedByAdminAt: product.archivedByAdminAt,
+      archivedByAdminId: product.archivedByAdminId,
       createdAt: product.createdAt,
       sellerName: product.sellerName,
       category: product.category,
@@ -496,7 +522,7 @@ export class ProductUtils {
       subsubcategory: product.subsubcategory,
       quantity: product.quantity,
       bestSellerRank: product.bestSellerRank,
-      
+
       clickCount: product.clickCount,
       clickCountAtStart: product.clickCountAtStart,
       favoritesCount: product.favoritesCount,

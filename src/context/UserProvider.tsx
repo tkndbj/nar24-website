@@ -1,4 +1,7 @@
 // contexts/UserProvider.tsx
+// UPDATED: Added Apple Sign-In support with name completion flow
+// Matches Flutter's user_provider.dart implementation
+
 "use client";
 
 import React, {
@@ -64,6 +67,15 @@ interface UserContextType {
   isPending2FA: boolean;
   complete2FA: () => void;
   cancel2FA: () => Promise<void>;
+  // ✅ NEW: Apple Sign-In specific state and methods
+  isAppleUser: boolean;
+  isGoogleUser: boolean;
+  isSocialUser: boolean;
+  needsNameCompletion: boolean;
+  isNameStateReady: boolean;
+  setNameComplete: (complete: boolean) => void;
+  setNameSaveInProgress: (inProgress: boolean) => void;
+  updateLocalProfileField: (key: string, value: unknown) => void;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -80,21 +92,103 @@ interface UserProviderProps {
   children: ReactNode;
 }
 
+// ✅ NEW: LocalStorage keys for caching (matching Flutter's SharedPreferences)
+const NAME_COMPLETE_KEY = "user_name_complete";
+const PROFILE_COMPLETE_KEY = "user_profile_complete";
+
 export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
-  const [profileComplete, setProfileCompleteState] = useState<boolean | null>(null);
+  const [profileComplete, setProfileCompleteState] = useState<boolean | null>(
+    null
+  );
   const [pending2FA, setPending2FA] = useState(false);
-  const [internalFirebaseUser, setInternalFirebaseUser] = useState<User | null>(null);
+  const [internalFirebaseUser, setInternalFirebaseUser] = useState<User | null>(
+    null
+  );
+
+  // ✅ NEW: Apple Sign-In specific state (matching Flutter's UserProvider)
+  const [nameComplete, setNameCompleteState] = useState<boolean | null>(null);
+  const [nameSaveInProgress, setNameSaveInProgressState] = useState(false);
 
   // Store Firebase instances after lazy load
   const authRef = useRef<import("firebase/auth").Auth | null>(null);
   const dbRef = useRef<import("firebase/firestore").Firestore | null>(null);
-  const firestoreModuleRef = useRef<typeof import("firebase/firestore") | null>(null);
+  const firestoreModuleRef = useRef<typeof import("firebase/firestore") | null>(
+    null
+  );
+
+  // ✅ NEW: Debounce timer for background fetches (matching Flutter)
+  const backgroundFetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const twoFactorService = useMemo(() => TwoFactorService.getInstance(), []);
+
+  // ✅ NEW: Computed property - is user signed in with Apple
+  const isAppleUser = useMemo(() => {
+    const currentUser = user || internalFirebaseUser;
+    return (
+      currentUser?.providerData?.some((p) => p.providerId === "apple.com") ??
+      false
+    );
+  }, [user, internalFirebaseUser]);
+
+  // ✅ NEW: Computed property - is user signed in with Google
+  const isGoogleUser = useMemo(() => {
+    const currentUser = user || internalFirebaseUser;
+    return (
+      currentUser?.providerData?.some((p) => p.providerId === "google.com") ??
+      false
+    );
+  }, [user, internalFirebaseUser]);
+
+  // ✅ NEW: Computed property - is user signed in with any social provider
+  const isSocialUser = useMemo(() => {
+    return isAppleUser || isGoogleUser;
+  }, [isAppleUser, isGoogleUser]);
+
+  // ✅ NEW: Computed property - is name state ready (matching Flutter's isNameStateReady)
+  const isNameStateReady = useMemo(() => {
+    // Not ready during save operations
+    if (nameSaveInProgress) return false;
+    return !isAppleUser || nameComplete !== null || profileData !== null;
+  }, [nameSaveInProgress, isAppleUser, nameComplete, profileData]);
+
+  // ✅ NEW: Computed property - does Apple user need to complete their name
+  const needsNameCompletion = useMemo(() => {
+    if (!isAppleUser) return false;
+
+    // During save, always return false to prevent redirect loops
+    if (nameSaveInProgress) return false;
+
+    // If we have cached state, use it
+    if (nameComplete !== null) return !nameComplete;
+
+    // If no profile data yet, can't determine
+    if (!profileData) return false;
+
+    const displayName = profileData.displayName;
+    const email =
+      profileData.email || user?.email || internalFirebaseUser?.email || "";
+    const emailPrefix = email.split("@")[0];
+
+    // Check if name is missing or invalid (matching Flutter logic)
+    return (
+      !displayName ||
+      displayName === "" ||
+      displayName === "User" ||
+      displayName === "No Name" ||
+      displayName === emailPrefix
+    );
+  }, [
+    isAppleUser,
+    nameSaveInProgress,
+    nameComplete,
+    profileData,
+    user,
+    internalFirebaseUser,
+  ]);
 
   // Calculate profile completion status
   const isProfileComplete = useMemo(() => {
@@ -107,6 +201,149 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       profileData.languageCode
     );
   }, [profileComplete, profileData]);
+
+  // ✅ NEW: Initialize cached state from localStorage (matching Flutter's SharedPreferences)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    try {
+      const cachedNameComplete = localStorage.getItem(NAME_COMPLETE_KEY);
+      if (cachedNameComplete !== null && nameComplete === null) {
+        setNameCompleteState(cachedNameComplete === "true");
+      }
+
+      const cachedProfileComplete = localStorage.getItem(PROFILE_COMPLETE_KEY);
+      if (cachedProfileComplete !== null && profileComplete === null) {
+        setProfileCompleteState(cachedProfileComplete === "true");
+      }
+    } catch (e) {
+      console.error("Error loading cached state:", e);
+    }
+  }, []);
+
+  // ✅ NEW: Cache name complete state to localStorage
+  const cacheNameComplete = useCallback((value: boolean) => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem(NAME_COMPLETE_KEY, String(value));
+    } catch (e) {
+      console.error("Error caching name state:", e);
+    }
+  }, []);
+
+  // ✅ NEW: Cache profile complete state to localStorage
+  const cacheProfileComplete = useCallback((value: boolean) => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem(PROFILE_COMPLETE_KEY, String(value));
+    } catch (e) {
+      console.error("Error caching profile state:", e);
+    }
+  }, []);
+
+  // ✅ NEW: Clear cached state on logout
+  const clearCachedState = useCallback(() => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.removeItem(NAME_COMPLETE_KEY);
+      localStorage.removeItem(PROFILE_COMPLETE_KEY);
+    } catch (e) {
+      console.error("Error clearing cached state:", e);
+    }
+  }, []);
+
+  // ✅ NEW: Set name complete state (exposed to components)
+  const setNameComplete = useCallback(
+    (complete: boolean) => {
+      if (nameComplete !== complete) {
+        setNameCompleteState(complete);
+        cacheNameComplete(complete);
+      }
+    },
+    [nameComplete, cacheNameComplete]
+  );
+
+  // ✅ NEW: Set name save in progress (exposed to components)
+  const setNameSaveInProgress = useCallback(
+    (inProgress: boolean) => {
+      if (nameSaveInProgress !== inProgress) {
+        setNameSaveInProgressState(inProgress);
+        // This triggers re-render which causes router redirect to re-evaluate
+      }
+    },
+    [nameSaveInProgress]
+  );
+
+  // ✅ NEW: Update local profile field immediately (for optimistic UI updates)
+  const updateLocalProfileField = useCallback((key: string, value: unknown) => {
+    setProfileData(
+      (prev) =>
+        ({
+          ...(prev || {}),
+          [key]: value,
+        } as ProfileData)
+    );
+  }, []);
+
+  // ✅ MODIFIED: Update user data from Firestore document (with race condition prevention)
+  const updateUserDataFromDoc = useCallback(
+    (data: Record<string, unknown>, currentUser: User | null) => {
+      // Skip updates during name save to prevent race conditions (matching Flutter)
+      if (nameSaveInProgress) {
+        console.log("⏸️ Skipping data update - name save in progress");
+        return;
+      }
+
+      setIsAdmin(data.isAdmin === true);
+      setProfileData(data as ProfileData);
+
+      // Update profile complete state
+      const isComplete = !!(data.gender && data.birthDate && data.languageCode);
+      if (profileComplete !== isComplete) {
+        setProfileCompleteState(isComplete);
+        cacheProfileComplete(isComplete);
+      }
+
+      // ✅ NEW: Update name complete state for Apple users
+      const userToCheck = currentUser || user || internalFirebaseUser;
+      const isApple =
+        userToCheck?.providerData?.some((p) => p.providerId === "apple.com") ??
+        false;
+
+      if (isApple) {
+        const displayName = data.displayName as string | undefined;
+        const email = (data.email as string) || userToCheck?.email || "";
+        const emailPrefix = email.split("@")[0];
+
+        const hasValidName =
+          displayName !== undefined &&
+          displayName !== null &&
+          displayName !== "" &&
+          displayName !== "User" &&
+          displayName !== "No Name" &&
+          displayName !== emailPrefix;
+
+        // Only update if not currently saving and value differs
+        if (!nameSaveInProgress && nameComplete !== hasValidName) {
+          // Only update to false if we're certain (server data says invalid)
+          // Don't override true -> false during race conditions
+          if (hasValidName || nameComplete === null) {
+            setNameCompleteState(hasValidName);
+            cacheNameComplete(hasValidName);
+          }
+        }
+      }
+    },
+    [
+      nameSaveInProgress,
+      profileComplete,
+      nameComplete,
+      user,
+      internalFirebaseUser,
+      cacheProfileComplete,
+      cacheNameComplete,
+    ]
+  );
 
   // Check if user needs 2FA verification
   const check2FARequirement = useCallback(
@@ -132,7 +369,8 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
           if (userDoc.exists()) {
             const userData = userDoc.data();
-            const lastVerification = userData?.lastTwoFactorVerification?.toDate?.();
+            const lastVerification =
+              userData?.lastTwoFactorVerification?.toDate?.();
 
             if (lastVerification) {
               const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
@@ -159,22 +397,69 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     const currentUser = user || internalFirebaseUser;
     if (!currentUser || !dbRef.current || !firestoreModuleRef.current) return;
 
+    // ✅ NEW: Skip fetch during name save (matching Flutter)
+    if (nameSaveInProgress) {
+      console.log("⏸️ Skipping fetch - name save in progress");
+      return;
+    }
+
     try {
       const { doc, getDoc } = firestoreModuleRef.current;
-      const userDoc = await getDoc(doc(dbRef.current, "users", currentUser.uid));
+      const userDoc = await getDoc(
+        doc(dbRef.current, "users", currentUser.uid)
+      );
 
       if (userDoc.exists()) {
         const data = userDoc.data();
-        setProfileData(data as ProfileData);
-        setIsAdmin(data.isAdmin === true);
-
-        const complete = !!(data.gender && data.birthDate && data.languageCode);
-        setProfileCompleteState(complete);
+        updateUserDataFromDoc(data, currentUser);
       }
     } catch (error) {
       console.error("Error fetching user data:", error);
     }
-  }, [user, internalFirebaseUser]);
+  }, [user, internalFirebaseUser, nameSaveInProgress, updateUserDataFromDoc]);
+
+  // ✅ NEW: Background fetch with debounce (matching Flutter's _backgroundFetchUserData)
+  const backgroundFetchUserData = useCallback(async () => {
+    // Skip during name save
+    if (nameSaveInProgress) {
+      console.log("⏸️ Skipping background fetch - name save in progress");
+      return;
+    }
+
+    const currentUser = user || internalFirebaseUser;
+    if (!currentUser || !dbRef.current || !firestoreModuleRef.current) return;
+
+    // Cancel any pending fetch
+    if (backgroundFetchTimeoutRef.current) {
+      clearTimeout(backgroundFetchTimeoutRef.current);
+    }
+
+    // Debounce - wait 500ms before fetching (matching Flutter's _backgroundFetchDelay)
+    backgroundFetchTimeoutRef.current = setTimeout(async () => {
+      // Double-check save isn't in progress after delay
+      if (nameSaveInProgress) return;
+
+      try {
+        const { doc, getDoc } = firestoreModuleRef.current!;
+        const userDoc = await getDoc(
+          doc(dbRef.current!, "users", currentUser.uid)
+        );
+
+        // Check again after async operation
+        if (nameSaveInProgress) {
+          console.log("⏸️ Aborting background fetch - name save started");
+          return;
+        }
+
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          updateUserDataFromDoc(data, currentUser);
+        }
+      } catch (error) {
+        console.error("Background fetch error:", error);
+      }
+    }, 500);
+  }, [user, internalFirebaseUser, nameSaveInProgress, updateUserDataFromDoc]);
 
   // Initialize auth state listener with lazy Firebase loading
   useEffect(() => {
@@ -221,16 +506,22 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
                 setPending2FA(false);
               }
 
-              // Fetch profile data
+              // Fetch profile data (respects nameSaveInProgress)
               const { doc, getDoc } = firestoreModule;
-              const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
 
-              if (!isMounted || operationId !== currentAuthOperationId) return;
+              // ✅ NEW: Skip fetch if name save in progress
+              if (!nameSaveInProgress) {
+                const userDoc = await getDoc(
+                  doc(db, "users", firebaseUser.uid)
+                );
 
-              if (userDoc.exists()) {
-                const data = userDoc.data();
-                setProfileData(data as ProfileData);
-                setIsAdmin(data.isAdmin === true);
+                if (!isMounted || operationId !== currentAuthOperationId)
+                  return;
+
+                if (userDoc.exists()) {
+                  const data = userDoc.data();
+                  updateUserDataFromDoc(data, firebaseUser);
+                }
               }
             } catch (error) {
               if (isMounted && operationId === currentAuthOperationId) {
@@ -243,6 +534,11 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
             setProfileData(null);
             setIsAdmin(false);
             setPending2FA(false);
+
+            // ✅ NEW: Reset Apple-specific state on logout
+            setNameCompleteState(null);
+            setNameSaveInProgressState(false);
+            clearCachedState();
 
             analyticsBatcher.setCurrentUserId(null);
 
@@ -271,32 +567,73 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       if (unsubscribe) {
         unsubscribe();
       }
+      // ✅ NEW: Cancel pending background fetch on cleanup
+      if (backgroundFetchTimeoutRef.current) {
+        clearTimeout(backgroundFetchTimeoutRef.current);
+      }
     };
-  }, [check2FARequirement]);
+  }, [
+    check2FARequirement,
+    nameSaveInProgress,
+    updateUserDataFromDoc,
+    clearCachedState,
+  ]);
 
+  // ✅ MODIFIED: Profile completion redirect (now also handles name completion)
   useEffect(() => {
     // Only run on client side
     if (typeof window === "undefined") return;
-    
-    // Skip if still loading or no user
-    if (isLoading || !user) return;
-    
-    // Skip if profile is complete
-    if (isProfileComplete) return;
-    
-    // Skip if already on complete-profile page
-    if (window.location.pathname.includes("/complete-profile")) return;
-    
-    // Skip if on public pages (login, registration, etc.)
+
+    // Skip if still loading
+    if (isLoading) return;
+
+    // Skip if no user
+    if (!user) return;
+
+    // Skip if name save in progress (prevents redirect loops)
+    if (nameSaveInProgress) return;
+
+    // Get current path
+    const currentPath = window.location.pathname;
+
+    // Define public/exempt paths
     const publicPaths = ["/login", "/registration", "/email-verification", "/"];
-    const publicPrefixes = ["/agreements"];
-    if (publicPaths.some(path => window.location.pathname === path || window.location.pathname.endsWith(path))) return;
-    if (publicPrefixes.some(prefix => window.location.pathname.includes(prefix))) return; // ✅ ADD this check
-    
-    // Redirect to complete profile
-    console.log("Profile incomplete, redirecting to complete-profile");
-    window.location.href = "/complete-profile";
-  }, [user, isLoading, isProfileComplete]);
+    const publicPrefixes = [
+      "/agreements",
+      "/complete-name",
+      "/complete-profile",
+    ];
+
+    const isPublicPath = publicPaths.some(
+      (path) => currentPath === path || currentPath.endsWith(path)
+    );
+    const hasPublicPrefix = publicPrefixes.some((prefix) =>
+      currentPath.includes(prefix)
+    );
+
+    if (isPublicPath || hasPublicPrefix) return;
+
+    // ✅ NEW: Check if Apple user needs name completion FIRST
+    if (needsNameCompletion && isNameStateReady) {
+      console.log("🔀 Redirecting to /complete-name - Apple user needs name");
+      window.location.href = "/complete-name";
+      return;
+    }
+
+    // Then check profile completion
+    if (!isProfileComplete) {
+      console.log("Profile incomplete, redirecting to complete-profile");
+      window.location.href = "/complete-profile";
+      return;
+    }
+  }, [
+    user,
+    isLoading,
+    isProfileComplete,
+    needsNameCompletion,
+    isNameStateReady,
+    nameSaveInProgress,
+  ]);
 
   useEffect(() => {
     if (user) {
@@ -331,7 +668,10 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         await debouncer.debounce(
           "update-profile",
           async () => {
-            await updateDoc(doc(dbRef.current!, "users", currentUser.uid), updates);
+            await updateDoc(
+              doc(dbRef.current!, "users", currentUser.uid),
+              updates
+            );
           },
           300
         )();
@@ -346,12 +686,13 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
           updatedProfileData.languageCode
         );
         setProfileCompleteState(complete);
+        cacheProfileComplete(complete);
       } catch (error) {
         console.error("Error updating profile data:", error);
         throw error;
       }
     },
-    [user, internalFirebaseUser, profileData]
+    [user, internalFirebaseUser, profileData, cacheProfileComplete]
   );
 
   // Get ID token
@@ -383,6 +724,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
       if (options?.profileComplete !== undefined) {
         setProfileCompleteState(options.profileComplete);
+        cacheProfileComplete(options.profileComplete);
       }
 
       const needs2FA = await check2FARequirement(currentUser);
@@ -394,14 +736,21 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         setUser(currentUser);
         setPending2FA(false);
       }
+
+      // ✅ NEW: Trigger background fetch for profile data
+      backgroundFetchUserData();
     },
-    [check2FARequirement]
+    [check2FARequirement, cacheProfileComplete, backgroundFetchUserData]
   );
 
   // Set profile complete
-  const setProfileComplete = useCallback((complete: boolean) => {
-    setProfileCompleteState(complete);
-  }, []);
+  const setProfileComplete = useCallback(
+    (complete: boolean) => {
+      setProfileCompleteState(complete);
+      cacheProfileComplete(complete);
+    },
+    [cacheProfileComplete]
+  );
 
   // Complete 2FA
   const complete2FA = useCallback(() => {
@@ -422,7 +771,12 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     setProfileData(null);
     setIsAdmin(false);
     setPending2FA(false);
-  }, [internalFirebaseUser]);
+
+    // ✅ NEW: Reset Apple-specific state
+    setNameCompleteState(null);
+    setNameSaveInProgressState(false);
+    clearCachedState();
+  }, [internalFirebaseUser, clearCachedState]);
 
   const contextValue: UserContextType = useMemo(
     () => ({
@@ -441,6 +795,15 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       isPending2FA: pending2FA,
       complete2FA,
       cancel2FA,
+      // ✅ NEW: Apple Sign-In specific exports
+      isAppleUser,
+      isGoogleUser,
+      isSocialUser,
+      needsNameCompletion,
+      isNameStateReady,
+      setNameComplete,
+      setNameSaveInProgress,
+      updateLocalProfileField,
     }),
     [
       user,
@@ -458,6 +821,15 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       pending2FA,
       complete2FA,
       cancel2FA,
+      // ✅ NEW: Apple Sign-In specific dependencies
+      isAppleUser,
+      isGoogleUser,
+      isSocialUser,
+      needsNameCompletion,
+      isNameStateReady,
+      setNameComplete,
+      setNameSaveInProgress,
+      updateLocalProfileField,
     ]
   );
 

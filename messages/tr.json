@@ -1836,6 +1836,21 @@
     "accountExistsWithDifferentCredential": "Bu e-posta adresiyle farklı bir giriş yöntemi kullanılarak hesap mevcut.",
     "invalidData": "Geçersiz veri. Lütfen bilgilerinizi kontrol edin."
   },
+  "CompleteName": {
+    "title": "Adınız nedir?",
+    "subtitle": "Sipariş teslimatı için adınıza ihtiyacımız var",
+    "firstName": "Ad",
+    "lastName": "Soyad",
+    "firstNamePlaceholder": "Adınızı girin",
+    "lastNamePlaceholder": "Soyadınızı girin",
+    "firstNameRequired": "Ad gereklidir",
+    "lastNameRequired": "Soyad gereklidir",
+    "nameTooShort": "İsim çok kısa",
+    "continue": "Devam Et",
+    "saveSuccess": "İsim başarıyla kaydedildi!",
+    "saveError": "İsim kaydedilemedi. Lütfen tekrar deneyin.",
+    "notLoggedIn": "Giriş yapmış olmalısınız"
+  },
   "LoginPage": {
     "welcome": "Hoş Geldiniz",
     "signInToContinue": "Hesabınıza giriş yaparak devam edin",
@@ -1843,6 +1858,9 @@
     "password": "Şifre",
     "signIn": "Giriş Yap",
     "signInWithGoogle": "Google ile Giriş Yap",
+    "signInWithApple": "Apple ile Devam Et",
+    "appleLoginSuccess": "Apple ile başarıyla giriş yapıldı!",
+    "appleLoginError": "Apple ile giriş başarısız. Lütfen tekrar deneyin.",
     "or": "veya",
     "noAccount": "Hesabınız yok mu?",
     "twoFactorPending": "İki faktörlü kimlik doğrulama tamamlanıyor...",

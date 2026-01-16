@@ -1,13 +1,24 @@
+// app/[locale]/login/page.tsx
+// UPDATED: Added Apple Sign-In support matching Flutter's implementation
+
 "use client";
 
-import React, { useState, useEffect, useRef, Suspense, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  Suspense,
+  useCallback,
+} from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import {
   signInWithEmailAndPassword,
   signInWithPopup,
   GoogleAuthProvider,
+  OAuthProvider,
   sendPasswordResetEmail,
   AuthError,
+  getAdditionalUserInfo,
 } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import {
@@ -15,7 +26,6 @@ import {
   EyeSlashIcon,
   EnvelopeIcon,
   LockClosedIcon,
-  
   ArrowRightIcon,
   CheckCircleIcon,
   GlobeAltIcon,
@@ -25,7 +35,7 @@ import { getFunctions, httpsCallable } from "firebase/functions";
 import { useTranslations, useLocale } from "next-intl";
 import TwoFactorService from "@/services/TwoFactorService";
 import { useUser } from "@/context/UserProvider";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 
 // Constants for timeouts
 const AUTH_TIMEOUT_MS = 30000; // 30 seconds timeout for auth operations
@@ -53,8 +63,12 @@ function LoginContent() {
   const t = useTranslations();
   const twoFactorService = TwoFactorService.getInstance();
 
-  // 🔥 CRITICAL: Get user context to check 2FA state
-  const { isPending2FA, cancel2FA } = useUser();
+  // 🔥 CRITICAL: Get user context to check 2FA state and Apple-specific state
+  const {
+    isPending2FA,
+    cancel2FA,
+    setNameComplete, // ✅ NEW: For Apple Sign-In
+  } = useUser();
 
   const [resetLoading, setResetLoading] = useState(false);
   const [resetMessage, setResetMessage] = useState("");
@@ -85,7 +99,9 @@ function LoginContent() {
 
     // Initialize theme from localStorage or system preference on mount
     const savedTheme = localStorage.getItem("theme");
-    const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const systemPrefersDark = window.matchMedia(
+      "(prefers-color-scheme: dark)"
+    ).matches;
 
     if (savedTheme === "dark" || (!savedTheme && systemPrefersDark)) {
       document.documentElement.classList.add("dark");
@@ -247,120 +263,123 @@ function LoginContent() {
   }, [twoFactorService, router]);
 
   // Handle email/password login
-  const handleLoginWithPassword = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleLoginWithPassword = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
 
-    if (!email.trim()) {
-      toast.error(t("LoginPage.emailRequired"));
-      return;
-    }
+      if (!email.trim()) {
+        toast.error(t("LoginPage.emailRequired"));
+        return;
+      }
 
-    if (!validateEmail(email)) {
-      toast.error(t("LoginPage.invalidEmail"));
-      return;
-    }
+      if (!validateEmail(email)) {
+        toast.error(t("LoginPage.invalidEmail"));
+        return;
+      }
 
-    if (!password) {
-      toast.error(t("LoginPage.passwordRequired"));
-      return;
-    }
+      if (!password) {
+        toast.error(t("LoginPage.passwordRequired"));
+        return;
+      }
 
-    if (password.length < 6) {
-      toast.error(t("LoginPage.passwordTooShort"));
-      return;
-    }
+      if (password.length < 6) {
+        toast.error(t("LoginPage.passwordTooShort"));
+        return;
+      }
 
-    // Reset TwoFactorService state before new login attempt
-    twoFactorService.reset();
-    setIsLoading(true);
+      // Reset TwoFactorService state before new login attempt
+      twoFactorService.reset();
+      setIsLoading(true);
 
-    try {
-      const userCredential = await withTimeout(
-        signInWithEmailAndPassword(auth, email.trim(), password),
-        AUTH_TIMEOUT_MS,
-        "AUTH_TIMEOUT"
-      );
-      const user = userCredential.user;
-
-      if (user && !user.emailVerified) {
-        // Check if user is using email/password (not Google)
-        const isEmailPasswordUser = user.providerData.some(
-          (info) => info.providerId === "password"
+      try {
+        const userCredential = await withTimeout(
+          signInWithEmailAndPassword(auth, email.trim(), password),
+          AUTH_TIMEOUT_MS,
+          "AUTH_TIMEOUT"
         );
+        const user = userCredential.user;
 
-        if (isEmailPasswordUser) {
-          await auth.signOut();
-          // Store credentials securely in sessionStorage (temporary, auto-clears on tab close)
-          if (typeof window !== "undefined") {
-            sessionStorage.setItem("verification_email", email.trim());
-            sessionStorage.setItem("verification_password", password);
+        if (user && !user.emailVerified) {
+          // Check if user is using email/password (not Google)
+          const isEmailPasswordUser = user.providerData.some(
+            (info) => info.providerId === "password"
+          );
+
+          if (isEmailPasswordUser) {
+            await auth.signOut();
+            // Store credentials securely in sessionStorage (temporary, auto-clears on tab close)
+            if (typeof window !== "undefined") {
+              sessionStorage.setItem("verification_email", email.trim());
+              sessionStorage.setItem("verification_password", password);
+            }
+            // Redirect to email verification page without credentials in URL
+            router.push(`/email-verification`);
+            return;
           }
-          // Redirect to email verification page without credentials in URL
-          router.push(`/email-verification`);
-          return;
         }
-      }
 
-      if (user) {
-        // Check if 2FA verification is needed
-        const loginComplete = await checkAndHandle2FA();
+        if (user) {
+          // Check if 2FA verification is needed
+          const loginComplete = await checkAndHandle2FA();
 
-        if (loginComplete) {
-          // No 2FA needed or 2FA check failed - complete login
-          toast.success(t("LoginPage.loginSuccess"), {
-            icon: "🎉",
-            style: {
-              borderRadius: "10px",
-              background: "#10B981",
-              color: "#fff",
-            },
-          });
-          router.push("/");
+          if (loginComplete) {
+            // No 2FA needed or 2FA check failed - complete login
+            toast.success(t("LoginPage.loginSuccess"), {
+              icon: "🎉",
+              style: {
+                borderRadius: "10px",
+                background: "#10B981",
+                color: "#fff",
+              },
+            });
+            router.push("/");
+          }
         }
-      }
-    } catch (error: unknown) {
-      let message = t("LoginPage.loginError");
-      const errorMessage = error instanceof Error ? error.message : "";
-      const authError = error as AuthError;
+      } catch (error: unknown) {
+        let message = t("LoginPage.loginError");
+        const errorMessage = error instanceof Error ? error.message : "";
+        const authError = error as AuthError;
 
-      // Handle timeout error
-      if (errorMessage === "AUTH_TIMEOUT") {
-        message = t("LoginPage.authTimeout");
-      } else {
-        switch (authError.code) {
-          case "auth/user-not-found":
-            message = t("LoginPage.userNotFound");
-            break;
-          case "auth/wrong-password":
-            message = t("LoginPage.wrongPassword");
-            break;
-          case "auth/invalid-email":
-            message = t("LoginPage.invalidEmail");
-            break;
-          case "auth/network-request-failed":
-            message = t("LoginPage.networkError");
-            break;
-          case "auth/too-many-requests":
-            message = t("LoginPage.tooManyRequests");
-            break;
-          case "auth/invalid-credential":
-            message = t("LoginPage.invalidCredentials");
-            break;
+        // Handle timeout error
+        if (errorMessage === "AUTH_TIMEOUT") {
+          message = t("LoginPage.authTimeout");
+        } else {
+          switch (authError.code) {
+            case "auth/user-not-found":
+              message = t("LoginPage.userNotFound");
+              break;
+            case "auth/wrong-password":
+              message = t("LoginPage.wrongPassword");
+              break;
+            case "auth/invalid-email":
+              message = t("LoginPage.invalidEmail");
+              break;
+            case "auth/network-request-failed":
+              message = t("LoginPage.networkError");
+              break;
+            case "auth/too-many-requests":
+              message = t("LoginPage.tooManyRequests");
+              break;
+            case "auth/invalid-credential":
+              message = t("LoginPage.invalidCredentials");
+              break;
+          }
         }
-      }
 
-      toast.error(message, {
-        style: {
-          borderRadius: "10px",
-          background: "#EF4444",
-          color: "#fff",
-        },
-      });
-    } finally {
-      // Always reset loading state
-      setIsLoading(false);
-    }
-  }, [email, password, t, twoFactorService, router, checkAndHandle2FA]);
+        toast.error(message, {
+          style: {
+            borderRadius: "10px",
+            background: "#EF4444",
+            color: "#fff",
+          },
+        });
+      } finally {
+        // Always reset loading state
+        setIsLoading(false);
+      }
+    },
+    [email, password, t, twoFactorService, router, checkAndHandle2FA]
+  );
 
   // Handle Google sign-in
   const handleGoogleSignIn = useCallback(async () => {
@@ -385,13 +404,12 @@ function LoginContent() {
       );
       console.log("🟢 signInWithPopup succeeded");
       const user = result.user;
-  
-      if (user) {
 
+      if (user) {
         // ✅ ADD: Check Firestore document for profile completion
         const userDocRef = doc(db, "users", user.uid);
         const userDoc = await getDoc(userDocRef);
-  
+
         // ✅ ADD: Check if document exists
         if (!userDoc.exists()) {
           // New user - no document yet, redirect to complete profile
@@ -406,15 +424,13 @@ function LoginContent() {
           router.push("/complete-profile");
           return;
         }
-  
+
         const userData = userDoc.data();
-  
+
         // ✅ ADD: Check if profile is complete - same logic as Flutter
         const isProfileIncomplete =
-          !userData.gender ||
-          !userData.birthDate ||
-          !userData.languageCode;
-  
+          !userData.gender || !userData.birthDate || !userData.languageCode;
+
         if (isProfileIncomplete) {
           toast.success(t("LoginPage.googleLoginSuccess"), {
             icon: "🚀",
@@ -427,10 +443,10 @@ function LoginContent() {
           router.push("/complete-profile");
           return;
         }
-  
+
         // ✅ Profile is complete - continue with 2FA check
         const loginComplete = await checkAndHandle2FA();
-  
+
         if (loginComplete) {
           // No 2FA needed or 2FA check failed - complete login
           toast.success(t("LoginPage.googleLoginSuccess"), {
@@ -464,7 +480,10 @@ function LoginContent() {
           },
         });
         // Don't return early - let finally handle loading state
-      } else if (authError.code === "auth/popup-closed-by-user" || authError.code === "auth/cancelled-popup-request") {
+      } else if (
+        authError.code === "auth/popup-closed-by-user" ||
+        authError.code === "auth/cancelled-popup-request"
+      ) {
         // User cancelled - don't show error, just reset loading
         console.log("🟡 User cancelled popup");
       } else if (authError.code === "auth/popup-blocked") {
@@ -483,7 +502,9 @@ function LoginContent() {
             color: "#fff",
           },
         });
-      } else if (authError.code === "auth/account-exists-with-different-credential") {
+      } else if (
+        authError.code === "auth/account-exists-with-different-credential"
+      ) {
         toast.error(t("LoginPage.accountExistsWithDifferentCredential"), {
           style: {
             borderRadius: "10px",
@@ -506,6 +527,249 @@ function LoginContent() {
       setIsLoading(false);
     }
   }, [t, twoFactorService, router, checkAndHandle2FA]);
+
+  // ✅ NEW: Handle Apple sign-in (matching Flutter's _handleAppleSignIn)
+  const handleAppleSignIn = useCallback(async () => {
+    console.log("🍎 handleAppleSignIn called");
+
+    // Reset TwoFactorService state before new login attempt
+    twoFactorService.reset();
+    setIsLoading(true);
+
+    try {
+      console.log("🍎 Creating OAuthProvider for Apple...");
+      const provider = new OAuthProvider("apple.com");
+      provider.addScope("email");
+      provider.addScope("name");
+
+      console.log("🍎 Calling signInWithPopup...");
+      const result = await withTimeout(
+        signInWithPopup(auth, provider),
+        AUTH_TIMEOUT_MS,
+        "AUTH_TIMEOUT"
+      );
+      console.log("🟢 Apple signInWithPopup succeeded");
+
+      const user = result.user;
+      const additionalInfo = getAdditionalUserInfo(result);
+      const isNewUser = additionalInfo?.isNewUser ?? false;
+
+      if (user) {
+        // ✅ Capture Apple's data (Apple only provides name on first sign-in)
+        let displayName: string | null = null;
+        const userEmail = user.email || "";
+
+        // Try to get name from the credential profile (Apple provides this only once)
+        const profile = additionalInfo?.profile as
+          | {
+              name?: { firstName?: string; lastName?: string };
+            }
+          | undefined;
+
+        if (profile?.name) {
+          const firstName = profile.name.firstName || "";
+          const lastName = profile.name.lastName || "";
+          if (firstName || lastName) {
+            displayName = [firstName, lastName].filter(Boolean).join(" ");
+          }
+        }
+
+        // Fallback to user.displayName if available
+        if (!displayName && user.displayName) {
+          displayName = user.displayName;
+        }
+
+        console.log("🍎 Apple user data:", {
+          isNewUser,
+          displayName,
+          email: userEmail,
+          uid: user.uid,
+        });
+
+        // Check Firestore document
+        const userDocRef = doc(db, "users", user.uid);
+        const userDoc = await getDoc(userDocRef);
+
+        // Determine if name is valid (matching Flutter logic)
+        const emailPrefix = userEmail.split("@")[0];
+        const hasValidName =
+          displayName !== null &&
+          displayName !== "" &&
+          displayName !== "User" &&
+          displayName !== "No Name" &&
+          displayName !== emailPrefix &&
+          !displayName.includes("@");
+
+        let needsName = !hasValidName;
+        let needsCompletion = true;
+
+        if (isNewUser || !userDoc.exists()) {
+          // New user - create document
+          console.log("🍎 Creating new user document...");
+
+          // Get current language from localStorage or default
+          let languageCode = "tr";
+          if (typeof window !== "undefined") {
+            languageCode = localStorage.getItem("locale") || "tr";
+          }
+
+          await setDoc(
+            userDocRef,
+            {
+              displayName: hasValidName ? displayName : null, // Don't use email as name
+              email: userEmail,
+              isNew: true,
+              createdAt: serverTimestamp(),
+              emailVerifiedAt: user.emailVerified ? serverTimestamp() : null,
+              languageCode: languageCode,
+            },
+            { merge: true }
+          );
+
+          needsName = !hasValidName;
+          needsCompletion = true;
+
+          console.log("🍎 New Apple user - needsName:", needsName);
+        } else {
+          // Existing user - check profile
+          const userData = userDoc.data();
+
+          // Update displayName if missing and we have one from Apple
+          if (displayName && hasValidName) {
+            const existingName = userData.displayName;
+            if (
+              !existingName ||
+              existingName === "User" ||
+              existingName === "No Name" ||
+              existingName === emailPrefix
+            ) {
+              await setDoc(userDocRef, { displayName }, { merge: true });
+            }
+          }
+
+          // Check if profile is complete (matching Flutter's _checkProfileCompletionWithName)
+          const existingDisplayName = userData.displayName as
+            | string
+            | undefined;
+          const existingEmailPrefix = (userData.email || userEmail).split(
+            "@"
+          )[0];
+
+          needsName =
+            !existingDisplayName ||
+            existingDisplayName === "" ||
+            existingDisplayName === "User" ||
+            existingDisplayName === "No Name" ||
+            existingDisplayName === existingEmailPrefix;
+
+          needsCompletion =
+            !userData.gender || !userData.birthDate || !userData.languageCode;
+
+          console.log(
+            "🍎 Existing Apple user - needsName:",
+            needsName,
+            "needsCompletion:",
+            needsCompletion
+          );
+        }
+
+        // ✅ Set name completion state for UserProvider (matching Flutter)
+        if (needsName) {
+          setNameComplete(false);
+        } else {
+          setNameComplete(true);
+        }
+
+        // Check 2FA requirement
+        const needs2FA = await twoFactorService.is2FAEnabled();
+
+        if (needs2FA) {
+          setTwoFAPending(true);
+          router.push(`/two-factor-verification?type=login`);
+          return;
+        }
+
+        // Success toast
+        toast.success(
+          t("LoginPage.appleLoginSuccess") || t("LoginPage.googleLoginSuccess"),
+          {
+            icon: "🍎",
+            style: {
+              borderRadius: "10px",
+              background: "#10B981",
+              color: "#fff",
+            },
+          }
+        );
+
+        // ✅ Navigate to home - UserProvider will redirect to /complete-name if needsName
+        // This matches Flutter's approach where router handles the redirect
+        router.push("/");
+      }
+    } catch (error: unknown) {
+      console.error("🔴 Apple Sign-In Error:", error);
+
+      const errorMessage = error instanceof Error ? error.message : "";
+      const authError = error as AuthError;
+
+      // Handle timeout error
+      if (errorMessage === "AUTH_TIMEOUT") {
+        toast.error(t("LoginPage.authTimeout"), {
+          style: {
+            borderRadius: "10px",
+            background: "#EF4444",
+            color: "#fff",
+          },
+        });
+      } else if (
+        authError.code === "auth/popup-closed-by-user" ||
+        authError.code === "auth/cancelled-popup-request"
+      ) {
+        // User cancelled - don't show error
+        console.log("🟡 User cancelled Apple popup");
+      } else if (authError.code === "auth/popup-blocked") {
+        toast.error(t("LoginPage.popupBlocked"), {
+          style: {
+            borderRadius: "10px",
+            background: "#EF4444",
+            color: "#fff",
+          },
+        });
+      } else if (authError.code === "auth/network-request-failed") {
+        toast.error(t("LoginPage.networkError"), {
+          style: {
+            borderRadius: "10px",
+            background: "#EF4444",
+            color: "#fff",
+          },
+        });
+      } else if (
+        authError.code === "auth/account-exists-with-different-credential"
+      ) {
+        toast.error(t("LoginPage.accountExistsWithDifferentCredential"), {
+          style: {
+            borderRadius: "10px",
+            background: "#EF4444",
+            color: "#fff",
+          },
+        });
+      } else {
+        toast.error(
+          t("LoginPage.appleLoginError") || t("LoginPage.googleLoginError"),
+          {
+            style: {
+              borderRadius: "10px",
+              background: "#EF4444",
+              color: "#fff",
+            },
+          }
+        );
+      }
+    } finally {
+      console.log("🍎 handleAppleSignIn finally block - resetting loading");
+      setIsLoading(false);
+    }
+  }, [t, twoFactorService, router, setNameComplete]);
 
   // Resend verification email
   const resendVerificationCode = async () => {
@@ -804,7 +1068,9 @@ function LoginContent() {
             <div className="text-center mb-8 relative">
               <div className="inline-flex items-center justify-center mb-4">
                 <img
-                  src={isDark ? "/images/beyazlogo.png" : "/images/siyahlogo.png"}
+                  src={
+                    isDark ? "/images/beyazlogo.png" : "/images/siyahlogo.png"
+                  }
                   alt="Logo"
                   className="w-20 h-20 object-contain"
                 />
@@ -818,7 +1084,6 @@ function LoginContent() {
               >
                 {t("LoginPage.welcome")}
               </h1>
-              
             </div>
 
             {/* 2FA Pending Message */}
@@ -1088,37 +1353,63 @@ function LoginContent() {
               </div>
             </div>
 
-            {/* Google Sign-in Button */}
-            <button
-              type="button"
-              onClick={handleGoogleSignIn}
-              disabled={isLoading || isPending2FA || twoFAPending}
-              className={`w-full border-2 font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] disabled:scale-100 shadow-lg hover:shadow-xl flex items-center justify-center space-x-3 group ${
-                isDark
-                  ? "bg-gray-700 border-gray-600 hover:border-gray-500 text-gray-200"
-                  : "bg-white border-gray-200 hover:border-gray-300 text-gray-700"
-              }`}
-            >
-              <svg className="w-5 h-5" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                />
-              </svg>
-              <span>{t("LoginPage.signInWithGoogle")}</span>
-            </button>
+            {/* Social Sign-in Buttons */}
+            <div className="space-y-3">
+              {/* ✅ NEW: Apple Sign-in Button */}
+              <button
+                type="button"
+                onClick={handleAppleSignIn}
+                disabled={isLoading || isPending2FA || twoFAPending}
+                className={`w-full font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] disabled:scale-100 shadow-lg hover:shadow-xl flex items-center justify-center space-x-3 group ${
+                  isDark
+                    ? "bg-white text-black hover:bg-gray-100"
+                    : "bg-black text-white hover:bg-gray-900"
+                }`}
+              >
+                <svg
+                  className="w-5 h-5"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
+                  <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
+                </svg>
+                <span>
+                  {t("LoginPage.signInWithApple") || "Continue with Apple"}
+                </span>
+              </button>
+
+              {/* Google Sign-in Button */}
+              <button
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={isLoading || isPending2FA || twoFAPending}
+                className={`w-full border-2 font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] disabled:scale-100 shadow-lg hover:shadow-xl flex items-center justify-center space-x-3 group ${
+                  isDark
+                    ? "bg-gray-700 border-gray-600 hover:border-gray-500 text-gray-200"
+                    : "bg-white border-gray-200 hover:border-gray-300 text-gray-700"
+                }`}
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                  <path
+                    fill="#4285F4"
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                  />
+                </svg>
+                <span>{t("LoginPage.signInWithGoogle")}</span>
+              </button>
+            </div>
 
             {/* Bottom Links */}
             <div className="mt-8 space-y-4 text-center">

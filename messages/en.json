@@ -1835,6 +1835,21 @@
     "accountExistsWithDifferentCredential": "An account already exists with this email using a different sign-in method.",
     "invalidData": "Invalid data. Please check your information."
   },
+  "CompleteName": {
+    "title": "What's your name?",
+    "subtitle": "We need your name for order delivery",
+    "firstName": "First Name",
+    "lastName": "Last Name",
+    "firstNamePlaceholder": "Enter your first name",
+    "lastNamePlaceholder": "Enter your last name",
+    "firstNameRequired": "First name is required",
+    "lastNameRequired": "Last name is required",
+    "nameTooShort": "Name is too short",
+    "continue": "Continue",
+    "saveSuccess": "Name saved successfully!",
+    "saveError": "Failed to save name. Please try again.",
+    "notLoggedIn": "You must be logged in"
+  },
   "LoginPage": {
     "welcome": "Welcome Back",
     "signInToContinue": "Sign in to your account to continue",
@@ -1842,6 +1857,9 @@
     "password": "Password",
     "signIn": "Sign In",
     "signInWithGoogle": "Sign In with Google",
+    "signInWithApple": "Continue with Apple",
+    "appleLoginSuccess": "Signed in with Apple successfully!",
+    "appleLoginError": "Apple sign-in failed. Please try again.",
     "or": "or",
     "noAccount": "Don't have an account?",
     "twoFactorPending": "Completing two-factor authentication...",
