@@ -202,25 +202,6 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     );
   }, [profileComplete, profileData]);
 
-  // ✅ NEW: Initialize cached state from localStorage (matching Flutter's SharedPreferences)
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    try {
-      const cachedNameComplete = localStorage.getItem(NAME_COMPLETE_KEY);
-      if (cachedNameComplete !== null && nameComplete === null) {
-        setNameCompleteState(cachedNameComplete === "true");
-      }
-
-      const cachedProfileComplete = localStorage.getItem(PROFILE_COMPLETE_KEY);
-      if (cachedProfileComplete !== null && profileComplete === null) {
-        setProfileCompleteState(cachedProfileComplete === "true");
-      }
-    } catch (e) {
-      console.error("Error loading cached state:", e);
-    }
-  }, []);
-
   // ✅ NEW: Cache name complete state to localStorage
   const cacheNameComplete = useCallback((value: boolean) => {
     if (typeof window === "undefined") return;
@@ -579,7 +560,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     clearCachedState,
   ]);
 
-  // ✅ MODIFIED: Profile completion redirect (now also handles name completion)
+  // ✅ Redirect logic for name completion and profile completion
   useEffect(() => {
     // Only run on client side
     if (typeof window === "undefined") return;
@@ -596,24 +577,24 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     // Get current path
     const currentPath = window.location.pathname;
 
-    // Define public/exempt paths
-    const publicPaths = ["/login", "/registration", "/email-verification", "/"];
-    const publicPrefixes = [
-      "/agreements",
-      "/complete-name",
-      "/complete-profile",
-    ];
-
-    const isPublicPath = publicPaths.some(
+    // Auth pages - don't redirect (user is logging in/registering)
+    const authPages = ["/login", "/registration", "/email-verification"];
+    const isOnAuthPage = authPages.some(
       (path) => currentPath === path || currentPath.endsWith(path)
     );
-    const hasPublicPrefix = publicPrefixes.some((prefix) =>
-      currentPath.includes(prefix)
+    if (isOnAuthPage) return;
+
+    // Completion pages - don't redirect (user is already completing something)
+    const completionPages = ["/complete-name", "/complete-profile"];
+    const isOnCompletionPage = completionPages.some((path) =>
+      currentPath.includes(path)
     );
+    if (isOnCompletionPage) return;
 
-    if (isPublicPath || hasPublicPrefix) return;
+    // Skip agreements pages
+    if (currentPath.includes("/agreements")) return;
 
-    // ✅ NEW: Check if Apple user needs name completion FIRST
+    // ✅ CRITICAL: Check if Apple user needs name completion FIRST
     if (needsNameCompletion && isNameStateReady) {
       console.log("🔀 Redirecting to /complete-name - Apple user needs name");
       window.location.href = "/complete-name";
@@ -622,7 +603,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
     // Then check profile completion
     if (!isProfileComplete) {
-      console.log("Profile incomplete, redirecting to complete-profile");
+      console.log("🔀 Redirecting to /complete-profile - Profile incomplete");
       window.location.href = "/complete-profile";
       return;
     }

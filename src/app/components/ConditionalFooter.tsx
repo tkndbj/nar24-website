@@ -20,6 +20,9 @@ export default function ConditionalFooter() {
     "/dynamicmarket2",
     "/shopdetail",
     "/search-results",
+    "/complete-name",
+    "/account-settings",
+    "/profile",
   ];
 
   const shouldHideFooter =
