@@ -702,9 +702,17 @@ function LoginContent() {
           }
         );
 
-        // ✅ Navigate to home - UserProvider will redirect to /complete-name if needsName
-        // This matches Flutter's approach where router handles the redirect
-        router.push("/");
+        // ✅ FIX: Navigate based on what user needs
+        if (needsName) {
+          // Navigate directly to complete-name (don't rely on UserProvider redirect)
+          router.push("/complete-name");
+        } else if (needsCompletion) {
+          // Profile incomplete (missing gender/birthDate/languageCode)
+          router.push("/complete-profile");
+        } else {
+          // Everything complete - go to home
+          router.push("/");
+        }
       }
     } catch (error: unknown) {
       console.error("🔴 Apple Sign-In Error:", error);
