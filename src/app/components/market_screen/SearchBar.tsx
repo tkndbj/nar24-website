@@ -537,12 +537,12 @@ export default function SearchBar({
             /* Search History */
             <div className="p-3">
               <div className="flex items-center space-x-2 mb-3">
-                <Clock size={16} className="text-gray-500" />
+                <Clock size={16} className={isDark ? "text-gray-400" : "text-gray-500"} />
                 <span className={`text-sm font-semibold ${isDark ? "text-gray-300" : "text-gray-700"}`}>
                   {t('header.recentSearches')}
                 </span>
-                <div className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded-full">
-                  <span className="text-xs font-bold text-gray-600 dark:text-gray-300">
+                <div className={`px-2 py-1 rounded-full ${isDark ? "bg-gray-700" : "bg-gray-100"}`}>
+                  <span className={`text-xs font-bold ${isDark ? "text-gray-300" : "text-gray-600"}`}>
                     {searchEntries.length}
                   </span>
                 </div>
@@ -563,8 +563,8 @@ export default function SearchBar({
                         data-search-action="history-item"
                         className="flex-1 flex items-center space-x-3 text-left cursor-pointer"
                       >
-                        <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
-                          <Clock size={14} className="text-gray-500" />
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? "bg-gray-700" : "bg-gray-100"}`}>
+                          <Clock size={14} className={isDark ? "text-gray-400" : "text-gray-500"} />
                         </div>
                         <p className={`text-sm font-medium ${isDark ? "text-gray-200" : "text-gray-900"}`}>
                           {entry.searchTerm}

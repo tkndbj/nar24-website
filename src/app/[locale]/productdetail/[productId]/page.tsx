@@ -697,9 +697,9 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
       if (actionButtonsRef.current) {
         const buttonRect = actionButtonsRef.current.getBoundingClientRect();
-        const isMobileView = window.innerWidth < 640;
-        const marketHeaderHeight = 64;
-        const productHeaderHeight = isMobileView ? 48 : 52;
+        const isLargeScreen = window.innerWidth >= 1024;
+        const marketHeaderHeight = isLargeScreen ? 64 : 108; // Desktop: single row, Mobile: two rows
+        const productHeaderHeight = isLargeScreen ? 52 : 48;
         const headerHeight = marketHeaderHeight + productHeaderHeight;
 
         setShowHeaderButtons(buttonRect.bottom < headerHeight);
@@ -1162,7 +1162,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
   return (
     <div
-      className={`min-h-screen isolate ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
+      className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
     >
       {/* Header */}
       <div

@@ -165,13 +165,15 @@ export default function AccountSettingsPage() {
           <div
             className={`p-2 rounded-lg ${
               value && onChanged
-                ? "bg-green-100 dark:bg-green-900/30"
-                : "bg-gray-100 dark:bg-gray-700"
+                ? isDarkMode ? "bg-green-900/30" : "bg-green-100"
+                : isDarkMode ? "bg-gray-700" : "bg-gray-100"
             }`}
           >
             <Icon
               className={`w-5 h-5 ${
-                value && onChanged ? "text-green-600 dark:text-green-400" : "text-gray-500"
+                value && onChanged
+                  ? isDarkMode ? "text-green-400" : "text-green-600"
+                  : "text-gray-500"
               }`}
             />
           </div>
@@ -204,7 +206,9 @@ export default function AccountSettingsPage() {
               className="sr-only peer"
             />
             <div
-              className={`w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all ${
+              className={`w-11 h-6 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all ${
+                isDarkMode ? "bg-gray-700" : "bg-gray-200"
+              } ${
                 value && onChanged ? "peer-checked:bg-green-600" : ""
               } ${!onChanged ? "opacity-50 cursor-not-allowed" : ""}`}
             />
@@ -360,14 +364,14 @@ export default function AccountSettingsPage() {
                     <div
                       className={`p-2 rounded-lg ${
                         settings.twoFactorEnabled
-                          ? "bg-green-100 dark:bg-green-900/30"
-                          : "bg-gray-100 dark:bg-gray-700"
+                          ? isDarkMode ? "bg-green-900/30" : "bg-green-100"
+                          : isDarkMode ? "bg-gray-700" : "bg-gray-100"
                       }`}
                     >
                       <Key
                         className={`w-5 h-5 ${
                           settings.twoFactorEnabled
-                            ? "text-green-600 dark:text-green-400"
+                            ? isDarkMode ? "text-green-400" : "text-green-600"
                             : "text-gray-500"
                         }`}
                       />
@@ -395,7 +399,7 @@ export default function AccountSettingsPage() {
                         onChange={(e) => handle2FAToggle(e.target.checked)}
                         className="sr-only peer"
                       />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600" />
+                      <div className={`w-11 h-6 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600 ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`} />
                     </label>
                   </div>
                 </div>
@@ -508,29 +512,29 @@ export default function AccountSettingsPage() {
             {/* Danger Zone */}
             <div>
               <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
-                  <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                <div className={`p-2 rounded-lg ${isDarkMode ? "bg-red-900/30" : "bg-red-100"}`}>
+                  <AlertTriangle className={`w-5 h-5 ${isDarkMode ? "text-red-400" : "text-red-600"}`} />
                 </div>
-                <h3 className="text-xl font-bold text-red-600 dark:text-red-400">
+                <h3 className={`text-xl font-bold ${isDarkMode ? "text-red-400" : "text-red-600"}`}>
                   {t("AccountSettings.dangerZone")}
                 </h3>
               </div>
 
               <div
-                className={`rounded-xl overflow-hidden border-2 border-red-200 dark:border-red-800 ${
-                  isDarkMode ? "bg-gray-800" : "bg-white"
+                className={`rounded-xl overflow-hidden border-2 ${
+                  isDarkMode ? "border-red-800 bg-gray-800" : "border-red-200 bg-white"
                 } shadow-sm`}
               >
                 <button
                   onClick={() => setShowDeleteDialog(true)}
-                  className="w-full p-4 text-left hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                  className={`w-full p-4 text-left transition-colors ${isDarkMode ? "hover:bg-red-900/20" : "hover:bg-red-50"}`}
                 >
                   <div className="flex items-center gap-4">
-                    <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
-                      <Trash2 className="w-5 h-5 text-red-600 dark:text-red-400" />
+                    <div className={`p-2 rounded-lg ${isDarkMode ? "bg-red-900/30" : "bg-red-100"}`}>
+                      <Trash2 className={`w-5 h-5 ${isDarkMode ? "text-red-400" : "text-red-600"}`} />
                     </div>
                     <div className="flex-1">
-                      <h4 className="font-semibold text-red-600 dark:text-red-400">
+                      <h4 className={`font-semibold ${isDarkMode ? "text-red-400" : "text-red-600"}`}>
                         {t("AccountSettings.deleteAccount")}
                       </h4>
                       <p
@@ -541,7 +545,7 @@ export default function AccountSettingsPage() {
                         {t("AccountSettings.deleteAccountDesc")}
                       </p>
                     </div>
-                    <ChevronRight className="w-5 h-5 text-red-600 dark:text-red-400" />
+                    <ChevronRight className={`w-5 h-5 ${isDarkMode ? "text-red-400" : "text-red-600"}`} />
                   </div>
                 </button>
               </div>
@@ -559,7 +563,7 @@ export default function AccountSettingsPage() {
             }`}
           >
             <h3
-              className={`text-xl font-bold mb-4 text-red-600 dark:text-red-400`}
+              className={`text-xl font-bold mb-4 ${isDarkMode ? "text-red-400" : "text-red-600"}`}
             >
               {t("AccountSettings.deleteAccount")}
             </h3>
