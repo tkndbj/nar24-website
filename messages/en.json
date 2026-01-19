@@ -4499,5 +4499,13 @@
     "pleaseLoginFirst": "Please log in first",
     "reportSubmittedSuccessfully": "Report submitted successfully",
     "errorSubmittingReport": "Error submitting report. Please try again."
+  },
+  "appDownload": {
+    "title": "Get the Nar24 App",
+    "description": "Download our mobile app for a faster, smoother shopping experience with exclusive features.",
+    "feature1": "Faster browsing and checkout",
+    "feature2": "Push notifications for deals",
+    "feature3": "Exclusive app-only discounts",
+    "maybeLater": "Maybe Later"
   }
 }

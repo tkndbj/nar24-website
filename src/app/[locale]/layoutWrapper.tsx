@@ -25,6 +25,12 @@ const CookieConsent = dynamic(
   { ssr: false }
 );
 
+// Lazy load AppDownloadModal - only shown on mobile/tablet devices
+const AppDownloadModal = dynamic(
+  () => import("../components/AppDownloadModal"),
+  { ssr: false }
+);
+
 // Inner component that has access to user context and lazy-loaded Firebase
 function AppProviders({
   children,
@@ -48,6 +54,7 @@ function AppProviders({
                 <main className="isolate">{children}</main>
                 <ConditionalFooter />
                 <CookieConsent />
+                <AppDownloadModal />
               </SearchHistoryProvider>
             </SearchProvider>
           </BadgeProvider>

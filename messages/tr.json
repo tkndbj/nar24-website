@@ -4512,5 +4512,13 @@
     "pleaseLoginFirst": "Lütfen önce giriş yapın",
     "reportSubmittedSuccessfully": "Şikayet başarıyla gönderildi",
     "errorSubmittingReport": "Şikayet gönderilirken hata oluştu. Lütfen tekrar deneyin."
+  },
+  "appDownload": {
+    "title": "Nar24 Uygulamasını İndir",
+    "description": "Daha hızlı ve akıcı bir alışveriş deneyimi için mobil uygulamamızı indirin.",
+    "feature1": "Daha hızlı gezinme ve ödeme",
+    "feature2": "Fırsatlar için anlık bildirimler",
+    "feature3": "Sadece uygulamaya özel indirimler",
+    "maybeLater": "Daha Sonra"
   }
 }

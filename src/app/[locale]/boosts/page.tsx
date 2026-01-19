@@ -15,6 +15,7 @@ import {
   Lock,
   RefreshCw,
   AlertCircle,
+  PauseCircle,
 } from "lucide-react";
 import { useUser } from "@/context/UserProvider";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -26,6 +27,7 @@ import {
   getDocs,
   doc,
   getDoc,
+  onSnapshot,
   Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -65,10 +67,35 @@ interface PaymentStatus {
   boostError?: string;
 }
 
-const BASE_PRICE_PER_PRODUCT = 1.0; // TL per product per minute
-const BOOST_DURATION_OPTIONS = [5, 10, 15, 20, 25, 30, 35]; // minutes
-const MAX_PRODUCTS = 5;
+// Boost prices config interface (matches Flutter BoostPricesService)
+interface BoostPricesConfig {
+  pricePerProductPerMinute: number;
+  minDuration: number;
+  maxDuration: number;
+  maxProducts: number;
+  serviceEnabled: boolean;
+}
+
+// Default config values (matches Flutter defaults)
+const DEFAULT_CONFIG: BoostPricesConfig = {
+  pricePerProductPerMinute: 1.0,
+  minDuration: 5,
+  maxDuration: 35,
+  maxProducts: 5,
+  serviceEnabled: true,
+};
+
 const STATUS_CHECK_INTERVAL = 2000; // 2 seconds
+
+// Generate duration options dynamically (matches Flutter durationOptions getter)
+const generateDurationOptions = (minDuration: number, maxDuration: number): number[] => {
+  const options: number[] = [];
+  for (let i = minDuration; i <= maxDuration; i += 5) {
+    options.push(i);
+  }
+  if (options.length === 0) options.push(minDuration);
+  return options;
+};
 
 export default function BoostPage() {
   const router = useRouter();
@@ -87,6 +114,12 @@ export default function BoostPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
+  // Boost prices config state (matches Flutter BoostPricesService)
+  const [boostConfig, setBoostConfig] = useState<BoostPricesConfig>(DEFAULT_CONFIG);
+  const [durationOptions, setDurationOptions] = useState<number[]>(
+    generateDurationOptions(DEFAULT_CONFIG.minDuration, DEFAULT_CONFIG.maxDuration)
+  );
+
   // Product states
   const [mainProduct, setMainProduct] = useState<Product | null>(null);
   const [unboostedProducts, setUnboostedProducts] = useState<Product[]>([]);
@@ -94,8 +127,8 @@ export default function BoostPage() {
 
   // Boost configuration
   const [selectedDurationIndex, setSelectedDurationIndex] = useState(0);
-  const [boostDuration, setBoostDuration] = useState(BOOST_DURATION_OPTIONS[0]);
-  const [totalPrice, setTotalPrice] = useState(BASE_PRICE_PER_PRODUCT);
+  const [boostDuration, setBoostDuration] = useState(DEFAULT_CONFIG.minDuration);
+  const [totalPrice, setTotalPrice] = useState(DEFAULT_CONFIG.pricePerProductPerMinute);
 
   // Payment states
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -116,6 +149,57 @@ export default function BoostPage() {
     return () => observer.disconnect();
   }, []);
 
+  // Listen to boost prices config from Firestore (matches Flutter BoostPricesService.startListening)
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      doc(db, "app_config", "boost_prices"),
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          const newConfig: BoostPricesConfig = {
+            pricePerProductPerMinute: data.pricePerProductPerMinute ?? DEFAULT_CONFIG.pricePerProductPerMinute,
+            minDuration: data.minDuration ?? DEFAULT_CONFIG.minDuration,
+            maxDuration: data.maxDuration ?? DEFAULT_CONFIG.maxDuration,
+            maxProducts: data.maxProducts ?? DEFAULT_CONFIG.maxProducts,
+            serviceEnabled: data.serviceEnabled ?? DEFAULT_CONFIG.serviceEnabled,
+          };
+          setBoostConfig(newConfig);
+          
+          // Update duration options
+          const newOptions = generateDurationOptions(newConfig.minDuration, newConfig.maxDuration);
+          setDurationOptions(newOptions);
+          
+          // Adjust selectedDurationIndex if out of range (matches Flutter logic)
+          setSelectedDurationIndex((prevIndex) => {
+            if (prevIndex >= newOptions.length) {
+              return 0;
+            }
+            return prevIndex;
+          });
+        } else {
+          // Use defaults if document doesn't exist
+          setBoostConfig(DEFAULT_CONFIG);
+          setDurationOptions(generateDurationOptions(DEFAULT_CONFIG.minDuration, DEFAULT_CONFIG.maxDuration));
+        }
+      },
+      (error) => {
+        console.error("Error listening to boost prices:", error);
+        // Use defaults on error
+        setBoostConfig(DEFAULT_CONFIG);
+        setDurationOptions(generateDurationOptions(DEFAULT_CONFIG.minDuration, DEFAULT_CONFIG.maxDuration));
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  // Update boostDuration when selectedDurationIndex or durationOptions change
+  useEffect(() => {
+    if (durationOptions.length > 0 && selectedDurationIndex < durationOptions.length) {
+      setBoostDuration(durationOptions[selectedDurationIndex]);
+    }
+  }, [selectedDurationIndex, durationOptions]);
+
   // Redirect if not authenticated
   useEffect(() => {
     if (!user) {
@@ -133,10 +217,10 @@ export default function BoostPage() {
     }
   }, [user, productId]);
 
-  // Update total price when selection or duration changes
+  // Update total price when selection or duration changes (matches Flutter _updateTotalPrice)
   useEffect(() => {
     updateTotalPrice();
-  }, [mainProduct, selectedProductIds, boostDuration]);
+  }, [mainProduct, selectedProductIds, boostDuration, boostConfig.pricePerProductPerMinute]);
 
   // Cleanup status check interval on unmount
   useEffect(() => {
@@ -151,7 +235,6 @@ export default function BoostPage() {
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === "PAYMENT_FORM_SUBMITTED") {
-        // Hide the loading overlay once the form is submitted and 3D secure page loads
         setIsInitialLoading(false);
       }
     };
@@ -235,25 +318,25 @@ export default function BoostPage() {
     }
   };
 
-  // Update total price calculation
+  // Update total price calculation (matches Flutter _updateTotalPrice)
   const updateTotalPrice = useCallback(() => {
     const itemCount = (mainProduct ? 1 : 0) + selectedProductIds.length;
-    setTotalPrice(boostDuration * BASE_PRICE_PER_PRODUCT * itemCount);
-  }, [mainProduct, selectedProductIds, boostDuration]);
+    setTotalPrice(boostDuration * boostConfig.pricePerProductPerMinute * itemCount);
+  }, [mainProduct, selectedProductIds, boostDuration, boostConfig.pricePerProductPerMinute]);
 
-  // Toggle product selection with limit check
+  // Toggle product selection with limit check (matches Flutter _buildItemCheckTile logic)
   const toggleProductSelection = (productId: string) => {
     setSelectedProductIds((prev) => {
       if (prev.includes(productId)) {
         // Always allow deselection
         return prev.filter((id) => id !== productId);
       } else {
-        // Check limit before adding
+        // Check limit before adding (matches Flutter canSelectMore logic)
         const totalItems = (mainProduct ? 1 : 0) + prev.length;
-        if (totalItems >= MAX_PRODUCTS) {
+        if (totalItems >= boostConfig.maxProducts) {
           alert(
             t("maximumProductsCanBeBoostedAtOnce") ||
-              `Maximum ${MAX_PRODUCTS} products can be boosted at once`
+              `Maximum ${boostConfig.maxProducts} products can be boosted at once`
           );
           return prev;
         }
@@ -265,10 +348,10 @@ export default function BoostPage() {
   // Handle duration change
   const handleDurationChange = (index: number) => {
     setSelectedDurationIndex(index);
-    setBoostDuration(BOOST_DURATION_OPTIONS[index]);
+    setBoostDuration(durationOptions[index]);
   };
 
-  // Format duration label
+  // Format duration label (matches Flutter _getDurationLabel)
   const getDurationLabel = (minutes: number) => {
     return `${minutes} ${t("minutes") || "minutes"}`;
   };
@@ -289,17 +372,14 @@ export default function BoostPage() {
         console.log("Payment status:", status);
 
         if (status.status === "completed") {
-          // Clear interval
           if (statusCheckInterval) {
             clearInterval(statusCheckInterval);
             setStatusCheckInterval(null);
           }
 
-          // Close modal and show success
           setShowPaymentModal(false);
           setPaymentData(null);
 
-          // Show success message
           setTimeout(() => {
             alert(
               `${t("paymentSuccessful") || "Payment Successful!"}\n${
@@ -310,7 +390,6 @@ export default function BoostPage() {
               } items for ${status.boostResult?.boostDuration || 0} minutes.`
             );
 
-            // Navigate to my products page
             router.push("/myproducts");
           }, 300);
         } else if (
@@ -318,13 +397,11 @@ export default function BoostPage() {
           status.status === "hash_verification_failed" ||
           status.status === "payment_succeeded_boost_failed"
         ) {
-          // Clear interval
           if (statusCheckInterval) {
             clearInterval(statusCheckInterval);
             setStatusCheckInterval(null);
           }
 
-          // Show error
           setPaymentError(
             status.errorMessage ||
               status.boostError ||
@@ -341,12 +418,10 @@ export default function BoostPage() {
   // Start status polling
   const startStatusPolling = useCallback(
     (orderNumber: string) => {
-      // Clear any existing interval
       if (statusCheckInterval) {
         clearInterval(statusCheckInterval);
       }
 
-      // Start new interval
       const interval = setInterval(() => {
         checkPaymentStatus(orderNumber);
       }, STATUS_CHECK_INTERVAL);
@@ -356,15 +431,15 @@ export default function BoostPage() {
     [statusCheckInterval, checkPaymentStatus]
   );
 
-  // Proceed to payment
+  // Proceed to payment (matches Flutter _proceedToPayment)
   const proceedToPayment = async () => {
     if (!user) {
       alert(t("userNotAuthenticated") || "User not authenticated");
       return;
     }
 
-    // Prepare items for the cloud function
-    const items = [];
+    // Prepare items for the cloud function (matches Flutter logic)
+    const items: Array<{ itemId: string; collection: string; shopId: string | null }> = [];
 
     // Add main product if exists
     if (mainProduct) {
@@ -443,8 +518,6 @@ export default function BoostPage() {
           itemCount: data.itemCount,
         });
         setShowPaymentModal(true);
-
-        // Start status polling
         startStatusPolling(data.orderNumber);
       }
     } catch (error: unknown) {
@@ -465,7 +538,6 @@ export default function BoostPage() {
           "Are you sure you want to cancel the payment?"
       )
     ) {
-      // Clear interval
       if (statusCheckInterval) {
         clearInterval(statusCheckInterval);
         setStatusCheckInterval(null);
@@ -483,7 +555,6 @@ export default function BoostPage() {
     setPaymentError(null);
     setIsInitialLoading(true);
     if (paymentData) {
-      // Reload iframe
       const iframe = document.getElementById(
         "payment-iframe"
       ) as HTMLIFrameElement;
@@ -493,20 +564,21 @@ export default function BoostPage() {
     }
   };
 
-  // Check if user can select more products
+  // Check if user can select more products (matches Flutter canSelectMore logic)
   const canSelectMore = () => {
     const totalItems = (mainProduct ? 1 : 0) + selectedProductIds.length;
-    return totalItems < MAX_PRODUCTS;
+    return totalItems < boostConfig.maxProducts;
   };
 
-  // Get total selected items count
+  // Get total selected items count (matches Flutter totalItemsCount)
   const getTotalItemsCount = () => {
     return (mainProduct ? 1 : 0) + selectedProductIds.length;
   };
 
-  // Check if user has products to boost
+  // Check if user has products to boost (matches Flutter hasProductsToBoost)
   const hasProductsToBoost = () => {
-    return mainProduct !== null || unboostedProducts.length > 0;
+    if (!boostConfig.serviceEnabled) return false;
+    return mainProduct !== null || unboostedProducts.length > 0 || selectedProductIds.length > 0;
   };
 
   // Product Card Component
@@ -646,33 +718,9 @@ export default function BoostPage() {
     <div className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}>
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="space-y-6">
-        {/* Info Banner Skeleton */}
-        <div
-          className={`rounded-xl border overflow-hidden relative h-32 ${
-            isDarkMode
-              ? "bg-gray-800 border-gray-700"
-              : "bg-gray-200 border-gray-200"
-          }`}
-        >
+          {/* Info Banner Skeleton */}
           <div
-            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"
-            style={{
-              backgroundSize: "200% 100%",
-            }}
-          />
-        </div>
-
-        {/* Main Product Skeleton */}
-        <div>
-          <div
-            className={`h-4 w-32 rounded mb-3 relative overflow-hidden ${
-              isDarkMode ? "bg-gray-700" : "bg-gray-300"
-            }`}
-          >
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
-          </div>
-          <div
-            className={`rounded-xl border overflow-hidden relative h-64 ${
+            className={`rounded-xl border overflow-hidden relative h-32 ${
               isDarkMode
                 ? "bg-gray-800 border-gray-700"
                 : "bg-gray-200 border-gray-200"
@@ -685,120 +733,144 @@ export default function BoostPage() {
               }}
             />
           </div>
-        </div>
 
-        {/* Additional Products Skeleton */}
-        <div
-          className={`rounded-xl border p-6 ${
-            isDarkMode
-              ? "bg-gray-800 border-gray-700"
-              : "bg-white border-gray-200"
-          }`}
-        >
-          <div className="flex items-center justify-between mb-4">
+          {/* Main Product Skeleton */}
+          <div>
             <div
-              className={`h-6 w-32 rounded relative overflow-hidden ${
+              className={`h-4 w-32 rounded mb-3 relative overflow-hidden ${
                 isDarkMode ? "bg-gray-700" : "bg-gray-300"
               }`}
             >
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
             </div>
             <div
-              className={`h-6 w-16 rounded-full relative overflow-hidden ${
-                isDarkMode ? "bg-gray-700" : "bg-gray-300"
+              className={`rounded-xl border overflow-hidden relative h-64 ${
+                isDarkMode
+                  ? "bg-gray-800 border-gray-700"
+                  : "bg-gray-200 border-gray-200"
               }`}
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
+              <div
+                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"
+                style={{
+                  backgroundSize: "200% 100%",
+                }}
+              />
             </div>
           </div>
-          <div className="space-y-3">
-            {[...Array(3)].map((_, i) => (
+
+          {/* Additional Products Skeleton */}
+          <div
+            className={`rounded-xl border p-6 ${
+              isDarkMode
+                ? "bg-gray-800 border-gray-700"
+                : "bg-white border-gray-200"
+            }`}
+          >
+            <div className="flex items-center justify-between mb-4">
               <div
-                key={i}
-                className={`rounded-lg h-20 relative overflow-hidden ${
-                  isDarkMode ? "bg-gray-700" : "bg-gray-200"
+                className={`h-6 w-32 rounded relative overflow-hidden ${
+                  isDarkMode ? "bg-gray-700" : "bg-gray-300"
                 }`}
               >
-                <div
-                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"
-                  style={{
-                    backgroundSize: "200% 100%",
-                  }}
-                />
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
               </div>
-            ))}
+              <div
+                className={`h-6 w-16 rounded-full relative overflow-hidden ${
+                  isDarkMode ? "bg-gray-700" : "bg-gray-300"
+                }`}
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
+              </div>
+            </div>
+            <div className="space-y-3">
+              {[...Array(3)].map((_, i) => (
+                <div
+                  key={i}
+                  className={`rounded-lg h-20 relative overflow-hidden ${
+                    isDarkMode ? "bg-gray-700" : "bg-gray-200"
+                  }`}
+                >
+                  <div
+                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"
+                    style={{
+                      backgroundSize: "200% 100%",
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
 
-        {/* Duration Selection Skeleton */}
-        <div
-          className={`rounded-xl border p-6 ${
-            isDarkMode
-              ? "bg-gray-800 border-gray-700"
-              : "bg-white border-gray-200"
-          }`}
-        >
+          {/* Duration Selection Skeleton */}
           <div
-            className={`h-6 w-48 rounded mb-6 relative overflow-hidden ${
-              isDarkMode ? "bg-gray-700" : "bg-gray-300"
+            className={`rounded-xl border p-6 ${
+              isDarkMode
+                ? "bg-gray-800 border-gray-700"
+                : "bg-white border-gray-200"
             }`}
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
+            <div
+              className={`h-6 w-48 rounded mb-6 relative overflow-hidden ${
+                isDarkMode ? "bg-gray-700" : "bg-gray-300"
+              }`}
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
+            </div>
+            <div
+              className={`h-3 rounded-full mb-4 relative overflow-hidden ${
+                isDarkMode ? "bg-gray-700" : "bg-gray-300"
+              }`}
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
+            </div>
+            <div
+              className={`h-12 w-32 rounded-2xl mx-auto relative overflow-hidden ${
+                isDarkMode ? "bg-gray-700" : "bg-gray-300"
+              }`}
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
+            </div>
           </div>
-          <div
-            className={`h-3 rounded-full mb-4 relative overflow-hidden ${
-              isDarkMode ? "bg-gray-700" : "bg-gray-300"
-            }`}
-          >
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
-          </div>
-          <div
-            className={`h-12 w-32 rounded-2xl mx-auto relative overflow-hidden ${
-              isDarkMode ? "bg-gray-700" : "bg-gray-300"
-            }`}
-          >
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
-          </div>
-        </div>
 
-        {/* Price Section Skeleton */}
-        <div
-          className={`rounded-xl border p-6 relative overflow-hidden ${
-            isDarkMode
-              ? "bg-gray-800 border-gray-700"
-              : "bg-gray-200 border-gray-200"
-          }`}
-        >
+          {/* Price Section Skeleton */}
           <div
-            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"
-            style={{
-              backgroundSize: "200% 100%",
-            }}
-          />
-          <div className="text-center space-y-3 relative z-10">
+            className={`rounded-xl border p-6 relative overflow-hidden ${
+              isDarkMode
+                ? "bg-gray-800 border-gray-700"
+                : "bg-gray-200 border-gray-200"
+            }`}
+          >
             <div
-              className={`h-4 w-24 rounded mx-auto ${
-                isDarkMode ? "bg-gray-700" : "bg-gray-300"
-              }`}
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"
+              style={{
+                backgroundSize: "200% 100%",
+              }}
             />
-            <div
-              className={`h-12 w-40 rounded mx-auto ${
-                isDarkMode ? "bg-gray-700" : "bg-gray-300"
-              }`}
-            />
-            <div
-              className={`h-3 w-32 rounded mx-auto ${
-                isDarkMode ? "bg-gray-700" : "bg-gray-300"
-              }`}
-            />
+            <div className="text-center space-y-3 relative z-10">
+              <div
+                className={`h-4 w-24 rounded mx-auto ${
+                  isDarkMode ? "bg-gray-700" : "bg-gray-300"
+                }`}
+              />
+              <div
+                className={`h-12 w-40 rounded mx-auto ${
+                  isDarkMode ? "bg-gray-700" : "bg-gray-300"
+                }`}
+              />
+              <div
+                className={`h-3 w-32 rounded mx-auto ${
+                  isDarkMode ? "bg-gray-700" : "bg-gray-300"
+                }`}
+              />
+            </div>
           </div>
         </div>
       </div>
     </div>
-    </div>
   );
 
-  // Empty State Component
+  // Empty State Component (matches Flutter _buildEmptyState)
   const EmptyState = () => (
     <div className="flex flex-col items-center justify-center py-20 px-6">
       <div
@@ -836,6 +908,39 @@ export default function BoostPage() {
         <Plus size={20} />
         <span>{t("addProductFirst") || "Add Product"}</span>
       </button>
+    </div>
+  );
+
+  // Service Disabled State Component (matches Flutter _buildServiceDisabledState)
+  const ServiceDisabledState = () => (
+    <div className="flex flex-col items-center justify-center py-20 px-6">
+      <div
+        className={`p-6 rounded-2xl mb-6 ${
+          isDarkMode ? "bg-orange-900/20" : "bg-orange-50"
+        }`}
+      >
+        <PauseCircle
+          size={64}
+          className="text-orange-500"
+        />
+      </div>
+
+      <h2
+        className={`text-2xl font-bold mb-3 text-center ${
+          isDarkMode ? "text-white" : "text-gray-900"
+        }`}
+      >
+        {t("boostServiceTemporarilyOff") || "Boost Service Temporarily Unavailable"}
+      </h2>
+
+      <p
+        className={`text-center max-w-md ${
+          isDarkMode ? "text-gray-400" : "text-gray-600"
+        }`}
+      >
+        {t("boostServiceDisabledMessage") ||
+          "The boost service is currently disabled. Please check back later."}
+      </p>
     </div>
   );
 
@@ -1116,7 +1221,6 @@ export default function BoostPage() {
           initializedRef.current = true;
         }
 
-        // Hide loading after timeout
         const timer = setTimeout(() => {
           onLoadComplete();
         }, 2500);
@@ -1198,8 +1302,10 @@ export default function BoostPage() {
         </div>
       </div>
 
-      {/* Empty State or Content */}
-      {!hasProductsToBoost() ? (
+      {/* Service Disabled State */}
+      {!boostConfig.serviceEnabled ? (
+        <ServiceDisabledState />
+      ) : !hasProductsToBoost() ? (
         <EmptyState />
       ) : (
         <>
@@ -1257,7 +1363,7 @@ export default function BoostPage() {
               )}
 
               {/* Additional Products Section */}
-              {unboostedProducts.length > 0 && (
+              {(unboostedProducts.length > 0 || mainProduct === null) && (
                 <div
                   className={`rounded-xl border p-6 ${
                     isDarkMode
@@ -1274,28 +1380,49 @@ export default function BoostPage() {
                       {t("addMoreItems") || "Add More Items"}
                     </h2>
 
-                    {/* Selection Counter */}
+                    {/* Selection Counter (matches Flutter _buildTabBarSection) */}
                     <div
-                      className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                        getTotalItemsCount() >= MAX_PRODUCTS
+                      className={`px-3 py-1 rounded-full text-sm font-semibold flex items-center space-x-2 ${
+                        getTotalItemsCount() >= boostConfig.maxProducts
                           ? "bg-orange-100 dark:bg-orange-900/30 text-orange-600 border border-orange-200 dark:border-orange-700"
                           : "bg-green-100 dark:bg-green-900/30 text-green-600 border border-green-200 dark:border-green-700"
                       }`}
                     >
-                      {getTotalItemsCount()} / {MAX_PRODUCTS}
+                      {getTotalItemsCount() >= boostConfig.maxProducts ? (
+                        <AlertCircle size={14} />
+                      ) : (
+                        <CheckCircle size={14} />
+                      )}
+                      <span>{getTotalItemsCount()} / {boostConfig.maxProducts}</span>
                     </div>
                   </div>
 
-                  <div className="space-y-3 max-h-80 overflow-y-auto pr-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-gray-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-600 [&::-webkit-scrollbar-thumb]:rounded-lg [&::-webkit-scrollbar-thumb:hover]:bg-gray-400 dark:[&::-webkit-scrollbar-thumb:hover]:bg-gray-500">
-                    {unboostedProducts.map((product) => (
-                      <ProductCard
-                        key={product.id}
-                        product={product}
-                        isSelected={selectedProductIds.includes(product.id)}
-                        onToggle={() => toggleProductSelection(product.id)}
+                  {unboostedProducts.length > 0 ? (
+                    <div className="space-y-3 max-h-80 overflow-y-auto pr-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-gray-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-600 [&::-webkit-scrollbar-thumb]:rounded-lg [&::-webkit-scrollbar-thumb:hover]:bg-gray-400 dark:[&::-webkit-scrollbar-thumb:hover]:bg-gray-500">
+                      {unboostedProducts.map((product) => (
+                        <ProductCard
+                          key={product.id}
+                          product={product}
+                          isSelected={selectedProductIds.includes(product.id)}
+                          onToggle={() => toggleProductSelection(product.id)}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8">
+                      <Package
+                        size={48}
+                        className={isDarkMode ? "text-gray-600" : "text-gray-400"}
                       />
-                    ))}
-                  </div>
+                      <p
+                        className={`mt-3 text-sm font-semibold ${
+                          isDarkMode ? "text-gray-400" : "text-gray-500"
+                        }`}
+                      >
+                        {t("noMoreItemsToAdd") || "No more items to add"}
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1338,9 +1465,11 @@ export default function BoostPage() {
                           className="absolute top-0 left-0 h-full bg-gradient-to-r from-green-500 to-green-600 transition-all duration-300 rounded-full"
                           style={{
                             width: `${
-                              (selectedDurationIndex /
-                                (BOOST_DURATION_OPTIONS.length - 1)) *
-                              100
+                              durationOptions.length > 1
+                                ? (selectedDurationIndex /
+                                    (durationOptions.length - 1)) *
+                                  100
+                                : 100
                             }%`,
                           }}
                         />
@@ -1348,7 +1477,7 @@ export default function BoostPage() {
 
                       {/* Tick marks */}
                       <div className="flex justify-between mt-2 px-1">
-                        {BOOST_DURATION_OPTIONS.map((duration, index) => (
+                        {durationOptions.map((duration, index) => (
                           <button
                             key={duration}
                             onClick={() => handleDurationChange(index)}
@@ -1368,14 +1497,14 @@ export default function BoostPage() {
                       onClick={() =>
                         handleDurationChange(
                           Math.min(
-                            BOOST_DURATION_OPTIONS.length - 1,
+                            durationOptions.length - 1,
                             selectedDurationIndex + 1
                           )
                         )
                       }
                       disabled={
                         selectedDurationIndex ===
-                        BOOST_DURATION_OPTIONS.length - 1
+                        durationOptions.length - 1
                       }
                       className="p-3 rounded-xl bg-green-500 text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-green-600 transition-all shadow-lg hover:shadow-xl disabled:hover:bg-green-500"
                     >
@@ -1433,7 +1562,7 @@ export default function BoostPage() {
                       {boostDuration} {t("minutes") || "minutes"}
                     </p>
                     <p>
-                      {BASE_PRICE_PER_PRODUCT} TL{" "}
+                      {boostConfig.pricePerProductPerMinute} TL{" "}
                       {t("perItemPerMinute") || "per item per minute"}
                     </p>
                   </div>
@@ -1444,8 +1573,8 @@ export default function BoostPage() {
         </>
       )}
 
-      {/* Bottom Action Bar - Attached before Footer */}
-      {hasProductsToBoost() && (
+      {/* Bottom Action Bar */}
+      {boostConfig.serviceEnabled && hasProductsToBoost() && (
         <div className="pt-6 pb-6">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
             <button

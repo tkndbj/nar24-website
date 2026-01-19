@@ -23,6 +23,8 @@ export default function ConditionalFooter() {
     "/complete-name",
     "/account-settings",
     "/profile",
+    "/(product)/listproduct",
+    "/(product)/listproductpreview", 
   ];
 
   const shouldHideFooter =
