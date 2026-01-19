@@ -80,6 +80,14 @@ body {
   }
 }
 
+/* Sticky positioning for mobile only - used by product detail header */
+/* Sets top value only on mobile, desktop uses lg:static to disable sticky */
+@media (max-width: 1023px) {
+  .sticky-below-market-header-mobile {
+    top: calc(116px + env(safe-area-inset-top, 0px));
+  }
+}
+
 /* GPU-accelerated shimmer animation using transform instead of background-position */
 @keyframes shimmer {
   0% {
