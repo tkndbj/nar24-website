@@ -39,7 +39,7 @@ export default function ShippingInfoPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [shipmentInfo, setShipmentInfo] = useState<ShipmentInfo | null>(null);
-  const { user, profileData } = useUser();
+  const { user, profileData, isLoading: authLoading } = useUser();
   const router = useRouter();
   const t = useTranslations();
 
@@ -61,12 +61,12 @@ export default function ShippingInfoPage() {
     return () => observer.disconnect();
   }, []);
 
-  // Redirect to login if not authenticated
+  // Redirect to login if not authenticated (only after auth state is determined)
   useEffect(() => {
-    if (!user) {
+    if (!authLoading && !user) {
       router.push("/login");
     }
-  }, [user, router]);
+  }, [user, authLoading, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -147,6 +147,19 @@ export default function ShippingInfoPage() {
         return "from-gray-500 to-gray-600";
     }
   };
+
+  // Show loading while auth state is being determined
+  if (authLoading) {
+    return (
+      <div
+        className={`min-h-screen flex items-center justify-center ${
+          isDarkMode ? "bg-gray-900" : "bg-gray-50"
+        }`}
+      >
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+      </div>
+    );
+  }
 
   if (!user) {
     return (

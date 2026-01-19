@@ -96,21 +96,13 @@ const AllQuestionsPage: React.FC<AllQuestionsPageProps> = ({}) => {
     [localization]
   );
 
-  // Dark mode detection
+  // Dark mode detection - only check document class (app's theme preference)
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     const detectDarkMode = () => {
-      const htmlElement = document.documentElement;
-      const darkModeMediaQuery = window.matchMedia(
-        "(prefers-color-scheme: dark)"
-      );
-
-      const isDark =
-        htmlElement.classList.contains("dark") ||
-        htmlElement.getAttribute("data-theme") === "dark" ||
-        darkModeMediaQuery.matches;
-
+      // Only check the document class - this is managed by the app's theme toggle
+      const isDark = document.documentElement.classList.contains("dark");
       setIsDarkMode(isDark);
     };
 
@@ -119,16 +111,11 @@ const AllQuestionsPage: React.FC<AllQuestionsPageProps> = ({}) => {
     const observer = new MutationObserver(detectDarkMode);
     observer.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ["class", "data-theme"],
+      attributeFilter: ["class"],
     });
-
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    const handleChange = () => detectDarkMode();
-    mediaQuery.addEventListener("change", handleChange);
 
     return () => {
       observer.disconnect();
-      mediaQuery.removeEventListener("change", handleChange);
     };
   }, []);
 
@@ -365,37 +352,37 @@ const AllQuestionsPage: React.FC<AllQuestionsPageProps> = ({}) => {
 
     return (
       <div
-        className={`${colors.containerBg} rounded-xl shadow-sm border ${colors.border} overflow-hidden transition-all hover:shadow-md`}
+        className={`${colors.containerBg} rounded-lg md:rounded-xl shadow-sm border ${colors.border} overflow-hidden transition-all hover:shadow-md`}
       >
         {/* Date header */}
         <div
-          className={`px-6 py-3 border-b ${colors.border} flex justify-between items-center`}
+          className={`px-3 py-2 md:px-6 md:py-3 border-b ${colors.border} flex justify-between items-center`}
         >
-          <div className="flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-orange-500" />
-            <span className={`text-sm ${colors.textSecondary}`}>
+          <div className="flex items-center gap-1.5 md:gap-2">
+            <Calendar className="w-3.5 h-3.5 md:w-4 md:h-4 text-orange-500" />
+            <span className={`text-xs md:text-sm ${colors.textSecondary}`}>
               {format(question.timestamp, "dd/MM/yyyy")}
             </span>
           </div>
         </div>
 
         {/* Question section */}
-        <div className="p-6 space-y-4">
-          <div className={`${colors.questionBg} rounded-lg p-4`}>
-            <div className="flex items-start gap-3">
+        <div className="p-3 md:p-6 space-y-2.5 md:space-y-4">
+          <div className={`${colors.questionBg} rounded-lg p-2.5 md:p-4`}>
+            <div className="flex items-start gap-2 md:gap-3">
               <div
-                className={`w-8 h-8 rounded-full ${
+                className={`w-7 h-7 md:w-8 md:h-8 rounded-full ${
                   isDarkMode ? "bg-gray-600" : "bg-gray-300"
                 } flex items-center justify-center flex-shrink-0`}
               >
-                <User className="w-4 h-4" />
+                <User className="w-3.5 h-3.5 md:w-4 md:h-4" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className={`font-semibold text-sm mb-2 ${colors.text}`}>
+                <p className={`font-semibold text-xs md:text-sm mb-1 md:mb-2 ${colors.text}`}>
                   {displayAskerName}
                 </p>
                 <p
-                  className={`${colors.text} text-base leading-relaxed break-words`}
+                  className={`${colors.text} text-sm md:text-base leading-relaxed break-words`}
                 >
                   {displayQuestionText}
                 </p>
@@ -406,10 +393,10 @@ const AllQuestionsPage: React.FC<AllQuestionsPageProps> = ({}) => {
           {/* Answer section */}
           {question.answered && question.answerText && (
             <div
-              className={`${colors.answerBg} rounded-lg p-4 border ${colors.border}`}
+              className={`${colors.answerBg} rounded-lg p-2.5 md:p-4 border ${colors.border}`}
             >
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 bg-gradient-to-br from-orange-400 to-orange-600">
+              <div className="flex items-start gap-2 md:gap-3">
+                <div className="w-7 h-7 md:w-8 md:h-8 rounded-full overflow-hidden flex-shrink-0 bg-gradient-to-br from-orange-400 to-orange-600">
                   {answererImage ? (
                     <Image
                       src={answererImage}
@@ -420,21 +407,21 @@ const AllQuestionsPage: React.FC<AllQuestionsPageProps> = ({}) => {
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-white">
-                      <User className="w-4 h-4" />
+                      <User className="w-3.5 h-3.5 md:w-4 md:h-4" />
                     </div>
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p
-                    className={`font-semibold text-sm mb-2 ${colors.text} flex items-center gap-2`}
+                    className={`font-semibold text-xs md:text-sm mb-1 md:mb-2 ${colors.text} flex items-center gap-1.5 md:gap-2`}
                   >
                     {answererName}
-                    <span className="px-2 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 text-xs rounded-full">
+                    <span className="px-1.5 py-0.5 md:px-2 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 text-[10px] md:text-xs rounded-full">
                       {t("seller")}
                     </span>
                   </p>
                   <p
-                    className={`${colors.text} text-base leading-relaxed break-words`}
+                    className={`${colors.text} text-sm md:text-base leading-relaxed break-words`}
                   >
                     {displayAnswerText}
                   </p>
@@ -444,11 +431,11 @@ const AllQuestionsPage: React.FC<AllQuestionsPageProps> = ({}) => {
           )}
 
           {/* Translation button */}
-          <div className="flex justify-end pt-2">
+          <div className="flex justify-end pt-1 md:pt-2">
             <button
               onClick={() => translateQuestion(question.id, question.questionText, question.answerText)}
               disabled={isTranslating}
-              className={`flex items-center gap-1.5 text-sm transition-colors ${
+              className={`flex items-center gap-1 md:gap-1.5 text-xs md:text-sm transition-colors ${
                 isTranslating
                   ? "opacity-50 cursor-not-allowed"
                   : ""
@@ -459,9 +446,9 @@ const AllQuestionsPage: React.FC<AllQuestionsPageProps> = ({}) => {
               } hover:text-orange-600`}
             >
               {isTranslating ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="w-3.5 h-3.5 md:w-4 md:h-4 animate-spin" />
               ) : (
-                <Languages className="w-4 h-4" />
+                <Languages className="w-3.5 h-3.5 md:w-4 md:h-4" />
               )}
               <span>{isTranslated ? t("original") : t("translate")}</span>
             </button>
@@ -477,23 +464,23 @@ const AllQuestionsPage: React.FC<AllQuestionsPageProps> = ({}) => {
       <div
         className={`sticky top-0 z-20 ${colors.containerBg} border-b ${colors.border} backdrop-blur-md bg-opacity-95`}
       >
-        <div className="px-4 py-3">
+        <div className="px-2 py-2 md:px-4 md:py-3">
           <div className="flex items-center justify-between max-w-6xl mx-auto">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 md:gap-3">
               <button
                 onClick={() => router.back()}
-                className={`p-2 rounded-lg transition-colors ${colors.hover}`}
+                className={`p-1.5 md:p-2 rounded-lg transition-colors ${colors.hover}`}
               >
                 <ArrowLeft className={`w-5 h-5 ${colors.text}`} />
               </button>
-              <h1 className={`text-lg font-semibold ${colors.text}`}>
+              <h1 className={`text-base md:text-lg font-semibold ${colors.text}`}>
                 {t("allQuestionsTitle")}
               </h1>
             </div>
 
             {sellerInfo && (
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-br from-orange-400 to-orange-600">
+                <div className="w-7 h-7 md:w-8 md:h-8 rounded-full overflow-hidden bg-gradient-to-br from-orange-400 to-orange-600">
                   {sellerInfo.profileImageUrl ? (
                     <Image
                       src={sellerInfo.profileImageUrl}
@@ -504,7 +491,7 @@ const AllQuestionsPage: React.FC<AllQuestionsPageProps> = ({}) => {
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-white">
-                      <User className="w-4 h-4" />
+                      <User className="w-3.5 h-3.5 md:w-4 md:h-4" />
                     </div>
                   )}
                 </div>
@@ -520,29 +507,29 @@ const AllQuestionsPage: React.FC<AllQuestionsPageProps> = ({}) => {
       </div>
 
       {/* Content */}
-      <div className="max-w-4xl mx-auto" ref={scrollContainerRef}>
+      <div className="max-w-4xl mx-auto px-2 md:px-0" ref={scrollContainerRef}>
         {isLoading ? (
           <LoadingSkeleton />
         ) : questions.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 px-4">
-            <div className="w-24 h-24 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
-              <MessageCircle className="w-12 h-12 text-gray-400" />
+          <div className="flex flex-col items-center justify-center py-12 md:py-20 px-4">
+            <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-3 md:mb-4">
+              <MessageCircle className="w-10 h-10 md:w-12 md:h-12 text-gray-400" />
             </div>
-            <h2 className={`text-xl font-semibold mb-2 ${colors.text}`}>
+            <h2 className={`text-lg md:text-xl font-semibold mb-2 ${colors.text}`}>
               {t("noQuestionsFound")}
             </h2>
-            <p className={`text-center mb-6 ${colors.textSecondary}`}>
+            <p className={`text-center mb-4 md:mb-6 text-sm md:text-base ${colors.textSecondary}`}>
               {t("beFirstToAsk")}
             </p>
             <button
               onClick={handleAskQuestion}
-              className="px-6 py-3 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700 transition-colors"
+              className="px-5 py-2.5 md:px-6 md:py-3 bg-orange-600 text-white rounded-lg font-medium text-sm md:text-base hover:bg-orange-700 transition-colors"
             >
               {t("askFirstQuestion")}
             </button>
           </div>
         ) : (
-          <div className="p-4 space-y-4">
+          <div className="p-2 md:p-4 space-y-2.5 md:space-y-4">
             {questions.map((question) => (
               <QuestionCard key={question.id} question={question} />
             ))}
@@ -551,7 +538,7 @@ const AllQuestionsPage: React.FC<AllQuestionsPageProps> = ({}) => {
             {hasMore && (
               <div
                 ref={loadMoreTriggerRef}
-                className="py-8 flex justify-center"
+                className="py-4 md:py-8 flex justify-center"
               >
                 {isLoadingMore && (
                   <div className="flex items-center gap-2 text-orange-600">
@@ -565,7 +552,7 @@ const AllQuestionsPage: React.FC<AllQuestionsPageProps> = ({}) => {
             )}
 
             {!hasMore && questions.length > 0 && (
-              <div className="py-8 text-center">
+              <div className="py-4 md:py-8 text-center">
                 <p className={`${colors.textSecondary} text-sm`}>
                   {t("allQuestionsLoaded")}
                 </p>
@@ -577,16 +564,16 @@ const AllQuestionsPage: React.FC<AllQuestionsPageProps> = ({}) => {
 
       {/* Fixed bottom bar */}
       <div
-        className={`fixed bottom-0 left-0 right-0 ${colors.containerBg} border-t ${colors.border} p-4 z-30`}
+        className={`fixed bottom-0 left-0 right-0 ${colors.containerBg} border-t ${colors.border} p-2.5 md:p-4 z-30`}
       >
         <div className="max-w-4xl mx-auto flex gap-3">
           <button
             onClick={handleAskQuestion}
-            className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all flex items-center justify-center gap-2 border-2 border-orange-500 text-orange-600 ${
+            className={`flex-1 py-2.5 md:py-3 px-3 md:px-4 rounded-lg font-medium text-sm md:text-base transition-all flex items-center justify-center gap-1.5 md:gap-2 border-2 border-orange-500 text-orange-600 ${
               isDarkMode ? "hover:bg-orange-900/20" : "hover:bg-orange-50"
             }`}
           >
-            <MessageCircle className="w-5 h-5" />
+            <MessageCircle className="w-4 h-4 md:w-5 md:h-5" />
             {t("askToSeller")}
           </button>
         </div>

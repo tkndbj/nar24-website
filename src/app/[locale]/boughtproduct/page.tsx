@@ -94,7 +94,7 @@ export default function BoughtProductsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const orderId = searchParams.get("orderId");
-  const { user } = useUser();
+  const { user, isLoading: authLoading } = useUser();
   const t = useTranslations("BoughtProducts");
 
   // State
@@ -115,14 +115,14 @@ export default function BoughtProductsPage() {
     return () => observer.disconnect();
   }, []);
 
-  // Redirect if not authenticated or no orderId
+  // Redirect if not authenticated or no orderId (only after auth state is determined)
   useEffect(() => {
-    if (!user) {
+    if (!authLoading && !user) {
       router.push("/login");
-    } else if (!orderId) {
+    } else if (!authLoading && user && !orderId) {
       router.push("/orders");
     }
-  }, [user, orderId, router]);
+  }, [user, authLoading, orderId, router]);
 
   // Load order details when user and orderId are available
   useEffect(() => {

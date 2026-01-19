@@ -78,7 +78,7 @@ export default function SoldProductsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const orderId = searchParams.get("orderId");
-  const { user } = useUser();
+  const { user, isLoading: authLoading } = useUser();
   const t = useTranslations("SoldProducts");
 
   // State
@@ -102,12 +102,12 @@ export default function SoldProductsPage() {
     return () => observer.disconnect();
   }, []);
 
-  // Redirect if not authenticated
+  // Redirect if not authenticated (only after auth state is determined)
   useEffect(() => {
-    if (!user) {
+    if (!authLoading && !user) {
       router.push("/login");
     }
-  }, [user, router]);
+  }, [user, authLoading, router]);
 
   // Load sold items when user changes
   useEffect(() => {
@@ -465,6 +465,15 @@ export default function SoldProductsPage() {
       </div>
     );
   };
+
+  // Show loading while auth state is being determined
+  if (authLoading) {
+    return (
+      <div className={`min-h-screen flex items-center justify-center ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}>
+        <RefreshCw size={32} className="animate-spin text-green-500" />
+      </div>
+    );
+  }
 
   if (!user) {
     return null; // Will redirect to login

@@ -51,7 +51,7 @@ export default function ReceiptsPage() {
     useState<QueryDocumentSnapshot<DocumentData> | null>(null);
   const locale = useLocale();
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { user } = useUser();
+  const { user, isLoading: authLoading } = useUser();
   const router = useRouter();
   const t = useTranslations();
 
@@ -338,8 +338,21 @@ export default function ReceiptsPage() {
         className="flex-1 overflow-y-auto"
         style={{ height: "calc(100vh - 64px)" }}
       >
-        {/* Not Authenticated State */}
-        {!user ? (
+        {/* Auth Loading State */}
+        {authLoading ? (
+          <div className="flex flex-col items-center justify-center h-full px-6 py-12">
+            <div className="animate-spin w-8 h-8 border-3 border-orange-500 border-t-transparent rounded-full mb-4"></div>
+            <p
+              className={`
+                text-sm sm:text-base text-center
+                ${isDarkMode ? "text-gray-400" : "text-gray-600"}
+              `}
+            >
+              {l("Receipts.loadingReceipts") || "Loading..."}
+            </p>
+          </div>
+        ) : /* Not Authenticated State */
+        !user ? (
           <div className="flex flex-col items-center justify-center h-full px-6 py-12">
             <div
               className={`

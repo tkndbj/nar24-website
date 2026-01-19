@@ -980,7 +980,7 @@ function LoginContent() {
       <div className="relative min-h-screen flex items-center justify-center p-4">
         <div className="w-full max-w-md">
           {/* Language Selector */}
-          <div className="flex justify-end mb-6">
+          <div className="flex justify-end mb-3 sm:mb-6">
             <div className="relative" ref={languageMenuRef}>
               <button
                 onClick={() => setShowLanguageMenu(!showLanguageMenu)}
@@ -1062,7 +1062,7 @@ function LoginContent() {
 
           {/* Main Card */}
           <div
-            className={`backdrop-blur-xl rounded-3xl shadow-2xl border p-8 relative overflow-hidden ${
+            className={`backdrop-blur-xl rounded-3xl shadow-2xl border p-5 sm:p-8 relative overflow-hidden ${
               isDark
                 ? "bg-gray-800/80 border-gray-700/20"
                 : "bg-white/80 border-white/20"
@@ -1073,18 +1073,18 @@ function LoginContent() {
             <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-purple-400/10 to-transparent rounded-full"></div>
 
             {/* Logo Section */}
-            <div className="text-center mb-8 relative">
-              <div className="inline-flex items-center justify-center mb-4">
+            <div className="text-center mb-4 sm:mb-8 relative">
+              <div className="inline-flex items-center justify-center mb-2 sm:mb-4">
                 <img
                   src={
                     isDark ? "/images/beyazlogo.png" : "/images/siyahlogo.png"
                   }
                   alt="Logo"
-                  className="w-20 h-20 object-contain"
+                  className="w-14 h-14 sm:w-20 sm:h-20 object-contain"
                 />
               </div>
               <h1
-                className={`text-3xl font-bold bg-gradient-to-r bg-clip-text text-transparent mb-2 ${
+                className={`text-2xl sm:text-3xl font-bold bg-gradient-to-r bg-clip-text text-transparent mb-1 sm:mb-2 ${
                   isDark
                     ? "from-white to-gray-300"
                     : "from-gray-800 to-gray-600"
@@ -1097,7 +1097,7 @@ function LoginContent() {
             {/* 2FA Pending Message */}
             {(isPending2FA || twoFAPending) && (
               <div
-                className={`mb-6 p-4 rounded-2xl border ${
+                className={`mb-4 sm:mb-6 p-3 sm:p-4 rounded-2xl border ${
                   isDark
                     ? "bg-gradient-to-r from-orange-900/20 to-pink-900/20 border-orange-700/30"
                     : "bg-gradient-to-r from-orange-50 to-pink-50 border-orange-200"
@@ -1120,7 +1120,7 @@ function LoginContent() {
             {/* Verification Success Message (for new registrations) */}
             {showVerificationMessage && (
               <div
-                className={`mb-6 p-4 rounded-2xl border ${
+                className={`mb-4 sm:mb-6 p-3 sm:p-4 rounded-2xl border ${
                   isDark
                     ? "bg-gradient-to-r from-green-900/20 to-emerald-900/20 border-green-700/30"
                     : "bg-gradient-to-r from-green-50 to-emerald-50 border-green-200"
@@ -1171,7 +1171,7 @@ function LoginContent() {
             )}
 
             {/* Login Form */}
-            <form onSubmit={handleLoginWithPassword} className="space-y-6">
+            <form onSubmit={handleLoginWithPassword} className="space-y-4 sm:space-y-6">
               {/* Email Field */}
               <div className="space-y-2">
                 <label
@@ -1197,7 +1197,7 @@ function LoginContent() {
                     onChange={(e) => setEmail(e.target.value)}
                     onFocus={() => setFocusedField("email")}
                     onBlur={() => setFocusedField(null)}
-                    className={`w-full pl-12 pr-4 py-4 rounded-2xl border-2 transition-all duration-300 focus:outline-none focus:ring-4 text-sm font-medium ${
+                    className={`w-full pl-12 pr-4 py-3 sm:py-4 rounded-2xl border-2 transition-all duration-300 focus:outline-none focus:ring-4 text-sm font-medium ${
                       focusedField === "email"
                         ? `border-blue-500 ring-blue-500/20 shadow-lg ${
                             isDark ? "bg-blue-900/10" : "bg-blue-50/50"
@@ -1244,7 +1244,7 @@ function LoginContent() {
                     onChange={(e) => setPassword(e.target.value)}
                     onFocus={() => setFocusedField("password")}
                     onBlur={() => setFocusedField(null)}
-                    className={`w-full pl-12 pr-12 py-4 rounded-2xl border-2 transition-all duration-300 focus:outline-none focus:ring-4 text-sm font-medium ${
+                    className={`w-full pl-12 pr-12 py-3 sm:py-4 rounded-2xl border-2 transition-all duration-300 focus:outline-none focus:ring-4 text-sm font-medium ${
                       focusedField === "password"
                         ? `border-blue-500 ring-blue-500/20 shadow-lg ${
                             isDark ? "bg-blue-900/10" : "bg-blue-50/50"
@@ -1326,7 +1326,7 @@ function LoginContent() {
               <button
                 type="submit"
                 disabled={isLoading || isPending2FA || twoFAPending}
-                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-bold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] disabled:scale-100 shadow-lg hover:shadow-xl disabled:shadow-md flex items-center justify-center group"
+                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-bold py-3 sm:py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] disabled:scale-100 shadow-lg hover:shadow-xl disabled:shadow-md flex items-center justify-center group"
               >
                 {isLoading || isPending2FA || twoFAPending ? (
                   <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -1340,7 +1340,7 @@ function LoginContent() {
             </form>
 
             {/* Divider */}
-            <div className="relative my-6">
+            <div className="relative my-4 sm:my-6">
               <div className="absolute inset-0 flex items-center">
                 <div
                   className={`w-full border-t ${
@@ -1362,13 +1362,13 @@ function LoginContent() {
             </div>
 
             {/* Social Sign-in Buttons */}
-            <div className="space-y-3">
+            <div className="space-y-2 sm:space-y-3">
               {/* ✅ NEW: Apple Sign-in Button */}
               <button
                 type="button"
                 onClick={handleAppleSignIn}
                 disabled={isLoading || isPending2FA || twoFAPending}
-                className={`w-full font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] disabled:scale-100 shadow-lg hover:shadow-xl flex items-center justify-center space-x-3 group ${
+                className={`w-full font-semibold py-3 sm:py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] disabled:scale-100 shadow-lg hover:shadow-xl flex items-center justify-center space-x-3 group ${
                   isDark
                     ? "bg-white text-black hover:bg-gray-100"
                     : "bg-black text-white hover:bg-gray-900"
@@ -1391,7 +1391,7 @@ function LoginContent() {
                 type="button"
                 onClick={handleGoogleSignIn}
                 disabled={isLoading || isPending2FA || twoFAPending}
-                className={`w-full border-2 font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] disabled:scale-100 shadow-lg hover:shadow-xl flex items-center justify-center space-x-3 group ${
+                className={`w-full border-2 font-semibold py-3 sm:py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] disabled:scale-100 shadow-lg hover:shadow-xl flex items-center justify-center space-x-3 group ${
                   isDark
                     ? "bg-gray-700 border-gray-600 hover:border-gray-500 text-gray-200"
                     : "bg-white border-gray-200 hover:border-gray-300 text-gray-700"
@@ -1420,7 +1420,7 @@ function LoginContent() {
             </div>
 
             {/* Bottom Links */}
-            <div className="mt-8 space-y-4 text-center">
+            <div className="mt-4 sm:mt-8 space-y-2 sm:space-y-4 text-center">
               <button
                 onClick={() => router.push("/registration")}
                 disabled={isPending2FA || twoFAPending}

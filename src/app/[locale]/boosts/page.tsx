@@ -101,7 +101,7 @@ export default function BoostPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const productId = searchParams.get("productId");
-  const { user } = useUser();
+  const { user, isLoading: authLoading } = useUser();
   const t = useTranslations("Boosts");
 
   // State
@@ -200,12 +200,12 @@ export default function BoostPage() {
     }
   }, [selectedDurationIndex, durationOptions]);
 
-  // Redirect if not authenticated
+  // Redirect if not authenticated (only after auth state is determined)
   useEffect(() => {
-    if (!user) {
+    if (!authLoading && !user) {
       router.push("/login");
     }
-  }, [user, router]);
+  }, [user, authLoading, router]);
 
   // Load data when user is available
   useEffect(() => {
@@ -1242,9 +1242,12 @@ export default function BoostPage() {
 
   PaymentIframe.displayName = "PaymentIframe";
 
-  if (!user) return null;
+  // Show loading while auth state is being determined
+  if (authLoading || loading) {
+    return <LoadingSkeleton />;
+  }
 
-  if (loading) return <LoadingSkeleton />;
+  if (!user) return null;
 
   return (
     <div

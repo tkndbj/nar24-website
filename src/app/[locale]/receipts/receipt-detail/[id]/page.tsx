@@ -70,7 +70,7 @@ export default function ReceiptDetailPage() {
 const [qrGenerationStatus, setQrGenerationStatus] = useState<string | null>(null);
 const [isQRModalOpen, setIsQRModalOpen] = useState(false);
 const [isRetryingQR, setIsRetryingQR] = useState(false);
-  const { user } = useUser();
+  const { user, isLoading: authLoading } = useUser();
   const router = useRouter();
   
   const t = useTranslations();
@@ -379,6 +379,19 @@ const [isRetryingQR, setIsRetryingQR] = useState(false);
   };
 
   const l = (key: string) => t(key) || key.split(".").pop() || key;
+
+  // Show loading while auth state is being determined
+  if (authLoading) {
+    return (
+      <div
+        className={`min-h-screen flex items-center justify-center ${
+          isDarkMode ? "bg-gray-900" : "bg-gray-50"
+        }`}
+      >
+        <RefreshCw size={32} className="animate-spin text-orange-500" />
+      </div>
+    );
+  }
 
   if (!user) {
     return (

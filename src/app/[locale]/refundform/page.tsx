@@ -60,7 +60,7 @@ export default function RefundFormPage() {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showOrderModal, setShowOrderModal] = useState(false);
-  const { user, profileData } = useUser();
+  const { user, profileData, isLoading: authLoading } = useUser();
   const router = useRouter();
   const t = useTranslations();
 
@@ -94,11 +94,12 @@ export default function RefundFormPage() {
     return () => observer.disconnect();
   }, []);
 
+  // Redirect if not authenticated (only after auth state is determined)
   useEffect(() => {
-    if (!user) {
+    if (!authLoading && !user) {
       router.push("/login");
     }
-  }, [user, router]);
+  }, [user, authLoading, router]);
 
   const loadOrders = async (isInitial: boolean = false) => {
     if (!user?.uid) return;
@@ -249,6 +250,19 @@ export default function RefundFormPage() {
       setIsSubmitting(false);
     }
   };
+
+  // Show loading while auth state is being determined
+  if (authLoading) {
+    return (
+      <div
+        className={`min-h-screen flex items-center justify-center ${
+          isDarkMode ? "bg-gray-900" : "bg-gray-50"
+        }`}
+      >
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+      </div>
+    );
+  }
 
   if (!user) {
     return (

@@ -61,8 +61,8 @@ body {
 /* Sticky positioning that accounts for safe area on mobile devices */
 /* Used for headers that need to stack below the MarketHeader */
 .sticky-below-market-header {
-  /* Mobile: MarketHeader height (108px) + safe area inset */
-  top: calc(108px + env(safe-area-inset-top, 0px));
+  /* Mobile: MarketHeader height (116px = 64px first row + 40px SearchBar + 12px pb-3) + safe area inset */
+  top: calc(116px + env(safe-area-inset-top, 0px));
 }
 
 @media (min-width: 1024px) {

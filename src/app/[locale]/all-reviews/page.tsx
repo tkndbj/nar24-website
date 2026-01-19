@@ -138,39 +138,26 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
     updateFilters(undefined, newRating);
   }, [updateFilters, filterRating]);
 
-  // Dark mode detection
+  // Dark mode detection - only check document class (app's theme preference)
   useEffect(() => {
     if (typeof window === "undefined") return;
-  
+
     const detectDarkMode = () => {
-      const htmlElement = document.documentElement;
-      const darkModeMediaQuery = window.matchMedia(
-        "(prefers-color-scheme: dark)"
-      );
-  
-      const isDark =
-        htmlElement.classList.contains("dark") ||
-        htmlElement.getAttribute("data-theme") === "dark" ||
-        darkModeMediaQuery.matches;
-  
+      // Only check the document class - this is managed by the app's theme toggle
+      const isDark = document.documentElement.classList.contains("dark");
       setIsDarkMode(isDark);
     };
-  
+
     detectDarkMode();
-  
+
     const observer = new MutationObserver(detectDarkMode);
     observer.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ["class", "data-theme"],
+      attributeFilter: ["class"],
     });
-  
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    const handleChange = () => detectDarkMode();
-    mediaQuery.addEventListener("change", handleChange);
-  
+
     return () => {
       observer.disconnect();
-      mediaQuery.removeEventListener("change", handleChange);
     };
   }, []);
 
@@ -475,12 +462,12 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
     const displayText = isTranslated ? translatedReviews[review.id] : review.review;
 
     return (
-      <div className={`${colors.containerBg} rounded-xl shadow-sm border ${colors.border} overflow-hidden`}>
-        <div className="p-6 space-y-4">
+      <div className={`${colors.containerBg} rounded-lg md:rounded-xl shadow-sm border ${colors.border} overflow-hidden`}>
+        <div className="p-3 md:p-6 space-y-2.5 md:space-y-4">
           {/* Header */}
           <div className="flex items-start justify-between">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-orange-400 to-orange-600 flex-shrink-0">
+            <div className="flex items-start gap-2 md:gap-3">
+              <div className="w-8 h-8 md:w-10 md:h-10 rounded-full overflow-hidden bg-gradient-to-br from-orange-400 to-orange-600 flex-shrink-0">
                 {review.userImage ? (
                   <Image
                     src={review.userImage}
@@ -490,26 +477,26 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-white font-semibold">
+                  <div className="w-full h-full flex items-center justify-center text-white font-semibold text-sm md:text-base">
                     {(review.userName || "U")[0].toUpperCase()}
                   </div>
                 )}
               </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <p className={`font-semibold ${colors.text}`}>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
+                  <p className={`font-semibold text-sm md:text-base ${colors.text}`}>
                     {review.userName || t("anonymous")}
                   </p>
                   {review.verified && (
-                    <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs rounded-full flex items-center gap-1">
-                      <Award className="w-3 h-3" />
+                    <span className="px-1.5 py-0.5 md:px-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-[10px] md:text-xs rounded-full flex items-center gap-0.5 md:gap-1">
+                      <Award className="w-2.5 h-2.5 md:w-3 md:h-3" />
                       {t("verifiedPurchase")}
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-3 mt-1">
+                <div className="flex items-center gap-2 md:gap-3 mt-0.5 md:mt-1">
                   <StarRating rating={review.rating} />
-                  <span className={`text-sm ${colors.textSecondary}`}>
+                  <span className={`text-xs md:text-sm ${colors.textSecondary}`}>
                     {format(review.timestamp, "MMM dd, yyyy")}
                   </span>
                 </div>
@@ -518,18 +505,18 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
           </div>
 
           {/* Review text */}
-          <p className={`${colors.text} leading-relaxed whitespace-pre-wrap`}>
+          <p className={`${colors.text} text-sm md:text-base leading-relaxed whitespace-pre-wrap`}>
             {displayText}
           </p>
 
           {/* Images */}
           {review.imageUrls && review.imageUrls.length > 0 && (
-            <div className="flex gap-2 overflow-x-auto py-2">
+            <div className="flex gap-1.5 md:gap-2 overflow-x-auto py-1 md:py-2">
               {review.imageUrls.map((url, index) => (
                 <button
                   key={index}
                   onClick={() => setImageGallery({ urls: review.imageUrls!, index })}
-                  className="relative w-24 h-24 rounded-lg overflow-hidden flex-shrink-0 border-2 border-transparent hover:border-orange-500 transition-colors"
+                  className="relative w-20 h-20 md:w-24 md:h-24 rounded-lg overflow-hidden flex-shrink-0 border-2 border-transparent hover:border-orange-500 transition-colors"
                 >
                   <Image
                     src={url}
@@ -549,50 +536,50 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
 
           {/* Seller response */}
           {review.sellerResponse && (
-            <div className={`${colors.cardBg} rounded-lg p-4 border-l-4 border-orange-500`}>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-sm font-semibold text-orange-600">
+            <div className={`${colors.cardBg} rounded-lg p-2.5 md:p-4 border-l-4 border-orange-500`}>
+              <div className="flex items-center gap-1.5 md:gap-2 mb-1 md:mb-2">
+                <span className="text-xs md:text-sm font-semibold text-orange-600">
                   {t("sellerResponse")}
                 </span>
                 {review.sellerResponseDate && (
-                  <span className={`text-xs ${colors.textSecondary}`}>
+                  <span className={`text-[10px] md:text-xs ${colors.textSecondary}`}>
                     {format(review.sellerResponseDate, "MMM dd, yyyy")}
                   </span>
                 )}
               </div>
-              <p className={`${colors.text} text-sm`}>{review.sellerResponse}</p>
+              <p className={`${colors.text} text-xs md:text-sm`}>{review.sellerResponse}</p>
             </div>
           )}
 
           {/* Actions */}
-          <div className="flex items-center justify-between pt-2">
-            <div className="flex items-center gap-4">
+          <div className="flex items-center justify-between pt-1 md:pt-2">
+            <div className="flex items-center gap-3 md:gap-4">
               <button
                 onClick={() => translateReview(review.id, review.review)}
                 disabled={isTranslating}
-                className={`flex items-center gap-1.5 text-sm ${colors.textSecondary} hover:text-orange-600 transition-colors`}
+                className={`flex items-center gap-1 md:gap-1.5 text-xs md:text-sm ${colors.textSecondary} hover:text-orange-600 transition-colors`}
               >
                 {isTranslating ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="w-3.5 h-3.5 md:w-4 md:h-4 animate-spin" />
                 ) : (
-                  <Languages className="w-4 h-4" />
+                  <Languages className="w-3.5 h-3.5 md:w-4 md:h-4" />
                 )}
                 <span>{isTranslated ? t("original") : t("translate")}</span>
               </button>
 
               <button
                 onClick={() => toggleLike(review.id)}
-                className={`flex items-center gap-1.5 text-sm transition-colors ${
+                className={`flex items-center gap-1 md:gap-1.5 text-xs md:text-sm transition-colors ${
                   isLiked ? "text-blue-600" : colors.textSecondary
                 } hover:text-blue-600`}
               >
-                <ThumbsUp className={`w-4 h-4 ${isLiked ? "fill-current" : ""}`} />
+                <ThumbsUp className={`w-3.5 h-3.5 md:w-4 md:h-4 ${isLiked ? "fill-current" : ""}`} />
                 <span>{review.likes.length}</span>
               </button>
             </div>
 
             {review.helpful !== undefined && (
-              <span className={`text-sm ${colors.textSecondary}`}>
+              <span className={`text-xs md:text-sm ${colors.textSecondary}`}>
                 {t("helpful")} {review.helpful}
               </span>
             )}
@@ -628,27 +615,27 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
     <div className={`min-h-screen ${colors.background}`}>
       {/* Header */}
       <div className={`sticky top-0 z-20 ${colors.containerBg} border-b ${colors.border} backdrop-blur-md bg-opacity-95`}>
-        <div className="px-4 py-3">
+        <div className="px-2 py-2 md:px-4 md:py-3">
           <div className="flex items-center justify-between max-w-6xl mx-auto">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 md:gap-3">
               <button
                 onClick={() => router.back()}
-                className={`p-2 rounded-lg transition-colors ${colors.hover}`}
+                className={`p-1.5 md:p-2 rounded-lg transition-colors ${colors.hover}`}
               >
                 <ArrowLeft className={`w-5 h-5 ${colors.text}`} />
               </button>
-              <h1 className={`text-lg font-semibold ${colors.text}`}>
+              <h1 className={`text-base md:text-lg font-semibold ${colors.text}`}>
                 {t("allReviews")}
               </h1>
             </div>
-            
+
             {productInfo && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 md:gap-2">
                 <StarRating rating={productInfo.averageRating} />
-                <span className={`text-sm ${colors.text}`}>
+                <span className={`text-xs md:text-sm ${colors.text}`}>
                   {productInfo.averageRating.toFixed(1)}
                 </span>
-                <span className={`text-sm ${colors.textSecondary}`}>
+                <span className={`text-xs md:text-sm ${colors.textSecondary}`}>
                   ({productInfo.totalReviews})
                 </span>
               </div>
@@ -657,13 +644,13 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
         </div>
 
         {/* Filters */}
-        <div className="px-4 py-2 border-t border-gray-200 dark:border-gray-700">
-          <div className="max-w-6xl mx-auto flex gap-2 overflow-x-auto">
+        <div className="px-2 py-1.5 md:px-4 md:py-2 border-t border-gray-200 dark:border-gray-700">
+          <div className="max-w-6xl mx-auto flex gap-1.5 md:gap-2 overflow-x-auto">
             {/* Sort buttons */}
             <select
               value={sortBy}
               onChange={(e) => handleSortChange(e.target.value as "recent" | "helpful" | "rating")}
-              className={`px-3 py-1.5 rounded-lg text-sm ${colors.cardBg} ${colors.text} border ${colors.border}`}
+              className={`px-2 py-1 md:px-3 md:py-1.5 rounded-lg text-xs md:text-sm ${colors.cardBg} ${colors.text} border ${colors.border}`}
             >
               <option value="recent">{t("sortRecent")}</option>
               <option value="helpful">{t("sortHelpful")}</option>
@@ -671,18 +658,18 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
             </select>
 
             {/* Rating filter */}
-            <div className="flex gap-1">
+            <div className="flex gap-0.5 md:gap-1">
               {[5, 4, 3, 2, 1].map((rating) => (
                 <button
                   key={rating}
                   onClick={() => handleRatingFilter(rating)}
-                  className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 transition-colors ${
+                  className={`px-2 py-1 md:px-3 md:py-1.5 rounded-lg text-xs md:text-sm flex items-center gap-0.5 md:gap-1 transition-colors ${
                     filterRating === rating
                       ? "bg-orange-600 text-white"
                       : `${colors.cardBg} ${colors.text} hover:bg-orange-100 dark:hover:bg-orange-900/20`
                   }`}
                 >
-                  <Star className="w-3 h-3 fill-current" />
+                  <Star className="w-2.5 h-2.5 md:w-3 md:h-3 fill-current" />
                   {rating}
                 </button>
               ))}
@@ -692,47 +679,47 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
       </div>
 
       {/* Content */}
-      <div className="max-w-4xl mx-auto p-4">
+      <div className="max-w-4xl mx-auto px-2 py-2 md:p-4">
         {isLoading ? (
           <LoadingSkeleton />
         ) : reviews.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20">
-            <div className="w-24 h-24 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
-              <Star className="w-12 h-12 text-gray-400" />
+          <div className="flex flex-col items-center justify-center py-12 md:py-20">
+            <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-3 md:mb-4">
+              <Star className="w-10 h-10 md:w-12 md:h-12 text-gray-400" />
             </div>
-            <h2 className={`text-xl font-semibold mb-2 ${colors.text}`}>
+            <h2 className={`text-lg md:text-xl font-semibold mb-2 ${colors.text}`}>
               {t("noReviewsYet")}
             </h2>
-            <p className={`text-center ${colors.textSecondary}`}>
+            <p className={`text-center text-sm md:text-base ${colors.textSecondary}`}>
               {t("beFirstToReview")}
             </p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-2.5 md:space-y-4">
             {/* Rating summary */}
             {productInfo && reviews.length > 0 && (
-              <div className={`${colors.containerBg} rounded-xl p-6 border ${colors.border}`}>
-                <h3 className={`font-semibold mb-4 ${colors.text}`}>
+              <div className={`${colors.containerBg} rounded-lg md:rounded-xl p-3 md:p-6 border ${colors.border}`}>
+                <h3 className={`font-semibold text-sm md:text-base mb-2.5 md:mb-4 ${colors.text}`}>
                   {t("ratingBreakdown")}
                 </h3>
-                <div className="space-y-2">
+                <div className="space-y-1.5 md:space-y-2">
                   {[5, 4, 3, 2, 1].map((rating) => {
                     const count = ratingStats[rating as keyof typeof ratingStats];
                     const percentage = (count / reviews.length) * 100;
-                    
+
                     return (
-                      <div key={rating} className="flex items-center gap-3">
-                        <div className="flex items-center gap-1 w-12">
-                          <span className={`text-sm ${colors.text}`}>{rating}</span>
-                          <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                      <div key={rating} className="flex items-center gap-2 md:gap-3">
+                        <div className="flex items-center gap-0.5 md:gap-1 w-9 md:w-12">
+                          <span className={`text-xs md:text-sm ${colors.text}`}>{rating}</span>
+                          <Star className="w-2.5 h-2.5 md:w-3 md:h-3 fill-yellow-400 text-yellow-400" />
                         </div>
-                        <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                        <div className="flex-1 h-1.5 md:h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                           <div
                             className="h-full bg-gradient-to-r from-orange-400 to-orange-600 transition-all duration-500"
                             style={{ width: `${percentage}%` }}
                           />
                         </div>
-                        <span className={`text-sm ${colors.textSecondary} w-12 text-right`}>
+                        <span className={`text-xs md:text-sm ${colors.textSecondary} w-8 md:w-12 text-right`}>
                           {count}
                         </span>
                       </div>
@@ -749,7 +736,7 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
 
             {/* Load more trigger */}
             {hasMore && (
-              <div ref={loadMoreTriggerRef} className="py-8 flex justify-center">
+              <div ref={loadMoreTriggerRef} className="py-4 md:py-8 flex justify-center">
                 {isLoadingMore && (
                   <div className="flex items-center gap-2 text-orange-600">
                     <Loader2 className="w-5 h-5 animate-spin" />
@@ -760,7 +747,7 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
             )}
 
             {!hasMore && reviews.length > 0 && (
-              <div className="py-8 text-center">
+              <div className="py-4 md:py-8 text-center">
                 <p className={`${colors.textSecondary} text-sm`}>
                   {t("allReviewsLoaded")}
                 </p>

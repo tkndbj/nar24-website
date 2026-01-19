@@ -152,7 +152,7 @@ const SCROLL_THROTTLE_DELAY = 100;
 
 export default function OrdersPage() {
   const router = useRouter();
-  const { user } = useUser();
+  const { user, isLoading: authLoading } = useUser();
   const t = useTranslations("Orders");
 
   // State
@@ -203,12 +203,12 @@ export default function OrdersPage() {
     return () => observer.disconnect();
   }, []);
 
-  // Redirect if not authenticated
+  // Redirect if not authenticated (only after auth state is determined)
   useEffect(() => {
-    if (!user) {
+    if (!authLoading && !user) {
       router.push("/login");
     }
-  }, [user, router]);
+  }, [user, authLoading, router]);
 
   // Load initial data when user changes
   useEffect(() => {
@@ -706,6 +706,15 @@ const ProductCard = ({ transaction, showStatus = false }: { transaction: Transac
       ))}
     </div>
   );
+
+  // Show loading while auth state is being determined
+  if (authLoading) {
+    return (
+      <div className={`min-h-screen flex items-center justify-center ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}>
+        <RefreshCw size={32} className="animate-spin text-green-500" />
+      </div>
+    );
+  }
 
   if (!user) {
     return null; // Will redirect to login

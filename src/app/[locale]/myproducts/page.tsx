@@ -57,7 +57,7 @@ interface DateRange {
 
 export default function MyProductsPage() {
   const router = useRouter();
-  const { user } = useUser();
+  const { user, isLoading: authLoading } = useUser();
   const t = useTranslations("MyProducts");
 
   // State
@@ -94,12 +94,12 @@ export default function MyProductsPage() {
     return () => observer.disconnect();
   }, []);
 
-  // Redirect if not authenticated
+  // Redirect if not authenticated (only after auth state is determined)
   useEffect(() => {
-    if (!user) {
+    if (!authLoading && !user) {
       router.push("/login");
     }
-  }, [user, router]);
+  }, [user, authLoading, router]);
 
   // Load products when user is available
   useEffect(() => {
@@ -671,7 +671,12 @@ export default function MyProductsPage() {
     </div>
   );
 
-  // Not logged in state
+  // Show loading skeleton while auth state is being determined
+  if (authLoading || loading) {
+    return <LoadingSkeleton />;
+  }
+
+  // Not logged in state (only shown after auth loading is complete)
   if (!user) {
     return (
       <div className={`min-h-screen flex items-center justify-center p-2 sm:p-4 ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}>
@@ -695,8 +700,6 @@ export default function MyProductsPage() {
       </div>
     );
   }
-
-  if (loading) return <LoadingSkeleton />;
 
   return (
     <div

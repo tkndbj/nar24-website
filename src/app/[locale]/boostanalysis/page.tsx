@@ -92,7 +92,7 @@ const colors = {
 export default function BoostAnalysisPage() {
   const router = useRouter();
   const t = useTranslations("BoostAnalysis");
-  const { user } = useUser();
+  const { user, isLoading: authLoading } = useUser();
 
   // State
   const [activeTab, setActiveTab] = useState<"analysis" | "ongoing" | "past">(
@@ -128,12 +128,12 @@ export default function BoostAnalysisPage() {
     return () => observer.disconnect();
   }, []);
 
-  // Redirect if not authenticated
+  // Redirect if not authenticated (only after auth state is determined)
   useEffect(() => {
-    if (!user) {
+    if (!authLoading && !user) {
       router.push("/login");
     }
-  }, [user, router]);
+  }, [user, authLoading, router]);
 
   // Initialize data fetching
   useEffect(() => {
