@@ -104,7 +104,7 @@ const DynamicMarketPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(0);
   const [showSortDropdown, setShowSortDropdown] = useState(false);
   const [selectedSortOption, setSelectedSortOption] = useState("None");
-  const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
+  const [selectedFilter] = useState<string | null>(null);
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const [filters, setFilters] = useState<FilterState>({

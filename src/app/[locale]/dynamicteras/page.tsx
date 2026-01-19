@@ -73,7 +73,7 @@ const createAppLocalizations = (
   return new Proxy(
     {},
     {
-      get: (target, prop: string) => {
+      get: (_target, prop: string) => {
         try {
           return t(prop);
         } catch {
@@ -123,7 +123,7 @@ const DynamicMarketPage: React.FC = () => {
   const [showSortDropdown, setShowSortDropdown] = useState(false);
   // Filter and sort states
   const [selectedSortOption, setSelectedSortOption] = useState("None");
-  const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
+  const [selectedFilter] = useState<string | null>(null);
   const [filters, setFilters] = useState<FilterState>({
     subcategories: [],
     colors: [],
