@@ -46,7 +46,7 @@ interface PageProps {
 
 const AskToSellerPage: React.FC<PageProps> = ({ params, searchParams }) => {
   const router = useRouter();
-  const { user, isLoading: authLoading } = useUser();
+  const { user } = useUser();
   const localization = useTranslations();
 
   const [resolvedParams, setResolvedParams] = useState<{
