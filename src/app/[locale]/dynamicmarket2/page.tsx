@@ -7,6 +7,7 @@ import React, {
   useMemo,
   useRef,
 } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams, useRouter } from "next/navigation";
 import { impressionBatcher } from "@/app/utils/impressionBatcher";
 import {
@@ -76,6 +77,7 @@ const DynamicMarketPage: React.FC = () => {
 
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   // URL parameters - memoized to prevent unnecessary re-renders
   const urlParams = useMemo(
@@ -251,6 +253,16 @@ const DynamicMarketPage: React.FC = () => {
     urlParams.selectedSubcategory,
     urlParams.selectedSubSubcategory,
   ]);
+
+  // Mobile detection
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 1024); // lg breakpoint
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   // Theme detection
   useEffect(() => {
@@ -744,27 +756,317 @@ const DynamicMarketPage: React.FC = () => {
           </button>
         </div>
 
-        {/* Mobile Overlay */}
-        {showSidebar && (
-          <div
-            className="lg:hidden fixed inset-0 bg-black/50 z-[9999]"
-            onClick={() => setShowSidebar(false)}
-          />
+        {/* Mobile Overlay + Sidebar via Portal */}
+        {isMobile && showSidebar && typeof document !== "undefined" && createPortal(
+          <>
+            <div
+              className="fixed inset-0 bg-black/50 z-[10000]"
+              onClick={() => setShowSidebar(false)}
+            />
+            <div
+              className={`
+                fixed top-0 left-0 h-[100dvh] w-64 z-[10001]
+                ${isDarkMode ? "bg-gray-800" : "bg-white"}
+                border-r ${isDarkMode ? "border-gray-700" : "border-gray-200"}
+                overflow-y-auto overflow-x-hidden flex-shrink-0 pb-20
+              `}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+            >
+              <div
+                className={`border-b ${
+                  isDarkMode ? "border-gray-700" : "border-gray-200"
+                }`}
+              >
+                <div className="p-4 flex items-center justify-between">
+                  <h2
+                    className={`font-semibold ${
+                      isDarkMode ? "text-white" : "text-gray-900"
+                    }`}
+                  >
+                    {t("DynamicMarket.filters")}
+                  </h2>
+                  <button
+                    onClick={() => setShowSidebar(false)}
+                    className={`p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full ${
+                      isDarkMode ? "text-gray-400" : "text-gray-600"
+                    }`}
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-3">
+                {getActiveFiltersCount() > 0 && (
+                  <button
+                    onClick={handleClearAllFilters}
+                    className="w-full mb-3 py-1.5 text-xs text-orange-500 border border-orange-500 rounded hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
+                  >
+                    {t("DynamicMarket.clearAllFilters")} ({getActiveFiltersCount()})
+                  </button>
+                )}
+
+                <div className="space-y-4">
+                  {shouldShowCategoriesFilter() &&
+                    getAvailableSubSubcategories().length > 0 && (
+                      <div>
+                        <button
+                          onClick={() =>
+                            setExpandedSections((prev) => ({
+                              ...prev,
+                              subcategory: !prev.subcategory,
+                            }))
+                          }
+                          className="w-full flex items-center justify-between text-left py-1.5"
+                        >
+                          <span
+                            className={`font-medium text-xs ${
+                              isDarkMode ? "text-white" : "text-gray-900"
+                            }`}
+                          >
+                            {t("DynamicMarket.subcategories")}
+                          </span>
+                          {expandedSections.subcategory ? (
+                            <ChevronUp size={14} className="text-gray-400" />
+                          ) : (
+                            <ChevronDown size={14} className="text-gray-400" />
+                          )}
+                        </button>
+
+                        {expandedSections.subcategory && (
+                          <div className="mt-1.5 space-y-1.5 max-h-40 overflow-y-auto">
+                            {getAvailableSubSubcategories().map((subSub) => (
+                              <label
+                                key={subSub}
+                                className="flex items-center space-x-2 cursor-pointer group"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={filters.subcategories.includes(subSub)}
+                                  onChange={() => handleToggleFilter("subcategories", subSub)}
+                                  className="w-3 h-3 rounded border-gray-300 dark:border-gray-600 text-orange-500 focus:ring-orange-500 focus:ring-1"
+                                />
+                                <span
+                                  className={`text-xs group-hover:text-orange-500 transition-colors ${
+                                    isDarkMode ? "text-gray-300" : "text-gray-600"
+                                  }`}
+                                >
+                                  {getLocalizedSubcategoryName(subSub)}
+                                </span>
+                              </label>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                  {/* Colors Filter */}
+                  {availableColors.length > 0 && (
+                    <div>
+                      <button
+                        onClick={() =>
+                          setExpandedSections((prev) => ({
+                            ...prev,
+                            color: !prev.color,
+                          }))
+                        }
+                        className="w-full flex items-center justify-between text-left py-1.5"
+                      >
+                        <span
+                          className={`font-medium text-xs ${
+                            isDarkMode ? "text-white" : "text-gray-900"
+                          }`}
+                        >
+                          {t("DynamicMarket.colors")}
+                        </span>
+                        {expandedSections.color ? (
+                          <ChevronUp size={14} className="text-gray-400" />
+                        ) : (
+                          <ChevronDown size={14} className="text-gray-400" />
+                        )}
+                      </button>
+
+                      {expandedSections.color && (
+                        <div className="mt-1.5 space-y-1.5 max-h-40 overflow-y-auto">
+                          {availableColors.map((colorData) => (
+                            <label
+                              key={colorData.name}
+                              className="flex items-center space-x-2 cursor-pointer group"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={filters.colors.includes(colorData.name)}
+                                onChange={() => handleToggleFilter("colors", colorData.name)}
+                                className="w-3 h-3 rounded border-gray-300 dark:border-gray-600 text-orange-500 focus:ring-orange-500 focus:ring-1"
+                              />
+                              <span
+                                className={`text-xs group-hover:text-orange-500 transition-colors ${
+                                  isDarkMode ? "text-gray-300" : "text-gray-600"
+                                }`}
+                              >
+                                {getLocalizedColorName(colorData.name)}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Brands Filter */}
+                  {globalBrands.length > 0 && (
+                    <div>
+                      <button
+                        onClick={() =>
+                          setExpandedSections((prev) => ({
+                            ...prev,
+                            brand: !prev.brand,
+                          }))
+                        }
+                        className="w-full flex items-center justify-between text-left py-1.5"
+                      >
+                        <span
+                          className={`font-medium text-xs ${
+                            isDarkMode ? "text-white" : "text-gray-900"
+                          }`}
+                        >
+                          {t("DynamicMarket.brands")}
+                        </span>
+                        {expandedSections.brand ? (
+                          <ChevronUp size={14} className="text-gray-400" />
+                        ) : (
+                          <ChevronDown size={14} className="text-gray-400" />
+                        )}
+                      </button>
+
+                      {expandedSections.brand && (
+                        <div className="mt-1.5 space-y-1.5">
+                          <div className="relative mb-2">
+                            <Search
+                              size={12}
+                              className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400"
+                            />
+                            <input
+                              type="text"
+                              placeholder={t("DynamicMarket.searchBrands")}
+                              value={brandSearch}
+                              onChange={(e) => setBrandSearch(e.target.value)}
+                              className={`w-full pl-7 pr-2 py-1.5 text-xs rounded border ${
+                                isDarkMode
+                                  ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                                  : "bg-white border-gray-200 text-gray-900 placeholder-gray-400"
+                              } focus:ring-1 focus:ring-orange-500 focus:border-orange-500`}
+                            />
+                          </div>
+                          <div className="max-h-40 overflow-y-auto space-y-1.5">
+                            {globalBrands
+                              .filter((brand: string) =>
+                                brand.toLowerCase().includes(brandSearch.toLowerCase())
+                              )
+                              .map((brand: string) => (
+                                <label
+                                  key={brand}
+                                  className="flex items-center space-x-2 cursor-pointer group"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={filters.brands.includes(brand)}
+                                    onChange={() => handleToggleFilter("brands", brand)}
+                                    className="w-3 h-3 rounded border-gray-300 dark:border-gray-600 text-orange-500 focus:ring-orange-500 focus:ring-1"
+                                  />
+                                  <span
+                                    className={`text-xs group-hover:text-orange-500 transition-colors ${
+                                      isDarkMode ? "text-gray-300" : "text-gray-600"
+                                    }`}
+                                  >
+                                    {brand}
+                                  </span>
+                                </label>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Price Range Filter */}
+                  <div>
+                    <button
+                      onClick={() =>
+                        setExpandedSections((prev) => ({
+                          ...prev,
+                          price: !prev.price,
+                        }))
+                      }
+                      className="w-full flex items-center justify-between text-left py-1.5"
+                    >
+                      <span
+                        className={`font-medium text-xs ${
+                          isDarkMode ? "text-white" : "text-gray-900"
+                        }`}
+                      >
+                        {t("DynamicMarket.priceRange")}
+                      </span>
+                      {expandedSections.price ? (
+                        <ChevronUp size={14} className="text-gray-400" />
+                      ) : (
+                        <ChevronDown size={14} className="text-gray-400" />
+                      )}
+                    </button>
+
+                    {expandedSections.price && (
+                      <div className="mt-1.5 space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="number"
+                            placeholder={t("DynamicMarket.min")}
+                            value={minPriceInput}
+                            onChange={(e) => setMinPriceInput(e.target.value)}
+                            className={`w-full px-2 py-1.5 text-xs rounded border ${
+                              isDarkMode
+                                ? "bg-gray-700 border-gray-600 text-white"
+                                : "bg-white border-gray-200 text-gray-900"
+                            } focus:ring-1 focus:ring-orange-500 focus:border-orange-500`}
+                          />
+                          <span className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>-</span>
+                          <input
+                            type="number"
+                            placeholder={t("DynamicMarket.max")}
+                            value={maxPriceInput}
+                            onChange={(e) => setMaxPriceInput(e.target.value)}
+                            className={`w-full px-2 py-1.5 text-xs rounded border ${
+                              isDarkMode
+                                ? "bg-gray-700 border-gray-600 text-white"
+                                : "bg-white border-gray-200 text-gray-900"
+                            } focus:ring-1 focus:ring-orange-500 focus:border-orange-500`}
+                          />
+                        </div>
+                        <button
+                          onClick={handleSetPriceFilter}
+                          className="w-full py-1.5 text-xs bg-orange-500 text-white rounded hover:bg-orange-600 transition-colors"
+                        >
+                          {t("DynamicMarket.apply")}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>,
+          document.body
         )}
 
+        {/* Desktop Filter Sidebar */}
         <div
           className={`
-          fixed lg:sticky lg:top-0 lg:h-screen top-0 left-0 h-[100dvh] w-64 transform transition-transform duration-300 z-[10000] lg:z-0
-          ${
-            showSidebar ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-          }
-          ${isDarkMode ? "bg-gray-800" : "bg-white"}
-          border-r ${isDarkMode ? "border-gray-700" : "border-gray-200"}
-          overflow-y-auto overflow-x-hidden flex-shrink-0 pb-20
-        `}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
+            hidden lg:block sticky top-0 h-screen w-64 z-0
+            ${isDarkMode ? "bg-gray-800" : "bg-white"}
+            border-r ${isDarkMode ? "border-gray-700" : "border-gray-200"}
+            overflow-y-auto overflow-x-hidden flex-shrink-0 pb-20
+          `}
         >
           <div
             className={`border-b ${

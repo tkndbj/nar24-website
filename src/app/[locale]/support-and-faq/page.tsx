@@ -308,11 +308,11 @@ const [helpErrors, setHelpErrors] = useState<{ [key: string]: string }>({});
 
 {/* Help Form Modal */}
 {showHelpForm && user && (
-  <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-    <div className={`${isDarkMode ? "bg-gray-800" : "bg-white"} rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl`}>
+  <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+    <div className={`${isDarkMode ? "bg-gray-800" : "bg-white"} rounded-2xl max-w-2xl w-full max-h-[85vh] sm:max-h-[90vh] overflow-y-auto shadow-2xl`}>
       {/* Modal Header */}
-      <div className="sticky top-0 bg-gradient-to-r from-orange-500 to-pink-500 px-6 py-4 rounded-t-2xl flex items-center justify-between">
-        <h2 className="text-xl font-bold text-white">
+      <div className="sticky top-0 bg-gradient-to-r from-orange-500 to-pink-500 px-4 py-3 sm:px-6 sm:py-4 rounded-t-2xl flex items-center justify-between">
+        <h2 className="text-lg sm:text-xl font-bold text-white">
           {t("SupportFAQ.helpFormTitle")}
         </h2>
         <button
@@ -321,7 +321,7 @@ const [helpErrors, setHelpErrors] = useState<{ [key: string]: string }>({});
             setHelpDescription("");
             setHelpErrors({});
           }}
-          className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+          className="p-1.5 sm:p-2 hover:bg-white/20 rounded-lg transition-colors"
         >
           <X className="w-5 h-5 text-white" />
         </button>
@@ -331,12 +331,12 @@ const [helpErrors, setHelpErrors] = useState<{ [key: string]: string }>({});
       <form
         onSubmit={async (e) => {
           e.preventDefault();
-          
+
           if (!helpDescription.trim()) {
             setHelpErrors({ description: t("SupportFAQ.descriptionRequired") });
             return;
           }
-          
+
           if (helpDescription.trim().length < 20) {
             setHelpErrors({ description: t("SupportFAQ.descriptionTooShort") });
             return;
@@ -369,11 +369,11 @@ const [helpErrors, setHelpErrors] = useState<{ [key: string]: string }>({});
             setIsSubmittingHelp(false);
           }
         }}
-        className="p-6 space-y-6"
+        className="p-4 space-y-4 sm:p-6 sm:space-y-6"
       >
         {/* Name Field */}
         <div>
-          <label className={`flex items-center gap-2 text-sm font-semibold mb-3 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+          <label className={`flex items-center gap-2 text-sm font-semibold mb-2 sm:mb-3 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
             <User className="w-4 h-4 text-orange-500" />
             {t("SupportFAQ.nameLabel")}
           </label>
@@ -381,7 +381,7 @@ const [helpErrors, setHelpErrors] = useState<{ [key: string]: string }>({});
             type="text"
             value={profileData?.displayName || t("SupportFAQ.noName")}
             disabled
-            className={`w-full px-4 py-3 rounded-lg text-sm md:text-base transition-colors ${
+            className={`w-full px-3 py-2.5 sm:px-4 sm:py-3 rounded-lg text-sm transition-colors ${
               isDarkMode
                 ? "bg-gray-700 text-gray-400 border-gray-600"
                 : "bg-gray-100 text-gray-600 border-gray-200"
@@ -391,7 +391,7 @@ const [helpErrors, setHelpErrors] = useState<{ [key: string]: string }>({});
 
         {/* Email Field */}
         <div>
-          <label className={`flex items-center gap-2 text-sm font-semibold mb-3 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+          <label className={`flex items-center gap-2 text-sm font-semibold mb-2 sm:mb-3 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
             <Mail className="w-4 h-4 text-orange-500" />
             {t("SupportFAQ.emailLabel")}
           </label>
@@ -399,7 +399,7 @@ const [helpErrors, setHelpErrors] = useState<{ [key: string]: string }>({});
             type="email"
             value={profileData?.email || user.email || ""}
             disabled
-            className={`w-full px-4 py-3 rounded-lg text-sm md:text-base transition-colors ${
+            className={`w-full px-3 py-2.5 sm:px-4 sm:py-3 rounded-lg text-sm transition-colors ${
               isDarkMode
                 ? "bg-gray-700 text-gray-400 border-gray-600"
                 : "bg-gray-100 text-gray-600 border-gray-200"
@@ -409,7 +409,7 @@ const [helpErrors, setHelpErrors] = useState<{ [key: string]: string }>({});
 
         {/* Description Field */}
         <div>
-          <label className={`flex items-center gap-2 text-sm font-semibold mb-3 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+          <label className={`flex items-center gap-2 text-sm font-semibold mb-2 sm:mb-3 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
             <MessageSquare className="w-4 h-4 text-orange-500" />
             {t("SupportFAQ.descriptionLabel")}
           </label>
@@ -422,8 +422,8 @@ const [helpErrors, setHelpErrors] = useState<{ [key: string]: string }>({});
               }
             }}
             placeholder={t("SupportFAQ.descriptionPlaceholder")}
-            rows={6}
-            className={`w-full px-4 py-3 rounded-lg text-sm md:text-base transition-colors resize-none ${
+            rows={4}
+            className={`w-full px-3 py-2.5 sm:px-4 sm:py-3 rounded-lg text-sm transition-colors resize-none ${
               isDarkMode
                 ? "bg-gray-700 text-white border-gray-600 placeholder-gray-500"
                 : "bg-white text-gray-900 border-gray-300 placeholder-gray-400"
@@ -431,13 +431,13 @@ const [helpErrors, setHelpErrors] = useState<{ [key: string]: string }>({});
               helpErrors.description ? "border-red-500" : ""
             }`}
           />
-          <div className="flex items-center justify-between mt-2">
+          <div className="flex items-center justify-between mt-1.5 sm:mt-2">
             {helpErrors.description ? (
-              <p className="text-xs md:text-sm text-red-500">
+              <p className="text-xs text-red-500">
                 {helpErrors.description}
               </p>
             ) : (
-              <p className={`text-xs md:text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+              <p className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
                 {t("SupportFAQ.descriptionHelper")}
               </p>
             )}
@@ -459,7 +459,7 @@ const [helpErrors, setHelpErrors] = useState<{ [key: string]: string }>({});
         <button
           type="submit"
           disabled={isSubmittingHelp}
-          className={`w-full flex items-center justify-center gap-2 px-6 py-4 rounded-xl font-semibold text-white transition-all duration-200 ${
+          className={`w-full flex items-center justify-center gap-2 px-4 py-3 sm:px-6 sm:py-4 rounded-xl font-semibold text-white transition-all duration-200 ${
             isSubmittingHelp
               ? "bg-gray-400 cursor-not-allowed"
               : "bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600 shadow-lg hover:shadow-xl active:scale-95"

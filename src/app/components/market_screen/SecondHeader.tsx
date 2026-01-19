@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   Grid3x3,
   User2,
@@ -940,8 +941,8 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
         </div>
       )}
 
-      {/* Mobile Drawer */}
-      {isMobile && (
+      {/* Mobile Drawer - rendered via portal to bypass stacking context issues */}
+      {isMobile && typeof document !== "undefined" && createPortal(
         <>
           {/* Backdrop */}
           <div
@@ -1184,7 +1185,8 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
                 )}
             </div>
           </div>
-        </>
+        </>,
+        document.body
       )}
     </>
   );
