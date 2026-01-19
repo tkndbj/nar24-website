@@ -129,14 +129,6 @@ const DynamicMarketPage: React.FC = () => {
   const [minPriceInput, setMinPriceInput] = useState("");
   const [maxPriceInput, setMaxPriceInput] = useState("");
 
-  const filterTypes = [
-    "",
-    "deals",
-    "boosted",
-    "trending",
-    "fiveStar",
-    "bestSellers",
-  ];
   const sortOptions = [
     "None",
     "Alphabetical",
@@ -453,10 +445,6 @@ const DynamicMarketPage: React.FC = () => {
     setSelectedSortOption(option);
   };
 
-  const handleFilterSelect = (filter: string | null) => {
-    setSelectedFilter(filter);
-  };
-
   const handleLoadMore = () => {
     if (hasMore && !isLoadingMore) {
       fetchProducts(currentPage + 1, false);
@@ -549,25 +537,6 @@ const DynamicMarketPage: React.FC = () => {
       return t(`DynamicMarket.${colorKey}`);
     } catch {
       return colorName;
-    }
-  };
-
-  const getFilterButtonText = (filter: string) => {
-    switch (filter) {
-      case "":
-        return t("DynamicMarket.filterAll");
-      case "deals":
-        return t("DynamicMarket.filterDeals");
-      case "boosted":
-        return t("DynamicMarket.filterFeatured");
-      case "trending":
-        return t("DynamicMarket.filterTrending");
-      case "fiveStar":
-        return t("DynamicMarket.filterFiveStar");
-      case "bestSellers":
-        return t("DynamicMarket.filterBestSellers");
-      default:
-        return t("DynamicMarket.filterAll");
     }
   };
 

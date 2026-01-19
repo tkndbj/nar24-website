@@ -153,15 +153,6 @@ const DynamicMarketPage: React.FC = () => {
   const [minPriceInput, setMinPriceInput] = useState("");
   const [maxPriceInput, setMaxPriceInput] = useState("");
 
-  // Filter types matching Flutter implementation
-  const filterTypes = [
-    "",
-    "deals",
-    "boosted",
-    "trending",
-    "fiveStar",
-    "bestSellers",
-  ];
   const sortOptions = [
     "None",
     "Alphabetical",
@@ -426,10 +417,7 @@ const DynamicMarketPage: React.FC = () => {
     setSelectedSortOption(option);
   };
 
-  // Handle filter selection
-  const handleFilterSelect = (filter: string | null) => {
-    setSelectedFilter(filter);
-  };
+ 
 
   // Handle load more
   const handleLoadMore = () => {
@@ -511,25 +499,6 @@ const DynamicMarketPage: React.FC = () => {
     }
   };
 
-  // Other handler functions
-  const getFilterButtonText = (filter: string) => {
-    switch (filter) {
-      case "":
-        return t("DynamicMarket.filterAll");
-      case "deals":
-        return t("DynamicMarket.filterDeals");
-      case "boosted":
-        return t("DynamicMarket.filterFeatured");
-      case "trending":
-        return t("DynamicMarket.filterTrending");
-      case "fiveStar":
-        return t("DynamicMarket.filterFiveStar");
-      case "bestSellers":
-        return t("DynamicMarket.filterBestSellers");
-      default:
-        return t("DynamicMarket.filterAll");
-    }
-  };
 
   const getSortOptionText = (option: string) => {
     switch (option) {
