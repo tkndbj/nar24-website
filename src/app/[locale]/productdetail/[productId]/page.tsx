@@ -1166,7 +1166,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     >
       {/* Header */}
       <div
-        className={`sticky top-14 sm:top-16 z-[60] border-b transition-all duration-300 ${
+        className={`sticky top-[108px] lg:top-16 z-[60] border-b transition-all duration-300 ${
           isDarkMode
             ? "bg-gray-900 border-gray-700"
             : "bg-white/95 backdrop-blur-md border-gray-200"

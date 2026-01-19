@@ -28,7 +28,6 @@ import {
   Sun,
   Settings,
   Receipt,
-  Bell,
   Folder,
 } from "lucide-react";
 import Image from "next/image";
@@ -402,24 +401,6 @@ export default function ProfilePage() {
                     <Moon className="w-4 h-4 md:w-5 md:h-5 text-gray-600" />
                   )}
                 </button>
-
-                {user && (
-                  <button
-                    onClick={() => router.push("/notifications")}
-                    className={`p-2 rounded-full transition-colors relative ${
-                      isDarkMode
-                        ? "bg-gray-700 hover:bg-gray-600"
-                        : "bg-gray-100 hover:bg-gray-200"
-                    }`}
-                  >
-                    <Bell
-                      className={`w-4 h-4 md:w-5 md:h-5 ${
-                        isDarkMode ? "text-white" : "text-gray-600"
-                      }`}
-                    />
-                    {/* Notification badge can be added here if needed */}
-                  </button>
-                )}
 
                 {!user && (
                   <button
