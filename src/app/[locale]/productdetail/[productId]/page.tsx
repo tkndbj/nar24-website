@@ -268,7 +268,7 @@ const LoadingSkeleton = React.memo(
       className={`min-h-screen isolate ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
     >
       <div
-        className={`sticky top-0 z-10 border-b ${
+        className={`sticky sticky-below-market-header z-10 border-b ${
           isDarkMode
             ? "bg-gray-800 border-gray-700"
             : "bg-white border-gray-200"
@@ -521,6 +521,21 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
       setPreviousImageIndex(0);
       setImageErrors(new Set());
       setShouldLoadBottomSections(false); // Reset for new product
+
+      // ✅ CRITICAL: Reset translation states for new product (fixes stale translations when navigating)
+      setIsDescriptionTranslated(false);
+      setTranslatedDescription("");
+      setIsDescriptionTranslating(false);
+      setDescriptionTranslationError(null);
+
+      // ✅ Reset cart UI states for new product
+      setCartButtonState("idle");
+      setShowCartOptionSelector(false);
+      setShowBuyNowOptionSelector(false);
+
+      // ✅ Reset scroll state
+      setHasScrolled(false);
+      setShowHeaderButtons(false);
 
       // ✅ STAGE 1: Check in-memory cache for INSTANT display
       const cached = getProduct(id);
@@ -1166,7 +1181,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     >
       {/* Header */}
       <div
-        className={`sticky top-[108px] lg:top-16 z-[60] border-b transition-all duration-300 ${
+        className={`sticky sticky-below-market-header z-[60] border-b transition-all duration-300 ${
           isDarkMode
             ? "bg-gray-900 border-gray-700"
             : "bg-white/95 backdrop-blur-md border-gray-200"
@@ -1698,6 +1713,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               }
             >
               <ProductCollectionWidget
+                key={`collection-${product.id}`}
                 productId={product.id}
                 shopId={product.shopId}
                 isDarkMode={isDarkMode}
@@ -1714,6 +1730,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               }
             >
               <BundleComponent
+                key={`bundle-${product.id}`}
                 productId={product.id}
                 shopId={product.shopId}
                 isDarkMode={isDarkMode}
@@ -1730,6 +1747,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               }
             >
               <ProductDetailReviewsTab
+                key={`reviews-${product.id}`}
                 productId={product.id}
                 isDarkMode={isDarkMode}
                 localization={localization}
@@ -1753,6 +1771,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               }
             >
               <ProductQuestionsWidget
+                key={`questions-${product.id}`}
                 productId={product.id}
                 sellerId={product.userId}
                 shopId={product.shopId}
@@ -1779,6 +1798,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               }
             >
               <ProductDetailRelatedProducts
+                key={`related-${product.id}`}
                 productId={product.id}
                 category={product.category}
                 subcategory={product.subcategory}

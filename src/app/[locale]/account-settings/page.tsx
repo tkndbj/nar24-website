@@ -10,12 +10,8 @@ import {
   ArrowLeft,
   Settings,
   Shield,
-  Bell,
   AlertTriangle,
   Key,
-  Mail,
-  Smartphone,
-  MessageSquare,
   Trash2,
   ChevronRight,
 } from "lucide-react";
@@ -23,20 +19,6 @@ import { useTranslations } from "next-intl";
 
 interface UserSettings {
   twoFactorEnabled: boolean;
-  notificationsEnabled: boolean;
-  emailNotifications: boolean;
-  pushNotifications: boolean;
-  smsNotifications: boolean;
-}
-
-interface NotificationTileProps {
-  icon: React.ElementType;
-  title: string;
-  subtitle: string;
-  value: boolean;
-  onChanged: ((value: boolean) => void) | null;
-  showDivider: boolean;
-  isDarkMode: boolean;
 }
 
 export default function AccountSettingsPage() {
@@ -44,10 +26,6 @@ export default function AccountSettingsPage() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [settings, setSettings] = useState<UserSettings>({
     twoFactorEnabled: false,
-    notificationsEnabled: true,
-    emailNotifications: true,
-    pushNotifications: true,
-    smsNotifications: false,
   });
   const [deleteEmail, setDeleteEmail] = useState("");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -91,10 +69,6 @@ export default function AccountSettingsPage() {
         const data = userDoc.data();
         setSettings({
           twoFactorEnabled: data.twoFactorEnabled ?? false,
-          notificationsEnabled: data.notificationsEnabled ?? true,
-          emailNotifications: data.emailNotifications ?? true,
-          pushNotifications: data.pushNotifications ?? true,
-          smsNotifications: data.smsNotifications ?? false,
         });
       }
     } catch (error) {
@@ -149,81 +123,6 @@ export default function AccountSettingsPage() {
       setShowDeleteDialog(false);
     }
   };
-
-  const NotificationTile: React.FC<NotificationTileProps> = ({
-    icon: Icon,
-    title,
-    subtitle,
-    value,
-    onChanged,
-    showDivider,
-    isDarkMode,
-  }) => (
-    <div>
-      <div className="p-4">
-        <div className="flex items-center gap-4">
-          <div
-            className={`p-2 rounded-lg ${
-              value && onChanged
-                ? isDarkMode ? "bg-green-900/30" : "bg-green-100"
-                : isDarkMode ? "bg-gray-700" : "bg-gray-100"
-            }`}
-          >
-            <Icon
-              className={`w-5 h-5 ${
-                value && onChanged
-                  ? isDarkMode ? "text-green-400" : "text-green-600"
-                  : "text-gray-500"
-              }`}
-            />
-          </div>
-          <div className="flex-1">
-            <h4
-              className={`font-semibold ${
-                onChanged
-                  ? isDarkMode
-                    ? "text-white"
-                    : "text-gray-900"
-                  : "text-gray-400"
-              }`}
-            >
-              {title}
-            </h4>
-            <p
-              className={`text-sm ${
-                isDarkMode ? "text-gray-300" : "text-gray-600"
-              }`}
-            >
-              {subtitle}
-            </p>
-          </div>
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={value}
-              onChange={(e) => onChanged?.(e.target.checked)}
-              disabled={!onChanged}
-              className="sr-only peer"
-            />
-            <div
-              className={`w-11 h-6 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all ${
-                isDarkMode ? "bg-gray-700" : "bg-gray-200"
-              } ${
-                value && onChanged ? "peer-checked:bg-green-600" : ""
-              } ${!onChanged ? "opacity-50 cursor-not-allowed" : ""}`}
-            />
-          </label>
-        </div>
-      </div>
-      {showDivider && (
-        <div
-          className={`h-px mx-4 ${
-            isDarkMode ? "bg-gray-700" : "bg-gray-200"
-          }`}
-        />
-      )}
-    </div>
-  );
 
   if (!user) {
     return (
@@ -299,30 +198,30 @@ export default function AccountSettingsPage() {
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-3 md:py-6">
         {/* Header Section */}
-        <div className="mb-8">
+        <div className="mb-4 md:mb-8">
           <div
-            className={`rounded-2xl md:rounded-3xl p-6 md:p-8 text-center ${
+            className={`rounded-xl md:rounded-3xl p-4 md:p-8 text-center ${
               isDarkMode
                 ? "bg-gradient-to-br from-orange-900/20 to-pink-900/20"
                 : "bg-gradient-to-br from-orange-50 to-pink-50"
             }`}
           >
-            <div className="flex justify-center mb-4">
-              <div className="p-4 bg-gradient-to-r from-orange-500 to-pink-500 rounded-full">
-                <Settings className="w-8 h-8 text-white" />
+            <div className="flex justify-center mb-2 md:mb-4">
+              <div className="p-3 md:p-4 bg-gradient-to-r from-orange-500 to-pink-500 rounded-full">
+                <Settings className="w-6 h-6 md:w-8 md:h-8 text-white" />
               </div>
             </div>
             <h2
-              className={`text-2xl md:text-3xl font-bold mb-2 ${
+              className={`text-xl md:text-3xl font-bold mb-1 md:mb-2 ${
                 isDarkMode ? "text-white" : "text-gray-900"
               }`}
             >
               {t("AccountSettings.accountSettingsTitle")}
             </h2>
             <p
-              className={`text-base md:text-lg ${
+              className={`text-sm md:text-lg ${
                 isDarkMode ? "text-gray-300" : "text-gray-600"
               }`}
             >
@@ -332,19 +231,19 @@ export default function AccountSettingsPage() {
         </div>
 
         {isLoading ? (
-          <div className="flex justify-center py-12">
+          <div className="flex justify-center py-8 md:py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500" />
           </div>
         ) : (
-          <div className="space-y-8">
+          <div className="space-y-4 md:space-y-8">
             {/* Security Section */}
             <div>
-              <div className="flex items-center gap-3 mb-6">
+              <div className="flex items-center gap-2 md:gap-3 mb-3 md:mb-6">
                 <div className="p-2 bg-gradient-to-r from-orange-500 to-pink-500 rounded-lg">
                   <Shield className="w-5 h-5 text-white" />
                 </div>
                 <h3
-                  className={`text-xl font-bold ${
+                  className={`text-lg md:text-xl font-bold ${
                     isDarkMode ? "text-white" : "text-gray-900"
                   }`}
                 >
@@ -359,8 +258,8 @@ export default function AccountSettingsPage() {
                     : "bg-white border border-gray-100"
                 } shadow-sm`}
               >
-                <div className="p-4">
-                  <div className="flex items-center gap-4">
+                <div className="p-3 md:p-4">
+                  <div className="flex items-center gap-3 md:gap-4">
                     <div
                       className={`p-2 rounded-lg ${
                         settings.twoFactorEnabled
@@ -406,116 +305,13 @@ export default function AccountSettingsPage() {
               </div>
             </div>
 
-            {/* Notifications Section */}
-            <div>
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-gradient-to-r from-orange-500 to-pink-500 rounded-lg">
-                  <Bell className="w-5 h-5 text-white" />
-                </div>
-                <h3
-                  className={`text-xl font-bold ${
-                    isDarkMode ? "text-white" : "text-gray-900"
-                  }`}
-                >
-                  {t("AccountSettings.notificationSettings")}
-                </h3>
-              </div>
-
-              <div
-                className={`rounded-xl overflow-hidden ${
-                  isDarkMode
-                    ? "bg-gray-800 border border-gray-700"
-                    : "bg-white border border-gray-100"
-                } shadow-sm`}
-              >
-                <NotificationTile
-                  icon={Bell}
-                  title={t("AccountSettings.allNotifications")}
-                  subtitle={t("AccountSettings.allNotificationsDesc")}
-                  value={settings.notificationsEnabled}
-                  onChanged={(value) => {
-                    setSettings((prev) => ({
-                      ...prev,
-                      notificationsEnabled: value,
-                      emailNotifications: value ? prev.emailNotifications : false,
-                      pushNotifications: value ? prev.pushNotifications : false,
-                      smsNotifications: value ? prev.smsNotifications : false,
-                    }));
-                    updateUserSetting("notificationsEnabled", value);
-                  }}
-                  showDivider={true}
-                  isDarkMode={isDarkMode}
-                />
-
-                <NotificationTile
-                  icon={Mail}
-                  title={t("AccountSettings.emailNotifications")}
-                  subtitle={t("AccountSettings.emailNotificationsDesc")}
-                  value={settings.emailNotifications && settings.notificationsEnabled}
-                  onChanged={
-                    settings.notificationsEnabled
-                      ? (value) => {
-                          setSettings((prev) => ({
-                            ...prev,
-                            emailNotifications: value,
-                          }));
-                          updateUserSetting("emailNotifications", value);
-                        }
-                      : null
-                  }
-                  showDivider={true}
-                  isDarkMode={isDarkMode}
-                />
-
-                <NotificationTile
-                  icon={Smartphone}
-                  title={t("AccountSettings.pushNotifications")}
-                  subtitle={t("AccountSettings.pushNotificationsDesc")}
-                  value={settings.pushNotifications && settings.notificationsEnabled}
-                  onChanged={
-                    settings.notificationsEnabled
-                      ? (value) => {
-                          setSettings((prev) => ({
-                            ...prev,
-                            pushNotifications: value,
-                          }));
-                          updateUserSetting("pushNotifications", value);
-                        }
-                      : null
-                  }
-                  showDivider={true}
-                  isDarkMode={isDarkMode}
-                />
-
-                <NotificationTile
-                  icon={MessageSquare}
-                  title={t("AccountSettings.smsNotifications")}
-                  subtitle={t("AccountSettings.smsNotificationsDesc")}
-                  value={settings.smsNotifications && settings.notificationsEnabled}
-                  onChanged={
-                    settings.notificationsEnabled
-                      ? (value) => {
-                          setSettings((prev) => ({
-                            ...prev,
-                            smsNotifications: value,
-                          }));
-                          updateUserSetting("smsNotifications", value);
-                        }
-                      : null
-                  }
-                  showDivider={false}
-                  isDarkMode={isDarkMode}
-                />
-              </div>
-            </div>
-
             {/* Danger Zone */}
             <div>
-              <div className="flex items-center gap-3 mb-6">
+              <div className="flex items-center gap-2 md:gap-3 mb-3 md:mb-6">
                 <div className={`p-2 rounded-lg ${isDarkMode ? "bg-red-900/30" : "bg-red-100"}`}>
                   <AlertTriangle className={`w-5 h-5 ${isDarkMode ? "text-red-400" : "text-red-600"}`} />
                 </div>
-                <h3 className={`text-xl font-bold ${isDarkMode ? "text-red-400" : "text-red-600"}`}>
+                <h3 className={`text-lg md:text-xl font-bold ${isDarkMode ? "text-red-400" : "text-red-600"}`}>
                   {t("AccountSettings.dangerZone")}
                 </h3>
               </div>
@@ -527,9 +323,9 @@ export default function AccountSettingsPage() {
               >
                 <button
                   onClick={() => setShowDeleteDialog(true)}
-                  className={`w-full p-4 text-left transition-colors ${isDarkMode ? "hover:bg-red-900/20" : "hover:bg-red-50"}`}
+                  className={`w-full p-3 md:p-4 text-left transition-colors ${isDarkMode ? "hover:bg-red-900/20" : "hover:bg-red-50"}`}
                 >
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-3 md:gap-4">
                     <div className={`p-2 rounded-lg ${isDarkMode ? "bg-red-900/30" : "bg-red-100"}`}>
                       <Trash2 className={`w-5 h-5 ${isDarkMode ? "text-red-400" : "text-red-600"}`} />
                     </div>
@@ -556,19 +352,31 @@ export default function AccountSettingsPage() {
 
       {/* Delete Account Dialog */}
       {showDeleteDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
           <div
-            className={`w-full max-w-md rounded-2xl p-6 ${
+            className={`w-full max-w-md rounded-2xl p-5 md:p-6 mx-4 ${
               isDarkMode ? "bg-gray-800" : "bg-white"
             }`}
           >
             <h3
-              className={`text-xl font-bold mb-4 ${isDarkMode ? "text-red-400" : "text-red-600"}`}
+              className={`text-lg md:text-xl font-bold mb-3 md:mb-4 ${isDarkMode ? "text-red-400" : "text-red-600"}`}
             >
               {t("AccountSettings.deleteAccount")}
             </h3>
             <p
-              className={`mb-4 ${
+              className={`mb-3 md:mb-4 text-sm md:text-base ${
                 isDarkMode ? "text-gray-300" : "text-gray-600"
               }`}
             >
@@ -579,16 +387,16 @@ export default function AccountSettingsPage() {
               value={deleteEmail}
               onChange={(e) => setDeleteEmail(e.target.value)}
               placeholder={t("AccountSettings.enterEmailToConfirm")}
-              className={`w-full p-3 rounded-lg border mb-4 ${
+              className={`w-full p-2.5 md:p-3 rounded-lg border mb-3 md:mb-4 text-sm md:text-base ${
                 isDarkMode
                   ? "bg-gray-700 border-gray-600 text-white"
                   : "bg-white border-gray-300 text-gray-900"
               }`}
             />
-            <div className="flex gap-3">
+            <div className="flex gap-2 md:gap-3">
               <button
                 onClick={() => setShowDeleteDialog(false)}
-                className={`flex-1 py-3 rounded-lg font-medium ${
+                className={`flex-1 py-2.5 md:py-3 rounded-lg font-medium text-sm md:text-base ${
                   isDarkMode
                     ? "bg-gray-700 text-white hover:bg-gray-600"
                     : "bg-gray-100 text-gray-900 hover:bg-gray-200"
@@ -599,7 +407,7 @@ export default function AccountSettingsPage() {
               <button
                 onClick={handleDeleteAccount}
                 disabled={isDeleting || deleteEmail !== user.email}
-                className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 py-2.5 md:py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium text-sm md:text-base transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isDeleting
                   ? t("AccountSettings.deleting")

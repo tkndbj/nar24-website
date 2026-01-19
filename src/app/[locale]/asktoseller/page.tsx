@@ -508,11 +508,11 @@ const AskToSellerPage: React.FC<PageProps> = ({ params, searchParams }) => {
             : "bg-white border-gray-200"
         } shadow-sm`}
       >
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center gap-4">
+        <div className="max-w-4xl mx-auto px-3 py-3 md:px-4 md:py-4">
+          <div className="flex items-center gap-3 md:gap-4">
             <button
               onClick={() => router.back()}
-              className={`p-2 rounded-lg transition-colors ${
+              className={`p-1.5 md:p-2 rounded-lg transition-colors ${
                 isDarkMode
                   ? "hover:bg-gray-700 text-gray-300"
                   : "hover:bg-gray-100 text-gray-700"
@@ -521,7 +521,7 @@ const AskToSellerPage: React.FC<PageProps> = ({ params, searchParams }) => {
               <ArrowLeft className="w-5 h-5" />
             </button>
             <h1
-              className={`text-xl font-semibold ${
+              className={`text-lg md:text-xl font-semibold ${
                 isDarkMode ? "text-white" : "text-gray-900"
               }`}
             >
@@ -532,39 +532,39 @@ const AskToSellerPage: React.FC<PageProps> = ({ params, searchParams }) => {
       </div>
 
       {/* Content */}
-      <div className="max-w-4xl mx-auto p-4">
-        <div className="space-y-6">
+      <div className="max-w-4xl mx-auto px-3 py-3 md:p-4">
+        <div className="space-y-3 md:space-y-6">
           {/* Seller Info */}
           <div
-            className={`rounded-xl p-6 ${
+            className={`rounded-xl p-4 md:p-6 ${
               isDarkMode
                 ? "bg-gray-800 border border-gray-700"
                 : "bg-white border border-gray-200"
             } shadow-sm`}
           >
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 md:gap-4">
               <div className="relative">
                 {sellerInfo.profileImage ? (
                   <img
                     src={sellerInfo.profileImage}
                     alt={sellerInfo.name}
-                    className="w-16 h-16 rounded-full object-cover"
+                    className="w-12 h-12 md:w-16 md:h-16 rounded-full object-cover"
                   />
                 ) : (
                   <div
-                    className={`w-16 h-16 rounded-full flex items-center justify-center ${
+                    className={`w-12 h-12 md:w-16 md:h-16 rounded-full flex items-center justify-center ${
                       isDarkMode ? "bg-gray-700" : "bg-gray-200"
                     }`}
                   >
                     {sellerInfo.isShop ? (
                       <Store
-                        className={`w-8 h-8 ${
+                        className={`w-6 h-6 md:w-8 md:h-8 ${
                           isDarkMode ? "text-gray-400" : "text-gray-500"
                         }`}
                       />
                     ) : (
                       <User
-                        className={`w-8 h-8 ${
+                        className={`w-6 h-6 md:w-8 md:h-8 ${
                           isDarkMode ? "text-gray-400" : "text-gray-500"
                         }`}
                       />
@@ -575,7 +575,7 @@ const AskToSellerPage: React.FC<PageProps> = ({ params, searchParams }) => {
 
               <div className="flex-1">
                 <h2
-                  className={`text-xl font-semibold ${
+                  className={`text-lg md:text-xl font-semibold ${
                     isDarkMode ? "text-white" : "text-gray-900"
                   }`}
                 >
@@ -610,14 +610,14 @@ const AskToSellerPage: React.FC<PageProps> = ({ params, searchParams }) => {
 
           {/* Info Banner */}
           <div
-            className={`rounded-xl p-4 ${
+            className={`rounded-xl p-3 md:p-4 ${
               isDarkMode
                 ? "bg-orange-900/20 border border-orange-700/30"
                 : "bg-orange-50 border border-orange-200"
             }`}
           >
             <p
-              className={`text-sm ${
+              className={`text-xs md:text-sm ${
                 isDarkMode ? "text-orange-300" : "text-orange-800"
               }`}
             >
@@ -634,16 +634,16 @@ const AskToSellerPage: React.FC<PageProps> = ({ params, searchParams }) => {
 
           {/* Question Form */}
           <div
-            className={`rounded-xl p-6 ${
+            className={`rounded-xl p-4 md:p-6 ${
               isDarkMode
                 ? "bg-gray-800 border border-gray-700"
                 : "bg-white border border-gray-200"
             } shadow-sm`}
           >
-            <div className="space-y-6">
+            <div className="space-y-4 md:space-y-6">
               <div className="flex items-center justify-between">
                 <h3
-                  className={`text-lg font-semibold ${
+                  className={`text-base md:text-lg font-semibold ${
                     isDarkMode ? "text-white" : "text-gray-900"
                   }`}
                 >
@@ -652,7 +652,7 @@ const AskToSellerPage: React.FC<PageProps> = ({ params, searchParams }) => {
 
                 <button
                   onClick={() => router.push("/publishing-criteria")}
-                  className={`text-sm underline ${
+                  className={`text-xs md:text-sm underline ${
                     isDarkMode
                       ? "text-blue-400 hover:text-blue-300"
                       : "text-blue-600 hover:text-blue-500"
@@ -662,23 +662,23 @@ const AskToSellerPage: React.FC<PageProps> = ({ params, searchParams }) => {
                 </button>
               </div>
 
-              <div>
+              <div className="-mx-1 md:mx-0">
                 <textarea
                   value={questionText}
                   onChange={(e) => setQuestionText(e.target.value)}
                   maxLength={150}
-                  rows={5}
+                  rows={4}
                   placeholder={t("askQuestionPlaceholder")}
-                  className={`w-full p-4 border rounded-lg resize-none transition-colors ${
+                  className={`w-full p-3 md:p-4 border rounded-lg resize-none transition-colors text-sm md:text-base ${
                     isDarkMode
                       ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-orange-500"
                       : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-orange-500"
                   } focus:outline-none focus:ring-2 focus:ring-orange-500/20`}
                 />
 
-                <div className="flex justify-between items-center mt-2">
+                <div className="flex justify-between items-center mt-1.5 md:mt-2">
                   <span
-                    className={`text-sm ${
+                    className={`text-xs md:text-sm ${
                       isDarkMode ? "text-gray-400" : "text-gray-500"
                     }`}
                   >
@@ -688,16 +688,16 @@ const AskToSellerPage: React.FC<PageProps> = ({ params, searchParams }) => {
               </div>
 
               {/* Checkboxes */}
-              <div className="space-y-4">
-                <label className="flex items-start gap-3 cursor-pointer">
+              <div className="space-y-3 md:space-y-4">
+                <label className="flex items-start gap-2.5 md:gap-3 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={allowNameVisible}
                     onChange={(e) => setAllowNameVisible(e.target.checked)}
-                    className="mt-1 w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                    className="mt-0.5 md:mt-1 w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
                   />
                   <span
-                    className={`text-sm ${
+                    className={`text-xs md:text-sm ${
                       isDarkMode ? "text-gray-300" : "text-gray-700"
                     }`}
                   >
@@ -705,15 +705,15 @@ const AskToSellerPage: React.FC<PageProps> = ({ params, searchParams }) => {
                   </span>
                 </label>
 
-                <label className="flex items-start gap-3 cursor-pointer">
+                <label className="flex items-start gap-2.5 md:gap-3 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={acceptTerms}
                     onChange={(e) => setAcceptTerms(e.target.checked)}
-                    className="mt-1 w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                    className="mt-0.5 md:mt-1 w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
                   />
                   <span
-                    className={`text-sm ${
+                    className={`text-xs md:text-sm ${
                       isDarkMode ? "text-gray-300" : "text-gray-700"
                     }`}
                   >
@@ -736,35 +736,35 @@ const AskToSellerPage: React.FC<PageProps> = ({ params, searchParams }) => {
 
           {/* Product Preview */}
           <div
-            className={`rounded-xl p-4 ${
+            className={`rounded-xl p-3 md:p-4 ${
               isDarkMode
                 ? "bg-gray-800 border border-gray-700"
                 : "bg-white border border-gray-200"
             } shadow-sm`}
           >
             <h4
-              className={`text-sm font-medium mb-3 ${
+              className={`text-xs md:text-sm font-medium mb-2 md:mb-3 ${
                 isDarkMode ? "text-gray-300" : "text-gray-600"
               }`}
             >
               {t("questionAbout")}:
             </h4>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 md:gap-4">
               {productInfo.imageUrl ? (
                 <img
                   src={productInfo.imageUrl}
                   alt={productInfo.productName}
-                  className="w-16 h-16 rounded-lg object-cover"
+                  className="w-12 h-12 md:w-16 md:h-16 rounded-lg object-cover"
                 />
               ) : (
                 <div
-                  className={`w-16 h-16 rounded-lg flex items-center justify-center ${
+                  className={`w-12 h-12 md:w-16 md:h-16 rounded-lg flex items-center justify-center ${
                     isDarkMode ? "bg-gray-700" : "bg-gray-200"
                   }`}
                 >
                   <ShoppingBag
-                    className={`w-8 h-8 ${
+                    className={`w-6 h-6 md:w-8 md:h-8 ${
                       isDarkMode ? "text-gray-400" : "text-gray-500"
                     }`}
                   />
@@ -773,13 +773,13 @@ const AskToSellerPage: React.FC<PageProps> = ({ params, searchParams }) => {
 
               <div className="flex-1 min-w-0">
                 <h5
-                  className={`font-medium truncate ${
+                  className={`text-sm md:text-base font-medium truncate ${
                     isDarkMode ? "text-white" : "text-gray-900"
                   }`}
                 >
                   {productInfo.productName}
                 </h5>
-                <p className={`text-lg font-bold text-orange-600 mt-1`}>
+                <p className={`text-base md:text-lg font-bold text-orange-600 mt-0.5 md:mt-1`}>
                   {productInfo.price} {productInfo.currency}
                 </p>
               </div>
@@ -787,15 +787,15 @@ const AskToSellerPage: React.FC<PageProps> = ({ params, searchParams }) => {
           </div>
 
           {/* Submit Button */}
-          <div className="pt-2 pb-4 flex justify-center">
+          <div className="pt-1 pb-2 md:pt-2 md:pb-4 flex justify-center">
             <button
               onClick={handleSubmit}
               disabled={isSubmitting || !questionText.trim() || !acceptTerms}
-              className="w-full max-w-md py-4 px-6 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-xl font-semibold text-lg transition-all duration-300 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 disabled:transform-none disabled:cursor-not-allowed"
+              className="w-full max-w-md py-3 md:py-4 px-5 md:px-6 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-xl font-semibold text-base md:text-lg transition-all duration-300 flex items-center justify-center gap-2 md:gap-3 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 disabled:transform-none disabled:cursor-not-allowed"
             >
               {isSubmitting ? (
                 <>
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <div className="w-4 h-4 md:w-5 md:h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   {t("sending")}...
                 </>
               ) : (

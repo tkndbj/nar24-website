@@ -83,6 +83,30 @@ const ProductDetailRelatedProducts: React.FC<
   const observerRef = useRef<IntersectionObserver | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Track the current productId to detect changes
+  const previousProductIdRef = useRef<string | undefined>(productId);
+
+  // ✅ CRITICAL: Reset all state when productId changes (fixes navigation between products)
+  useEffect(() => {
+    if (previousProductIdRef.current !== productId) {
+      console.log(`🔄 RelatedProducts: Product changed from ${previousProductIdRef.current} to ${productId}, resetting state`);
+      previousProductIdRef.current = productId;
+
+      // Reset all state for new product
+      setRelatedProducts([]);
+      setLoading(false);
+      setLoadingInitiated(false);
+      setError(null);
+      setCanScrollLeft(false);
+      setCanScrollRight(false);
+
+      // Reset scroll position
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollLeft = 0;
+      }
+    }
+  }, [productId]);
+
   const t = useCallback(
     (key: string) => {
       if (!localization) {
@@ -176,14 +200,15 @@ const ProductDetailRelatedProducts: React.FC<
     }
   }, [cardWidth, gap]);
 
+  // ✅ Handle prefetched products - depends on both prefetchedProducts AND productId
   useEffect(() => {
     if (prefetchedProducts && prefetchedProducts.length > 0) {
-      console.log("✅ RelatedProducts: Using prefetched data");
+      console.log(`✅ RelatedProducts: Using prefetched data for product ${productId} (${prefetchedProducts.length} products)`);
       setRelatedProducts(prefetchedProducts);
       setLoadingInitiated(true);
       setLoading(false);
     }
-  }, [prefetchedProducts]);
+  }, [prefetchedProducts, productId]);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
