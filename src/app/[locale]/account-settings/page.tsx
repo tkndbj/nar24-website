@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/context/UserProvider";
-import { updateDoc, doc, getDoc } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { httpsCallable, getFunctions } from "firebase/functions";
 import {
@@ -78,17 +78,7 @@ export default function AccountSettingsPage() {
     }
   };
 
-  const updateUserSetting = async (field: string, value: boolean) => {
-    if (!user) return;
-
-    try {
-      await updateDoc(doc(db, "users", user.uid), {
-        [field]: value,
-      });
-    } catch (error) {
-      console.error("Error updating setting:", error);
-    }
-  };
+ 
 
   const handle2FAToggle = async (value: boolean) => {
     if (value) {
