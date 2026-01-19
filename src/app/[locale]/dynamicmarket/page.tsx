@@ -886,7 +886,7 @@ export default function DynamicMarketPage() {
                                   )
                                   .join(" ") || "";
 
-                              const localizedName = getLocalizedSubcategory(
+                              const localizedName = getLocalizedSubcategoryName(
                                 formattedCategory,
                                 sub
                               );
@@ -899,7 +899,7 @@ export default function DynamicMarketPage() {
                                   <input
                                     type="checkbox"
                                     checked={filters.subcategories.includes(sub)}
-                                    onChange={() => toggleSubcategory(sub)}
+                                    onChange={() => toggleFilter("subcategories", sub)}
                                     className="w-3 h-3 rounded border-gray-300 dark:border-gray-600 text-orange-500 focus:ring-orange-500 focus:ring-1"
                                   />
                                   <span
@@ -946,23 +946,27 @@ export default function DynamicMarketPage() {
 
                         {expandedSections.color && (
                           <div className="mt-1.5 space-y-1.5 max-h-40 overflow-y-auto">
-                            {availableColors.map((color) => (
+                            {availableColors.map((colorData) => (
                               <label
-                                key={color}
+                                key={colorData.name}
                                 className="flex items-center space-x-2 cursor-pointer group"
                               >
                                 <input
                                   type="checkbox"
-                                  checked={filters.colors.includes(color)}
-                                  onChange={() => toggleColor(color)}
+                                  checked={filters.colors.includes(colorData.name)}
+                                  onChange={() => toggleFilter("colors", colorData.name)}
                                   className="w-3 h-3 rounded border-gray-300 dark:border-gray-600 text-orange-500 focus:ring-orange-500 focus:ring-1"
+                                />
+                                <div
+                                  className="w-3 h-3 rounded border border-gray-300 flex-shrink-0"
+                                  style={{ backgroundColor: colorData.color }}
                                 />
                                 <span
                                   className={`text-xs group-hover:text-orange-500 transition-colors ${
                                     isDarkMode ? "text-gray-300" : "text-gray-600"
                                   }`}
                                 >
-                                  {getLocalizedColor(color)}
+                                  {getLocalizedColorName(colorData.name)}
                                 </span>
                               </label>
                             ))}
@@ -972,7 +976,7 @@ export default function DynamicMarketPage() {
                     )}
 
                     {/* Brands Filter */}
-                    {availableBrands.length > 0 && (
+                    {globalBrands.length > 0 && (
                       <div>
                         <button
                           onClick={() =>
@@ -1018,7 +1022,7 @@ export default function DynamicMarketPage() {
                               />
                             </div>
                             <div className="max-h-40 overflow-y-auto space-y-1.5">
-                              {availableBrands
+                              {globalBrands
                                 .filter((brand) =>
                                   brand.toLowerCase().includes(brandSearch.toLowerCase())
                                 )
@@ -1030,7 +1034,7 @@ export default function DynamicMarketPage() {
                                     <input
                                       type="checkbox"
                                       checked={filters.brands.includes(brand)}
-                                      onChange={() => toggleBrand(brand)}
+                                      onChange={() => toggleFilter("brands", brand)}
                                       className="w-3 h-3 rounded border-gray-300 dark:border-gray-600 text-orange-500 focus:ring-orange-500 focus:ring-1"
                                     />
                                     <span
@@ -1102,7 +1106,7 @@ export default function DynamicMarketPage() {
                             />
                           </div>
                           <button
-                            onClick={applyPriceFilter}
+                            onClick={setPriceFilter}
                             className="w-full py-1.5 text-xs bg-orange-500 text-white rounded hover:bg-orange-600 transition-colors"
                           >
                             {t("DynamicMarket.apply") || "Apply"}
