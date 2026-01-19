@@ -780,10 +780,18 @@ export default function DynamicMarketPage() {
             </button>
           </div>
 
+          {/* Mobile Overlay */}
+          {showSidebar && (
+            <div
+              className="lg:hidden fixed inset-0 bg-black/50 z-[9999]"
+              onClick={() => setShowSidebar(false)}
+            />
+          )}
+
           {/* Filter Sidebar */}
           <div
             className={`
-              fixed lg:sticky lg:top-16 lg:h-[calc(100vh-4rem)] top-0 left-0 h-screen w-64 transform transition-transform duration-300 z-50 lg:z-40
+              fixed lg:sticky lg:top-16 lg:h-[calc(100vh-4rem)] top-0 left-0 h-[100dvh] w-64 transform transition-transform duration-300 z-[10000] lg:z-40
               ${
                 showSidebar
                   ? "translate-x-0"
@@ -791,7 +799,7 @@ export default function DynamicMarketPage() {
               }
               ${isDarkMode ? "bg-gray-800" : "bg-white"}
               border-r ${isDarkMode ? "border-gray-700" : "border-gray-200"}
-              overflow-y-auto overflow-x-hidden flex-shrink-0
+              overflow-y-auto overflow-x-hidden flex-shrink-0 pb-20
             `}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}

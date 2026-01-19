@@ -943,10 +943,10 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
       {/* Mobile Drawer */}
       {isMobile && (
         <>
-          {/* ✅ Fix 2: Backdrop with no background color */}
+          {/* Backdrop */}
           <div
             className={`
-              fixed inset-0 z-[9998] transition-opacity duration-300 ease-in-out
+              fixed inset-0 z-[10000] bg-black/50 transition-opacity duration-300 ease-in-out
               ${
                 showMobileDrawer
                   ? "opacity-100"
@@ -956,10 +956,10 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
             onClick={closeMobileDrawer}
           />
 
-          {/* ✅ Fix 1: Drawer with smooth slide animation */}
+          {/* Drawer with smooth slide animation */}
           <div
             className={`
-              fixed top-0 left-0 h-full w-80 max-w-[85vw] z-[9999]
+              fixed top-0 left-0 h-full w-80 max-w-[85vw] z-[10001]
               ${isDark ? "bg-gray-900" : "bg-white"}
               shadow-2xl transform transition-transform duration-300 ease-in-out
               ${showMobileDrawer ? "translate-x-0" : "-translate-x-full"}

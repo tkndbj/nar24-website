@@ -845,16 +845,24 @@ const DynamicMarketPage: React.FC = () => {
           </button>
         </div>
 
+        {/* Mobile Overlay */}
+        {showSidebar && (
+          <div
+            className="lg:hidden fixed inset-0 bg-black/50 z-[9999]"
+            onClick={() => setShowSidebar(false)}
+          />
+        )}
+
         {/* Sidebar - This stays static and doesn't reload */}
         <div
           className={`
-          fixed lg:sticky lg:top-0 lg:h-screen top-0 left-0 h-screen w-64 transform transition-transform duration-300 z-40
+          fixed lg:sticky lg:top-0 lg:h-screen top-0 left-0 h-[100dvh] w-64 transform transition-transform duration-300 z-[10000] lg:z-40
           ${
             showSidebar ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
           }
           ${isDarkMode ? "bg-gray-800" : "bg-white"}
           border-r ${isDarkMode ? "border-gray-700" : "border-gray-200"}
-          overflow-y-auto overflow-x-hidden flex-shrink-0
+          overflow-y-auto overflow-x-hidden flex-shrink-0 pb-20
         `}
         >
           {/* Sidebar Header */}
@@ -1578,13 +1586,6 @@ const DynamicMarketPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Overlay for mobile */}
-        {showSidebar && (
-          <div
-            className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-30"
-            onClick={() => setShowSidebar(false)}
-          />
-        )}
 
         {/* Main Content - This is the only part that reloads when filters change */}
         <div className="flex-1 min-w-0">
@@ -1615,26 +1616,7 @@ const DynamicMarketPage: React.FC = () => {
                 Vitrin
               </div>
 
-              {/* Filter buttons - now in the same row */}
-              <div className="flex gap-2 overflow-x-auto scrollbar-hide flex-1">
-                {filterTypes.map((filter) => (
-                  <button
-                    key={filter}
-                    onClick={() =>
-                      handleFilterSelect(filter === "" ? null : filter)
-                    }
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
-                      selectedFilter === (filter === "" ? null : filter)
-                        ? "bg-orange-600 text-white"
-                        : isDarkMode
-                        ? "bg-gray-700 text-gray-300 hover:bg-gray-600 border border-gray-600"
-                        : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-200"
-                    }`}
-                  >
-                    {getFilterButtonText(filter)}
-                  </button>
-                ))}
-              </div>
+              <div className="flex-1"></div>
 
               {/* Sort button */}
               <div className="relative">

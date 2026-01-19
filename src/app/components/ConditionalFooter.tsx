@@ -22,16 +22,17 @@ export default function ConditionalFooter() {
     "/search-results",
     "/complete-name",
     "/account-settings",
-    "/profile",
-    "/(product)/listproduct",
-    "/(product)/listproductpreview", 
+    "/profile",   
+    "/support-and-faq",
   ];
 
   const shouldHideFooter =
     hideFooterRoutes.includes(pathname) ||
     hideFooterRoutes.some((route) => pathname.endsWith(route)) ||
     pathname.includes("/agreements") ||
-    pathname.includes("/productdetail");
+    pathname.includes("/productdetail") ||
+    pathname.includes("/listproduct") ||
+    pathname.includes("/listproductpreview");
 
   if (shouldHideFooter) {
     return null;

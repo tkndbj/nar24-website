@@ -955,15 +955,16 @@ export default function CreateShopPage() {
 
       {/* Map Location Picker Modal */}
       {showMapModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 sm:p-4">
           <div
-            className={`w-full max-w-4xl rounded-2xl p-6 max-h-[90vh] overflow-hidden shadow-2xl transition-all duration-300 flex flex-col ${
+            className={`w-full sm:max-w-4xl rounded-t-2xl sm:rounded-2xl p-4 sm:p-6 shadow-2xl transition-all duration-300 flex flex-col h-[85dvh] sm:h-auto sm:max-h-[90vh] ${
               isDarkMode ? "bg-gray-800" : "bg-white"
             }`}
           >
-            <div className="flex justify-between items-center mb-5">
+            {/* Header */}
+            <div className="flex justify-between items-center mb-3 sm:mb-5 flex-shrink-0">
               <h3
-                className={`text-xl font-bold ${
+                className={`text-lg sm:text-xl font-bold ${
                   isDarkMode ? "text-white" : "text-gray-900"
                 }`}
               >
@@ -976,37 +977,43 @@ export default function CreateShopPage() {
                 }`}
               >
                 <XMarkIcon
-                  className={`w-6 h-6 ${
+                  className={`w-5 h-5 sm:w-6 sm:h-6 ${
                     isDarkMode ? "text-white" : "text-gray-900"
                   }`}
                 />
               </button>
             </div>
 
-            <div className="flex-1 mb-5">
+            {/* Map Container - flexible height */}
+            <div className="flex-1 min-h-0 mb-3 sm:mb-5">
               <div
                 id="shop-location-map"
-                className="w-full h-[500px] rounded-xl border-2 border-gray-200 dark:border-gray-600"
+                className="w-full h-full sm:h-[500px] rounded-xl border-2 border-gray-200 dark:border-gray-600"
               />
+            </div>
+
+            {/* Instructions & Coordinates */}
+            <div className="flex-shrink-0 mb-3 sm:mb-5">
               <p
-                className={`text-sm mt-4 text-center ${
+                className={`text-xs sm:text-sm text-center ${
                   isDarkMode ? "text-gray-400" : "text-gray-600"
                 }`}
               >
                 {t("mapInstructions")}
               </p>
               {coordinates.latitude && coordinates.longitude && (
-                <p className="text-sm font-semibold text-blue-600 dark:text-blue-400 mt-2 text-center">
+                <p className="text-xs sm:text-sm font-semibold text-blue-600 dark:text-blue-400 mt-1 sm:mt-2 text-center">
                   {coordinates.latitude.toFixed(6)},{" "}
                   {coordinates.longitude.toFixed(6)}
                 </p>
               )}
             </div>
 
-            <div className="flex space-x-4">
+            {/* Buttons - always visible */}
+            <div className="flex space-x-3 sm:space-x-4 flex-shrink-0">
               <button
                 onClick={() => setShowMapModal(false)}
-                className={`flex-1 py-3 rounded-lg font-semibold transition-all duration-200 ${
+                className={`flex-1 py-2.5 sm:py-3 rounded-lg font-semibold transition-all duration-200 text-sm sm:text-base ${
                   isDarkMode
                     ? "bg-gray-700 hover:bg-gray-600 text-white"
                     : "bg-gray-200 hover:bg-gray-300 text-gray-900"
@@ -1017,7 +1024,7 @@ export default function CreateShopPage() {
               <button
                 onClick={() => setShowMapModal(false)}
                 disabled={!coordinates.latitude || !coordinates.longitude}
-                className="flex-1 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-400 text-white font-semibold rounded-lg transition-all duration-200"
+                className="flex-1 py-2.5 sm:py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-400 text-white font-semibold rounded-lg transition-all duration-200 text-sm sm:text-base"
               >
                 {t("confirmLocation")}
               </button>

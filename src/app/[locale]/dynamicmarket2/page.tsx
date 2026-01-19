@@ -775,15 +775,23 @@ const DynamicMarketPage: React.FC = () => {
           </button>
         </div>
 
+        {/* Mobile Overlay */}
+        {showSidebar && (
+          <div
+            className="lg:hidden fixed inset-0 bg-black/50 z-[9999]"
+            onClick={() => setShowSidebar(false)}
+          />
+        )}
+
         <div
           className={`
-          fixed lg:sticky lg:top-0 lg:h-screen top-0 left-0 h-screen w-64 transform transition-transform duration-300 z-50 lg:z-0
+          fixed lg:sticky lg:top-0 lg:h-screen top-0 left-0 h-[100dvh] w-64 transform transition-transform duration-300 z-[10000] lg:z-0
           ${
             showSidebar ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
           }
           ${isDarkMode ? "bg-gray-800" : "bg-white"}
           border-r ${isDarkMode ? "border-gray-700" : "border-gray-200"}
-          overflow-y-auto overflow-x-hidden flex-shrink-0
+          overflow-y-auto overflow-x-hidden flex-shrink-0 pb-20
         `}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
@@ -1347,25 +1355,7 @@ const DynamicMarketPage: React.FC = () => {
                 Nar24
               </div>
 
-              <div className="flex gap-2 overflow-x-auto scrollbar-hide flex-1">
-                {filterTypes.map((filter) => (
-                  <button
-                    key={filter}
-                    onClick={() =>
-                      handleFilterSelect(filter === "" ? null : filter)
-                    }
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all duration-200 flex-shrink-0 ${
-                      selectedFilter === (filter === "" ? null : filter)
-                        ? "bg-gradient-to-r from-orange-500 to-pink-500 text-white shadow-lg"
-                        : isDarkMode
-                        ? "bg-gray-700 text-gray-300 hover:bg-gray-600 border border-gray-600"
-                        : "bg-white text-gray-700 hover:bg-gray-50 shadow-sm border border-gray-200"
-                    }`}
-                  >
-                    {getFilterButtonText(filter)}
-                  </button>
-                ))}
-              </div>
+              <div className="flex-1"></div>
 
               <div className="relative">
                 <button
