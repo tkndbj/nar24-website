@@ -17,7 +17,6 @@ import ProductCard from "@/app/components/ProductCard";
 import {
   SearchResultsProvider,
   useSearchResultsProvider,
-  FilterType,
   SortOption,
 } from "@/context/SearchResultsProvider";
 
@@ -177,75 +176,6 @@ const EmptyState: React.FC<{ isDarkMode: boolean; query: string }> = ({
   );
 };
 
-// Enhanced Filter bar component
-const FilterBar: React.FC<{
-  filterTypes: FilterType[];
-  currentFilter: FilterType;
-  onFilterChange: (filter: FilterType) => void;
-  isDarkMode: boolean;
-}> = ({ filterTypes, currentFilter, onFilterChange, isDarkMode }) => {
-  const t = useTranslations("searchResults");
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  const localizedFilterLabel = (key: FilterType): string => {
-    switch (key) {
-      case "deals":
-        return t("deals") || "Deals";
-      case "boosted":
-        return t("boosted") || "Featured";
-      case "trending":
-        return t("trending") || "Trending";
-      case "fiveStar":
-        return t("fiveStar") || "5 Stars";
-      case "bestSellers":
-        return t("bestSellers") || "Best Sellers";
-      default:
-        return t("all") || "All";
-    }
-  };
-
-  return (
-    <div className="flex-1 min-w-0">
-      {" "}
-      {/* Added min-w-0 to allow shrinking */}
-      <div
-        ref={scrollRef}
-        className="flex gap-1 overflow-x-auto scrollbar-hide pb-1" // Added pb-1 for better touch scrolling
-        style={{
-          scrollbarWidth: "none",
-          msOverflowStyle: "none",
-          // Ensure the container doesn't expand beyond its parent
-          maxWidth: "100%",
-        }}
-      >
-        {filterTypes.map((key) => {
-          const isSelected = key === currentFilter;
-          const label = localizedFilterLabel(key);
-
-          return (
-            <button
-              key={key}
-              onClick={() => onFilterChange(key)}
-              className={`
-                flex-shrink-0 px-3 py-1 rounded-full border text-xs font-semibold transition-all duration-200 whitespace-nowrap
-                ${
-                  isSelected
-                    ? "bg-orange-500 text-white border-orange-500"
-                    : isDarkMode
-                    ? "bg-transparent text-white border-gray-600 hover:border-gray-500"
-                    : "bg-transparent text-black border-gray-300 hover:border-gray-400"
-                }
-              `}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
-
 // Enhanced Sort menu component
 const SortMenu: React.FC<{
   sortOptions: SortOption[];
@@ -340,14 +270,12 @@ const SearchResultsContent: React.FC = () => {
   const tRoot = useTranslations(); // Root translations for ProductOptionSelector
   const {
     filteredProducts,
-    currentFilter,
     sortOption,
     isEmpty,
     hasNoData,
     setRawProducts,
     addMoreProducts,
     clearProducts,
-    setFilter,
     setSortOption,
   } = useSearchResultsProvider();
 
@@ -366,15 +294,7 @@ const SearchResultsContent: React.FC = () => {
   const [shops, setShops] = useState<Shop[]>([]);
   const [isLoadingShops, setIsLoadingShops] = useState(false);
 
-  // Constants - Match Flutter exactly
-  const filterTypes: FilterType[] = [
-    "",
-    "deals",
-    "boosted",
-    "trending",
-    "fiveStar",
-    "bestSellers",
-  ];
+  // Sort options
   const sortOptions: SortOption[] = [
     "None",
     "Alphabetical",
@@ -546,7 +466,7 @@ const SearchResultsContent: React.FC = () => {
 
   // Enhanced fetch results function that mirrors Flutter's searchOnly method
   const fetchResults = useCallback(
-    async (reset: boolean = false, filterOverride?: FilterType) => {
+    async (reset: boolean = false) => {
       if (!query.trim()) {
         console.log("❌ Empty query, skipping search");
         return;
@@ -557,13 +477,10 @@ const SearchResultsContent: React.FC = () => {
         return;
       }
 
-      // Use filterOverride if provided, otherwise use currentFilter
-      const activeFilter = filterOverride !== undefined ? filterOverride : currentFilter;
-
       console.log(
         `🔍 Fetching results for "${query}", reset: ${reset}, page: ${
           reset ? 0 : currentPage
-        }, filter: "${activeFilter}"`
+        }`
       );
 
       // Connectivity check
@@ -600,21 +517,16 @@ const SearchResultsContent: React.FC = () => {
           `🔍 Starting enhanced search for "${query}" page ${pageToFetch}`
         );
 
-        // Search with current filter applied server-side when possible
-        const serverSideFilterType = activeFilter || undefined;
-
         // Try products index first with enhanced error handling
         let results: Product[] = [];
         try {
-          console.log(
-            `🔍 Searching products index with filter: ${serverSideFilterType}`
-          );
+          console.log(`🔍 Searching products index`);
           const algoliaResults = await algoliaManager.searchProducts(
             query,
             pageToFetch,
             20,
             "products",
-            serverSideFilterType,
+            undefined,
             sortOption === "None" ? "None" : sortOption
           );
           results = algoliaResults.map((algoliaProduct) =>
@@ -632,7 +544,7 @@ const SearchResultsContent: React.FC = () => {
               pageToFetch,
               20,
               "shop_products",
-              serverSideFilterType,
+              undefined,
               sortOption === "None" ? "None" : sortOption
             );
             results = algoliaResults.map((algoliaProduct) =>
@@ -765,7 +677,6 @@ const SearchResultsContent: React.FC = () => {
       query,
       isLoading,
       currentPage,
-      currentFilter,
       sortOption,
       checkConnectivity,
       t,
@@ -817,27 +728,6 @@ const SearchResultsContent: React.FC = () => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]); // Only depend on query to avoid race conditions
-
-  // Enhanced filter change handler
-  const handleFilterChange = useCallback(
-    (filter: FilterType) => {
-      if (filter === currentFilter) return;
-
-      console.log(`🎯 Filter changed from "${currentFilter}" to "${filter}"`);
-      setFilter(filter);
-
-      // Reset pagination when filter changes to get fresh server-side filtered results
-      setCurrentPage(0);
-      setHasMore(true);
-
-      // Fetch new results with the filter applied server-side when possible
-      // Pass the new filter directly to avoid stale state issues
-      if (query.trim()) {
-        fetchResults(true, filter);
-      }
-    },
-    [currentFilter, setFilter, query, fetchResults]
-  );
 
   // Enhanced sort change handler
   const handleSortChange = useCallback(
@@ -900,7 +790,7 @@ const SearchResultsContent: React.FC = () => {
   if (isLoading && hasNoData) {
     return (
       <div className="space-y-4">
-        <div className="flex items-center gap-4 px-4 py-3">
+        <div className="flex items-center justify-between px-4 py-3">
           <button
             onClick={() => router.back()}
             className={`flex-shrink-0 ${
@@ -909,13 +799,6 @@ const SearchResultsContent: React.FC = () => {
           >
             <ChevronLeft size={20} />
           </button>
-
-          <FilterBar
-            filterTypes={filterTypes}
-            currentFilter={currentFilter}
-            onFilterChange={handleFilterChange}
-            isDarkMode={isDarkMode}
-          />
 
           <div className="relative">
             <button
@@ -953,7 +836,7 @@ const SearchResultsContent: React.FC = () => {
   if (hasError) {
     return (
       <div className="space-y-4">
-        <div className="flex items-center gap-4 px-4 py-3">
+        <div className="flex items-center justify-between px-4 py-3">
           <button
             onClick={() => router.back()}
             className={`flex-shrink-0 ${
@@ -962,13 +845,6 @@ const SearchResultsContent: React.FC = () => {
           >
             <ChevronLeft size={20} />
           </button>
-
-          <FilterBar
-            filterTypes={filterTypes}
-            currentFilter={currentFilter}
-            onFilterChange={handleFilterChange}
-            isDarkMode={isDarkMode}
-          />
 
           <div className="relative">
             <button
@@ -998,7 +874,7 @@ const SearchResultsContent: React.FC = () => {
   return (
     <div className="space-y-4" ref={mainScrollRef}>
       {/* Enhanced Header */}
-      <div className="flex items-center gap-4 px-4 py-3">
+      <div className="flex items-center justify-between px-4 py-3">
         <button
           onClick={() => router.back()}
           className={`flex-shrink-0 ${
@@ -1007,13 +883,6 @@ const SearchResultsContent: React.FC = () => {
         >
           <ChevronLeft size={20} />
         </button>
-
-        <FilterBar
-          filterTypes={filterTypes}
-          currentFilter={currentFilter}
-          onFilterChange={handleFilterChange}
-          isDarkMode={isDarkMode}
-        />
 
         <div className="relative">
           <button

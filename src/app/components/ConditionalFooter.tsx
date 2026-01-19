@@ -24,6 +24,7 @@ export default function ConditionalFooter() {
     "/account-settings",
     "/profile",   
     "/support-and-faq",
+    "/orders"
   ];
 
   const shouldHideFooter =

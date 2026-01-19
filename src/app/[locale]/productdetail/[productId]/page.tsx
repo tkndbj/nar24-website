@@ -625,34 +625,23 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
+    // Check theme from localStorage (app preference) or system preference as fallback
     const savedTheme = localStorage.getItem("theme");
     const systemPrefersDark = window.matchMedia(
       "(prefers-color-scheme: dark)"
     ).matches;
 
+    // Only apply theme if not already set by the app
     if (savedTheme === "dark" || (!savedTheme && systemPrefersDark)) {
       document.documentElement.classList.add("dark");
-    } else {
+    } else if (savedTheme === "light") {
       document.documentElement.classList.remove("dark");
     }
 
-    let timeoutId: NodeJS.Timeout;
-
     const detectDarkMode = () => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        const htmlElement = document.documentElement;
-        const darkModeMediaQuery = window.matchMedia(
-          "(prefers-color-scheme: dark)"
-        );
-
-        const isDark =
-          htmlElement.classList.contains("dark") ||
-          htmlElement.getAttribute("data-theme") === "dark" ||
-          darkModeMediaQuery.matches;
-
-        setIsDarkMode(isDark);
-      }, 50);
+      // Only check the document class - this is managed by the app's theme toggle
+      const isDark = document.documentElement.classList.contains("dark");
+      setIsDarkMode(isDark);
     };
 
     detectDarkMode();
@@ -660,16 +649,11 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     const observer = new MutationObserver(detectDarkMode);
     observer.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ["class", "data-theme"],
+      attributeFilter: ["class"],
     });
 
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    mediaQuery.addEventListener("change", detectDarkMode);
-
     return () => {
-      clearTimeout(timeoutId);
       observer.disconnect();
-      mediaQuery.removeEventListener("change", detectDarkMode);
     };
   }, []);
 
