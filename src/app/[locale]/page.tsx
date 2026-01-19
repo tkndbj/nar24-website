@@ -5,6 +5,7 @@ import { useLocale } from "next-intl";
 import SecondHeader from "../components/market_screen/SecondHeader";
 import { MarketBubbles } from "../components/market_screen/MarketBubbles";
 import { PreferenceProduct } from "../components/market_screen/PreferenceProduct";
+import Footer from "../components/Footer";
 
 // ✅ LAZY LOAD: Heavy components below the fold
 const MarketBanner = lazy(() => import("../components/market_screen/MarketBanner"));
@@ -150,6 +151,9 @@ export default function Home() {
           />
         </div>
       </div>
+
+      {/* Footer - Only on home page */}
+      <Footer />
     </>
   );
 }

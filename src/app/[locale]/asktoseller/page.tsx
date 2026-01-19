@@ -123,16 +123,8 @@ const AskToSellerPage: React.FC<PageProps> = ({ params, searchParams }) => {
 
   useEffect(() => {
     const detectDarkMode = () => {
-      const htmlElement = document.documentElement;
-      const darkModeMediaQuery = window.matchMedia(
-        "(prefers-color-scheme: dark)"
-      );
-
-      const isDark =
-        htmlElement.classList.contains("dark") ||
-        htmlElement.getAttribute("data-theme") === "dark" ||
-        darkModeMediaQuery.matches;
-
+      // Only check the document class - this is managed by the app's theme toggle
+      const isDark = document.documentElement.classList.contains("dark");
       setIsDarkMode(isDark);
     };
 
@@ -141,15 +133,11 @@ const AskToSellerPage: React.FC<PageProps> = ({ params, searchParams }) => {
     const observer = new MutationObserver(detectDarkMode);
     observer.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ["class", "data-theme"],
+      attributeFilter: ["class"],
     });
-
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    mediaQuery.addEventListener("change", detectDarkMode);
 
     return () => {
       observer.disconnect();
-      mediaQuery.removeEventListener("change", detectDarkMode);
     };
   }, []);
 

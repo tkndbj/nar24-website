@@ -11,7 +11,6 @@ import { BadgeProvider } from "@/context/BadgeProvider";
 import { SearchProvider } from "@/context/SearchProvider";
 import ConditionalHeader from "../components/ConditionalHeader";
 import { SearchHistoryProvider } from "@/context/SearchHistoryProvider";
-import ConditionalFooter from "../components/ConditionalFooter";
 import { AppInitializer } from "@/app/components/AppInitializer";
 import { AnalyticsInitializer } from "@/app/components/AnalyticsInitializer";
 import { getFirebaseDb, getFirebaseFunctions } from "@/lib/firebase-lazy";
@@ -52,7 +51,6 @@ function AppProviders({
               <SearchHistoryProvider>
                 <ConditionalHeader />
                 <main className="isolate">{children}</main>
-                <ConditionalFooter />
                 <CookieConsent />
                 <AppDownloadModal />
               </SearchHistoryProvider>
