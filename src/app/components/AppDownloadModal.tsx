@@ -19,7 +19,6 @@ const SmartphoneIcon: React.FC<{ className?: string }> = ({ className }) => (
 );
 
 const STORAGE_KEY = "nar24_app_modal_dismissed";
-const DISMISS_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
 
 // Google Play link
 const GOOGLE_PLAY_URL = "https://play.google.com/store/apps/details?id=com.cts.emlak";
@@ -118,13 +117,9 @@ export default function AppDownloadModal() {
         return;
       }
 
-      // Check if user has dismissed the modal recently
-      const dismissedAt = localStorage.getItem(STORAGE_KEY);
-      if (dismissedAt) {
-        const dismissedTime = parseInt(dismissedAt, 10);
-        if (Date.now() - dismissedTime < DISMISS_DURATION) {
-          return;
-        }
+      // Check if user has already dismissed the modal this session
+      if (sessionStorage.getItem(STORAGE_KEY)) {
+        return;
       }
 
       // Show the modal with animation delay
@@ -147,8 +142,8 @@ export default function AppDownloadModal() {
     // Remove from DOM after animation
     setTimeout(() => {
       setIsVisible(false);
-      // Save dismissal time
-      localStorage.setItem(STORAGE_KEY, Date.now().toString());
+      // Mark as dismissed for this session
+      sessionStorage.setItem(STORAGE_KEY, "1");
     }, 300);
   };
 
