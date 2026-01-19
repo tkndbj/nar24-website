@@ -1410,9 +1410,9 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
             {/* Thumbnail Images */}
             {product.imageUrls.length > 1 && (
-              <div className="flex justify-center">
+              <div className="flex justify-center w-full overflow-x-hidden lg:overflow-x-visible">
                 <div
-                  className="flex gap-1.5 sm:gap-2 overflow-x-auto py-2 px-2 scrollbar-hide"
+                  className="flex gap-1.5 sm:gap-2 overflow-x-auto py-2 px-2 scrollbar-hide max-w-full"
                   style={{ WebkitOverflowScrolling: "touch" }}
                 >
                   {product.imageUrls.map((url, index) => (

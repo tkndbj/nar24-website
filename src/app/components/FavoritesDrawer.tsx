@@ -700,15 +700,15 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                   "Please log in to view your favorites"}
               </p>
 
-              {/* Login/Register Buttons */}
-              <div className="flex space-x-3 w-full max-w-sm">
+              {/* Login Button */}
+              <div className="w-full max-w-sm">
                 <button
                   onClick={() => {
                     onClose();
                     router.push("/login");
                   }}
                   className="
-                    flex-1 flex items-center justify-center space-x-2 px-6 py-3 rounded-lg
+                    w-full flex items-center justify-center space-x-2 px-6 py-3 rounded-lg
                     bg-gradient-to-r from-orange-500 to-pink-500 text-white
                     hover:from-orange-600 hover:to-pink-600
                     transition-all duration-200 shadow-lg hover:shadow-xl
@@ -717,25 +717,6 @@ export const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({
                 >
                   <LogIn size={18} />
                   <span className="font-medium">{t("login") || "Login"}</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    onClose();
-                    router.push("/register");
-                  }}
-                  className={`
-                    flex-1 flex items-center justify-center space-x-2 px-6 py-3 rounded-lg
-                    border-2 border-orange-500 text-orange-500
-                    hover:bg-orange-50 transition-all duration-200
-                    active:scale-95
-                    ${isDarkMode ? "hover:bg-gray-800" : "hover:bg-orange-50"}
-                  `}
-                >
-                  <User size={18} />
-                  <span className="font-medium">
-                    {t("register") || "Register"}
-                  </span>
                 </button>
               </div>
             </div>

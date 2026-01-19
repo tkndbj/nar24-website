@@ -955,21 +955,21 @@ function LoginContent() {
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div
-          className={`absolute -top-4 -left-4 w-72 h-72 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob ${
+          className={`absolute -top-4 -left-4 w-40 h-40 sm:w-72 sm:h-72 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob ${
             isDark
               ? "bg-gradient-to-r from-blue-600 to-purple-600"
               : "bg-gradient-to-r from-blue-300 to-purple-300"
           }`}
         ></div>
         <div
-          className={`absolute -top-4 -right-4 w-72 h-72 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob animation-delay-2000 ${
+          className={`absolute -top-4 -right-4 w-40 h-40 sm:w-72 sm:h-72 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob animation-delay-2000 ${
             isDark
               ? "bg-gradient-to-r from-yellow-600 to-pink-600"
               : "bg-gradient-to-r from-yellow-300 to-pink-300"
           }`}
         ></div>
         <div
-          className={`absolute -bottom-8 left-20 w-72 h-72 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob animation-delay-4000 ${
+          className={`absolute -bottom-8 left-20 w-40 h-40 sm:w-72 sm:h-72 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob animation-delay-4000 ${
             isDark
               ? "bg-gradient-to-r from-pink-600 to-indigo-600"
               : "bg-gradient-to-r from-pink-300 to-indigo-300"
@@ -977,10 +977,10 @@ function LoginContent() {
         ></div>
       </div>
 
-      <div className="relative min-h-screen flex items-center justify-center p-4">
+      <div className="relative min-h-screen flex items-center justify-center p-2 sm:p-4">
         <div className="w-full max-w-md">
           {/* Language Selector */}
-          <div className="flex justify-end mb-3 sm:mb-6">
+          <div className="flex justify-end mb-1 sm:mb-6">
             <div className="relative" ref={languageMenuRef}>
               <button
                 onClick={() => setShowLanguageMenu(!showLanguageMenu)}
@@ -1062,7 +1062,7 @@ function LoginContent() {
 
           {/* Main Card */}
           <div
-            className={`backdrop-blur-xl rounded-3xl shadow-2xl border p-5 sm:p-8 relative overflow-hidden ${
+            className={`backdrop-blur-xl rounded-2xl sm:rounded-3xl shadow-2xl border p-4 sm:p-8 relative overflow-hidden ${
               isDark
                 ? "bg-gray-800/80 border-gray-700/20"
                 : "bg-white/80 border-white/20"
@@ -1073,18 +1073,18 @@ function LoginContent() {
             <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-purple-400/10 to-transparent rounded-full"></div>
 
             {/* Logo Section */}
-            <div className="text-center mb-4 sm:mb-8 relative">
-              <div className="inline-flex items-center justify-center mb-2 sm:mb-4">
+            <div className="text-center mb-2 sm:mb-8 relative">
+              <div className="inline-flex items-center justify-center mb-1 sm:mb-4">
                 <img
                   src={
                     isDark ? "/images/beyazlogo.png" : "/images/siyahlogo.png"
                   }
                   alt="Logo"
-                  className="w-14 h-14 sm:w-20 sm:h-20 object-contain"
+                  className="w-10 h-10 sm:w-20 sm:h-20 object-contain"
                 />
               </div>
               <h1
-                className={`text-2xl sm:text-3xl font-bold bg-gradient-to-r bg-clip-text text-transparent mb-1 sm:mb-2 ${
+                className={`text-xl sm:text-3xl font-bold bg-gradient-to-r bg-clip-text text-transparent ${
                   isDark
                     ? "from-white to-gray-300"
                     : "from-gray-800 to-gray-600"
@@ -1171,11 +1171,11 @@ function LoginContent() {
             )}
 
             {/* Login Form */}
-            <form onSubmit={handleLoginWithPassword} className="space-y-4 sm:space-y-6">
+            <form onSubmit={handleLoginWithPassword} className="space-y-2 sm:space-y-6">
               {/* Email Field */}
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <label
-                  className={`block text-sm font-semibold mb-2 ${
+                  className={`block text-xs sm:text-sm font-semibold ${
                     isDark ? "text-gray-300" : "text-gray-700"
                   }`}
                 >
@@ -1197,7 +1197,7 @@ function LoginContent() {
                     onChange={(e) => setEmail(e.target.value)}
                     onFocus={() => setFocusedField("email")}
                     onBlur={() => setFocusedField(null)}
-                    className={`w-full pl-12 pr-4 py-3 sm:py-4 rounded-2xl border-2 transition-all duration-300 focus:outline-none focus:ring-4 text-sm font-medium ${
+                    className={`w-full pl-10 sm:pl-12 pr-4 py-2.5 sm:py-4 rounded-xl sm:rounded-2xl border-2 transition-all duration-300 focus:outline-none focus:ring-4 text-sm font-medium ${
                       focusedField === "email"
                         ? `border-blue-500 ring-blue-500/20 shadow-lg ${
                             isDark ? "bg-blue-900/10" : "bg-blue-50/50"
@@ -1220,9 +1220,9 @@ function LoginContent() {
               </div>
 
               {/* Password Field */}
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <label
-                  className={`block text-sm font-semibold mb-2 ${
+                  className={`block text-xs sm:text-sm font-semibold ${
                     isDark ? "text-gray-300" : "text-gray-700"
                   }`}
                 >
@@ -1244,7 +1244,7 @@ function LoginContent() {
                     onChange={(e) => setPassword(e.target.value)}
                     onFocus={() => setFocusedField("password")}
                     onBlur={() => setFocusedField(null)}
-                    className={`w-full pl-12 pr-12 py-3 sm:py-4 rounded-2xl border-2 transition-all duration-300 focus:outline-none focus:ring-4 text-sm font-medium ${
+                    className={`w-full pl-10 sm:pl-12 pr-12 py-2.5 sm:py-4 rounded-xl sm:rounded-2xl border-2 transition-all duration-300 focus:outline-none focus:ring-4 text-sm font-medium ${
                       focusedField === "password"
                         ? `border-blue-500 ring-blue-500/20 shadow-lg ${
                             isDark ? "bg-blue-900/10" : "bg-blue-50/50"
@@ -1326,7 +1326,7 @@ function LoginContent() {
               <button
                 type="submit"
                 disabled={isLoading || isPending2FA || twoFAPending}
-                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-bold py-3 sm:py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] disabled:scale-100 shadow-lg hover:shadow-xl disabled:shadow-md flex items-center justify-center group"
+                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-bold py-2.5 sm:py-4 px-6 rounded-xl sm:rounded-2xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] disabled:scale-100 shadow-lg hover:shadow-xl disabled:shadow-md flex items-center justify-center group"
               >
                 {isLoading || isPending2FA || twoFAPending ? (
                   <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -1340,7 +1340,7 @@ function LoginContent() {
             </form>
 
             {/* Divider */}
-            <div className="relative my-4 sm:my-6">
+            <div className="relative my-2 sm:my-6">
               <div className="absolute inset-0 flex items-center">
                 <div
                   className={`w-full border-t ${
@@ -1362,13 +1362,13 @@ function LoginContent() {
             </div>
 
             {/* Social Sign-in Buttons */}
-            <div className="space-y-2 sm:space-y-3">
+            <div className="space-y-1.5 sm:space-y-3">
               {/* ✅ NEW: Apple Sign-in Button */}
               <button
                 type="button"
                 onClick={handleAppleSignIn}
                 disabled={isLoading || isPending2FA || twoFAPending}
-                className={`w-full font-semibold py-3 sm:py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] disabled:scale-100 shadow-lg hover:shadow-xl flex items-center justify-center space-x-3 group ${
+                className={`w-full font-semibold py-2.5 sm:py-4 px-6 rounded-xl sm:rounded-2xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] disabled:scale-100 shadow-lg hover:shadow-xl flex items-center justify-center space-x-3 group ${
                   isDark
                     ? "bg-white text-black hover:bg-gray-100"
                     : "bg-black text-white hover:bg-gray-900"
@@ -1391,7 +1391,7 @@ function LoginContent() {
                 type="button"
                 onClick={handleGoogleSignIn}
                 disabled={isLoading || isPending2FA || twoFAPending}
-                className={`w-full border-2 font-semibold py-3 sm:py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] disabled:scale-100 shadow-lg hover:shadow-xl flex items-center justify-center space-x-3 group ${
+                className={`w-full border-2 font-semibold py-2.5 sm:py-4 px-6 rounded-xl sm:rounded-2xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] disabled:scale-100 shadow-lg hover:shadow-xl flex items-center justify-center space-x-3 group ${
                   isDark
                     ? "bg-gray-700 border-gray-600 hover:border-gray-500 text-gray-200"
                     : "bg-white border-gray-200 hover:border-gray-300 text-gray-700"
@@ -1420,11 +1420,11 @@ function LoginContent() {
             </div>
 
             {/* Bottom Links */}
-            <div className="mt-4 sm:mt-8 space-y-2 sm:space-y-4 text-center">
+            <div className="mt-2 sm:mt-8 space-y-1 sm:space-y-4 text-center">
               <button
                 onClick={() => router.push("/registration")}
                 disabled={isPending2FA || twoFAPending}
-                className={`block w-full font-semibold text-sm transition-colors duration-200 py-2 ${
+                className={`block w-full font-semibold text-xs sm:text-sm transition-colors duration-200 py-1 sm:py-2 ${
                   isDark
                     ? "text-blue-400 hover:text-blue-300"
                     : "text-blue-600 hover:text-blue-700"
@@ -1441,7 +1441,7 @@ function LoginContent() {
               {/* 🔥 CRITICAL FIX: Proper Continue as Guest button */}
               <button
                 onClick={handleContinueAsGuest}
-                className={`block w-full font-medium text-sm transition-colors duration-200 py-2 ${
+                className={`block w-full font-medium text-xs sm:text-sm transition-colors duration-200 py-1 sm:py-2 ${
                   isDark
                     ? "text-gray-500 hover:text-gray-300"
                     : "text-gray-500 hover:text-gray-700"
