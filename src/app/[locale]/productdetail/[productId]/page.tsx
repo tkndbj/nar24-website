@@ -1284,7 +1284,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
       </div>
 
       {/* Main Content */}
-      <div className="w-full sm:max-w-6xl sm:mx-auto p-2 sm:p-3 lg:p-4">
+      <div className="w-full sm:max-w-6xl sm:mx-auto p-2 sm:p-3 lg:p-4 overflow-x-hidden">
         <div className="grid lg:grid-cols-2 gap-3 sm:gap-6 lg:gap-8">
           {/* Left Column - Images */}
           <div className="space-y-2 sm:space-y-3">
