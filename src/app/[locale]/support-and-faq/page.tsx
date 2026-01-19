@@ -308,10 +308,10 @@ const [helpErrors, setHelpErrors] = useState<{ [key: string]: string }>({});
 
 {/* Help Form Modal */}
 {showHelpForm && user && (
-  <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
-    <div className={`${isDarkMode ? "bg-gray-800" : "bg-white"} rounded-2xl max-w-2xl w-full max-h-[85vh] sm:max-h-[90vh] overflow-y-auto shadow-2xl`}>
+  <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 sm:p-4">
+    <div className={`${isDarkMode ? "bg-gray-800" : "bg-white"} w-full sm:max-w-2xl sm:rounded-2xl rounded-t-2xl shadow-2xl flex flex-col h-[85dvh] sm:h-auto sm:max-h-[90vh]`}>
       {/* Modal Header */}
-      <div className="sticky top-0 bg-gradient-to-r from-orange-500 to-pink-500 px-4 py-3 sm:px-6 sm:py-4 rounded-t-2xl flex items-center justify-between">
+      <div className="bg-gradient-to-r from-orange-500 to-pink-500 px-4 py-3 sm:px-6 sm:py-4 rounded-t-2xl flex items-center justify-between flex-shrink-0">
         <h2 className="text-lg sm:text-xl font-bold text-white">
           {t("SupportFAQ.helpFormTitle")}
         </h2>
@@ -369,11 +369,11 @@ const [helpErrors, setHelpErrors] = useState<{ [key: string]: string }>({});
             setIsSubmittingHelp(false);
           }
         }}
-        className="p-4 space-y-4 sm:p-6 sm:space-y-6"
+        className="p-4 sm:p-6 flex flex-col flex-1 min-h-0"
       >
         {/* Name Field */}
-        <div>
-          <label className={`flex items-center gap-2 text-sm font-semibold mb-2 sm:mb-3 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+        <div className="flex-shrink-0 mb-3 sm:mb-4">
+          <label className={`flex items-center gap-2 text-sm font-semibold mb-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
             <User className="w-4 h-4 text-orange-500" />
             {t("SupportFAQ.nameLabel")}
           </label>
@@ -381,7 +381,7 @@ const [helpErrors, setHelpErrors] = useState<{ [key: string]: string }>({});
             type="text"
             value={profileData?.displayName || t("SupportFAQ.noName")}
             disabled
-            className={`w-full px-3 py-2.5 sm:px-4 sm:py-3 rounded-lg text-sm transition-colors ${
+            className={`w-full px-3 py-2.5 rounded-lg text-sm transition-colors ${
               isDarkMode
                 ? "bg-gray-700 text-gray-400 border-gray-600"
                 : "bg-gray-100 text-gray-600 border-gray-200"
@@ -390,8 +390,8 @@ const [helpErrors, setHelpErrors] = useState<{ [key: string]: string }>({});
         </div>
 
         {/* Email Field */}
-        <div>
-          <label className={`flex items-center gap-2 text-sm font-semibold mb-2 sm:mb-3 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+        <div className="flex-shrink-0 mb-3 sm:mb-4">
+          <label className={`flex items-center gap-2 text-sm font-semibold mb-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
             <Mail className="w-4 h-4 text-orange-500" />
             {t("SupportFAQ.emailLabel")}
           </label>
@@ -399,7 +399,7 @@ const [helpErrors, setHelpErrors] = useState<{ [key: string]: string }>({});
             type="email"
             value={profileData?.email || user.email || ""}
             disabled
-            className={`w-full px-3 py-2.5 sm:px-4 sm:py-3 rounded-lg text-sm transition-colors ${
+            className={`w-full px-3 py-2.5 rounded-lg text-sm transition-colors ${
               isDarkMode
                 ? "bg-gray-700 text-gray-400 border-gray-600"
                 : "bg-gray-100 text-gray-600 border-gray-200"
@@ -407,9 +407,9 @@ const [helpErrors, setHelpErrors] = useState<{ [key: string]: string }>({});
           />
         </div>
 
-        {/* Description Field */}
-        <div>
-          <label className={`flex items-center gap-2 text-sm font-semibold mb-2 sm:mb-3 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+        {/* Description Field - flexible height */}
+        <div className="flex-1 flex flex-col min-h-0 mb-3 sm:mb-4">
+          <label className={`flex items-center gap-2 text-sm font-semibold mb-2 flex-shrink-0 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
             <MessageSquare className="w-4 h-4 text-orange-500" />
             {t("SupportFAQ.descriptionLabel")}
           </label>
@@ -422,8 +422,7 @@ const [helpErrors, setHelpErrors] = useState<{ [key: string]: string }>({});
               }
             }}
             placeholder={t("SupportFAQ.descriptionPlaceholder")}
-            rows={4}
-            className={`w-full px-3 py-2.5 sm:px-4 sm:py-3 rounded-lg text-sm transition-colors resize-none ${
+            className={`w-full flex-1 px-3 py-2.5 rounded-lg text-sm transition-colors resize-none min-h-[100px] ${
               isDarkMode
                 ? "bg-gray-700 text-white border-gray-600 placeholder-gray-500"
                 : "bg-white text-gray-900 border-gray-300 placeholder-gray-400"
@@ -431,7 +430,7 @@ const [helpErrors, setHelpErrors] = useState<{ [key: string]: string }>({});
               helpErrors.description ? "border-red-500" : ""
             }`}
           />
-          <div className="flex items-center justify-between mt-1.5 sm:mt-2">
+          <div className="flex items-center justify-between mt-1.5 flex-shrink-0">
             {helpErrors.description ? (
               <p className="text-xs text-red-500">
                 {helpErrors.description}
@@ -459,7 +458,7 @@ const [helpErrors, setHelpErrors] = useState<{ [key: string]: string }>({});
         <button
           type="submit"
           disabled={isSubmittingHelp}
-          className={`w-full flex items-center justify-center gap-2 px-4 py-3 sm:px-6 sm:py-4 rounded-xl font-semibold text-white transition-all duration-200 ${
+          className={`w-full flex-shrink-0 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-white transition-all duration-200 ${
             isSubmittingHelp
               ? "bg-gray-400 cursor-not-allowed"
               : "bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600 shadow-lg hover:shadow-xl active:scale-95"
