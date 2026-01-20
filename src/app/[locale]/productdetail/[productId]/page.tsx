@@ -1181,7 +1181,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     >
       {/* Header - sticky on both mobile and desktop */}
       <div
-        className={`sticky sticky-below-market-header z-[60] border-b transition-all duration-300 ${
+        className={`sticky sticky-below-market-header-mobile lg:top-16 z-[60] border-b transition-all duration-300 ${
           isDarkMode
             ? "bg-gray-900 border-gray-700"
             : "bg-white/95 backdrop-blur-md border-gray-200"
