@@ -24,6 +24,7 @@ import { debouncer } from "@/app/utils/debouncer";
 import { impressionBatcher } from "@/app/utils/impressionBatcher";
 import { clearPreferenceProductsCache } from "@/app/components/market_screen/PreferenceProduct";
 import { analyticsBatcher } from "@/app/utils/analyticsBatcher";
+import { usePathname } from "next/navigation";
 
 interface ProfileData {
   displayName?: string;
@@ -108,7 +109,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const [internalFirebaseUser, setInternalFirebaseUser] = useState<User | null>(
     null
   );
-
+  const pathname = typeof window !== "undefined" ? window.location.pathname : "";
   // ✅ NEW: Apple Sign-In specific state (matching Flutter's UserProvider)
   const [nameComplete, setNameCompleteState] = useState<boolean | null>(null);
   const [nameSaveInProgress, setNameSaveInProgressState] = useState(false);
@@ -211,6 +212,41 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       console.error("Error caching name state:", e);
     }
   }, []);
+
+  const getCurrentLocale = useCallback((): string => {
+    const segments = pathname.split("/").filter(Boolean);
+    const firstSegment = segments[0];
+    
+    const supportedLocales = ["en", "tr"];
+    if (firstSegment && supportedLocales.includes(firstSegment)) {
+      return firstSegment;
+    }
+    
+    return "tr"; // Default locale
+  }, [pathname]);
+
+  const syncLanguageToFirestore = useCallback(async (
+    uid: string, 
+    firestoreLanguage?: string
+  ) => {
+    if (typeof window === "undefined") return;
+    if (!dbRef.current || !firestoreModuleRef.current) return;
+    
+    try {
+      const localLanguage = getCurrentLocale();
+      
+      if (localLanguage !== firestoreLanguage) {
+        const { doc, updateDoc } = firestoreModuleRef.current;
+        await updateDoc(doc(dbRef.current, "users", uid), {
+          languageCode: localLanguage,
+        });
+        
+        console.log(`🌍 Language synced: ${firestoreLanguage} → ${localLanguage}`);
+      }
+    } catch (error) {
+      console.error("⚠️ Language sync failed:", error);
+    }
+  }, [getCurrentLocale]);
 
   // ✅ NEW: Cache profile complete state to localStorage
   const cacheProfileComplete = useCallback((value: boolean) => {
@@ -502,6 +538,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
                 if (userDoc.exists()) {
                   const data = userDoc.data();
                   updateUserDataFromDoc(data, firebaseUser);
+                  syncLanguageToFirestore(firebaseUser.uid, data.languageCode as string | undefined);
                 }
               }
             } catch (error) {
