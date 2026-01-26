@@ -24,7 +24,7 @@ import { debouncer } from "@/app/utils/debouncer";
 import { impressionBatcher } from "@/app/utils/impressionBatcher";
 import { clearPreferenceProductsCache } from "@/app/components/market_screen/PreferenceProduct";
 import { analyticsBatcher } from "@/app/utils/analyticsBatcher";
-import { usePathname } from "next/navigation";
+
 
 interface ProfileData {
   displayName?: string;
