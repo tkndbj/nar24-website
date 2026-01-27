@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useUser } from "@/context/UserProvider";
 import {
@@ -20,11 +20,27 @@ import {
   MapPin,
   User,
   LogIn,
-  QrCode,  
+  QrCode,
   RefreshCw,
-  X
+  X,
+  Mail,
+  Send,
+  FileText,
+  Package,
+  Info,
+  ShoppingBag,
+  DollarSign,
+  Tag,
+  Gift,
+  Percent,
+  Check,
+
 } from "lucide-react";
 import { useTranslations } from "next-intl";
+
+// ============================================================================
+// INTERFACES
+// ============================================================================
 
 interface Receipt {
   id: string;
@@ -36,6 +52,14 @@ interface Receipt {
   paymentMethod: string;
   deliveryOption: string;
   receiptUrl?: string;
+  // Price breakdown fields
+  itemsSubtotal: number;
+  deliveryPrice: number;
+  originalDeliveryPrice: number;
+  // Coupon/benefit fields
+  couponCode?: string;
+  couponDiscount: number;
+  freeShippingApplied: boolean;
 }
 
 interface OrderData {
@@ -44,6 +68,10 @@ interface OrderData {
     addressLine2?: string;
     city: string;
     phoneNumber: string;
+  };
+  qrGenerationStatus?: string;
+  deliveryQR?: {
+    url: string;
   };
 }
 
@@ -58,6 +86,10 @@ interface OrderItem {
   selectedAttributes?: Record<string, unknown>;
 }
 
+// ============================================================================
+// COMPONENT
+// ============================================================================
+
 export default function ReceiptDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -66,16 +98,29 @@ export default function ReceiptDetailPage() {
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [copySuccess, setCopySuccess] = useState(false);
+
+  // QR Code state
   const [deliveryQRUrl, setDeliveryQRUrl] = useState<string | null>(null);
-const [qrGenerationStatus, setQrGenerationStatus] = useState<string | null>(null);
-const [isQRModalOpen, setIsQRModalOpen] = useState(false);
-const [isRetryingQR, setIsRetryingQR] = useState(false);
+  const [qrGenerationStatus, setQrGenerationStatus] = useState<string | null>(
+    null
+  );
+  const [isQRModalOpen, setIsQRModalOpen] = useState(false);
+  const [isRetryingQR, setIsRetryingQR] = useState(false);
+
+  // Email modal state
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [emailAddress, setEmailAddress] = useState("");
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+
   const { user, isLoading: authLoading } = useUser();
   const router = useRouter();
-  
+  const emailInputRef = useRef<HTMLInputElement>(null);
+
   const t = useTranslations();
 
-  
+  // ========================================================================
+  // THEME DETECTION
+  // ========================================================================
 
   useEffect(() => {
     const checkTheme = () => {
@@ -95,7 +140,10 @@ const [isRetryingQR, setIsRetryingQR] = useState(false);
     return () => observer.disconnect();
   }, []);
 
-  // Fetch receipt and order details
+  // ========================================================================
+  // DATA FETCHING
+  // ========================================================================
+
   useEffect(() => {
     const fetchReceiptDetails = async () => {
       if (!user || !id) {
@@ -128,6 +176,14 @@ const [isRetryingQR, setIsRetryingQR] = useState(false);
           paymentMethod: receiptData.paymentMethod || "",
           deliveryOption: receiptData.deliveryOption || "",
           receiptUrl: receiptData.receiptUrl,
+          // Price breakdown
+          itemsSubtotal: receiptData.itemsSubtotal || receiptData.totalPrice || 0,
+          deliveryPrice: receiptData.deliveryPrice || 0,
+          originalDeliveryPrice: receiptData.originalDeliveryPrice || receiptData.deliveryPrice || 0,
+          // Coupon/benefit fields
+          couponCode: receiptData.couponCode,
+          couponDiscount: receiptData.couponDiscount || 0,
+          freeShippingApplied: receiptData.freeShippingApplied || false,
         };
 
         setReceipt(receiptObj);
@@ -137,8 +193,8 @@ const [isRetryingQR, setIsRetryingQR] = useState(false);
         if (orderDoc.exists()) {
           const data = orderDoc.data();
           setOrderData(data as OrderData);
-          
-          // Extract QR URL (same as Flutter)
+
+          // Extract QR URL
           if (data.deliveryQR?.url) {
             setDeliveryQRUrl(data.deliveryQR.url);
           }
@@ -150,10 +206,10 @@ const [isRetryingQR, setIsRetryingQR] = useState(false);
           collection(db, "orders", receiptObj.orderId, "items")
         );
 
-        const items: OrderItem[] = itemsSnapshot.docs.map((doc) => {
-          const data = doc.data();
+        const items: OrderItem[] = itemsSnapshot.docs.map((docItem) => {
+          const data = docItem.data();
           return {
-            id: doc.id,
+            id: docItem.id,
             productName: data.productName || "Unknown Product",
             quantity: data.quantity || 1,
             price: data.price || 0,
@@ -165,6 +221,13 @@ const [isRetryingQR, setIsRetryingQR] = useState(false);
         });
 
         setOrderItems(items);
+
+        // Load user email
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          setEmailAddress(userData.email || user.email || "");
+        }
       } catch (error) {
         console.error("Error fetching receipt details:", error);
       } finally {
@@ -175,28 +238,34 @@ const [isRetryingQR, setIsRetryingQR] = useState(false);
     fetchReceiptDetails();
   }, [user, id]);
 
+  // ========================================================================
+  // QR CODE FUNCTIONS
+  // ========================================================================
+
   const retryQRGeneration = async () => {
     if (!receipt) return;
-    
+
     setIsRetryingQR(true);
     try {
-      const { getFunctions, httpsCallable } = await import("firebase/functions");
+      const { getFunctions, httpsCallable } = await import(
+        "firebase/functions"
+      );
       const functions = getFunctions(undefined, "europe-west3");
       const retryQR = httpsCallable(functions, "retryQRGeneration");
-      
+
       const result = await retryQR({ orderId: receipt.orderId });
       const data = result.data as { success: boolean };
-      
+
       if (data.success) {
         // Refresh order data after a short delay
         setTimeout(async () => {
           const orderDoc = await getDoc(doc(db, "orders", receipt.orderId));
           if (orderDoc.exists()) {
-            const orderData = orderDoc.data();
-            if (orderData.deliveryQR?.url) {
-              setDeliveryQRUrl(orderData.deliveryQR.url);
+            const orderDataRefresh = orderDoc.data();
+            if (orderDataRefresh.deliveryQR?.url) {
+              setDeliveryQRUrl(orderDataRefresh.deliveryQR.url);
             }
-            setQrGenerationStatus(orderData.qrGenerationStatus || null);
+            setQrGenerationStatus(orderDataRefresh.qrGenerationStatus || null);
           }
         }, 3000);
       }
@@ -206,13 +275,12 @@ const [isRetryingQR, setIsRetryingQR] = useState(false);
       setIsRetryingQR(false);
     }
   };
-  
-  // Share QR code
+
   const shareQRCode = async () => {
     if (!deliveryQRUrl || !receipt) return;
-    
+
     const shareText = `${l("ReceiptDetail.orderQRCode") || "Order QR Code"} #${receipt.orderId.substring(0, 8).toUpperCase()}`;
-    
+
     if (navigator.share) {
       try {
         await navigator.share({
@@ -221,16 +289,55 @@ const [isRetryingQR, setIsRetryingQR] = useState(false);
           url: deliveryQRUrl,
         });
       } catch {
-        // User cancelled or share failed
         console.log("Share cancelled");
       }
     } else {
-      // Fallback: open QR in new tab
       window.open(deliveryQRUrl, "_blank");
     }
   };
 
-  // Format date
+  // ========================================================================
+  // EMAIL FUNCTIONS
+  // ========================================================================
+
+  const sendReceiptByEmail = async () => {
+    if (!receipt || !emailAddress.trim()) return;
+
+    setIsSendingEmail(true);
+    try {
+      const { getFunctions, httpsCallable } = await import(
+        "firebase/functions"
+      );
+      const functions = getFunctions(undefined, "europe-west3");
+      const sendEmail = httpsCallable(functions, "sendReceiptEmail");
+
+      const result = await sendEmail({
+        receiptId: receipt.receiptId,
+        orderId: receipt.orderId,
+        email: emailAddress,
+      });
+
+      const data = result.data as { success: boolean };
+
+      if (data.success) {
+        setIsEmailModalOpen(false);
+        // Show success toast/notification
+        alert(l("ReceiptDetail.receiptSentSuccessfully") || "Receipt sent successfully!");
+      } else {
+        throw new Error("Failed to send email");
+      }
+    } catch (error) {
+      console.error("Error sending receipt email:", error);
+      alert(l("ReceiptDetail.failedToSendEmail") || "Failed to send email. Please try again.");
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
+
+  // ========================================================================
+  // UTILITY FUNCTIONS
+  // ========================================================================
+
   const formatDate = (timestamp: Date): string => {
     return `${timestamp.getDate().toString().padStart(2, "0")}/${(
       timestamp.getMonth() + 1
@@ -242,7 +349,6 @@ const [isRetryingQR, setIsRetryingQR] = useState(false);
       .padStart(2, "0")}:${timestamp.getMinutes().toString().padStart(2, "0")}`;
   };
 
-  // Get delivery option color
   const getDeliveryColor = (deliveryOption: string): string => {
     switch (deliveryOption) {
       case "express":
@@ -255,7 +361,6 @@ const [isRetryingQR, setIsRetryingQR] = useState(false);
     }
   };
 
-  // Localize delivery option
   const localizeDeliveryOption = (deliveryOption: string): string => {
     switch (deliveryOption) {
       case "express":
@@ -268,7 +373,6 @@ const [isRetryingQR, setIsRetryingQR] = useState(false);
     }
   };
 
-  // Share receipt
   const shareReceipt = () => {
     if (!receipt) return;
 
@@ -295,7 +399,6 @@ const [isRetryingQR, setIsRetryingQR] = useState(false);
     }
   };
 
-  // Download receipt
   const downloadReceipt = () => {
     if (receipt?.receiptUrl) {
       window.open(receipt.receiptUrl, "_blank");
@@ -306,7 +409,6 @@ const [isRetryingQR, setIsRetryingQR] = useState(false);
     }
   };
 
-  // Copy order ID
   const copyOrderId = () => {
     if (receipt) {
       navigator.clipboard.writeText(receipt.orderId);
@@ -315,45 +417,43 @@ const [isRetryingQR, setIsRetryingQR] = useState(false);
     }
   };
 
-  // Format attributes
   const formatAttributes = (attributes?: Record<string, unknown>): string => {
     if (!attributes) return "";
 
     const formattedAttrs: string[] = [];
     Object.entries(attributes).forEach(([key, value]) => {
       if (value !== null && value !== undefined && value !== "") {
-        // Skip system fields
         const systemFields = [
           "productId",
-                            "orderId",
-                            "buyerId",
-                            "sellerId",
-                            "timestamp",
-                            "addedAt",
-                            "updatedAt",
-                            "selectedColorImage",
-                            "productImage",
-                            "price",
-                            "finalPrice",
-                            "shopId",
-                            "sellerName",
-                            "buyerName",
-                            "productName",
-                            "currency",
-                            "quantity",
-                            "unitPrice",
-                            "clothingFit",
-                            "clothingType",
-                            "clothingTypes",
-                            "pantFabricTypes",
-                            "pantFabricType",
-                            "isBundleItem",
-                            "gender",
-                            "calculatedTotal",
-                            "calculatedUnitPrice",
-                            "ourComission",
-                            "sellerContactNo",
-                            "showSellerHeader",
+          "orderId",
+          "buyerId",
+          "sellerId",
+          "timestamp",
+          "addedAt",
+          "updatedAt",
+          "selectedColorImage",
+          "productImage",
+          "price",
+          "finalPrice",
+          "shopId",
+          "sellerName",
+          "buyerName",
+          "productName",
+          "currency",
+          "quantity",
+          "unitPrice",
+          "clothingFit",
+          "clothingType",
+          "clothingTypes",
+          "pantFabricTypes",
+          "pantFabricType",
+          "isBundleItem",
+          "gender",
+          "calculatedTotal",
+          "calculatedUnitPrice",
+          "ourComission",
+          "sellerContactNo",
+          "showSellerHeader",
         ];
         if (!systemFields.includes(key)) {
           formattedAttrs.push(`${key}: ${value}`);
@@ -364,23 +464,28 @@ const [isRetryingQR, setIsRetryingQR] = useState(false);
     return formattedAttrs.join(", ");
   };
 
-  // Group items by seller
   const groupItemsBySeller = (
     items: OrderItem[]
   ): Record<string, OrderItem[]> => {
-    return items.reduce((groups, item) => {
-      const sellerId = item.sellerId || "unknown";
-      if (!groups[sellerId]) {
-        groups[sellerId] = [];
-      }
-      groups[sellerId].push(item);
-      return groups;
-    }, {} as Record<string, OrderItem[]>);
+    return items.reduce(
+      (groups, item) => {
+        const sellerId = item.sellerId || "unknown";
+        if (!groups[sellerId]) {
+          groups[sellerId] = [];
+        }
+        groups[sellerId].push(item);
+        return groups;
+      },
+      {} as Record<string, OrderItem[]>
+    );
   };
 
   const l = (key: string) => t(key) || key.split(".").pop() || key;
 
-  // Show loading while auth state is being determined
+  // ========================================================================
+  // RENDER: LOADING / AUTH STATES
+  // ========================================================================
+
   if (authLoading) {
     return (
       <div
@@ -480,7 +585,6 @@ const [isRetryingQR, setIsRetryingQR] = useState(false);
           isDarkMode ? "bg-gray-900" : "bg-gray-50"
         }`}
       >
-        {/* Header */}
         <div
           className={`${isDarkMode ? "bg-gray-900" : "bg-white"} border-b ${
             isDarkMode ? "border-gray-700" : "border-gray-200"
@@ -512,7 +616,6 @@ const [isRetryingQR, setIsRetryingQR] = useState(false);
           </div>
         </div>
 
-        {/* Loading State */}
         <div className="flex-1 flex items-center justify-center">
           <div className="flex flex-col items-center">
             <div className="animate-spin w-8 h-8 border-3 border-orange-500 border-t-transparent rounded-full mb-4"></div>
@@ -532,7 +635,6 @@ const [isRetryingQR, setIsRetryingQR] = useState(false);
           isDarkMode ? "bg-gray-900" : "bg-gray-50"
         }`}
       >
-        {/* Header */}
         <div
           className={`${isDarkMode ? "bg-gray-900" : "bg-white"} border-b ${
             isDarkMode ? "border-gray-700" : "border-gray-200"
@@ -564,7 +666,6 @@ const [isRetryingQR, setIsRetryingQR] = useState(false);
           </div>
         </div>
 
-        {/* Not Found State */}
         <div className="flex-1 flex items-center justify-center px-6 py-12">
           <div className="text-center">
             <h3
@@ -594,149 +695,368 @@ const [isRetryingQR, setIsRetryingQR] = useState(false);
     );
   }
 
-  const groupedItems = groupItemsBySeller(orderItems);
+  // ========================================================================
+  // COMPUTED VALUES
+  // ========================================================================
 
-  // QR Code Modal Component
-const QRCodeModal = () => {
-  if (!isQRModalOpen) return null;
-  
-  const hasQR = deliveryQRUrl && deliveryQRUrl.length > 0;
-  
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={() => setIsQRModalOpen(false)}
-      />
-      
-      {/* Modal */}
-      <div className={`relative w-full sm:max-w-md mx-auto sm:mx-4 rounded-t-3xl sm:rounded-2xl ${
-        isDarkMode ? "bg-gray-800" : "bg-white"
-      } p-6 animate-in slide-in-from-bottom sm:slide-in-from-bottom-0 sm:zoom-in-95`}>
-        
-        {/* Handle bar (mobile) */}
-        <div className="sm:hidden w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-4" />
-        
-        {/* Header */}
-        <div className="flex items-start space-x-4 mb-6">
-          <div className="p-3 rounded-xl bg-gradient-to-br from-orange-500 to-pink-500">
-            <QrCode className="w-5 h-5 text-white" />
+  const groupedItems = groupItemsBySeller(orderItems);
+  const shippingSavings = receipt.freeShippingApplied
+    ? receipt.originalDeliveryPrice
+    : 0;
+  const totalSavings = receipt.couponDiscount + shippingSavings;
+
+  // ========================================================================
+  // MODAL COMPONENTS
+  // ========================================================================
+
+  const QRCodeModal = () => {
+    if (!isQRModalOpen) return null;
+
+    const hasQR = deliveryQRUrl && deliveryQRUrl.length > 0;
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+        <div
+          className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+          onClick={() => setIsQRModalOpen(false)}
+        />
+
+        <div
+          className={`relative w-full sm:max-w-md mx-auto sm:mx-4 rounded-t-3xl sm:rounded-2xl ${
+            isDarkMode ? "bg-gray-800" : "bg-white"
+          } p-6 animate-in slide-in-from-bottom sm:slide-in-from-bottom-0 sm:zoom-in-95`}
+        >
+          <div className="sm:hidden w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-4" />
+
+          {/* Header */}
+          <div className="flex items-start space-x-4 mb-6">
+            <div className="p-3 rounded-xl bg-gradient-to-br from-orange-500 to-pink-500">
+              <QrCode className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex-1">
+              <h3
+                className={`text-lg font-semibold ${
+                  isDarkMode ? "text-white" : "text-gray-900"
+                }`}
+              >
+                {l("ReceiptDetail.deliveryQRCode") || "Delivery QR Code"}
+              </h3>
+              <p
+                className={`text-sm ${
+                  isDarkMode ? "text-gray-400" : "text-gray-600"
+                }`}
+              >
+                {l("ReceiptDetail.showThisToDelivery") ||
+                  "Show this to the delivery person"}
+              </p>
+            </div>
+            <button
+              onClick={() => setIsQRModalOpen(false)}
+              className={`p-2 rounded-lg ${
+                isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"
+              }`}
+            >
+              <X
+                className={`w-5 h-5 ${
+                  isDarkMode ? "text-gray-400" : "text-gray-600"
+                }`}
+              />
+            </button>
           </div>
-          <div className="flex-1">
-            <h3 className={`text-lg font-semibold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-              {l("ReceiptDetail.deliveryQRCode") || "Delivery QR Code"}
-            </h3>
-            <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-              {l("ReceiptDetail.showThisToDelivery") || "Show this to the delivery person"}
-            </p>
+
+          {/* Order badge */}
+          <div className="flex justify-center mb-6">
+            <span className="px-4 py-2 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 text-sm font-medium rounded-full flex items-center space-x-2">
+              <Package className="w-4 h-4" />
+              <span>
+                {l("ReceiptDetail.orders") || "Order"} #
+                {receipt?.orderId.substring(0, 8).toUpperCase()}
+              </span>
+            </span>
           </div>
+
+          {/* QR Code Display */}
+          {hasQR ? (
+            <>
+              <div className="flex justify-center mb-6">
+                <div className="p-4 bg-white rounded-2xl shadow-lg">
+                  <img
+                    src={deliveryQRUrl}
+                    alt="Delivery QR Code"
+                    className="w-64 h-64 object-contain"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = "none";
+                    }}
+                  />
+                </div>
+              </div>
+
+              <button
+                onClick={shareQRCode}
+                className="w-full py-3 px-4 bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600 text-white font-medium rounded-xl flex items-center justify-center space-x-2 transition-all"
+              >
+                <Share2 className="w-5 h-5" />
+                <span>
+                  {l("ReceiptDetail.shareQRCode") || "Share QR Code"}
+                </span>
+              </button>
+            </>
+          ) : (
+            <div
+              className={`p-8 rounded-2xl text-center ${
+                isDarkMode ? "bg-gray-700" : "bg-gray-100"
+              }`}
+            >
+              {qrGenerationStatus === "processing" ? (
+                <>
+                  <div className="animate-spin w-16 h-16 mx-auto mb-4 border-4 border-orange-500 border-t-transparent rounded-full" />
+                  <h4
+                    className={`font-semibold mb-2 ${
+                      isDarkMode ? "text-white" : "text-gray-900"
+                    }`}
+                  >
+                    {l("ReceiptDetail.qrGenerating") || "Generating QR Code..."}
+                  </h4>
+                  <p
+                    className={`text-sm ${
+                      isDarkMode ? "text-gray-400" : "text-gray-600"
+                    }`}
+                  >
+                    {l("ReceiptDetail.pleaseWaitQR") ||
+                      "Please wait a moment..."}
+                  </p>
+                </>
+              ) : qrGenerationStatus === "failed" ? (
+                <>
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                    <X className="w-8 h-8 text-red-500" />
+                  </div>
+                  <h4
+                    className={`font-semibold mb-2 ${
+                      isDarkMode ? "text-white" : "text-gray-900"
+                    }`}
+                  >
+                    {l("ReceiptDetail.qrGenerationFailed") ||
+                      "QR generation failed"}
+                  </h4>
+                  <p
+                    className={`text-sm mb-4 ${
+                      isDarkMode ? "text-gray-400" : "text-gray-600"
+                    }`}
+                  >
+                    {l("ReceiptDetail.tapToRetryQR") || "Tap to retry"}
+                  </p>
+                  <button
+                    onClick={retryQRGeneration}
+                    disabled={isRetryingQR}
+                    className="px-4 py-2 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 text-white rounded-lg flex items-center space-x-2 mx-auto transition-colors"
+                  >
+                    {isRetryingQR ? (
+                      <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4" />
+                    )}
+                    <span>
+                      {isRetryingQR
+                        ? l("ReceiptDetail.retrying") || "Retrying..."
+                        : l("ReceiptDetail.retry") || "Retry"}
+                    </span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+                    <QrCode className="w-8 h-8 text-orange-500" />
+                  </div>
+                  <h4
+                    className={`font-semibold mb-2 ${
+                      isDarkMode ? "text-white" : "text-gray-900"
+                    }`}
+                  >
+                    {l("ReceiptDetail.qrNotReady") || "QR Code not ready yet"}
+                  </h4>
+                  <p
+                    className={`text-sm ${
+                      isDarkMode ? "text-gray-400" : "text-gray-600"
+                    }`}
+                  >
+                    {l("ReceiptDetail.qrWillBeReady") ||
+                      "It will be ready shortly"}
+                  </p>
+                </>
+              )}
+            </div>
+          )}
+
           <button
             onClick={() => setIsQRModalOpen(false)}
-            className={`p-2 rounded-lg ${isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
+            className={`w-full mt-4 py-3 px-4 border ${
+              isDarkMode
+                ? "border-gray-600 text-gray-300 hover:bg-gray-700"
+                : "border-gray-300 text-gray-700 hover:bg-gray-50"
+            } font-medium rounded-xl transition-colors`}
           >
-            <X className={`w-5 h-5 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`} />
+            {l("ReceiptDetail.close") || "Close"}
           </button>
         </div>
-        
-        {/* Order badge */}
-        <div className="flex justify-center mb-6">
-          <span className="px-4 py-2 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 text-sm font-medium rounded-full">
-            {l("ReceiptDetail.orders") || "Order"} #{receipt?.orderId.substring(0, 8).toUpperCase()}
-          </span>
-        </div>
-        
-        {/* QR Code Display */}
-        {hasQR ? (
-          <>
-            <div className="flex justify-center mb-6">
-              <div className="p-4 bg-white rounded-2xl shadow-lg">
-                <img
-                  src={deliveryQRUrl}
-                  alt="Delivery QR Code"
-                  className="w-64 h-64 object-contain"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
-                />
-              </div>
-            </div>
-            
-            {/* Share button */}
-            <button
-              onClick={shareQRCode}
-              className="w-full py-3 px-4 bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600 text-white font-medium rounded-xl flex items-center justify-center space-x-2 transition-all"
-            >
-              <Share2 className="w-5 h-5" />
-              <span>{l("ReceiptDetail.shareQRCode") || "Share QR Code"}</span>
-            </button>
-          </>
-        ) : (
-          /* QR not available state */
-          <div className={`p-8 rounded-2xl text-center ${isDarkMode ? "bg-gray-700" : "bg-gray-100"}`}>
-            {qrGenerationStatus === "processing" ? (
-              <>
-                <div className="animate-spin w-16 h-16 mx-auto mb-4 border-4 border-orange-500 border-t-transparent rounded-full" />
-                <h4 className={`font-semibold mb-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-                  {l("ReceiptDetail.qrGenerating") || "Generating QR Code..."}
-                </h4>
-                <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                  {l("ReceiptDetail.pleaseWaitQR") || "Please wait a moment..."}
-                </p>
-              </>
-            ) : qrGenerationStatus === "failed" ? (
-              <>
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-                  <X className="w-8 h-8 text-red-500" />
-                </div>
-                <h4 className={`font-semibold mb-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-                  {l("ReceiptDetail.qrGenerationFailed") || "QR generation failed"}
-                </h4>
-                <p className={`text-sm mb-4 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                  {l("ReceiptDetail.tapToRetryQR") || "Tap to retry"}
-                </p>
-                <button
-                  onClick={retryQRGeneration}
-                  disabled={isRetryingQR}
-                  className="px-4 py-2 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 text-white rounded-lg flex items-center space-x-2 mx-auto transition-colors"
-                >
-                  {isRetryingQR ? (
-                    <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
-                  ) : (
-                    <RefreshCw className="w-4 h-4" />
-                  )}
-                  <span>{isRetryingQR ? (l("ReceiptDetail.retrying") || "Retrying...") : (l("ReceiptDetail.retry") || "Retry")}</span>
-                </button>
-              </>
-            ) : (
-              <>
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
-                  <QrCode className="w-8 h-8 text-orange-500" />
-                </div>
-                <h4 className={`font-semibold mb-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-                  {l("ReceiptDetail.qrNotReady") || "QR Code not ready yet"}
-                </h4>
-                <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                  {l("ReceiptDetail.qrWillBeReady") || "It will be ready shortly"}
-                </p>
-              </>
-            )}
-          </div>
-        )}
-        
-        {/* Close button */}
-        <button
-          onClick={() => setIsQRModalOpen(false)}
-          className={`w-full mt-4 py-3 px-4 border ${
-            isDarkMode ? "border-gray-600 text-gray-300 hover:bg-gray-700" : "border-gray-300 text-gray-700 hover:bg-gray-50"
-          } font-medium rounded-xl transition-colors`}
-        >
-          {l("ReceiptDetail.close") || "Close"}
-        </button>
       </div>
-    </div>
-  );
-};
+    );
+  };
+
+  const EmailModal = () => {
+    if (!isEmailModalOpen) return null;
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+        <div
+          className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+          onClick={() => !isSendingEmail && setIsEmailModalOpen(false)}
+        />
+
+        <div
+          className={`relative w-full sm:max-w-md mx-auto sm:mx-4 rounded-t-3xl sm:rounded-2xl ${
+            isDarkMode ? "bg-gray-800" : "bg-white"
+          } p-6`}
+        >
+          <div className="sm:hidden w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-4" />
+
+          {/* Header */}
+          <div className="flex items-start space-x-4 mb-6">
+            <div className="p-3 rounded-xl bg-gradient-to-br from-orange-500 to-pink-500">
+              <Mail className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex-1">
+              <h3
+                className={`text-lg font-semibold ${
+                  isDarkMode ? "text-white" : "text-gray-900"
+                }`}
+              >
+                {l("ReceiptDetail.sendReceiptByEmail") ||
+                  "Send Receipt by Email"}
+              </h3>
+              <p
+                className={`text-sm ${
+                  isDarkMode ? "text-gray-400" : "text-gray-600"
+                }`}
+              >
+                {l("ReceiptDetail.receiptWillBeSentToEmail") ||
+                  "Your receipt will be sent to the email below"}
+              </p>
+            </div>
+          </div>
+
+          {/* Email Input */}
+          <div className="mb-4">
+            <label
+              className={`block text-sm font-semibold mb-2 ${
+                isDarkMode ? "text-white" : "text-gray-900"
+              }`}
+            >
+              {l("ReceiptDetail.emailAddress") || "Email Address"}
+            </label>
+            <div
+              className={`flex items-center rounded-xl ${
+                isDarkMode ? "bg-gray-700" : "bg-gray-100"
+              }`}
+            >
+              <Mail
+                className={`w-5 h-5 ml-4 ${
+                  isDarkMode ? "text-gray-400" : "text-gray-500"
+                }`}
+              />
+              <input
+                ref={emailInputRef}
+                type="email"
+                value={emailAddress}
+                onChange={(e) => setEmailAddress(e.target.value)}
+                placeholder={
+                  l("ReceiptDetail.enterEmailAddress") || "Enter email address"
+                }
+                className={`flex-1 px-3 py-3.5 bg-transparent outline-none text-sm ${
+                  isDarkMode
+                    ? "text-white placeholder-gray-500"
+                    : "text-gray-900 placeholder-gray-400"
+                }`}
+              />
+            </div>
+          </div>
+
+          {/* Receipt Preview */}
+          <div
+            className={`p-4 rounded-xl mb-6 ${
+              isDarkMode
+                ? "bg-gradient-to-r from-orange-500/10 to-pink-500/10 border border-orange-500/30"
+                : "bg-gradient-to-r from-orange-50 to-pink-50 border border-orange-200"
+            }`}
+          >
+            <div className="flex items-center space-x-3">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-orange-500 to-pink-500">
+                <FileText className="w-4 h-4 text-white" />
+              </div>
+              <div className="flex-1">
+                <p
+                  className={`text-sm font-semibold ${
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  }`}
+                >
+                  {l("ReceiptDetail.receipt") || "Receipt"} #
+                  {receipt.receiptId.substring(0, 8).toUpperCase()}
+                </p>
+                <p
+                  className={`text-xs ${
+                    isDarkMode ? "text-gray-400" : "text-gray-600"
+                  }`}
+                >
+                  {l("ReceiptDetail.orders") || "Order"} #
+                  {receipt.orderId.substring(0, 8).toUpperCase()}
+                </p>
+              </div>
+              <p className="text-sm font-semibold text-green-500">
+                {receipt.totalPrice.toFixed(0)} {receipt.currency}
+              </p>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex space-x-3">
+            <button
+              onClick={() => !isSendingEmail && setIsEmailModalOpen(false)}
+              disabled={isSendingEmail}
+              className={`flex-1 py-3 px-4 border ${
+                isDarkMode
+                  ? "border-gray-600 text-gray-300 hover:bg-gray-700"
+                  : "border-gray-300 text-gray-700 hover:bg-gray-50"
+              } font-medium rounded-xl transition-colors disabled:opacity-50`}
+            >
+              {l("ReceiptDetail.cancel") || "Cancel"}
+            </button>
+            <button
+              onClick={sendReceiptByEmail}
+              disabled={isSendingEmail || !emailAddress.trim()}
+              className={`flex-1 py-3 px-4 font-medium rounded-xl flex items-center justify-center space-x-2 transition-all ${
+                isSendingEmail || !emailAddress.trim()
+                  ? "bg-gray-400 text-white cursor-not-allowed"
+                  : "bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600 text-white"
+              }`}
+            >
+              {isSendingEmail ? (
+                <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />
+              ) : (
+                <>
+                  <Send className="w-4 h-4" />
+                  <span>{l("ReceiptDetail.sendEmail") || "Send Email"}</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ========================================================================
+  // MAIN RENDER
+  // ========================================================================
 
   return (
     <div
@@ -770,21 +1090,33 @@ const QRCodeModal = () => {
               {l("ReceiptDetail.receiptDetails") || "Receipt Details"}
             </h1>
 
-            <div className="flex items-center space-x-2">
-  {/* QR Code Button */}
-  <button
-    onClick={() => setIsQRModalOpen(true)}
-    className={`p-2 rounded-lg transition-colors ${
-      isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"
-    }`}
-    title={l("ReceiptDetail.deliveryQRCode") || "Delivery QR Code"}
-  >
-    <QrCode
-      className={`w-5 h-5 ${
-        isDarkMode ? "text-white" : "text-gray-900"
-      }`}
-    />
-  </button>
+            <div className="flex items-center space-x-1">
+              <button
+                onClick={() => setIsQRModalOpen(true)}
+                className={`p-2 rounded-lg transition-colors ${
+                  isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"
+                }`}
+                title={l("ReceiptDetail.deliveryQRCode") || "Delivery QR Code"}
+              >
+                <QrCode
+                  className={`w-5 h-5 ${
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  }`}
+                />
+              </button>
+              <button
+                onClick={() => setIsEmailModalOpen(true)}
+                className={`p-2 rounded-lg transition-colors ${
+                  isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"
+                }`}
+                title={l("ReceiptDetail.sendByEmail") || "Send by Email"}
+              >
+                <Mail
+                  className={`w-5 h-5 ${
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  }`}
+                />
+              </button>
               <button
                 onClick={shareReceipt}
                 className={`p-2 rounded-lg transition-colors ${
@@ -826,6 +1158,9 @@ const QRCodeModal = () => {
             <div className="w-16 h-16 mx-auto mb-4 bg-white/20 rounded-full flex items-center justify-center">
               <CheckCircle className="w-8 h-8" />
             </div>
+            <h2 className="text-xl font-bold mb-2">
+              {l("ReceiptDetail.receiptDetails") || "Receipt Details"}
+            </h2>
             <p className="text-white/90 text-sm">
               {formatDate(receipt.timestamp)}
             </p>
@@ -839,13 +1174,18 @@ const QRCodeModal = () => {
               isDarkMode ? "border-gray-700" : "border-gray-200"
             }`}
           >
-            <h2
-              className={`text-lg font-semibold mb-4 ${
-                isDarkMode ? "text-white" : "text-gray-900"
-              }`}
-            >
-              {l("ReceiptDetail.orderInformation") || "Order Information"}
-            </h2>
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-orange-500 to-pink-500">
+                <Info className="w-4 h-4 text-white" />
+              </div>
+              <h2
+                className={`text-lg font-semibold ${
+                  isDarkMode ? "text-white" : "text-gray-900"
+                }`}
+              >
+                {l("ReceiptDetail.orderInformation") || "Order Information"}
+              </h2>
+            </div>
 
             <div className="space-y-4">
               {/* Order Number */}
@@ -884,6 +1224,12 @@ const QRCodeModal = () => {
                 </div>
               </div>
 
+              <div
+                className={`border-t ${
+                  isDarkMode ? "border-gray-700" : "border-gray-100"
+                }`}
+              />
+
               {/* Receipt Number */}
               <div className="flex items-center justify-between">
                 <span
@@ -902,6 +1248,12 @@ const QRCodeModal = () => {
                 </span>
               </div>
 
+              <div
+                className={`border-t ${
+                  isDarkMode ? "border-gray-700" : "border-gray-100"
+                }`}
+              />
+
               {/* Payment Method */}
               <div className="flex items-center justify-between">
                 <span
@@ -919,6 +1271,12 @@ const QRCodeModal = () => {
                   {receipt.paymentMethod}
                 </span>
               </div>
+
+              <div
+                className={`border-t ${
+                  isDarkMode ? "border-gray-700" : "border-gray-100"
+                }`}
+              />
 
               {/* Delivery Option */}
               <div className="flex items-center justify-between">
@@ -949,8 +1307,10 @@ const QRCodeModal = () => {
                 isDarkMode ? "border-gray-700" : "border-gray-200"
               }`}
             >
-              <div className="flex items-center space-x-2 mb-4">
-                <MapPin className="w-5 h-5 text-orange-500" />
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="p-2 rounded-lg bg-gradient-to-br from-orange-500 to-pink-500">
+                  <MapPin className="w-4 h-4 text-white" />
+                </div>
                 <h2
                   className={`text-lg font-semibold ${
                     isDarkMode ? "text-white" : "text-gray-900"
@@ -997,13 +1357,18 @@ const QRCodeModal = () => {
                 isDarkMode ? "border-gray-700" : "border-gray-200"
               }`}
             >
-              <h2
-                className={`text-lg font-semibold mb-4 ${
-                  isDarkMode ? "text-white" : "text-gray-900"
-                }`}
-              >
-                {l("ReceiptDetail.purchasedItems") || "Purchased Items"}
-              </h2>
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="p-2 rounded-lg bg-gradient-to-br from-orange-500 to-pink-500">
+                  <ShoppingBag className="w-4 h-4 text-white" />
+                </div>
+                <h2
+                  className={`text-lg font-semibold ${
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  }`}
+                >
+                  {l("ReceiptDetail.purchasedItems") || "Purchased Items"}
+                </h2>
+              </div>
 
               <div className="space-y-6">
                 {Object.entries(groupedItems).map(([sellerId, items]) => {
@@ -1012,8 +1377,9 @@ const QRCodeModal = () => {
                   return (
                     <div key={sellerId}>
                       <div className="mb-3">
-                        <span className="px-3 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 text-xs font-medium rounded-full">
-                          {sellerName}
+                        <span className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-gradient-to-r from-orange-100 to-pink-100 dark:from-orange-900/30 dark:to-pink-900/30 text-orange-700 dark:text-orange-300 text-xs font-medium rounded-lg">
+                          <User className="w-3 h-3" />
+                          <span>{sellerName}</span>
                         </span>
                       </div>
 
@@ -1024,16 +1390,18 @@ const QRCodeModal = () => {
                             className="flex items-start space-x-3"
                           >
                             <div
-                              className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                                isDarkMode ? "bg-gray-700" : "bg-gray-100"
+                              className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                                isDarkMode
+                                  ? "bg-gradient-to-br from-orange-500/20 to-pink-500/20"
+                                  : "bg-gradient-to-br from-orange-100 to-pink-100"
                               }`}
                             >
-                              <span className="text-sm font-semibold text-orange-500">
+                              <span className="text-sm font-bold text-orange-500">
                                 {item.quantity}x
                               </span>
                             </div>
 
-                            <div className="flex-1">
+                            <div className="flex-1 min-w-0">
                               <h4
                                 className={`font-medium ${
                                   isDarkMode ? "text-white" : "text-gray-900"
@@ -1044,7 +1412,7 @@ const QRCodeModal = () => {
                               {item.selectedAttributes &&
                                 formatAttributes(item.selectedAttributes) && (
                                   <p
-                                    className={`text-sm mt-1 ${
+                                    className={`text-sm mt-1 truncate ${
                                       isDarkMode
                                         ? "text-gray-400"
                                         : "text-gray-600"
@@ -1074,30 +1442,180 @@ const QRCodeModal = () => {
             </div>
           )}
 
-          {/* Price Summary */}
+          {/* Price Summary - Matching Flutter */}
           <div
-            className={`p-6 rounded-2xl border-2 border-green-200 dark:border-green-800 ${
+            className={`p-6 rounded-2xl ${
               isDarkMode ? "bg-gray-800" : "bg-white"
-            } shadow-sm`}
+            } shadow-sm border ${
+              isDarkMode ? "border-gray-700" : "border-gray-200"
+            }`}
           >
-            <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-orange-500 to-pink-500">
+                <DollarSign className="w-4 h-4 text-white" />
+              </div>
               <h2
                 className={`text-lg font-semibold ${
                   isDarkMode ? "text-white" : "text-gray-900"
                 }`}
               >
-                {l("ReceiptDetail.total") || "Total"}
+                {l("ReceiptDetail.priceSummary") || "Price Summary"}
               </h2>
-              <p className="text-2xl font-bold text-green-600">
-                {receipt.totalPrice.toFixed(0)} {receipt.currency}
-              </p>
+            </div>
+
+            <div className="space-y-3">
+              {/* Subtotal */}
+              <div className="flex items-center justify-between">
+                <span
+                  className={`text-sm ${
+                    isDarkMode ? "text-gray-400" : "text-gray-600"
+                  }`}
+                >
+                  {l("ReceiptDetail.subtotal") || "Subtotal"}
+                </span>
+                <span
+                  className={`font-semibold ${
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  }`}
+                >
+                  {receipt.itemsSubtotal.toFixed(0)} {receipt.currency}
+                </span>
+              </div>
+
+              {/* Coupon Discount */}
+              {receipt.couponDiscount > 0 && (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Tag className="w-4 h-4 text-green-500" />
+                    <span
+                      className={`text-sm ${
+                        isDarkMode ? "text-gray-400" : "text-gray-600"
+                      }`}
+                    >
+                      {receipt.couponCode
+                        ? `${l("ReceiptDetail.coupon") || "Coupon"} (${receipt.couponCode})`
+                        : l("ReceiptDetail.couponDiscount") || "Coupon Discount"}
+                    </span>
+                  </div>
+                  <span className="font-semibold text-green-500">
+                    -{receipt.couponDiscount.toFixed(0)} {receipt.currency}
+                  </span>
+                </div>
+              )}
+
+              {/* Delivery */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  {receipt.freeShippingApplied && (
+                    <Gift className="w-4 h-4 text-green-500" />
+                  )}
+                  <span
+                    className={`text-sm ${
+                      isDarkMode ? "text-gray-400" : "text-gray-600"
+                    }`}
+                  >
+                    {l("ReceiptDetail.delivery") || "Delivery"}
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  {receipt.freeShippingApplied &&
+                    receipt.originalDeliveryPrice > 0 && (
+                      <span
+                        className={`text-sm line-through ${
+                          isDarkMode ? "text-gray-500" : "text-gray-400"
+                        }`}
+                      >
+                        {receipt.originalDeliveryPrice.toFixed(0)}{" "}
+                        {receipt.currency}
+                      </span>
+                    )}
+                  <span
+                    className={`font-semibold ${
+                      receipt.deliveryPrice === 0
+                        ? "text-green-500"
+                        : isDarkMode
+                          ? "text-white"
+                          : "text-gray-900"
+                    }`}
+                  >
+                    {receipt.deliveryPrice === 0
+                      ? l("ReceiptDetail.free") || "Free"
+                      : `${receipt.deliveryPrice.toFixed(0)} ${receipt.currency}`}
+                  </span>
+                </div>
+              </div>
+
+              {/* Free Shipping Benefit Label */}
+              {receipt.freeShippingApplied && (
+                <div className="flex justify-end">
+                  <span className="inline-flex items-center space-x-1 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 text-xs font-medium rounded">
+                    <Check className="w-3 h-3" />
+                    <span>
+                      {l("ReceiptDetail.freeShippingBenefit") ||
+                        "Free Shipping Benefit"}
+                    </span>
+                  </span>
+                </div>
+              )}
+
+              {/* Total Savings */}
+              {totalSavings > 0 && (
+                <div
+                  className={`p-3 rounded-xl ${
+                    isDarkMode
+                      ? "bg-green-900/20 border border-green-800/50"
+                      : "bg-green-50 border border-green-200"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Percent className="w-4 h-4 text-green-600" />
+                      <span className="text-sm font-semibold text-green-700 dark:text-green-400">
+                        {l("ReceiptDetail.youSaved") || "You Saved"}
+                      </span>
+                    </div>
+                    <span className="font-bold text-green-600">
+                      {totalSavings.toFixed(0)} {receipt.currency}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <div
+                className={`border-t my-4 ${
+                  isDarkMode ? "border-gray-700" : "border-gray-200"
+                }`}
+              />
+
+              {/* Grand Total */}
+              <div
+                className={`p-4 rounded-xl ${
+                  isDarkMode
+                    ? "bg-green-900/20 border border-green-800/50"
+                    : "bg-green-50 border border-green-200"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span
+                    className={`text-lg font-bold ${
+                      isDarkMode ? "text-white" : "text-gray-900"
+                    }`}
+                  >
+                    {l("ReceiptDetail.total") || "Total"}
+                  </span>
+                  <span className="text-2xl font-bold text-green-600">
+                    {receipt.totalPrice.toFixed(0)} {receipt.currency}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
-          
         </div>
       </div>
-       {/* QR Code Modal - ADD IT HERE */}
-       <QRCodeModal />
+
+      {/* Modals */}
+      <QRCodeModal />
+      <EmailModal />
     </div>
   );
 }
