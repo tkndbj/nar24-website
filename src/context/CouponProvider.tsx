@@ -34,6 +34,9 @@ import {
   createCheckoutDiscounts,
 } from "@/app/models/coupon";
 
+export const FREE_SHIPPING_MINIMUM = 1000.0;
+export const COUPON_MINIMUM_MULTIPLIER = 2.0;
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -65,6 +68,10 @@ interface CouponContextType {
   // Benefit operations
   fetchAllBenefits: () => Promise<UserBenefit[]>;
   markBenefitAsUsed: (benefitId: string, orderId: string) => Promise<boolean>;
+
+  isCouponApplicable: (coupon: Coupon, cartTotal: number) => boolean;
+getMinimumForCoupon: (coupon: Coupon) => number;
+isFreeShippingApplicable: (cartTotal: number) => boolean;
 
   // Checkout helpers
   calculateCheckoutDiscounts: (params: {
@@ -175,6 +182,23 @@ export const CouponProvider: React.FC<CouponProviderProps> = ({
     setIsLoading(false);
   }, []);
 
+  const isCouponApplicable = useCallback(
+    (coupon: Coupon, cartTotal: number): boolean => {
+      if (!coupon.isValid) return false;
+      const minimumRequired = coupon.amount * COUPON_MINIMUM_MULTIPLIER;
+      return cartTotal >= minimumRequired;
+    },
+    []
+  );
+  
+  const getMinimumForCoupon = useCallback((coupon: Coupon): number => {
+    return coupon.amount * COUPON_MINIMUM_MULTIPLIER;
+  }, []);
+  
+  const isFreeShippingApplicable = useCallback((cartTotal: number): boolean => {
+    return cartTotal >= FREE_SHIPPING_MINIMUM;
+  }, []);
+
   // ========================================================================
   // LISTENERS
   // ========================================================================
@@ -268,6 +292,11 @@ export const CouponProvider: React.FC<CouponProviderProps> = ({
   const calculateCouponDiscount = useCallback(
     (coupon: Coupon, cartTotal: number): number => {
       if (!coupon.isValid) return 0;
+      
+      // Check minimum cart total requirement (2x coupon amount)
+      const minimumRequired = coupon.amount * COUPON_MINIMUM_MULTIPLIER;
+      if (cartTotal < minimumRequired) return 0;
+      
       // Coupon cannot exceed cart total
       return coupon.amount > cartTotal ? cartTotal : coupon.amount;
     },
@@ -518,6 +547,10 @@ export const CouponProvider: React.FC<CouponProviderProps> = ({
       availableFreeShipping,
       totalCouponValue,
 
+      isCouponApplicable,
+      getMinimumForCoupon,
+      isFreeShippingApplicable,
+
       // Coupon operations
       fetchAllCoupons,
       calculateCouponDiscount,
@@ -545,6 +578,9 @@ export const CouponProvider: React.FC<CouponProviderProps> = ({
       hasFreeShipping,
       availableFreeShipping,
       totalCouponValue,
+      isCouponApplicable,
+      getMinimumForCoupon,
+      isFreeShippingApplicable,
       fetchAllCoupons,
       calculateCouponDiscount,
       findBestCoupon,

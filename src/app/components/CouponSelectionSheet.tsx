@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Coupon, UserBenefit, BenefitType } from "@/app/models/coupon";
-import { useCoupon } from "@/context/CouponProvider";
+import { useCoupon, FREE_SHIPPING_MINIMUM } from "@/context/CouponProvider";
 
 // ============================================================================
 // TYPES
@@ -55,7 +55,14 @@ export const CouponSelectionSheet: React.FC<CouponSelectionSheetProps> = ({
   // COUPON SERVICE
   // ========================================================================
 
-  const { coupons, benefits, calculateCouponDiscount } = useCoupon();
+  const { 
+    coupons, 
+    benefits, 
+    calculateCouponDiscount,
+    isCouponApplicable,
+    getMinimumForCoupon,
+    isFreeShippingApplicable,
+  } = useCoupon();
 
   // ========================================================================
   // TEMP STATE (before applying)
@@ -130,7 +137,9 @@ export const CouponSelectionSheet: React.FC<CouponSelectionSheetProps> = ({
     if (freeShippingBenefits.length === 0) {
       return null;
     }
-
+  
+    const isApplicable = isFreeShippingApplicable(cartTotal);
+  
     return (
       <div className="mb-5">
         {/* Section Header */}
@@ -152,14 +161,16 @@ export const CouponSelectionSheet: React.FC<CouponSelectionSheetProps> = ({
             {freeShippingBenefits.length}
           </span>
         </div>
-
+  
         {/* Free Shipping Toggle Card */}
         <button
-          onClick={() => setTempUseFreeShipping(!tempUseFreeShipping)}
+          onClick={isApplicable ? () => setTempUseFreeShipping(!tempUseFreeShipping) : undefined}
+          disabled={!isApplicable}
           className={`
             w-full p-3 rounded-xl border-2 transition-all duration-200
+            ${!isApplicable ? "opacity-50 cursor-not-allowed" : ""}
             ${
-              tempUseFreeShipping
+              tempUseFreeShipping && isApplicable
                 ? "border-green-500 bg-green-500/10"
                 : isDarkMode
                   ? "border-gray-700 bg-gray-800 hover:border-gray-600"
@@ -191,12 +202,18 @@ export const CouponSelectionSheet: React.FC<CouponSelectionSheetProps> = ({
               >
                 {t("freeShippingDescription")}
               </p>
+              {/* Show minimum requirement if not applicable */}
+              {!isApplicable && (
+                <p className="text-xs text-red-500 font-medium mt-1">
+                  {t("minimumCartTotal", { amount: FREE_SHIPPING_MINIMUM.toFixed(0) })}
+                </p>
+              )}
             </div>
             <div
               className={`
                 w-5 h-5 rounded flex items-center justify-center transition-colors
                 ${
-                  tempUseFreeShipping
+                  tempUseFreeShipping && isApplicable
                     ? "bg-green-500"
                     : isDarkMode
                       ? "border-2 border-gray-600"
@@ -204,7 +221,7 @@ export const CouponSelectionSheet: React.FC<CouponSelectionSheetProps> = ({
                 }
               `}
             >
-              {tempUseFreeShipping && (
+              {tempUseFreeShipping && isApplicable && (
                 <Check size={12} className="text-white" />
               )}
             </div>
@@ -218,21 +235,28 @@ export const CouponSelectionSheet: React.FC<CouponSelectionSheetProps> = ({
     coupon: Coupon | null,
     title: string,
     subtitle: string,
-    expiresIn?: number | null
+    expiresIn?: number | null,
+    isApplicable: boolean = true,
+    minimumRequired?: number
   ) => {
     const isSelected =
       coupon === null
         ? tempSelectedCoupon === null
         : tempSelectedCoupon?.id === coupon?.id;
-
+  
+    // Can only select if applicable (or if it's the "no coupon" option)
+    const canSelect = coupon === null || isApplicable;
+  
     return (
       <button
         key={coupon?.id ?? "no-coupon"}
-        onClick={() => setTempSelectedCoupon(coupon)}
+        onClick={canSelect ? () => setTempSelectedCoupon(coupon) : undefined}
+        disabled={!canSelect}
         className={`
           w-full p-3 rounded-xl border-2 transition-all duration-200 mb-2
+          ${!canSelect ? "opacity-50 cursor-not-allowed" : ""}
           ${
-            isSelected
+            isSelected && canSelect
               ? "border-orange-500 bg-orange-500/10"
               : isDarkMode
                 ? "border-gray-700 bg-gray-800 hover:border-gray-600"
@@ -305,12 +329,18 @@ export const CouponSelectionSheet: React.FC<CouponSelectionSheetProps> = ({
             >
               {subtitle}
             </p>
+            {/* Show minimum requirement if not applicable */}
+            {!isApplicable && minimumRequired !== undefined && (
+              <p className="text-xs text-red-500 font-medium mt-1">
+                {t("minimumCartTotal", { amount: minimumRequired.toFixed(0) })}
+              </p>
+            )}
           </div>
           <div
             className={`
               w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0
               ${
-                isSelected
+                isSelected && canSelect
                   ? "border-orange-500 bg-orange-500"
                   : isDarkMode
                     ? "border-gray-600"
@@ -318,7 +348,7 @@ export const CouponSelectionSheet: React.FC<CouponSelectionSheetProps> = ({
               }
             `}
           >
-            {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
+            {isSelected && canSelect && <div className="w-2 h-2 rounded-full bg-white" />}
           </div>
         </div>
       </button>
@@ -347,7 +377,7 @@ export const CouponSelectionSheet: React.FC<CouponSelectionSheetProps> = ({
             {activeCoupons.length}
           </span>
         </div>
-
+  
         {activeCoupons.length === 0 ? (
           // Empty State
           <div
@@ -372,27 +402,36 @@ export const CouponSelectionSheet: React.FC<CouponSelectionSheetProps> = ({
           </div>
         ) : (
           <div>
-            {/* "No coupon" option */}
+            {/* "No coupon" option - always applicable */}
             {renderCouponCard(
               null,
               t("noCoupon"),
-              t("proceedWithoutDiscount")
+              t("proceedWithoutDiscount"),
+              null,
+              true // Always applicable
             )}
-
+  
             {/* Available coupons */}
             {activeCoupons.map((coupon) => {
+              const isApplicable = isCouponApplicable(coupon, cartTotal);
+              const minimumRequired = getMinimumForCoupon(coupon);
               const discount = calculateCouponDiscount(coupon, cartTotal);
+              
               const subtitle =
                 coupon.description ??
-                (discount < coupon.amount
-                  ? `${t("willDeduct")} ${discount.toFixed(2)} ${coupon.currency}`
-                  : t("discountCouponDesc"));
-
+                (isApplicable
+                  ? (discount < coupon.amount
+                      ? `${t("willDeduct")} ${discount.toFixed(2)} ${coupon.currency}`
+                      : t("discountCouponDesc"))
+                  : t("minimumNotMet"));
+  
               return renderCouponCard(
                 coupon,
                 `${coupon.amount.toFixed(0)} ${coupon.currency}`,
                 subtitle,
-                coupon.daysUntilExpiry
+                coupon.daysUntilExpiry,
+                isApplicable,
+                minimumRequired
               );
             })}
           </div>

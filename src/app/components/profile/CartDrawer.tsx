@@ -31,11 +31,10 @@ import Image from "next/image";
 import { Product } from "@/app/models/Product";
 import { doc, onSnapshot } from "firebase/firestore";
 
-// ✅ Coupon System Imports
-import { useCoupon } from "@/context/CouponProvider";
 import { useDiscountSelection } from "@/context/DiscountSelectionProvider";
 import { CouponSelectionSheet } from "../CouponSelectionSheet";
 import { Coupon, UserBenefit } from "@/app/models/coupon";
+import { useCoupon } from "@/context/CouponProvider";
 
 // Lazy load CartValidationDialog - only shown when validation needed
 const CartValidationDialog = dynamic(
@@ -125,7 +124,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   // ✅ Coupon Service - for available coupons/benefits
   const {
     activeCoupons,
-    activeFreeShippingBenefits,    
+    activeFreeShippingBenefits,
+    isFreeShippingApplicable,
   } = useCoupon();
 
   // ✅ Discount Selection Service - for selected discounts (matches Flutter's DiscountSelectionService)
@@ -213,7 +213,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     return Object.entries(selectedProducts)
       .filter(([, selected]) => selected)
       .map(([id]) => id);
-  }, [selectedProducts]);
+  }, [selectedProducts]);  
 
   // Calculate coupon discount amount
   const couponDiscount = useMemo(() => {
@@ -224,6 +224,20 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   const finalTotal = useMemo(() => {
     return calculateFinalTotal(calculatedTotals.total);
   }, [calculateFinalTotal, calculatedTotals.total]);
+
+  useEffect(() => {
+    if (selectedCoupon && couponDiscount === 0 && calculatedTotals.total > 0) {
+      // Coupon selected but not applicable
+      selectCoupon(null);
+    }
+  }, [selectedCoupon, couponDiscount, calculatedTotals.total, selectCoupon]);
+  
+  // Auto-clear free shipping if no longer applicable
+  useEffect(() => {
+    if (useFreeShipping && !isFreeShippingApplicable(calculatedTotals.total) && calculatedTotals.total > 0) {
+      setFreeShipping(false);
+    }
+  }, [useFreeShipping, calculatedTotals.total, isFreeShippingApplicable, setFreeShipping]);
 
   // ========================================================================
   // EFFECTS

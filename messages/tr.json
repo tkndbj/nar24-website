@@ -1279,6 +1279,8 @@
     "newSellerInfo": "Yeni Satıcı Bilgisi",
     "ibanOwnerName": "IBAN Sahibinin Adı",
     "location": "Konum",
+    "ibanFormatHint": "IBAN Formatı",
+    "phoneFormatHint": "Telefon Formatı",
     "pinLocationOnMap": "Haritada konum işaretle",
     "ibanOwnerSurname": "IBAN Sahibinin Soyadı",
     "phoneNumber": "Telefon Numarası",
@@ -1321,6 +1323,7 @@
     "title": "Kayıtlı Adresler",
     "ofFourAddresses": "4 adresden",
     "addNew": "Yeni Ekle",
+    "phoneFormatHint": "Telefon Formatı",
     "clearing": "Temizleniyor...",
     "clearAll": "Hepsini Temizle",
     "loginRequired": "Giriş Gerekli",
@@ -2020,7 +2023,9 @@
     "selected": "Seçildi",
     "expired": "Süresi doldu",
     "minPurchase": "Min. alışveriş: {amount}",
-    "applied": "Uygulandı"
+    "applied": "Uygulandı",
+    "minimumNotMet": "Minimum tutar karşılanmadı",
+    "minimumCartTotal": "Min. sepet tutarı: {amount} TL"
   },
   "FavoritesDrawer": {
     "title": "Favorilerim",
@@ -2260,6 +2265,7 @@
     "cancel": "İptal",
     "days": "gün",    
     "appliedDiscounts": "Uygulanan İndirimler",
+    "phoneFormatHint": "Telefon Formatı",
     "placeOrder": "Siparişi Tamamla",
     "processing": "İşleniyor...",
     "iAgreeToThe": "Kabul ediyorum:",

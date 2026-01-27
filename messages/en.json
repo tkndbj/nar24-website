@@ -1278,6 +1278,8 @@
     "newSellerInfo": "New Seller Info",
     "ibanOwnerName": "IBAN Owner Name",
     "saving": "Saving",
+    "ibanFormatHint": "IBAN Format Hint",
+    "phoneFormatHint": "Phone Format Hint",
     "ibanOwnerSurname": "IBAN Owner Surname",
     "location": "Location",
     "pinLocationOnMap": "Pin location on map",
@@ -1325,6 +1327,7 @@
     "loginRequired": "Login Required",
     "loginToManageAddresses": "Please login to view and manage your saved addresses.",
     "login": "Login",
+    "phoneFormatHint": "Phone Format Hint",
     "loading": "Loading addresses...",
     "noSavedAddresses": "No Saved Addresses",
     "addFirstAddress": "Add your first address to get started with faster deliveries.",
@@ -1985,7 +1988,9 @@
     "selected": "Selected",
     "expired": "Expired",
     "minPurchase": "Min. purchase: {amount}",
-    "applied": "Applied"
+    "applied": "Applied",
+    "minimumNotMet": "Minimum not met",
+    "minimumCartTotal": "Min. cart total: {amount} TL"
   },
   "header": {
     "back": "Back",
@@ -2184,6 +2189,7 @@
     "cancel": "Cancel",
     "days": "day",
     "shipping": "Shipping",
+    "phoneFormatHint": "Phone Format Hint",
     "expressNotAvailableWithFreeShipping": "Express shipping is not available with free shipping benefit",
     "iAgreeToThe": "I agree to the",
     "distanceSellingContract": "Distance Selling Contract",

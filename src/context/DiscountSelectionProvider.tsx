@@ -14,6 +14,8 @@ import React, {
 } from "react";
 import { Coupon, UserBenefit } from "@/app/models/coupon";
 import { useCoupon } from "./CouponProvider";
+import { FREE_SHIPPING_MINIMUM, COUPON_MINIMUM_MULTIPLIER } from "./CouponProvider";
+
 
 // ============================================================================
 // STORAGE KEYS (matching Flutter SharedPreferences keys)
@@ -44,6 +46,9 @@ interface DiscountSelectionContextType {
   revalidateSelections: () => Promise<void>;
   clearCouponIfSelected: (couponId: string) => Promise<void>;
   clearBenefitIfSelected: (benefitId: string) => Promise<void>;
+
+  isCouponApplicableForCart: (cartTotal: number) => boolean;
+isFreeShippingApplicableForCart: (cartTotal: number) => boolean;
 
   // Calculation helpers
   calculateCouponDiscount: (cartTotal: number) => number;
@@ -104,6 +109,22 @@ export const DiscountSelectionProvider: React.FC<DiscountSelectionProviderProps>
   const hasAnyDiscount = useMemo(() => {
     return selectedCoupon !== null || useFreeShipping;
   }, [selectedCoupon, useFreeShipping]);
+
+  const isCouponApplicableForCart = useCallback(
+    (cartTotal: number): boolean => {
+      if (!selectedCoupon) return true; // No coupon selected
+      const minimumRequired = selectedCoupon.amount * COUPON_MINIMUM_MULTIPLIER;
+      return cartTotal >= minimumRequired;
+    },
+    [selectedCoupon]
+  );
+  
+  const isFreeShippingApplicableForCart = useCallback(
+    (cartTotal: number): boolean => {
+      return cartTotal >= FREE_SHIPPING_MINIMUM;
+    },
+    []
+  );
 
   // ========================================================================
   // HELPER FUNCTIONS
@@ -354,6 +375,11 @@ export const DiscountSelectionProvider: React.FC<DiscountSelectionProviderProps>
   const calculateCouponDiscount = useCallback(
     (cartTotal: number): number => {
       if (!selectedCoupon || !selectedCoupon.isValid) return 0;
+      
+      // Check minimum requirement (2x coupon amount)
+      const minimumRequired = selectedCoupon.amount * COUPON_MINIMUM_MULTIPLIER;
+      if (cartTotal < minimumRequired) return 0;
+      
       // Cap discount at cart total
       return selectedCoupon.amount > cartTotal ? cartTotal : selectedCoupon.amount;
     },
@@ -398,6 +424,8 @@ export const DiscountSelectionProvider: React.FC<DiscountSelectionProviderProps>
       useFreeShipping,
       isLoading,
       hasAnyDiscount,
+      isCouponApplicableForCart,
+    isFreeShippingApplicableForCart,
 
       // Methods
       selectCoupon,
@@ -417,6 +445,8 @@ export const DiscountSelectionProvider: React.FC<DiscountSelectionProviderProps>
       useFreeShipping,
       isLoading,
       hasAnyDiscount,
+      isCouponApplicableForCart,
+      isFreeShippingApplicableForCart,
       selectCoupon,
       setFreeShipping,
       clearAllSelections,
