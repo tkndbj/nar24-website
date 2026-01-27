@@ -351,7 +351,7 @@ export const CelebrationProvider: React.FC<CelebrationProviderProps> = ({
 }) => {
   const { user } = useUser();
   const { coupons, isInitialized } = useCoupon();
-  const [celebrationQueue, setCelebrationQueue] = useState<Coupon[]>([]);
+  const [, setCelebrationQueue] = useState<Coupon[]>([]);
   const [currentCoupon, setCurrentCoupon] = useState<Coupon | null>(null);
   const hasCheckedRef = useRef(false);
 
