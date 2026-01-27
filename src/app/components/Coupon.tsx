@@ -151,11 +151,11 @@ export const CouponWidget: React.FC<CouponWidgetProps> = ({
         {/* Left Section - Rotated Text */}
         <div className="w-[18%] flex items-center justify-center">
           <span
-            className="text-[10px] md:text-xs font-bold tracking-wider text-gray-800 whitespace-nowrap"
+            className="text-[8px] md:text-[10px] font-bold tracking-wider text-gray-800 whitespace-nowrap"
             style={{
               writingMode: "vertical-rl",
               transform: "rotate(180deg)",
-              letterSpacing: "1px",
+              letterSpacing: "0.5px",
             }}
           >
             {leftText.toUpperCase()}
@@ -191,7 +191,7 @@ export const CouponWidget: React.FC<CouponWidgetProps> = ({
         {/* Right Section - Code */}
         <div className="w-[25%] flex items-center justify-center bg-white rounded-r-lg">
           <span
-            className="text-xl md:text-2xl lg:text-3xl font-light text-gray-800 tracking-widest"
+            className="text-sm md:text-base lg:text-lg font-light text-gray-800 tracking-wide"
             style={{
               writingMode: "vertical-rl",
               transform: "rotate(180deg)",
