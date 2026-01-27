@@ -29,6 +29,7 @@ import {
   Settings,
   Receipt,
   Folder,
+  Ticket,
 } from "lucide-react";
 import Image from "next/image";
 import dynamic from "next/dynamic";
@@ -252,6 +253,12 @@ export default function ProfilePage() {
       label: t("ProfilePage.sellerInfo"),
       action: () => setIsSellerInfoDrawerOpen(true),
       gradient: "from-indigo-500 to-indigo-600",
+    },
+    {
+      icon: Ticket,
+      label: t("ProfilePage.coupons"),
+      path: "/coupon-and-benefits",
+      gradient: "from-amber-500 to-amber-600",
     },
   ];
 

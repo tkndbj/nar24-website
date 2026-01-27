@@ -1412,7 +1412,8 @@
     "logoutConfirmation": "Çıkış yapmak istediğinizden emin misiniz?",
     "loginToAccess": "Profilinize erişmek için giriş yapın",
     "loginDescription": "Siparişlerinizi, kayıtlı öğelerinizi ve hesap ayarlarınızı görüntülemek için oturum açın",
-    "sellOnVitrin": "Vitrin'de Sat"
+    "sellOnVitrin": "Vitrin'de Sat",
+    "coupons": "Kuponlar"
   },
   "ProductQuestions": {
     "title": "Ürün Soruları",
@@ -1837,6 +1838,32 @@
     "saveSuccess": "İsim başarıyla kaydedildi!",
     "saveError": "İsim kaydedilemedi. Lütfen tekrar deneyin.",
     "notLoggedIn": "Giriş yapmış olmalısınız"
+  },
+  "CouponsPage": {
+    "myCouponsAndBenefits": "Kuponlarım ve Avantajlarım",
+    "activeCoupons": "Aktif",
+    "usedCoupons": "Kullanılmış",
+    "noCouponsOrBenefits": "Kupon veya Avantaj Yok",
+    "noCouponsOrBenefitsDescription": "Henüz aktif kuponunuz veya avantajınız bulunmuyor. Özel teklifler için daha sonra tekrar kontrol edin!",
+    "noUsedCouponsOrBenefits": "Kullanılmış Kupon veya Avantaj Yok",
+    "noUsedCouponsOrBenefitsDescription": "Henüz hiçbir kupon veya avantaj kullanmadınız. Ödüllerinizi kullanmak için alışverişe başlayın!",
+    "errorLoadingData": "Veri Yüklenirken Hata",
+    "tryAgainLater": "Bir şeyler yanlış gitti. Lütfen daha sonra tekrar deneyin.",
+    "retry": "Tekrar Dene",
+    "validUntil": "Geçerlilik tarihi",
+    "usedOn": "Kullanım tarihi",
+    "noExpiry": "Süresiz",
+    "active": "Aktif",
+    "expired": "Süresi Dolmuş",
+    "used": "Kullanıldı",
+    "coupon": "Kupon",
+    "enjoyYourGift": "Hediyenin Tadını Çıkar",
+    "freeShipping": "Ücretsiz Kargo",
+    "freeShippingDescription": "Bir sonraki siparişinizde ücretsiz teslimat",
+    "discount": "İndirim",
+    "discountDescription": "Alışverişinizde özel indirim",
+    "benefit": "Avantaj",
+    "benefitDescription": "Size özel avantaj"
   },
   "LoginPage": {
     "welcome": "Hoş Geldiniz",
