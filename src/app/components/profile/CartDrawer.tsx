@@ -14,6 +14,11 @@ import {
   RefreshCw,
   Minus,
   Plus,
+  Tag,
+  Truck,
+  
+  Check,
+  Ticket,
 } from "lucide-react";
 import { CompactBundleWidget } from "../CompactBundle";
 import { useCart, CartTotals, CartItemTotal } from "@/context/CartProvider";
@@ -25,6 +30,12 @@ import { db } from "@/lib/firebase";
 import Image from "next/image";
 import { Product } from "@/app/models/Product";
 import { doc, onSnapshot } from "firebase/firestore";
+
+// ✅ Coupon System Imports
+import { useCoupon } from "@/context/CouponProvider";
+import { useDiscountSelection } from "@/context/DiscountSelectionProvider";
+import { CouponSelectionSheet } from "../CouponSelectionSheet";
+import { Coupon, UserBenefit, BenefitType } from "@/app/models/coupon";
 
 // Lazy load CartValidationDialog - only shown when validation needed
 const CartValidationDialog = dynamic(
@@ -73,6 +84,7 @@ interface CartItem {
   isShop: boolean;
   isOptimistic?: boolean;
   salePreferences?: SalePreferences | null;
+  salePreferenceInfo?: SalePreferences | null;
   selectedColorImage?: string;
   showSellerHeader?: boolean;
   [key: string]: unknown;
@@ -121,16 +133,39 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     initializeCartIfNeeded,
     loadMoreItems,
     calculateCartTotals,
-    validateForPayment, // ✅ ADD THIS
+    validateForPayment,
     updateCartCacheFromValidation,
   } = useCart();
+
+  // ✅ Coupon Service - for available coupons/benefits
+  const {
+    activeCoupons,
+    activeFreeShippingBenefits,
+    benefits,
+  } = useCoupon();
+
+  // ✅ Discount Selection Service - for selected discounts (matches Flutter's DiscountSelectionService)
+  const {
+    selectedCoupon,
+    selectedBenefit,
+    useFreeShipping,
+    hasAnyDiscount,
+    selectCoupon,
+    setFreeShipping,
+    calculateCouponDiscount,
+    calculateFinalTotal,
+    revalidateSelections,
+  } = useDiscountSelection();
+
+  // ✅ Coupon sheet state
+  const [showCouponSheet, setShowCouponSheet] = useState(false);
 
   const [isAnimating, setIsAnimating] = useState(false);
   const [shouldRender, setShouldRender] = useState(false);
   const [salesPaused, setSalesPaused] = useState(false);
-const [pauseReason, setPauseReason] = useState("");
-const [showSalesPausedDialog, setShowSalesPausedDialog] = useState(false);
-const totalsVerificationTimer = useRef<NodeJS.Timeout | null>(null);
+  const [pauseReason, setPauseReason] = useState("");
+  const [showSalesPausedDialog, setShowSalesPausedDialog] = useState(false);
+  const totalsVerificationTimer = useRef<NodeJS.Timeout | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<
     Record<string, boolean>
   >({});
@@ -143,9 +178,22 @@ const totalsVerificationTimer = useRef<NodeJS.Timeout | null>(null);
   });
   const [isCalculatingTotals, setIsCalculatingTotals] = useState(false);
 
+  const [isValidating, setIsValidating] = useState(false);
+  const [showValidationDialog, setShowValidationDialog] = useState(false);
+  const [validationResult, setValidationResult] = useState<{
+    isValid: boolean;
+    errors: Record<string, ValidationMessage>;
+    warnings: Record<string, ValidationMessage>;
+    validatedItems: ValidatedCartItem[];
+  } | null>(null);
+
+  // ========================================================================
+  // TRANSLATION HELPER
+  // ========================================================================
+
   const t = useCallback(
-    (key: string) => {
-      if (!localization) return key;
+    (key: string, fallback?: string) => {
+      if (!localization) return fallback ?? key;
 
       try {
         const translation = localization(`CartDrawer.${key}`);
@@ -158,89 +206,77 @@ const totalsVerificationTimer = useRef<NodeJS.Timeout | null>(null);
           return directTranslation;
         }
 
-        return key;
+        return fallback ?? key;
       } catch (error) {
         console.warn(`Translation error for key: ${key}`, error);
-        return key;
+        return fallback ?? key;
       }
     },
     [localization]
   );
 
-  const calculateOptimisticTotals = useCallback((): CartTotals => {
-    const selectedIds = Object.entries(selectedProducts)
+  // ========================================================================
+  // COMPUTED VALUES (matching Flutter)
+  // ========================================================================
+
+  // Check if user has any coupons or benefits available
+  const hasAnyCouponsOrBenefits = useMemo(() => {
+    return activeCoupons.length > 0 || activeFreeShippingBenefits.length > 0;
+  }, [activeCoupons, activeFreeShippingBenefits]);
+
+  // Get selected item count
+  const selectedIds = useMemo(() => {
+    return Object.entries(selectedProducts)
       .filter(([, selected]) => selected)
       .map(([id]) => id);
-  
-    if (selectedIds.length === 0) {
-      return { total: 0, currency: "TL", items: [] };
-    }
-  
-    const selectedItems = cartItems.filter((item) =>
-      selectedIds.includes(item.productId)
-    );
-  
-    let total = 0;
-    const currency = selectedItems[0]?.product?.currency || "TL";
-    const items: CartItemTotal[] = [];
-  
-    for (const item of selectedItems) {
-      const quantity = item.quantity || 1;
-      let unitPrice = item.product?.price || 0;
-  
-      // Apply bulk discount if applicable
-      const discountThreshold = item.salePreferences?.discountThreshold;
-      const bulkDiscountPercentage = item.salePreferences?.bulkDiscountPercentage;
-  
-      if (
-        discountThreshold &&
-        bulkDiscountPercentage &&
-        quantity >= discountThreshold
-      ) {
-        unitPrice = unitPrice * (1 - bulkDiscountPercentage / 100);
-      }
-  
-      const itemTotal = unitPrice * quantity;
-      total += itemTotal;
-  
-      items.push({
-        productId: item.productId,
-        unitPrice,
-        total: itemTotal,
-        quantity,
-        isBundleItem: false,
-      });
-    }
-  
-    return {
-      total: Math.round(total * 100) / 100,
-      currency,
-      items,
+  }, [selectedProducts]);
+
+  // Calculate coupon discount amount
+  const couponDiscount = useMemo(() => {
+    return calculateCouponDiscount(calculatedTotals.total);
+  }, [calculateCouponDiscount, calculatedTotals.total]);
+
+  // Calculate final total after discounts
+  const finalTotal = useMemo(() => {
+    return calculateFinalTotal(calculatedTotals.total);
+  }, [calculateFinalTotal, calculatedTotals.total]);
+
+  // ========================================================================
+  // EFFECTS
+  // ========================================================================
+
+  // Revalidate selections on app resume/focus (matching Flutter's didChangeAppLifecycleState)
+  useEffect(() => {
+    const handleFocus = () => {
+      revalidateSelections();
     };
-  }, [cartItems, selectedProducts]);
+
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [revalidateSelections]);
 
   // Listen to sales config in real-time
-useEffect(() => {
-  const unsubscribe = onSnapshot(
-    doc(db, "settings", "salesConfig"),
-    (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.data();
-        setSalesPaused(data.salesPaused || false);
-        setPauseReason(data.pauseReason || "");
-      } else {
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      doc(db, "settings", "salesConfig"),
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          setSalesPaused(data.salesPaused || false);
+          setPauseReason(data.pauseReason || "");
+        } else {
+          setSalesPaused(false);
+          setPauseReason("");
+        }
+      },
+      (error) => {
+        console.error("Error listening to sales config:", error);
         setSalesPaused(false);
-        setPauseReason("");
       }
-    },
-    (error) => {
-      console.error("Error listening to sales config:", error);
-      setSalesPaused(false);
-    }
-  );
+    );
 
-  return () => unsubscribe();
-}, []);
+    return () => unsubscribe();
+  }, []);
 
   // Handle drawer animation
   useEffect(() => {
@@ -288,7 +324,7 @@ useEffect(() => {
     }
   }, [isOpen, user, isInitialized, isLoading, initializeCartIfNeeded]);
 
-  // Sync selections with cart items
+  // Sync selections with cart items (matching Flutter's _syncSelections)
   useEffect(() => {
     if (cartItems.length > 0) {
       setSelectedProducts((prev) => {
@@ -304,6 +340,7 @@ useEffect(() => {
     }
   }, [cartItems]);
 
+  // Cleanup timer on unmount
   useEffect(() => {
     return () => {
       if (totalsVerificationTimer.current) {
@@ -312,28 +349,24 @@ useEffect(() => {
     };
   }, []);
 
-  // Calculate totals when selections change
+  // Calculate totals when selections change (matching Flutter's _updateTotalsForCurrentSelection)
   useEffect(() => {
-    const selectedIds = Object.entries(selectedProducts)
-      .filter(([, selected]) => selected)
-      .map(([id]) => id);
-  
     // Step 1: Immediate optimistic update
     const optimistic = calculateOptimisticTotals();
     setCalculatedTotals(optimistic);
-  
+
     if (selectedIds.length === 0) {
       return;
     }
-  
+
     // Step 2: Debounced server verification
     setIsCalculatingTotals(true);
-  
+
     // Clear previous timer
     if (totalsVerificationTimer.current) {
       clearTimeout(totalsVerificationTimer.current);
     }
-  
+
     totalsVerificationTimer.current = setTimeout(async () => {
       try {
         const serverTotals = await calculateCartTotals(selectedIds);
@@ -345,13 +378,66 @@ useEffect(() => {
         setIsCalculatingTotals(false);
       }
     }, 500); // 500ms debounce (matches Flutter)
-  
+
     return () => {
       if (totalsVerificationTimer.current) {
         clearTimeout(totalsVerificationTimer.current);
       }
     };
-  }, [selectedProducts, cartItems, calculateCartTotals, calculateOptimisticTotals]);
+  }, [selectedProducts, cartItems, calculateCartTotals]);
+
+  // ========================================================================
+  // HELPER FUNCTIONS
+  // ========================================================================
+
+  const calculateOptimisticTotals = useCallback((): CartTotals => {
+    if (selectedIds.length === 0) {
+      return { total: 0, currency: "TL", items: [] };
+    }
+
+    const selectedItems = cartItems.filter((item) =>
+      selectedIds.includes(item.productId)
+    );
+
+    let total = 0;
+    const currency = selectedItems[0]?.product?.currency || "TL";
+    const items: CartItemTotal[] = [];
+
+    for (const item of selectedItems) {
+      const quantity = item.quantity || 1;
+      let unitPrice = item.product?.price || 0;
+
+      // Apply bulk discount if applicable
+      const salePrefs = item.salePreferences || item.salePreferenceInfo;
+      const discountThreshold = salePrefs?.discountThreshold;
+      const bulkDiscountPercentage = salePrefs?.bulkDiscountPercentage;
+
+      if (
+        discountThreshold &&
+        bulkDiscountPercentage &&
+        quantity >= discountThreshold
+      ) {
+        unitPrice = unitPrice * (1 - bulkDiscountPercentage / 100);
+      }
+
+      const itemTotal = unitPrice * quantity;
+      total += itemTotal;
+
+      items.push({
+        productId: item.productId,
+        unitPrice,
+        total: itemTotal,
+        quantity,
+        isBundleItem: false,
+      });
+    }
+
+    return {
+      total: Math.round(total * 100) / 100,
+      currency,
+      items,
+    };
+  }, [cartItems, selectedIds]);
 
   // Get available stock for item (matching Flutter logic)
   const getAvailableStock = useCallback((item: CartItem): number => {
@@ -371,30 +457,6 @@ useEffect(() => {
 
     return product.quantity || 0;
   }, []);
-
-  // Handle item removal
-  const handleRemoveItem = useCallback(
-    async (productId: string) => {
-      try {
-        await removeFromCart(productId);
-      } catch (error) {
-        console.error("Failed to remove item:", error);
-      }
-    },
-    [removeFromCart]
-  );
-
-  // Handle quantity change
-  const handleQuantityChange = useCallback(
-    async (productId: string, newQuantity: number) => {
-      try {
-        await updateQuantity(productId, newQuantity);
-      } catch (error) {
-        console.error("Failed to update quantity:", error);
-      }
-    },
-    [updateQuantity]
-  );
 
   // Format attributes for display
   const formatItemAttributes = useCallback(
@@ -445,10 +507,9 @@ useEffect(() => {
           value !== null &&
           value !== "" &&
           typeof value !== "boolean" &&
-          typeof value !== "object" && // Skip objects and arrays
+          typeof value !== "object" &&
           !Array.isArray(value)
         ) {
-          // Only include string or number values
           if (typeof value === "string" || typeof value === "number") {
             const localizedValue =
               AttributeLocalizationUtils.getLocalizedAttributeValue(
@@ -468,118 +529,87 @@ useEffect(() => {
     [localization]
   );
 
+  // ========================================================================
+  // CART OPERATIONS
+  // ========================================================================
+
+  const handleRemoveItem = useCallback(
+    async (productId: string) => {
+      try {
+        await removeFromCart(productId);
+      } catch (error) {
+        console.error("Failed to remove item:", error);
+      }
+    },
+    [removeFromCart]
+  );
+
+  const handleQuantityChange = useCallback(
+    async (productId: string, newQuantity: number) => {
+      try {
+        await updateQuantity(productId, newQuantity);
+      } catch (error) {
+        console.error("Failed to update quantity:", error);
+      }
+    },
+    [updateQuantity]
+  );
+
+  // ========================================================================
+  // COUPON HANDLERS (matching Flutter)
+  // ========================================================================
+
+  const handleCouponSelected = useCallback(
+    (coupon: Coupon | null) => {
+      selectCoupon(coupon);
+    },
+    [selectCoupon]
+  );
+
+  const handleFreeShippingToggled = useCallback(
+    (use: boolean, benefit?: UserBenefit | null) => {
+      // Find the first valid free shipping benefit if toggling on and no benefit provided
+      const benefitToUse = use && !benefit && activeFreeShippingBenefits.length > 0
+        ? activeFreeShippingBenefits[0]
+        : benefit;
+      setFreeShipping(use, benefitToUse);
+    },
+    [setFreeShipping, activeFreeShippingBenefits]
+  );
+
+  const showCouponSelectionSheet = useCallback(() => {
+    setShowCouponSheet(true);
+  }, []);
+
+  // ========================================================================
+  // CHECKOUT (matching Flutter's _proceedToCheckout)
+  // ========================================================================
+
   const proceedToPayment = useCallback(
     async (freshTotals: CartTotals) => {
-      // ✅ Build pricing map from Cloud Function totals
+      // Build pricing map from Cloud Function totals
       const pricingMap = new Map<string, CartItemTotal>();
       freshTotals.items.forEach((itemTotal) => {
         pricingMap.set(itemTotal.productId, itemTotal);
       });
 
-      // Get selected IDs
-      const selectedIds = Object.entries(selectedProducts)
-        .filter(([, selected]) => selected)
-        .map(([id]) => id);
-
-      // ✅ Filter cart items to only include those with calculated pricing
+      // Filter cart items to only include those with calculated pricing
       const itemsWithPricing = cartItems.filter(
         (item) =>
           selectedIds.includes(item.productId) && pricingMap.has(item.productId)
       );
 
-      // ✅ Check if we lost any items
+      // Check if we lost any items
       if (itemsWithPricing.length !== selectedIds.length) {
         const missingIds = selectedIds.filter((id) => !pricingMap.has(id));
         console.error("❌ Missing pricing for items:", missingIds);
         alert(
-          t("pricingError") ||
-            "Some items are missing pricing information. Please refresh and try again."
+          t("pricingError", "Some items are missing pricing information. Please refresh and try again.")
         );
         return;
       }
 
-      // ✅ DEFINE excludedKeys HERE (matching formatItemAttributes)
-      const excludedKeys = [
-        "productId",
-        "cartData",
-        "product",
-        "quantity",
-        "sellerName",
-        "sellerId",
-        "isShop",
-        "isOptimistic",
-        "selectedColorImage",
-        "salePreferences",
-        "salePreferenceInfo", // ✅ Add this too
-        "sellerContactNo",
-        "ourComission",
-        "unitPrice",
-        "currency",
-        "addedAt",
-        "updatedAt",
-        "showSellerHeader",
-      ];
-
-      // ✅ Build full payment items with ALL required fields
-      const paymentItems: PaymentItem[] = itemsWithPricing.map((item) => {
-        // ✅ GET PRICING FIRST
-        const calculatedPricing = pricingMap.get(item.productId)!;
-
-        // ✅ Extract ALL attributes from item
-        const allAttributes: Record<string, unknown> = {};
-
-        // Add selectedColor from cartData
-        if (item.cartData?.selectedColor) {
-          allAttributes.selectedColor = item.cartData.selectedColor;
-        }
-
-        // Add all other attributes from item root (already flattened by CartProvider)
-        Object.entries(item).forEach(([key, value]) => {
-          if (
-            !excludedKeys.includes(key) &&
-            value !== undefined &&
-            value !== null &&
-            value !== ""
-          ) {
-            allAttributes[key] = value;
-          }
-        });
-
-        return {
-          productId: item.productId,
-          quantity: item.quantity,
-          sellerName: item.sellerName,
-          sellerId: item.sellerId,
-          isShop: item.isShop,
-
-          // ✅ Spread all attributes (size, fit, color, etc.)
-          ...allAttributes,
-
-          // ✅ Add complete product data
-          product: item.product,
-
-          // ✅ Sale preferences (use salePreferenceInfo if available, fallback to salePreferences)
-          salePreferences: item.salePreferenceInfo || item.salePreferences,
-
-          // ✅ Images
-          selectedColorImage: item.selectedColorImage,
-
-          // ✅ Cart data (for reference)
-          cartData: item.cartData,
-
-          // ✅ Calculated pricing from Cloud Function
-          calculatedUnitPrice: calculatedPricing.unitPrice,
-          calculatedTotal: calculatedPricing.total,
-          isBundleItem: calculatedPricing.isBundleItem || false,
-        };
-      });
-
-      console.log("✅ Proceeding with items:", paymentItems);
-      console.log("✅ Total:", freshTotals.total);
-
-      // Store only selected product IDs in sessionStorage (small data)
-      // Payment page will fetch cart data directly from Firebase
-      // Note: selectedIds already defined at line 480, reusing it here
+      // Store checkout data in sessionStorage
       if (typeof window !== "undefined") {
         sessionStorage.setItem(
           "checkoutSelectedIds",
@@ -588,46 +618,47 @@ useEffect(() => {
             timestamp: Date.now(),
           })
         );
+
+        // ✅ Store discount selections (matching Flutter's passing to ProductPaymentScreen)
+        sessionStorage.setItem(
+          "checkoutDiscounts",
+          JSON.stringify({
+            couponId: selectedCoupon?.id ?? null,
+            couponAmount: selectedCoupon?.amount ?? 0,
+            couponCurrency: selectedCoupon?.currency ?? "TL",
+            couponCode: selectedCoupon?.code ?? null,
+            useFreeShipping: useFreeShipping,
+            benefitId: selectedBenefit?.id ?? null,
+            timestamp: Date.now(),
+          })
+        );
       }
 
       router.push("/productpayment");
       onClose();
     },
-    [cartItems, selectedProducts, onClose, router, t]
+    [cartItems, selectedIds, selectedCoupon, selectedBenefit, useFreeShipping, onClose, router, t]
   );
 
-  const [isValidating, setIsValidating] = useState(false);
-  const [showValidationDialog, setShowValidationDialog] = useState(false);
-  const [validationResult, setValidationResult] = useState<{
-    isValid: boolean;
-    errors: Record<string, ValidationMessage>;
-    warnings: Record<string, ValidationMessage>;
-    validatedItems: ValidatedCartItem[];
-  } | null>(null);
-
   const handleCheckout = useCallback(async () => {
-    const selectedIds = Object.entries(selectedProducts)
-      .filter(([, selected]) => selected)
-      .map(([id]) => id);
-  
     if (selectedIds.length === 0) return;
-  
+
     if (salesPaused) {
       setShowSalesPausedDialog(true);
       return;
     }
-  
+
     setIsValidating(true);
-  
+
     try {
       // STEP 1: Validate cart
       const validation = await validateForPayment(selectedIds, false);
-  
+
       if (validation.isValid && Object.keys(validation.warnings).length === 0) {
         // STEP 2: Calculate FRESH totals with retry
         console.log("💰 Calculating fresh totals before payment...");
         
-        let freshTotals: CartTotals | null = null;  // ✅ Initialize as null
+        let freshTotals: CartTotals | null = null;
         let retries = 3;
         
         while (retries > 0) {
@@ -644,12 +675,12 @@ useEffect(() => {
             }
           }
         }
-  
+
         // STEP 3: Validate totals before proceeding
         if (!freshTotals || freshTotals.total <= 0) {
           throw new Error("Invalid totals calculated");
         }
-  
+
         console.log("💰 Fresh totals:", freshTotals);
         setIsValidating(false);
         proceedToPayment(freshTotals);
@@ -661,102 +692,16 @@ useEffect(() => {
     } catch (error) {
       setIsValidating(false);
       console.error("❌ Checkout error:", error);
-      alert(t("validationFailed") || "Checkout failed. Please wait a moment and try again.");
+      alert(t("validationFailed", "Checkout failed. Please wait a moment and try again."));
     }
   }, [
-    selectedProducts,
+    selectedIds,
     validateForPayment,
     calculateCartTotals,
     proceedToPayment,
     salesPaused,
     t,
   ]);
-
-  // Sales Paused Dialog Component
-const SalesPausedDialog = () => {
-  if (!showSalesPausedDialog) return null;
-
-  return (
-    <div className="fixed inset-0 z-[1100] flex items-center justify-center">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={() => setShowSalesPausedDialog(false)}
-      />
-
-      {/* Dialog */}
-      <div
-        className={`
-          relative z-10 w-full max-w-sm mx-4 rounded-2xl overflow-hidden shadow-2xl
-          ${isDarkMode ? "bg-gray-800" : "bg-white"}
-        `}
-      >
-        {/* Header */}
-        <div className={`px-6 py-5 ${isDarkMode ? "bg-gray-700" : "bg-orange-50"}`}>
-          <div className="flex items-center space-x-3">
-            <div
-              className={`
-                w-12 h-12 rounded-full flex items-center justify-center
-                ${isDarkMode ? "bg-orange-500/20" : "bg-orange-100"}
-              `}
-            >
-              <svg
-                className="w-6 h-6 text-orange-500"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </div>
-            <div>
-              <h3
-                className={`text-lg font-bold ${
-                  isDarkMode ? "text-white" : "text-gray-900"
-                }`}
-              >
-                {t("salesPausedTitle") || "Sales Temporarily Paused"}
-              </h3>
-            </div>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="px-6 py-5">
-          <p
-            className={`text-center ${
-              isDarkMode ? "text-gray-300" : "text-gray-600"
-            }`}
-          >
-            {pauseReason ||
-              t("salesPausedMessage") ||
-              "We are currently not accepting orders. Please try again later."}
-          </p>
-        </div>
-
-        {/* Footer */}
-        <div className={`px-6 py-4 ${isDarkMode ? "bg-gray-700/50" : "bg-gray-50"}`}>
-          <button
-            onClick={() => setShowSalesPausedDialog(false)}
-            className="
-              w-full py-3 px-4 rounded-xl font-medium transition-all duration-200
-              bg-gradient-to-r from-orange-500 to-pink-500 text-white
-              hover:from-orange-600 hover:to-pink-600
-              active:scale-95
-            "
-          >
-            {t("understood") || "Understood"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
 
   const handleValidationContinue = useCallback(async () => {
     if (!validationResult) return;
@@ -786,15 +731,15 @@ const SalesPausedDialog = () => {
       setIsValidating(false);
 
       if (validIds.length > 0) {
-        // ✅ Calculate FRESH totals (like Flutter)
+        // Calculate FRESH totals (like Flutter)
         console.log("💰 Calculating fresh totals after validation...");
         const freshTotals = await calculateCartTotals(validIds);
         console.log("💰 Fresh totals:", freshTotals);
 
-        // ✅ Proceed with fresh totals
+        // Proceed with fresh totals
         proceedToPayment(freshTotals);
       } else {
-        alert(t("noValidItemsToCheckout") || "No valid items to checkout");
+        alert(t("noValidItemsToCheckout", "No valid items to checkout"));
       }
     } catch (error) {
       setIsValidating(false);
@@ -808,7 +753,6 @@ const SalesPausedDialog = () => {
     t,
   ]);
 
-  // Backdrop click handler
   const handleBackdropClick = useCallback(
     (e: React.MouseEvent) => {
       if (e.target === e.currentTarget) {
@@ -818,14 +762,134 @@ const SalesPausedDialog = () => {
     [onClose]
   );
 
-  // Render cart items
+  // ========================================================================
+  // PRICE BREAKDOWN COMPONENT (matching Flutter's _buildPriceBreakdown)
+  // ========================================================================
+
+  const renderPriceBreakdown = useCallback(() => {
+    if (!hasAnyDiscount) return null;
+
+    const subtotal = calculatedTotals.total;
+
+    return (
+      <div
+        className={`
+          p-3 rounded-xl mb-3 border
+          ${isDarkMode ? "bg-green-500/5 border-green-500/20" : "bg-green-50 border-green-200"}
+        `}
+      >
+        {/* Subtotal row */}
+        <div className="flex justify-between items-center">
+          <span className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+            {t("subtotal", "Subtotal")}
+          </span>
+          <span className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+            {subtotal.toFixed(2)} {calculatedTotals.currency}
+          </span>
+        </div>
+
+        {/* Coupon discount row */}
+        {couponDiscount > 0 && (
+          <div className="flex justify-between items-center mt-1.5">
+            <div className="flex items-center space-x-1">
+              <Tag size={14} className="text-green-500" />
+              <span className="text-sm font-medium text-green-600">
+                {selectedCoupon?.code || t("coupon", "Coupon")}
+              </span>
+            </div>
+            <span className="text-sm font-semibold text-green-600">
+              -{couponDiscount.toFixed(2)} {calculatedTotals.currency}
+            </span>
+          </div>
+        )}
+
+        {/* Free shipping row */}
+        {useFreeShipping && (
+          <div className="flex justify-between items-center mt-1.5">
+            <div className="flex items-center space-x-1">
+              <Truck size={14} className="text-green-500" />
+              <span className="text-sm font-medium text-green-600">
+                {t("freeShipping", "Free Shipping")}
+              </span>
+            </div>
+            <span className="text-sm font-semibold text-green-600">
+              {t("applied", "Applied")}
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  }, [
+    hasAnyDiscount,
+    calculatedTotals,
+    couponDiscount,
+    selectedCoupon,
+    useFreeShipping,
+    isDarkMode,
+    t,
+  ]);
+
+  // ========================================================================
+  // COMPACT COUPON BUTTON (matching Flutter's _buildCompactCouponButton)
+  // ========================================================================
+
+  const renderCompactCouponButton = useCallback(() => {
+    if (!hasAnyCouponsOrBenefits) return null;
+
+    // Count applied discounts (matching Flutter logic)
+    const appliedCount = (selectedCoupon ? 1 : 0) + (useFreeShipping ? 1 : 0);
+
+    return (
+      <button
+        onClick={showCouponSelectionSheet}
+        className={`
+          px-2.5 py-1.5 rounded-lg border transition-all duration-200
+          ${
+            hasAnyDiscount
+              ? "border-green-500/30 bg-green-500/10"
+              : "border-orange-500/30 bg-orange-500/10"
+          }
+        `}
+      >
+        <div className="flex items-center space-x-1.5">
+          {hasAnyDiscount ? (
+            <Check size={14} className="text-green-500" />
+          ) : (
+            <Ticket size={14} className="text-orange-500" />
+          )}
+          <span
+            className={`text-xs font-semibold ${
+              hasAnyDiscount ? "text-green-600" : "text-orange-600"
+            }`}
+          >
+            {hasAnyDiscount
+              ? `${appliedCount} ${t("applied", "applied")}`
+              : t("addDiscount", "Add discount")}
+          </span>
+        </div>
+      </button>
+    );
+  }, [
+    hasAnyCouponsOrBenefits,
+    hasAnyDiscount,
+    selectedCoupon,
+    useFreeShipping,
+    showCouponSelectionSheet,
+    t,
+  ]);
+
+  // ========================================================================
+  // RENDER CART ITEMS
+  // ========================================================================
+
   const renderCartItems = useMemo(() => {
     return cartItems.map((item) => {
       const isSelected = selectedProducts[item.productId] ?? true;
       const availableStock = getAvailableStock(item);
+      const salePrefs = item.salePreferences || item.salePreferenceInfo;
       const maxQuantity = Math.min(
         availableStock,
-        item.salePreferences?.maxQuantity ?? 99
+        salePrefs?.maxQuantity ?? 99
       );
       const attributesDisplay = formatItemAttributes(item);
 
@@ -834,12 +898,7 @@ const SalesPausedDialog = () => {
           key={item.productId}
           className={`
             rounded-lg border p-2 transition-all duration-200
-            ${
-              isDarkMode
-                ? "bg-gray-800 border-gray-700"
-                : "bg-gray-50 border-gray-200"
-            }
-            
+            ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-gray-50 border-gray-200"}
             ${isSelected ? "border-orange-500" : ""}
           `}
         >
@@ -893,9 +952,7 @@ const SalesPausedDialog = () => {
               }}
             >
               <Image
-                src={
-                  item.selectedColorImage || item.product?.imageUrls?.[0] || ""
-                }
+                src={item.selectedColorImage || item.product?.imageUrls?.[0] || ""}
                 alt={item.product?.productName || ""}
                 fill
                 className="object-cover"
@@ -925,15 +982,14 @@ const SalesPausedDialog = () => {
                   isDarkMode ? "text-white" : "text-gray-900"
                 }`}
               >
-                {item.product?.productName || t("loadingProduct")}
+                {item.product?.productName || t("loadingProduct", "Loading...")}
               </h3>
               <p className="text-sm font-bold text-orange-500 mt-0.5">
-                {item.product?.price.toFixed(2)}{" "}
-                {item.product?.currency || "TL"}
+                {item.product?.price.toFixed(2)} {item.product?.currency || "TL"}
               </p>
               {availableStock < 10 && (
                 <p className="text-xs text-red-500 mt-0.5">
-                  {t("onlyLeft")} {availableStock}
+                  {t("onlyLeft", "Only")} {availableStock} {t("left", "left")}
                 </p>
               )}
             </div>
@@ -957,7 +1013,7 @@ const SalesPausedDialog = () => {
                 isDarkMode ? "text-gray-300" : "text-gray-700"
               }`}
             >
-              {t("quantity")}:
+              {t("quantity", "Quantity")}:
             </span>
             <div className="flex items-center space-x-1.5">
               <button
@@ -970,11 +1026,7 @@ const SalesPausedDialog = () => {
                 disabled={item.quantity <= 1 || item.isOptimistic}
                 className={`
                   p-1 rounded-md transition-colors
-                  ${
-                    isDarkMode
-                      ? "hover:bg-gray-700 text-gray-300"
-                      : "hover:bg-gray-200 text-gray-700"
-                  }
+                  ${isDarkMode ? "hover:bg-gray-700 text-gray-300" : "hover:bg-gray-200 text-gray-700"}
                   disabled:opacity-50 disabled:cursor-not-allowed
                 `}
               >
@@ -999,11 +1051,7 @@ const SalesPausedDialog = () => {
                 disabled={item.quantity >= maxQuantity || item.isOptimistic}
                 className={`
                   p-1 rounded-md transition-colors
-                  ${
-                    isDarkMode
-                      ? "hover:bg-gray-700 text-gray-300"
-                      : "hover:bg-gray-200 text-gray-700"
-                  }
+                  ${isDarkMode ? "hover:bg-gray-700 text-gray-300" : "hover:bg-gray-200 text-gray-700"}
                   disabled:opacity-50 disabled:cursor-not-allowed
                 `}
               >
@@ -1012,28 +1060,27 @@ const SalesPausedDialog = () => {
             </div>
           </div>
 
-          {/* Sale Preference Label */}
-          {item.salePreferences?.discountThreshold &&
-            item.salePreferences?.bulkDiscountPercentage && (
-              <div className="mt-1.5">
-                <div
-                  className={`
+          {/* Sale Preference Label (matching Flutter's _buildSalePreferenceLabel) */}
+          {salePrefs?.discountThreshold && salePrefs?.bulkDiscountPercentage && (
+            <div className="mt-1.5">
+              <div
+                className={`
                   inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-full text-xs
                   ${
-                    item.quantity >= item.salePreferences.discountThreshold
+                    item.quantity >= salePrefs.discountThreshold
                       ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
                       : "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300"
                   }
                 `}
-                >
-                  <span>
-                    {item.quantity >= item.salePreferences.discountThreshold
-                      ? t("youGotDiscount")
-                      : t("buyForDiscount")}
-                  </span>
-                </div>
+              >
+                <span>
+                  {item.quantity >= salePrefs.discountThreshold
+                    ? t("youGotDiscount", `You got ${salePrefs.bulkDiscountPercentage}% discount!`)
+                    : t("buyForDiscount", `Buy ${salePrefs.discountThreshold}+ for ${salePrefs.bulkDiscountPercentage}% off`)}
+                </span>
               </div>
-            )}
+            </div>
+          )}
 
           {/* Compact Bundle Widget */}
           {item.isShop && item.sellerId && (
@@ -1056,16 +1103,12 @@ const SalesPausedDialog = () => {
             className={`
               mt-2 w-full flex items-center justify-center space-x-1.5 px-2 py-1.5 rounded-md text-xs
               transition-colors duration-200
-              ${
-                isDarkMode
-                  ? "text-red-400 hover:bg-red-900/20"
-                  : "text-red-500 hover:bg-red-50"
-              }
+              ${isDarkMode ? "text-red-400 hover:bg-red-900/20" : "text-red-500 hover:bg-red-50"}
               disabled:opacity-50 disabled:cursor-not-allowed
             `}
           >
             <Trash2 size={12} />
-            <span>{t("remove")}</span>
+            <span>{t("remove", "Remove")}</span>
           </button>
         </div>
       );
@@ -1082,6 +1125,91 @@ const SalesPausedDialog = () => {
     router,
     t,
   ]);
+
+  // ========================================================================
+  // SALES PAUSED DIALOG
+  // ========================================================================
+
+  const SalesPausedDialog = () => {
+    if (!showSalesPausedDialog) return null;
+
+    return (
+      <div className="fixed inset-0 z-[1100] flex items-center justify-center">
+        {/* Backdrop */}
+        <div
+          className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+          onClick={() => setShowSalesPausedDialog(false)}
+        />
+
+        {/* Dialog */}
+        <div
+          className={`
+            relative z-10 w-full max-w-sm mx-4 rounded-2xl overflow-hidden shadow-2xl
+            ${isDarkMode ? "bg-gray-800" : "bg-white"}
+          `}
+        >
+          {/* Header */}
+          <div className={`px-6 py-5 ${isDarkMode ? "bg-gray-700" : "bg-orange-50"}`}>
+            <div className="flex items-center space-x-3">
+              <div
+                className={`
+                  w-12 h-12 rounded-full flex items-center justify-center
+                  ${isDarkMode ? "bg-orange-500/20" : "bg-orange-100"}
+                `}
+              >
+                <svg
+                  className="w-6 h-6 text-orange-500"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              </div>
+              <div>
+                <h3
+                  className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}
+                >
+                  {t("salesPausedTitle", "Sales Temporarily Paused")}
+                </h3>
+              </div>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="px-6 py-5">
+            <p className={`text-center ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
+              {pauseReason || t("salesPausedMessage", "We are currently not accepting orders. Please try again later.")}
+            </p>
+          </div>
+
+          {/* Footer */}
+          <div className={`px-6 py-4 ${isDarkMode ? "bg-gray-700/50" : "bg-gray-50"}`}>
+            <button
+              onClick={() => setShowSalesPausedDialog(false)}
+              className="
+                w-full py-3 px-4 rounded-xl font-medium transition-all duration-200
+                bg-gradient-to-r from-orange-500 to-pink-500 text-white
+                hover:from-orange-600 hover:to-pink-600
+                active:scale-95
+              "
+            >
+              {t("understood", "Understood")}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ========================================================================
+  // MAIN RENDER
+  // ========================================================================
 
   if (!shouldRender) return null;
 
@@ -1108,41 +1236,25 @@ const SalesPausedDialog = () => {
         <div
           className={`
             sticky top-0 z-10 border-b px-6 py-4
-            ${
-              isDarkMode
-                ? "bg-gray-900 border-gray-700"
-                : "bg-white border-gray-200"
-            }
+            ${isDarkMode ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"}
             backdrop-blur-xl bg-opacity-95
           `}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div
-                className={`p-2 rounded-full ${
-                  isDarkMode ? "bg-gray-800" : "bg-gray-100"
-                }`}
-              >
+              <div className={`p-2 rounded-full ${isDarkMode ? "bg-gray-800" : "bg-gray-100"}`}>
                 <ShoppingCart
                   size={20}
                   className={isDarkMode ? "text-gray-300" : "text-gray-700"}
                 />
               </div>
               <div>
-                <h2
-                  className={`text-lg font-bold ${
-                    isDarkMode ? "text-white" : "text-gray-900"
-                  }`}
-                >
-                  {t("title")}
+                <h2 className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                  {t("title", "My Cart")}
                 </h2>
                 {user && cartCount > 0 && (
-                  <p
-                    className={`text-sm ${
-                      isDarkMode ? "text-gray-400" : "text-gray-500"
-                    }`}
-                  >
-                    {cartCount} {t("itemsCount")}
+                  <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                    {cartCount} {t("itemsCount", "items")}
                   </p>
                 )}
               </div>
@@ -1152,11 +1264,7 @@ const SalesPausedDialog = () => {
               onClick={onClose}
               className={`
                 p-2 rounded-full transition-colors duration-200
-                ${
-                  isDarkMode
-                    ? "hover:bg-gray-800 text-gray-400 hover:text-white"
-                    : "hover:bg-gray-100 text-gray-500 hover:text-gray-700"
-                }
+                ${isDarkMode ? "hover:bg-gray-800 text-gray-400 hover:text-white" : "hover:bg-gray-100 text-gray-500 hover:text-gray-700"}
               `}
             >
               <X size={20} />
@@ -1175,24 +1283,17 @@ const SalesPausedDialog = () => {
                     isDarkMode ? "bg-gray-800" : "bg-gray-100"
                   }`}
                 >
-                  <User
-                    size={32}
-                    className={isDarkMode ? "text-gray-400" : "text-gray-500"}
-                  />
+                  <User size={32} className={isDarkMode ? "text-gray-400" : "text-gray-500"} />
                 </div>
                 <h3
                   className={`text-xl font-bold mb-3 text-center ${
                     isDarkMode ? "text-white" : "text-gray-900"
                   }`}
                 >
-                  {t("loginRequired")}
+                  {t("loginRequired", "Login Required")}
                 </h3>
-                <p
-                  className={`text-center mb-8 ${
-                    isDarkMode ? "text-gray-400" : "text-gray-600"
-                  }`}
-                >
-                  {t("loginToViewCart")}
+                <p className={`text-center mb-8 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                  {t("loginToViewCart", "Please log in to view your cart")}
                 </p>
                 <button
                   onClick={() => {
@@ -1208,21 +1309,14 @@ const SalesPausedDialog = () => {
                   "
                 >
                   <LogIn size={18} />
-                  <span className="font-medium">{t("login")}</span>
+                  <span className="font-medium">{t("login", "Login")}</span>
                 </button>
               </div>
             ) : /* Loading */ isLoading && !isInitialized ? (
               <div className="flex flex-col items-center justify-center h-full px-6 py-12">
-                <RefreshCw
-                  size={32}
-                  className="animate-spin text-orange-500 mb-4"
-                />
-                <p
-                  className={`text-center ${
-                    isDarkMode ? "text-gray-400" : "text-gray-600"
-                  }`}
-                >
-                  {t("loading")}
+                <RefreshCw size={32} className="animate-spin text-orange-500 mb-4" />
+                <p className={`text-center ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                  {t("loading", "Loading...")}
                 </p>
               </div>
             ) : /* Empty Cart */ cartCount === 0 ? (
@@ -1232,24 +1326,17 @@ const SalesPausedDialog = () => {
                     isDarkMode ? "bg-gray-800" : "bg-gray-100"
                   }`}
                 >
-                  <ShoppingBag
-                    size={32}
-                    className={isDarkMode ? "text-gray-400" : "text-gray-500"}
-                  />
+                  <ShoppingBag size={32} className={isDarkMode ? "text-gray-400" : "text-gray-500"} />
                 </div>
                 <h3
                   className={`text-xl font-bold mb-3 text-center ${
                     isDarkMode ? "text-white" : "text-gray-900"
                   }`}
                 >
-                  {t("emptyCart")}
+                  {t("emptyCart", "Your cart is empty")}
                 </h3>
-                <p
-                  className={`text-center mb-8 ${
-                    isDarkMode ? "text-gray-400" : "text-gray-600"
-                  }`}
-                >
-                  {t("emptyCartDescription")}
+                <p className={`text-center mb-8 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                  {t("emptyCartDescription", "Start shopping to add items")}
                 </p>
                 <button
                   onClick={() => {
@@ -1265,7 +1352,7 @@ const SalesPausedDialog = () => {
                   "
                 >
                   <Heart size={18} />
-                  <span className="font-medium">{t("startShopping")}</span>
+                  <span className="font-medium">{t("startShopping", "Start Shopping")}</span>
                 </button>
               </div>
             ) : (
@@ -1281,21 +1368,17 @@ const SalesPausedDialog = () => {
                       disabled={isLoadingMore}
                       className={`
                         px-4 py-2 rounded-lg text-sm font-medium transition-colors
-                        ${
-                          isDarkMode
-                            ? "bg-gray-800 text-gray-300 hover:bg-gray-700"
-                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                        }
+                        ${isDarkMode ? "bg-gray-800 text-gray-300 hover:bg-gray-700" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}
                         disabled:opacity-50 disabled:cursor-not-allowed
                       `}
                     >
                       {isLoadingMore ? (
                         <div className="flex items-center space-x-2">
                           <RefreshCw size={14} className="animate-spin" />
-                          <span>{t("loadingMore")}</span>
+                          <span>{t("loadingMore", "Loading more...")}</span>
                         </div>
                       ) : (
-                        t("loadMore")
+                        t("loadMore", "Load More")
                       )}
                     </button>
                   </div>
@@ -1304,71 +1387,85 @@ const SalesPausedDialog = () => {
             )}
           </div>
 
-          {/* Footer */}
-{user && cartCount > 0 && (
-  <div
-    className={`
-      sticky bottom-0 border-t px-6 py-4
-      ${
-        isDarkMode
-          ? "bg-gray-900 border-gray-700"
-          : "bg-white border-gray-200"
-      }
-      backdrop-blur-xl bg-opacity-95
-    `}
-  >
-    {/* ✅ ADD: Sales Paused Banner */}
-    {salesPaused && (
-      <div
-        className={`
-          mb-4 p-3 rounded-lg border flex items-start space-x-2
-          ${
-            isDarkMode
-              ? "bg-orange-500/10 border-orange-500/30"
-              : "bg-orange-50 border-orange-200"
-          }
-        `}
-      >
-        <svg
-          className="w-5 h-5 text-orange-500 flex-shrink-0 mt-0.5"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        </svg>
-        <p className="text-sm text-orange-600 dark:text-orange-400 font-medium">
-          {pauseReason ||
-            t("salesTemporarilyPaused") ||
-            "Sales are temporarily paused"}
-        </p>
-      </div>
-    )}
-              {/* Total */}
-              <div className="flex items-center justify-between mb-4">
-                <span
-                  className={`text-lg font-bold ${
-                    isDarkMode ? "text-white" : "text-gray-900"
-                  }`}
+          {/* ========================================================================
+              FOOTER (matching Flutter's _buildCheckoutButton + _buildTotalsSection)
+              ======================================================================== */}
+          {user && cartCount > 0 && (
+            <div
+              className={`
+                sticky bottom-0 border-t px-6 py-4
+                ${isDarkMode ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"}
+                backdrop-blur-xl bg-opacity-95
+              `}
+            >
+              {/* Sales Paused Banner (matching Flutter) */}
+              {salesPaused && (
+                <div
+                  className={`
+                    mb-4 p-3 rounded-lg border flex items-start space-x-2
+                    ${isDarkMode ? "bg-orange-500/10 border-orange-500/30" : "bg-orange-50 border-orange-200"}
+                  `}
                 >
-                  {t("total")}:
-                </span>
-                {isCalculatingTotals ? (
-                  <RefreshCw
-                    size={20}
-                    className="animate-spin text-orange-500"
-                  />
-                ) : (
-                  <span className="text-lg font-bold text-orange-500">
-                    {calculatedTotals.total.toFixed(2)}{" "}
-                    {calculatedTotals.currency}
+                  <svg
+                    className="w-5 h-5 text-orange-500 flex-shrink-0 mt-0.5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  <p className="text-sm text-orange-600 dark:text-orange-400 font-medium">
+                    {pauseReason || t("salesTemporarilyPaused", "Sales are temporarily paused")}
+                  </p>
+                </div>
+              )}
+
+              {/* Price Breakdown (when discount applied) - matching Flutter's _buildPriceBreakdown */}
+              {renderPriceBreakdown()}
+
+              {/* Main Total Row (matching Flutter's _buildTotalsSection) */}
+              <div className="flex items-end justify-between mb-4">
+                <div className="flex flex-col">
+                  {/* Item count */}
+                  <span className={`text-xs ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+                    {selectedIds.length} {t("items", "items")}
                   </span>
-                )}
+
+                  {/* Price display */}
+                  <div className="flex items-baseline space-x-2 mt-0.5">
+                    {/* Show original price struck through if discounted */}
+                    {couponDiscount > 0 && (
+                      <span
+                        className={`text-sm line-through ${
+                          isDarkMode ? "text-gray-500" : "text-gray-400"
+                        }`}
+                      >
+                        {calculatedTotals.total.toFixed(2)} {calculatedTotals.currency}
+                      </span>
+                    )}
+
+                    {/* Final total */}
+                    {isCalculatingTotals ? (
+                      <RefreshCw size={22} className="animate-spin text-orange-500" />
+                    ) : (
+                      <span
+                        className={`text-xl font-bold ${
+                          hasAnyDiscount ? "text-green-500" : "text-orange-500"
+                        }`}
+                      >
+                        {finalTotal.toFixed(2)} {calculatedTotals.currency}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Compact Coupon Button (matching Flutter's _buildCompactCouponButton) */}
+                {renderCompactCouponButton()}
               </div>
 
               {/* Buttons */}
@@ -1388,62 +1485,65 @@ const SalesPausedDialog = () => {
                     active:scale-95
                   `}
                 >
-                  {t("viewCart")}
+                  {t("viewCart", "View Cart")}
                 </button>
+
                 <button
-  onClick={handleCheckout}
-  disabled={
-    isCalculatingTotals ||
-    isValidating ||
-    salesPaused ||
-    Object.values(selectedProducts).filter((v) => v).length === 0
-  }
-  className={`
-    py-3 px-4 rounded-xl font-medium transition-all duration-200
-    ${
-      salesPaused
-        ? "bg-gray-400"
-        : "bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600"
-    }
-    text-white shadow-lg hover:shadow-xl active:scale-95
-    flex items-center justify-center space-x-2
-    disabled:opacity-50 disabled:cursor-not-allowed
-  `}
->
-  {isValidating ? (
-    <>
-      <RefreshCw size={16} className="animate-spin" />
-      <span>{t("validating")}</span>
-    </>
-  ) : salesPaused ? (
-    <>
-      <svg
-        className="w-4 h-4"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"
-        />
-      </svg>
-      <span>{t("checkoutPaused") || "Checkout Paused"}</span>
-    </>
-  ) : (
-    <>
-      <span>{t("checkout")}</span>
-      <ArrowRight size={16} />
-    </>
-  )}
-</button>
+                  onClick={handleCheckout}
+                  disabled={
+                    isCalculatingTotals ||
+                    isValidating ||
+                    salesPaused ||
+                    selectedIds.length === 0
+                  }
+                  className={`
+                    py-3 px-4 rounded-xl font-medium transition-all duration-200
+                    ${
+                      salesPaused
+                        ? "bg-gray-400"
+                        : "bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600"
+                    }
+                    text-white shadow-lg hover:shadow-xl active:scale-95
+                    flex items-center justify-center space-x-2
+                    disabled:opacity-50 disabled:cursor-not-allowed
+                  `}
+                >
+                  {isValidating ? (
+                    <>
+                      <RefreshCw size={16} className="animate-spin" />
+                      <span>{t("validating", "Validating...")}</span>
+                    </>
+                  ) : salesPaused ? (
+                    <>
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
+                      <span>{t("checkoutPaused", "Checkout Paused")}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>{t("checkout", "Checkout")}</span>
+                      <ArrowRight size={16} />
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           )}
         </div>
       </div>
+
+      {/* Validation Dialog */}
       {showValidationDialog && validationResult && (
         <CartValidationDialog
           open={showValidationDialog}
@@ -1459,7 +1559,24 @@ const SalesPausedDialog = () => {
           localization={localization}
         />
       )}
+
+      {/* Sales Paused Dialog */}
       <SalesPausedDialog />
+
+      {/* Coupon Selection Sheet (matching Flutter's CouponSelectionSheet) */}
+      <CouponSelectionSheet
+        isOpen={showCouponSheet}
+        onClose={() => setShowCouponSheet(false)}
+        cartTotal={calculatedTotals.total}
+        selectedCoupon={selectedCoupon}
+        useFreeShipping={useFreeShipping}
+        onCouponSelected={handleCouponSelected}
+        onFreeShippingToggled={handleFreeShippingToggled}
+        isDarkMode={isDarkMode}
+        localization={t}
+      />
     </div>
   );
 };
+
+export default CartDrawer;

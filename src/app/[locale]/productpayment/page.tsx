@@ -16,6 +16,8 @@ import {
   CheckCircle2,
   Star,
   Package,
+  Tag,
+  Truck,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useUser } from "@/context/UserProvider";
@@ -27,6 +29,11 @@ import { httpsCallable } from "firebase/functions";
 import { functions } from "@/lib/firebase";
 import regionsList from "@/constants/regions";
 import type { Product } from "@/app/models/Product";
+
+// ✅ Import discount system
+import { useDiscountSelection } from "@/context/DiscountSelectionProvider";
+import { useCoupon } from "@/context/CouponProvider";
+import { UserBenefit, BenefitType } from "@/app/models/coupon";
 
 // Types
 interface Address {
@@ -71,6 +78,7 @@ interface CartItem {
   product?: Product;
   salePreferences?: SalePreferences | null;
   cartData?: CartData;
+  selectedAttributes?: Record<string, unknown>;
   [key: string]:
     | string
     | number
@@ -103,6 +111,17 @@ interface PaymentInitResponse {
   success: boolean;
   gatewayUrl: string;
   paymentParams: Record<string, string | number>;
+}
+
+// ✅ Checkout discount data from sessionStorage
+interface CheckoutDiscountData {
+  couponId: string | null;
+  couponAmount: number;
+  couponCurrency: string;
+  couponCode: string | null;
+  useFreeShipping: boolean;
+  benefitId: string | null;
+  timestamp: number;
 }
 
 // Load Google Maps script
@@ -400,12 +419,29 @@ const DeliveryOption: React.FC<{
   onSelect: () => void;
   isDarkMode: boolean;
   icon: React.ReactNode;
-}> = ({ title, description, price, selected, onSelect, isDarkMode, icon }) => {
+  disabled?: boolean;
+  disabledReason?: string;
+}> = ({
+  title,
+  description,
+  price,
+  selected,
+  onSelect,
+  isDarkMode,
+  icon,
+  disabled = false,
+  disabledReason,
+}) => {
   return (
     <button
       onClick={onSelect}
+      disabled={disabled}
       className={`w-full p-4 sm:p-5 rounded-xl border-2 transition-all duration-200 text-left ${
-        selected
+        disabled
+          ? isDarkMode
+            ? "border-gray-700 bg-gray-800/50 opacity-50 cursor-not-allowed"
+            : "border-gray-200 bg-gray-100/50 opacity-50 cursor-not-allowed"
+          : selected
           ? isDarkMode
             ? "border-blue-500 bg-blue-500/10 shadow-lg"
             : "border-blue-500 bg-blue-50 shadow-lg"
@@ -442,6 +478,9 @@ const DeliveryOption: React.FC<{
             >
               {description}
             </p>
+            {disabled && disabledReason && (
+              <p className="text-xs text-orange-500 mt-1">{disabledReason}</p>
+            )}
           </div>
         </div>
         <div className="text-right">
@@ -476,12 +515,28 @@ export default function ProductPaymentPage() {
   } = useCart();
   const t = useTranslations("ProductPayment");
 
+  // ✅ Discount system hooks
+  const { clearAllSelections } = useDiscountSelection();
+  const { activeFreeShippingBenefits } = useCoupon();
+
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isLoadingCheckout, setIsLoadingCheckout] = useState(true);
   const [totalPrice, setTotalPrice] = useState(0);
   const [agreesToContract, setAgreesToContract] = useState(false);
   const [selectedDeliveryOption, setSelectedDeliveryOption] =
     useState<string>("normal");
+
+  // ✅ Discount state (matching Flutter's ProductPaymentProvider)
+  const [appliedCoupon, setAppliedCoupon] = useState<{
+    id: string;
+    amount: number;
+    currency: string;
+    code: string | null;
+  } | null>(null);
+  const [useFreeShipping, setUseFreeShipping] = useState(false);
+  const [selectedBenefitId, setSelectedBenefitId] = useState<string | null>(null);
+  const [couponDiscount, setCouponDiscount] = useState(0);
+  const [freeShippingBenefit, setFreeShippingBenefit] = useState<UserBenefit | null>(null);
 
   // Delivery settings from Firestore
   const [deliverySettings, setDeliverySettings] = useState<{
@@ -514,6 +569,81 @@ export default function ProductPaymentPage() {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // ========================================================================
+  // DISCOUNT CALCULATIONS (matching Flutter's ProductPaymentProvider)
+  // ========================================================================
+
+  // ✅ Calculate coupon discount (matching Flutter's _calculateCouponDiscount)
+  const calculateCouponDiscount = useCallback(
+    (coupon: { amount: number } | null, cartTotal: number): number => {
+      if (!coupon) return 0;
+      // Cap discount at cart total (can't go negative)
+      return coupon.amount > cartTotal ? cartTotal : coupon.amount;
+    },
+    []
+  );
+
+  // ✅ Find free shipping benefit (matching Flutter's _findFreeShippingBenefit)
+  const findFreeShippingBenefit = useCallback(
+    (benefitId: string | null, benefits: UserBenefit[]): UserBenefit | null => {
+      if (!useFreeShipping) return null;
+
+      // Use specific benefit ID if provided
+      if (benefitId) {
+        const specificBenefit = benefits.find(
+          (b) => b.id === benefitId && b.isValid
+        );
+        if (specificBenefit) return specificBenefit;
+      }
+
+      // Fallback to first available
+      return (
+        benefits.find(
+          (b) => b.isValid && b.type === BenefitType.FreeShipping
+        ) || null
+      );
+    },
+    [useFreeShipping]
+  );
+
+  // ✅ Get delivery price (matching Flutter's getDeliveryPrice)
+  const getDeliveryPrice = useCallback((): number => {
+    const normalPrice = deliverySettings?.normal.price ?? 150;
+    const normalThreshold = deliverySettings?.normal.freeThreshold ?? 2000;
+    const expressPrice = deliverySettings?.express.price ?? 350;
+    const expressThreshold = deliverySettings?.express.freeThreshold ?? 10000;
+
+    switch (selectedDeliveryOption) {
+      case "normal":
+        return totalPrice >= normalThreshold ? 0 : normalPrice;
+      case "express":
+        return totalPrice >= expressThreshold ? 0 : expressPrice;
+      case "pickup":
+        return 0;
+      default:
+        return 0;
+    }
+  }, [selectedDeliveryOption, totalPrice, deliverySettings]);
+
+  // ✅ Get effective delivery price (matching Flutter's getEffectiveDeliveryPrice)
+  const getEffectiveDeliveryPrice = useCallback((): number => {
+    if (useFreeShipping && freeShippingBenefit) {
+      return 0;
+    }
+    return getDeliveryPrice();
+  }, [useFreeShipping, freeShippingBenefit, getDeliveryPrice]);
+
+  // ✅ Calculate final total (matching Flutter's finalTotal getter)
+  const finalTotal = totalPrice - couponDiscount + getEffectiveDeliveryPrice();
+
+  // ✅ Check if express is available (matching Flutter's isExpressAvailable)
+  const isExpressAvailable = !useFreeShipping;
+
+  // ========================================================================
+  // EFFECTS
+  // ========================================================================
+
+  // Fetch delivery settings
   useEffect(() => {
     const fetchDeliverySettings = async () => {
       try {
@@ -524,12 +654,12 @@ export default function ProductPaymentPage() {
           const data = docSnap.data();
           setDeliverySettings({
             normal: {
-              price: data.normal?.price ?? 50,
+              price: data.normal?.price ?? 150,
               freeThreshold: data.normal?.freeThreshold ?? 2000,
               estimatedDays: data.normal?.estimatedDays ?? "3-5",
             },
             express: {
-              price: data.express?.price ?? 100,
+              price: data.express?.price ?? 350,
               freeThreshold: data.express?.freeThreshold ?? 10000,
               estimatedDays: data.express?.estimatedDays ?? "1-2",
             },
@@ -580,6 +710,7 @@ export default function ProductPaymentPage() {
     };
   }, []);
 
+  // Load Google Maps
   useEffect(() => {
     if (typeof window !== "undefined") {
       loadGoogleMapsScript()
@@ -595,21 +726,50 @@ export default function ProductPaymentPage() {
     }
   }, [user, cartInitialized, cartLoading, initializeCartIfNeeded]);
 
+  // ✅ Load discount data from sessionStorage and find benefit
+  useEffect(() => {
+    if (useFreeShipping && activeFreeShippingBenefits.length > 0) {
+      const benefit = findFreeShippingBenefit(
+        selectedBenefitId,
+        activeFreeShippingBenefits
+      );
+      setFreeShippingBenefit(benefit);
+    }
+  }, [
+    useFreeShipping,
+    selectedBenefitId,
+    activeFreeShippingBenefits,
+    findFreeShippingBenefit,
+  ]);
+
+  // ✅ Recalculate coupon discount when total changes
+  useEffect(() => {
+    if (appliedCoupon) {
+      const discount = calculateCouponDiscount(appliedCoupon, totalPrice);
+      setCouponDiscount(discount);
+    } else {
+      setCouponDiscount(0);
+    }
+  }, [appliedCoupon, totalPrice, calculateCouponDiscount]);
+
+  // ✅ Force normal delivery when free shipping is used (matching Flutter)
+  useEffect(() => {
+    if (useFreeShipping && selectedDeliveryOption === "express") {
+      setSelectedDeliveryOption("normal");
+    }
+  }, [useFreeShipping, selectedDeliveryOption]);
+
   // Handle checkout data initialization
   useEffect(() => {
     const buyNowData = searchParams.get("buyNowData");
 
-    // ✅ CASE 1: Buy Now - Single Product Purchase (no Firebase needed)
+    // CASE 1: Buy Now - Single Product Purchase
     if (buyNowData) {
       try {
         console.log("🛒 Buy Now Mode - Decoding buyNowData...");
-
-        // Use decodeURIComponent for Unicode support
         const decodedItem = JSON.parse(decodeURIComponent(buyNowData));
-
         console.log("✅ Decoded Buy Now Item:", decodedItem);
 
-        // Add calculated prices for Buy Now items
         const itemWithCalculatedPrices = {
           ...decodedItem,
           calculatedUnitPrice: decodedItem.unitPrice,
@@ -618,10 +778,12 @@ export default function ProductPaymentPage() {
         };
 
         setCartItems([itemWithCalculatedPrices]);
-
         const itemTotal = decodedItem.unitPrice * decodedItem.quantity;
         setTotalPrice(itemTotal);
         setIsLoadingCheckout(false);
+
+        // ✅ Load discount data from sessionStorage for Buy Now
+        loadDiscountData();
 
         console.log("💰 Buy Now Total:", itemTotal);
         return;
@@ -633,10 +795,9 @@ export default function ProductPaymentPage() {
       }
     }
 
-    // ✅ CASE 2: Regular Cart Checkout - Fetch from Firebase
-    // Wait for cart to be initialized before proceeding
+    // CASE 2: Regular Cart Checkout
     if (!cartInitialized || cartLoading) {
-      return; // Wait for cart to load
+      return;
     }
 
     const loadCheckoutFromFirebase = async () => {
@@ -653,11 +814,11 @@ export default function ProductPaymentPage() {
         console.log("🛒 Cart Checkout Mode - Fetching from Firebase...");
         const checkoutData = JSON.parse(checkoutDataStr);
 
-        // Check if data is not stale (within 30 minutes)
         const isStale = Date.now() - checkoutData.timestamp > 30 * 60 * 1000;
         if (isStale) {
           console.warn("⚠️ Checkout session expired, clearing...");
           sessionStorage.removeItem("checkoutSelectedIds");
+          sessionStorage.removeItem("checkoutDiscounts");
           router.push("/cart");
           return;
         }
@@ -668,11 +829,11 @@ export default function ProductPaymentPage() {
         if (!selectedIds || selectedIds.length === 0) {
           console.error("❌ No selected items in checkout session!");
           sessionStorage.removeItem("checkoutSelectedIds");
+          sessionStorage.removeItem("checkoutDiscounts");
           router.push("/cart");
           return;
         }
 
-        // Filter cart items by selected IDs (cart data comes from Firebase via CartProvider)
         const selectedCartItems = firebaseCartItems.filter((item) =>
           selectedIds.includes(item.productId)
         );
@@ -680,19 +841,22 @@ export default function ProductPaymentPage() {
         if (selectedCartItems.length === 0) {
           console.error("❌ Selected items not found in cart!");
           sessionStorage.removeItem("checkoutSelectedIds");
+          sessionStorage.removeItem("checkoutDiscounts");
           router.push("/cart");
           return;
         }
 
         console.log("📦 Cart items from Firebase:", selectedCartItems);
 
-        // Calculate fresh totals from server (Cloud Function)
+        // Calculate fresh totals
         console.log("💰 Calculating fresh totals from server...");
         const freshTotals = await calculateCartTotals(selectedIds);
         console.log("💰 Server totals:", freshTotals);
 
-        // Build pricing map from Cloud Function response
-        const pricingMap = new Map<string, { unitPrice: number; total: number; isBundleItem?: boolean }>();
+        const pricingMap = new Map<
+          string,
+          { unitPrice: number; total: number; isBundleItem?: boolean }
+        >();
         freshTotals.items.forEach((itemTotal) => {
           pricingMap.set(itemTotal.productId, {
             unitPrice: itemTotal.unitPrice,
@@ -701,7 +865,6 @@ export default function ProductPaymentPage() {
           });
         });
 
-        // Build cart items with calculated pricing
         const itemsWithPricing: CartItem[] = selectedCartItems.map((item) => {
           const pricing = pricingMap.get(item.productId);
           return {
@@ -709,40 +872,100 @@ export default function ProductPaymentPage() {
             quantity: item.quantity,
             productName: item.product?.productName,
             currency: item.product?.currency || "TL",
-            calculatedUnitPrice: pricing?.unitPrice || item.product?.price || 0,
-            calculatedTotal: pricing?.total || (item.product?.price || 0) * item.quantity,
+            calculatedUnitPrice:
+              pricing?.unitPrice || item.product?.price || 0,
+            calculatedTotal:
+              pricing?.total || (item.product?.price || 0) * item.quantity,
             isBundleItem: pricing?.isBundleItem || false,
-            // Include all other attributes needed for the order
             sellerName: item.sellerName,
             sellerId: item.sellerId,
             isShop: item.isShop,
             selectedColor: item.cartData?.selectedColor,
             selectedSize: item.cartData?.selectedSize,
-            product: item.product ?? undefined, // Convert null to undefined for type compatibility
+            product: item.product ?? undefined,
             salePreferences: item.salePreferences,
             cartData: item.cartData,
           };
         });
 
-        console.log("✅ Items with server-calculated pricing:", itemsWithPricing);
+        console.log(
+          "✅ Items with server-calculated pricing:",
+          itemsWithPricing
+        );
 
         setCartItems(itemsWithPricing);
         setTotalPrice(freshTotals.total);
-        setIsLoadingCheckout(false);
 
-        // Clear the sessionStorage after successful load (one-time use)
+        // ✅ Load discount data from sessionStorage
+        loadDiscountData();
+
+        setIsLoadingCheckout(false);
         sessionStorage.removeItem("checkoutSelectedIds");
       } catch (error) {
         console.error("❌ Error loading checkout from Firebase:", error);
         sessionStorage.removeItem("checkoutSelectedIds");
+        sessionStorage.removeItem("checkoutDiscounts");
         alert("Failed to load checkout data. Please try again.");
         router.push("/cart");
       }
     };
 
     loadCheckoutFromFirebase();
-  }, [searchParams, router, cartInitialized, cartLoading, firebaseCartItems, calculateCartTotals]);
+  }, [
+    searchParams,
+    router,
+    cartInitialized,
+    cartLoading,
+    firebaseCartItems,
+    calculateCartTotals,
+  ]);
 
+  // ✅ Load discount data from sessionStorage (matching Flutter's passing from CartScreen)
+  const loadDiscountData = () => {
+    if (typeof window === "undefined") return;
+
+    const discountDataStr = sessionStorage.getItem("checkoutDiscounts");
+    if (!discountDataStr) {
+      console.log("📝 No discount data in session");
+      return;
+    }
+
+    try {
+      const discountData: CheckoutDiscountData = JSON.parse(discountDataStr);
+      console.log("🎫 Loaded discount data:", discountData);
+
+      // Check if discount data is not stale (within 1 hour)
+      const isStale = Date.now() - discountData.timestamp > 60 * 60 * 1000;
+      if (isStale) {
+        console.warn("⚠️ Discount data expired, clearing...");
+        sessionStorage.removeItem("checkoutDiscounts");
+        return;
+      }
+
+      // Set coupon if present
+      if (discountData.couponId && discountData.couponAmount > 0) {
+        setAppliedCoupon({
+          id: discountData.couponId,
+          amount: discountData.couponAmount,
+          currency: discountData.couponCurrency || "TL",
+          code: discountData.couponCode,
+        });
+        console.log("✅ Applied coupon:", discountData.couponId);
+      }
+
+      // Set free shipping
+      if (discountData.useFreeShipping) {
+        setUseFreeShipping(true);
+        setSelectedBenefitId(discountData.benefitId);
+        console.log("✅ Free shipping enabled, benefit:", discountData.benefitId);
+      }
+    } catch (error) {
+      console.error("❌ Failed to parse discount data:", error);
+      sessionStorage.removeItem("checkoutDiscounts");
+    }
+  };
+
+  // Load saved addresses
   useEffect(() => {
     if (user) {
       loadSavedAddresses();
@@ -804,20 +1027,13 @@ export default function ProductPaymentPage() {
     }
   };
 
-  const getDeliveryPrice = () => {
-    const normalPrice = deliverySettings?.normal.price ?? 50;
-    const normalThreshold = deliverySettings?.normal.freeThreshold ?? 2000;
-    const expressPrice = deliverySettings?.express.price ?? 100;
-    const expressThreshold = deliverySettings?.express.freeThreshold ?? 10000;
-
-    switch (selectedDeliveryOption) {
-      case "normal":
-        return totalPrice >= normalThreshold ? 0 : normalPrice;
-      case "express":
-        return totalPrice >= expressThreshold ? 0 : expressPrice;
-      default:
-        return 0;
+  // ✅ Handle delivery option change (matching Flutter's setDeliveryOption)
+  const handleDeliveryOptionChange = (option: string) => {
+    // Prevent express selection when free shipping is active
+    if (useFreeShipping && option === "express") {
+      return;
     }
+    setSelectedDeliveryOption(option);
   };
 
   const validateForm = () => {
@@ -844,6 +1060,7 @@ export default function ProductPaymentPage() {
     return Object.keys(newErrors).length === 0;
   };
 
+  // ✅ Handle payment submission (matching Flutter's confirmPayment)
   const handleSubmit = async () => {
     if (!user) {
       alert(t("pleaseLogin"));
@@ -864,6 +1081,7 @@ export default function ProductPaymentPage() {
           quantity: item.quantity,
         };
 
+        // Extract dynamic attributes from selectedAttributes map
         if (
           item.selectedAttributes &&
           typeof item.selectedAttributes === "object"
@@ -885,21 +1103,23 @@ export default function ProductPaymentPage() {
 
       const orderNumber = `ORDER-${Date.now()}`;
 
-      // Get user info
       const customerName = user.displayName || user.email || "Customer";
       const customerEmail = user.email || "";
 
-      // Prepare cart data for cloud function
+      // Normalize phone number (matching Flutter)
+      const normalizedPhone = `0${formData.phoneNumber.replace(/\D/g, "")}`;
+
+      // ✅ Prepare cart data with discount info (matching Flutter's cartData)
       const cartData = {
         items: itemsPayload,
         cartCalculatedTotal: totalPrice,
         deliveryOption: selectedDeliveryOption,
-        deliveryPrice: getDeliveryPrice(),
+        deliveryPrice: getEffectiveDeliveryPrice(), // ✅ Use effective price
         address: {
           addressLine1: formData.addressLine1,
           addressLine2: formData.addressLine2,
           city: formData.city,
-          phoneNumber: formData.phoneNumber,
+          phoneNumber: normalizedPhone,
           location: {
             latitude: formData.location!.latitude,
             longitude: formData.location!.longitude,
@@ -907,19 +1127,24 @@ export default function ProductPaymentPage() {
         },
         paymentMethod: "Card",
         saveAddress: formData.saveAddress,
+        // ✅ Add discount data (matching Flutter)
+        couponId: appliedCoupon?.id ?? null,
+        freeShippingBenefitId: useFreeShipping ? freeShippingBenefit?.id ?? selectedBenefitId : null,
+        clientDeliveryPrice: getDeliveryPrice(), // Original delivery price before free shipping
       };
 
       console.log("🔍 Initializing İşbank payment with:", {
-        amount: totalPrice + getDeliveryPrice(),
+        amount: finalTotal, // ✅ Use finalTotal (after discounts)
         orderNumber,
         customerName,
         customerEmail,
+        cartData,
       });
 
       // Initialize İşbank payment
       const initPayment = httpsCallable(functions, "initializeIsbankPayment");
       const initResponse = await initPayment({
-        amount: totalPrice + getDeliveryPrice(),
+        amount: finalTotal, // ✅ Use finalTotal (matching Flutter)
         orderNumber,
         customerName,
         customerEmail,
@@ -935,6 +1160,9 @@ export default function ProductPaymentPage() {
 
       console.log("✅ Payment initialized, redirecting to İşbank...");
 
+      // ✅ Clear discount session data (will clear local storage after successful payment)
+      sessionStorage.removeItem("checkoutDiscounts");
+
       const searchParamsString =
         `?gatewayUrl=${encodeURIComponent(initData.gatewayUrl)}` +
         `&orderNumber=${encodeURIComponent(orderNumber)}` +
@@ -942,24 +1170,72 @@ export default function ProductPaymentPage() {
           JSON.stringify(initData.paymentParams)
         )}`;
 
-      // Don't try to extract locale, just use relative path from current location
-      // The middleware will handle locale preservation
       const targetPath = `/isbankpayment${searchParamsString}`;
-
       console.log("Navigating to:", targetPath);
-
-      // Use router.push with just the path (no locale prefix)
-      // The middleware should preserve the current locale
       router.push(targetPath);
     } catch (error: unknown) {
       console.error("Payment error:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : t("paymentFailed");
-      alert(errorMessage);
+
+      // ✅ Handle specific coupon/benefit errors (matching Flutter)
+      if (error instanceof Error) {
+        const errorMessage = error.message;
+
+        // Check for coupon errors
+        if (
+          errorMessage.includes("Coupon has already been used") ||
+          errorMessage.includes("Coupon has expired") ||
+          errorMessage.includes("Coupon not found")
+        ) {
+          // Clear invalid coupon
+          setAppliedCoupon(null);
+          setCouponDiscount(0);
+          clearAllSelections(); // Clear from local storage too
+
+          const displayError = errorMessage.includes("already been used")
+            ? t("couponAlreadyUsed") || "This coupon has already been used"
+            : errorMessage.includes("expired")
+            ? t("couponExpired") || "This coupon has expired"
+            : t("couponNotFound") || "Coupon not found";
+
+          alert(displayError);
+          setIsProcessing(false);
+          return;
+        }
+
+        // Check for free shipping errors
+        if (
+          errorMessage.includes("Free shipping has already been used") ||
+          errorMessage.includes("Free shipping benefit has expired")
+        ) {
+          // Clear invalid free shipping
+          setUseFreeShipping(false);
+          setFreeShippingBenefit(null);
+          setSelectedBenefitId(null);
+          clearAllSelections(); // Clear from local storage too
+
+          const displayError = errorMessage.includes("already been used")
+            ? t("freeShippingAlreadyUsed") ||
+              "This free shipping benefit has already been used"
+            : t("freeShippingExpired") ||
+              "This free shipping benefit has expired";
+
+          alert(displayError);
+          setIsProcessing(false);
+          return;
+        }
+
+        alert(errorMessage);
+      } else {
+        alert(t("paymentFailed") || "Payment failed. Please try again.");
+      }
     } finally {
       setIsProcessing(false);
     }
   };
+
+  // ========================================================================
+  // RENDER
+  // ========================================================================
 
   if (userLoading || isLoadingCheckout || cartItems.length === 0) {
     return (
@@ -998,6 +1274,8 @@ export default function ProductPaymentPage() {
       </div>
     );
   }
+
+  const currency = cartItems[0]?.currency || "TL";
 
   return (
     <div
@@ -1101,13 +1379,16 @@ export default function ProductPaymentPage() {
                     deliverySettings?.normal.estimatedDays ?? "3-5"
                   } ${t("days")}`}
                   price={
-                    totalPrice >=
-                    (deliverySettings?.normal.freeThreshold ?? 2000)
+                    // ✅ Show 0 if free shipping benefit is applied
+                    useFreeShipping && freeShippingBenefit
+                      ? 0
+                      : totalPrice >=
+                        (deliverySettings?.normal.freeThreshold ?? 2000)
                       ? 0
                       : deliverySettings?.normal.price ?? 150
                   }
                   selected={selectedDeliveryOption === "normal"}
-                  onSelect={() => setSelectedDeliveryOption("normal")}
+                  onSelect={() => handleDeliveryOptionChange("normal")}
                   isDarkMode={isDarkMode}
                   icon={<Package size={20} className="text-blue-500" />}
                 />
@@ -1124,9 +1405,17 @@ export default function ProductPaymentPage() {
                       : deliverySettings?.express.price ?? 350
                   }
                   selected={selectedDeliveryOption === "express"}
-                  onSelect={() => setSelectedDeliveryOption("express")}
+                  onSelect={() => handleDeliveryOptionChange("express")}
                   isDarkMode={isDarkMode}
                   icon={<Package size={20} className="text-purple-500" />}
+                  // ✅ Disable express when free shipping is used (matching Flutter)
+                  disabled={!isExpressAvailable}
+                  disabledReason={
+                    !isExpressAvailable
+                      ? t("expressNotAvailableWithFreeShipping") ||
+                        "Express not available with free shipping"
+                      : undefined
+                  }
                 />
               </div>
             </div>
@@ -1276,7 +1565,7 @@ export default function ProductPaymentPage() {
                     </div>
                   )}
 
-                  {/* Address Form */}
+                  {/* Address Form Fields */}
                   <div className="space-y-4 sm:space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                       <div>
@@ -1681,12 +1970,14 @@ export default function ProductPaymentPage() {
                   </div>
                 ))}
               </div>
-              {/* Pricing Breakdown */}
+
+              {/* ✅ PRICING BREAKDOWN (matching Flutter's bottom section) */}
               <div
                 className={`border-t pt-5 sm:pt-6 space-y-3 sm:space-y-4 ${
                   isDarkMode ? "border-gray-700/50" : "border-gray-200/50"
                 }`}
               >
+                {/* Subtotal */}
                 <div className="flex items-center justify-between">
                   <span
                     className={`text-xs sm:text-sm ${
@@ -1700,37 +1991,72 @@ export default function ProductPaymentPage() {
                       isDarkMode ? "text-white" : "text-gray-900"
                     }`}
                   >
-                    {totalPrice.toFixed(2)} {cartItems[0]?.currency || "TL"}
+                    {totalPrice.toFixed(2)} {currency}
                   </span>
                 </div>
+
+                {/* ✅ Coupon Discount Row (matching Flutter) */}
+                {appliedCoupon && couponDiscount > 0 && (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-1.5">
+                      <Tag size={14} className="text-green-500" />
+                      <span className="text-xs sm:text-sm text-green-600 font-medium">
+                        {appliedCoupon.code || t("coupon") || "Coupon"}
+                      </span>
+                    </div>
+                    <span className="text-sm sm:text-base font-semibold text-green-600">
+                      -{couponDiscount.toFixed(2)} {currency}
+                    </span>
+                  </div>
+                )}
+
+                {/* ✅ Shipping Row (matching Flutter) */}
                 <div className="flex items-center justify-between">
-                  <span
-                    className={`text-xs sm:text-sm ${
-                      isDarkMode ? "text-gray-400" : "text-gray-600"
-                    }`}
-                  >
-                    {t("deliveryFee")}
-                  </span>
+                  <div className="flex items-center space-x-1.5">
+                    <Truck
+                      size={14}
+                      className={
+                        useFreeShipping && freeShippingBenefit
+                          ? "text-green-500"
+                          : isDarkMode
+                          ? "text-gray-400"
+                          : "text-gray-500"
+                      }
+                    />
+                    <span
+                      className={`text-xs sm:text-sm ${
+                        useFreeShipping && freeShippingBenefit
+                          ? "text-green-600 font-medium"
+                          : isDarkMode
+                          ? "text-gray-400"
+                          : "text-gray-600"
+                      }`}
+                    >
+                      {t("shipping") || "Shipping"}
+                    </span>
+                  </div>
                   <span
                     className={`text-sm sm:text-base font-medium ${
-                      getDeliveryPrice() === 0
-                        ? "text-green-500"
+                      getEffectiveDeliveryPrice() === 0
+                        ? "text-green-500 font-semibold"
                         : isDarkMode
                         ? "text-white"
                         : "text-gray-900"
                     }`}
                   >
-                    {getDeliveryPrice() === 0
-                      ? t("free")
-                      : `${getDeliveryPrice().toFixed(2)} TL`}
+                    {getEffectiveDeliveryPrice() === 0
+                      ? t("free") || "Free"
+                      : `${getEffectiveDeliveryPrice().toFixed(2)} ${currency}`}
                   </span>
                 </div>
 
+                {/* Divider */}
                 <div
                   className={`border-t pt-3 sm:pt-4 ${
                     isDarkMode ? "border-gray-700/50" : "border-gray-200/50"
                   }`}
                 >
+                  {/* ✅ Final Total (matching Flutter) */}
                   <div className="flex items-center justify-between mb-5 sm:mb-6">
                     <span
                       className={`text-lg sm:text-xl font-bold ${
@@ -1740,21 +2066,28 @@ export default function ProductPaymentPage() {
                       {t("total")}
                     </span>
                     <div className="text-right">
-                      <span className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent">
-                        {(totalPrice + getDeliveryPrice()).toFixed(2)}
+                      <span
+                        className={`text-2xl sm:text-3xl font-bold ${
+                          couponDiscount > 0 ||
+                          (useFreeShipping && freeShippingBenefit)
+                            ? "text-green-500"
+                            : "bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent"
+                        }`}
+                      >
+                        {finalTotal.toFixed(2)}
                       </span>
                       <p
                         className={`text-xs sm:text-sm ${
                           isDarkMode ? "text-gray-400" : "text-gray-600"
                         }`}
                       >
-                        {cartItems[0]?.currency || "TL"}
+                        {currency}
                       </p>
                     </div>
                   </div>
                 </div>
 
-                {/* Contract Agreement Checkbox */}
+                {/* Contract Agreement */}
                 <div
                   className={`p-4 sm:p-5 rounded-xl border mb-5 sm:mb-6 ${
                     isDarkMode
