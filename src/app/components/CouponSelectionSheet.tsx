@@ -54,7 +54,6 @@ export const CouponSelectionSheet: React.FC<CouponSelectionSheetProps> = ({
   const {
     coupons,
     benefits,
-    activeFreeShippingBenefits,
     calculateCouponDiscount,
   } = useCoupon();
 
@@ -520,7 +519,7 @@ export const SelectedDiscountsDisplay: React.FC<SelectedDiscountsDisplayProps> =
   selectedCoupon,
   useFreeShipping,
   couponDiscount,
-  shippingDiscount,
+  
   onTap,
   isDarkMode = false,
   localization,

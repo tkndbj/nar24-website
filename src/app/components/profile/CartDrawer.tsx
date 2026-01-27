@@ -35,7 +35,7 @@ import { doc, onSnapshot } from "firebase/firestore";
 import { useCoupon } from "@/context/CouponProvider";
 import { useDiscountSelection } from "@/context/DiscountSelectionProvider";
 import { CouponSelectionSheet } from "../CouponSelectionSheet";
-import { Coupon, UserBenefit, BenefitType } from "@/app/models/coupon";
+import { Coupon, UserBenefit } from "@/app/models/coupon";
 
 // Lazy load CartValidationDialog - only shown when validation needed
 const CartValidationDialog = dynamic(
@@ -90,21 +90,6 @@ interface CartItem {
   [key: string]: unknown;
 }
 
-interface PaymentItem {
-  productId: string;
-  quantity: number;
-  sellerName: string;
-  sellerId: string;
-  isShop: boolean;
-  selectedMetres?: number;
-  selectedColor?: string;
-  price?: number;
-  productName?: string;
-  currency?: string;
-  calculatedUnitPrice?: number;
-  calculatedTotal?: number;
-  isBundleItem?: boolean;
-}
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -140,8 +125,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   // ✅ Coupon Service - for available coupons/benefits
   const {
     activeCoupons,
-    activeFreeShippingBenefits,
-    benefits,
+    activeFreeShippingBenefits,    
   } = useCoupon();
 
   // ✅ Discount Selection Service - for selected discounts (matches Flutter's DiscountSelectionService)

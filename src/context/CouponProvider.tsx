@@ -22,12 +22,17 @@ import {
   doc,
   serverTimestamp,
   getDocs,
-  
   Firestore,
   QuerySnapshot,
   Unsubscribe,
 } from "firebase/firestore";
-import { Coupon, UserBenefit, BenefitType, CheckoutDiscounts, createCheckoutDiscounts } from "@/app/models/coupon";
+import {
+  Coupon,
+  UserBenefit,
+  BenefitType,
+  CheckoutDiscounts,
+  createCheckoutDiscounts,
+} from "@/app/models/coupon";
 
 // ============================================================================
 // TYPES
@@ -55,11 +60,11 @@ interface CouponContextType {
   fetchAllCoupons: () => Promise<Coupon[]>;
   calculateCouponDiscount: (coupon: Coupon, cartTotal: number) => number;
   findBestCoupon: (cartTotal: number) => Coupon | null;
-  useCoupon: (couponId: string, orderId: string) => Promise<boolean>;
+  markCouponAsUsed: (couponId: string, orderId: string) => Promise<boolean>;
 
   // Benefit operations
   fetchAllBenefits: () => Promise<UserBenefit[]>;
-  useBenefit: (benefitId: string, orderId: string) => Promise<boolean>;
+  markBenefitAsUsed: (benefitId: string, orderId: string) => Promise<boolean>;
 
   // Checkout helpers
   calculateCheckoutDiscounts: (params: {
@@ -150,6 +155,27 @@ export const CouponProvider: React.FC<CouponProviderProps> = ({
   }, [activeCoupons]);
 
   // ========================================================================
+  // LISTENER HELPERS
+  // ========================================================================
+
+  const stopListening = useCallback(() => {
+    if (unsubscribeCouponsRef.current) {
+      unsubscribeCouponsRef.current();
+      unsubscribeCouponsRef.current = null;
+    }
+    if (unsubscribeBenefitsRef.current) {
+      unsubscribeBenefitsRef.current();
+      unsubscribeBenefitsRef.current = null;
+    }
+  }, []);
+
+  const clearData = useCallback(() => {
+    setCoupons([]);
+    setBenefits([]);
+    setIsLoading(false);
+  }, []);
+
+  // ========================================================================
   // LISTENERS
   // ========================================================================
 
@@ -212,25 +238,8 @@ export const CouponProvider: React.FC<CouponProviderProps> = ({
       setIsInitialized(true);
       console.log(`🔴 Started listening to coupons & benefits for ${userId}`);
     },
-    [db, handleCouponsUpdate, handleBenefitsUpdate]
+    [db, handleCouponsUpdate, handleBenefitsUpdate, stopListening]
   );
-
-  const stopListening = useCallback(() => {
-    if (unsubscribeCouponsRef.current) {
-      unsubscribeCouponsRef.current();
-      unsubscribeCouponsRef.current = null;
-    }
-    if (unsubscribeBenefitsRef.current) {
-      unsubscribeBenefitsRef.current();
-      unsubscribeBenefitsRef.current = null;
-    }
-  }, []);
-
-  const clearData = useCallback(() => {
-    setCoupons([]);
-    setBenefits([]);
-    setIsLoading(false);
-  }, []);
 
   // ========================================================================
   // COUPON OPERATIONS
@@ -283,7 +292,8 @@ export const CouponProvider: React.FC<CouponProviderProps> = ({
     [activeCoupons]
   );
 
-  const useCoupon = useCallback(
+  // Renamed from useCoupon to markCouponAsUsed to avoid hook naming conflict
+  const markCouponAsUsed = useCallback(
     async (couponId: string, orderId: string): Promise<boolean> => {
       if (!user || !db) return false;
 
@@ -328,7 +338,8 @@ export const CouponProvider: React.FC<CouponProviderProps> = ({
     }
   }, [user, db]);
 
-  const useBenefit = useCallback(
+  // Renamed from useBenefit to markBenefitAsUsed to avoid hook naming conflict
+  const markBenefitAsUsed = useCallback(
     async (benefitId: string, orderId: string): Promise<boolean> => {
       if (!user || !db) return false;
 
@@ -339,7 +350,9 @@ export const CouponProvider: React.FC<CouponProviderProps> = ({
           orderId: orderId,
         });
 
-        console.log(`✅ Benefit ${benefitId} marked as used for order ${orderId}`);
+        console.log(
+          `✅ Benefit ${benefitId} marked as used for order ${orderId}`
+        );
         return true;
       } catch (error) {
         console.error("❌ Error marking benefit as used:", error);
@@ -399,16 +412,18 @@ export const CouponProvider: React.FC<CouponProviderProps> = ({
       const promises: Promise<boolean>[] = [];
 
       if (params.usedCoupon) {
-        promises.push(useCoupon(params.usedCoupon.id, params.orderId));
+        promises.push(markCouponAsUsed(params.usedCoupon.id, params.orderId));
       }
 
       if (params.usedFreeShipping) {
-        promises.push(useBenefit(params.usedFreeShipping.id, params.orderId));
+        promises.push(
+          markBenefitAsUsed(params.usedFreeShipping.id, params.orderId)
+        );
       }
 
       await Promise.all(promises);
     },
-    [useCoupon, useBenefit]
+    [markCouponAsUsed, markBenefitAsUsed]
   );
 
   // ========================================================================
@@ -507,11 +522,11 @@ export const CouponProvider: React.FC<CouponProviderProps> = ({
       fetchAllCoupons,
       calculateCouponDiscount,
       findBestCoupon,
-      useCoupon,
+      markCouponAsUsed,
 
       // Benefit operations
       fetchAllBenefits,
-      useBenefit,
+      markBenefitAsUsed,
 
       // Checkout helpers
       calculateCheckoutDiscounts,
@@ -533,9 +548,9 @@ export const CouponProvider: React.FC<CouponProviderProps> = ({
       fetchAllCoupons,
       calculateCouponDiscount,
       findBestCoupon,
-      useCoupon,
+      markCouponAsUsed,
       fetchAllBenefits,
-      useBenefit,
+      markBenefitAsUsed,
       calculateCheckoutDiscounts,
       markDiscountsAsUsed,
       refresh,
