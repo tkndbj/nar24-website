@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import {
   X,
   Truck,
@@ -11,8 +11,8 @@ import {
   Check,
   CircleMinus,
   Gift,
-  
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Coupon, UserBenefit, BenefitType } from "@/app/models/coupon";
 import { useCoupon } from "@/context/CouponProvider";
 
@@ -29,7 +29,6 @@ interface CouponSelectionSheetProps {
   onCouponSelected: (coupon: Coupon | null) => void;
   onFreeShippingToggled: (use: boolean, benefit?: UserBenefit | null) => void;
   isDarkMode?: boolean;
-  localization?: (key: string) => string;
 }
 
 // ============================================================================
@@ -45,17 +44,18 @@ export const CouponSelectionSheet: React.FC<CouponSelectionSheetProps> = ({
   onCouponSelected,
   onFreeShippingToggled,
   isDarkMode = false,
-  localization,
 }) => {
+  // ========================================================================
+  // TRANSLATIONS
+  // ========================================================================
+
+  const t = useTranslations("coupons");
+
   // ========================================================================
   // COUPON SERVICE
   // ========================================================================
 
-  const {
-    coupons,
-    benefits,
-    calculateCouponDiscount,
-  } = useCoupon();
+  const { coupons, benefits, calculateCouponDiscount } = useCoupon();
 
   // ========================================================================
   // TEMP STATE (before applying)
@@ -64,24 +64,16 @@ export const CouponSelectionSheet: React.FC<CouponSelectionSheetProps> = ({
   const [tempSelectedCoupon, setTempSelectedCoupon] = useState<Coupon | null>(
     selectedCoupon
   );
-  const [tempUseFreeShipping, setTempUseFreeShipping] = useState(useFreeShipping);
+  const [tempUseFreeShipping, setTempUseFreeShipping] =
+    useState(useFreeShipping);
 
-  // ========================================================================
-  // TRANSLATION HELPER
-  // ========================================================================
-
-  const t = useCallback(
-    (key: string, fallback?: string): string => {
-      if (localization) {
-        try {
-          const result = localization(key);
-          if (result && result !== key) return result;
-        } catch {}
-      }
-      return fallback ?? key;
-    },
-    [localization]
-  );
+  // Sync temp state when props change (e.g., when sheet reopens)
+  useEffect(() => {
+    if (isOpen) {
+      setTempSelectedCoupon(selectedCoupon);
+      setTempUseFreeShipping(useFreeShipping);
+    }
+  }, [isOpen, selectedCoupon, useFreeShipping]);
 
   // ========================================================================
   // COMPUTED
@@ -103,12 +95,13 @@ export const CouponSelectionSheet: React.FC<CouponSelectionSheetProps> = ({
 
   const handleApply = useCallback(() => {
     onCouponSelected(tempSelectedCoupon);
-    
+
     // Find the first valid free shipping benefit if toggled on
-    const benefit = tempUseFreeShipping && freeShippingBenefits.length > 0
-      ? freeShippingBenefits[0]
-      : null;
-    
+    const benefit =
+      tempUseFreeShipping && freeShippingBenefits.length > 0
+        ? freeShippingBenefits[0]
+        : null;
+
     onFreeShippingToggled(tempUseFreeShipping, benefit);
     onClose();
   }, [
@@ -139,20 +132,20 @@ export const CouponSelectionSheet: React.FC<CouponSelectionSheetProps> = ({
     }
 
     return (
-      <div className="mb-6">
+      <div className="mb-5">
         {/* Section Header */}
-        <div className="flex items-center space-x-2 mb-3">
-          <Truck size={18} className="text-green-500" />
+        <div className="flex items-center space-x-2 mb-2">
+          <Truck size={16} className="text-green-500" />
           <span
             className={`text-sm font-semibold ${
               isDarkMode ? "text-white" : "text-gray-900"
             }`}
           >
-            {t("freeShipping", "Free Shipping")}
+            {t("freeShipping")}
           </span>
           <span
             className={`
-              px-2 py-0.5 rounded-full text-xs font-bold
+              px-1.5 py-0.5 rounded-full text-xs font-bold
               ${isDarkMode ? "bg-green-500/20 text-green-400" : "bg-green-100 text-green-600"}
             `}
           >
@@ -164,7 +157,7 @@ export const CouponSelectionSheet: React.FC<CouponSelectionSheetProps> = ({
         <button
           onClick={() => setTempUseFreeShipping(!tempUseFreeShipping)}
           className={`
-            w-full p-4 rounded-xl border-2 transition-all duration-200
+            w-full p-3 rounded-xl border-2 transition-all duration-200
             ${
               tempUseFreeShipping
                 ? "border-green-500 bg-green-500/10"
@@ -177,41 +170,43 @@ export const CouponSelectionSheet: React.FC<CouponSelectionSheetProps> = ({
           <div className="flex items-center space-x-3">
             <div
               className={`
-                w-12 h-12 rounded-xl flex items-center justify-center
+                w-10 h-10 rounded-lg flex items-center justify-center
                 ${isDarkMode ? "bg-green-500/20" : "bg-green-100"}
               `}
             >
-              <Truck size={24} className="text-green-500" />
+              <Truck size={20} className="text-green-500" />
             </div>
             <div className="flex-1 text-left">
               <p
-                className={`font-semibold ${
+                className={`text-sm font-semibold ${
                   isDarkMode ? "text-white" : "text-gray-900"
                 }`}
               >
-                {t("useFreeShipping", "Use Free Shipping")}
+                {t("useFreeShipping")}
               </p>
               <p
-                className={`text-sm ${
+                className={`text-xs ${
                   isDarkMode ? "text-gray-400" : "text-gray-500"
                 }`}
               >
-                {t("freeShippingDescription", "Your shipping fee will be waived")}
+                {t("freeShippingDescription")}
               </p>
             </div>
             <div
               className={`
-                w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors
+                w-5 h-5 rounded flex items-center justify-center transition-colors
                 ${
                   tempUseFreeShipping
-                    ? "bg-green-500 border-green-500"
+                    ? "bg-green-500"
                     : isDarkMode
-                      ? "border-gray-600"
-                      : "border-gray-300"
+                      ? "border-2 border-gray-600"
+                      : "border-2 border-gray-300"
                 }
               `}
             >
-              {tempUseFreeShipping && <Check size={14} className="text-white" />}
+              {tempUseFreeShipping && (
+                <Check size={12} className="text-white" />
+              )}
             </div>
           </div>
         </button>
@@ -235,7 +230,7 @@ export const CouponSelectionSheet: React.FC<CouponSelectionSheetProps> = ({
         key={coupon?.id ?? "no-coupon"}
         onClick={() => setTempSelectedCoupon(coupon)}
         className={`
-          w-full p-4 rounded-xl border-2 transition-all duration-200 mb-2
+          w-full p-3 rounded-xl border-2 transition-all duration-200 mb-2
           ${
             isSelected
               ? "border-orange-500 bg-orange-500/10"
@@ -248,7 +243,7 @@ export const CouponSelectionSheet: React.FC<CouponSelectionSheetProps> = ({
         <div className="flex items-center space-x-3">
           <div
             className={`
-              w-12 h-12 rounded-xl flex items-center justify-center
+              w-10 h-10 rounded-lg flex items-center justify-center
               ${
                 coupon === null
                   ? isDarkMode
@@ -262,17 +257,17 @@ export const CouponSelectionSheet: React.FC<CouponSelectionSheetProps> = ({
           >
             {coupon === null ? (
               <CircleMinus
-                size={24}
+                size={20}
                 className={isDarkMode ? "text-gray-500" : "text-gray-400"}
               />
             ) : (
-              <Ticket size={24} className="text-orange-500" />
+              <Ticket size={20} className="text-orange-500" />
             )}
           </div>
-          <div className="flex-1 text-left">
+          <div className="flex-1 text-left min-w-0">
             <div className="flex items-center space-x-2">
               <p
-                className={`font-semibold ${
+                className={`text-sm font-semibold truncate ${
                   coupon === null
                     ? isDarkMode
                       ? "text-gray-400"
@@ -284,23 +279,27 @@ export const CouponSelectionSheet: React.FC<CouponSelectionSheetProps> = ({
               >
                 {title}
               </p>
-              {expiresIn !== null && expiresIn !== undefined && expiresIn <= 7 && (
-                <span
-                  className={`
-                    px-1.5 py-0.5 rounded text-xs font-bold
+              {expiresIn !== null &&
+                expiresIn !== undefined &&
+                expiresIn <= 7 && (
+                  <span
+                    className={`
+                    px-1.5 py-0.5 rounded text-xs font-bold whitespace-nowrap
                     ${
                       expiresIn <= 3
                         ? "bg-red-100 text-red-600"
                         : "bg-amber-100 text-amber-600"
                     }
                   `}
-                >
-                  {expiresIn === 0 ? t("today", "Today") : `${expiresIn} ${t("days", "days")}`}
-                </span>
-              )}
+                  >
+                    {expiresIn === 0
+                      ? t("today")
+                      : `${expiresIn} ${t("days")}`}
+                  </span>
+                )}
             </div>
             <p
-              className={`text-sm ${
+              className={`text-xs truncate ${
                 isDarkMode ? "text-gray-400" : "text-gray-500"
               }`}
             >
@@ -309,7 +308,7 @@ export const CouponSelectionSheet: React.FC<CouponSelectionSheetProps> = ({
           </div>
           <div
             className={`
-              w-5 h-5 rounded-full border-2 flex items-center justify-center
+              w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0
               ${
                 isSelected
                   ? "border-orange-500 bg-orange-500"
@@ -319,9 +318,7 @@ export const CouponSelectionSheet: React.FC<CouponSelectionSheetProps> = ({
               }
             `}
           >
-            {isSelected && (
-              <div className="w-2 h-2 rounded-full bg-white" />
-            )}
+            {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
           </div>
         </div>
       </button>
@@ -332,18 +329,18 @@ export const CouponSelectionSheet: React.FC<CouponSelectionSheetProps> = ({
     return (
       <div>
         {/* Section Header */}
-        <div className="flex items-center space-x-2 mb-3">
-          <Ticket size={18} className="text-orange-500" />
+        <div className="flex items-center space-x-2 mb-2">
+          <Ticket size={16} className="text-orange-500" />
           <span
             className={`text-sm font-semibold ${
               isDarkMode ? "text-white" : "text-gray-900"
             }`}
           >
-            {t("discountCoupons", "Discount Coupons")}
+            {t("discountCoupons")}
           </span>
           <span
             className={`
-              px-2 py-0.5 rounded-full text-xs font-bold
+              px-1.5 py-0.5 rounded-full text-xs font-bold
               ${isDarkMode ? "bg-orange-500/20 text-orange-400" : "bg-orange-100 text-orange-600"}
             `}
           >
@@ -355,13 +352,13 @@ export const CouponSelectionSheet: React.FC<CouponSelectionSheetProps> = ({
           // Empty State
           <div
             className={`
-              p-8 rounded-xl text-center
+              p-6 rounded-xl text-center
               ${isDarkMode ? "bg-gray-800" : "bg-gray-100"}
             `}
           >
             <Ticket
-              size={48}
-              className={`mx-auto mb-3 ${
+              size={36}
+              className={`mx-auto mb-2 ${
                 isDarkMode ? "text-gray-600" : "text-gray-400"
               }`}
             />
@@ -370,7 +367,7 @@ export const CouponSelectionSheet: React.FC<CouponSelectionSheetProps> = ({
                 isDarkMode ? "text-gray-400" : "text-gray-500"
               }`}
             >
-              {t("noCouponsAvailable", "No coupons available")}
+              {t("noCouponsAvailable")}
             </p>
           </div>
         ) : (
@@ -378,8 +375,8 @@ export const CouponSelectionSheet: React.FC<CouponSelectionSheetProps> = ({
             {/* "No coupon" option */}
             {renderCouponCard(
               null,
-              t("noCoupon", "No Coupon"),
-              t("proceedWithoutDiscount", "Proceed without discount")
+              t("noCoupon"),
+              t("proceedWithoutDiscount")
             )}
 
             {/* Available coupons */}
@@ -388,8 +385,8 @@ export const CouponSelectionSheet: React.FC<CouponSelectionSheetProps> = ({
               const subtitle =
                 coupon.description ??
                 (discount < coupon.amount
-                  ? `${t("willDeduct", "Will deduct")} ${discount.toFixed(2)} ${coupon.currency}`
-                  : t("discountCouponDesc", "Discount coupon"));
+                  ? `${t("willDeduct")} ${discount.toFixed(2)} ${coupon.currency}`
+                  : t("discountCouponDesc"));
 
               return renderCouponCard(
                 coupon,
@@ -411,52 +408,43 @@ export const CouponSelectionSheet: React.FC<CouponSelectionSheetProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[1100] overflow-hidden">
+    <div className="fixed inset-0 z-[1100] overflow-hidden flex items-end justify-center">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300"
         onClick={handleBackdropClick}
       />
 
-      {/* Sheet */}
+      {/* Sheet - Compact width */}
       <div
         className={`
-          absolute bottom-0 left-0 right-0 max-h-[90vh] rounded-t-3xl
+          relative w-full max-w-md mx-4 mb-4 max-h-[85vh] rounded-2xl
           transform transition-transform duration-300 ease-out
           ${isDarkMode ? "bg-gray-900" : "bg-white"}
           shadow-2xl
         `}
       >
-        {/* Handle Bar */}
-        <div className="flex justify-center pt-3 pb-2">
-          <div
-            className={`w-10 h-1 rounded-full ${
-              isDarkMode ? "bg-gray-700" : "bg-gray-300"
-            }`}
-          />
-        </div>
-
         {/* Header */}
         <div
           className={`
-            flex items-center justify-between px-6 py-4 border-b
+            flex items-center justify-between px-4 py-3 border-b
             ${isDarkMode ? "border-gray-800" : "border-gray-100"}
           `}
         >
-          <div className="flex items-center space-x-3">
-            <Tag size={24} className="text-orange-500" />
+          <div className="flex items-center space-x-2">
+            <Tag size={20} className="text-orange-500" />
             <h2
-              className={`text-lg font-bold ${
+              className={`text-base font-bold ${
                 isDarkMode ? "text-white" : "text-gray-900"
               }`}
             >
-              {t("couponsAndBenefits", "Coupons & Benefits")}
+              {t("couponsAndBenefits")}
             </h2>
           </div>
           <button
             onClick={onClose}
             className={`
-              p-2 rounded-full transition-colors
+              p-1.5 rounded-full transition-colors
               ${
                 isDarkMode
                   ? "hover:bg-gray-800 text-gray-400"
@@ -464,12 +452,12 @@ export const CouponSelectionSheet: React.FC<CouponSelectionSheetProps> = ({
               }
             `}
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
         {/* Content */}
-        <div className="px-6 py-4 overflow-y-auto max-h-[60vh]">
+        <div className="px-4 py-4 overflow-y-auto max-h-[55vh]">
           {/* Free Shipping Section */}
           {renderFreeShippingSection()}
 
@@ -480,20 +468,21 @@ export const CouponSelectionSheet: React.FC<CouponSelectionSheetProps> = ({
         {/* Footer - Apply Button */}
         <div
           className={`
-            px-6 py-4 border-t safe-area-inset-bottom
+            px-4 py-3 border-t
             ${isDarkMode ? "border-gray-800 bg-gray-900" : "border-gray-100 bg-white"}
+            rounded-b-2xl
           `}
         >
           <button
             onClick={handleApply}
             className="
-              w-full py-4 rounded-xl font-semibold text-white
+              w-full py-3 rounded-xl font-semibold text-white text-sm
               bg-gradient-to-r from-orange-500 to-pink-500
               hover:from-orange-600 hover:to-pink-600
               transition-all duration-200 active:scale-[0.98]
             "
           >
-            {t("apply", "Apply")}
+            {t("apply")}
           </button>
         </div>
       </div>
@@ -512,30 +501,18 @@ interface SelectedDiscountsDisplayProps {
   shippingDiscount: number;
   onTap: () => void;
   isDarkMode?: boolean;
-  localization?: (key: string) => string;
 }
 
-export const SelectedDiscountsDisplay: React.FC<SelectedDiscountsDisplayProps> = ({
+export const SelectedDiscountsDisplay: React.FC<
+  SelectedDiscountsDisplayProps
+> = ({
   selectedCoupon,
   useFreeShipping,
   couponDiscount,
-  
   onTap,
   isDarkMode = false,
-  localization,
 }) => {
-  const t = useCallback(
-    (key: string, fallback?: string): string => {
-      if (localization) {
-        try {
-          const result = localization(key);
-          if (result && result !== key) return result;
-        } catch {}
-      }
-      return fallback ?? key;
-    },
-    [localization]
-  );
+  const t = useTranslations("coupons");
 
   const hasDiscount = selectedCoupon !== null || useFreeShipping;
 
@@ -570,7 +547,7 @@ export const SelectedDiscountsDisplay: React.FC<SelectedDiscountsDisplayProps> =
                       isDarkMode ? "text-gray-300" : "text-gray-600"
                     }`}
                   >
-                    {t("coupon", "Coupon")}:
+                    {t("coupon")}:
                   </span>
                   <span className="text-sm font-bold text-green-500">
                     -{couponDiscount.toFixed(2)} TL
@@ -584,10 +561,10 @@ export const SelectedDiscountsDisplay: React.FC<SelectedDiscountsDisplayProps> =
                       isDarkMode ? "text-gray-300" : "text-gray-600"
                     }`}
                   >
-                    {t("shipping", "Shipping")}:
+                    {t("shipping")}:
                   </span>
                   <span className="text-sm font-bold text-green-500">
-                    {t("free", "Free")}
+                    {t("free")}
                   </span>
                 </div>
               )}
@@ -598,7 +575,7 @@ export const SelectedDiscountsDisplay: React.FC<SelectedDiscountsDisplayProps> =
                 isDarkMode ? "text-gray-400" : "text-gray-500"
               }`}
             >
-              {t("addCouponOrBenefit", "Add coupon or benefit")}
+              {t("addCouponOrBenefit")}
             </span>
           )}
         </div>

@@ -1556,8 +1556,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
         useFreeShipping={useFreeShipping}
         onCouponSelected={handleCouponSelected}
         onFreeShippingToggled={handleFreeShippingToggled}
-        isDarkMode={isDarkMode}
-        localization={t}
+        isDarkMode={isDarkMode}       
       />
     </div>
   );
