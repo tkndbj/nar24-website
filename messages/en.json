@@ -1940,6 +1940,10 @@
     "loginRequired": "Login Required",
     "loginToViewCart": "Please login to view your cart and continue shopping.",
     "login": "Login",
+    "items": "items",
+    "addDiscount": "Add discount",
+    "applied": "Applied",
+    "validating": "Validating...",
     "loading": "Loading your cart...",
     "emptyCart": "Your Cart is Empty",
     "emptyCartDescription": "You haven't added any items to your cart yet. Start shopping to discover products!",
@@ -1997,7 +2001,8 @@
     "days": "days",
     "selected": "Selected",
     "expired": "Expired",
-    "minPurchase": "Min. purchase: {amount}"
+    "minPurchase": "Min. purchase: {amount}",
+    "applied": "Applied"
   },
   "header": {
     "back": "Back",
@@ -2195,6 +2200,8 @@
     "tapAnywhereToSetLocation": "Tap anywhere on the map to set your delivery location",
     "cancel": "Cancel",
     "days": "day",
+    "shipping": "Shipping",
+    "expressNotAvailableWithFreeShipping": "Express shipping is not available with free shipping benefit",
     "iAgreeToThe": "I agree to the",
     "distanceSellingContract": "Distance Selling Contract",
     "confirmLocation": "Confirm Location",

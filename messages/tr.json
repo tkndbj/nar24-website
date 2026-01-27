@@ -1976,6 +1976,10 @@
     "loginToViewCart": "Sepetinizi görüntülemek ve alışverişe devam etmek için lütfen giriş yapın.",
     "login": "Giriş Yap",
     "loading": "Sepetiniz yükleniyor...",
+    "items": "ürün",
+    "addDiscount": "İndirim ekle",
+    "applied": "Uygulandı",
+    "validating": "Doğrulanıyor...",
     "emptyCart": "Sepetiniz Boş",
     "emptyCartDescription": "Henüz sepetinize ürün eklemediniz. Alışverişe başlamak için ürünleri keşfedin!",
     "startShopping": "Alışverişe Başla",
@@ -2032,7 +2036,8 @@
     "days": "gün",
     "selected": "Seçildi",
     "expired": "Süresi doldu",
-    "minPurchase": "Min. alışveriş: {amount}"
+    "minPurchase": "Min. alışveriş: {amount}",
+    "applied": "Uygulandı"
   },
   "FavoritesDrawer": {
     "title": "Favorilerim",
@@ -2293,6 +2298,8 @@
     "deliveryAddress": "Teslimat Adresi",
     "whereToDeliver": "Siparişinizi nereye teslim edelim?",
     "savedAddresses": "Kayıtlı Adresler",
+    "shipping": "Kargo",
+    "expressNotAvailableWithFreeShipping": "Ücretsiz kargo avantajı ile hızlı kargo kullanılamaz",
     "enterNewAddress": "Yeni adres girin",
     "addressLine1": "Adres Satırı 1",
     "addressLine2": "Adres Satırı 2",
