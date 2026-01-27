@@ -9,7 +9,7 @@ import React, {
   useContext,
   ReactNode,
 } from "react";
-import { X, Gift, Sparkles } from "lucide-react";
+import { X, Sparkles } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCoupon } from "@/context/CouponProvider";
 import { useUser } from "@/context/UserProvider";
@@ -82,10 +82,10 @@ const setCelebratedIds = (userId: string, ids: Set<string>) => {
 
 const generateParticles = (count: number): Particle[] => {
   const colors = [
-    "rgba(249, 115, 22, 0.6)", // orange
-    "rgba(236, 72, 153, 0.6)", // pink
-    "rgba(250, 204, 21, 0.6)", // yellow
-    "rgba(255, 255, 255, 0.4)", // white
+    "rgba(249, 115, 22, 0.6)",
+    "rgba(236, 72, 153, 0.6)",
+    "rgba(250, 204, 21, 0.6)",
+    "rgba(255, 255, 255, 0.4)",
   ];
 
   return Array.from({ length: count }, (_, i) => ({
@@ -118,14 +118,10 @@ const CelebrationOverlay: React.FC<CelebrationOverlayProps> = ({
   const [particles] = useState(() => generateParticles(20));
 
   useEffect(() => {
-    // Trigger entrance animation
     requestAnimationFrame(() => {
       setIsVisible(true);
     });
-
-    // Prevent body scroll
     document.body.style.overflow = "hidden";
-
     return () => {
       document.body.style.overflow = "";
     };
@@ -135,33 +131,30 @@ const CelebrationOverlay: React.FC<CelebrationOverlayProps> = ({
     if (isExiting) return;
     setIsExiting(true);
     setIsVisible(false);
-
-    // Wait for exit animation
     setTimeout(() => {
       onDismiss();
     }, 400);
   }, [isExiting, onDismiss]);
 
-  // Format coupon display
   const couponAmount = coupon.amount?.toFixed(0) || "0";
   const couponCurrency = coupon.currency || "TL";
 
+  const overlayVisibility = isVisible && !isExiting ? "opacity-100" : "opacity-0";
+  const contentTransform = isVisible && !isExiting
+    ? "translate-y-0 scale-100 opacity-100"
+    : "translate-y-20 scale-75 opacity-0";
+  const buttonTransform = isVisible && !isExiting
+    ? "translate-y-0 opacity-100"
+    : "-translate-y-4 opacity-0";
+
   return (
     <div
-      className={`
-        fixed inset-0 z-[9999] flex items-center justify-center
-        transition-opacity duration-400
-        ${isVisible && !isExiting ? "opacity-100" : "opacity-0"}
-      `}
+      className={`fixed inset-0 z-[9999] flex items-center justify-center transition-opacity duration-400 ${overlayVisibility}`}
       onClick={handleDismiss}
     >
       {/* Dark overlay background */}
       <div
-        className={`
-          absolute inset-0 bg-black/70 backdrop-blur-sm
-          transition-opacity duration-400
-          ${isVisible && !isExiting ? "opacity-100" : "opacity-0"}
-        `}
+        className={`absolute inset-0 bg-black/70 backdrop-blur-sm transition-opacity duration-400 ${overlayVisibility}`}
       />
 
       {/* Floating particles */}
@@ -169,14 +162,14 @@ const CelebrationOverlay: React.FC<CelebrationOverlayProps> = ({
         {particles.map((particle) => (
           <div
             key={particle.id}
-            className="absolute rounded-full animate-float-up"
+            className="absolute rounded-full"
             style={{
               left: `${particle.x}%`,
               bottom: "-10%",
               width: particle.size,
               height: particle.size,
               backgroundColor: particle.color,
-              animationDuration: `${particle.speed}s`,
+              animation: `float-up ${particle.speed}s linear infinite`,
               animationDelay: `${particle.delay}s`,
             }}
           />
@@ -189,15 +182,7 @@ const CelebrationOverlay: React.FC<CelebrationOverlayProps> = ({
           e.stopPropagation();
           handleDismiss();
         }}
-        className={`
-          absolute top-4 right-4 z-10
-          w-11 h-11 rounded-full
-          bg-white/20 border border-white/30
-          flex items-center justify-center
-          hover:bg-white/30 transition-all duration-200
-          transform
-          ${isVisible && !isExiting ? "translate-y-0 opacity-100" : "-translate-y-4 opacity-0"}
-        `}
+        className={`absolute top-4 right-4 z-10 w-11 h-11 rounded-full bg-white/20 border border-white/30 flex items-center justify-center hover:bg-white/30 transition-all duration-200 transform ${buttonTransform}`}
         style={{ transitionDelay: "200ms" }}
       >
         <X className="w-6 h-6 text-white" />
@@ -205,47 +190,31 @@ const CelebrationOverlay: React.FC<CelebrationOverlayProps> = ({
 
       {/* Main content */}
       <div
-        className={`
-          relative z-10 flex flex-col items-center
-          transform transition-all duration-500
-          ${isVisible && !isExiting ? "translate-y-0 scale-100 opacity-100" : "translate-y-20 scale-75 opacity-0"}
-        `}
+        className={`relative z-10 flex flex-col items-center transform transition-all duration-500 ${contentTransform}`}
         style={{ transitionTimingFunction: "cubic-bezier(0.34, 1.56, 0.64, 1)" }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Coupon card with glow */}
-        <div className="relative animate-pulse-slow">
+        <div className="relative" style={{ animation: "pulse-slow 2s ease-in-out infinite" }}>
           {/* Glow effect */}
           <div
             className="absolute inset-0 rounded-3xl blur-3xl"
             style={{
-              background:
-                "linear-gradient(135deg, rgba(249, 115, 22, 0.4), rgba(236, 72, 153, 0.4))",
+              background: "linear-gradient(135deg, rgba(249, 115, 22, 0.4), rgba(236, 72, 153, 0.4))",
               transform: "scale(1.2)",
             }}
           />
 
           {/* Coupon card */}
-          <div
-            className="
-              relative w-72 sm:w-80 aspect-[1.4/1]
-              rounded-3xl overflow-hidden
-              bg-gradient-to-br from-orange-500 via-pink-500 to-rose-500
-              shadow-2xl
-            "
-          >
+          <div className="relative w-72 sm:w-80 rounded-3xl overflow-hidden bg-gradient-to-br from-orange-500 via-pink-500 to-rose-500 shadow-2xl" style={{ aspectRatio: "1.4 / 1" }}>
             {/* Shimmer overlay */}
-            <div className="absolute inset-0 animate-shimmer">
-              <div
-                className="absolute inset-0"
-                style={{
-                  background:
-                    "linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.4) 50%, transparent 60%)",
-                  transform: "translateX(-100%)",
-                  animation: "shimmer 2s infinite",
-                }}
-              />
-            </div>
+            <div
+              className="absolute inset-0"
+              style={{
+                background: "linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.4) 50%, transparent 60%)",
+                animation: "shimmer 2s ease-in-out infinite",
+              }}
+            />
 
             {/* Decorative circles */}
             <div className="absolute -left-8 top-1/2 -translate-y-1/2 w-16 h-16 rounded-full bg-white/10" />
@@ -295,39 +264,31 @@ const CelebrationOverlay: React.FC<CelebrationOverlayProps> = ({
         {/* Celebration text */}
         <div className="mt-8 text-center">
           <h2
-            className="
-              text-2xl sm:text-3xl font-extrabold
-              bg-gradient-to-r from-orange-400 via-pink-400 to-orange-400
-              bg-clip-text text-transparent
-              animate-gradient-x
-            "
+            className="text-2xl sm:text-3xl font-extrabold bg-clip-text text-transparent"
+            style={{
+              backgroundImage: "linear-gradient(to right, #fb923c, #ec4899, #fb923c)",
+              backgroundSize: "200% 200%",
+              animation: "gradient-x 3s ease infinite",
+            }}
           >
             🎉 {t("youHaveACoupon") || "You have a coupon!"}
           </h2>
 
           <p className="mt-3 text-white/90 text-sm sm:text-base font-medium max-w-xs">
-            {t("couponWaitingForYou") ||
-              "A special discount is waiting for you in your cart!"}
+            {t("couponWaitingForYou") || "A special discount is waiting for you in your cart!"}
           </p>
         </div>
 
         {/* CTA Button */}
         <button
           onClick={handleDismiss}
-          className="
-            mt-8 px-8 py-3
-            bg-white text-gray-900
-            rounded-full font-semibold
-            hover:bg-gray-100 active:scale-95
-            transition-all duration-200
-            shadow-lg hover:shadow-xl
-          "
+          className="mt-8 px-8 py-3 bg-white text-gray-900 rounded-full font-semibold hover:bg-gray-100 active:scale-95 transition-all duration-200 shadow-lg hover:shadow-xl"
         >
           {t("gotIt") || "Got it!"}
         </button>
       </div>
 
-      {/* CSS for animations */}
+      {/* Global CSS for animations */}
       <style jsx global>{`
         @keyframes float-up {
           0% {
@@ -356,8 +317,7 @@ const CelebrationOverlay: React.FC<CelebrationOverlayProps> = ({
         }
 
         @keyframes pulse-slow {
-          0%,
-          100% {
+          0%, 100% {
             transform: scale(1);
           }
           50% {
@@ -366,30 +326,12 @@ const CelebrationOverlay: React.FC<CelebrationOverlayProps> = ({
         }
 
         @keyframes gradient-x {
-          0%,
-          100% {
+          0%, 100% {
             background-position: 0% 50%;
           }
           50% {
             background-position: 100% 50%;
           }
-        }
-
-        .animate-float-up {
-          animation: float-up linear infinite;
-        }
-
-        .animate-shimmer > div {
-          animation: shimmer 2s ease-in-out infinite;
-        }
-
-        .animate-pulse-slow {
-          animation: pulse-slow 2s ease-in-out infinite;
-        }
-
-        .animate-gradient-x {
-          background-size: 200% 200%;
-          animation: gradient-x 3s ease infinite;
         }
       `}</style>
     </div>
@@ -413,24 +355,16 @@ export const CelebrationProvider: React.FC<CelebrationProviderProps> = ({
   const [currentCoupon, setCurrentCoupon] = useState<Coupon | null>(null);
   const hasCheckedRef = useRef(false);
 
-  // Check for new coupons to celebrate
   const checkAndShowCelebrations = useCallback(() => {
     if (!user?.uid || !isInitialized || coupons.length === 0) return;
 
     const celebratedIds = getCelebratedIds(user.uid);
     const now = new Date();
 
-    // Filter for active, uncelebrated coupons
     const newCoupons = coupons.filter((coupon) => {
-      // Skip if already celebrated
       if (celebratedIds.has(coupon.id)) return false;
-
-      // Skip if used
       if (coupon.isUsed) return false;
-
-      // Skip if expired
       if (coupon.expiresAt && coupon.expiresAt.toDate() < now) return false;
-
       return true;
     });
 
@@ -440,10 +374,8 @@ export const CelebrationProvider: React.FC<CelebrationProviderProps> = ({
     }
   }, [user?.uid, isInitialized, coupons]);
 
-  // Auto-check on mount and when coupons change
   useEffect(() => {
     if (!hasCheckedRef.current && isInitialized && user?.uid) {
-      // Delay to ensure page is ready
       const timer = setTimeout(() => {
         checkAndShowCelebrations();
         hasCheckedRef.current = true;
@@ -453,20 +385,16 @@ export const CelebrationProvider: React.FC<CelebrationProviderProps> = ({
     }
   }, [isInitialized, user?.uid, checkAndShowCelebrations]);
 
-  // Handle dismissal
   const handleDismiss = useCallback(() => {
     if (!currentCoupon || !user?.uid) return;
 
-    // Mark as celebrated
     const celebratedIds = getCelebratedIds(user.uid);
     celebratedIds.add(currentCoupon.id);
     setCelebratedIds(user.uid, celebratedIds);
 
-    // Move to next coupon in queue
     setCelebrationQueue((prev) => {
       const newQueue = prev.slice(1);
       if (newQueue.length > 0) {
-        // Small delay before showing next
         setTimeout(() => {
           setCurrentCoupon(newQueue[0]);
         }, 300);
@@ -477,7 +405,6 @@ export const CelebrationProvider: React.FC<CelebrationProviderProps> = ({
     });
   }, [currentCoupon, user?.uid]);
 
-  // Manual show function
   const showCelebration = useCallback((coupon: Coupon) => {
     setCurrentCoupon(coupon);
     setCelebrationQueue([coupon]);
@@ -501,7 +428,6 @@ export const CelebrationProvider: React.FC<CelebrationProviderProps> = ({
 
 export default CelebrationOverlay;
 
-// Utility to reset celebrations (for testing)
 export const resetCelebrations = (userId: string) => {
   if (typeof window === "undefined") return;
   localStorage.removeItem(`${STORAGE_KEY_PREFIX}${userId}`);
