@@ -15,10 +15,22 @@ import {
   Phone,
   CreditCard,
   Building,
+  AlertCircle,
 } from "lucide-react";
 import { useUser } from "@/context/UserProvider";
 import { useRouter } from "next/navigation";
-import { doc, getDoc, setDoc, updateDoc, deleteDoc } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  collection,
+  query,
+  where,
+  limit,
+  getDocs,
+} from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useTranslations } from "next-intl";
 
@@ -200,6 +212,10 @@ export const SellerInfoDrawer: React.FC<SellerInfoDrawerProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
 
+  // Product check states
+  const [checkingProducts, setCheckingProducts] = useState(false);
+  const [showCannotDeleteModal, setShowCannotDeleteModal] = useState(false);
+
   // Animation states
   const [isAnimating, setIsAnimating] = useState(false);
   const [shouldRender, setShouldRender] = useState(false);
@@ -307,6 +323,44 @@ export const SellerInfoDrawer: React.FC<SellerInfoDrawerProps> = ({
       loadSellerInfo();
     }
   }, [user, isOpen, loadSellerInfo, shopId]);
+
+  /**
+   * Checks if the current user has any listed products.
+   * For normal users: checks "products" collection with ownerId
+   * For shops: checks "shop_products" collection with shopId
+   * Returns true if products exist, false otherwise.
+   * On error, returns true to prevent accidental deletion.
+   */
+  const checkUserHasListedProducts = async (): Promise<boolean> => {
+    if (!user) return false;
+
+    try {
+      let productsQuery;
+
+      if (shopId) {
+        // Shop context - check shop_products collection
+        productsQuery = query(
+          collection(db, "shop_products"),
+          where("shopId", "==", shopId),
+          limit(1)
+        );
+      } else {
+        // Normal user context - check products collection
+        productsQuery = query(
+          collection(db, "products"),
+          where("ownerId", "==", user.uid),
+          limit(1)
+        );
+      }
+
+      const snapshot = await getDocs(productsQuery);
+      return !snapshot.empty;
+    } catch (error) {
+      console.error("Error checking user products:", error);
+      // Return true on error to be safe - prevents accidental deletion
+      return true;
+    }
+  };
 
   // Toast notifications
   const showErrorToast = (message: string) => {
@@ -523,8 +577,22 @@ export const SellerInfoDrawer: React.FC<SellerInfoDrawerProps> = ({
     });
   };
 
-  // Delete seller info
+  // Delete seller info with product check
   const deleteSellerInfo = async () => {
+    if (!user) return;
+
+    // First check if user has listed products
+    setCheckingProducts(true);
+    const hasProducts = await checkUserHasListedProducts();
+    setCheckingProducts(false);
+
+    if (hasProducts) {
+      // Show cannot delete modal
+      setShowCannotDeleteModal(true);
+      return;
+    }
+
+    // No products - show confirmation dialog
     if (
       !confirm(
         l("SellerInfoDrawer.deleteConfirmation") ||
@@ -541,7 +609,7 @@ export const SellerInfoDrawer: React.FC<SellerInfoDrawerProps> = ({
         docRef = doc(db, "shops", shopId, "seller_info", "info");
         await deleteDoc(docRef);
       } else {
-        docRef = doc(db, "users", user?.uid || "");
+        docRef = doc(db, "users", user.uid);
         await updateDoc(docRef, { sellerInfo: null });
       }
 
@@ -602,6 +670,62 @@ export const SellerInfoDrawer: React.FC<SellerInfoDrawerProps> = ({
 
   const drawerContent = (
     <>
+      {/* Cannot Delete Modal */}
+      {showCannotDeleteModal && (
+        <div className="fixed inset-0 z-[1002] overflow-hidden">
+          <div
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            onClick={() => setShowCannotDeleteModal(false)}
+          />
+          <div className="absolute inset-0 flex items-center justify-center p-4">
+            <div
+              className={`
+                w-full max-w-md rounded-xl p-6 shadow-2xl
+                ${isDarkMode ? "bg-gray-800" : "bg-white"}
+                animate-in fade-in zoom-in duration-200
+              `}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2.5 bg-red-100 rounded-lg">
+                  <AlertCircle className="w-6 h-6 text-red-600" />
+                </div>
+                <h3
+                  className={`
+                    text-lg font-semibold
+                    ${isDarkMode ? "text-white" : "text-gray-900"}
+                  `}
+                >
+                  {l("SellerInfoDrawer.cannotDelete") || "Cannot Delete"}
+                </h3>
+              </div>
+              <p
+                className={`
+                  mb-6
+                  ${isDarkMode ? "text-gray-300" : "text-gray-600"}
+                `}
+              >
+                {l("SellerInfoDrawer.cannotDeleteWithProducts") ||
+                  "You cannot delete your seller information while you have listed products. Please delete all your products first."}
+              </p>
+              <button
+                onClick={() => setShowCannotDeleteModal(false)}
+                className={`
+                  w-full px-4 py-2.5 rounded-lg font-medium transition-colors
+                  ${
+                    isDarkMode
+                      ? "bg-gray-700 hover:bg-gray-600 text-white"
+                      : "bg-gray-900 hover:bg-gray-800 text-white"
+                  }
+                `}
+              >
+                {l("SellerInfoDrawer.understood") || "OK"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="fixed inset-0 z-[1000] overflow-hidden">
         {/* Backdrop */}
         <div
@@ -987,7 +1111,7 @@ export const SellerInfoDrawer: React.FC<SellerInfoDrawerProps> = ({
 
                     <button
                       onClick={deleteSellerInfo}
-                      disabled={isDeleting}
+                      disabled={isDeleting || checkingProducts}
                       className={`
                         flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors duration-200
                         ${
@@ -995,16 +1119,18 @@ export const SellerInfoDrawer: React.FC<SellerInfoDrawerProps> = ({
                             ? "hover:bg-gray-700 text-gray-400 hover:text-red-400"
                             : "hover:bg-red-50 text-gray-500 hover:text-red-600"
                         }
-                        ${isDeleting ? "opacity-50 cursor-not-allowed" : ""}
+                        ${isDeleting || checkingProducts ? "opacity-50 cursor-not-allowed" : ""}
                       `}
                     >
-                      {isDeleting ? (
+                      {isDeleting || checkingProducts ? (
                         <RefreshCw size={16} className="animate-spin" />
                       ) : (
                         <Trash2 size={16} />
                       )}
                       <span className="text-sm font-medium">
-                        {isDeleting
+                        {checkingProducts
+                          ? l("SellerInfoDrawer.checking") || "Checking..."
+                          : isDeleting
                           ? l("SellerInfoDrawer.deleting") || "Deleting..."
                           : l("SellerInfoDrawer.delete") || "Delete"}
                       </span>
