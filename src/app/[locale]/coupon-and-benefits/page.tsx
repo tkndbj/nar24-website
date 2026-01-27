@@ -575,7 +575,7 @@ export default function CouponsAndBenefitsPage() {
       : t("CouponsPage.noExpiry");
 
     return (
-      <div key={coupon.id} className="mb-4">
+      <div key={coupon.id}>
         {/* Coupon Visual Widget */}
         <div className="flex justify-center">
           <CouponWidget
@@ -702,12 +702,14 @@ export default function CouponsAndBenefitsPage() {
     }
 
     return (
-      <div className="space-y-4">
-        {/* Benefits first */}
-        {activeBenefits.map((benefit) => renderBenefitCard(benefit, false))}
-        
-        {/* Then coupons */}
-        {activeCoupons.map((coupon) => renderCouponCard(coupon, false))}
+      <div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Benefits first */}
+          {activeBenefits.map((benefit) => renderBenefitCard(benefit, false))}
+
+          {/* Then coupons */}
+          {activeCoupons.map((coupon) => renderCouponCard(coupon, false))}
+        </div>
 
         {/* Loading more indicator */}
         {(hasMoreActiveCoupons || hasMoreActiveBenefits) && (
@@ -734,12 +736,14 @@ export default function CouponsAndBenefitsPage() {
     }
 
     return (
-      <div className="space-y-4">
-        {/* Benefits first */}
-        {usedBenefits.map((benefit) => renderBenefitCard(benefit, true))}
-        
-        {/* Then coupons */}
-        {usedCoupons.map((coupon) => renderCouponCard(coupon, true))}
+      <div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Benefits first */}
+          {usedBenefits.map((benefit) => renderBenefitCard(benefit, true))}
+
+          {/* Then coupons */}
+          {usedCoupons.map((coupon) => renderCouponCard(coupon, true))}
+        </div>
 
         {/* Loading more indicator */}
         {(hasMoreUsedCoupons || hasMoreUsedBenefits) && (
