@@ -19,6 +19,7 @@ import type { Firestore } from "firebase/firestore";
 import type { Functions } from "firebase/functions";
 import { CouponProvider } from "@/context/CouponProvider";
 import { DiscountSelectionProvider } from "@/context/DiscountSelectionProvider";
+import { CelebrationProvider } from "@/app/components/CouponCelebrationOverlay";
 
 // Lazy load CookieConsent - only shown conditionally, not needed on initial render
 const CookieConsent = dynamic(
@@ -50,6 +51,7 @@ function AppProviders({
         <FavoritesProvider>
         <CouponProvider user={user} db={db}>
         <DiscountSelectionProvider>
+        <CelebrationProvider>
           <BadgeProvider>
             <SearchProvider>
               <SearchHistoryProvider>
@@ -60,6 +62,7 @@ function AppProviders({
               </SearchHistoryProvider>
             </SearchProvider>
           </BadgeProvider>
+          </CelebrationProvider>
           </DiscountSelectionProvider>
           </CouponProvider>
         </FavoritesProvider>

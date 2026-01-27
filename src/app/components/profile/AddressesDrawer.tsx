@@ -31,6 +31,70 @@ import { db } from "@/lib/firebase";
 import { useTranslations } from "next-intl";
 import regionsList from "@/constants/regions";
 
+// ============================================================================
+// Phone number formatting utilities (matching Flutter implementation)
+// Format: (5XX) XXX XX XX for Turkish phone numbers
+// ============================================================================
+
+/**
+ * Formats phone input as user types: (5XX) XXX XX XX
+ * Matches Flutter's _PhoneNumberFormatter
+ */
+const formatPhoneNumber = (value: string): string => {
+  // Remove all non-digit characters
+  const digitsOnly = value.replace(/\D/g, '');
+  // Limit to 10 digits
+  const limited = digitsOnly.slice(0, 10);
+  
+  let formatted = '';
+  for (let i = 0; i < limited.length; i++) {
+    if (i === 0) formatted += '(';
+    formatted += limited[i];
+    if (i === 2) formatted += ') ';
+    if (i === 5) formatted += ' ';
+    if (i === 7) formatted += ' ';
+  }
+  
+  return formatted;
+};
+
+/**
+ * Converts stored phone "05XXXXXXXXX" to display format "(5XX) XXX XX XX"
+ * Matches Flutter's _formatPhoneForDisplay
+ */
+const formatPhoneForDisplay = (phone: string): string => {
+  if (!phone) return '';
+  
+  const digitsOnly = phone.replace(/\D/g, '');
+  // Remove leading 0 if present
+  const digits = digitsOnly.startsWith('0') ? digitsOnly.slice(1) : digitsOnly;
+  
+  if (digits.length !== 10) return phone; // Return as-is if not valid
+  
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)} ${digits.slice(6, 8)} ${digits.slice(8, 10)}`;
+};
+
+/**
+ * Normalizes phone for storage: "(5XX) XXX XX XX" -> "05XXXXXXXXX"
+ * Matches Flutter's normalization: '0${_phoneNumberController.text.replaceAll(RegExp(r'\D'), '')}'
+ */
+const normalizePhoneForStorage = (phone: string): string => {
+  const digitsOnly = phone.replace(/\D/g, '');
+  // Add leading 0 if not present (matching Flutter behavior)
+  return digitsOnly.startsWith('0') ? digitsOnly : `0${digitsOnly}`;
+};
+
+/**
+ * Validates phone number (must be 10 digits starting with 5 for Turkish mobile)
+ */
+const isValidPhoneNumber = (phone: string): boolean => {
+  const digitsOnly = phone.replace(/\D/g, '');
+  // Should be 10 digits and start with 5 (Turkish mobile format)
+  return digitsOnly.length === 10 && digitsOnly.startsWith('5');
+};
+
+// ============================================================================
+
 interface Address {
   id: string;
   addressLine1: string;
@@ -216,12 +280,21 @@ export const SavedAddressesDrawer: React.FC<SavedAddressesDrawerProps> = ({
     alert(`Success: ${message}`);
   };
 
-  // Handle form input changes
+  // Handle form input changes with phone formatting
   const handleInputChange = (field: string, value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+    if (field === 'phoneNumber') {
+      // Apply phone number formatting (matching Flutter's _PhoneNumberFormatter)
+      const formattedPhone = formatPhoneNumber(value);
+      setFormData((prev) => ({
+        ...prev,
+        [field]: formattedPhone,
+      }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        [field]: value,
+      }));
+    }
   };
 
   // Add or update address
@@ -238,6 +311,15 @@ export const SavedAddressesDrawer: React.FC<SavedAddressesDrawerProps> = ({
       return;
     }
 
+    // Validate phone number format (matching Flutter validation)
+    if (!isValidPhoneNumber(phoneNumber)) {
+      showErrorToast(
+        l("SavedAddressesDrawer.invalidPhoneNumber") ||
+          "Please enter a valid phone number starting with 5"
+      );
+      return;
+    }
+
     if (!editingAddress && addresses.length >= 4) {
       showErrorToast(
         l("SavedAddressesDrawer.maxAddressesReached") ||
@@ -249,10 +331,13 @@ export const SavedAddressesDrawer: React.FC<SavedAddressesDrawerProps> = ({
     try {
       const addressesRef = collection(db, "users", user.uid, "addresses");
 
+      // Normalize phone number for storage (matching Flutter: '0${digitsOnly}')
+      const normalizedPhone = normalizePhoneForStorage(phoneNumber);
+
       const addressData = {
         addressLine1: addressLine1.trim(),
         addressLine2: formData.addressLine2.trim(),
-        phoneNumber: phoneNumber.trim(),
+        phoneNumber: normalizedPhone, // Store as "05XXXXXXXXX"
         city: city.trim(),
         ...(formData.location && {
           location: new GeoPoint(
@@ -404,12 +489,13 @@ export const SavedAddressesDrawer: React.FC<SavedAddressesDrawerProps> = ({
     }
   };
 
-  // Edit address
+  // Edit address - format phone for display when loading
   const editAddress = (address: Address) => {
     setFormData({
       addressLine1: address.addressLine1,
       addressLine2: address.addressLine2,
-      phoneNumber: address.phoneNumber,
+      // Convert stored "05XXXXXXXXX" to display format "(5XX) XXX XX XX"
+      phoneNumber: formatPhoneForDisplay(address.phoneNumber),
       city: address.city,
       location: address.location || null,
     });
@@ -703,7 +789,8 @@ export const SavedAddressesDrawer: React.FC<SavedAddressesDrawerProps> = ({
                   }
                   if (address.phoneNumber?.trim()) {
                     if (subtitleText) subtitleText += "\n";
-                    subtitleText += address.phoneNumber;
+                    // Display formatted phone number
+                    subtitleText += formatPhoneForDisplay(address.phoneNumber);
                   }
 
                   return (
@@ -980,7 +1067,7 @@ export const SavedAddressesDrawer: React.FC<SavedAddressesDrawerProps> = ({
                 />
               </div>
 
-              {/* Phone Number */}
+              {/* Phone Number - Updated with formatting */}
               <div>
                 <label
                   className={`
@@ -996,9 +1083,7 @@ export const SavedAddressesDrawer: React.FC<SavedAddressesDrawerProps> = ({
                   onChange={(e) =>
                     handleInputChange("phoneNumber", e.target.value)
                   }
-                  placeholder={
-                    l("SavedAddressesDrawer.phoneNumber") || "Phone Number"
-                  }
+                  placeholder="(5__) ___ __ __"
                   className={`
                     w-full px-3 py-2 rounded-lg border
                     ${
@@ -1009,6 +1094,15 @@ export const SavedAddressesDrawer: React.FC<SavedAddressesDrawerProps> = ({
                     focus:ring-2 focus:ring-orange-500 focus:border-transparent
                   `}
                 />
+                {/* Phone format hint */}
+                <p
+                  className={`
+                    mt-1 text-xs
+                    ${isDarkMode ? "text-gray-400" : "text-gray-500"}
+                  `}
+                >
+                  {l("SavedAddressesDrawer.phoneFormatHint") || "Format: (5XX) XXX XX XX"}
+                </p>
               </div>
 
               {/* City Dropdown */}
@@ -1156,7 +1250,8 @@ export const SavedAddressesDrawer: React.FC<SavedAddressesDrawerProps> = ({
                 disabled={
                   !formData.addressLine1.trim() ||
                   !formData.phoneNumber.trim() ||
-                  !formData.city.trim()
+                  !formData.city.trim() ||
+                  !isValidPhoneNumber(formData.phoneNumber)
                 }
                 className="
                   flex-1 py-2 px-4 rounded-lg

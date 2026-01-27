@@ -70,12 +70,12 @@ export async function GET(request: NextRequest) {
 
     if (mainProductId) {
       // Query bundles where this product is the main product
-      const bundlesQuery = db.collection('bundles')
+      let bundlesQuery = db.collection('bundles')
         .where('shopId', '==', shopId)
         .where('mainProductId', '==', mainProductId);
-      
+
       if (isActive === 'true') {
-        bundlesQuery.where('isActive', '==', true);
+        bundlesQuery = bundlesQuery.where('isActive', '==', true);
       }
 
       const bundlesSnapshot = await bundlesQuery.get();

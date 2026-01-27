@@ -569,6 +569,40 @@ export default function ProductPaymentPage() {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // ============================================================================
+// Phone number formatting utilities (matching Flutter implementation)
+// Format: (5XX) XXX XX XX for Turkish phone numbers
+// ============================================================================
+
+const formatPhoneNumber = (value: string): string => {
+  const digitsOnly = value.replace(/\D/g, '');
+  const limited = digitsOnly.slice(0, 10);
+  
+  let formatted = '';
+  for (let i = 0; i < limited.length; i++) {
+    if (i === 0) formatted += '(';
+    formatted += limited[i];
+    if (i === 2) formatted += ') ';
+    if (i === 5) formatted += ' ';
+    if (i === 7) formatted += ' ';
+  }
+  
+  return formatted;
+};
+
+const formatPhoneForDisplay = (phone: string): string => {
+  if (!phone) return '';
+  const digitsOnly = phone.replace(/\D/g, '');
+  const digits = digitsOnly.startsWith('0') ? digitsOnly.slice(1) : digitsOnly;
+  if (digits.length !== 10) return phone;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)} ${digits.slice(6, 8)} ${digits.slice(8, 10)}`;
+};
+
+const isValidPhoneNumber = (phone: string): boolean => {
+  const digitsOnly = phone.replace(/\D/g, '');
+  return digitsOnly.length === 10 && digitsOnly.startsWith('5');
+};
+
   // ========================================================================
   // DISCOUNT CALCULATIONS (matching Flutter's ProductPaymentProvider)
   // ========================================================================
@@ -994,7 +1028,13 @@ export default function ProductPaymentPage() {
     field: keyof FormData,
     value: string | boolean | { latitude: number; longitude: number } | null
   ) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    if (field === 'phoneNumber' && typeof value === 'string') {
+      // Apply phone number formatting (matching Flutter's _PhoneNumberFormatter)
+      const formattedPhone = formatPhoneNumber(value);
+      setFormData((prev) => ({ ...prev, [field]: formattedPhone }));
+    } else {
+      setFormData((prev) => ({ ...prev, [field]: value }));
+    }
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: "" }));
     }
@@ -1002,7 +1042,7 @@ export default function ProductPaymentPage() {
 
   const handleAddressSelect = (addressId: string | null) => {
     setSelectedAddressId(addressId);
-
+  
     if (addressId) {
       const address = savedAddresses.find((a) => a.id === addressId);
       if (address) {
@@ -1010,11 +1050,13 @@ export default function ProductPaymentPage() {
           ...prev,
           addressLine1: address.addressLine1,
           addressLine2: address.addressLine2,
-          phoneNumber: address.phoneNumber,
+          // Convert stored "05XXXXXXXXX" to display format "(5XX) XXX XX XX"
+          phoneNumber: formatPhoneForDisplay(address.phoneNumber),
           city: address.city,
           location: address.location || null,
         }));
       }
+    
     } else {
       setFormData((prev) => ({
         ...prev,
@@ -1038,12 +1080,14 @@ export default function ProductPaymentPage() {
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
-
+  
     if (!formData.addressLine1.trim()) {
       newErrors.addressLine1 = t("fieldRequired");
     }
     if (!formData.phoneNumber.trim()) {
       newErrors.phoneNumber = t("fieldRequired");
+    } else if (!isValidPhoneNumber(formData.phoneNumber)) {
+      newErrors.phoneNumber = t("invalidPhoneNumber") || "Please enter a valid phone number starting with 5";
     }
     if (!formData.city.trim()) {
       newErrors.city = t("fieldRequired");
@@ -1668,9 +1712,13 @@ export default function ProductPaymentPage() {
                                 ? "border-gray-600 bg-gray-700/50 text-white focus:border-blue-500 focus:ring-blue-500/20"
                                 : "border-gray-300 bg-white text-gray-900 focus:border-blue-500 focus:ring-blue-500/20"
                             } focus:outline-none focus:ring-4`}
-                            placeholder={t("yourContactNumber")}
+                            placeholder="(5__) ___ __ __"
                           />
                         </div>
+                        {/* Format hint - outside the relative group */}
+                        <p className={`mt-1 text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                          {t("phoneFormatHint") || "Format: (5XX) XXX XX XX"}
+                        </p>
                         {errors.phoneNumber && (
                           <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm text-red-500 flex items-center space-x-1">
                             <X size={12} className="sm:size-[14px]" />

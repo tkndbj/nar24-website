@@ -28,6 +28,143 @@ const LocationPickerModal = dynamic(
   { ssr: false }
 );
 
+// ============================================================================
+// Phone number formatting utilities (matching Flutter implementation)
+// Format: (5XX) XXX XX XX for Turkish phone numbers
+// ============================================================================
+
+/**
+ * Formats phone input as user types: (5XX) XXX XX XX
+ * Matches Flutter's _PhoneNumberFormatter
+ */
+const formatPhoneNumber = (value: string): string => {
+  // Remove all non-digit characters
+  const digitsOnly = value.replace(/\D/g, '');
+  // Limit to 10 digits
+  const limited = digitsOnly.slice(0, 10);
+  
+  let formatted = '';
+  for (let i = 0; i < limited.length; i++) {
+    if (i === 0) formatted += '(';
+    formatted += limited[i];
+    if (i === 2) formatted += ') ';
+    if (i === 5) formatted += ' ';
+    if (i === 7) formatted += ' ';
+  }
+  
+  return formatted;
+};
+
+/**
+ * Converts stored phone "05XXXXXXXXX" to display format "(5XX) XXX XX XX"
+ * Matches Flutter's _formatPhoneForDisplay
+ */
+const formatPhoneForDisplay = (phone: string): string => {
+  if (!phone) return '';
+  
+  const digitsOnly = phone.replace(/\D/g, '');
+  // Remove leading 0 if present
+  const digits = digitsOnly.startsWith('0') ? digitsOnly.slice(1) : digitsOnly;
+  
+  if (digits.length !== 10) return phone; // Return as-is if not valid
+  
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)} ${digits.slice(6, 8)} ${digits.slice(8, 10)}`;
+};
+
+/**
+ * Normalizes phone for storage: "(5XX) XXX XX XX" -> "05XXXXXXXXX"
+ * Matches Flutter's normalization: '0${_phoneController.text.replaceAll(RegExp(r'\D'), '')}'
+ */
+const normalizePhoneForStorage = (phone: string): string => {
+  const digitsOnly = phone.replace(/\D/g, '');
+  // Add leading 0 if not present (matching Flutter behavior)
+  return digitsOnly.startsWith('0') ? digitsOnly : `0${digitsOnly}`;
+};
+
+/**
+ * Validates phone number (must be 10 digits starting with 5 for Turkish mobile)
+ */
+const isValidPhoneNumber = (phone: string): boolean => {
+  const digitsOnly = phone.replace(/\D/g, '');
+  // Should be 10 digits and start with 5 (Turkish mobile format)
+  return digitsOnly.length === 10 && digitsOnly.startsWith('5');
+};
+
+// ============================================================================
+// IBAN formatting utilities (matching Flutter implementation)
+// Format: TR## #### #### #### #### #### ## for Turkish IBAN
+// ============================================================================
+
+/**
+ * Formats IBAN input as user types: TR## #### #### #### #### #### ##
+ * Matches Flutter's _TurkishIbanFormatter
+ */
+const formatIbanNumber = (value: string): string => {
+  // Remove all non-alphanumeric and get uppercase
+  let cleaned = value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  
+  // Remove TR prefix if present (we'll add it back)
+  if (cleaned.startsWith('TR')) {
+    cleaned = cleaned.slice(2);
+  }
+  
+  // Keep only digits after TR
+  const digitsOnly = cleaned.replace(/[^0-9]/g, '');
+  
+  // Limit to 24 digits
+  const limited = digitsOnly.slice(0, 24);
+  
+  // Format as TR## #### #### #### #### #### ##
+  let formatted = 'TR';
+  for (let i = 0; i < limited.length; i++) {
+    if (i === 2 || i === 6 || i === 10 || i === 14 || i === 18 || i === 22) {
+      formatted += ' ';
+    }
+    formatted += limited[i];
+  }
+  
+  return formatted;
+};
+
+/**
+ * Converts stored IBAN "TRXXXXXXXXXXXXXXXXXXXXXXXXXX" to display format "TR## #### #### #### #### #### ##"
+ * Matches Flutter's _formatIbanForDisplay
+ */
+const formatIbanForDisplay = (iban: string): string => {
+  if (!iban) return '';
+  
+  const cleaned = iban.toUpperCase().replace(/\s/g, '');
+  if (cleaned.length !== 26 || !cleaned.startsWith('TR')) return iban;
+  
+  let formatted = '';
+  for (let i = 0; i < cleaned.length; i++) {
+    if (i === 4 || i === 8 || i === 12 || i === 16 || i === 20 || i === 24) {
+      formatted += ' ';
+    }
+    formatted += cleaned[i];
+  }
+  
+  return formatted;
+};
+
+/**
+ * Normalizes IBAN for storage: "TR## #### #### #### #### #### ##" -> "TRXXXXXXXXXXXXXXXXXXXXXXXXXX"
+ * Matches Flutter's normalization: _ibanController.text.replaceAll(' ', '').toUpperCase()
+ */
+const normalizeIbanForStorage = (iban: string): string => {
+  return iban.replace(/\s/g, '').toUpperCase();
+};
+
+/**
+ * Validates Turkish IBAN (must be TR + 24 digits = 26 characters)
+ */
+const isValidTurkishIban = (iban: string): boolean => {
+  const normalized = normalizeIbanForStorage(iban);
+  return normalized.length === 26 && normalized.startsWith('TR') && /^TR\d{24}$/.test(normalized);
+};
+
+// ============================================================================
+
 interface SellerInfo {
   ibanOwnerName: string;
   ibanOwnerSurname: string;
@@ -208,12 +345,28 @@ export const SellerInfoDrawer: React.FC<SellerInfoDrawerProps> = ({
     }
   };
 
-  // Handle form input changes
+  // Handle form input changes with formatting
   const handleInputChange = (field: string, value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+    if (field === 'phone') {
+      // Apply phone number formatting (matching Flutter's _PhoneNumberFormatter)
+      const formattedPhone = formatPhoneNumber(value);
+      setFormData((prev) => ({
+        ...prev,
+        [field]: formattedPhone,
+      }));
+    } else if (field === 'iban') {
+      // Apply IBAN formatting (matching Flutter's _TurkishIbanFormatter)
+      const formattedIban = formatIbanNumber(value);
+      setFormData((prev) => ({
+        ...prev,
+        [field]: formattedIban,
+      }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        [field]: value,
+      }));
+    }
   };
 
   // Handle location selection
@@ -260,19 +413,20 @@ export const SellerInfoDrawer: React.FC<SellerInfoDrawerProps> = ({
       return false;
     }
 
-    // Validate IBAN format (basic check)
-    if (iban.trim().length < 15) {
+    // Validate phone number format (matching Flutter validation)
+    if (!isValidPhoneNumber(phone)) {
       showErrorToast(
-        l("SellerInfoDrawer.invalidIban") || "Please enter a valid IBAN"
+        l("SellerInfoDrawer.invalidPhone") ||
+          "Please enter a valid phone number starting with 5"
       );
       return false;
     }
 
-    // Validate phone number (basic check)
-    if (phone.trim().length < 10) {
+    // Validate IBAN format (matching Flutter validation: TR + 24 digits)
+    if (!isValidTurkishIban(iban)) {
       showErrorToast(
-        l("SellerInfoDrawer.invalidPhone") ||
-          "Please enter a valid phone number"
+        l("SellerInfoDrawer.invalidIban") ||
+          "Invalid IBAN. Turkish IBAN must be TR followed by 24 digits."
       );
       return false;
     }
@@ -298,14 +452,18 @@ export const SellerInfoDrawer: React.FC<SellerInfoDrawerProps> = ({
     setIsSaving(true);
 
     try {
+      // Normalize phone and IBAN for storage (matching Flutter)
+      const normalizedPhone = normalizePhoneForStorage(formData.phone);
+      const normalizedIban = normalizeIbanForStorage(formData.iban);
+
       const sellerData: SellerInfo = {
         ibanOwnerName: formData.ibanOwnerName.trim(),
         ibanOwnerSurname: formData.ibanOwnerSurname.trim(),
-        phone: formData.phone.trim(),
+        phone: normalizedPhone, // Store as "05XXXXXXXXX"
         latitude: formData.latitude!,
         longitude: formData.longitude!,
         address: formData.address.trim(),
-        iban: formData.iban.trim(),
+        iban: normalizedIban, // Store as "TRXXXXXXXXXXXXXXXXXXXXXXXXXX"
       };
 
       // Debug log
@@ -401,17 +559,19 @@ export const SellerInfoDrawer: React.FC<SellerInfoDrawerProps> = ({
     }
   };
 
-  // Edit seller info
+  // Edit seller info - format phone and IBAN for display when loading
   const editSellerInfo = () => {
     if (sellerInfo) {
       setFormData({
         ibanOwnerName: sellerInfo.ibanOwnerName,
         ibanOwnerSurname: sellerInfo.ibanOwnerSurname,
-        phone: sellerInfo.phone,
+        // Convert stored "05XXXXXXXXX" to display format "(5XX) XXX XX XX"
+        phone: formatPhoneForDisplay(sellerInfo.phone),
         latitude: sellerInfo.latitude,
         longitude: sellerInfo.longitude,
         address: sellerInfo.address,
-        iban: sellerInfo.iban,
+        // Convert stored "TRXXXXXXXXXXXXXXXXXXXXXXXXXX" to display format "TR## #### #### #### #### #### ##"
+        iban: formatIbanForDisplay(sellerInfo.iban),
       });
       setShowAddModal(true);
     }
@@ -696,7 +856,8 @@ export const SellerInfoDrawer: React.FC<SellerInfoDrawerProps> = ({
                         `}
                       >
                         <Phone size={14} />
-                        <span>{sellerInfo.phone}</span>
+                        {/* Display formatted phone number */}
+                        <span>{formatPhoneForDisplay(sellerInfo.phone)}</span>
                       </p>
                     </div>
                   </div>
@@ -911,7 +1072,7 @@ export const SellerInfoDrawer: React.FC<SellerInfoDrawerProps> = ({
                     ${isDarkMode ? "text-gray-300" : "text-gray-700"}
                   `}
                 >
-                  {l("SellerInfoDrawer.ibanOwnerName") || "IBAN Owner Name"}
+                  {l("SellerInfoDrawer.ibanOwnerName") || "IBAN Owner Name"} *
                 </label>
                 <input
                   type="text"
@@ -943,7 +1104,7 @@ export const SellerInfoDrawer: React.FC<SellerInfoDrawerProps> = ({
                   `}
                 >
                   {l("SellerInfoDrawer.ibanOwnerSurname") ||
-                    "IBAN Owner Surname"}
+                    "IBAN Owner Surname"} *
                 </label>
                 <input
                   type="text"
@@ -967,7 +1128,7 @@ export const SellerInfoDrawer: React.FC<SellerInfoDrawerProps> = ({
                 />
               </div>
 
-              {/* Phone Number */}
+              {/* Phone Number - Updated with formatting */}
               <div>
                 <label
                   className={`
@@ -975,15 +1136,13 @@ export const SellerInfoDrawer: React.FC<SellerInfoDrawerProps> = ({
                     ${isDarkMode ? "text-gray-300" : "text-gray-700"}
                   `}
                 >
-                  {l("SellerInfoDrawer.phoneNumber") || "Phone Number"}
+                  {l("SellerInfoDrawer.phoneNumber") || "Phone Number"} *
                 </label>
                 <input
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => handleInputChange("phone", e.target.value)}
-                  placeholder={
-                    l("SellerInfoDrawer.phoneNumber") || "Phone Number"
-                  }
+                  placeholder="(5__) ___ __ __"
                   className={`
                     w-full px-3 py-2 rounded-lg border
                     ${
@@ -994,6 +1153,15 @@ export const SellerInfoDrawer: React.FC<SellerInfoDrawerProps> = ({
                     focus:ring-2 focus:ring-orange-500 focus:border-transparent
                   `}
                 />
+                {/* Phone format hint */}
+                <p
+                  className={`
+                    mt-1 text-xs
+                    ${isDarkMode ? "text-gray-400" : "text-gray-500"}
+                  `}
+                >
+                  {l("SellerInfoDrawer.phoneFormatHint") || "Format: (5XX) XXX XX XX"}
+                </p>
               </div>
 
               {/* Location Selection Button */}
@@ -1004,7 +1172,7 @@ export const SellerInfoDrawer: React.FC<SellerInfoDrawerProps> = ({
                     ${isDarkMode ? "text-gray-300" : "text-gray-700"}
                   `}
                 >
-                  {l("SellerInfoDrawer.location") || "Location"}
+                  {l("SellerInfoDrawer.location") || "Location"} *
                 </label>
                 <button
                   onClick={() => setShowLocationPicker(true)}
@@ -1054,7 +1222,7 @@ export const SellerInfoDrawer: React.FC<SellerInfoDrawerProps> = ({
                     ${isDarkMode ? "text-gray-300" : "text-gray-700"}
                   `}
                 >
-                  {l("SellerInfoDrawer.addressDetails") || "Address Details"}
+                  {l("SellerInfoDrawer.addressDetails") || "Address Details"} *
                 </label>
                 <textarea
                   value={formData.address}
@@ -1075,7 +1243,7 @@ export const SellerInfoDrawer: React.FC<SellerInfoDrawerProps> = ({
                 />
               </div>
 
-              {/* IBAN */}
+              {/* IBAN - Updated with formatting */}
               <div>
                 <label
                   className={`
@@ -1084,13 +1252,13 @@ export const SellerInfoDrawer: React.FC<SellerInfoDrawerProps> = ({
                   `}
                 >
                   {l("SellerInfoDrawer.bankAccountNumberIban") ||
-                    "Bank Account Number (IBAN)"}
+                    "Bank Account Number (IBAN)"} *
                 </label>
                 <input
                   type="text"
                   value={formData.iban}
                   onChange={(e) => handleInputChange("iban", e.target.value)}
-                  placeholder="TR00 0000 0000 0000 0000 0000 00"
+                  placeholder="TR__ ____ ____ ____ ____ ____ __"
                   className={`
                     w-full px-3 py-2 rounded-lg border font-mono
                     ${
@@ -1101,6 +1269,15 @@ export const SellerInfoDrawer: React.FC<SellerInfoDrawerProps> = ({
                     focus:ring-2 focus:ring-orange-500 focus:border-transparent
                   `}
                 />
+                {/* IBAN format hint */}
+                <p
+                  className={`
+                    mt-1 text-xs
+                    ${isDarkMode ? "text-gray-400" : "text-gray-500"}
+                  `}
+                >
+                  {l("SellerInfoDrawer.ibanFormatHint") || "Format: TR + 24 digits"}
+                </p>
               </div>
             </div>
 
@@ -1132,7 +1309,9 @@ export const SellerInfoDrawer: React.FC<SellerInfoDrawerProps> = ({
                   formData.latitude === null ||
                   formData.longitude === null ||
                   !formData.address.trim() ||
-                  !formData.iban.trim()
+                  !formData.iban.trim() ||
+                  !isValidPhoneNumber(formData.phone) ||
+                  !isValidTurkishIban(formData.iban)
                 }
                 className="
                   flex-1 py-2 px-4 rounded-lg flex items-center justify-center space-x-2
