@@ -4,6 +4,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { getFirestoreAdmin } from "@/lib/firebase-admin";
 import { Product, ProductUtils } from "@/app/models/Product";
 
+interface BundleDisplayData {
+  bundleId: string;
+  product: Record<string, unknown>;
+  totalBundlePrice: number;
+  totalOriginalPrice: number;
+  discountPercentage: number;
+  currency: string;
+  totalProductCount: number;
+}
+
+
 // ✅ Memory cache for batch requests
 const batchCache = new Map<string, { product: Product; timestamp: number }>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
@@ -50,6 +61,74 @@ function documentToProduct(
   } catch (error) {
     console.error(`Error parsing product ${doc.id}:`, error);
     return null;
+  }
+}
+
+async function fetchBundles(productId: string, shopId: string | null): Promise<BundleDisplayData[]> {
+  if (!shopId) return [];
+  
+  try {
+    const db = getFirestoreAdmin();
+    const bundlesSnapshot = await db
+      .collection("bundles")
+      .where("shopId", "==", shopId)
+      .where("isActive", "==", true)
+      .get();
+
+    const bundleDisplayList: BundleDisplayData[] = [];
+
+    for (const bundleDoc of bundlesSnapshot.docs) {
+      const bundle = bundleDoc.data();
+      const products = bundle.products || [];
+
+      // Check if current product is in this bundle
+      const productInBundle = products.some(
+        (bp: { productId: string }) => bp.productId === productId
+      );
+
+      if (!productInBundle) continue;
+
+      // Get OTHER products (not the current one)
+      const otherProducts = products.filter(
+        (bp: { productId: string }) => bp.productId !== productId
+      );
+
+      for (const bundleProduct of otherProducts) {
+        try {
+          const productDoc = await db
+            .collection("shop_products")
+            .doc(bundleProduct.productId)
+            .get();
+
+          if (productDoc.exists) {
+            const productData = productDoc.data();
+            
+            // Only include if not paused
+            if (productData?.paused !== true) {
+              bundleDisplayList.push({
+                bundleId: bundleDoc.id,
+                product: {
+                  ...productData,
+                  id: productDoc.id,
+                },
+                totalBundlePrice: bundle.totalBundlePrice || 0,
+                totalOriginalPrice: bundle.totalOriginalPrice || 0,
+                discountPercentage: bundle.discountPercentage || 0,
+                currency: bundle.currency || "TL",
+                totalProductCount: products.length,
+              });
+            }
+          }
+        } catch (err) {
+          console.error(`Error fetching bundled product ${bundleProduct.productId}:`, err);
+        }
+      }
+    }
+
+    return bundleDisplayList;
+  } catch (error) {
+    console.error("Error fetching bundles:", error);
+    return [];
   }
 }
 

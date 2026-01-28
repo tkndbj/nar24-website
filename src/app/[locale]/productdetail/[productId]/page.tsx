@@ -146,11 +146,11 @@ interface CollectionData {
 interface BundleData {
   bundleId: string;
   product: Product;
-  bundlePrice: number;
-  originalPrice: number;
+  totalBundlePrice: number;      // ✅ Changed from bundlePrice
+  totalOriginalPrice: number;    // ✅ Changed from originalPrice  
   discountPercentage: number;
   currency: string;
-  isMainProduct: boolean;
+  totalProductCount: number;     // ✅ Added (replaces isMainProduct)
 }
 
 interface SellerInfo {

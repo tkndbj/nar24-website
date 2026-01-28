@@ -2000,6 +2000,7 @@
     "startShopping": "Alışverişe Başla",
     "selectedOptions": "Seçenekler",
     "remove": "Kaldır",
+    "left": "Kalan",
     "removing": "Kaldırılıyor...",
     "loadingProduct": "Ürün yükleniyor...",
     "loadingProductInfo": "Ürün bilgileri yükleniyor...",
@@ -2780,6 +2781,7 @@
     "goBack": "Geri Dön",
     "addToCart": "Sepete Ekle",
     "adding": "Ekleniyor...",
+    "salesPaused": "Satış Durduruldu",
     "removing": "Çıkarılıyor...",
     "addedToCart": "Sepete Eklendi!",
     "removedFromCart": "Sepetten Çıkarıldı!",
@@ -2822,7 +2824,8 @@
     "main": "ANA",
     "bundleItem": "Paket Ürünü",
     "youSave": "Tasarruf Ediyorsunuz",
-    "failedToLoadBundles": "Paketler yüklenemedi"
+    "failedToLoadBundles": "Paketler yüklenemedi",
+    "bundlePrice": "Paket Fiyatı"
   },
   "ProductCollectionWidget": {
     "title": "Bu Koleksiyondan",

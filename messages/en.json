@@ -1956,6 +1956,7 @@
     "loginToViewCart": "Please login to view your cart and continue shopping.",
     "login": "Login",
     "items": "items",
+    "left": "Left",
     "addDiscount": "Add discount",
     "applied": "Applied",
     "validating": "Validating...",
@@ -2745,6 +2746,7 @@
     "adding": "Adding...",
     "removing": "Removing...",
     "addedToCart": "Added to Cart!",
+    "salesPaused": "Sales Paused",
     "removedFromCart": "Removed from Cart!",
     "removeFromCart": "Remove from Cart",
     "buyNow": "Buy Now",
@@ -2785,7 +2787,8 @@
     "main": "MAIN",
     "bundleItem": "Bundle Item",
     "youSave": "You Save",
-    "failedToLoadBundles": "Failed to load bundles"
+    "failedToLoadBundles": "Failed to load bundles",
+    "bundlePrice": "Bundle Price"
   },
   "ProductCollectionWidget": {
     "title": "From This Collection",

@@ -1,161 +1,55 @@
 // src/app/api/bundles/route.ts
 
-import { NextRequest, NextResponse } from 'next/server';
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
-
-// Initialize Firebase Admin if not already initialized
-if (!getApps().length) {
-  initializeApp({
-    credential: cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-    }),
-  });
-}
-
-const db = getFirestore();
-
-interface BundleItem {
-  productId: string;
-  productName: string;
-  originalPrice: number;
-  bundlePrice: number;
-  discountPercentage: number;
-  imageUrl?: string;
-  currency: string;
-}
-
-interface Bundle {
-  id: string;
-  mainProductId: string;
-  bundleItems: BundleItem[];
-  isActive: boolean;
-  shopId: string;
-}
-
-interface Product {
-  id: string;
-  productName: string;
-  imageUrls: string[];
-  price: number;
-  currency: string;
-  brandModel?: string;
-  category?: string;
-  subcategory?: string;
-  description?: string;
-  userId: string;
-  shopId?: string;
-  sellerName?: string;
-}
+import { NextRequest, NextResponse } from "next/server";
+import { getFirestoreAdmin } from "@/lib/firebase-admin";
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const shopId = searchParams.get('shopId');
-    const mainProductId = searchParams.get('mainProductId');
-    const isActive = searchParams.get('isActive');
+    const shopId = request.nextUrl.searchParams.get("shopId");
+    const isActive = request.nextUrl.searchParams.get("isActive");
 
-    console.log('Bundle API called with params:', { shopId, mainProductId, isActive });
-
-    if (!shopId) {
-      return NextResponse.json(
-        { error: 'shopId is required' },
-        { status: 400 }
-      );
+    if (!shopId || shopId.trim() === "") {
+      return NextResponse.json([]);
     }
 
-    let bundles: Bundle[] = [];
+    const db = getFirestoreAdmin();
 
-    if (mainProductId) {
-      // Query bundles where this product is the main product
-      let bundlesQuery = db.collection('bundles')
-        .where('shopId', '==', shopId)
-        .where('mainProductId', '==', mainProductId);
+    // Build query matching Flutter's logic
+    let query = db.collection("bundles").where("shopId", "==", shopId);
 
-      if (isActive === 'true') {
-        bundlesQuery = bundlesQuery.where('isActive', '==', true);
-      }
+    if (isActive === "true") {
+      query = query.where("isActive", "==", true);
+    }
 
-      const bundlesSnapshot = await bundlesQuery.get();
-      
-      bundles = bundlesSnapshot.docs.map(doc => ({
+    const snapshot = await query.get();
+
+    const bundles = snapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
         id: doc.id,
-        ...doc.data()
-      } as Bundle));
-
-    } else {
-      // Query all bundles for the shop
-      let bundlesQuery = db.collection('bundles')
-        .where('shopId', '==', shopId);
-      
-      if (isActive === 'true') {
-        bundlesQuery = bundlesQuery.where('isActive', '==', true);
-      }
-
-      const bundlesSnapshot = await bundlesQuery.get();
-      
-      bundles = bundlesSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as Bundle));
-    }
-
-    console.log('Found bundles:', bundles.length);
-    return NextResponse.json(bundles);
-
-  } catch (error) {
-    console.error('Error fetching bundles:', error);
-    return NextResponse.json(
-      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
-  }
-}
-
-// Helper endpoint to get product data for bundles
-export async function POST(request: NextRequest) {
-  try {
-    const { productIds } = await request.json();
-    
-    if (!productIds || !Array.isArray(productIds)) {
-      return NextResponse.json(
-        { error: 'productIds array is required' },
-        { status: 400 }
-      );
-    }
-
-    
-
-    // Fetch all products in parallel
-    const productPromises = productIds.map(async (productId: string) => {
-      try {
-        const productDoc = await db.collection('shop_products').doc(productId).get();
-        if (productDoc.exists) {
-          return {
-            id: productDoc.id,
-            ...productDoc.data()
-          } as Product;
-        }
-        return null;
-      } catch (error) {
-        console.error(`Error fetching product ${productId}:`, error);
-        return null;
-      }
+        shopId: data.shopId || "",
+        products: (data.products || []).map((p: Record<string, unknown>) => ({
+          productId: p.productId || "",
+          productName: p.productName || "",
+          originalPrice: typeof p.originalPrice === "number" ? p.originalPrice : 0,
+          imageUrl: p.imageUrl || null,
+        })),
+        totalBundlePrice: typeof data.totalBundlePrice === "number" ? data.totalBundlePrice : 0,
+        totalOriginalPrice: typeof data.totalOriginalPrice === "number" ? data.totalOriginalPrice : 0,
+        discountPercentage: typeof data.discountPercentage === "number" ? data.discountPercentage : 0,
+        currency: data.currency || "TL",
+        isActive: data.isActive === true,
+        purchaseCount: typeof data.purchaseCount === "number" ? data.purchaseCount : 0,
+        createdAt: data.createdAt?._seconds ? data.createdAt._seconds * 1000 : Date.now(),
+        updatedAt: data.updatedAt?._seconds ? data.updatedAt._seconds * 1000 : null,
+      };
     });
 
-    const productResults = await Promise.all(productPromises);
-    
-    // Filter out null results
-    const validProducts = productResults.filter(product => product !== null) as Product[];
-
-    return NextResponse.json(validProducts);
-
+    return NextResponse.json(bundles);
   } catch (error) {
-    console.error('Error fetching products:', error);
+    console.error("Error fetching bundles:", error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

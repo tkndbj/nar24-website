@@ -1,38 +1,40 @@
-// src/app/components/BundleComponent.tsx
+// src/app/components/product_detail/BundleComponent.tsx
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { Sparkles, ShoppingBag, Package } from "lucide-react";
-import { Product } from "@/app/models/Product";
+import { Sparkles, Package } from "lucide-react";
+import { Product, ProductUtils } from "@/app/models/Product";
 import { useTranslations } from "next-intl";
 
-interface BundleItem {
+// ✅ NEW: Match Flutter's Bundle structure
+interface BundleProduct {
   productId: string;
   productName: string;
   originalPrice: number;
-  bundlePrice: number;
-  discountPercentage: number;
   imageUrl?: string;
-  currency: string;
 }
 
 interface Bundle {
   id: string;
-  mainProductId: string;
-  bundleItems: BundleItem[];
-  isActive: boolean;
   shopId: string;
-}
-
-interface BundleData {
-  bundleId: string;
-  product: Product;
-  bundlePrice: number;
-  originalPrice: number;
+  products: BundleProduct[]; // ✅ Changed from mainProductId + bundleItems
+  totalBundlePrice: number;
+  totalOriginalPrice: number;
   discountPercentage: number;
   currency: string;
-  isMainProduct: boolean;
+  isActive: boolean;
+}
+
+// ✅ NEW: Match Flutter's BundleDisplayData
+interface BundleDisplayData {
+  bundleId: string;
+  product: Product;
+  totalBundlePrice: number;
+  totalOriginalPrice: number;
+  discountPercentage: number;
+  currency: string;
+  totalProductCount: number;
 }
 
 interface BundleComponentProps {
@@ -40,11 +42,11 @@ interface BundleComponentProps {
   shopId?: string;
   isDarkMode?: boolean;
   localization?: ReturnType<typeof useTranslations>;
-  prefetchedData?: BundleData[] | null;
+  prefetchedData?: BundleDisplayData[] | null;
 }
 
 interface BundleProductCardProps {
-  bundleData: BundleData;
+  bundleData: BundleDisplayData;
   onClick: () => void;
   isDarkMode: boolean;
   t: (key: string) => string;
@@ -58,19 +60,19 @@ const BundleProductCard: React.FC<BundleProductCardProps> = ({
 }) => {
   const {
     product,
-    bundlePrice,
-    originalPrice,
+    totalBundlePrice,
+    totalOriginalPrice,
     discountPercentage,
     currency,
-    isMainProduct,
+    totalProductCount,
   } = bundleData;
-  const savings = originalPrice - bundlePrice;
+  const savings = totalOriginalPrice - totalBundlePrice;
   const [imageError, setImageError] = useState(false);
 
   return (
     <div
       onClick={onClick}
-      className={`group relative overflow-hidden rounded-2xl sm:rounded-none border cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-xl ${
+      className={`group relative overflow-hidden rounded-2xl sm:rounded-xl border cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-xl ${
         isDarkMode
           ? "bg-gradient-to-br from-gray-700 to-gray-800 border-gray-600 hover:border-orange-500"
           : "bg-gradient-to-br from-white to-gray-50 border-gray-200 hover:border-orange-300"
@@ -109,34 +111,16 @@ const BundleProductCard: React.FC<BundleProductCardProps> = ({
               -{discountPercentage.toFixed(0)}%
             </span>
           </div>
+
+          {/* Bundle product count indicator */}
+          <div className="absolute -bottom-1 -left-1 px-1.5 py-0.5 bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg shadow-lg flex items-center gap-1">
+            <Package className="w-3 h-3 text-white" />
+            <span className="text-xs font-bold text-white">{totalProductCount}</span>
+          </div>
         </div>
 
         {/* Product Details */}
         <div className="flex-1 ml-3 sm:ml-4 flex flex-col justify-center">
-          {/* Product Type Badge */}
-          <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
-            {isMainProduct && (
-              <div
-                className={`px-1.5 py-0.5 sm:px-2 rounded-md text-xs font-semibold ${
-                  isDarkMode
-                    ? "bg-orange-900/20 text-orange-400"
-                    : "bg-orange-100 text-orange-600"
-                }`}
-              >
-                {t("main")}
-              </div>
-            )}
-            <div
-              className={`px-1.5 py-0.5 sm:px-2 rounded-md text-xs font-medium ${
-                isDarkMode
-                  ? "bg-blue-900/20 text-blue-400"
-                  : "bg-blue-100 text-blue-600"
-              }`}
-            >
-              {t("bundleItem")}
-            </div>
-          </div>
-
           {/* Product Name */}
           <h4
             className={`text-sm sm:text-sm font-semibold mb-1.5 sm:mb-2 line-clamp-2 leading-tight group-hover:text-orange-500 transition-colors ${
@@ -146,18 +130,27 @@ const BundleProductCard: React.FC<BundleProductCardProps> = ({
             {product.productName}
           </h4>
 
+          {/* Bundle Price Label */}
+          <p
+            className={`text-xs mb-1 ${
+              isDarkMode ? "text-gray-400" : "text-gray-500"
+            }`}
+          >
+            {t("bundlePrice")}
+          </p>
+
           {/* Pricing */}
           <div className="space-y-0.5 sm:space-y-1">
             <div className="flex items-center gap-1.5 sm:gap-2">
               <span className="text-base sm:text-lg font-bold text-orange-500">
-                {bundlePrice.toFixed(2)} {currency}
+                {totalBundlePrice.toFixed(2)} {currency}
               </span>
               <span
                 className={`text-xs sm:text-sm line-through ${
                   isDarkMode ? "text-gray-400" : "text-gray-500"
                 }`}
               >
-                {originalPrice.toFixed(2)}
+                {totalOriginalPrice.toFixed(2)}
               </span>
             </div>
 
@@ -186,145 +179,108 @@ const BundleComponent: React.FC<BundleComponentProps> = ({
   prefetchedData,
 }) => {
   const router = useRouter();
-  const [bundles, setBundles] = useState<BundleData[]>([]);
+  const [bundles, setBundles] = useState<BundleDisplayData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // ✅ FIXED: Proper nested translation function that uses JSON files
   const t = useCallback(
     (key: string) => {
-      if (!localization) {
-        return key;
-      }
-
+      if (!localization) return key;
       try {
-        // Try to get the nested BundleComponent translation
         const translation = localization(`BundleComponent.${key}`);
-
-        // Check if we got a valid translation (not the same as the key we requested)
         if (translation && translation !== `BundleComponent.${key}`) {
           return translation;
         }
-
-        // If nested translation doesn't exist, try direct key
         const directTranslation = localization(key);
         if (directTranslation && directTranslation !== key) {
           return directTranslation;
         }
-
-        // Return the key as fallback
         return key;
-      } catch (error) {
-        console.warn(`Translation error for key: ${key}`, error);
+      } catch {
         return key;
       }
     },
     [localization]
   );
 
-  const fetchProductBundles = useCallback(async (): Promise<BundleData[]> => {
+  // ✅ NEW: Match Flutter's _fetchProductBundles logic exactly
+  const fetchProductBundles = useCallback(async (): Promise<BundleDisplayData[]> => {
     try {
+      // Only proceed if we have a shopId (bundles are shop-only feature)
       if (!shopId || shopId.trim() === "") {
         return [];
       }
 
-      const bundleDataList: BundleData[] = [];
+      const bundleDisplayList: BundleDisplayData[] = [];
 
-      const mainProductBundlesResponse = await fetch(
-        `/api/bundles?shopId=${shopId}&mainProductId=${productId}&isActive=true`
+      // Find all active bundles in this shop
+      const response = await fetch(
+        `/api/bundles?shopId=${encodeURIComponent(shopId)}&isActive=true`
       );
 
-      if (mainProductBundlesResponse.ok) {
-        const mainProductBundles: Bundle[] =
-          await mainProductBundlesResponse.json();
+      if (!response.ok) {
+        console.error("Failed to fetch bundles:", response.status);
+        return [];
+      }
 
-        for (const bundle of mainProductBundles) {
-          for (const bundleItem of bundle.bundleItems) {
-            try {
-              const productResponse = await fetch(
-                `/api/products/${bundleItem.productId}`
-              );
+      const allBundles: Bundle[] = await response.json();
 
-              if (productResponse.ok) {
-                const product: Product = await productResponse.json();
+      for (const bundle of allBundles) {
+        // ✅ Check if current product is in this bundle's products array
+        const productInBundle = bundle.products?.some(
+          (bp) => bp.productId === productId
+        );
 
-                bundleDataList.push({
+        if (!productInBundle) continue;
+
+        // ✅ Get all OTHER products in this bundle (not the current one)
+        const otherProducts = bundle.products.filter(
+          (bp) => bp.productId !== productId
+        );
+
+        // Fetch the actual Product objects for other products
+        for (const bundleProduct of otherProducts) {
+          try {
+            const productResponse = await fetch(
+              `/api/products/${bundleProduct.productId}`
+            );
+
+            if (productResponse.ok) {
+              const productData = await productResponse.json();
+              const product = ProductUtils.fromJson(productData);
+
+              // Only show if product is active (not paused)
+              if (product.paused !== true) {
+                bundleDisplayList.push({
                   bundleId: bundle.id,
                   product: product,
-                  bundlePrice: bundleItem.bundlePrice,
-                  originalPrice: bundleItem.originalPrice,
-                  discountPercentage:
-                    ((bundleItem.originalPrice - bundleItem.bundlePrice) /
-                      bundleItem.originalPrice) *
-                    100,
-                  currency: bundleItem.currency,
-                  isMainProduct: false,
+                  totalBundlePrice: bundle.totalBundlePrice,
+                  totalOriginalPrice: bundle.totalOriginalPrice,
+                  discountPercentage: bundle.discountPercentage,
+                  currency: bundle.currency,
+                  totalProductCount: bundle.products.length,
                 });
               }
-            } catch (error) {
-              console.error(
-                `Error fetching bundled product ${bundleItem.productId}:`,
-                error
-              );
             }
+          } catch (err) {
+            console.error(
+              `Error fetching bundled product ${bundleProduct.productId}:`,
+              err
+            );
           }
         }
       }
 
-      const allBundlesResponse = await fetch(
-        `/api/bundles?shopId=${shopId}&isActive=true`
-      );
-
-      if (allBundlesResponse.ok) {
-        const allBundles: Bundle[] = await allBundlesResponse.json();
-
-        for (const bundle of allBundles) {
-          const matchingItem = bundle.bundleItems.find(
-            (item) => item.productId === productId
-          );
-
-          if (matchingItem) {
-            try {
-              const mainProductResponse = await fetch(
-                `/api/products/${bundle.mainProductId}`
-              );
-
-              if (mainProductResponse.ok) {
-                const mainProduct: Product = await mainProductResponse.json();
-
-                bundleDataList.push({
-                  bundleId: bundle.id,
-                  product: mainProduct,
-                  bundlePrice: matchingItem.bundlePrice,
-                  originalPrice: matchingItem.originalPrice,
-                  discountPercentage:
-                    ((matchingItem.originalPrice - matchingItem.bundlePrice) /
-                      matchingItem.originalPrice) *
-                    100,
-                  currency: matchingItem.currency,
-                  isMainProduct: true,
-                });
-              }
-            } catch (error) {
-              console.error(
-                `Error fetching main product ${bundle.mainProductId}:`,
-                error
-              );
-            }
-          }
-        }
-      }
-
-      return bundleDataList;
-    } catch (error) {
-      console.error("Error fetching product bundles:", error);
+      return bundleDisplayList;
+    } catch (err) {
+      console.error("Error fetching product bundles:", err);
       return [];
     }
   }, [productId, shopId]);
 
   useEffect(() => {
     // ✅ PRIORITY 1: Use prefetched data (INSTANT)
-    if (prefetchedData) {
+    if (prefetchedData && prefetchedData.length > 0) {
       console.log("✅ Bundles: Using prefetched data");
       setBundles(prefetchedData);
       setIsLoading(false);
@@ -355,19 +311,23 @@ const BundleComponent: React.FC<BundleComponentProps> = ({
           console.error("Cannot navigate to product with empty ID");
           return;
         }
-
         router.push(`/product/${product.id}`);
-      } catch (error) {
-        console.error("Error navigating to bundled product:", error);
+      } catch (err) {
+        console.error("Error navigating to bundled product:", err);
       }
     },
     [router]
   );
 
+  // Don't show loading state if no shopId (bundles are shop-only)
+  if (!shopId || shopId.trim() === "") {
+    return null;
+  }
+
   if (isLoading) {
     return (
       <div
-        className={`rounded-2xl sm:rounded-none p-4 sm:p-6 border shadow-sm -mx-4 sm:mx-0 ${
+        className={`rounded-2xl sm:rounded-xl p-4 sm:p-6 border shadow-sm ${
           isDarkMode
             ? "bg-gray-800 border-gray-700"
             : "bg-white border-gray-200"
@@ -411,17 +371,6 @@ const BundleComponent: React.FC<BundleComponentProps> = ({
             >
               {t("subtitle")}
             </p>
-          </div>
-
-          <div
-            className={`flex items-center gap-1 px-2 py-1 sm:px-3 rounded-full ${
-              isDarkMode
-                ? "bg-green-900/20 text-green-400 border border-green-800"
-                : "bg-green-50 text-green-700 border border-green-200"
-            }`}
-          >
-            <ShoppingBag className="w-3 h-3" />
-            <span className="text-xs font-medium">{t("specialOffer")}</span>
           </div>
         </div>
 
