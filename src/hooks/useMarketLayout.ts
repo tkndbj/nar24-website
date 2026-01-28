@@ -5,16 +5,17 @@
  * Mirrors Flutter's MarketLayoutService functionality.
  * 
  * Features:
- * - Real-time Firestore synchronization
- * - Automatic retry with exponential backoff
- * - Proper cleanup to prevent memory leaks
+ * - ONE-TIME Firestore fetch (no real-time listeners)
+ * - Platform-specific config with fallback
  * - Validation and sanitization of widget data
  * - Default fallback on errors
  * - TypeScript type safety
+ * 
+ * NO LISTENERS - Only fetches on mount or manual refresh()
  */
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { doc, onSnapshot, Unsubscribe } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
   MarketWidgetConfig,
@@ -25,20 +26,17 @@ import {
   WidgetType,
 } from "@/types/MarketLayout";
 
-// Configuration constants
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
 const FIRESTORE_COLLECTION = "app_config";
 const FIRESTORE_DOC_WEB = "market_layout_web"; // Web-specific (priority)
 const FIRESTORE_DOC_SHARED = "market_layout"; // Shared/fallback
-const MAX_RETRIES = 3;
-const RETRY_BASE_DELAY_MS = 2000;
 
-// Retryable Firestore error codes (matches Flutter implementation)
-const RETRYABLE_ERROR_CODES = new Set([
-  "unavailable",
-  "deadline-exceeded",
-  "internal",
-  "unknown",
-]);
+// ============================================================================
+// TYPES
+// ============================================================================
 
 interface UseMarketLayoutOptions {
   /** Enable debug logging */
@@ -52,14 +50,18 @@ interface UseMarketLayoutReturn extends MarketLayoutState {
   resetToDefaults: () => void;
 }
 
+// ============================================================================
+// VALIDATION HELPERS
+// ============================================================================
+
 /**
  * Validates a single widget configuration
  */
 function isValidWidget(widget: unknown): widget is MarketWidgetConfig {
   if (!widget || typeof widget !== "object") return false;
-  
+
   const w = widget as Record<string, unknown>;
-  
+
   return (
     typeof w.id === "string" &&
     w.id.length > 0 &&
@@ -80,7 +82,7 @@ function parseWidgetsFromData(data: unknown): MarketWidgetConfig[] {
   }
 
   const docData = data as MarketLayoutDocument;
-  
+
   if (!docData.widgets || !Array.isArray(docData.widgets)) {
     return [];
   }
@@ -100,7 +102,7 @@ function parseWidgetsFromData(data: unknown): MarketWidgetConfig[] {
     }
 
     seenIds.add(widget.id);
-    
+
     // Sanitize and add widget
     validWidgets.push({
       id: String(widget.id),
@@ -114,18 +116,12 @@ function parseWidgetsFromData(data: unknown): MarketWidgetConfig[] {
   return validWidgets;
 }
 
-/**
- * Determines if an error should trigger a retry
- */
-function shouldRetry(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
-  
-  const errorCode = (error as { code?: string }).code;
-  return typeof errorCode === "string" && RETRYABLE_ERROR_CODES.has(errorCode);
-}
+// ============================================================================
+// HOOK
+// ============================================================================
 
 /**
- * Custom hook for managing market layout with Firestore real-time sync
+ * Custom hook for managing market layout with one-time Firestore fetch
  */
 export function useMarketLayout(
   options: UseMarketLayoutOptions = {}
@@ -143,10 +139,7 @@ export function useMarketLayout(
     isInitialized: false,
   });
 
-  // Refs for cleanup and preventing race conditions
-  const unsubscribeRef = useRef<Unsubscribe | null>(null);
-  const retryCountRef = useRef(0);
-  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Ref to track mount status
   const isMountedRef = useRef(true);
 
   // Debug logger
@@ -163,13 +156,9 @@ export function useMarketLayout(
    * Updates state only if component is still mounted
    */
   const safeSetState = useCallback(
-    (updater: Partial<MarketLayoutState> | ((prev: MarketLayoutState) => MarketLayoutState)) => {
+    (updater: Partial<MarketLayoutState>) => {
       if (!isMountedRef.current) return;
-      
-      setState((prev) => {
-        const newState = typeof updater === "function" ? updater(prev) : { ...prev, ...updater };
-        return newState;
-      });
+      setState((prev) => ({ ...prev, ...updater }));
     },
     []
   );
@@ -187,189 +176,107 @@ export function useMarketLayout(
   );
 
   /**
-   * Cleanup function for subscriptions and timeouts
-   */
-  const cleanup = useCallback(() => {
-    if (unsubscribeRef.current) {
-      unsubscribeRef.current();
-      unsubscribeRef.current = null;
-    }
-    if (retryTimeoutRef.current) {
-      clearTimeout(retryTimeoutRef.current);
-      retryTimeoutRef.current = null;
-    }
-  }, []);
-
-  /**
-   * Sets up the Firestore real-time listener
+   * Fetches layout from Firestore (ONE-TIME, no listener)
    * Priority: web-specific document first, then shared/fallback
    */
-  const setupListener = useCallback(() => {
-    // Cleanup any existing listener
-    cleanup();
-
+  const fetchLayout = useCallback(async () => {
     if (!isMountedRef.current) return;
 
-  
+    log("Fetching layout...");
 
-    /**
-     * Subscribe to a document and handle the response
-     */
-    const subscribeToDoc = (docName: string, isFallback: boolean) => {
+    try {
+      let parsedWidgets: MarketWidgetConfig[] = [];
+
+      // ========================================
+      // 1. Try web-specific document first
+      // ========================================
       try {
-        const docRef = doc(db, FIRESTORE_COLLECTION, docName);
+        const webDocRef = doc(db, FIRESTORE_COLLECTION, FIRESTORE_DOC_WEB);
+        const webSnap = await getDoc(webDocRef);
 
-        log(`Setting up Firestore listener for ${docName}...`);
+        if (webSnap.exists()) {
+          const data = webSnap.data();
+          parsedWidgets = parseWidgetsFromData(data);
 
-        const unsubscribe = onSnapshot(
-          docRef,
-          { includeMetadataChanges: false },
-          (snapshot) => {
-            if (!isMountedRef.current) return;
-
-            try {
-              // Reset retry count on successful connection
-              retryCountRef.current = 0;
-
-              // If web-specific doc doesn't exist or is empty, try fallback
-              if (!snapshot.exists() || !snapshot.data()?.widgets?.length) {
-                if (!isFallback) {
-                  log(`No web-specific layout found, trying shared fallback...`);
-                  // Cleanup current listener and try fallback
-                  unsubscribe();
-                  subscribeToDoc(FIRESTORE_DOC_SHARED, true);
-                  return;
-                }
-
-                // Even fallback is empty, use defaults
-                log("No layout document found, using defaults");
-                safeSetState({
-                  widgets: DEFAULT_WIDGETS,
-                  visibleWidgets: computeVisibleWidgets(DEFAULT_WIDGETS),
-                  isLoading: false,
-                  error: null,
-                  isInitialized: true,
-                });
-                return;
-              }
-
-              const data = snapshot.data();
-              const parsedWidgets = parseWidgetsFromData(data);
-
-              if (parsedWidgets.length === 0) {
-                if (!isFallback) {
-                  log(`No valid widgets in web-specific, trying shared fallback...`);
-                  unsubscribe();
-                  subscribeToDoc(FIRESTORE_DOC_SHARED, true);
-                  return;
-                }
-
-                log("No valid widgets found, using defaults");
-                safeSetState({
-                  widgets: DEFAULT_WIDGETS,
-                  visibleWidgets: computeVisibleWidgets(DEFAULT_WIDGETS),
-                  isLoading: false,
-                  error: null,
-                  isInitialized: true,
-                });
-                return;
-              }
-
-              log(`Layout synced from ${docName}: ${parsedWidgets.length} widgets`);
-
-              safeSetState({
-                widgets: parsedWidgets,
-                visibleWidgets: computeVisibleWidgets(parsedWidgets),
-                isLoading: false,
-                error: null,
-                isInitialized: true,
-              });
-
-              // Store ref for cleanup
-              unsubscribeRef.current = unsubscribe;
-            } catch (error) {
-              console.error("[MarketLayout] Error processing snapshot:", error);
-              safeSetState({
-                widgets: DEFAULT_WIDGETS,
-                visibleWidgets: computeVisibleWidgets(DEFAULT_WIDGETS),
-                isLoading: false,
-                error: "Failed to process layout update",
-                isInitialized: true,
-              });
-            }
-          },
-          (error) => {
-            if (!isMountedRef.current) return;
-
-            console.error("[MarketLayout] Snapshot error:", error);
-
-            // If web-specific failed, try fallback
-            if (!isFallback) {
-              log(`Web-specific listener failed, trying shared fallback...`);
-              subscribeToDoc(FIRESTORE_DOC_SHARED, true);
-              return;
-            }
-
-            // Check if we should retry
-            if (shouldRetry(error) && retryCountRef.current < MAX_RETRIES) {
-              retryCountRef.current++;
-              const delay = RETRY_BASE_DELAY_MS * Math.pow(2, retryCountRef.current - 1);
-              
-              log(`Retrying in ${delay}ms (attempt ${retryCountRef.current}/${MAX_RETRIES})...`);
-
-              retryTimeoutRef.current = setTimeout(() => {
-                if (isMountedRef.current) {
-                  setupListener();
-                }
-              }, delay);
-            } else {
-              // Max retries reached or non-retryable error
-              safeSetState({
-                widgets: DEFAULT_WIDGETS,
-                visibleWidgets: computeVisibleWidgets(DEFAULT_WIDGETS),
-                isLoading: false,
-                error: `Connection error: ${error instanceof Error ? error.message : "Unknown error"}`,
-                isInitialized: true,
-              });
-            }
+          if (parsedWidgets.length > 0) {
+            log(`Layout loaded from web-specific: ${parsedWidgets.length} widgets`);
+            safeSetState({
+              widgets: parsedWidgets,
+              visibleWidgets: computeVisibleWidgets(parsedWidgets),
+              isLoading: false,
+              error: null,
+              isInitialized: true,
+            });
+            return;
           }
-        );
-
-        // Store unsubscribe function
-        unsubscribeRef.current = unsubscribe;
-      } catch (error) {
-        console.error("[MarketLayout] Error setting up listener:", error);
-        
-        // If web-specific setup failed, try fallback
-        if (!isFallback) {
-          log(`Web-specific setup failed, trying shared fallback...`);
-          subscribeToDoc(FIRESTORE_DOC_SHARED, true);
-          return;
         }
-
-        safeSetState({
-          widgets: DEFAULT_WIDGETS,
-          visibleWidgets: computeVisibleWidgets(DEFAULT_WIDGETS),
-          isLoading: false,
-          error: "Failed to connect to layout service",
-          isInitialized: true,
-        });
+      } catch (webError) {
+        log("Web-specific fetch failed, trying fallback...");
+        console.error("[MarketLayout] Web-specific error:", webError);
       }
-    };
 
-    // Start with web-specific document
-    subscribeToDoc(FIRESTORE_DOC_WEB, false);
-  }, [cleanup, computeVisibleWidgets, log, safeSetState]);
+      // ========================================
+      // 2. Fallback to shared document
+      // ========================================
+      try {
+        const sharedDocRef = doc(db, FIRESTORE_COLLECTION, FIRESTORE_DOC_SHARED);
+        const sharedSnap = await getDoc(sharedDocRef);
+
+        if (sharedSnap.exists()) {
+          const data = sharedSnap.data();
+          parsedWidgets = parseWidgetsFromData(data);
+
+          if (parsedWidgets.length > 0) {
+            log(`Layout loaded from shared: ${parsedWidgets.length} widgets`);
+            safeSetState({
+              widgets: parsedWidgets,
+              visibleWidgets: computeVisibleWidgets(parsedWidgets),
+              isLoading: false,
+              error: null,
+              isInitialized: true,
+            });
+            return;
+          }
+        }
+      } catch (sharedError) {
+        log("Shared fallback fetch failed");
+        console.error("[MarketLayout] Shared fallback error:", sharedError);
+      }
+
+      // ========================================
+      // 3. No config found, use defaults
+      // ========================================
+      log("No layout config found, using defaults");
+      safeSetState({
+        widgets: DEFAULT_WIDGETS,
+        visibleWidgets: computeVisibleWidgets(DEFAULT_WIDGETS),
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+      });
+
+    } catch (error) {
+      console.error("[MarketLayout] Fetch error:", error);
+
+      // Use defaults on error
+      safeSetState({
+        widgets: DEFAULT_WIDGETS,
+        visibleWidgets: computeVisibleWidgets(DEFAULT_WIDGETS),
+        isLoading: false,
+        error: "Failed to load layout",
+        isInitialized: true,
+      });
+    }
+  }, [computeVisibleWidgets, log, safeSetState]);
 
   /**
-   * Manually refresh the layout
+   * Manually refresh the layout (re-fetches from Firestore)
    */
   const refresh = useCallback(() => {
     log("Manual refresh triggered");
-    retryCountRef.current = 0;
     safeSetState({ isLoading: true, error: null });
-    setupListener();
-  }, [log, safeSetState, setupListener]);
+    fetchLayout();
+  }, [log, safeSetState, fetchLayout]);
 
   /**
    * Reset to default widgets (local only, doesn't affect Firestore)
@@ -383,17 +290,15 @@ export function useMarketLayout(
     });
   }, [computeVisibleWidgets, log, safeSetState]);
 
-  // Setup listener on mount
+  // Fetch layout on mount (ONE-TIME)
   useEffect(() => {
     isMountedRef.current = true;
-    setupListener();
+    fetchLayout();
 
-    // Cleanup on unmount
     return () => {
       isMountedRef.current = false;
-      cleanup();
     };
-  }, [setupListener, cleanup]);
+  }, [fetchLayout]);
 
   // Memoize return value to prevent unnecessary re-renders
   return useMemo(
