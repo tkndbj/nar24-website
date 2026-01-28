@@ -8,7 +8,6 @@ import {
   collection,
   query,
   where,
-  onSnapshot,
   doc,
   getDoc,
   getDocs,
@@ -297,7 +296,7 @@ const DynamicList: React.FC<{
   return (
     <div className="w-full my-2 lg:mx-0 lg:px-6">
       <div className="relative w-full rounded-none lg:rounded-t-3xl overflow-visible">
-        {/* Background gradient - horizontal with vertical fade mask */}
+        {/* Background gradient with vertical fade mask */}
         <div
           className="absolute inset-0 rounded-none lg:rounded-t-3xl"
           style={{
@@ -458,162 +457,144 @@ export default function DynamicHorizontalList({ keyPrefix = '' }: DynamicHorizon
     return () => observer.disconnect();
   }, []);
 
-  // Fetch dynamic lists from Firestore
+  // Fetch dynamic lists from Firestore (one-time fetch, fresh on every page visit)
   useEffect(() => {
     if (!isClient) return;
 
-    console.log("Setting up dynamic lists stream");
+    const fetchDynamicLists = async () => {
+      console.log("Fetching dynamic lists (one-time)");
 
-    // Try without orderBy first to see if that's causing issues
-    const q = query(
-      collection(db, "dynamic_product_lists"),
-      where("isActive", "==", true)
-    );
+      try {
+        const q = query(
+          collection(db, "dynamic_product_lists"),
+          where("isActive", "==", true)
+        );
 
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        console.log("Firestore snapshot received");
+        const snapshot = await getDocs(q);
+
+        console.log("Firestore fetch complete");
         console.log("Snapshot size:", snapshot.size);
-        console.log("Snapshot empty:", snapshot.empty);
-        console.log("Snapshot docs length:", snapshot.docs.length);
 
         if (snapshot.empty) {
-          console.log("No dynamic product lists found or no data available");
+          console.log("No dynamic product lists found");
           setDynamicLists([]);
         } else {
           const lists = snapshot.docs.map((doc) => {
             const data = doc.data();
-            console.log(`Processing list: ${doc.id} - ${data.title}`);
-            console.log("List active:", data.isActive);
-            console.log("List order:", data.order);
-            console.log("Full doc data:", JSON.stringify(data, null, 2));
-
             return {
               id: doc.id,
               ...data,
             } as DynamicListData;
           });
 
-          // Sort manually by order if needed
+          // Sort by order
           lists.sort((a, b) => (a.order || 0) - (b.order || 0));
 
           console.log(`Found ${lists.length} dynamic product lists`);
-          console.log(
-            "All lists:",
-            lists.map((l) => ({ id: l.id, title: l.title, active: l.isActive }))
-          );
           setDynamicLists(lists);
         }
-        setLoading(false);
-      },
-      (error) => {
-        console.error("Error in DynamicHorizontalList:", error);
-        console.error("Error details:", error.message);
-        console.error("Error code:", error.code);
+      } catch (error) {
+        console.error("Error fetching dynamic lists:", error);
         setDynamicLists([]);
+      } finally {
         setLoading(false);
       }
-    );
+    };
 
-    return () => unsubscribe();
+    fetchDynamicLists();
   }, [isClient]);
 
   // Don't render until client-side hydration is complete
   if (!isClient) {
     return (
-      <div className="w-full">
-        <div className="max-w-[1400px] mx-auto">
-          {Array.from({ length: 2 }, (_, index) => (
-            <div
-              key={index}
-              className="w-full my-2 lg:mx-0 lg:px-6"
-              style={{ height: `${rowHeight}px` }}
-            >
-              <div className="relative w-full rounded-none lg:rounded-t-3xl overflow-visible">
-                <div
-                  className="absolute inset-0 rounded-none lg:rounded-t-3xl"
-                  style={{
-                    height: `${rowHeight * 0.6}px`,
-                    background: `linear-gradient(to right, #f97316, #ec4899)`,
-                    maskImage: `linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%)`,
-                    WebkitMaskImage: `linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%)`,
-                  }}
-                />
-                <div className="relative py-3">
-                  <div className="px-0 lg:px-2 mb-2">
-                    <div className="flex justify-between items-center">
-                      <div className="h-5 bg-white bg-opacity-30 rounded w-48 relative overflow-hidden">
-                        <div className="shimmer-effect shimmer-effect-light" />
-                      </div>
-                      <div className="h-4 bg-white bg-opacity-30 rounded w-16 relative overflow-hidden">
-                        <div className="shimmer-effect shimmer-effect-light" />
-                      </div>
+      <>
+        {Array.from({ length: 2 }, (_, index) => (
+          <div
+            key={index}
+            className="w-full my-2 lg:mx-0 lg:px-6"
+            style={{ height: `${rowHeight}px` }}
+          >
+            <div className="relative w-full rounded-none lg:rounded-t-3xl overflow-visible">
+              <div
+                className="absolute inset-0 rounded-none lg:rounded-t-3xl"
+                style={{
+                  height: `${rowHeight * 0.6}px`,
+                  background: `linear-gradient(to right, #f97316, #ec4899)`,
+                  maskImage: `linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%)`,
+                  WebkitMaskImage: `linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%)`,
+                }}
+              />
+              <div className="relative py-3">
+                <div className="px-0 lg:px-2 mb-2">
+                  <div className="flex justify-between items-center">
+                    <div className="h-5 bg-white bg-opacity-30 rounded w-48 relative overflow-hidden">
+                      <div className="shimmer-effect shimmer-effect-light" />
+                    </div>
+                    <div className="h-4 bg-white bg-opacity-30 rounded w-16 relative overflow-hidden">
+                      <div className="shimmer-effect shimmer-effect-light" />
                     </div>
                   </div>
-                  <ShimmerList
-                    height={rowHeight - 60}
-                    count={5}
-                    portraitImageHeight={portraitImageHeight}
-                    infoAreaHeight={infoAreaHeight}
-                    scaleFactor={0.88}
-                    isDarkMode={isDarkMode}
-                  />
                 </div>
+                <ShimmerList
+                  height={rowHeight - 60}
+                  count={5}
+                  portraitImageHeight={portraitImageHeight}
+                  infoAreaHeight={infoAreaHeight}
+                  scaleFactor={0.88}
+                  isDarkMode={isDarkMode}
+                />
               </div>
             </div>
-          ))}
-        </div>
-      </div>
+          </div>
+        ))}
+      </>
     );
   }
 
   // Render loading state
   if (loading) {
     return (
-      <div className="w-full">
-        <div className="max-w-[1400px] mx-auto">
-          {Array.from({ length: 2 }, (_, index) => (
-            <div
-              key={index}
-              className="w-full my-2 lg:mx-0 lg:px-6"
-              style={{ height: `${rowHeight}px` }}
-            >
-              <div className="relative w-full rounded-none lg:rounded-t-3xl overflow-visible">
-                <div
-                  className="absolute inset-0 rounded-none lg:rounded-t-3xl"
-                  style={{
-                    height: `${rowHeight * 0.6}px`,
-                    background: `linear-gradient(to right, #f97316, #ec4899)`,
-                    maskImage: `linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%)`,
-                    WebkitMaskImage: `linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%)`,
-                  }}
-                />
-                <div className="relative py-3">
-                  <div className="px-0 lg:px-2 mb-2">
-                    <div className="flex justify-between items-center">
-                      <div className="h-5 bg-white bg-opacity-30 rounded w-48 relative overflow-hidden">
-                        <div className="shimmer-effect shimmer-effect-light" />
-                      </div>
-                      <div className="h-4 bg-white bg-opacity-30 rounded w-16 relative overflow-hidden">
-                        <div className="shimmer-effect shimmer-effect-light" />
-                      </div>
+      <>
+        {Array.from({ length: 2 }, (_, index) => (
+          <div
+            key={index}
+            className="w-full my-2 lg:mx-0 lg:px-6"
+            style={{ height: `${rowHeight}px` }}
+          >
+            <div className="relative w-full rounded-none lg:rounded-t-3xl overflow-visible">
+              <div
+                className="absolute inset-0 rounded-none lg:rounded-t-3xl"
+                style={{
+                  height: `${rowHeight * 0.6}px`,
+                  background: `linear-gradient(to right, #f97316, #ec4899)`,
+                  maskImage: `linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%)`,
+                  WebkitMaskImage: `linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%)`,
+                }}
+              />
+              <div className="relative py-3">
+                <div className="px-0 lg:px-2 mb-2">
+                  <div className="flex justify-between items-center">
+                    <div className="h-5 bg-white bg-opacity-30 rounded w-48 relative overflow-hidden">
+                      <div className="shimmer-effect shimmer-effect-light" />
+                    </div>
+                    <div className="h-4 bg-white bg-opacity-30 rounded w-16 relative overflow-hidden">
+                      <div className="shimmer-effect shimmer-effect-light" />
                     </div>
                   </div>
-                  <ShimmerList
-                    height={rowHeight - 60}
-                    count={5}
-                    portraitImageHeight={portraitImageHeight}
-                    infoAreaHeight={infoAreaHeight}
-                    scaleFactor={0.88}
-                    isDarkMode={isDarkMode}
-                  />
                 </div>
+                <ShimmerList
+                  height={rowHeight - 60}
+                  count={5}
+                  portraitImageHeight={portraitImageHeight}
+                  infoAreaHeight={infoAreaHeight}
+                  scaleFactor={0.88}
+                  isDarkMode={isDarkMode}
+                />
               </div>
             </div>
-          ))}
-        </div>
-      </div>
+          </div>
+        ))}
+      </>
     );
   }
 
@@ -632,23 +613,21 @@ export default function DynamicHorizontalList({ keyPrefix = '' }: DynamicHorizon
 
   // Render dynamic lists
   return (
-    <div className="w-full">
-      <div className="max-w-[1400px] mx-auto">
-        {dynamicLists.map((listData, index) => (
-          <div key={`${keyPrefix}${listData.id}`}>
-            <DynamicList
-              listData={listData}
-              portraitImageHeight={portraitImageHeight}
-              infoAreaHeight={infoAreaHeight}
-              rowHeight={rowHeight}
-              keyPrefix={keyPrefix}
-              isDarkMode={isDarkMode}
-            />
-            {/* Add spacing between lists except after the last one */}
-            {index < dynamicLists.length - 1 && <div className="h-3" />}
-          </div>
-        ))}
-      </div>
-    </div>
+    <>
+      {dynamicLists.map((listData, index) => (
+        <div key={`${keyPrefix}${listData.id}`}>
+          <DynamicList
+            listData={listData}
+            portraitImageHeight={portraitImageHeight}
+            infoAreaHeight={infoAreaHeight}
+            rowHeight={rowHeight}
+            keyPrefix={keyPrefix}
+            isDarkMode={isDarkMode}
+          />
+          {/* Add spacing between lists except after the last one */}
+          {index < dynamicLists.length - 1 && <div className="h-3" />}
+        </div>
+      ))}
+    </>
   );
 };

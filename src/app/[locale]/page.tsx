@@ -14,10 +14,10 @@ import { MarketWidgetConfig, WidgetType } from "@/types/MarketLayout";
 // Critical components - loaded eagerly
 import { MarketBubbles } from "../components/market_screen/MarketBubbles";
 import { PreferenceProduct } from "../components/market_screen/PreferenceProduct";
+import DynamicHorizontalList from "../components/market_screen/DynamicHorizontalList";
 
 // Below-the-fold components - lazy loaded
 const MarketBanner = lazy(() => import("../components/market_screen/MarketBanner"));
-const DynamicHorizontalList = lazy(() => import("../components/market_screen/DynamicHorizontalList"));
 const AdsBanner = lazy(() => 
   import("../components/market_screen/MarketTopAdsBanner").then(mod => ({ default: mod.AdsBanner }))
 );
@@ -36,12 +36,23 @@ interface LoaderProps {
 
 const ComponentLoader = memo(({ isDark, height = "h-40" }: LoaderProps) => (
   <div className="w-full">
-    <div className="max-w-7xl mx-auto px-4">
-      <div 
+    {/* Mobile: full width with padding */}
+    <div className="block lg:hidden px-0">
+      <div
         className={`w-full ${height} rounded-lg animate-pulse ${
           isDark ? "bg-gray-800" : "bg-gray-200"
-        }`} 
+        }`}
       />
+    </div>
+    {/* Desktop: centered layout matching components */}
+    <div className="hidden lg:block">
+      <div className="max-w-[1400px] mx-auto px-6">
+        <div
+          className={`w-full ${height} rounded-lg animate-pulse ${
+            isDark ? "bg-gray-800" : "bg-gray-200"
+          }`}
+        />
+      </div>
     </div>
   </div>
 ));
@@ -148,11 +159,18 @@ const WidgetRenderer = memo(({
 
       case "dynamic_product_list":
         return (
-          <Suspense fallback={<ComponentLoader isDark={isDarkMode} height="h-40" />}>
-            <div className={`w-full ${bgClass}`}>
-              <DynamicHorizontalList keyPrefix="main-" />
+          <div className={`w-full ${bgClass}`}>
+            {/* Mobile: full width */}
+            <div className="block lg:hidden">
+              <DynamicHorizontalList keyPrefix="mobile-" />
             </div>
-          </Suspense>
+            {/* Desktop: centered layout */}
+            <div className="hidden lg:block">
+              <div className="max-w-[1400px] mx-auto">
+                <DynamicHorizontalList keyPrefix="desktop-" />
+              </div>
+            </div>
+          </div>
         );
 
       case "market_banner":
@@ -251,8 +269,8 @@ interface LoadingStateProps {
 
 const LoadingState = memo(({ isDarkMode }: LoadingStateProps) => (
   <div className={`w-full py-8 ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}>
-    <div className="max-w-7xl mx-auto px-4 space-y-6">
-      {/* Simulate widget placeholders */}
+    {/* Mobile: full width */}
+    <div className="block lg:hidden px-0 space-y-6">
       {[1, 2, 3, 4].map((i) => (
         <div
           key={i}
@@ -261,6 +279,19 @@ const LoadingState = memo(({ isDarkMode }: LoadingStateProps) => (
           }`}
         />
       ))}
+    </div>
+    {/* Desktop: centered layout matching components */}
+    <div className="hidden lg:block">
+      <div className="max-w-[1400px] mx-auto px-6 space-y-6">
+        {[1, 2, 3, 4].map((i) => (
+          <div
+            key={i}
+            className={`w-full h-32 rounded-lg animate-pulse ${
+              isDarkMode ? "bg-gray-800" : "bg-gray-200"
+            }`}
+          />
+        ))}
+      </div>
     </div>
   </div>
 ));

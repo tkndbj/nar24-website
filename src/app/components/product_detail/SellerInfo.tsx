@@ -198,7 +198,7 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
 
   return (
     <div
-      className={`rounded-2xl p-6 border shadow-sm transition-all duration-200 hover:shadow-md ${
+      className={`rounded-2xl p-4 md:p-6 border shadow-sm transition-all duration-200 hover:shadow-md ${
         isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
       }`}
     >
@@ -209,33 +209,33 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
           canNavigate ? "cursor-pointer" : "cursor-default"
         }`}
       >
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 md:gap-4">
           {/* Seller Avatar/Icon */}
           <div
-            className={`relative p-3 rounded-full transition-all duration-200 ${
+            className={`relative p-2 md:p-3 rounded-full transition-all duration-200 ${
               isDarkMode
                 ? "bg-gradient-to-br from-orange-900/20 to-orange-800/20 text-orange-400"
                 : "bg-gradient-to-br from-orange-100 to-orange-200 text-orange-600"
             } ${canNavigate ? "group-hover:scale-105" : ""}`}
           >
             {isShop ? (
-              <Store className="w-6 h-6" />
+              <Store className="w-5 h-5 md:w-6 md:h-6" />
             ) : (
-              <User className="w-6 h-6" />
+              <User className="w-5 h-5 md:w-6 md:h-6" />
             )}
 
             {sellerInfo.sellerIsVerified && (
-              <div className="absolute -top-1 -right-1 bg-blue-500 rounded-full p-1">
-                <Verified className="w-3 h-3 text-white" fill="currentColor" />
+              <div className="absolute -top-1 -right-1 bg-blue-500 rounded-full p-0.5 md:p-1">
+                <Verified className="w-2.5 h-2.5 md:w-3 md:h-3 text-white" fill="currentColor" />
               </div>
             )}
           </div>
 
           {/* Seller Info */}
-          <div className="flex-1 text-left">
-            <div className="flex items-center gap-2 mb-1">
+          <div className="flex-1 text-left min-w-0">
+            <div className="flex items-center gap-1.5 md:gap-2 mb-0.5 md:mb-1">
               <h4
-                className={`font-bold text-lg truncate ${
+                className={`font-bold text-base md:text-lg truncate ${
                   isDarkMode ? "text-white" : "text-gray-900"
                 }`}
               >
@@ -243,7 +243,7 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
               </h4>
 
               <span
-                className={`text-sm ${
+                className={`text-xs md:text-sm whitespace-nowrap ${
                   isDarkMode ? "text-gray-400" : "text-gray-600"
                 }`}
               >
@@ -252,10 +252,10 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
             </div>
 
             {/* Rating and Stats */}
-            <div className="flex items-center gap-4 text-sm">
+            <div className="flex items-center gap-2 md:gap-4 text-xs md:text-sm">
               <div className="flex items-center gap-1">
-                <div className="flex items-center gap-1">
-                  <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                <div className="flex items-center gap-0.5 md:gap-1">
+                  <Star className="w-3.5 h-3.5 md:w-4 md:h-4 fill-amber-400 text-amber-400" />
                   <span
                     className={`font-semibold ${
                       isDarkMode ? "text-white" : "text-gray-900"
@@ -277,7 +277,7 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
               </div>
 
               {sellerInfo.totalProductsSold > 0 && (
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-0.5 md:gap-1">
                   <Package className="w-3 h-3" />
                   <span
                     className={`${
@@ -300,32 +300,32 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
                   : "text-gray-400 group-hover:text-orange-600"
               } group-hover:translate-x-1`}
             >
-              <ChevronRight className="w-5 h-5" />
+              <ChevronRight className="w-4 h-4 md:w-5 md:h-5" />
             </div>
           )}
         </div>
 
         {/* Trust Indicators */}
-        <div className="mt-4 flex items-center gap-3">
+        <div className="mt-3 md:mt-4 flex items-center gap-2 md:gap-3">
           <div
-            className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${
+            className={`flex items-center gap-0.5 md:gap-1 px-2 md:px-3 py-0.5 md:py-1 rounded-full text-[10px] md:text-xs font-medium ${
               isDarkMode
                 ? "bg-green-900/20 text-green-400 border border-green-800"
                 : "bg-green-50 text-green-700 border border-green-200"
             }`}
           >
-            <Verified className="w-3 h-3" />
+            <Verified className="w-2.5 h-2.5 md:w-3 md:h-3" />
             {t("verified")} {isShop ? t("store") : t("seller")}
           </div>
 
           <div
-            className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${
+            className={`flex items-center gap-0.5 md:gap-1 px-2 md:px-3 py-0.5 md:py-1 rounded-full text-[10px] md:text-xs font-medium ${
               isDarkMode
                 ? "bg-blue-900/20 text-blue-400 border border-blue-800"
                 : "bg-blue-50 text-blue-700 border border-blue-200"
             }`}
           >
-            <MessageCircle className="w-3 h-3" />
+            <MessageCircle className="w-2.5 h-2.5 md:w-3 md:h-3" />
             {t("fastResponse")}
           </div>
         </div>
