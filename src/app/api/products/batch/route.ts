@@ -4,15 +4,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getFirestoreAdmin } from "@/lib/firebase-admin";
 import { Product, ProductUtils } from "@/app/models/Product";
 
-interface BundleDisplayData {
-  bundleId: string;
-  product: Record<string, unknown>;
-  totalBundlePrice: number;
-  totalOriginalPrice: number;
-  discountPercentage: number;
-  currency: string;
-  totalProductCount: number;
-}
 
 
 // ✅ Memory cache for batch requests
