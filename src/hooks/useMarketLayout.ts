@@ -210,8 +210,7 @@ export function useMarketLayout(
 
     if (!isMountedRef.current) return;
 
-    // Track which document we're using
-    let usingFallback = false;
+  
 
     /**
      * Subscribe to a document and handle the response

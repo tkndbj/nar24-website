@@ -169,6 +169,20 @@ const ShopCard = memo(
   }) => {
     const mainTextColor = isDarkMode ? "text-white" : "text-black";
 
+    // Match Flutter logic: check coverImageUrls (array) first, then coverImageUrl (single)
+    const shopData = shop as unknown as Record<string, unknown>;
+    const coverImageUrls = shopData.coverImageUrls as string[] | undefined;
+    const coverImageUrl = shopData.coverImageUrl as string | undefined;
+    
+    // Get the first cover image URL (Flutter shows first image or uses PageView for multiple)
+    const displayCoverImage = 
+      (Array.isArray(coverImageUrls) && coverImageUrls.length > 0) 
+        ? coverImageUrls[0] 
+        : (coverImageUrl || null);
+    
+    // Profile image - Flutter uses 'profileImageUrl'
+    const profileImageUrl = (shopData.profileImageUrl as string) || (shop as unknown as Record<string, unknown>).logoUrl as string || null;
+
     return (
       <Link href={`/shop/${shop.id}`} className="block">
         <div
@@ -191,9 +205,9 @@ const ShopCard = memo(
                 borderTopRightRadius: 11,
               }}
             >
-              {shop.coverImageUrl ? (
+              {displayCoverImage ? (
                 <Image
-                  src={shop.coverImageUrl}
+                  src={displayCoverImage}
                   alt={`${shop.name} cover`}
                   fill
                   className="object-cover"
@@ -231,9 +245,9 @@ const ShopCard = memo(
                   boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
                 }}
               >
-                {shop.logoUrl ? (
+                {profileImageUrl ? (
                   <Image
-                    src={shop.logoUrl}
+                    src={profileImageUrl}
                     alt={shop.name}
                     width={48}
                     height={48}
