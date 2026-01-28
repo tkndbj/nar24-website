@@ -12,15 +12,13 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   collection,
-  doc,        // ADD
-  getDoc,     // ADD
+  doc,
+  getDoc,
   getDocs,
   query,
   where,
   orderBy,
   limit,
-  onSnapshot,
-  Unsubscribe,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -75,7 +73,6 @@ export function useShops(): UseShopsReturn {
     error: null,
   });
 
-  const unsubscribeRef = useRef<Unsubscribe | null>(null);
   const isMountedRef = useRef(true);
 
   const safeSetState = useCallback((updater: Partial<UseShopsState>) => {
@@ -84,14 +81,10 @@ export function useShops(): UseShopsReturn {
   }, []);
 
   const setupSubscription = useCallback(async () => {
-    if (unsubscribeRef.current) {
-      unsubscribeRef.current();
-    }
-  
     safeSetState({ isLoading: true, error: null });
   
     try {
-      let shops: Shop[] = [];
+      const shops: Shop[] = [];
   
       // ========================================
       // 1. Try to get configured featured shops
@@ -218,10 +211,6 @@ export function useShops(): UseShopsReturn {
 
     return () => {
       isMountedRef.current = false;
-      if (unsubscribeRef.current) {
-        unsubscribeRef.current();
-        unsubscribeRef.current = null;
-      }
     };
   }, [setupSubscription]);
 

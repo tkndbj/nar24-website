@@ -1,16 +1,16 @@
 /**
  * useMarketLayout Hook
- * 
+ *
  * Production-ready hook for managing dynamic market screen layout.
  * Mirrors Flutter's MarketLayoutService functionality.
- * 
+ *
  * Features:
  * - ONE-TIME Firestore fetch (no real-time listeners)
  * - Platform-specific config with fallback
  * - Validation and sanitization of widget data
  * - Default fallback on errors
  * - TypeScript type safety
- * 
+ *
  * NO LISTENERS - Only fetches on mount or manual refresh()
  */
 
@@ -155,13 +155,10 @@ export function useMarketLayout(
   /**
    * Updates state only if component is still mounted
    */
-  const safeSetState = useCallback(
-    (updater: Partial<MarketLayoutState>) => {
-      if (!isMountedRef.current) return;
-      setState((prev) => ({ ...prev, ...updater }));
-    },
-    []
-  );
+  const safeSetState = useCallback((updater: Partial<MarketLayoutState>) => {
+    if (!isMountedRef.current) return;
+    setState((prev) => ({ ...prev, ...updater }));
+  }, []);
 
   /**
    * Computes visible widgets from all widgets
@@ -199,7 +196,9 @@ export function useMarketLayout(
           parsedWidgets = parseWidgetsFromData(data);
 
           if (parsedWidgets.length > 0) {
-            log(`Layout loaded from web-specific: ${parsedWidgets.length} widgets`);
+            log(
+              `Layout loaded from web-specific: ${parsedWidgets.length} widgets`
+            );
             safeSetState({
               widgets: parsedWidgets,
               visibleWidgets: computeVisibleWidgets(parsedWidgets),
@@ -219,7 +218,11 @@ export function useMarketLayout(
       // 2. Fallback to shared document
       // ========================================
       try {
-        const sharedDocRef = doc(db, FIRESTORE_COLLECTION, FIRESTORE_DOC_SHARED);
+        const sharedDocRef = doc(
+          db,
+          FIRESTORE_COLLECTION,
+          FIRESTORE_DOC_SHARED
+        );
         const sharedSnap = await getDoc(sharedDocRef);
 
         if (sharedSnap.exists()) {
@@ -254,7 +257,6 @@ export function useMarketLayout(
         error: null,
         isInitialized: true,
       });
-
     } catch (error) {
       console.error("[MarketLayout] Fetch error:", error);
 
