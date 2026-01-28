@@ -1,0 +1,351 @@
+"use client";
+
+import React, { useState, useEffect, useRef, useCallback, memo } from "react";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+  Unsubscribe,
+} from "firebase/firestore";
+import { db } from "@/lib/firebase";
+
+/**
+ * MarketThinBanner Component
+ *
+ * Slim promotional banner carousel - matches Flutter implementation exactly.
+ *
+ * Features:
+ * - Real-time Firestore sync from `market_thin_banners` collection
+ * - Auto-play with vsync-like control (4 second intervals)
+ * - Infinite scroll simulation
+ * - Click tracking and navigation (shop/product links)
+ * - Gradient background matching Flutter
+ */
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+interface ThinBannerItem {
+  id: string;
+  url: string;
+  linkType?: string | null;
+  linkId?: string | null;
+}
+
+interface MarketThinBannerProps {
+  shouldAutoPlay?: boolean;
+  className?: string;
+}
+
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
+const BANNER_HEIGHT = 48; // Matches Flutter: const double bannerHeight = 48
+const AUTO_PLAY_INTERVAL = 4000; // Matches Flutter: Duration(seconds: 4)
+const TRANSITION_DURATION = 300; // Matches Flutter: Duration(milliseconds: 300)
+
+// Gradient matching Flutter:
+// LinearGradient(colors: [Colors.orange, Colors.pink, Color.fromARGB(255, 252, 178, 18)])
+const GRADIENT_STYLE =
+  "linear-gradient(to right, #FF9800, #E91E63, #FCB212)";
+
+// ============================================================================
+// ANALYTICS SERVICE (placeholder - implement your actual tracking)
+// ============================================================================
+
+const AdAnalyticsService = {
+  trackAdClick: (params: {
+    adId: string;
+    adType: string;
+    linkedType?: string | null;
+    linkedId?: string | null;
+  }) => {
+    // Implement your analytics tracking here
+    console.log("[AdAnalytics] Click tracked:", params);
+  },
+};
+
+// ============================================================================
+// COMPONENT
+// ============================================================================
+
+const MarketThinBanner = memo(
+  ({ shouldAutoPlay = true, className = "" }: MarketThinBannerProps) => {
+    const router = useRouter();
+
+    // State
+    const [banners, setBanners] = useState<ThinBannerItem[]>([]);
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const [isTransitioning, setIsTransitioning] = useState(false);
+
+    // Refs for cleanup and control
+    const unsubscribeRef = useRef<Unsubscribe | null>(null);
+    const autoPlayTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const isMountedRef = useRef(true);
+
+    // ========================================================================
+    // FIRESTORE SUBSCRIPTION
+    // ========================================================================
+
+    useEffect(() => {
+      isMountedRef.current = true;
+
+      const setupSubscription = () => {
+        try {
+          // Query matching Flutter:
+          // .where('isActive', isEqualTo: true)
+          // .orderBy('createdAt', descending: true)
+          const bannersQuery = query(
+            collection(db, "market_thin_banners"),
+            where("isActive", "==", true),
+            orderBy("createdAt", "desc")
+          );
+
+          const unsubscribe = onSnapshot(
+            bannersQuery,
+            (snapshot) => {
+              if (!isMountedRef.current) return;
+
+              const items: ThinBannerItem[] = [];
+
+              snapshot.docs.forEach((doc) => {
+                const data = doc.data();
+                const url = data.imageUrl as string | undefined;
+
+                if (!url || url.trim() === "") return;
+
+                items.push({
+                  id: doc.id,
+                  url: url,
+                  linkType: data.linkType as string | undefined,
+                  linkId: data.linkedShopId || data.linkedProductId,
+                });
+              });
+
+              setBanners(items);
+            },
+            (error) => {
+              console.error("[MarketThinBanner] Firestore error:", error);
+            }
+          );
+
+          unsubscribeRef.current = unsubscribe;
+        } catch (error) {
+          console.error("[MarketThinBanner] Setup error:", error);
+        }
+      };
+
+      setupSubscription();
+
+      return () => {
+        isMountedRef.current = false;
+        if (unsubscribeRef.current) {
+          unsubscribeRef.current();
+          unsubscribeRef.current = null;
+        }
+      };
+    }, []);
+
+    // ========================================================================
+    // AUTO-PLAY LOGIC
+    // ========================================================================
+
+    useEffect(() => {
+      // Clear existing timer
+      if (autoPlayTimerRef.current) {
+        clearInterval(autoPlayTimerRef.current);
+        autoPlayTimerRef.current = null;
+      }
+
+      // Only auto-play if enabled and we have multiple banners
+      if (!shouldAutoPlay || banners.length <= 1) return;
+
+      autoPlayTimerRef.current = setInterval(() => {
+        if (!isMountedRef.current) return;
+
+        setIsTransitioning(true);
+        setCurrentIndex((prev) => (prev + 1) % banners.length);
+
+        // Reset transition state after animation
+        setTimeout(() => {
+          if (isMountedRef.current) {
+            setIsTransitioning(false);
+          }
+        }, TRANSITION_DURATION);
+      }, AUTO_PLAY_INTERVAL);
+
+      return () => {
+        if (autoPlayTimerRef.current) {
+          clearInterval(autoPlayTimerRef.current);
+          autoPlayTimerRef.current = null;
+        }
+      };
+    }, [shouldAutoPlay, banners.length]);
+
+    // ========================================================================
+    // NAVIGATION HANDLER
+    // ========================================================================
+
+    const handleBannerTap = useCallback(
+      (item: ThinBannerItem) => {
+        // Track click - matches Flutter: AdAnalyticsService.trackAdClick
+        AdAnalyticsService.trackAdClick({
+          adId: item.id,
+          adType: "thinBanner",
+          linkedType: item.linkType,
+          linkedId: item.linkId,
+        });
+
+        // Navigate based on linkType - matches Flutter switch statement
+        if (item.linkType && item.linkId) {
+          switch (item.linkType) {
+            case "shop":
+              router.push(`/shop/${item.linkId}`);
+              break;
+            case "product":
+            case "shop_product":
+            default:
+              router.push(`/product/${item.linkId}`);
+              break;
+          }
+        }
+      },
+      [router]
+    );
+
+    // ========================================================================
+    // SWIPE HANDLERS (for manual navigation)
+    // ========================================================================
+
+    const touchStartRef = useRef<number>(0);
+
+    const handleTouchStart = useCallback((e: React.TouchEvent) => {
+      touchStartRef.current = e.touches[0].clientX;
+    }, []);
+
+    const handleTouchEnd = useCallback(
+      (e: React.TouchEvent) => {
+        if (banners.length <= 1) return;
+
+        const touchEnd = e.changedTouches[0].clientX;
+        const diff = touchStartRef.current - touchEnd;
+
+        // Swipe threshold
+        if (Math.abs(diff) > 50) {
+          setIsTransitioning(true);
+
+          if (diff > 0) {
+            // Swipe left - next
+            setCurrentIndex((prev) => (prev + 1) % banners.length);
+          } else {
+            // Swipe right - previous
+            setCurrentIndex(
+              (prev) => (prev - 1 + banners.length) % banners.length
+            );
+          }
+
+          // Reset auto-play timer on manual swipe
+          if (autoPlayTimerRef.current) {
+            clearInterval(autoPlayTimerRef.current);
+            autoPlayTimerRef.current = setInterval(() => {
+              if (!isMountedRef.current) return;
+              setIsTransitioning(true);
+              setCurrentIndex((prev) => (prev + 1) % banners.length);
+              setTimeout(() => {
+                if (isMountedRef.current) setIsTransitioning(false);
+              }, TRANSITION_DURATION);
+            }, AUTO_PLAY_INTERVAL);
+          }
+
+          setTimeout(() => {
+            if (isMountedRef.current) setIsTransitioning(false);
+          }, TRANSITION_DURATION);
+        }
+      },
+      [banners.length]
+    );
+
+    // ========================================================================
+    // RENDER
+    // ========================================================================
+
+    // Don't render if no banners - matches Flutter: if (_banners.isEmpty) return SizedBox.shrink()
+    if (banners.length === 0) {
+      return null;
+    }
+
+    const currentBanner = banners[currentIndex];
+
+    return (
+      <div
+        className={`mx-4 ${className}`}
+        style={{
+          height: BANNER_HEIGHT,
+        }}
+      >
+        <div
+          className="relative w-full h-full rounded-xl overflow-hidden cursor-pointer"
+          style={{
+            background: GRADIENT_STYLE,
+            boxShadow: "0 2px 6px rgba(0, 0, 0, 0.1)",
+          }}
+          onClick={() => handleBannerTap(currentBanner)}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
+          {/* Banner Image */}
+          <div
+            className={`absolute inset-0 transition-opacity ${
+              isTransitioning ? "duration-300" : "duration-0"
+            }`}
+            style={{ opacity: isTransitioning ? 0.7 : 1 }}
+          >
+            <Image
+              src={currentBanner.url}
+              alt="Promotional banner"
+              fill
+              className="object-cover"
+              sizes="(max-width: 768px) 100vw, 800px"
+              priority={currentIndex === 0}
+              onError={(e) => {
+                // Hide broken images
+                (e.target as HTMLImageElement).style.display = "none";
+              }}
+            />
+          </div>
+
+          {/* Dots indicator for multiple banners */}
+          {banners.length > 1 && (
+            <div className="absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-1">
+              {banners.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCurrentIndex(index);
+                  }}
+                  className={`w-1.5 h-1.5 rounded-full transition-all ${
+                    index === currentIndex
+                      ? "bg-white w-3"
+                      : "bg-white/50 hover:bg-white/70"
+                  }`}
+                  aria-label={`Go to banner ${index + 1}`}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+);
+
+MarketThinBanner.displayName = "MarketThinBanner";
+
+export default MarketThinBanner;
