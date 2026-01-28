@@ -310,7 +310,7 @@ const ShopHorizontalList = memo(({ className = "" }: ShopHorizontalListProps) =>
   }, []);
 
   // Fetch shops
-  const { shops, isLoading, error } = useShops();
+  const { shops, isLoading } = useShops();
 
   // ========================================================================
   // RENDER STATES
@@ -389,7 +389,7 @@ const ShopHorizontalList = memo(({ className = "" }: ShopHorizontalListProps) =>
         style={{ paddingLeft: dimensions.horizontalPadding }}
       >
         <div className="flex" style={{ gap: dimensions.cardSpacing }}>
-          {shops.map((shop, index) => (
+          {shops.map((shop) => (
             <ShopCard
               key={shop.id}
               shop={shop}
