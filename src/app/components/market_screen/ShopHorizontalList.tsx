@@ -156,7 +156,7 @@ const ShimmerCard = memo(
 );
 ShimmerCard.displayName = "ShimmerCard";
 
-// Shop Card - matches Flutter ShopCardWidget
+// Shop Card - matches Flutter ShopCardWidget exactly
 const ShopCard = memo(
   ({
     shop,
@@ -167,114 +167,129 @@ const ShopCard = memo(
     width: number;
     isDarkMode: boolean;
   }) => {
+    const mainTextColor = isDarkMode ? "text-white" : "text-black";
+
     return (
       <Link href={`/shop/${shop.id}`} className="block">
         <div
-          className={`flex-shrink-0 rounded-lg overflow-hidden transition-transform hover:scale-[1.02] ${
-            isDarkMode ? "bg-gray-800" : "bg-white"
-          }`}
+          className="flex-shrink-0 overflow-hidden transition-transform hover:scale-[1.02]"
           style={{
             width,
-            boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
+            margin: 4,
+            border: "1px solid #d1d5db",
+            borderRadius: 12,
           }}
         >
-          {/* Cover Image or Gradient */}
-          <div className="relative h-20 overflow-hidden">
-            {shop.coverImageUrl ? (
-              <Image
-                src={shop.coverImageUrl}
-                alt={`${shop.name} cover`}
-                fill
-                className="object-cover"
-                sizes={`${width}px`}
-              />
-            ) : (
-              <div
-                className="w-full h-full"
-                style={{
-                  background:
-                    "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                }}
-              />
-            )}
-
-            {/* Verified Badge */}
-            {shop.isVerified && (
-              <div className="absolute top-2 right-2 bg-blue-500 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
-                  <path
-                    fillRule="evenodd"
-                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </div>
-            )}
-          </div>
-
-          {/* Logo Avatar - positioned to overlap cover */}
-          <div className="relative flex justify-center -mt-8">
+          {/* Cover Section - 138px total (120px image + 18px for avatar overflow) */}
+          <div className="relative" style={{ height: 138 }}>
+            {/* Cover Image Area */}
             <div
-              className={`w-16 h-16 rounded-full border-4 overflow-hidden ${
-                isDarkMode ? "border-gray-800 bg-gray-700" : "border-white bg-gray-100"
-              }`}
+              className="absolute top-0 left-0 right-0 overflow-hidden"
+              style={{
+                height: 120,
+                borderTopLeftRadius: 11,
+                borderTopRightRadius: 11,
+              }}
             >
-              {shop.logoUrl ? (
+              {shop.coverImageUrl ? (
                 <Image
-                  src={shop.logoUrl}
-                  alt={shop.name}
-                  width={64}
-                  height={64}
-                  className="object-cover w-full h-full"
+                  src={shop.coverImageUrl}
+                  alt={`${shop.name} cover`}
+                  fill
+                  className="object-cover"
+                  sizes={`${width}px`}
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-2xl">
-                  🏪
+                <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                  <svg
+                    className="w-10 h-10 text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    />
+                  </svg>
                 </div>
               )}
             </div>
+
+            {/* Profile Avatar - positioned bottom-right */}
+            <div
+              className="absolute"
+              style={{ right: 16, bottom: 0 }}
+            >
+              <div
+                className="rounded-full border-2 border-white overflow-hidden bg-gray-200"
+                style={{
+                  width: 48,
+                  height: 48,
+                  boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
+                }}
+              >
+                {shop.logoUrl ? (
+                  <Image
+                    src={shop.logoUrl}
+                    alt={shop.name}
+                    width={48}
+                    height={48}
+                    className="object-cover w-full h-full"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <svg
+                      className="w-6 h-6 text-white"
+                      fill="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                    </svg>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
-          {/* Shop Info */}
-          <div className="p-3 pt-2 text-center">
+          {/* Shop Info Section - matches Flutter padding: fromLTRB(12, 8, 12, 12) */}
+          <div style={{ padding: "8px 12px 12px 12px" }}>
             {/* Shop Name */}
             <h3
-              className={`font-semibold text-sm truncate ${
-                isDarkMode ? "text-white" : "text-gray-900"
-              }`}
+              className={`font-semibold ${mainTextColor}`}
+              style={{
+                fontSize: 14,
+                lineHeight: 1.2,
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }}
             >
               {shop.name}
             </h3>
 
-            {/* Rating */}
-            <div className="flex items-center justify-center gap-1 mt-1">
-              <span className="text-yellow-500 text-xs">⭐</span>
-              <span
-                className={`text-xs font-medium ${
-                  isDarkMode ? "text-gray-300" : "text-gray-600"
-                }`}
-              >
-                {shop.averageRating.toFixed(1)}
-              </span>
-              {shop.reviewCount > 0 && (
-                <span
-                  className={`text-xs ${
-                    isDarkMode ? "text-gray-500" : "text-gray-400"
-                  }`}
+            {/* Rating - only show if > 0 */}
+            {shop.averageRating > 0 && (
+              <div className="flex items-center mt-1" style={{ gap: 4 }}>
+                <svg
+                  className="text-amber-400"
+                  style={{ width: 16, height: 16 }}
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
                 >
-                  ({shop.reviewCount})
+                  <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+                </svg>
+                <span
+                  className={`font-medium ${mainTextColor}`}
+                  style={{ fontSize: 12 }}
+                >
+                  {shop.averageRating.toFixed(1)}
                 </span>
-              )}
-            </div>
-
-            {/* Product Count */}
-            <p
-              className={`text-xs mt-1 ${
-                isDarkMode ? "text-gray-400" : "text-gray-500"
-              }`}
-            >
-              {shop.productCount} products
-            </p>
+              </div>
+            )}
           </div>
         </div>
       </Link>

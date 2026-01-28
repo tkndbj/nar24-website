@@ -283,63 +283,62 @@ const MarketThinBanner = memo(
     const currentBanner = banners[currentIndex];
 
     return (
-      <div
-        className={`mx-4 ${className}`}
-        style={{
-          height: BANNER_HEIGHT,
-        }}
-      >
-        <div
-          className="relative w-full h-full rounded-xl overflow-hidden cursor-pointer"
-          style={{
-            background: GRADIENT_STYLE,
-            boxShadow: "0 2px 6px rgba(0, 0, 0, 0.1)",
-          }}
-          onClick={() => handleBannerTap(currentBanner)}
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
-        >
-          {/* Banner Image */}
+      <div className={`w-full ${className}`}>
+        {/* Outer container for centering on larger screens */}
+        <div className="max-w-3xl mx-auto px-4">
           <div
-            className={`absolute inset-0 transition-opacity ${
-              isTransitioning ? "duration-300" : "duration-0"
-            }`}
-            style={{ opacity: isTransitioning ? 0.7 : 1 }}
+            className="relative w-full rounded-xl overflow-hidden cursor-pointer"
+            style={{
+              height: BANNER_HEIGHT,
+              background: GRADIENT_STYLE,
+              boxShadow: "0 2px 6px rgba(0, 0, 0, 0.1)",
+            }}
+            onClick={() => handleBannerTap(currentBanner)}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
           >
-            <Image
-              src={currentBanner.url}
-              alt="Promotional banner"
-              fill
-              className="object-cover"
-              sizes="(max-width: 768px) 100vw, 800px"
-              priority={currentIndex === 0}
-              onError={(e) => {
-                // Hide broken images
-                (e.target as HTMLImageElement).style.display = "none";
-              }}
-            />
-          </div>
-
-          {/* Dots indicator for multiple banners */}
-          {banners.length > 1 && (
-            <div className="absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-1">
-              {banners.map((_, index) => (
-                <button
-                  key={index}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setCurrentIndex(index);
-                  }}
-                  className={`w-1.5 h-1.5 rounded-full transition-all ${
-                    index === currentIndex
-                      ? "bg-white w-3"
-                      : "bg-white/50 hover:bg-white/70"
-                  }`}
-                  aria-label={`Go to banner ${index + 1}`}
-                />
-              ))}
+            {/* Banner Image */}
+            <div
+              className={`absolute inset-0 transition-opacity ${
+                isTransitioning ? "duration-300" : "duration-0"
+              }`}
+              style={{ opacity: isTransitioning ? 0.7 : 1 }}
+            >
+              <Image
+                src={currentBanner.url}
+                alt="Promotional banner"
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 100vw, 768px"
+                priority={currentIndex === 0}
+                onError={(e) => {
+                  // Hide broken images
+                  (e.target as HTMLImageElement).style.display = "none";
+                }}
+              />
             </div>
-          )}
+
+            {/* Dots indicator for multiple banners */}
+            {banners.length > 1 && (
+              <div className="absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-1">
+                {banners.map((_, index) => (
+                  <button
+                    key={index}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCurrentIndex(index);
+                    }}
+                    className={`w-1.5 h-1.5 rounded-full transition-all ${
+                      index === currentIndex
+                        ? "bg-white w-3"
+                        : "bg-white/50 hover:bg-white/70"
+                    }`}
+                    aria-label={`Go to banner ${index + 1}`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );

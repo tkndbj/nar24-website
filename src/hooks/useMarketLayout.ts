@@ -27,7 +27,8 @@ import {
 
 // Configuration constants
 const FIRESTORE_COLLECTION = "app_config";
-const FIRESTORE_DOCUMENT = "market_layout";
+const FIRESTORE_DOC_WEB = "market_layout_web"; // Web-specific (priority)
+const FIRESTORE_DOC_SHARED = "market_layout"; // Shared/fallback
 const MAX_RETRIES = 3;
 const RETRY_BASE_DELAY_MS = 2000;
 
@@ -201,6 +202,7 @@ export function useMarketLayout(
 
   /**
    * Sets up the Firestore real-time listener
+   * Priority: web-specific document first, then shared/fallback
    */
   const setupListener = useCallback(() => {
     // Cleanup any existing listener
@@ -208,110 +210,156 @@ export function useMarketLayout(
 
     if (!isMountedRef.current) return;
 
-    try {
-      const docRef = doc(db, FIRESTORE_COLLECTION, FIRESTORE_DOCUMENT);
+    // Track which document we're using
+    let usingFallback = false;
 
-      log("Setting up Firestore listener...");
+    /**
+     * Subscribe to a document and handle the response
+     */
+    const subscribeToDoc = (docName: string, isFallback: boolean) => {
+      try {
+        const docRef = doc(db, FIRESTORE_COLLECTION, docName);
 
-      const unsubscribe = onSnapshot(
-        docRef,
-        { includeMetadataChanges: false },
-        (snapshot) => {
-          if (!isMountedRef.current) return;
+        log(`Setting up Firestore listener for ${docName}...`);
 
-          try {
-            // Reset retry count on successful connection
-            retryCountRef.current = 0;
+        const unsubscribe = onSnapshot(
+          docRef,
+          { includeMetadataChanges: false },
+          (snapshot) => {
+            if (!isMountedRef.current) return;
 
-            if (!snapshot.exists()) {
-              log("No layout document found, using defaults");
-              safeSetState({
-                widgets: DEFAULT_WIDGETS,
-                visibleWidgets: computeVisibleWidgets(DEFAULT_WIDGETS),
-                isLoading: false,
-                error: null,
-                isInitialized: true,
-              });
-              return;
-            }
+            try {
+              // Reset retry count on successful connection
+              retryCountRef.current = 0;
 
-            const data = snapshot.data();
-            const parsedWidgets = parseWidgetsFromData(data);
+              // If web-specific doc doesn't exist or is empty, try fallback
+              if (!snapshot.exists() || !snapshot.data()?.widgets?.length) {
+                if (!isFallback) {
+                  log(`No web-specific layout found, trying shared fallback...`);
+                  // Cleanup current listener and try fallback
+                  unsubscribe();
+                  subscribeToDoc(FIRESTORE_DOC_SHARED, true);
+                  return;
+                }
 
-            if (parsedWidgets.length === 0) {
-              log("No valid widgets found, using defaults");
-              safeSetState({
-                widgets: DEFAULT_WIDGETS,
-                visibleWidgets: computeVisibleWidgets(DEFAULT_WIDGETS),
-                isLoading: false,
-                error: null,
-                isInitialized: true,
-              });
-              return;
-            }
-
-            log(`Layout synced: ${parsedWidgets.length} widgets`);
-
-            safeSetState({
-              widgets: parsedWidgets,
-              visibleWidgets: computeVisibleWidgets(parsedWidgets),
-              isLoading: false,
-              error: null,
-              isInitialized: true,
-            });
-          } catch (error) {
-            console.error("[MarketLayout] Error processing snapshot:", error);
-            safeSetState({
-              widgets: DEFAULT_WIDGETS,
-              visibleWidgets: computeVisibleWidgets(DEFAULT_WIDGETS),
-              isLoading: false,
-              error: "Failed to process layout update",
-              isInitialized: true,
-            });
-          }
-        },
-        (error) => {
-          if (!isMountedRef.current) return;
-
-          console.error("[MarketLayout] Snapshot error:", error);
-
-          // Check if we should retry
-          if (shouldRetry(error) && retryCountRef.current < MAX_RETRIES) {
-            retryCountRef.current++;
-            const delay = RETRY_BASE_DELAY_MS * Math.pow(2, retryCountRef.current - 1);
-            
-            log(`Retrying in ${delay}ms (attempt ${retryCountRef.current}/${MAX_RETRIES})...`);
-
-            retryTimeoutRef.current = setTimeout(() => {
-              if (isMountedRef.current) {
-                setupListener();
+                // Even fallback is empty, use defaults
+                log("No layout document found, using defaults");
+                safeSetState({
+                  widgets: DEFAULT_WIDGETS,
+                  visibleWidgets: computeVisibleWidgets(DEFAULT_WIDGETS),
+                  isLoading: false,
+                  error: null,
+                  isInitialized: true,
+                });
+                return;
               }
-            }, delay);
-          } else {
-            // Max retries reached or non-retryable error
-            safeSetState({
-              widgets: DEFAULT_WIDGETS,
-              visibleWidgets: computeVisibleWidgets(DEFAULT_WIDGETS),
-              isLoading: false,
-              error: `Connection error: ${error instanceof Error ? error.message : "Unknown error"}`,
-              isInitialized: true,
-            });
-          }
-        }
-      );
 
-      unsubscribeRef.current = unsubscribe;
-    } catch (error) {
-      console.error("[MarketLayout] Error setting up listener:", error);
-      
-      safeSetState({
-        widgets: DEFAULT_WIDGETS,
-        visibleWidgets: computeVisibleWidgets(DEFAULT_WIDGETS),
-        isLoading: false,
-        error: "Failed to connect to layout service",
-        isInitialized: true,
-      });
-    }
+              const data = snapshot.data();
+              const parsedWidgets = parseWidgetsFromData(data);
+
+              if (parsedWidgets.length === 0) {
+                if (!isFallback) {
+                  log(`No valid widgets in web-specific, trying shared fallback...`);
+                  unsubscribe();
+                  subscribeToDoc(FIRESTORE_DOC_SHARED, true);
+                  return;
+                }
+
+                log("No valid widgets found, using defaults");
+                safeSetState({
+                  widgets: DEFAULT_WIDGETS,
+                  visibleWidgets: computeVisibleWidgets(DEFAULT_WIDGETS),
+                  isLoading: false,
+                  error: null,
+                  isInitialized: true,
+                });
+                return;
+              }
+
+              log(`Layout synced from ${docName}: ${parsedWidgets.length} widgets`);
+
+              safeSetState({
+                widgets: parsedWidgets,
+                visibleWidgets: computeVisibleWidgets(parsedWidgets),
+                isLoading: false,
+                error: null,
+                isInitialized: true,
+              });
+
+              // Store ref for cleanup
+              unsubscribeRef.current = unsubscribe;
+            } catch (error) {
+              console.error("[MarketLayout] Error processing snapshot:", error);
+              safeSetState({
+                widgets: DEFAULT_WIDGETS,
+                visibleWidgets: computeVisibleWidgets(DEFAULT_WIDGETS),
+                isLoading: false,
+                error: "Failed to process layout update",
+                isInitialized: true,
+              });
+            }
+          },
+          (error) => {
+            if (!isMountedRef.current) return;
+
+            console.error("[MarketLayout] Snapshot error:", error);
+
+            // If web-specific failed, try fallback
+            if (!isFallback) {
+              log(`Web-specific listener failed, trying shared fallback...`);
+              subscribeToDoc(FIRESTORE_DOC_SHARED, true);
+              return;
+            }
+
+            // Check if we should retry
+            if (shouldRetry(error) && retryCountRef.current < MAX_RETRIES) {
+              retryCountRef.current++;
+              const delay = RETRY_BASE_DELAY_MS * Math.pow(2, retryCountRef.current - 1);
+              
+              log(`Retrying in ${delay}ms (attempt ${retryCountRef.current}/${MAX_RETRIES})...`);
+
+              retryTimeoutRef.current = setTimeout(() => {
+                if (isMountedRef.current) {
+                  setupListener();
+                }
+              }, delay);
+            } else {
+              // Max retries reached or non-retryable error
+              safeSetState({
+                widgets: DEFAULT_WIDGETS,
+                visibleWidgets: computeVisibleWidgets(DEFAULT_WIDGETS),
+                isLoading: false,
+                error: `Connection error: ${error instanceof Error ? error.message : "Unknown error"}`,
+                isInitialized: true,
+              });
+            }
+          }
+        );
+
+        // Store unsubscribe function
+        unsubscribeRef.current = unsubscribe;
+      } catch (error) {
+        console.error("[MarketLayout] Error setting up listener:", error);
+        
+        // If web-specific setup failed, try fallback
+        if (!isFallback) {
+          log(`Web-specific setup failed, trying shared fallback...`);
+          subscribeToDoc(FIRESTORE_DOC_SHARED, true);
+          return;
+        }
+
+        safeSetState({
+          widgets: DEFAULT_WIDGETS,
+          visibleWidgets: computeVisibleWidgets(DEFAULT_WIDGETS),
+          isLoading: false,
+          error: "Failed to connect to layout service",
+          isInitialized: true,
+        });
+      }
+    };
+
+    // Start with web-specific document
+    subscribeToDoc(FIRESTORE_DOC_WEB, false);
   }, [cleanup, computeVisibleWidgets, log, safeSetState]);
 
   /**
