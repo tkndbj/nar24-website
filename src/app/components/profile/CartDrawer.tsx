@@ -153,9 +153,9 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
   const isLoadingMoreRef = useRef(false); // Prevents race conditions
-  const [selectedProducts, setSelectedProducts] = useState<
-    Record<string, boolean>
-  >({});
+  const [deselectedProducts, setDeselectedProducts] = useState<Set<string>>(
+    new Set()
+  );
 
   // Totals state
   const [calculatedTotals, setCalculatedTotals] = useState<CartTotals>({
@@ -213,10 +213,10 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
   // Get selected item count
   const selectedIds = useMemo(() => {
-    return Object.entries(selectedProducts)
-      .filter(([, selected]) => selected)
-      .map(([id]) => id);
-  }, [selectedProducts]);  
+    return cartItems
+      .filter((item) => !deselectedProducts.has(item.productId))
+      .map((item) => item.productId);
+  }, [cartItems, deselectedProducts]); 
 
   // Calculate coupon discount amount
   const couponDiscount = useMemo(() => {
@@ -327,18 +327,25 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
   // Sync selections with cart items (matching Flutter's _syncSelections)
   useEffect(() => {
-    if (cartItems.length > 0) {
-      setSelectedProducts((prev) => {
-        const newSelected: Record<string, boolean> = {};
-        cartItems.forEach((item) => {
-          // Select all by default (matching Flutter)
-          newSelected[item.productId] = prev[item.productId] ?? true;
-        });
-        return newSelected;
-      });
-    } else {
-      setSelectedProducts({});
+    if (cartItems.length === 0) {
+      setDeselectedProducts(new Set());
+      return;
     }
+
+    const currentProductIds = new Set(
+      cartItems.map((item) => item.productId)
+    );
+
+    setDeselectedProducts((prev) => {
+      const newDeselected = new Set<string>();
+      prev.forEach((id) => {
+        // Only keep deselection if item still exists in cart
+        if (currentProductIds.has(id)) {
+          newDeselected.add(id);
+        }
+      });
+      return newDeselected;
+    });
   }, [cartItems]);
 
   // Cleanup timer on unmount
@@ -426,7 +433,6 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     [hasMore, isLoadingMore, handleLoadMore]
   );
 
-  // Calculate totals when selections change (matching Flutter's _updateTotalsForCurrentSelection)
   useEffect(() => {
     // Step 1: Immediate optimistic update
     const optimistic = calculateOptimisticTotals();
@@ -446,11 +452,14 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
     totalsVerificationTimer.current = setTimeout(async () => {
       try {
-        const serverTotals = await calculateCartTotals(selectedIds);
+        // ✅ Pass excluded IDs to Cloud Function (matching Flutter)
+        const excludedIds = Array.from(deselectedProducts);
+        const serverTotals = await calculateCartTotals(
+          excludedIds.length > 0 ? excludedIds : undefined
+        );
         setCalculatedTotals(serverTotals);
       } catch (error) {
         console.error("Server totals failed, using optimistic:", error);
-        // Keep optimistic value on error - don't reset to 0
       } finally {
         setIsCalculatingTotals(false);
       }
@@ -461,7 +470,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
         clearTimeout(totalsVerificationTimer.current);
       }
     };
-  }, [selectedProducts, cartItems, calculateCartTotals]);
+  }, [deselectedProducts, cartItems, calculateCartTotals, selectedIds.length]);
 
   // ========================================================================
   // HELPER FUNCTIONS
@@ -738,10 +747,14 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
         let freshTotals: CartTotals | null = null;
         let retries = 3;
         
-        while (retries > 0) {
-          try {
-            freshTotals = await calculateCartTotals(selectedIds);
-            break;
+        const excludedIds = Array.from(deselectedProducts);
+
+while (retries > 0) {
+  try {
+    freshTotals = await calculateCartTotals(
+      excludedIds.length > 0 ? excludedIds : undefined
+    );
+    break;
           } catch (error) {
             if (error instanceof Error && error.message.includes("Too many requests") && retries > 1) {
               console.log(`⏳ Rate limited, waiting 2s... (${retries - 1} retries left)`);
@@ -773,6 +786,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     }
   }, [
     selectedIds,
+    deselectedProducts,
     validateForPayment,
     calculateCartTotals,
     proceedToPayment,
@@ -794,10 +808,10 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
       // Remove error items
       const errorIds = Object.keys(validationResult.errors);
-      setSelectedProducts((prev) => {
-        const updated = { ...prev };
-        errorIds.forEach((id) => delete updated[id]);
-        return updated;
+      setDeselectedProducts((prev) => {
+        const newSet = new Set(prev);
+        errorIds.forEach((id) => newSet.add(id));
+        return newSet;
       });
 
       // Get valid IDs
@@ -809,8 +823,15 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
       if (validIds.length > 0) {
         // Calculate FRESH totals (like Flutter)
-        console.log("💰 Calculating fresh totals after validation...");
-        const freshTotals = await calculateCartTotals(validIds);
+            // ✅ Calculate FRESH totals with excluded IDs (matching Flutter)
+            console.log("💰 Calculating fresh totals after validation...");
+            const allProductIds = cartItems.map((item) => item.productId);
+            const excludedForTotals = allProductIds.filter(
+              (id) => !validIds.includes(id)
+            );
+            const freshTotals = await calculateCartTotals(
+              excludedForTotals.length > 0 ? excludedForTotals : undefined
+            );
         console.log("💰 Fresh totals:", freshTotals);
 
         // Proceed with fresh totals
@@ -961,7 +982,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
   const renderCartItems = useMemo(() => {
     return cartItems.map((item) => {
-      const isSelected = selectedProducts[item.productId] ?? true;
+      const isSelected = !deselectedProducts.has(item.productId);
       const availableStock = getAvailableStock(item);
       const salePrefs = item.salePreferences || item.salePreferenceInfo;
       const maxQuantity = Math.min(
@@ -1004,10 +1025,17 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
             <div
               onClick={(e) => {
                 e.stopPropagation();
-                setSelectedProducts((prev) => ({
-                  ...prev,
-                  [item.productId]: !prev[item.productId],
-                }));
+                setDeselectedProducts((prev) => {
+                  const newSet = new Set(prev);
+                  if (newSet.has(item.productId)) {
+                    // Was deselected, now select it
+                    newSet.delete(item.productId);
+                  } else {
+                    // Was selected, now deselect it
+                    newSet.add(item.productId);
+                  }
+                  return newSet;
+                });
               }}
               className="flex items-center justify-center cursor-pointer p-1 -m-1"
             >
@@ -1192,7 +1220,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     });
   }, [
     cartItems,
-    selectedProducts,
+    deselectedProducts,
     isDarkMode,
     getAvailableStock,
     formatItemAttributes,

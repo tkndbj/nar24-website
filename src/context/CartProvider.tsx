@@ -183,7 +183,7 @@ interface CartContextType {
   removeMultipleFromCart: (productIds: string[]) => Promise<string>;
   initializeCartIfNeeded: () => Promise<void>;
   loadMoreItems: () => Promise<void>;
-  calculateCartTotals: (selectedProductIds?: string[]) => Promise<CartTotals>;
+  calculateCartTotals: (excludedProductIds?: string[]) => Promise<CartTotals>;
   validateForPayment: (
     selectedProductIds: string[],
     reserveStock?: boolean
@@ -1051,16 +1051,123 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     cartItems.length,
   ]);
 
+  const calculateCartTotals = useCallback(
+    async (excludedProductIds?: string[]): Promise<CartTotals> => {
+      if (!user || !functions) {
+        return { total: 0, items: [], currency: "TL" };
+      }
+  
+      // ✅ Build cache key from excluded IDs (empty = all items)
+      const excludedSorted = [...(excludedProductIds ?? [])].sort();
+      const cacheKey = `all_minus_${excludedSorted.join(",")}`;
+  
+      // ✅ Check local cache first
+      const cached = cartTotalsCache.get(user.uid, [cacheKey]);
+      if (cached) {
+        console.log("⚡ Cache hit - instant total");
+        return {
+          total: cached.total,
+          currency: cached.currency,
+          items: cached.items.map((i) => ({
+            productId: i.productId,
+            unitPrice: i.unitPrice,
+            total: i.total,
+            quantity: i.quantity,
+            isBundleItem: i.isBundleItem,
+          })),
+        };
+      }
+
+      // Request deduplication
+      if (pendingFetchesRef.current.has(`totals_${cacheKey}`)) {
+        console.log("⏳ Waiting for existing totals calculation...");
+        const result = await pendingFetchesRef.current.get(
+          `totals_${cacheKey}`
+        );
+        return result as CartTotals;
+      }
+
+      const totalsPromise = (async () => {
+        try {
+         
+
+          const calculateCartTotalsFunction = httpsCallable(
+            functions,
+            "calculateCartTotals"
+          );
+
+          const result = await calculateCartTotalsFunction({
+            excludedProductIds: excludedProductIds ?? [],
+          });
+
+          // Deep conversion of nested structures
+          const rawData = result.data;
+          const totalsData = deepConvertMap(rawData);
+
+          console.log("✅ Converted totals data:", Object.keys(totalsData));
+
+          const totals: CartTotals = {
+            total: (totalsData.total as number) ?? 0,
+            currency: (totalsData.currency as string) ?? "TL",
+            items: (Array.isArray(totalsData.items)
+              ? totalsData.items
+              : []
+            ).map((item): CartItemTotal => {
+              const itemData = item as Record<string, unknown>;
+              return {
+                productId: (itemData.productId as string) ?? "",
+                unitPrice: (itemData.unitPrice as number) ?? 0,
+                total: (itemData.total as number) ?? 0,
+                quantity: (itemData.quantity as number) ?? 1,
+                isBundleItem: (itemData.isBundleItem as boolean) ?? false,
+              };
+            }),
+          };
+
+          // ✅ Cache result locally (instead of Redis)
+          cartTotalsCache.set(user.uid, [cacheKey], {
+            total: totals.total,
+            currency: totals.currency,
+            items: totals.items.map((i) => ({
+              productId: i.productId,
+              unitPrice: i.unitPrice,
+              total: i.total,
+              quantity: i.quantity,
+              isBundleItem: i.isBundleItem ?? false,
+            })),
+          });
+
+          console.log(
+            `✅ Total calculated: ${totals.total} ${totals.currency}`
+          );
+          return totals;
+        } catch (error) {
+          console.error("❌ Cloud Function error:", error);
+          // Return empty totals on error
+          return { total: 0, items: [], currency: "TL" };
+        }
+      })();
+
+      pendingFetchesRef.current.set(`totals_${cacheKey}`, totalsPromise);
+      const result = await totalsPromise;
+      pendingFetchesRef.current.delete(`totals_${cacheKey}`);
+
+      return result;
+    },
+    [user, cartItems, functions]
+  );
+
   const backgroundRefreshTotals = useCallback(async () => {
     if (!user || cartProductIds.size === 0) return;
-
+  
     try {
-      await calculateCartTotals(Array.from(cartProductIds));
+      // ✅ Pass undefined = calculate ALL items (no exclusions)
+      await calculateCartTotals();
       console.log("⚡ Background totals cached");
     } catch (error) {
       console.log("⚠️ Background total refresh failed:", error);
     }
-  }, [user, cartProductIds]);
+  }, [user, cartProductIds, calculateCartTotals]);
 
   const applyOptimisticAdd = useCallback(
     (
@@ -1582,119 +1689,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       }
       return item;
     });
-  };
-
-  const calculateCartTotals = useCallback(
-    async (selectedProductIds?: string[]): Promise<CartTotals> => {
-      if (!user || !functions) {
-        return { total: 0, items: [], currency: "TL" };
-      }
-
-      const productsToCalculate =
-        selectedProductIds ?? cartItems.map((item) => item.productId);
-
-      if (productsToCalculate.length === 0) {
-        return { total: 0, items: [], currency: "TL" };
-      }
-
-      // ✅ Check local cache first (instead of Redis)
-      const cached = cartTotalsCache.get(user.uid, productsToCalculate);
-      if (cached) {
-        console.log("⚡ Cache hit - instant total");
-        return {
-          total: cached.total,
-          currency: cached.currency,
-          items: cached.items.map((i) => ({
-            productId: i.productId,
-            unitPrice: i.unitPrice,
-            total: i.total,
-            quantity: i.quantity,
-            isBundleItem: i.isBundleItem,
-          })),
-        };
-      }
-
-      // Request deduplication
-      const cacheKey = productsToCalculate.join(",");
-      if (pendingFetchesRef.current.has(`totals_${cacheKey}`)) {
-        console.log("⏳ Waiting for existing totals calculation...");
-        const result = await pendingFetchesRef.current.get(
-          `totals_${cacheKey}`
-        );
-        return result as CartTotals;
-      }
-
-      const totalsPromise = (async () => {
-        try {
-          console.log(
-            `🔥 Calling Cloud Function for ${productsToCalculate.length} items`
-          );
-
-          const calculateCartTotalsFunction = httpsCallable(
-            functions,
-            "calculateCartTotals"
-          );
-
-          const result = await calculateCartTotalsFunction({
-            selectedProductIds: productsToCalculate,
-          });
-
-          // Deep conversion of nested structures
-          const rawData = result.data;
-          const totalsData = deepConvertMap(rawData);
-
-          console.log("✅ Converted totals data:", Object.keys(totalsData));
-
-          const totals: CartTotals = {
-            total: (totalsData.total as number) ?? 0,
-            currency: (totalsData.currency as string) ?? "TL",
-            items: (Array.isArray(totalsData.items)
-              ? totalsData.items
-              : []
-            ).map((item): CartItemTotal => {
-              const itemData = item as Record<string, unknown>;
-              return {
-                productId: (itemData.productId as string) ?? "",
-                unitPrice: (itemData.unitPrice as number) ?? 0,
-                total: (itemData.total as number) ?? 0,
-                quantity: (itemData.quantity as number) ?? 1,
-                isBundleItem: (itemData.isBundleItem as boolean) ?? false,
-              };
-            }),
-          };
-
-          // ✅ Cache result locally (instead of Redis)
-          cartTotalsCache.set(user.uid, productsToCalculate, {
-            total: totals.total,
-            currency: totals.currency,
-            items: totals.items.map((i) => ({
-              productId: i.productId,
-              unitPrice: i.unitPrice,
-              total: i.total,
-              quantity: i.quantity,
-              isBundleItem: i.isBundleItem ?? false,
-            })),
-          });
-
-          console.log(
-            `✅ Total calculated: ${totals.total} ${totals.currency}`
-          );
-          return totals;
-        } catch (error) {
-          console.error("❌ Cloud Function error:", error);
-          // Return empty totals on error
-          return { total: 0, items: [], currency: "TL" };
-        }
-      })();
-
-      pendingFetchesRef.current.set(`totals_${cacheKey}`, totalsPromise);
-      const result = await totalsPromise;
-      pendingFetchesRef.current.delete(`totals_${cacheKey}`);
-
-      return result;
-    },
-    [user, cartItems, functions]
-  );
+  }; 
 
   // ========================================================================
   // VALIDATION
