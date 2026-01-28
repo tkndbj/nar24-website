@@ -2304,7 +2304,8 @@
     "specialProductsForYou": "Special Products For You",
     "viewAll": "View All",
     "failedToLoadRecommendations": "Failed to load recommendations",
-    "tryAgain": "Try Again"
+    "tryAgain": "Try Again",
+    "featuredShops": "Featured Shops"
   },
   "MarketBubbles": {
     "shops": "Shops",

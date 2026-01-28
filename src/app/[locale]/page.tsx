@@ -168,7 +168,16 @@ const WidgetRenderer = memo(({
         return (
           <Suspense fallback={<ComponentLoader isDark={isDarkMode} height="h-32" />}>
             <div className={`w-full ${bgClass}`}>
-              <ShopHorizontalList />
+              {/* Mobile: full width */}
+              <div className="block lg:hidden">
+                <ShopHorizontalList />
+              </div>
+              {/* Desktop: centered layout */}
+              <div className="hidden lg:block">
+                <div className="max-w-[1400px] mx-auto">
+                  <ShopHorizontalList />
+                </div>
+              </div>
             </div>
           </Suspense>
         );

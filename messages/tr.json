@@ -2380,7 +2380,8 @@
     "specialProductsForYou": "Senin İçin Özel Ürünler",
     "viewAll": "Tümünü Görüntüle",
     "failedToLoadRecommendations": "Öneriler yüklenemedi",
-    "tryAgain": "Tekrar Dene"
+    "tryAgain": "Tekrar Dene",
+    "featuredShops": "Öne Çıkan Mağazalar"
   },
   "MarketBubbles": {
     "shops": "Mağazalar",

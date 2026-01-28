@@ -12,6 +12,9 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   collection,
+  doc,        // ADD
+  getDoc,     // ADD
+  getDocs,
   query,
   where,
   orderBy,
@@ -31,6 +34,8 @@ export interface Shop {
   description?: string;
   logoUrl?: string;
   coverImageUrl?: string;
+  coverImageUrls?: string[]; // Added: array of cover images (Flutter primary field)
+  profileImageUrl?: string;  // Added: Flutter's profile image field
   averageRating: number;
   reviewCount: number;
   productCount: number;
@@ -56,6 +61,9 @@ interface UseShopsReturn extends UseShopsState {
 const SHOPS_LIMIT = 10;
 const COLLECTION_NAME = "shops";
 
+const CONFIG_COLLECTION = "app_config";      // ADD
+const CONFIG_DOC = "featured_shops"; 
+
 // ============================================================================
 // HOOK
 // ============================================================================
@@ -75,68 +83,125 @@ export function useShops(): UseShopsReturn {
     setState((prev) => ({ ...prev, ...updater }));
   }, []);
 
-  const setupSubscription = useCallback(() => {
+  const setupSubscription = useCallback(async () => {
     if (unsubscribeRef.current) {
       unsubscribeRef.current();
     }
-
+  
     safeSetState({ isLoading: true, error: null });
-
+  
     try {
-      // Query for featured/active shops
+      let shops: Shop[] = [];
+  
+      // ========================================
+      // 1. Try to get configured featured shops
+      // ========================================
+      try {
+        const configRef = doc(db, CONFIG_COLLECTION, CONFIG_DOC);
+        const configSnap = await getDoc(configRef);
+  
+        if (configSnap.exists()) {
+          const config = configSnap.data();
+          const shopIds = config.shopIds as string[] | undefined;
+  
+          if (shopIds && shopIds.length > 0) {
+            // Fetch each shop in order
+            for (const id of shopIds) {
+              try {
+                const shopRef = doc(db, COLLECTION_NAME, id);
+                const shopSnap = await getDoc(shopRef);
+  
+                if (shopSnap.exists()) {
+                  const data = shopSnap.data();
+                  
+                  // Skip inactive shops
+                  if (data.isActive === false) continue;
+                  if (!data.name) continue;
+  
+                  // Parse coverImageUrls - matches Flutter logic
+                  let coverImageUrls: string[] | undefined;
+                  if (Array.isArray(data.coverImageUrls) && data.coverImageUrls.length > 0) {
+                    coverImageUrls = data.coverImageUrls;
+                  }
+  
+                  shops.push({
+                    id: shopSnap.id,
+                    name: data.name,
+                    description: data.description,
+                    logoUrl: data.logoUrl || data.profileImageUrl,
+                    profileImageUrl: data.profileImageUrl,
+                    coverImageUrl: data.coverImageUrl,
+                    coverImageUrls: coverImageUrls,
+                    averageRating: Number(data.averageRating) || 0,
+                    reviewCount: Number(data.reviewCount) || 0,
+                    productCount: Number(data.productCount) || 0,
+                    category: data.category,
+                    isVerified: Boolean(data.isVerified),
+                    ownerId: data.ownerId || "",
+                  });
+                }
+              } catch (e) {
+                console.error(`[useShops] Error fetching shop ${id}:`, e);
+              }
+            }
+  
+            if (shops.length > 0) {
+              console.log(`[useShops] Loaded ${shops.length} configured featured shops`);
+              safeSetState({ shops, isLoading: false, error: null });
+              return;
+            }
+          }
+        }
+      } catch (configError) {
+        console.error("[useShops] Error reading config:", configError);
+      }
+  
+      // ========================================
+      // 2. Fallback: fetch top-rated shops
+      // ========================================
+      console.log("[useShops] No featured config, using fallback query");
+      
       const shopsQuery = query(
         collection(db, COLLECTION_NAME),
         where("isActive", "==", true),
         orderBy("averageRating", "desc"),
         limit(SHOPS_LIMIT)
       );
-
-      const unsubscribe = onSnapshot(
-        shopsQuery,
-        (snapshot) => {
-          if (!isMountedRef.current) return;
-
-          const shops: Shop[] = [];
-
-          snapshot.docs.forEach((doc) => {
-            const data = doc.data();
-
-            if (!data.name) return;
-
-            shops.push({
-              id: doc.id,
-              name: data.name,
-              description: data.description,
-              logoUrl: data.logoUrl || data.profileImageUrl,
-              coverImageUrl: data.coverImageUrl,
-              averageRating: Number(data.averageRating) || 0,
-              reviewCount: Number(data.reviewCount) || 0,
-              productCount: Number(data.productCount) || 0,
-              category: data.category,
-              isVerified: Boolean(data.isVerified),
-              ownerId: data.ownerId || "",
-            });
-          });
-
-          safeSetState({
-            shops,
-            isLoading: false,
-            error: null,
-          });
-        },
-        (error) => {
-          console.error("[useShops] Firestore error:", error);
-          safeSetState({
-            isLoading: false,
-            error: "Failed to load shops",
-          });
+  
+      const snapshot = await getDocs(shopsQuery);
+  
+      snapshot.docs.forEach((doc) => {
+        const data = doc.data();
+        if (!data.name) return;
+  
+        let coverImageUrls: string[] | undefined;
+        if (Array.isArray(data.coverImageUrls) && data.coverImageUrls.length > 0) {
+          coverImageUrls = data.coverImageUrls;
         }
-      );
-
-      unsubscribeRef.current = unsubscribe;
+  
+        shops.push({
+          id: doc.id,
+          name: data.name,
+          description: data.description,
+          logoUrl: data.logoUrl || data.profileImageUrl,
+          profileImageUrl: data.profileImageUrl,
+          coverImageUrl: data.coverImageUrl,
+          coverImageUrls: coverImageUrls,
+          averageRating: Number(data.averageRating) || 0,
+          reviewCount: Number(data.reviewCount) || 0,
+          productCount: Number(data.productCount) || 0,
+          category: data.category,
+          isVerified: Boolean(data.isVerified),
+          ownerId: data.ownerId || "",
+        });
+      });
+  
+      safeSetState({ shops, isLoading: false, error: null });
+  
     } catch (error) {
       console.error("[useShops] Setup error:", error);
       safeSetState({
+        shops: [],
         isLoading: false,
         error: "Failed to connect to shops service",
       });

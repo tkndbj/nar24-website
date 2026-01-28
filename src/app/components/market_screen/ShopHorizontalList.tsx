@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useState, useEffect, memo } from "react";
+import React, { useState, useEffect, memo, useRef, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { ChevronRight, ChevronLeft } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useShops, Shop } from "@/hooks/useShops";
 
 /**
@@ -15,6 +17,7 @@ import { useShops, Shop } from "@/hooks/useShops";
  * - Shimmer loading state
  * - Shop cards with rating, product count
  * - "Featured Shops" title
+ * - Desktop scroll arrows (like PreferenceProduct)
  */
 
 // ============================================================================
@@ -170,18 +173,13 @@ const ShopCard = memo(
     const mainTextColor = isDarkMode ? "text-white" : "text-black";
 
     // Match Flutter logic: check coverImageUrls (array) first, then coverImageUrl (single)
-    const shopData = shop as unknown as Record<string, unknown>;
-    const coverImageUrls = shopData.coverImageUrls as string[] | undefined;
-    const coverImageUrl = shopData.coverImageUrl as string | undefined;
-    
-    // Get the first cover image URL (Flutter shows first image or uses PageView for multiple)
-    const displayCoverImage = 
-      (Array.isArray(coverImageUrls) && coverImageUrls.length > 0) 
-        ? coverImageUrls[0] 
-        : (coverImageUrl || null);
-    
-    // Profile image - Flutter uses 'profileImageUrl'
-    const profileImageUrl = (shopData.profileImageUrl as string) || (shop as unknown as Record<string, unknown>).logoUrl as string || null;
+    const displayCoverImage =
+      (shop.coverImageUrls && shop.coverImageUrls.length > 0)
+        ? shop.coverImageUrls[0]
+        : (shop.coverImageUrl || null);
+
+    // Profile image - Flutter uses 'profileImageUrl', fallback to logoUrl
+    const profileImageUrl = shop.profileImageUrl || shop.logoUrl || null;
 
     return (
       <Link href={`/shop/${shop.id}`} className="block">
@@ -318,8 +316,12 @@ ShopCard.displayName = "ShopCard";
 
 const ShopHorizontalList = memo(({ className = "" }: ShopHorizontalListProps) => {
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isTablet = useIsTablet();
   const dimensions = useResponsiveDimensions();
+  const t = useTranslations("MarketScreen");
 
   // Theme detection
   useEffect(() => {
@@ -341,6 +343,31 @@ const ShopHorizontalList = memo(({ className = "" }: ShopHorizontalListProps) =>
   // Fetch shops
   const { shops, isLoading } = useShops();
 
+  // Check scroll position
+  const checkScrollPosition = useCallback(() => {
+    if (scrollContainerRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
+      setCanScrollLeft(scrollLeft > 0);
+      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1);
+    }
+  }, []);
+
+  // Scroll handlers
+  const scrollLeft = useCallback(() => {
+    scrollContainerRef.current?.scrollBy({ left: -200, behavior: "smooth" });
+  }, []);
+
+  const scrollRight = useCallback(() => {
+    scrollContainerRef.current?.scrollBy({ left: 200, behavior: "smooth" });
+  }, []);
+
+  // Check scroll position when shops change
+  useEffect(() => {
+    if (shops.length > 0) {
+      requestAnimationFrame(checkScrollPosition);
+    }
+  }, [shops.length, checkScrollPosition]);
+
   // ========================================================================
   // RENDER STATES
   // ========================================================================
@@ -348,21 +375,20 @@ const ShopHorizontalList = memo(({ className = "" }: ShopHorizontalListProps) =>
   // Loading state with shimmer - matches Flutter
   if (isLoading && shops.length === 0) {
     return (
-      <div
-        className={`w-full ${className}`}
-        style={{ height: dimensions.containerHeight }}
-      >
+      <div className={`w-full my-2 lg:mx-0 lg:px-6 ${className}`}>
         <div
-          className="flex gap-3 overflow-hidden"
-          style={{ paddingLeft: dimensions.horizontalPadding }}
+          className="w-full"
+          style={{ height: dimensions.containerHeight }}
         >
-          {[1, 2, 3, 4, 5].map((i) => (
-            <ShimmerCard
-              key={i}
-              width={dimensions.cardWidth}
-              isDarkMode={isDarkMode}
-            />
-          ))}
+          <div className="flex gap-3 overflow-hidden px-0 lg:px-2">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <ShimmerCard
+                key={i}
+                width={dimensions.cardWidth}
+                isDarkMode={isDarkMode}
+              />
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -371,16 +397,18 @@ const ShopHorizontalList = memo(({ className = "" }: ShopHorizontalListProps) =>
   // No shops state - matches Flutter
   if (shops.length === 0) {
     return (
-      <div
-        className={`w-full flex items-center justify-center ${className}`}
-        style={{ height: isTablet ? 280 : 240 }}
-      >
-        <p
-          className={`text-base ${isDarkMode ? "text-white" : "text-gray-900"}`}
-          style={{ fontSize: isTablet ? 18 : 16 }}
+      <div className={`w-full my-2 lg:mx-0 lg:px-6 ${className}`}>
+        <div
+          className="w-full flex items-center justify-center"
+          style={{ height: isTablet ? 280 : 240 }}
         >
-          Featured Shops
-        </p>
+          <p
+            className={`text-base ${isDarkMode ? "text-white" : "text-gray-900"}`}
+            style={{ fontSize: isTablet ? 18 : 16 }}
+          >
+            {t("featuredShops")}
+          </p>
+        </div>
       </div>
     );
   }
@@ -390,44 +418,88 @@ const ShopHorizontalList = memo(({ className = "" }: ShopHorizontalListProps) =>
   // ========================================================================
 
   return (
-    <div
-      className={`w-full ${className}`}
-      style={{ height: dimensions.containerHeight }}
-    >
-      {/* Title - matches Flutter */}
+    <div className={`w-full my-2 lg:mx-0 lg:px-6 ${className}`}>
       <div
-        className="flex items-center"
-        style={{
-          paddingLeft: dimensions.horizontalPadding,
-          paddingRight: 16,
-          paddingTop: isTablet ? 20 : 16,
-          paddingBottom: isTablet ? 12 : 8,
-        }}
+        className="w-full"
+        style={{ height: dimensions.containerHeight }}
       >
-        <h2
-          className={`font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}
-          style={{ fontSize: dimensions.titleFontSize }}
+        {/* Title */}
+        <div
+          className="flex items-center px-0 lg:px-2"
+          style={{
+            paddingTop: isTablet ? 20 : 16,
+            paddingBottom: isTablet ? 12 : 8,
+          }}
         >
-          Featured Shops
-        </h2>
-      </div>
+          <h2
+            className={`font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}
+            style={{ fontSize: dimensions.titleFontSize }}
+          >
+            {t("featuredShops")}
+          </h2>
+        </div>
 
-      {/* Shops List - horizontal scroll */}
-      <div
-        className="flex-1 overflow-x-auto scrollbar-hide"
-        style={{ paddingLeft: dimensions.horizontalPadding }}
-      >
-        <div className="flex" style={{ gap: dimensions.cardSpacing }}>
-          {shops.map((shop) => (
-            <ShopCard
-              key={shop.id}
-              shop={shop}
-              width={dimensions.cardWidth}
-              isDarkMode={isDarkMode}
-            />
-          ))}
+        {/* Shops List with scroll arrows */}
+        <div className="relative">
+          {/* Desktop scroll arrows */}
+          {canScrollLeft && (
+            <button
+              onClick={scrollLeft}
+              className="hidden lg:flex absolute top-1/2 -translate-y-1/2 z-20 w-12 h-12 bg-white rounded-full items-center justify-center transition-all duration-200 hover:scale-105"
+              style={{
+                left: "-30px",
+                boxShadow: "0 4px 16px rgba(0, 0, 0, 0.2)",
+              }}
+              aria-label="Scroll left"
+            >
+              <ChevronLeft size={28} className="text-gray-700" />
+            </button>
+          )}
+
+          {canScrollRight && (
+            <button
+              onClick={scrollRight}
+              className="hidden lg:flex absolute top-1/2 -translate-y-1/2 z-20 w-12 h-12 bg-white rounded-full items-center justify-center transition-all duration-200 hover:scale-105"
+              style={{
+                right: "-30px",
+                boxShadow: "0 4px 16px rgba(0, 0, 0, 0.2)",
+              }}
+              aria-label="Scroll right"
+            >
+              <ChevronRight size={28} className="text-gray-700" />
+            </button>
+          )}
+
+          {/* Scrollable container */}
+          <div
+            ref={scrollContainerRef}
+            className="overflow-x-auto scrollbar-hide"
+            onScroll={checkScrollPosition}
+          >
+            <div className="flex px-0 lg:px-2" style={{ gap: dimensions.cardSpacing }}>
+              {shops.map((shop) => (
+                <ShopCard
+                  key={shop.id}
+                  shop={shop}
+                  width={dimensions.cardWidth}
+                  isDarkMode={isDarkMode}
+                />
+              ))}
+            </div>
+          </div>
         </div>
       </div>
+
+      <style jsx global>{`
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}</style>
     </div>
   );
 });
