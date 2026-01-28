@@ -197,7 +197,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
     return (
       <div className="absolute -top-1 -right-1 min-w-[18px] lg:min-w-[20px] h-4 lg:h-5 bg-pink-500 rounded-full flex items-center justify-center shadow-lg ring-2 ring-white dark:ring-gray-900">
         <span className="text-white text-xs font-bold px-1">
-          {favoriteCount > 99 ? "99+" : favoriteCount}
+          {favoriteCount > 10 ? "+10" : favoriteCount}
         </span>
       </div>
     );
@@ -209,7 +209,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
     return (
       <div className="absolute -top-1 -right-1 min-w-[18px] lg:min-w-[20px] h-4 lg:h-5 bg-orange-500 rounded-full flex items-center justify-center shadow-lg ring-2 ring-white dark:ring-gray-900">
         <span className="text-white text-xs font-bold px-1">
-          {cartCount > 99 ? "99+" : cartCount}
+          {cartCount > 10 ? "+10" : cartCount}
         </span>
       </div>
     );

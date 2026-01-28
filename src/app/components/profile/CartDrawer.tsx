@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef, UIEvent } from "react";
 import dynamic from "next/dynamic";
 import {
   X,
@@ -150,6 +150,9 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   const [pauseReason, setPauseReason] = useState("");
   const [showSalesPausedDialog, setShowSalesPausedDialog] = useState(false);
   const totalsVerificationTimer = useRef<NodeJS.Timeout | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
+  const isLoadingMoreRef = useRef(false); // Prevents race conditions
   const [selectedProducts, setSelectedProducts] = useState<
     Record<string, boolean>
   >({});
@@ -346,6 +349,82 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
       }
     };
   }, []);
+
+  // ========================================================================
+  // INFINITE SCROLL - IntersectionObserver for reliable pagination
+  // ========================================================================
+
+  // Stable loadMore handler that prevents race conditions
+  const handleLoadMore = useCallback(async () => {
+    // Guard against concurrent loads using ref (more reliable than state)
+    if (isLoadingMoreRef.current || !hasMore || isLoadingMore) {
+      return;
+    }
+
+    isLoadingMoreRef.current = true;
+    try {
+      await loadMoreItems();
+    } finally {
+      // Small delay before allowing next load to prevent rapid-fire calls
+      setTimeout(() => {
+        isLoadingMoreRef.current = false;
+      }, 100);
+    }
+  }, [hasMore, isLoadingMore, loadMoreItems]);
+
+  // IntersectionObserver for automatic infinite scroll
+  useEffect(() => {
+    // Only set up observer when drawer is open and user is logged in with items
+    if (!isOpen || !user || cartCount === 0 || !hasMore) {
+      return;
+    }
+
+    const sentinel = loadMoreSentinelRef.current;
+    if (!sentinel) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (entry.isIntersecting && hasMore && !isLoadingMore && !isLoadingMoreRef.current) {
+          console.log("📜 Sentinel visible, loading more items...");
+          handleLoadMore();
+        }
+      },
+      {
+        root: scrollContainerRef.current,
+        rootMargin: "200px", // Trigger 200px before reaching the sentinel
+        threshold: 0,
+      }
+    );
+
+    observer.observe(sentinel);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [isOpen, user, cartCount, hasMore, isLoadingMore, handleLoadMore]);
+
+  // Fallback scroll handler for browsers with IntersectionObserver issues
+  const handleScroll = useCallback(
+    (e: UIEvent<HTMLDivElement>) => {
+      if (!hasMore || isLoadingMore || isLoadingMoreRef.current) {
+        return;
+      }
+
+      const target = e.target as HTMLDivElement;
+      const { scrollTop, scrollHeight, clientHeight } = target;
+
+      // Trigger load when user is within 300px of the bottom
+      const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+
+      if (distanceFromBottom < 300) {
+        handleLoadMore();
+      }
+    },
+    [hasMore, isLoadingMore, handleLoadMore]
+  );
 
   // Calculate totals when selections change (matching Flutter's _updateTotalsForCurrentSelection)
   useEffect(() => {
@@ -1272,7 +1351,11 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
         {/* Content */}
         <div className="flex flex-col h-full">
-          <div className="flex-1 overflow-y-auto">
+          <div
+            ref={scrollContainerRef}
+            className="flex-1 overflow-y-auto"
+            onScroll={handleScroll}
+          >
             {/* Not Authenticated */}
             {!user ? (
               <div className="flex flex-col items-center justify-center h-full px-6 py-12">
@@ -1356,31 +1439,47 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
             ) : (
               /* Cart Items */
               <div className="px-3 py-3">
-                <div className="space-y-2.5 pb-32">{renderCartItems}</div>
+                <div className="space-y-2.5 pb-32">
+                  {renderCartItems}
 
-                {/* Load More */}
-                {hasMore && (
-                  <div className="flex justify-center pt-4">
-                    <button
-                      onClick={loadMoreItems}
-                      disabled={isLoadingMore}
-                      className={`
-                        px-4 py-2 rounded-lg text-sm font-medium transition-colors
-                        ${isDarkMode ? "bg-gray-800 text-gray-300 hover:bg-gray-700" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}
-                        disabled:opacity-50 disabled:cursor-not-allowed
-                      `}
+                  {/* Infinite Scroll Sentinel & Loading Indicator */}
+                  {hasMore && (
+                    <div
+                      ref={loadMoreSentinelRef}
+                      className="flex justify-center py-4"
+                      aria-hidden="true"
                     >
                       {isLoadingMore ? (
                         <div className="flex items-center space-x-2">
-                          <RefreshCw size={14} className="animate-spin" />
-                          <span>{t("loadingMore", "Loading more...")}</span>
+                          <RefreshCw size={16} className="animate-spin text-orange-500" />
+                          <span className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                            {t("loadingMore", "Loading more...")}
+                          </span>
                         </div>
                       ) : (
-                        t("loadMore", "Load More")
+                        // Invisible sentinel for IntersectionObserver - also acts as manual trigger
+                        <button
+                          onClick={handleLoadMore}
+                          className={`
+                            px-4 py-2 rounded-lg text-sm font-medium transition-colors
+                            ${isDarkMode ? "bg-gray-800 text-gray-300 hover:bg-gray-700" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}
+                          `}
+                        >
+                          {t("loadMore", "Load More")}
+                        </button>
                       )}
-                    </button>
-                  </div>
-                )}
+                    </div>
+                  )}
+
+                  {/* End of list indicator when all items loaded */}
+                  {!hasMore && cartItems.length > 0 && (
+                    <div className="flex justify-center py-3">
+                      <span className={`text-xs ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+                        {t("allItemsLoaded", "All items loaded")}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -1466,76 +1565,59 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 {renderCompactCouponButton()}
               </div>
 
-              {/* Buttons */}
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => {
-                    onClose();
-                    router.push("/cart");
-                  }}
-                  className={`
-                    py-3 px-4 rounded-xl font-medium transition-all duration-200
-                    ${
-                      isDarkMode
-                        ? "bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200"
-                    }
-                    active:scale-95
-                  `}
-                >
-                  {t("viewCart", "View Cart")}
-                </button>
-
-                <button
-                  onClick={handleCheckout}
-                  disabled={
-                    isCalculatingTotals ||
-                    isValidating ||
-                    salesPaused ||
-                    selectedIds.length === 0
+              {/* Checkout Button - Full width, compact on mobile */}
+              <button
+                onClick={handleCheckout}
+                disabled={
+                  isCalculatingTotals ||
+                  isValidating ||
+                  salesPaused ||
+                  selectedIds.length === 0
+                }
+                className={`
+                  w-full py-2.5 sm:py-3 px-4 rounded-xl font-medium transition-all duration-200
+                  ${
+                    salesPaused
+                      ? "bg-gray-400"
+                      : "bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600"
                   }
-                  className={`
-                    py-3 px-4 rounded-xl font-medium transition-all duration-200
-                    ${
-                      salesPaused
-                        ? "bg-gray-400"
-                        : "bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600"
-                    }
-                    text-white shadow-lg hover:shadow-xl active:scale-95
-                    flex items-center justify-center space-x-2
-                    disabled:opacity-50 disabled:cursor-not-allowed
-                  `}
-                >
-                  {isValidating ? (
-                    <>
-                      <RefreshCw size={16} className="animate-spin" />
-                      <span>{t("validating", "Validating...")}</span>
-                    </>
-                  ) : salesPaused ? (
-                    <>
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
-                      </svg>
-                      <span>{t("checkoutPaused", "Checkout Paused")}</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>{t("checkout", "Checkout")}</span>
-                      <ArrowRight size={16} />
-                    </>
-                  )}
-                </button>
-              </div>
+                  text-white shadow-lg hover:shadow-xl active:scale-[0.98]
+                  flex items-center justify-center space-x-2
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                  text-sm sm:text-base
+                `}
+              >
+                {isValidating ? (
+                  <>
+                    <RefreshCw size={16} className="animate-spin" />
+                    <span className="hidden sm:inline">{t("validating", "Validating...")}</span>
+                    <span className="sm:hidden">{t("validatingShort", "Wait...")}</span>
+                  </>
+                ) : salesPaused ? (
+                  <>
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    <span className="hidden sm:inline">{t("checkoutPaused", "Checkout Paused")}</span>
+                    <span className="sm:hidden">{t("paused", "Paused")}</span>
+                  </>
+                ) : (
+                  <>
+                    <span>{t("checkout", "Checkout")}</span>
+                    <ArrowRight size={16} />
+                  </>
+                )}
+              </button>
             </div>
           )}
         </div>
