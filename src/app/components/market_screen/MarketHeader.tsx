@@ -22,8 +22,10 @@ import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useUser } from "@/context/UserProvider";
 import { useBadgeProvider } from "@/context/BadgeProvider";
-import { useCart } from "@/context/CartProvider";
-import { useFavorites } from "@/context/FavoritesProvider";
+// Performance optimized: Use selector hooks for count-only subscriptions
+// Header only re-renders when counts change, not on item detail changes
+import { useCartCount } from "@/hooks/selectors/useCartSelectors";
+import { useFavoriteCount } from "@/hooks/selectors/useFavoriteSelectors";
 import dynamic from "next/dynamic";
 import SearchBar from "./SearchBar";
 
@@ -56,8 +58,11 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
   // ✅ OPTIMIZED: Context hooks - data comes from providers
   const { user, isLoading: userLoading } = useUser();
   const { unreadNotificationsCount } = useBadgeProvider();
-  const { cartCount } = useCart();
-  const { favoriteCount } = useFavorites();
+
+  // Performance optimized: Use selector hooks for count-only subscriptions
+  // Header only re-renders when counts change, not on item detail changes
+  const cartCount = useCartCount();
+  const favoriteCount = useFavoriteCount();
 
   // ✅ SIMPLIFIED: Minimal UI state
   const [isDark, setIsDark] = useState(false);

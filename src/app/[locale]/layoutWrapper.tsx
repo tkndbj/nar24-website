@@ -1,25 +1,22 @@
 // layoutWrapper.tsx
+// Performance optimized with composite providers to reduce visual nesting
+// while maintaining proper dependency order
 "use client";
 
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { NextIntlClientProvider } from "next-intl";
 import { UserProvider, useUser } from "../../context/UserProvider";
-import { CartProvider } from "../../context/CartProvider";
-import { FavoritesProvider } from "@/context/FavoritesProvider";
-import { BadgeProvider } from "@/context/BadgeProvider";
-import { SearchProvider } from "@/context/SearchProvider";
 import ConditionalHeader from "../components/ConditionalHeader";
-import { SearchHistoryProvider } from "@/context/SearchHistoryProvider";
 import { AppInitializer } from "@/app/components/AppInitializer";
 import { AnalyticsInitializer } from "@/app/components/AnalyticsInitializer";
 import { getFirebaseDb, getFirebaseFunctions } from "@/lib/firebase-lazy";
-import { ProductCacheProvider } from "@/context/ProductCacheProvider";
 import type { Firestore } from "firebase/firestore";
 import type { Functions } from "firebase/functions";
-import { CouponProvider } from "@/context/CouponProvider";
-import { DiscountSelectionProvider } from "@/context/DiscountSelectionProvider";
-import { CelebrationProvider } from "@/app/components/CouponCelebrationOverlay";
+
+// Composite providers - reduces nesting while maintaining dependencies
+import { CommerceProviders } from "@/context/CommerceProviders";
+import { UIProviders } from "@/context/UIProviders";
 
 // Lazy load CookieConsent - only shown conditionally, not needed on initial render
 const CookieConsent = dynamic(
@@ -34,6 +31,7 @@ const AppDownloadModal = dynamic(
 );
 
 // Inner component that has access to user context and lazy-loaded Firebase
+// Uses composite providers to reduce visual nesting from 14 levels to 6
 function AppProviders({
   children,
   db,
@@ -46,28 +44,14 @@ function AppProviders({
   const { user } = useUser();
 
   return (
-    <ProductCacheProvider>
-      <CartProvider user={user} db={db} functions={functions}>
-        <FavoritesProvider>
-        <CouponProvider user={user} db={db}>
-        <DiscountSelectionProvider>
-        <CelebrationProvider>
-          <BadgeProvider>
-            <SearchProvider>
-              <SearchHistoryProvider>
-                <ConditionalHeader />
-                <main className="isolate">{children}</main>
-                <CookieConsent />
-                <AppDownloadModal />
-              </SearchHistoryProvider>
-            </SearchProvider>
-          </BadgeProvider>
-          </CelebrationProvider>
-          </DiscountSelectionProvider>
-          </CouponProvider>
-        </FavoritesProvider>
-      </CartProvider>
-    </ProductCacheProvider>
+    <CommerceProviders user={user} db={db} functions={functions}>
+      <UIProviders user={user}>
+        <ConditionalHeader />
+        <main className="isolate">{children}</main>
+        <CookieConsent />
+        <AppDownloadModal />
+      </UIProviders>
+    </CommerceProviders>
   );
 }
 

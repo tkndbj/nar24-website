@@ -79,8 +79,12 @@ interface PaginatedFavorite {
   productId: string;
 }
 
-interface FavoritesContextType {
-  // Reactive state (like ValueNotifiers in Flutter)
+// ============================================================================
+// SPLIT CONTEXT TYPES - For granular subscriptions
+// ============================================================================
+
+// State-only context type (changes frequently)
+interface FavoritesStateContextType {
   favoriteIds: Set<string>;
   favoriteCount: number;
   paginatedFavorites: PaginatedFavorite[];
@@ -90,7 +94,10 @@ interface FavoritesContextType {
   isLoadingMore: boolean;
   isInitialLoadComplete: boolean;
   favoriteBaskets: FavoriteBasket[];
+}
 
+// Actions-only context type (stable references, never causes re-renders)
+interface FavoritesActionsContextType {
   // Methods
   addToFavorites: (
     productId: string,
@@ -129,10 +136,44 @@ interface FavoritesContextType {
   getBasketNameForProduct: (productId: string) => Promise<string | null>;
 }
 
+// Combined context type (for backward compatibility)
+interface FavoritesContextType extends FavoritesStateContextType, FavoritesActionsContextType {}
+
+// Create separate contexts
+const FavoritesStateContext = createContext<FavoritesStateContextType | undefined>(undefined);
+const FavoritesActionsContext = createContext<FavoritesActionsContextType | undefined>(undefined);
+
+// Combined context for backward compatibility
 const FavoritesContext = createContext<FavoritesContextType | undefined>(
   undefined
 );
 
+/**
+ * Hook to access only favorites state (will re-render on state changes)
+ */
+export const useFavoritesState = (): FavoritesStateContextType => {
+  const context = useContext(FavoritesStateContext);
+  if (!context) {
+    throw new Error("useFavoritesState must be used within FavoritesProvider");
+  }
+  return context;
+};
+
+/**
+ * Hook to access only favorites actions (stable, never re-renders)
+ */
+export const useFavoritesActions = (): FavoritesActionsContextType => {
+  const context = useContext(FavoritesActionsContext);
+  if (!context) {
+    throw new Error("useFavoritesActions must be used within FavoritesProvider");
+  }
+  return context;
+};
+
+/**
+ * Combined hook for backward compatibility - returns both state and actions
+ * PREFER useFavoritesState() or useFavoritesActions() for better performance
+ */
 export const useFavorites = (): FavoritesContextType => {
   const context = useContext(FavoritesContext);
   if (!context) {
@@ -1620,12 +1661,12 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   }, []);
 
   // ========================================================================
-  // CONTEXT VALUE
+  // CONTEXT VALUES - Split for granular subscriptions
   // ========================================================================
 
-  const contextValue = useMemo<FavoritesContextType>(
+  // State context - changes trigger re-renders
+  const stateValue = useMemo<FavoritesStateContextType>(
     () => ({
-      // State
       favoriteIds,
       favoriteCount,
       paginatedFavorites,
@@ -1635,32 +1676,6 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
       isLoadingMore,
       isInitialLoadComplete,
       favoriteBaskets,
-
-      // Methods
-      addToFavorites,
-      removeMultipleFromFavorites,
-      removeGloballyFromFavorites,
-
-      // Basket management
-      createFavoriteBasket,
-      deleteFavoriteBasket,
-      setSelectedBasket,
-      transferToBasket,
-
-      // Pagination
-      loadNextPage,
-      resetPagination,
-      shouldReloadFavorites,
-
-      // Real-time listeners
-      enableLiveUpdates,
-      disableLiveUpdates,
-
-      // Utilities
-      isFavorite,
-      isGloballyFavorited,
-      isFavoritedInBasket,
-      getBasketNameForProduct,
     }),
     [
       favoriteIds,
@@ -1672,6 +1687,30 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
       isLoadingMore,
       isInitialLoadComplete,
       favoriteBaskets,
+    ]
+  );
+
+  // Actions context - stable references, no re-renders
+  const actionsValue = useMemo<FavoritesActionsContextType>(
+    () => ({
+      addToFavorites,
+      removeMultipleFromFavorites,
+      removeGloballyFromFavorites,
+      createFavoriteBasket,
+      deleteFavoriteBasket,
+      setSelectedBasket,
+      transferToBasket,
+      loadNextPage,
+      resetPagination,
+      shouldReloadFavorites,
+      enableLiveUpdates,
+      disableLiveUpdates,
+      isFavorite,
+      isGloballyFavorited,
+      isFavoritedInBasket,
+      getBasketNameForProduct,
+    }),
+    [
       addToFavorites,
       removeMultipleFromFavorites,
       removeGloballyFromFavorites,
@@ -1691,9 +1730,22 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
     ]
   );
 
+  // Combined context for backward compatibility
+  const combinedValue = useMemo<FavoritesContextType>(
+    () => ({
+      ...stateValue,
+      ...actionsValue,
+    }),
+    [stateValue, actionsValue]
+  );
+
   return (
-    <FavoritesContext.Provider value={contextValue}>
-      {children}
-    </FavoritesContext.Provider>
+    <FavoritesStateContext.Provider value={stateValue}>
+      <FavoritesActionsContext.Provider value={actionsValue}>
+        <FavoritesContext.Provider value={combinedValue}>
+          {children}
+        </FavoritesContext.Provider>
+      </FavoritesActionsContext.Provider>
+    </FavoritesStateContext.Provider>
   );
 };
