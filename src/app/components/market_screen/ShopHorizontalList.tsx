@@ -182,7 +182,7 @@ const ShopCard = memo(
     const profileImageUrl = shop.profileImageUrl || shop.logoUrl || null;
 
     return (
-      <Link href={`/shop/${shop.id}`} className="block">
+      <Link href={`/shopdetail/${shop.id}`} className="block">
         <div
           className="flex-shrink-0 overflow-hidden transition-transform hover:scale-[1.02]"
           style={{
