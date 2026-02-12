@@ -1990,11 +1990,11 @@
     "shipping": "Shipping",
     "discount": "Discount",
     "couponDiscount": "Coupon Discount",
-    "freeShipping": "Free Shipping",    
+    "freeShipping": "Free Shipping",
     "selectCoupon": "Select Coupon",
     "couponApplied": "Coupon Applied",
     "freeShippingApplied": "Free Shipping Applied",
-    "proceedToCheckout": "Proceed to Checkout"    
+    "proceedToCheckout": "Proceed to Checkout"
   },
   "coupons": {
     "title": "Coupons & Benefits",
@@ -2013,7 +2013,7 @@
     "shipping": "Shipping",
     "youHaveACoupon": "You have a coupon!",
     "couponWaitingForYou": "A special discount is waiting for you in your cart!",
-    "gotIt": "Got it!",   
+    "gotIt": "Got it!",
     "free": "Free",
     "addCouponOrBenefit": "Add coupon or benefit",
     "today": "Today",
@@ -2031,6 +2031,7 @@
     "languageSelection": "Language Selection",
     "turkish": "Türkçe",
     "english": "English",
+    "limitedSearchMode": "Advanced search mode is under maintenance. Please try again later.",
     "favorites": "Favorites",
     "cart": "Cart",
     "profile": "Profile",

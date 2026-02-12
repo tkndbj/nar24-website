@@ -1572,7 +1572,7 @@
     "shippedAt": "Gönderim Tarihi",
     "orderedAt": "Sipariş Tarihi"
   },
- "BoughtProducts": {
+  "BoughtProducts": {
     "orderDetails": "Sipariş Detayları",
     "orderNumber": "Sipariş Numarası",
     "orderDate": "Sipariş Tarihi",
@@ -2225,6 +2225,7 @@
     "languageSelection": "Dil Seçimi",
     "turkish": "Türkçe",
     "english": "English",
+    "limitedSearchMode": "Gelişmiş arama bakımı devam etmektedir. Lütfen daha sonra tekrar deneyin.",
     "favorites": "Favoriler",
     "cart": "Sepet",
     "profile": "Profil",
@@ -2296,7 +2297,7 @@
     "locationSelected": "Konum Seçildi",
     "tapAnywhereToSetLocation": "Teslimat konumunuzu ayarlamak için haritada herhangi bir yere dokunun",
     "cancel": "İptal",
-    "days": "gün",    
+    "days": "gün",
     "appliedDiscounts": "Uygulanan İndirimler",
     "phoneFormatHint": "Telefon Formatı",
     "placeOrder": "Siparişi Tamamla",
