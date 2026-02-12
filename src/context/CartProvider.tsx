@@ -155,8 +155,12 @@ interface BundleDataItem {
   [key: string]: unknown;
 }
 
-interface CartContextType {
-  // State
+// ============================================================================
+// SPLIT CONTEXT TYPES - For granular subscriptions
+// ============================================================================
+
+// State-only context type (changes frequently)
+interface CartStateContextType {
   cartCount: number;
   cartProductIds: Set<string>;
   cartItems: CartItem[];
@@ -164,8 +168,10 @@ interface CartContextType {
   isLoadingMore: boolean;
   hasMore: boolean;
   isInitialized: boolean;
+}
 
-  // Methods
+// Actions-only context type (stable references, never causes re-renders)
+interface CartActionsContextType {
   addProductToCart: (
     product: Product,
     quantity?: number,
@@ -201,8 +207,42 @@ interface CartContextType {
   disableLiveUpdates: () => void;
 }
 
+// Combined context type (for backward compatibility)
+interface CartContextType extends CartStateContextType, CartActionsContextType {}
+
+// Create separate contexts
+const CartStateContext = createContext<CartStateContextType | undefined>(undefined);
+const CartActionsContext = createContext<CartActionsContextType | undefined>(undefined);
+
+// Combined context for backward compatibility
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
+/**
+ * Hook to access only cart state (will re-render on state changes)
+ */
+export const useCartState = (): CartStateContextType => {
+  const context = useContext(CartStateContext);
+  if (context === undefined) {
+    throw new Error("useCartState must be used within a CartProvider");
+  }
+  return context;
+};
+
+/**
+ * Hook to access only cart actions (stable, never re-renders)
+ */
+export const useCartActions = (): CartActionsContextType => {
+  const context = useContext(CartActionsContext);
+  if (context === undefined) {
+    throw new Error("useCartActions must be used within a CartProvider");
+  }
+  return context;
+};
+
+/**
+ * Combined hook for backward compatibility - returns both state and actions
+ * PREFER useCartState() or useCartActions() for better performance
+ */
 export const useCart = (): CartContextType => {
   const context = useContext(CartContext);
   if (context === undefined) {
@@ -1970,12 +2010,12 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   }, [disableLiveUpdates]);
 
   // ========================================================================
-  // CONTEXT VALUE
+  // CONTEXT VALUES - Split for granular subscriptions
   // ========================================================================
 
-  const contextValue = useMemo<CartContextType>(
+  // State context - changes trigger re-renders
+  const stateValue = useMemo<CartStateContextType>(
     () => ({
-      // State
       cartCount,
       cartProductIds,
       cartItems,
@@ -1983,8 +2023,21 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       isLoadingMore,
       hasMore,
       isInitialized,
+    }),
+    [
+      cartCount,
+      cartProductIds,
+      cartItems,
+      isLoading,
+      isLoadingMore,
+      hasMore,
+      isInitialized,
+    ]
+  );
 
-      // Methods
+  // Actions context - stable references, no re-renders
+  const actionsValue = useMemo<CartActionsContextType>(
+    () => ({
       addProductToCart,
       addToCartById,
       removeFromCart,
@@ -2000,13 +2053,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       disableLiveUpdates,
     }),
     [
-      cartCount,
-      cartProductIds,
-      cartItems,
-      isLoading,
-      isLoadingMore,
-      hasMore,
-      isInitialized,
       addProductToCart,
       addToCartById,
       removeFromCart,
@@ -2023,7 +2069,22 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     ]
   );
 
+  // Combined context for backward compatibility
+  const combinedValue = useMemo<CartContextType>(
+    () => ({
+      ...stateValue,
+      ...actionsValue,
+    }),
+    [stateValue, actionsValue]
+  );
+
   return (
-    <CartContext.Provider value={contextValue}>{children}</CartContext.Provider>
+    <CartStateContext.Provider value={stateValue}>
+      <CartActionsContext.Provider value={actionsValue}>
+        <CartContext.Provider value={combinedValue}>
+          {children}
+        </CartContext.Provider>
+      </CartActionsContext.Provider>
+    </CartStateContext.Provider>
   );
 };

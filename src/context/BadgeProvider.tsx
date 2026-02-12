@@ -5,7 +5,9 @@ import React, {
   useContext,
   useState,
   useEffect,
+  useRef,
   ReactNode,
+  useCallback,
 } from "react";
 import {
   collection,
@@ -16,8 +18,8 @@ import {
   orderBy,
   Unsubscribe,
 } from "firebase/firestore";
-import { onAuthStateChanged } from "firebase/auth";
-import { auth, db } from "../lib/firebase";
+import type { User } from "firebase/auth";
+import { db } from "../lib/firebase";
 
 interface BadgeContextType {
   unreadMessagesCount: number;
@@ -38,59 +40,34 @@ export function useBadgeProvider() {
 
 interface BadgeProviderProps {
   children: ReactNode;
+  user?: User | null; // Optional: Accept user from parent to avoid duplicate auth listener
 }
 
-export function BadgeProvider({ children }: BadgeProviderProps) {
+export function BadgeProvider({ children, user: userProp }: BadgeProviderProps) {
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Store unsubscribe functions
-  const [unsubscribes, setUnsubscribes] = useState<Unsubscribe[]>([]);
+  // Store unsubscribe functions using ref to avoid dependency issues
+  const unsubscribesRef = useRef<Unsubscribe[]>([]);
+  const currentUserIdRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    console.log("🔧 BadgeProvider: Initializing...");
-
-    // Listen to auth state changes
-    const authUnsubscribe = onAuthStateChanged(auth, (user) => {
-      console.log(
-        "👤 BadgeProvider: Auth state changed:",
-        user?.uid || "logged out"
-      );
-
-      if (!user) {
-        // User logged out - cleanup and reset
-        cancelAllSubscriptions();
-        setUnreadMessagesCount(0);
-        setUnreadNotificationsCount(0);
-        setIsLoading(false);
-        setError(null);
-      } else {
-        // User logged in - setup Firestore listeners
-        setupFirestoreListeners(user.uid);
-      }
-    });
-
-    return () => {
-      authUnsubscribe();
-      cancelAllSubscriptions();
-    };
-  }, []);
-
-  const cancelAllSubscriptions = () => {
+  // Cancel all subscriptions helper
+  const cancelAllSubscriptions = useCallback(() => {
     console.log("🧹 BadgeProvider: Canceling all subscriptions");
-    unsubscribes.forEach((unsubscribe) => {
+    unsubscribesRef.current.forEach((unsubscribe) => {
       try {
         unsubscribe();
       } catch (e) {
         console.warn("Error unsubscribing:", e);
       }
     });
-    setUnsubscribes([]);
-  };
+    unsubscribesRef.current = [];
+  }, []);
 
-  const setupFirestoreListeners = (userId: string) => {
+  // Setup Firestore listeners helper
+  const setupFirestoreListeners = useCallback((userId: string) => {
     console.log(
       "🔥 BadgeProvider: Setting up Firestore listeners for user:",
       userId
@@ -153,7 +130,7 @@ export function BadgeProvider({ children }: BadgeProviderProps) {
       newUnsubscribes.push(notificationsUnsubscribe);
 
       // Store all unsubscribe functions
-      setUnsubscribes(newUnsubscribes);
+      unsubscribesRef.current = newUnsubscribes;
       setIsLoading(false);
 
       console.log("✅ BadgeProvider: All listeners setup successfully");
@@ -171,7 +148,37 @@ export function BadgeProvider({ children }: BadgeProviderProps) {
         }
       });
     }
-  };
+  }, [cancelAllSubscriptions]);
+
+  // Handle user prop changes (optimized - no internal auth listener needed when user prop is provided)
+  useEffect(() => {
+    console.log("🔧 BadgeProvider: User changed:", userProp?.uid || "logged out");
+
+    const newUserId = userProp?.uid || null;
+
+    // Skip if user hasn't changed
+    if (newUserId === currentUserIdRef.current) {
+      return;
+    }
+
+    currentUserIdRef.current = newUserId;
+
+    if (!newUserId) {
+      // User logged out - cleanup and reset
+      cancelAllSubscriptions();
+      setUnreadMessagesCount(0);
+      setUnreadNotificationsCount(0);
+      setIsLoading(false);
+      setError(null);
+    } else {
+      // User logged in - setup Firestore listeners
+      setupFirestoreListeners(newUserId);
+    }
+
+    return () => {
+      cancelAllSubscriptions();
+    };
+  }, [userProp, cancelAllSubscriptions, setupFirestoreListeners]);
 
   const value: BadgeContextType = {
     unreadMessagesCount,

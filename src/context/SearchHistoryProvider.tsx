@@ -1,24 +1,24 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
-import { 
-  collection, 
-  query, 
-  where, 
-  orderBy, 
-  onSnapshot, 
-  deleteDoc, 
-  doc, 
-  getDocs, 
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+  deleteDoc,
+  doc,
+  getDocs,
   writeBatch,
   limit,
-  startAfter,  
+  startAfter,
   QueryDocumentSnapshot,
   Unsubscribe,
   addDoc,
   serverTimestamp
 } from 'firebase/firestore';
-import { User, onAuthStateChanged } from 'firebase/auth';
+import type { User } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 
 // SearchEntry interface to match your Flutter model
@@ -67,7 +67,12 @@ class TimeoutException extends Error {
 const INITIAL_LOAD_LIMIT = 20;
 const PAGINATION_LIMIT = 10;
 
-export const SearchHistoryProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+interface SearchHistoryProviderProps {
+  children: React.ReactNode;
+  user?: User | null; // Optional: Accept user from parent to avoid duplicate auth listener
+}
+
+export const SearchHistoryProvider: React.FC<SearchHistoryProviderProps> = ({ children, user: userProp }) => {
   // Core state for search entries
   const [searchEntries, setSearchEntries] = useState<SearchEntry[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
@@ -82,58 +87,10 @@ export const SearchHistoryProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // Subscription references
   const historyUnsubscribe = useRef<Unsubscribe | null>(null);
-  const authUnsubscribe = useRef<Unsubscribe | null>(null);
+  // Note: authUnsubscribe removed - we now use user prop from parent
 
-  // Initialize auth listener on mount
-  useEffect(() => {
-    // Capture ref values for cleanup
-    const deletingRef = deletingEntries.current;
-    const optimisticRef = optimisticallyDeleted.current;
-
-    initAuthListener();
-
-    return () => {
-      // Cleanup on unmount
-      historyUnsubscribe.current?.();
-      authUnsubscribe.current?.();
-      deletingRef.clear();
-      optimisticRef.clear();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // initAuthListener omitted - defined below
-
-  const initAuthListener = useCallback(() => {
-    // Check current user immediately when provider is created
-    const currentUser = auth.currentUser;
-    const newUserId = currentUser?.uid || null;
-    setCurrentUserId(newUserId);
-
-    if (newUserId) {
-      setIsLoadingHistory(true);
-      fetchSearchHistory(newUserId);
-    } else {
-      clearHistory(); // Clear immediately if no user
-    }
-
-    // Then listen for future auth changes
-    authUnsubscribe.current = onAuthStateChanged(auth, (user: User | null) => {
-      const newUserId = user?.uid || null;
-
-      // If user changed (login/logout/switch), clear and reload
-      if (newUserId !== currentUserId) {
-        setCurrentUserId(newUserId);
-
-        if (newUserId) {
-          setIsLoadingHistory(true);
-          resetPagination();
-          fetchSearchHistory(newUserId);
-        } else {
-          clearHistory();
-        }
-      }
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUserId]); // clearHistory, fetchSearchHistory, resetPagination omitted - defined below
+  // Track if user prop is being used
+  const usingUserProp = userProp !== undefined;
 
   const resetPagination = useCallback(() => {
     lastDocument.current = null;
@@ -439,6 +396,40 @@ export const SearchHistoryProvider: React.FC<{ children: React.ReactNode }> = ({
       throw error;
     }
   }, [resetPagination]);
+
+  // Handle user prop changes (optimized - uses user prop when provided)
+  useEffect(() => {
+    // Capture ref values for cleanup
+    const deletingRef = deletingEntries.current;
+    const optimisticRef = optimisticallyDeleted.current;
+
+    // Determine user ID - prefer prop, fallback to auth.currentUser
+    const effectiveUserId = usingUserProp ? (userProp?.uid || null) : (auth.currentUser?.uid || null);
+
+    // Skip if user hasn't changed
+    if (effectiveUserId === currentUserId) {
+      return;
+    }
+
+    console.log('🔧 SearchHistoryProvider: User changed:', effectiveUserId || 'logged out');
+    setCurrentUserId(effectiveUserId);
+
+    if (effectiveUserId) {
+      setIsLoadingHistory(true);
+      resetPagination();
+      fetchSearchHistory(effectiveUserId);
+    } else {
+      clearHistory();
+    }
+
+    return () => {
+      // Cleanup on unmount or user change
+      historyUnsubscribe.current?.();
+      deletingRef.clear();
+      optimisticRef.clear();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userProp, usingUserProp]); // Dependencies minimized to avoid re-running
 
   const contextValue: SearchHistoryContextType = {
     searchEntries,

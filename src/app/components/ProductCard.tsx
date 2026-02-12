@@ -24,9 +24,16 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useCart } from "@/context/CartProvider";
-import { useFavorites } from "@/context/FavoritesProvider";
 import { useUser } from "@/context/UserProvider";
+// Performance optimized: Use selector hooks instead of full context consumption
+import {
+  useIsProductInCart,
+  useCartActions,
+} from "@/hooks/selectors/useCartSelectors";
+import {
+  useIsProductFavorited,
+  useFavoriteActions,
+} from "@/hooks/selectors/useFavoriteSelectors";
 import dynamic from "next/dynamic";
 
 const ProductOptionSelector = dynamic(
@@ -463,19 +470,17 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
   const { setProduct } = useProductCache();
   const t = useTranslations();
 
-  // Cart, favorites, and user hooks
-  const { addProductToCart, removeFromCart, cartProductIds } = useCart();
-  const {
-    addToFavorites,
-    removeMultipleFromFavorites,
-    isFavorite: isProductFavorite,
-  } = useFavorites();
+  // User hook
   const { user } = useUser();
 
-  const isProductInCart = useCallback(
-    (productId: string) => cartProductIds.has(productId),
-    [cartProductIds]
-  );
+  // Performance optimized: Use selector hooks for granular subscriptions
+  // Component only re-renders when THIS product's cart/favorite status changes
+  const actualIsInCart = useIsProductInCart(product.id);
+  const actualIsFavorite = useIsProductFavorited(product.id);
+
+  // Get stable action references (never cause re-renders)
+  const { addProductToCart, removeFromCart } = useCartActions();
+  const { addToFavorites, removeMultipleFromFavorites } = useFavoriteActions();
 
   const [isDarkModeState, setIsDarkMode] = useState(false);
   const isDarkMode =
@@ -510,9 +515,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
     "idle" | "adding" | "added" | "removing" | "removed"
   >("idle");
 
-  // Get actual states from context
-  const actualIsInCart = isProductInCart(product.id);
-  const actualIsFavorite = isProductFavorite(product.id);
+  // Note: actualIsInCart and actualIsFavorite are now defined above using selector hooks
 
   // ✅ Navigation throttling (matches Flutter implementation)
   const lastNavigationTimeRef = useRef<number>(0);
