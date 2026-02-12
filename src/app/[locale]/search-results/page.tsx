@@ -4,7 +4,8 @@ import AlgoliaServiceManager from "@/lib/algolia";
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { impressionBatcher } from '@/app/utils/impressionBatcher';
+import { impressionBatcher } from "@/app/utils/impressionBatcher";
+import { getSearchConfig } from "@/hooks/useSearchConfig";
 import {
   ChevronLeft,
   SortAsc,
@@ -47,7 +48,7 @@ interface Shop {
 // Enhanced utility functions
 const throttle = <T extends (...args: unknown[]) => unknown>(
   func: T,
-  limit: number
+  limit: number,
 ): T => {
   let inThrottle: boolean;
   return ((...args: Parameters<T>) => {
@@ -168,7 +169,8 @@ const EmptyState: React.FC<{ isDarkMode: boolean; query: string }> = ({
               isDarkMode ? "text-gray-400" : "text-gray-600"
             }`}
           >
-            {t("noProductsFoundMessage", { query }) || `We couldn't find any products matching "${query}". Try adjusting your search terms or removing filters.`}
+            {t("noProductsFoundMessage", { query }) ||
+              `We couldn't find any products matching "${query}". Try adjusting your search terms or removing filters.`}
           </p>
         </div>
       </div>
@@ -248,8 +250,8 @@ const SortMenu: React.FC<{
                   currentSort === opt
                     ? "bg-orange-500 text-white"
                     : isDarkMode
-                    ? "text-gray-200 hover:bg-gray-700"
-                    : "text-gray-700 hover:bg-gray-50"
+                      ? "text-gray-200 hover:bg-gray-700"
+                      : "text-gray-700 hover:bg-gray-50"
                 }
               `}
             >
@@ -314,7 +316,7 @@ const SearchResultsContent: React.FC = () => {
 
   useEffect(() => {
     return () => {
-      console.log('🧹 DynamicMarketPage: Flushing impressions on unmount');
+      console.log("🧹 DynamicMarketPage: Flushing impressions on unmount");
       impressionBatcher.flush();
     };
   }, []);
@@ -323,15 +325,15 @@ const SearchResultsContent: React.FC = () => {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        console.log('👁️ DynamicMarketPage: Tab hidden, flushing impressions');
+        console.log("👁️ DynamicMarketPage: Tab hidden, flushing impressions");
         impressionBatcher.flush();
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
 
@@ -360,115 +362,228 @@ const SearchResultsContent: React.FC = () => {
   }, []);
 
   // Shop search function with Firestore enrichment
-  const searchShops = useCallback(async (searchQuery: string) => {
-    if (!searchQuery.trim()) {
-      setShops([]);
-      return;
-    }
-
-    setIsLoadingShops(true);
-
-    try {
-      console.log(`🏪 Searching shops for: "${searchQuery}"`);
-
-      const algoliaResults = await algoliaManager.searchShops(
-        searchQuery,
-        10, // Limit to 10 shops for performance
-        0
-      );
-
-      console.log(`✅ Algolia returned ${algoliaResults.length} shop results`);
-
-      // Convert and enrich with Firestore if needed
-      let shopResults: Shop[] = algoliaResults.map((result) => {
-        // Strip "shops_" prefix from Algolia objectID to get Firestore document ID
-        const firestoreId = result.id.startsWith("shops_")
-          ? result.id.substring(6)
-          : result.id;
-
-        return {
-          id: firestoreId,
-          name: result.name,
-          profileImageUrl: result.profileImageUrl,
-          coverImageUrls: result.coverImageUrls,
-          address: result.address,
-          averageRating: result.averageRating,
-          reviewCount: result.reviewCount,
-          followerCount: result.followerCount,
-          clickCount: result.clickCount,
-          categories: result.categories,
-          contactNo: result.contactNo,
-          ownerId: result.ownerId,
-          isBoosted: result.isBoosted,
-          isActive: (result as unknown as Record<string, unknown>).isActive as boolean | undefined,
-          createdAt: result.createdAt
-            ? Timestamp.fromDate(new Date(result.createdAt))
-            : Timestamp.now(),
-        };
-      });
-
-      // Enrich shops missing cover images
-      const shopsNeedingEnrichment = shopResults.filter(
-        (shop) => !shop.coverImageUrls || shop.coverImageUrls.length === 0
-      );
-
-      if (shopsNeedingEnrichment.length > 0) {
-        console.log(
-          `🔄 Enriching ${shopsNeedingEnrichment.length} shops with Firestore data`
-        );
-
-        const enrichmentPromises = shopsNeedingEnrichment.map(async (shop) => {
-          try {
-            const shopDocRef = doc(db, "shops", shop.id);
-            const shopDocSnap = await getDoc(shopDocRef);
-
-            if (shopDocSnap.exists()) {
-              const firestoreData = shopDocSnap.data();
-              return {
-                shopId: shop.id,
-                coverImageUrls: firestoreData.coverImageUrls || [],
-              };
-            }
-          } catch (err) {
-            console.error(`Failed to enrich shop ${shop.id}:`, err);
-          }
-          return null;
-        });
-
-        const enrichmentResults = await Promise.all(enrichmentPromises);
-
-        const enrichmentMap = new Map(
-          enrichmentResults
-            .filter((r) => r !== null)
-            .map((r) => [r!.shopId, r!.coverImageUrls])
-        );
-
-        shopResults = shopResults.map((shop) => ({
-          ...shop,
-          coverImageUrls: enrichmentMap.get(shop.id) || shop.coverImageUrls,
-        }));
-
-        console.log(`✅ Enrichment complete for ${enrichmentMap.size} shops`);
+  const searchShops = useCallback(
+    async (searchQuery: string) => {
+      if (!searchQuery.trim()) {
+        setShops([]);
+        return;
       }
 
-      // Filter out inactive shops
-      shopResults = shopResults.filter((shop) => shop.isActive !== false);
+      setIsLoadingShops(true);
 
-      console.log(`✅ Setting ${shopResults.length} shops to state`);
-      setShops(shopResults);
-    } catch (error) {
-      console.error("❌ Shop search error:", error);
-      setShops([]);
-    } finally {
-      setIsLoadingShops(false);
-    }
-  }, [algoliaManager]);
+      try {
+        console.log(`🏪 Searching shops for: "${searchQuery}"`);
+
+        const algoliaResults = await algoliaManager.searchShops(
+          searchQuery,
+          10, // Limit to 10 shops for performance
+          0,
+        );
+
+        console.log(
+          `✅ Algolia returned ${algoliaResults.length} shop results`,
+        );
+
+        // Convert and enrich with Firestore if needed
+        let shopResults: Shop[] = algoliaResults.map((result) => {
+          // Strip "shops_" prefix from Algolia objectID to get Firestore document ID
+          const firestoreId = result.id.startsWith("shops_")
+            ? result.id.substring(6)
+            : result.id;
+
+          return {
+            id: firestoreId,
+            name: result.name,
+            profileImageUrl: result.profileImageUrl,
+            coverImageUrls: result.coverImageUrls,
+            address: result.address,
+            averageRating: result.averageRating,
+            reviewCount: result.reviewCount,
+            followerCount: result.followerCount,
+            clickCount: result.clickCount,
+            categories: result.categories,
+            contactNo: result.contactNo,
+            ownerId: result.ownerId,
+            isBoosted: result.isBoosted,
+            isActive: (result as unknown as Record<string, unknown>)
+              .isActive as boolean | undefined,
+            createdAt: result.createdAt
+              ? Timestamp.fromDate(new Date(result.createdAt))
+              : Timestamp.now(),
+          };
+        });
+
+        // Enrich shops missing cover images
+        const shopsNeedingEnrichment = shopResults.filter(
+          (shop) => !shop.coverImageUrls || shop.coverImageUrls.length === 0,
+        );
+
+        if (shopsNeedingEnrichment.length > 0) {
+          console.log(
+            `🔄 Enriching ${shopsNeedingEnrichment.length} shops with Firestore data`,
+          );
+
+          const enrichmentPromises = shopsNeedingEnrichment.map(
+            async (shop) => {
+              try {
+                const shopDocRef = doc(db, "shops", shop.id);
+                const shopDocSnap = await getDoc(shopDocRef);
+
+                if (shopDocSnap.exists()) {
+                  const firestoreData = shopDocSnap.data();
+                  return {
+                    shopId: shop.id,
+                    coverImageUrls: firestoreData.coverImageUrls || [],
+                  };
+                }
+              } catch (err) {
+                console.error(`Failed to enrich shop ${shop.id}:`, err);
+              }
+              return null;
+            },
+          );
+
+          const enrichmentResults = await Promise.all(enrichmentPromises);
+
+          const enrichmentMap = new Map(
+            enrichmentResults
+              .filter((r) => r !== null)
+              .map((r) => [r!.shopId, r!.coverImageUrls]),
+          );
+
+          shopResults = shopResults.map((shop) => ({
+            ...shop,
+            coverImageUrls: enrichmentMap.get(shop.id) || shop.coverImageUrls,
+          }));
+
+          console.log(`✅ Enrichment complete for ${enrichmentMap.size} shops`);
+        }
+
+        // Filter out inactive shops
+        shopResults = shopResults.filter((shop) => shop.isActive !== false);
+
+        console.log(`✅ Setting ${shopResults.length} shops to state`);
+        setShops(shopResults);
+      } catch (error) {
+        console.error("❌ Shop search error:", error);
+        setShops([]);
+      } finally {
+        setIsLoadingShops(false);
+      }
+    },
+    [algoliaManager],
+  );
 
   // Enhanced fetch results function that mirrors Flutter's searchOnly method
   const fetchResults = useCallback(
     async (reset: boolean = false) => {
       if (!query.trim()) {
         console.log("❌ Empty query, skipping search");
+        return;
+      }
+
+      // ✅ Firestore fallback mode
+      if (getSearchConfig().provider === "firestore") {
+        if (reset) {
+          clearProducts();
+          setCurrentPage(0);
+          setHasMore(false);
+          setHasError(false);
+          setIsNetworkError(false);
+          setIsLoading(true);
+          fetchInitialCompleteRef.current = false;
+          lastQueryRef.current = query;
+        } else {
+          // No pagination in Firestore mode
+          setIsLoadingMore(false);
+          return;
+        }
+
+        try {
+          const firebaseDb = (await import("@/lib/firebase-lazy"))
+            .getFirebaseDb;
+          const {
+            collection,
+            query: fsQuery,
+            orderBy,
+            startAt,
+            endAt,
+            limit,
+            getDocs,
+          } = await import("firebase/firestore");
+          const db = await firebaseDb();
+
+          const lower = query.toLowerCase();
+          const capitalized =
+            query.charAt(0).toUpperCase() + query.slice(1).toLowerCase();
+          const searchLimit = 20;
+
+          const snapshots = await Promise.all([
+            getDocs(
+              fsQuery(
+                collection(db, "products"),
+                orderBy("productName"),
+                startAt(lower),
+                endAt(lower + "\uf8ff"),
+                limit(searchLimit),
+              ),
+            ),
+            getDocs(
+              fsQuery(
+                collection(db, "products"),
+                orderBy("productName"),
+                startAt(capitalized),
+                endAt(capitalized + "\uf8ff"),
+                limit(searchLimit),
+              ),
+            ),
+            getDocs(
+              fsQuery(
+                collection(db, "shop_products"),
+                orderBy("productName"),
+                startAt(lower),
+                endAt(lower + "\uf8ff"),
+                limit(searchLimit),
+              ),
+            ),
+            getDocs(
+              fsQuery(
+                collection(db, "shop_products"),
+                orderBy("productName"),
+                startAt(capitalized),
+                endAt(capitalized + "\uf8ff"),
+                limit(searchLimit),
+              ),
+            ),
+          ]);
+
+          const seen = new Set<string>();
+          const results: Product[] = [];
+
+          for (const snapshot of snapshots) {
+            for (const doc of snapshot.docs) {
+              if (results.length >= searchLimit) break;
+              if (seen.has(doc.id)) continue;
+              seen.add(doc.id);
+              results.push(
+                ProductUtils.fromJson({ id: doc.id, ...doc.data() }),
+              );
+            }
+          }
+
+          setRawProducts(results);
+          fetchInitialCompleteRef.current = true;
+          setHasMore(false); // No pagination in Firestore mode
+          setHasError(false);
+          console.log(`✅ Firestore fallback: ${results.length} results`);
+        } catch (error) {
+          console.error("❌ Firestore search error:", error);
+          setErrorMessage("Search failed. Please try again.");
+          setHasError(true);
+        } finally {
+          setIsLoading(false);
+          setIsLoadingMore(false);
+        }
         return;
       }
 
@@ -480,7 +595,7 @@ const SearchResultsContent: React.FC = () => {
       console.log(
         `🔍 Fetching results for "${query}", reset: ${reset}, page: ${
           reset ? 0 : currentPage
-        }`
+        }`,
       );
 
       // Connectivity check
@@ -489,7 +604,7 @@ const SearchResultsContent: React.FC = () => {
         setIsNetworkError(true);
         setErrorMessage(
           t("noInternet") ||
-            "No internet connection. Please check your network and try again."
+            "No internet connection. Please check your network and try again.",
         );
         setHasError(true);
         return;
@@ -514,7 +629,7 @@ const SearchResultsContent: React.FC = () => {
 
         // Enhanced search strategy matching Flutter's dual-index approach
         console.log(
-          `🔍 Starting enhanced search for "${query}" page ${pageToFetch}`
+          `🔍 Starting enhanced search for "${query}" page ${pageToFetch}`,
         );
 
         // Try products index first with enhanced error handling
@@ -527,10 +642,12 @@ const SearchResultsContent: React.FC = () => {
             20,
             "products",
             undefined,
-            sortOption === "None" ? "None" : sortOption
+            sortOption === "None" ? "None" : sortOption,
           );
           results = algoliaResults.map((algoliaProduct) =>
-            ProductUtils.fromAlgolia(algoliaProduct as unknown as Record<string, unknown>)
+            ProductUtils.fromAlgolia(
+              algoliaProduct as unknown as Record<string, unknown>,
+            ),
           );
           console.log(`✅ Products index returned ${results.length} results`);
         } catch (productError) {
@@ -545,13 +662,15 @@ const SearchResultsContent: React.FC = () => {
               20,
               "shop_products",
               undefined,
-              sortOption === "None" ? "None" : sortOption
+              sortOption === "None" ? "None" : sortOption,
             );
             results = algoliaResults.map((algoliaProduct) =>
-              ProductUtils.fromAlgolia(algoliaProduct as unknown as Record<string, unknown>)
+              ProductUtils.fromAlgolia(
+                algoliaProduct as unknown as Record<string, unknown>,
+              ),
             );
             console.log(
-              `✅ Shop_products index returned ${results.length} results`
+              `✅ Shop_products index returned ${results.length} results`,
             );
           } catch (shopError) {
             console.error("❌ Both indexes failed:", {
@@ -566,35 +685,43 @@ const SearchResultsContent: React.FC = () => {
         const productsNeedingEnrichment = results.filter((product) => {
           const hasColors =
             (product.availableColors && product.availableColors.length > 0) ||
-            (product.colorImages && Object.keys(product.colorImages).length > 0);
+            (product.colorImages &&
+              Object.keys(product.colorImages).length > 0);
           return hasColors;
         });
 
         if (productsNeedingEnrichment.length > 0) {
           console.log(
-            `🔄 Enriching ${productsNeedingEnrichment.length} products with options from Firestore...`
+            `🔄 Enriching ${productsNeedingEnrichment.length} products with options from Firestore...`,
           );
 
-          const enrichmentPromises = productsNeedingEnrichment.map(async (product) => {
-            try {
-              // Try products collection first
-              let productDoc = await getDoc(doc(db, "products", product.id));
+          const enrichmentPromises = productsNeedingEnrichment.map(
+            async (product) => {
+              try {
+                // Try products collection first
+                let productDoc = await getDoc(doc(db, "products", product.id));
 
-              // If not found, try shop_products collection
-              if (!productDoc.exists()) {
-                productDoc = await getDoc(doc(db, "shop_products", product.id));
-              }
+                // If not found, try shop_products collection
+                if (!productDoc.exists()) {
+                  productDoc = await getDoc(
+                    doc(db, "shop_products", product.id),
+                  );
+                }
 
-              if (productDoc.exists()) {
-                const firestoreData = { id: productDoc.id, ...productDoc.data() };
-                const enriched = ProductUtils.fromJson(firestoreData);
-                return { productId: product.id, enriched };
+                if (productDoc.exists()) {
+                  const firestoreData = {
+                    id: productDoc.id,
+                    ...productDoc.data(),
+                  };
+                  const enriched = ProductUtils.fromJson(firestoreData);
+                  return { productId: product.id, enriched };
+                }
+              } catch (err) {
+                console.error(`Failed to enrich product ${product.id}:`, err);
               }
-            } catch (err) {
-              console.error(`Failed to enrich product ${product.id}:`, err);
-            }
-            return null;
-          });
+              return null;
+            },
+          );
 
           const enrichmentResults = await Promise.all(enrichmentPromises);
 
@@ -602,16 +729,16 @@ const SearchResultsContent: React.FC = () => {
           const enrichmentMap = new Map(
             enrichmentResults
               .filter((r) => r !== null)
-              .map((r) => [r!.productId, r!.enriched])
+              .map((r) => [r!.productId, r!.enriched]),
           );
 
           // Merge enriched products back into results
-          results = results.map((product) =>
-            enrichmentMap.get(product.id) || product
+          results = results.map(
+            (product) => enrichmentMap.get(product.id) || product,
           );
 
           console.log(
-            `✅ Enrichment complete: ${enrichmentMap.size} products updated`
+            `✅ Enrichment complete: ${enrichmentMap.size} products updated`,
           );
         }
 
@@ -638,7 +765,7 @@ const SearchResultsContent: React.FC = () => {
         const boostedIds = results.filter((p) => p.isBoosted).map((p) => p.id);
         if (boostedIds.length > 0) {
           console.log(
-            `📊 Tracking ${boostedIds.length} boosted product impressions`
+            `📊 Tracking ${boostedIds.length} boosted product impressions`,
           );
           // TODO: Implement analytics tracking similar to Flutter's incrementImpressionCount
         }
@@ -660,7 +787,7 @@ const SearchResultsContent: React.FC = () => {
           isNetworkIssue
             ? t("noInternet") ||
                 "Connection failed. Please check your internet and try again."
-            : t("searchFailedTryAgain") || "Search failed. Please try again."
+            : t("searchFailedTryAgain") || "Search failed. Please try again.",
         );
         setIsNetworkError(isNetworkIssue);
         setHasError(true);
@@ -684,7 +811,7 @@ const SearchResultsContent: React.FC = () => {
       clearProducts,
       setRawProducts,
       addMoreProducts,
-    ]
+    ],
   );
 
   // Enhanced load more with debouncing
@@ -713,11 +840,13 @@ const SearchResultsContent: React.FC = () => {
   useEffect(() => {
     if (query.trim() && query !== lastQueryRef.current) {
       console.log(
-        `🔄 Query changed from "${lastQueryRef.current}" to "${query}"`
+        `🔄 Query changed from "${lastQueryRef.current}" to "${query}"`,
       );
       // Search both products and shops (each function manages its own abort flag)
       fetchResults(true);
-      searchShops(query);
+      if (getSearchConfig().provider !== "firestore") {
+        searchShops(query);
+      }
     }
 
     return () => {
@@ -744,7 +873,7 @@ const SearchResultsContent: React.FC = () => {
         fetchResults(true);
       }
     },
-    [sortOption, setSortOption, query, fetchResults]
+    [sortOption, setSortOption, query, fetchResults],
   );
 
   // Handle product navigation
@@ -753,7 +882,7 @@ const SearchResultsContent: React.FC = () => {
       console.log(`👆 Product tapped: ${product.productName} (${product.id})`);
       router.push(`/productdetail/${product.id}`);
     },
-    [router]
+    [router],
   );
 
   // Enhanced infinite scroll with throttling
@@ -994,9 +1123,18 @@ const SearchResultsContent: React.FC = () => {
       {/* Enhanced Loading more indicator */}
       {isLoadingMore && (
         <div className="flex items-center justify-center py-8 gap-2">
-          <div className="w-2.5 h-2.5 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-          <div className="w-2.5 h-2.5 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-          <div className="w-2.5 h-2.5 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+          <div
+            className="w-2.5 h-2.5 bg-orange-500 rounded-full animate-bounce"
+            style={{ animationDelay: "0ms" }}
+          ></div>
+          <div
+            className="w-2.5 h-2.5 bg-orange-500 rounded-full animate-bounce"
+            style={{ animationDelay: "150ms" }}
+          ></div>
+          <div
+            className="w-2.5 h-2.5 bg-orange-500 rounded-full animate-bounce"
+            style={{ animationDelay: "300ms" }}
+          ></div>
         </div>
       )}
 
@@ -1046,9 +1184,9 @@ export default function SearchResultsPage() {
       <div
         className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
         style={{
-          transform: 'translateZ(0)',
-          backfaceVisibility: 'hidden',
-          WebkitFontSmoothing: 'antialiased'
+          transform: "translateZ(0)",
+          backfaceVisibility: "hidden",
+          WebkitFontSmoothing: "antialiased",
         }}
       >
         <div className="pb-8">
