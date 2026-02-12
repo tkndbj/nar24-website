@@ -8,12 +8,26 @@ import React, {
   useCallback,
   useRef,
 } from "react";
-import AlgoliaServiceManager, { Suggestion, CategorySuggestion } from "@/lib/algolia";
+import AlgoliaServiceManager, {
+  Suggestion,
+  CategorySuggestion,
+} from "@/lib/algolia";
 import { circuitBreaker, CIRCUITS } from "@/app/utils/circuitBreaker";
 import { requestDeduplicator } from "@/app/utils/requestDeduplicator";
 import { debouncer, DEBOUNCE_DELAYS } from "@/app/utils/debouncer";
 import { cacheManager, CACHE_NAMES } from "@/app/utils/cacheManager";
-import { userActivityService } from '@/services/userActivity';
+import { userActivityService } from "@/services/userActivity";
+import { getSearchConfig } from "@/hooks/useSearchConfig";
+import { getFirebaseDb } from "@/lib/firebase-lazy";
+import {
+  collection,
+  query,
+  orderBy,
+  startAt,
+  endAt,
+  limit,
+  getDocs,
+} from "firebase/firestore";
 
 interface SearchContextType {
   term: string;
@@ -46,14 +60,15 @@ interface SearchProviderProps {
 export function SearchProvider({ children }: SearchProviderProps) {
   const [term, setTerm] = useState("");
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-  const [categorySuggestions, setCategorySuggestions] = useState<CategorySuggestion[]>([]);
+  const [categorySuggestions, setCategorySuggestions] = useState<
+    CategorySuggestion[]
+  >([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [hasNetworkError, setHasNetworkError] = useState(false);
 
   const algoliaManagerRef = useRef(AlgoliaServiceManager.getInstance());
 
- 
   const clearResults = useCallback(() => {
     setSuggestions([]);
     setCategorySuggestions([]);
@@ -76,132 +91,230 @@ export function SearchProvider({ children }: SearchProviderProps) {
       setHasNetworkError(isNetworkError);
       setErrorMessage(message);
     },
-    []
+    [],
   );
 
-  // REPLACE the entire performSearch function with:
-const performSearch = useCallback(
-  async (searchTerm: string) => {
-    if (!searchTerm.trim()) return;
-
-    console.log("🔍 SearchProvider: Performing search for:", searchTerm);
-    
-    // ✅ Check cache first
-    const cacheKey = `search_${searchTerm}`;
-    const cached = cacheManager.get<{
+  const performFirestoreSearch = useCallback(
+    async (
+      searchTerm: string,
+    ): Promise<{
       suggestions: Suggestion[];
       categorySuggestions: CategorySuggestion[];
-    }>(CACHE_NAMES.SEARCH, cacheKey);
-    
-    if (cached) {
-      console.log("✅ Returning cached search results");
-      setSuggestions(cached.suggestions);
-      setCategorySuggestions(cached.categorySuggestions);
-      setIsLoading(false);
-      return;
-    }
+    }> => {
+      const db = await getFirebaseDb();
+      const lower = searchTerm.toLowerCase();
+      const capitalized =
+        searchTerm.charAt(0).toUpperCase() + searchTerm.slice(1).toLowerCase();
+      const searchLimit = 10;
 
-    try {
-      // ✅ Deduplicate concurrent searches
-      const results = await requestDeduplicator.deduplicate(
-        `search-${searchTerm}`,
-        async () => {
-          // ✅ Use circuit breaker for each Algolia call
-          const searchPromises: [
-            Promise<Suggestion[]>,
-            Promise<Suggestion[]>,
-            Promise<CategorySuggestion[]>
-          ] = [
-            circuitBreaker.execute(
-              CIRCUITS.ALGOLIA_MAIN,
-              () =>
-                algoliaManagerRef.current.searchProductSuggestions(
-                  searchTerm,
-                  "products",
-                  "alphabetical",
-                  0,
-                  5
-                ),
-              async () => [] // Fallback to empty array
-            ),
-            circuitBreaker.execute(
-              CIRCUITS.ALGOLIA_SHOP,
-              () =>
-                algoliaManagerRef.current.searchProductSuggestions(
-                  searchTerm,
-                  "shop_products",
-                  "alphabetical",
-                  0,
-                  5
-                ),
-              async () => [] // Fallback
-            ),
-            circuitBreaker.execute(
-              CIRCUITS.ALGOLIA_MAIN,
-              () =>
-                algoliaManagerRef.current.searchCategories(searchTerm, 15, "en"),
-              async () => [] // Fallback
-            ),
-          ];
+      const queries = [
+        getDocs(
+          query(
+            collection(db, "products"),
+            orderBy("productName"),
+            startAt(lower),
+            endAt(lower + "\uf8ff"),
+            limit(searchLimit),
+          ),
+        ),
+        getDocs(
+          query(
+            collection(db, "products"),
+            orderBy("productName"),
+            startAt(capitalized),
+            endAt(capitalized + "\uf8ff"),
+            limit(searchLimit),
+          ),
+        ),
+        getDocs(
+          query(
+            collection(db, "shop_products"),
+            orderBy("productName"),
+            startAt(lower),
+            endAt(lower + "\uf8ff"),
+            limit(searchLimit),
+          ),
+        ),
+        getDocs(
+          query(
+            collection(db, "shop_products"),
+            orderBy("productName"),
+            startAt(capitalized),
+            endAt(capitalized + "\uf8ff"),
+            limit(searchLimit),
+          ),
+        ),
+      ];
 
-          return await Promise.all(searchPromises);
-        }
-      );
-
-      const [productSuggestions, shopSuggestions, categoryResults] = results;
-
+      const snapshots = await Promise.all(queries);
       const combined: Suggestion[] = [];
       const seenIds = new Set<string>();
 
-      for (const suggestion of productSuggestions) {
-        if (seenIds.add(suggestion.id)) {
-          combined.push(suggestion);
+      for (const snapshot of snapshots) {
+        for (const doc of snapshot.docs) {
+          if (combined.length >= searchLimit) break;
+          if (seenIds.has(doc.id)) continue;
+          seenIds.add(doc.id);
+
+          const data = doc.data();
+          combined.push({
+            id: doc.id,
+            name: data.productName ?? "",
+            price: typeof data.price === "number" ? data.price : 0,
+          });
         }
       }
 
-      for (const suggestion of shopSuggestions) {
-        if (seenIds.add(suggestion.id)) {
-          combined.push(suggestion);
+      return { suggestions: combined, categorySuggestions: [] };
+    },
+    [],
+  );
+
+  // REPLACE the entire performSearch function with:
+  const performSearch = useCallback(
+    async (searchTerm: string) => {
+      if (!searchTerm.trim()) return;
+
+      console.log("🔍 SearchProvider: Performing search for:", searchTerm);
+
+      // ✅ Firestore fallback mode
+      if (getSearchConfig().provider === "firestore") {
+        try {
+          const results = await performFirestoreSearch(searchTerm);
+          setSuggestions(results.suggestions);
+          setCategorySuggestions([]);
+          setIsLoading(false);
+          setErrorMessage(null);
+          setHasNetworkError(false);
+          console.log("✅ SearchProvider: Firestore fallback search completed");
+          return;
+        } catch (error) {
+          console.error("❌ Firestore search error:", error);
+          handleError("Search error occurred");
+          return;
         }
       }
 
-      const finalSuggestions = combined.slice(0, 10);
-      
-      // ✅ Cache results for 2 minutes
-      cacheManager.set(
-        CACHE_NAMES.SEARCH,
-        cacheKey,
-        {
-          suggestions: finalSuggestions,
-          categorySuggestions: categoryResults,
-        },
-        2 * 60 * 1000
-      );
+      // ✅ Check cache first
+      const cacheKey = `search_${searchTerm}`;
+      const cached = cacheManager.get<{
+        suggestions: Suggestion[];
+        categorySuggestions: CategorySuggestion[];
+      }>(CACHE_NAMES.SEARCH, cacheKey);
 
-      setSuggestions(finalSuggestions);
-      setCategorySuggestions(categoryResults);
-      setIsLoading(false);
-      setErrorMessage(null);
-      setHasNetworkError(false);
-      console.log("✅ SearchProvider: Search completed successfully");
-    } catch (error) {
-      console.error("❌ SearchProvider: Search error:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Search error occurred";
-      const isNetworkIssue =
-        errorMessage.toLowerCase().includes("failed to fetch") ||
-        !navigator.onLine;
+      if (cached) {
+        console.log("✅ Returning cached search results");
+        setSuggestions(cached.suggestions);
+        setCategorySuggestions(cached.categorySuggestions);
+        setIsLoading(false);
+        return;
+      }
 
-      handleError(
-        isNetworkIssue
-          ? "Connection failed. Please try again."
-          : "Search error occurred",
-        isNetworkIssue
-      );
-    }
-  },
-  [handleError]
-);
+      try {
+        // ✅ Deduplicate concurrent searches
+        const results = await requestDeduplicator.deduplicate(
+          `search-${searchTerm}`,
+          async () => {
+            // ✅ Use circuit breaker for each Algolia call
+            const searchPromises: [
+              Promise<Suggestion[]>,
+              Promise<Suggestion[]>,
+              Promise<CategorySuggestion[]>,
+            ] = [
+              circuitBreaker.execute(
+                CIRCUITS.ALGOLIA_MAIN,
+                () =>
+                  algoliaManagerRef.current.searchProductSuggestions(
+                    searchTerm,
+                    "products",
+                    "alphabetical",
+                    0,
+                    5,
+                  ),
+                async () => [], // Fallback to empty array
+              ),
+              circuitBreaker.execute(
+                CIRCUITS.ALGOLIA_SHOP,
+                () =>
+                  algoliaManagerRef.current.searchProductSuggestions(
+                    searchTerm,
+                    "shop_products",
+                    "alphabetical",
+                    0,
+                    5,
+                  ),
+                async () => [], // Fallback
+              ),
+              circuitBreaker.execute(
+                CIRCUITS.ALGOLIA_MAIN,
+                () =>
+                  algoliaManagerRef.current.searchCategories(
+                    searchTerm,
+                    15,
+                    "en",
+                  ),
+                async () => [], // Fallback
+              ),
+            ];
+
+            return await Promise.all(searchPromises);
+          },
+        );
+
+        const [productSuggestions, shopSuggestions, categoryResults] = results;
+
+        const combined: Suggestion[] = [];
+        const seenIds = new Set<string>();
+
+        for (const suggestion of productSuggestions) {
+          if (seenIds.add(suggestion.id)) {
+            combined.push(suggestion);
+          }
+        }
+
+        for (const suggestion of shopSuggestions) {
+          if (seenIds.add(suggestion.id)) {
+            combined.push(suggestion);
+          }
+        }
+
+        const finalSuggestions = combined.slice(0, 10);
+
+        // ✅ Cache results for 2 minutes
+        cacheManager.set(
+          CACHE_NAMES.SEARCH,
+          cacheKey,
+          {
+            suggestions: finalSuggestions,
+            categorySuggestions: categoryResults,
+          },
+          2 * 60 * 1000,
+        );
+
+        setSuggestions(finalSuggestions);
+        setCategorySuggestions(categoryResults);
+        setIsLoading(false);
+        setErrorMessage(null);
+        setHasNetworkError(false);
+        console.log("✅ SearchProvider: Search completed successfully");
+      } catch (error) {
+        console.error("❌ SearchProvider: Search error:", error);
+        const errorMessage =
+          error instanceof Error ? error.message : "Search error occurred";
+        const isNetworkIssue =
+          errorMessage.toLowerCase().includes("failed to fetch") ||
+          !navigator.onLine;
+
+        handleError(
+          isNetworkIssue
+            ? "Connection failed. Please try again."
+            : "Search error occurred",
+          isNetworkIssue,
+        );
+      }
+    },
+    [handleError, performFirestoreSearch],
+  );
 
   const search = useCallback(
     async (searchTerm: string) => {
@@ -221,15 +334,13 @@ const performSearch = useCallback(
       setLoadingState();
       await performSearch(trimmed);
     },
-    [clearResults, setLoadingState, performSearch]
+    [clearResults, setLoadingState, performSearch],
   );
 
   const updateTerm = useCallback(
     (newTerm: string) => {
       const trimmed = newTerm.trim();
       setTerm(trimmed);
-
-      
 
       if (!trimmed) {
         clearResults();
@@ -240,21 +351,21 @@ const performSearch = useCallback(
 
       // Set new timeout
       debouncer.debounce(
-        'search-input',
+        "search-input",
         () => performSearch(trimmed),
-        DEBOUNCE_DELAYS.SEARCH // 300ms
+        DEBOUNCE_DELAYS.SEARCH, // 300ms
       )();
     },
-    [clearResults, setLoadingState, performSearch]
+    [clearResults, setLoadingState, performSearch],
   );
 
   const clearSearchState = useCallback(() => {
     console.log("🧹 SearchProvider: Clearing search state");
     setTerm("");
     clearResults();
-    
+
     // ✅ Cancel any pending operations
-    debouncer.cancel('search-input');
+    debouncer.cancel("search-input");
     requestDeduplicator.cancel(`search-${term}`);
   }, [clearResults, term]);
 
