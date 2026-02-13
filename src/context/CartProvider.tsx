@@ -321,6 +321,7 @@ export const buildProductDataForCart = (
     category: product.category || "Uncategorized",
     subcategory: product.subcategory || "",
     subsubcategory: product.subsubcategory || "",
+    gender: product.gender || "", 
     allImages: Array.isArray(product.imageUrls) ? product.imageUrls : [],
     productImage:
       Array.isArray(product.imageUrls) && product.imageUrls.length > 0
@@ -1335,6 +1336,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           subsubcategory: product.subsubcategory,
           brand: product.brandModel,
           price: product.price,
+          gender: product.gender,
           quantity,
         });
 
@@ -1484,8 +1486,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         userActivityService.trackRemoveFromCart({
           productId,
           shopId: shopId || undefined,
-          // Note: We don't have productName/category here unless we fetch from cartItems
-          // You can optionally find it from cartItems state before deletion
+          
         });
 
         // ✅ ADD METRICS LOGGING (NEW)

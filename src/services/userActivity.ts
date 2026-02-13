@@ -67,6 +67,7 @@ import {
     subcategory?: string;
     subsubcategory?: string;
     brand?: string;
+    gender?: string;
     price?: number;
     searchQuery?: string;
     source?: 'search' | 'category' | 'recommendation' | 'trending' | 'direct' | string;
@@ -93,6 +94,7 @@ import {
     subcategory?: string;
     subsubcategory?: string;
     brand?: string;
+    gender?: string;
     price?: number;
     source?: string;
   }
@@ -107,6 +109,7 @@ import {
     subcategory?: string;
     subsubcategory?: string;
     brand?: string;
+    gender?: string;
     price?: number;
     source?: string;
     viewDurationSeconds?: number;
@@ -123,6 +126,7 @@ import {
     subcategory?: string;
     subsubcategory?: string;
     brand?: string;
+    gender?: string;
     price?: number;
     quantity?: number;
   }
@@ -136,6 +140,7 @@ import {
     productName?: string;
     category?: string;
     brand?: string;
+    gender?: string;
     price?: number;
     quantity?: number;
   }
@@ -151,6 +156,7 @@ import {
     subcategory?: string;
     subsubcategory?: string;
     brand?: string;
+    gender?: string;
     price?: number;
   }
   
@@ -165,6 +171,7 @@ import {
     subcategory?: string;
     subsubcategory?: string;
     brand?: string;
+    gender?: string;
     price: number;
     quantity: number;
     totalValue: number;
@@ -191,6 +198,7 @@ import {
     subsubcategory?: string;
     brandModel?: string;
     price?: number;
+    gender?: string;
   }
   
   /**
@@ -205,6 +213,7 @@ import {
     subsubcategory?: string;
     brandModel?: string;
     unitPrice?: number;
+    gender?: string;
   }
   
   // ============================================================================
@@ -488,6 +497,7 @@ import {
         subcategory: params.subcategory,
         subsubcategory: params.subsubcategory,
         brand: params.brand,
+        gender: params.gender,
         price: params.price,
         source: params.source,
       });
@@ -507,6 +517,7 @@ import {
         subcategory: params.subcategory,
         subsubcategory: params.subsubcategory,
         brand: params.brand,
+        gender: params.gender,
         price: params.price,
         source: params.source,
         extra: params.viewDurationSeconds !== undefined 
@@ -530,6 +541,7 @@ import {
         subcategory: params.subcategory,
         subsubcategory: params.subsubcategory,
         brand: params.brand,
+        gender: params.gender,
         price: params.price,
         quantity: params.quantity || 1,
       });
@@ -548,6 +560,7 @@ import {
         shopId: params.shopId,
         category: params.category,
         brand: params.brand,
+        gender: params.gender,
         price: params.price,
         quantity: params.quantity || 1,
       });
@@ -568,6 +581,7 @@ import {
         subcategory: params.subcategory,
         subsubcategory: params.subsubcategory,
         brand: params.brand,
+        gender: params.gender,
         price: params.price,
       });
     }
@@ -585,6 +599,7 @@ import {
         shopId: params.shopId,
         category: params.category,
         brand: params.brand,
+        gender: params.gender,
         price: params.price,
       });
     }
@@ -605,6 +620,7 @@ import {
         subcategory: params.subcategory,
         subsubcategory: params.subsubcategory,
         brand: params.brand,
+        gender: params.gender,
         price: params.price,
         quantity: params.quantity,
         totalValue: params.totalValue,
@@ -793,6 +809,7 @@ import {
           subcategory: product.subcategory,
           subsubcategory: product.subsubcategory,
           brand: product.brandModel,
+          gender: product.gender,
           price: product.price,
           source,
         });
@@ -813,6 +830,7 @@ import {
           subcategory: product.subcategory,
           subsubcategory: product.subsubcategory,
           brand: product.brandModel,
+          gender: product.gender,
           price: product.price,
           source,
           viewDurationSeconds: viewDuration,
@@ -835,6 +853,7 @@ import {
           subcategory: cartData.subcategory,
           subsubcategory: cartData.subsubcategory,
           brand: cartData.brandModel,
+          gender: cartData.gender,
           price: cartData.unitPrice,
           quantity,
         });

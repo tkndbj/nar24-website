@@ -575,6 +575,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
       category: product.category,
       subcategory: product.subcategory,
       subsubcategory: product.subsubcategory,
+      gender: product.gender,
       brand: product.brandModel,
       price: product.price,
     });

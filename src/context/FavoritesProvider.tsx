@@ -494,6 +494,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
       subcategory?: string;
       subsubcategory?: string;
       brand?: string;
+      gender?: string;
     }> => {
       try {
         // ✅ Fetch BOTH collections in parallel
@@ -512,6 +513,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
             subcategory: data?.subcategory as string | undefined,
             subsubcategory: data?.subsubcategory as string | undefined,
             brand: data?.brandModel as string | undefined,
+            gender: data?.gender as string | undefined,
           };
         }
 
@@ -525,6 +527,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
             subcategory: data?.subcategory as string | undefined,
             subsubcategory: data?.subsubcategory as string | undefined,
             brand: data?.brandModel as string | undefined,
+            gender: data?.gender as string | undefined,
           };
         }
 
@@ -742,6 +745,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
               productName: metadata.productName || undefined,
               category: metadata.category || undefined,
               brand: metadata.brand || undefined,
+              gender: metadata.gender || undefined,
             });
 
             // ✅ STEP 3: Get shopId and log metrics
@@ -793,6 +797,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
               subcategory: metadata.subcategory || undefined,
               subsubcategory: metadata.subsubcategory || undefined,
               brand: metadata.brand || undefined,
+              gender: metadata.gender || undefined,
               price: undefined, // We don't have price here
             });
             // ✅ STEP 2.5: FETCH AND ADD PRODUCT TO PAGINATED LIST (NEW!)
