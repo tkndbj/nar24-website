@@ -13,6 +13,7 @@ import {
   Calendar,
   X,
   TrendingUp,
+  Archive,
   Heart,
   ShoppingCart,
   Eye,
@@ -784,6 +785,20 @@ export default function MyProductsPage() {
                 {selectedDateRange
                   ? formatDateRange(selectedDateRange)
                   : t("filterByDate") || "Filter by Date"}
+              </span>
+            </button>
+
+            <button
+              onClick={() => router.push("/archived")}
+              className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg border text-sm transition-colors ${
+                isDarkMode
+                  ? "border-gray-600 text-gray-300 hover:bg-gray-800 bg-gray-800"
+                  : "border-gray-300 text-gray-700 hover:bg-gray-50 bg-white"
+              }`}
+            >
+              <Archive size={14} />
+              <span className="font-medium">
+                {t("archivedProducts") || "Archived Products"}
               </span>
             </button>
 
