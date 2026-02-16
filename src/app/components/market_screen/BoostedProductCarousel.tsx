@@ -48,14 +48,20 @@ const ShimmerCard = memo(({ isDarkMode }: { isDarkMode: boolean }) => {
   const highlightColor = isDarkMode ? "bg-gray-600" : "bg-gray-200";
 
   return (
-    <div className={`w-[170px] flex-shrink-0 rounded-lg overflow-hidden ${baseColor}`}>
+    <div
+      className={`w-[170px] flex-shrink-0 rounded-lg overflow-hidden ${baseColor}`}
+    >
       <div className="relative">
         {/* Image shimmer */}
         <div className={`w-full h-[200px] ${highlightColor} animate-pulse`} />
         {/* Content shimmer */}
         <div className="p-3 space-y-2">
-          <div className={`h-4 w-3/4 ${highlightColor} rounded animate-pulse`} />
-          <div className={`h-4 w-1/2 ${highlightColor} rounded animate-pulse`} />
+          <div
+            className={`h-4 w-3/4 ${highlightColor} rounded animate-pulse`}
+          />
+          <div
+            className={`h-4 w-1/2 ${highlightColor} rounded animate-pulse`}
+          />
         </div>
       </div>
     </div>
@@ -65,13 +71,19 @@ ShimmerCard.displayName = "ShimmerCard";
 
 // Product Card
 const ProductCard = memo(
-  ({ product, isDarkMode }: { product: BoostedProduct; isDarkMode: boolean }) => {
+  ({
+    product,
+    isDarkMode,
+  }: {
+    product: BoostedProduct;
+    isDarkMode: boolean;
+  }) => {
     const hasDiscount =
       product.originalPrice && product.originalPrice > product.price;
     const discountPercent = hasDiscount
       ? Math.round(
           ((product.originalPrice! - product.price) / product.originalPrice!) *
-            100
+            100,
         )
       : 0;
 
@@ -191,7 +203,7 @@ const ProductCard = memo(
         </div>
       </Link>
     );
-  }
+  },
 );
 ProductCard.displayName = "ProductCard";
 
@@ -221,8 +233,14 @@ const BoostedProductsCarousel = memo(
     }, []);
 
     // Fetch boosted products
-    const { boostedProducts, isLoading, error, hasProducts, totalBoosted, refresh } =
-      useBoostedProducts();
+    const {
+      boostedProducts,
+      isLoading,
+      error,
+      hasProducts,
+      totalBoosted,
+      refresh,
+    } = useBoostedProducts();
 
     // Calculate row height based on viewport - matches Flutter logic
     const [rowHeight, setRowHeight] = useState(380);
@@ -245,37 +263,9 @@ const BoostedProductsCarousel = memo(
     // ========================================================================
 
     // Shimmer loading state - matches Flutter: if (provider.isLoading && !provider.hasProducts)
+    // Initial loading - render nothing to avoid gradient flash
     if (isLoading && !hasProducts) {
-      return (
-        <div className={`relative my-2 ${className}`}>
-          {/* Background gradient (half height) */}
-          <div
-            className="absolute top-0 left-0 right-0"
-            style={{
-              height: rowHeight / 2,
-              background: `linear-gradient(to right, ${GRADIENT_COLORS.from}, ${GRADIENT_COLORS.to})`,
-            }}
-          />
-
-          {/* Content */}
-          <div className="relative py-1.5">
-            {/* Header shimmer */}
-            <div className="px-2 mb-2">
-              <div className="h-5 w-44 bg-white/70 rounded animate-pulse" />
-            </div>
-
-            {/* Cards shimmer */}
-            <div
-              className="flex gap-1.5 overflow-hidden pl-2"
-              style={{ height: rowHeight }}
-            >
-              {[1, 2, 3].map((i) => (
-                <ShimmerCard key={i} isDarkMode={isDarkMode} />
-              ))}
-            </div>
-          </div>
-        </div>
-      );
+      return null;
     }
 
     // Hide if no products - matches Flutter: if (!provider.hasProducts && !provider.isLoading) return SizedBox.shrink()
@@ -370,7 +360,7 @@ const BoostedProductsCarousel = memo(
         </div>
       </div>
     );
-  }
+  },
 );
 
 BoostedProductsCarousel.displayName = "BoostedProductsCarousel";

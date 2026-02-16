@@ -11,6 +11,7 @@ import { MarketWidgetConfig } from "@/types/MarketLayout";
 
 import { MarketBubbles } from "./MarketBubbles";
 import { PreferenceProduct } from "./PreferenceProduct";
+import DynamicHorizontalList from "./DynamicHorizontalList";
 
 // ============================================================================
 // LAZY LOADED — below-the-fold, code-split into separate chunks
@@ -18,12 +19,11 @@ import { PreferenceProduct } from "./PreferenceProduct";
 
 const MarketBanner = lazy(() => import("./MarketBanner"));
 const AdsBanner = lazy(() =>
-  import("./MarketTopAdsBanner").then((mod) => ({ default: mod.AdsBanner }))
+  import("./MarketTopAdsBanner").then((mod) => ({ default: mod.AdsBanner })),
 );
 const ThinBanner = lazy(() => import("./MarketThinBanner"));
 const BoostedProductCarousel = lazy(() => import("./BoostedProductCarousel"));
-const DynamicHorizontalList = lazy(() => import("./DynamicHorizontalList"));
-const ShopHorizontalList = lazy(() => import("./ShopHorizontalList"));
+import ShopHorizontalList from "./ShopHorizontalList";
 
 // ============================================================================
 // LOADING COMPONENTS
@@ -85,7 +85,9 @@ const WidgetRenderer = memo(
     switch (widget.type) {
       case "ads_banner":
         content = (
-          <Suspense fallback={<FullWidthLoader isDark={isDarkMode} height="h-48" />}>
+          <Suspense
+            fallback={<FullWidthLoader isDark={isDarkMode} height="h-48" />}
+          >
             <AdsBanner />
           </Suspense>
         );
@@ -103,7 +105,9 @@ const WidgetRenderer = memo(
 
       case "thin_banner":
         content = (
-          <Suspense fallback={<ComponentLoader isDark={isDarkMode} height="h-16" />}>
+          <Suspense
+            fallback={<ComponentLoader isDark={isDarkMode} height="h-16" />}
+          >
             <div className={`w-full ${bgClass}`}>
               <div className="max-w-7xl mx-auto px-4">
                 <ThinBanner />
@@ -125,7 +129,9 @@ const WidgetRenderer = memo(
 
       case "boosted_product_carousel":
         content = (
-          <Suspense fallback={<ComponentLoader isDark={isDarkMode} height="h-64" />}>
+          <Suspense
+            fallback={<ComponentLoader isDark={isDarkMode} height="h-64" />}
+          >
             <div className={`w-full ${bgClass}`}>
               <BoostedProductCarousel />
             </div>
@@ -135,19 +141,19 @@ const WidgetRenderer = memo(
 
       case "dynamic_product_list":
         content = (
-          <Suspense fallback={<ComponentLoader isDark={isDarkMode} height="h-64" />}>
-            <div className={`w-full ${bgClass}`}>
-              <div className="lg:max-w-[1400px] lg:mx-auto">
-                <DynamicHorizontalList keyPrefix="dynamic-" />
-              </div>
+          <div className={`w-full ${bgClass}`}>
+            <div className="lg:max-w-[1400px] lg:mx-auto">
+              <DynamicHorizontalList />
             </div>
-          </Suspense>
+          </div>
         );
         break;
 
       case "market_banner":
         content = (
-          <Suspense fallback={<ComponentLoader isDark={isDarkMode} height="h-48" />}>
+          <Suspense
+            fallback={<ComponentLoader isDark={isDarkMode} height="h-48" />}
+          >
             <div className={`w-full ${bgClass}`}>
               <MarketBanner />
             </div>
@@ -157,13 +163,11 @@ const WidgetRenderer = memo(
 
       case "shop_horizontal_list":
         content = (
-          <Suspense fallback={<ComponentLoader isDark={isDarkMode} height="h-32" />}>
-            <div className={`w-full ${bgClass}`}>
-              <div className="lg:max-w-[1400px] lg:mx-auto">
-                <ShopHorizontalList />
-              </div>
+          <div className={`w-full ${bgClass}`}>
+            <div className="lg:max-w-[1400px] lg:mx-auto">
+              <ShopHorizontalList />
             </div>
-          </Suspense>
+          </div>
         );
         break;
 
@@ -179,7 +183,7 @@ const WidgetRenderer = memo(
         <div className={`w-full h-5 ${bgClass}`} />
       </div>
     );
-  }
+  },
 );
 WidgetRenderer.displayName = "WidgetRenderer";
 
@@ -210,14 +214,18 @@ export default function HomeWidgets({ widgets }: HomeWidgetsProps) {
           onNavigation={handleNavigation}
         />
       )),
-    [widgets, isDarkMode, locale, handleNavigation]
+    [widgets, isDarkMode, locale, handleNavigation],
   );
 
   return (
-    <div className={`flex-1 w-full ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}>
+    <div
+      className={`flex-1 w-full ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
+    >
       <div className="w-full">
         {renderedWidgets}
-        <div className={`w-full h-8 ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`} />
+        <div
+          className={`w-full h-8 ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
+        />
       </div>
     </div>
   );

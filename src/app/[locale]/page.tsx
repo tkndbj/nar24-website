@@ -112,7 +112,7 @@ export default async function Home() {
   const widgets = await getMarketLayout();
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col overflow-x-hidden">
       <SecondHeader />
       <HomeWidgets widgets={widgets} />
       <Footer />
