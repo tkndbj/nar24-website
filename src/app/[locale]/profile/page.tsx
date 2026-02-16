@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useUser } from "@/context/UserProvider";
 import { updateDoc, doc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -14,7 +14,6 @@ import {
   Mail,
   MapPin,
   Package,
-  // CreditCard,
   ShoppingCart,
   Upload,
   Star,
@@ -30,16 +29,12 @@ import {
   Receipt,
   Folder,
   Ticket,
+  CheckCircle,
+  Store,
 } from "lucide-react";
 import Image from "next/image";
 import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
-
-// Dynamic imports for heavy drawer components - only loaded when needed
-// const SavedPaymentMethodsDrawer = dynamic(
-//   () => import("@/app/components/profile/SavedPaymentMethodsDrawer").then((mod) => ({ default: mod.SavedPaymentMethodsDrawer })),
-//   { ssr: false }
-// );
 
 const SellerInfoDrawer = dynamic(
   () =>
@@ -57,40 +52,30 @@ const SavedAddressesDrawer = dynamic(
   { ssr: false }
 );
 
-interface ActionButton {
+interface NavItem {
   icon: React.ElementType;
   label: string;
+  description?: string;
   path?: string;
   action?: () => void;
-  gradient: string;
-}
-
-interface MainActionButton {
-  icon: React.ElementType;
-  label: string;
-  path?: string;
-  description: string;
-  featured?: boolean;
   isExternal?: boolean;
+  featured?: boolean;
+  color?: string;
 }
 
 export default function ProfilePage() {
   const { user, profileData, updateProfileData, isLoading } = useUser();
-
-  // For now, we'll mock userOwnsShop - you can replace this with actual logic
   const userOwnsShop = profileData?.userOwnsShop || false;
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  // const [isPaymentMethodsDrawerOpen, setIsPaymentMethodsDrawerOpen] =
-  //   useState(false);
   const [isSellerInfoDrawerOpen, setIsSellerInfoDrawerOpen] = useState(false);
   const [isAddressesDrawerOpen, setIsAddressesDrawerOpen] = useState(false);
   const t = useTranslations();
   const router = useRouter();
 
-  React.useEffect(() => {
+  useEffect(() => {
     const checkTheme = () => {
       if (typeof document !== "undefined") {
         setIsDarkMode(document.documentElement.classList.contains("dark"));
@@ -148,7 +133,6 @@ export default function ProfilePage() {
       });
 
       await updateProfileData({ profileImage: downloadURL });
-
       alert(t("ProfilePage.imageUploadSuccess"));
     } catch (error) {
       console.error("Error uploading image:", error);
@@ -160,7 +144,6 @@ export default function ProfilePage() {
 
   const handleLogout = async () => {
     if (isLoggingOut) return;
-
     const confirmLogout = window.confirm(t("ProfilePage.logoutConfirmation"));
     if (!confirmLogout) return;
 
@@ -174,10 +157,6 @@ export default function ProfilePage() {
     }
   };
 
-  const handleUnauthenticatedTap = () => {
-    router.push("/login");
-  };
-
   const handleNavigation = (
     path?: string,
     action?: () => void,
@@ -187,12 +166,10 @@ export default function ProfilePage() {
       action();
       return;
     }
-
     if (!user) {
-      handleUnauthenticatedTap();
+      router.push("/login");
       return;
     }
-
     if (path) {
       if (isExternal) {
         window.open(path, "_blank");
@@ -205,9 +182,7 @@ export default function ProfilePage() {
   const toggleTheme = () => {
     if (typeof document !== "undefined") {
       const html = document.documentElement;
-      const isDarkMode = html.classList.contains("dark");
-
-      if (isDarkMode) {
+      if (html.classList.contains("dark")) {
         html.classList.remove("dark");
         localStorage.setItem("theme", "light");
       } else {
@@ -217,633 +192,296 @@ export default function ProfilePage() {
     }
   };
 
+  // Loading
   if (isLoading) {
     return (
-      <div
-        className={`min-h-screen flex items-center justify-center ${
-          isDarkMode ? "bg-gray-900" : "bg-gray-50"
-        }`}
-      >
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+      <div className={`min-h-screen flex items-center justify-center ${isDarkMode ? "bg-gray-950" : "bg-gray-50"}`}>
+        <div className="h-6 w-6 border-2 border-orange-200 dark:border-orange-900 border-t-orange-500 rounded-full animate-spin" />
       </div>
     );
   }
 
-  const quickActionButtons: ActionButton[] = [
-    {
-      icon: Box,
-      label: t("ProfilePage.myProducts"),
-      path: "/myproducts",
-      gradient: "from-blue-500 to-blue-600",
-    },
-    // {
-    //   icon: CreditCard,
-    //   label: t("ProfilePage.paymentMethods"),
-    //   action: () => setIsPaymentMethodsDrawerOpen(true),
-    //   gradient: "from-green-500 to-green-600",
-    // },
-    {
-      icon: MapPin,
-      label: t("ProfilePage.myAddresses"),
-      action: () => setIsAddressesDrawerOpen(true),
-      gradient: "from-purple-500 to-purple-600",
-    },
-    {
-      icon: Info,
-      label: t("ProfilePage.sellerInfo"),
-      action: () => setIsSellerInfoDrawerOpen(true),
-      gradient: "from-indigo-500 to-indigo-600",
-    },
-    {
-      icon: Ticket,
-      label: t("ProfilePage.coupons"),
-      path: "/coupon-and-benefits",
-      gradient: "from-amber-500 to-amber-600",
-    },
+  // --- Sections data ---
+
+  const shortcutItems: NavItem[] = [
+    { icon: Box, label: t("ProfilePage.myProducts"), path: "/myproducts", color: "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40" },
+    { icon: MapPin, label: t("ProfilePage.myAddresses"), action: () => setIsAddressesDrawerOpen(true), color: "text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/40" },
+    { icon: Info, label: t("ProfilePage.sellerInfo"), action: () => setIsSellerInfoDrawerOpen(true), color: "text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/40" },
+    { icon: Ticket, label: t("ProfilePage.coupons"), path: "/coupon-and-benefits", color: "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40" },
   ];
 
-  // Main action buttons with conditional layout based on userOwnsShop
-  const getMainActionButtons = (): MainActionButton[] => {
-    const baseButtons: MainActionButton[] = [
-      {
-        icon: Package,
-        label: t("ProfilePage.myOrders"),
-        path: "/orders",
-        description: t("ProfilePage.trackRecentPurchases"),
-      },
-      {
-        icon: Upload,
-        label: t("ProfilePage.sellOnVitrin"),
-        path: "/listproduct",
-        description: t("ProfilePage.startSellingProducts"),
-      },
-      {
-        icon: Star,
-        label: t("ProfilePage.myReviews"),
-        path: "/reviews",
-        description: t("ProfilePage.yourWrittenReviews"),
-      },
-      {
-        icon: Zap,
-        label: t("ProfilePage.boosts"),
-        path: "/boosts",
-        description: t("ProfilePage.promoteYourListings"),
-      },
-      {
-        icon: HelpCircle,
-        label: t("ProfilePage.myQuestions"),
-        path: "/productquestions",
-        description: t("ProfilePage.productQuestionsAnswers"),
-      },
-    ];
-
-    if (userOwnsShop) {
-      return [
-        {
+  const activityItems: NavItem[] = [
+    ...(userOwnsShop
+      ? [{
           icon: ShoppingCart,
           label: t("ProfilePage.sellerPanel"),
           path: "/seller-panel",
           description: t("ProfilePage.manageYourStore"),
           featured: true,
-        },
-        ...baseButtons,
-      ];
-    }
+          color: "text-purple-600 dark:text-purple-400",
+        }]
+      : []),
+    { icon: Package, label: t("ProfilePage.myOrders"), path: "/orders", description: t("ProfilePage.trackRecentPurchases"), color: "text-orange-500 dark:text-orange-400" },
+    { icon: Upload, label: t("ProfilePage.sellOnVitrin"), path: "/listproduct", description: t("ProfilePage.startSellingProducts"), color: "text-emerald-500 dark:text-emerald-400" },
+    { icon: Star, label: t("ProfilePage.myReviews"), path: "/reviews", description: t("ProfilePage.yourWrittenReviews"), color: "text-amber-500 dark:text-amber-400" },
+    { icon: Zap, label: t("ProfilePage.boosts"), path: "/boosts", description: t("ProfilePage.promoteYourListings"), color: "text-blue-500 dark:text-blue-400" },
+    { icon: HelpCircle, label: t("ProfilePage.myQuestions"), path: "/productquestions", description: t("ProfilePage.productQuestionsAnswers"), color: "text-rose-500 dark:text-rose-400" },
+  ];
 
-    return baseButtons;
-  };
+  const accountItems: NavItem[] = [
+    { icon: Receipt, label: t("ProfilePage.myReceipts"), path: "/receipts", color: "text-emerald-500 dark:text-emerald-400" },
+    { icon: Folder, label: t("ProfilePage.refundForm"), path: "/refundform", color: "text-orange-500 dark:text-orange-400" },
+    { icon: Store, label: t("ProfilePage.becomeASeller"), path: "/createshop", color: "text-violet-500 dark:text-violet-400" },
+    { icon: Settings, label: t("ProfilePage.accountSettings"), path: "/account-settings", color: "text-gray-500 dark:text-gray-400" },
+    { icon: Info, label: t("ProfilePage.supportAndFaq"), path: "/support-and-faq", color: "text-blue-500 dark:text-blue-400" },
+  ];
 
-  const mainActionButtons = getMainActionButtons();
-
-  return (
-    <div
-      className={`min-h-screen py-3 md:py-5 ${
-        isDarkMode ? "bg-gray-900" : "bg-gray-50"
-      }`}
-      style={{
-        transform: "translateZ(0)",
-        backfaceVisibility: "hidden",
-        WebkitFontSmoothing: "antialiased",
-      }}
+  // Row component for nav lists
+  const NavRow = ({ item, showBorder = true }: { item: NavItem; showBorder?: boolean }) => (
+    <button
+      onClick={() => handleNavigation(item.path, item.action, item.isExternal)}
+      className={`w-full flex items-center gap-3 px-4 py-3 md:py-3.5 text-left transition-colors group ${
+        showBorder
+          ? isDarkMode ? "border-b border-gray-800/70" : "border-b border-gray-100"
+          : ""
+      } ${isDarkMode ? "hover:bg-gray-800/40" : "hover:bg-gray-50"}`}
     >
-      <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
-        {/* Header Card */}
-        <div
-          className={`rounded-2xl md:rounded-3xl shadow-xl overflow-hidden mb-3 md:mb-5 ${
-            isDarkMode ? "bg-gray-800" : "bg-white"
-          }`}
-        >
-          {/* Cover Section */}
-          <div className="h-20 md:h-32 bg-gradient-to-r from-orange-500 via-pink-500 to-purple-500 relative">
-            <div className="absolute inset-0 bg-black/10"></div>
+      <item.icon
+        className={`w-[18px] h-[18px] flex-shrink-0 ${item.color || (isDarkMode ? "text-gray-500" : "text-gray-400")}`}
+        strokeWidth={1.8}
+      />
+      <div className="flex-1 min-w-0">
+        <span className={`text-[13px] md:text-sm block font-medium ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+          {item.label}
+        </span>
+        {item.description && (
+          <span className={`text-[11px] md:text-xs block mt-0.5 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+            {item.description}
+          </span>
+        )}
+      </div>
+      <ChevronRight
+        className={`w-4 h-4 flex-shrink-0 transition-transform group-hover:translate-x-0.5 ${isDarkMode ? "text-gray-700" : "text-gray-300"}`}
+        strokeWidth={1.5}
+      />
+    </button>
+  );
+
+  // --- Unauthenticated ---
+  if (!user) {
+    return (
+      <div
+        className={`min-h-screen ${isDarkMode ? "bg-gray-950" : "bg-gray-50"}`}
+        style={{ WebkitFontSmoothing: "antialiased" }}
+      >
+        <div className="max-w-4xl mx-auto px-5 md:px-10">
+          {/* Top bar */}
+          <div className="flex items-center justify-end py-4">
+            <button
+              onClick={toggleTheme}
+              className={`p-2 rounded-lg transition-colors ${isDarkMode ? "hover:bg-gray-800" : "hover:bg-gray-200"}`}
+            >
+              {isDarkMode ? (
+                <Sun className="w-4 h-4 text-amber-400" />
+              ) : (
+                <Moon className="w-4 h-4 text-gray-500" />
+              )}
+            </button>
           </div>
 
-          {/* Profile Section */}
-          <div className="relative px-4 md:px-6 pb-3 md:pb-5">
-            {/* Profile Image */}
-            <div className="flex items-end justify-between -mt-10 md:-mt-16 mb-3 md:mb-5">
-              <div className="relative">
-                <div
-                  className={`w-20 h-20 md:w-32 md:h-32 rounded-full p-2 shadow-2xl ${
-                    isDarkMode ? "bg-gray-800" : "bg-white"
-                  }`}
-                >
-                  <div
-                    className={`w-full h-full rounded-full overflow-hidden relative ${
-                      isDarkMode ? "bg-gray-700" : "bg-gray-200"
-                    }`}
-                  >
-                    {user && profileData?.profileImage ? (
-                      <Image
-                        src={profileData.profileImage}
-                        alt="Profile"
-                        fill
-                        className="object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <User className="w-7 h-7 md:w-14 md:h-14 text-gray-400" />
-                      </div>
-                    )}
+          <div className="pt-12 pb-10 text-center">
+            <div className={`w-20 h-20 rounded-full mx-auto mb-6 flex items-center justify-center ${isDarkMode ? "bg-gray-800" : "bg-gray-200"}`}>
+              <User className={`w-9 h-9 ${isDarkMode ? "text-gray-600" : "text-gray-400"}`} strokeWidth={1.5} />
+            </div>
+            <h1 className={`text-lg font-semibold mb-1.5 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+              {t("ProfilePage.loginToAccess")}
+            </h1>
+            <p className={`text-sm mb-8 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+              {t("ProfilePage.loginDescription")}
+            </p>
+            <button
+              onClick={() => router.push("/login")}
+              className="px-8 py-2.5 rounded-lg text-sm font-medium transition-colors bg-orange-500 hover:bg-orange-600 text-white"
+            >
+              {t("ProfilePage.login")}
+            </button>
+          </div>
+
+          <div className={`rounded-xl overflow-hidden ${isDarkMode ? "bg-gray-900 border border-gray-800" : "bg-white border border-gray-200"}`}>
+            {activityItems
+              .filter((b) => !b.featured)
+              .slice(0, 3)
+              .map((item, i, arr) => (
+                <NavRow key={i} item={item} showBorder={i < arr.length - 1} />
+              ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- Authenticated ---
+  return (
+    <div
+      className={`min-h-screen ${isDarkMode ? "bg-gray-950" : "bg-gray-50"}`}
+      style={{ WebkitFontSmoothing: "antialiased" }}
+    >
+      <div className="max-w-4xl mx-auto px-5 md:px-10 pb-12">
+        {/* Top bar */}
+        <div className="flex items-center justify-end py-4">
+          <button
+            onClick={toggleTheme}
+            className={`p-2 rounded-lg transition-colors ${isDarkMode ? "hover:bg-gray-800" : "hover:bg-gray-200"}`}
+          >
+            {isDarkMode ? (
+              <Sun className="w-4 h-4 text-amber-400" />
+            ) : (
+              <Moon className="w-4 h-4 text-gray-500" />
+            )}
+          </button>
+        </div>
+
+        {/* ===== Profile Card ===== */}
+        <div className={`rounded-xl p-5 mb-5 ${isDarkMode ? "bg-gray-900 border border-gray-800" : "bg-white border border-gray-200"}`}>
+          <div className="flex items-center gap-4">
+            {/* Avatar */}
+            <div className="relative flex-shrink-0">
+              <div className={`w-16 h-16 md:w-[72px] md:h-[72px] rounded-full overflow-hidden ring-2 ${isDarkMode ? "ring-gray-700 bg-gray-800" : "ring-gray-200 bg-gray-100"}`}>
+                {profileData?.profileImage ? (
+                  <Image
+                    src={profileData.profileImage}
+                    alt="Profile"
+                    fill
+                    className="object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <User className={`w-7 h-7 ${isDarkMode ? "text-gray-600" : "text-gray-400"}`} strokeWidth={1.5} />
                   </div>
-                </div>
-
-                {/* Upload Button */}
-                {user && (
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isUploadingImage}
-                    className="absolute bottom-0 md:bottom-1 right-0 md:right-1 w-7 h-7 md:w-10 md:h-10 bg-orange-500 hover:bg-orange-600 rounded-full flex items-center justify-center shadow-lg transition-colors disabled:opacity-50"
-                  >
-                    {isUploadingImage ? (
-                      <div className="animate-spin rounded-full h-3.5 w-3.5 md:h-5 md:w-5 border-2 border-white border-t-transparent" />
-                    ) : (
-                      <Camera className="w-3.5 h-3.5 md:w-5 md:h-5 text-white" />
-                    )}
-                  </button>
-                )}
-
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                />
-              </div>
-
-              {/* Theme Toggle and Login Button */}
-              <div className="flex items-center gap-2 mt-10 md:mt-16">
-                <button
-                  onClick={toggleTheme}
-                  className={`p-2 rounded-full transition-colors ${
-                    isDarkMode
-                      ? "bg-gray-700 hover:bg-gray-600"
-                      : "bg-gray-100 hover:bg-gray-200"
-                  }`}
-                >
-                  {isDarkMode ? (
-                    <Sun className="w-4 h-4 md:w-5 md:h-5 text-yellow-500" />
-                  ) : (
-                    <Moon className="w-4 h-4 md:w-5 md:h-5 text-gray-600" />
-                  )}
-                </button>
-
-                {!user && (
-                  <button
-                    onClick={() => router.push("/login")}
-                    className="px-4 py-2 md:px-5 md:py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-md font-medium transition-colors text-sm"
-                  >
-                    {t("ProfilePage.login")}
-                  </button>
                 )}
               </div>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploadingImage}
+                className="absolute -bottom-0.5 -right-0.5 w-7 h-7 rounded-full bg-orange-500 hover:bg-orange-600 flex items-center justify-center transition-colors disabled:opacity-50 border-2 border-white dark:border-gray-900"
+              >
+                {isUploadingImage ? (
+                  <div className="h-3 w-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Camera className="w-3.5 h-3.5 text-white" strokeWidth={2} />
+                )}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="hidden"
+              />
             </div>
 
-            {/* User Info */}
-            <div className="space-y-1.5 md:space-y-3">
-              <div>
-                <h1
-                  className={`text-lg md:text-2xl font-bold ${
-                    isDarkMode ? "text-white" : "text-gray-900"
-                  }`}
-                >
-                  {user
-                    ? profileData?.displayName || t("ProfilePage.noName")
-                    : t("ProfilePage.notLoggedIn")}
+            {/* User info */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5">
+                <h1 className={`text-base md:text-lg font-semibold truncate ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                  {profileData?.displayName || t("ProfilePage.noName")}
                 </h1>
-                {user && (
-                  <div className="flex items-center gap-3 mt-1">
-                    <div
-                      className={`flex items-center gap-2 ${
-                        isDarkMode ? "text-gray-400" : "text-gray-600"
-                      }`}
-                    >
-                      <Mail className="w-3 h-3 md:w-4 md:h-4" />
-                      <span className="text-sm md:text-base">
-                        {profileData?.email || user.email}
-                      </span>
-                    </div>
-                    {profileData?.isVerified && (
-                      <span
-                        className={`inline-flex items-center px-2 py-1 md:px-3 md:py-1 rounded-full text-xs font-medium ${
-                          isDarkMode
-                            ? "bg-green-900/30 text-green-400"
-                            : "bg-green-100 text-green-800"
-                        }`}
-                      >
-                        {t("ProfilePage.verified")}
-                      </span>
-                    )}
-                  </div>
+                {profileData?.isVerified && (
+                  <CheckCircle className="w-4 h-4 text-blue-500 flex-shrink-0" strokeWidth={2.5} />
                 )}
               </div>
-
-              {/* User Stats */}
-              {user && (
-                <div className="flex items-center gap-6 pt-1.5 md:pt-3">
-                  {profileData?.location && (
-                    <div
-                      className={`flex items-center gap-2 ${
-                        isDarkMode ? "text-gray-400" : "text-gray-600"
-                      }`}
-                    >
-                      <MapPin className="w-3 h-3 md:w-4 md:h-4" />
-                      <span className="text-sm md:text-base">
-                        {profileData.location}
-                      </span>
-                    </div>
-                  )}
+              <div className={`flex items-center gap-1.5 mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                <Mail className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={1.5} />
+                <span className="text-xs md:text-[13px] truncate">{profileData?.email || user.email}</span>
+              </div>
+              {profileData?.location && (
+                <div className={`flex items-center gap-1.5 mt-0.5 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+                  <MapPin className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={1.5} />
+                  <span className="text-xs truncate">{profileData.location}</span>
                 </div>
               )}
             </div>
           </div>
         </div>
 
-        {/* Quick Actions */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3 mb-3 md:mb-5">
-          {quickActionButtons.map((button, index) => (
+        {/* ===== Quick Shortcuts ===== */}
+        <div className="grid grid-cols-4 gap-2.5 mb-5">
+          {shortcutItems.map((item, i) => (
             <button
-              key={index}
-              onClick={() => handleNavigation(button.path, button.action)}
-              className={`group p-2.5 md:p-3 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 border flex items-center gap-2 ${
+              key={i}
+              onClick={() => handleNavigation(item.path, item.action)}
+              className={`flex flex-col items-center gap-2 p-3 rounded-xl transition-colors ${
                 isDarkMode
-                  ? "bg-gray-800 border-gray-700"
-                  : "bg-white border-gray-100"
+                  ? "bg-gray-900 border border-gray-800 hover:bg-gray-800"
+                  : "bg-white border border-gray-200 hover:bg-gray-50"
               }`}
             >
-              <div
-                className={`w-8 h-8 md:w-9 md:h-9 rounded-lg bg-gradient-to-r ${button.gradient} flex items-center justify-center group-hover:scale-110 transition-transform flex-shrink-0`}
-              >
-                <button.icon className="w-4 h-4 text-white" />
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${item.color}`}>
+                <item.icon className="w-[18px] h-[18px]" strokeWidth={1.8} />
               </div>
-              <p
-                className={`text-xs md:text-sm font-medium text-left leading-tight ${
-                  isDarkMode ? "text-white" : "text-gray-900"
-                }`}
-              >
-                {button.label}
-              </p>
+              <span className={`text-[11px] font-medium text-center leading-tight ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                {item.label}
+              </span>
             </button>
           ))}
         </div>
 
-        {/* Main Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 md:gap-4 mb-3 md:mb-5">
-          {mainActionButtons.map((button, index) => (
-            <button
-              key={index}
-              onClick={() =>
-                handleNavigation(button.path, undefined, button.isExternal)
-              }
-              className={`group p-3 md:p-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 text-left ${
-                button.featured
-                  ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white"
-                  : isDarkMode
-                  ? "bg-gray-800 border border-gray-700"
-                  : "bg-white border border-gray-100"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5 md:gap-3">
-                  <div
-                    className={`w-9 h-9 md:w-11 md:h-11 rounded-lg flex items-center justify-center ${
-                      button.featured
-                        ? "bg-white/20"
-                        : "bg-gradient-to-r from-orange-500 to-pink-500"
-                    }`}
-                  >
-                    <button.icon
-                      className={`w-4 h-4 md:w-5 md:h-5 ${
-                        button.featured ? "text-white" : "text-white"
-                      }`}
-                    />
-                  </div>
-                  <div>
-                    <h3
-                      className={`text-sm md:text-base font-semibold ${
-                        button.featured
-                          ? "text-white"
-                          : isDarkMode
-                          ? "text-white"
-                          : "text-gray-900"
-                      }`}
-                    >
-                      {button.label}
-                    </h3>
-                    <p
-                      className={`text-xs ${
-                        button.featured
-                          ? "text-white/80"
-                          : isDarkMode
-                          ? "text-gray-400"
-                          : "text-gray-600"
-                      }`}
-                    >
-                      {button.description}
-                    </p>
-                  </div>
-                </div>
-                <ChevronRight
-                  className={`w-4 h-4 md:w-5 md:h-5 group-hover:translate-x-1 transition-transform ${
-                    button.featured
-                      ? "text-white/80"
-                      : isDarkMode
-                      ? "text-gray-600"
-                      : "text-gray-400"
-                  }`}
-                />
-              </div>
-            </button>
-          ))}
+        {/* ===== Seller Panel (featured) ===== */}
+        {userOwnsShop && (
+          <button
+            onClick={() => handleNavigation("/seller-panel")}
+            className="w-full mb-5 flex items-center gap-3 p-4 rounded-xl bg-orange-500 hover:bg-orange-600 transition-colors text-left group"
+          >
+            <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0">
+              <ShoppingCart className="w-5 h-5 text-white" strokeWidth={1.8} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <span className="text-sm font-semibold text-white block">{t("ProfilePage.sellerPanel")}</span>
+              <span className="text-xs text-white/70 block mt-0.5">{t("ProfilePage.manageYourStore")}</span>
+            </div>
+            <ChevronRight className="w-4 h-4 text-white/50 group-hover:translate-x-0.5 transition-transform flex-shrink-0" strokeWidth={1.5} />
+          </button>
+        )}
+
+        {/* ===== Activity ===== */}
+        <div className={`rounded-xl overflow-hidden mb-5 ${isDarkMode ? "bg-gray-900 border border-gray-800" : "bg-white border border-gray-200"}`}>
+          {activityItems
+            .filter((b) => !b.featured)
+            .map((item, i, arr) => (
+              <NavRow key={i} item={item} showBorder={i < arr.length - 1} />
+            ))}
         </div>
 
-        {/* Additional Actions for Authenticated Users */}
-        {user && (
-          <div
-            className={`rounded-xl shadow-md p-3 md:p-4 border mb-3 md:mb-5 ${
-              isDarkMode
-                ? "bg-gray-800 border-gray-700"
-                : "bg-white border-gray-100"
-            }`}
-          >
-            <div className="space-y-2 md:space-y-2.5">
-              {/* Pickup Points */}
-              {/* <button
-                onClick={() => handleNavigation("/pickup-points")}
-                className={`w-full flex items-center gap-2.5 md:gap-3 p-2.5 md:p-3 rounded-lg transition-colors text-left ${
-                  isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"
-                }`}
-              >
-                <MapPin
-                  className={`w-4 h-4 md:w-5 md:h-5 ${
-                    isDarkMode ? "text-gray-400" : "text-gray-600"
-                  }`}
-                />
-                <span
-                  className={`text-sm md:text-base ${
-                    isDarkMode ? "text-white" : "text-gray-900"
-                  }`}
-                >
-                  {t("ProfilePage.pickupPoints")}
-                </span>
-                <ChevronRight
-                  className={`w-4 h-4 md:w-5 md:h-5 ml-auto ${
-                    isDarkMode ? "text-gray-600" : "text-gray-400"
-                  }`}
-                />
-              </button> */}
-              {/* <div
-                className={`border-t ${
-                  isDarkMode ? "border-gray-700" : "border-gray-200"
-                }`}
-              ></div> */}
-              {/* My Receipts */}
-              <button
-                onClick={() => handleNavigation("/receipts")}
-                className={`w-full flex items-center gap-2.5 md:gap-3 p-2.5 md:p-3 rounded-lg transition-colors text-left ${
-                  isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"
-                }`}
-              >
-                <Receipt
-                  className={`w-4 h-4 md:w-5 md:h-5 ${
-                    isDarkMode ? "text-gray-400" : "text-gray-600"
-                  }`}
-                />
-                <span
-                  className={`text-sm md:text-base ${
-                    isDarkMode ? "text-white" : "text-gray-900"
-                  }`}
-                >
-                  {t("ProfilePage.myReceipts")}
-                </span>
-                <ChevronRight
-                  className={`w-4 h-4 md:w-5 md:h-5 ml-auto ${
-                    isDarkMode ? "text-gray-600" : "text-gray-400"
-                  }`}
-                />
-              </button>
-              <div
-                className={`border-t ${
-                  isDarkMode ? "border-gray-700" : "border-gray-200"
-                }`}
-              ></div>
-              {/* Refund Form */}
-              <button
-                onClick={() => handleNavigation("/refundform")}
-                className={`w-full flex items-center gap-2.5 md:gap-3 p-2.5 md:p-3 rounded-lg transition-colors text-left ${
-                  isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"
-                }`}
-              >
-                <Folder
-                  className={`w-4 h-4 md:w-5 md:h-5 ${
-                    isDarkMode ? "text-gray-400" : "text-gray-600"
-                  }`}
-                />
-                <span
-                  className={`text-sm md:text-base ${
-                    isDarkMode ? "text-white" : "text-gray-900"
-                  }`}
-                >
-                  {t("ProfilePage.refundForm")}
-                </span>
-                <ChevronRight
-                  className={`w-4 h-4 md:w-5 md:h-5 ml-auto ${
-                    isDarkMode ? "text-gray-600" : "text-gray-400"
-                  }`}
-                />
-              </button>
-              <div
-                className={`border-t ${
-                  isDarkMode ? "border-gray-700" : "border-gray-200"
-                }`}
-              ></div>
-              {/* Become a Seller */}
-              <button
-                onClick={() => handleNavigation("/createshop")}
-                className={`w-full flex items-center gap-2.5 md:gap-3 p-2.5 md:p-3 rounded-lg transition-colors text-left ${
-                  isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"
-                }`}
-              >
-                <ShoppingCart
-                  className={`w-4 h-4 md:w-5 md:h-5 ${
-                    isDarkMode ? "text-gray-400" : "text-gray-600"
-                  }`}
-                />
-                <span
-                  className={`text-sm md:text-base ${
-                    isDarkMode ? "text-white" : "text-gray-900"
-                  }`}
-                >
-                  {t("ProfilePage.becomeASeller")}
-                </span>
-                <ChevronRight
-                  className={`w-4 h-4 md:w-5 md:h-5 ml-auto ${
-                    isDarkMode ? "text-gray-600" : "text-gray-400"
-                  }`}
-                />
-              </button>
-              <div
-                className={`border-t ${
-                  isDarkMode ? "border-gray-700" : "border-gray-200"
-                }`}
-              ></div>
-              {/* Account Settings */}
-              <button
-                onClick={() => handleNavigation("/account-settings")}
-                className={`w-full flex items-center gap-2.5 md:gap-3 p-2.5 md:p-3 rounded-lg transition-colors text-left ${
-                  isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"
-                }`}
-              >
-                <Settings
-                  className={`w-4 h-4 md:w-5 md:h-5 ${
-                    isDarkMode ? "text-gray-400" : "text-gray-600"
-                  }`}
-                />
-                <span
-                  className={`text-sm md:text-base ${
-                    isDarkMode ? "text-white" : "text-gray-900"
-                  }`}
-                >
-                  {t("ProfilePage.accountSettings")}
-                </span>
-                <ChevronRight
-                  className={`w-4 h-4 md:w-5 md:h-5 ml-auto ${
-                    isDarkMode ? "text-gray-600" : "text-gray-400"
-                  }`}
-                />
-              </button>
-              <div
-                className={`border-t ${
-                  isDarkMode ? "border-gray-700" : "border-gray-200"
-                }`}
-              ></div>
-              {/* Support and FAQ */}
-              <button
-                onClick={() => handleNavigation("/support-and-faq")}
-                className={`w-full flex items-center gap-2.5 md:gap-3 p-2.5 md:p-3 rounded-lg transition-colors text-left ${
-                  isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"
-                }`}
-              >
-                <Info
-                  className={`w-4 h-4 md:w-5 md:h-5 ${
-                    isDarkMode ? "text-gray-400" : "text-gray-600"
-                  }`}
-                />
-                <span
-                  className={`text-sm md:text-base ${
-                    isDarkMode ? "text-white" : "text-gray-900"
-                  }`}
-                >
-                  {t("ProfilePage.supportAndFaq")}
-                </span>
-                <ChevronRight
-                  className={`w-4 h-4 md:w-5 md:h-5 ml-auto ${
-                    isDarkMode ? "text-gray-600" : "text-gray-400"
-                  }`}
-                />
-              </button>
-              <div
-                className={`border-t ${
-                  isDarkMode ? "border-gray-700" : "border-gray-200"
-                }`}
-              ></div>
-              {/* Logout */}
-              <button
-                onClick={handleLogout}
-                disabled={isLoggingOut}
-                className={`w-full flex items-center gap-2.5 md:gap-3 p-2.5 md:p-3 rounded-lg transition-colors text-left disabled:opacity-50 ${
-                  isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"
-                }`}
-              >
-                <LogOut
-                  className={`w-4 h-4 md:w-5 md:h-5 ${
-                    isDarkMode ? "text-gray-400" : "text-gray-600"
-                  } ${isLoggingOut ? "animate-pulse" : ""}`}
-                />
-                <span
-                  className={`text-sm md:text-base ${
-                    isDarkMode ? "text-white" : "text-gray-900"
-                  }`}
-                >
-                  {isLoggingOut
-                    ? t("ProfilePage.loggingOut")
-                    : t("ProfilePage.logout")}
-                </span>
-              </button>
-            </div>
+        {/* ===== Account & Settings ===== */}
+        <div className="mb-5">
+          <p className={`text-[11px] font-semibold uppercase tracking-wider mb-2 px-1 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+            {t("ProfilePage.accountSettings")}
+          </p>
+          <div className={`rounded-xl overflow-hidden ${isDarkMode ? "bg-gray-900 border border-gray-800" : "bg-white border border-gray-200"}`}>
+            {accountItems.map((item, i) => (
+              <NavRow key={i} item={item} showBorder={i < accountItems.length - 1} />
+            ))}
           </div>
-        )}
+        </div>
 
-        {/* Unauthenticated State Message */}
-        {!user && (
-          <div
-            className={`rounded-xl shadow-md p-4 border text-center ${
-              isDarkMode
-                ? "bg-gray-800 border-gray-700"
-                : "bg-white border-gray-100"
-            }`}
-          >
-            <div className="space-y-3">
-              <User
-                className={`w-12 h-12 md:w-14 md:h-14 mx-auto ${
-                  isDarkMode ? "text-gray-600" : "text-gray-400"
-                }`}
-              />
-              <div>
-                <h3
-                  className={`text-base md:text-lg font-semibold mb-1.5 ${
-                    isDarkMode ? "text-white" : "text-gray-900"
-                  }`}
-                >
-                  {t("ProfilePage.loginToAccess")}
-                </h3>
-                <p
-                  className={`text-sm mb-3 ${
-                    isDarkMode ? "text-gray-400" : "text-gray-600"
-                  }`}
-                >
-                  {t("ProfilePage.loginDescription")}
-                </p>
-                <button
-                  onClick={() => router.push("/login")}
-                  className="w-full px-6 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium transition-colors text-sm"
-                >
-                  {t("ProfilePage.login")}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* ===== Logout ===== */}
+        <button
+          onClick={handleLogout}
+          disabled={isLoggingOut}
+          className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm transition-colors disabled:opacity-50 group ${
+            isDarkMode
+              ? "bg-gray-900 border border-gray-800 text-red-400 hover:bg-red-950/30 hover:border-red-900/50"
+              : "bg-white border border-gray-200 text-red-500 hover:bg-red-50 hover:border-red-200"
+          }`}
+        >
+          <LogOut className={`w-4 h-4 ${isLoggingOut ? "animate-spin" : ""}`} strokeWidth={1.8} />
+          <span className="font-medium">
+            {isLoggingOut ? t("ProfilePage.loggingOut") : t("ProfilePage.logout")}
+          </span>
+        </button>
       </div>
 
       {/* Drawers */}
-      {/* <SavedPaymentMethodsDrawer
-        isOpen={isPaymentMethodsDrawerOpen}
-        onClose={() => setIsPaymentMethodsDrawerOpen(false)}
-        isDarkMode={isDarkMode}
-        localization={t}
-      /> */}
       <SellerInfoDrawer
         isOpen={isSellerInfoDrawerOpen}
         onClose={() => setIsSellerInfoDrawerOpen(false)}
