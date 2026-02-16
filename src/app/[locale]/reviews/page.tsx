@@ -4,21 +4,17 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Star,
   Filter,
-  Calendar,
-
   X,
   Send,
   Store,
   ShoppingBag,
-  RefreshCw,
   Camera,
   ArrowLeft,
-
+  Package,
 } from "lucide-react";
 import { useUser } from "@/context/UserProvider";
 import { useRouter } from "next/navigation";
 import {
- 
   query,
   where,
   orderBy,
@@ -31,11 +27,17 @@ import {
   DocumentData,
 } from "firebase/firestore";
 import { db, storage, functions } from "@/lib/firebase";
-import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import {
+  ref,
+  uploadBytes,
+  getDownloadURL,
+  deleteObject,
+} from "firebase/storage";
 import { httpsCallable, HttpsCallableResult } from "firebase/functions";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
 import imageCompression from "browser-image-compression";
+import { useTheme } from "@/hooks/useTheme";
 
 // ============================================================================
 // TYPES
@@ -127,7 +129,7 @@ interface SubmitReviewResult {
 // ============================================================================
 
 const PAGE_SIZE = 20;
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = [
   "image/jpeg",
   "image/jpg",
@@ -146,6 +148,7 @@ export default function ReviewsPage() {
   const router = useRouter();
   const { user, isLoading: authLoading } = useUser();
   const t = useTranslations("Reviews");
+  const isDarkMode = useTheme();
 
   // ============================================================================
   // STATE
@@ -153,7 +156,8 @@ export default function ReviewsPage() {
 
   const [activeTab, setActiveTab] = useState<ReviewTab>("pending");
   const [filters, setFilters] = useState<FilterOptions>({ reviewType: "all" });
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   // Pending reviews state
   const [pendingReviews, setPendingReviews] = useState<PendingReview[]>([]);
@@ -173,7 +177,7 @@ export default function ReviewsPage() {
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showLoadingModal, setShowLoadingModal] = useState(false);
   const [selectedReview, setSelectedReview] = useState<PendingReview | null>(
-    null
+    null,
   );
 
   // Review form state
@@ -203,10 +207,9 @@ export default function ReviewsPage() {
           collectionGroup(db, "items"),
           where("buyerId", "==", user.uid),
           where("deliveryStatus", "==", "delivered"),
-          where("needsAnyReview", "==", true)
+          where("needsAnyReview", "==", true),
         );
 
-        // Apply filters
         if (filters.productId) {
           q = query(q, where("productId", "==", filters.productId));
         }
@@ -216,7 +219,7 @@ export default function ReviewsPage() {
         if (filters.startDate) {
           q = query(
             q,
-            where("timestamp", ">=", Timestamp.fromDate(filters.startDate))
+            where("timestamp", ">=", Timestamp.fromDate(filters.startDate)),
           );
         }
         if (filters.endDate) {
@@ -268,7 +271,7 @@ export default function ReviewsPage() {
             const combined = [...prev, ...newReviews];
             const uniqueMap = new Map();
             combined.forEach((review) => {
-              uniqueMap.set(review.id, review);
+              uniqueMap.set(`${review.orderId}_${review.id}`, review);
             });
             return Array.from(uniqueMap.values());
           });
@@ -285,7 +288,7 @@ export default function ReviewsPage() {
         setPendingLoading(false);
       }
     },
-    [user, filters, pendingLoading, pendingLastDoc, pendingHasMore]
+    [user, filters, pendingLoading, pendingLastDoc, pendingHasMore],
   );
 
   const loadMyReviews = useCallback(
@@ -298,10 +301,9 @@ export default function ReviewsPage() {
       try {
         let q = query(
           collectionGroup(db, "reviews"),
-          where("userId", "==", user.uid)
+          where("userId", "==", user.uid),
         );
 
-        // Apply filters based on review type
         if (filters.reviewType === "product") {
           q = query(q, where("productId", "!=", null));
         } else if (filters.reviewType === "seller") {
@@ -317,7 +319,7 @@ export default function ReviewsPage() {
         if (filters.startDate) {
           q = query(
             q,
-            where("timestamp", ">=", Timestamp.fromDate(filters.startDate))
+            where("timestamp", ">=", Timestamp.fromDate(filters.startDate)),
           );
         }
         if (filters.endDate) {
@@ -338,7 +340,7 @@ export default function ReviewsPage() {
             ({
               id: doc.id,
               ...doc.data(),
-            } as Review)
+            }) as Review,
         );
 
         const hasMore = newReviews.length === PAGE_SIZE;
@@ -351,7 +353,7 @@ export default function ReviewsPage() {
             const combined = [...prev, ...newReviews];
             const uniqueMap = new Map();
             combined.forEach((review) => {
-              uniqueMap.set(review.id, review);
+              uniqueMap.set(`${review.orderId}_${review.id}`, review);
             });
             return Array.from(uniqueMap.values());
           });
@@ -368,21 +370,10 @@ export default function ReviewsPage() {
         setMyReviewsLoading(false);
       }
     },
-    [user, filters, myReviewsLoading, myReviewsLastDoc, myReviewsHasMore]
+    [user, filters, myReviewsLoading, myReviewsLastDoc, myReviewsHasMore],
   );
 
-  // Check dark mode
-  useEffect(() => {
-    const checkDarkMode = () => {
-      setIsDarkMode(document.documentElement.classList.contains("dark"));
-    };
-    checkDarkMode();
-    const observer = new MutationObserver(checkDarkMode);
-    observer.observe(document.documentElement, { attributes: true });
-    return () => observer.disconnect();
-  }, []);
-
-  // Redirect if not authenticated (only after auth state is determined)
+  // Redirect if not authenticated
   useEffect(() => {
     if (!authLoading && !user) {
       router.push("/login");
@@ -485,21 +476,12 @@ export default function ReviewsPage() {
     setSelectedReview(null);
   };
 
-  const formatDate = (timestamp: Timestamp) => {
-    return new Intl.DateTimeFormat("tr-TR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(timestamp.toDate());
-  };
-
   const getActiveFiltersCount = () => {
     let count = 0;
     if (filters.productId) count++;
     if (filters.sellerId) count++;
-    if (filters.startDate || filters.endDate) count++;
+    if (filters.startDate) count++;
+    if (filters.endDate) count++;
     if (filters.reviewType !== "all") count++;
     return count;
   };
@@ -519,11 +501,10 @@ export default function ReviewsPage() {
   };
 
   // ============================================================================
-  // IMAGE VALIDATION & PROCESSING (Like Flutter)
+  // IMAGE VALIDATION & PROCESSING
   // ============================================================================
 
   const validateFile = (file: File): ImageValidationResult => {
-    // Check file size
     if (file.size > MAX_FILE_SIZE_BYTES) {
       return {
         valid: false,
@@ -531,8 +512,6 @@ export default function ReviewsPage() {
         message: t("imageTooLarge") || "Image is too large (max 10MB)",
       };
     }
-
-    // Check file type
     if (!ALLOWED_MIME_TYPES.includes(file.type)) {
       return {
         valid: false,
@@ -542,7 +521,6 @@ export default function ReviewsPage() {
           "Invalid image format (JPG, PNG, HEIC, WEBP only)",
       };
     }
-
     return { valid: true };
   };
 
@@ -558,14 +536,14 @@ export default function ReviewsPage() {
       return compressedFile;
     } catch (error) {
       console.error("Error compressing image:", error);
-      return file; // Return original if compression fails
+      return file;
     }
   };
 
   const processImage = async (
     imageFile: File,
     storagePath: string,
-    index: number
+    index: number,
   ): Promise<ImageProcessResult> => {
     if (!user) {
       return {
@@ -576,7 +554,6 @@ export default function ReviewsPage() {
     }
 
     try {
-      // 1. Validate file first
       const validation = validateFile(imageFile);
       if (!validation.valid) {
         return {
@@ -586,19 +563,16 @@ export default function ReviewsPage() {
         };
       }
 
-      // 2. Compress
       const compressedFile = await compressImage(imageFile);
 
-      // 3. Upload to Storage
       const fileName = `${user.uid}_${Date.now()}_${index}.jpg`;
       const storageRef = ref(storage, `${storagePath}/${fileName}`);
 
       await uploadBytes(storageRef, compressedFile);
       const imageUrl = await getDownloadURL(storageRef);
 
-      // 4. Moderate via Cloud Function
-      const moderateImageFunction = httpsCallable
-        <{ imageUrl: string },
+      const moderateImageFunction = httpsCallable<
+        { imageUrl: string },
         ModerationResult
       >(functions, "moderateImage");
 
@@ -607,14 +581,12 @@ export default function ReviewsPage() {
       const data = result.data;
 
       if (data.approved) {
-        // Approved - keep it
         return {
           success: true,
           url: imageUrl,
           ref: storageRef.fullPath,
         };
       } else {
-        // Rejected - delete it
         await deleteObject(storageRef);
         return {
           success: false,
@@ -653,7 +625,7 @@ export default function ReviewsPage() {
 
     if (currentCount >= MAX_IMAGES) {
       showErrorToast(
-        t("maxImagesReached") || `Maximum ${MAX_IMAGES} images allowed`
+        t("maxImagesReached") || `Maximum ${MAX_IMAGES} images allowed`,
       );
       return;
     }
@@ -661,7 +633,6 @@ export default function ReviewsPage() {
     const remainingSlots = MAX_IMAGES - currentCount;
     const filesToAdd = files.slice(0, remainingSlots);
 
-    // Validate each file before adding
     const validFiles: File[] = [];
     for (const file of filesToAdd) {
       const validation = validateFile(file);
@@ -680,12 +651,12 @@ export default function ReviewsPage() {
   };
 
   // ============================================================================
-  // REVIEW SUBMISSION (Like Flutter with Two-Modal System)
+  // REVIEW SUBMISSION
   // ============================================================================
 
   const openReviewModal = (
     review: PendingReview,
-    type: "product" | "seller"
+    type: "product" | "seller",
   ) => {
     setSelectedReview(review);
     setReviewType(type);
@@ -693,22 +664,16 @@ export default function ReviewsPage() {
   };
 
   const handleReviewSubmit = () => {
-    // Validate inputs
     if (rating === 0 || reviewText.trim() === "") {
       showErrorToast(
         t("pleaseProvideRatingAndReview") ||
-          "Please provide a rating and review text"
+          "Please provide a rating and review text",
       );
       return;
     }
 
-    // Close review modal immediately (like Flutter)
     setShowReviewModal(false);
-
-    // Show loading modal
     setShowLoadingModal(true);
-
-    // Start async submission
     submitReviewAsync();
   };
 
@@ -723,7 +688,6 @@ export default function ReviewsPage() {
       const approvedUrls: string[] = [];
       const uploadedRefs: string[] = [];
 
-      // Process images if this is a product review
       if (reviewType === "product" && reviewImages.length > 0) {
         const storagePath = `reviews/${selectedReview.productId}`;
 
@@ -731,7 +695,6 @@ export default function ReviewsPage() {
           const result = await processImage(reviewImages[i], storagePath, i);
 
           if (!result.success) {
-            // Clean up previously uploaded images
             for (const refPath of uploadedRefs) {
               try {
                 await deleteObject(ref(storage, refPath));
@@ -742,7 +705,6 @@ export default function ReviewsPage() {
 
             setShowLoadingModal(false);
 
-            // Show detailed error message
             let message = `Image ${i + 1}: `;
             if (result.message) {
               message += result.message;
@@ -780,9 +742,8 @@ export default function ReviewsPage() {
         }
       }
 
-      // Call submitReview Cloud Function (like Flutter)
-      const submitReviewFunction = httpsCallable
-        <SubmitReviewData,
+      const submitReviewFunction = httpsCallable<
+        SubmitReviewData,
         SubmitReviewResult
       >(functions, "submitReview");
 
@@ -806,10 +767,8 @@ export default function ReviewsPage() {
 
       if (result.data.success) {
         showSuccessToast(
-          t("reviewSubmittedSuccessfully") || "Review submitted successfully!"
+          t("reviewSubmittedSuccessfully") || "Review submitted successfully!",
         );
-
-        // Reset form and refresh data
         resetReviewForm();
         refreshReviews();
       } else {
@@ -819,12 +778,10 @@ export default function ReviewsPage() {
     } catch (error) {
       setShowLoadingModal(false);
       console.error("Error submitting review:", error);
-      
+
       const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "An unexpected error occurred";
-      
+        error instanceof Error ? error.message : "An unexpected error occurred";
+
       showErrorToast(errorMessage);
       resetReviewForm();
     }
@@ -835,163 +792,46 @@ export default function ReviewsPage() {
   // ============================================================================
 
   const showSuccessToast = (message: string) => {
-    // You can replace this with your toast library
     alert(message);
   };
 
   const showErrorToast = (message: string) => {
-    // You can replace this with your toast library
     alert(message);
   };
 
   // ============================================================================
-  // UI COMPONENTS
+  // UI HELPERS
   // ============================================================================
 
-  const ProductCard = ({ review }: { review: PendingReview }) => (
-    <div
-      className={`
-        p-4 rounded-lg border cursor-pointer transition-colors duration-200
-        ${
-          isDarkMode
-            ? "bg-gray-800 border-gray-700 hover:border-gray-600"
-            : "bg-white border-gray-200 hover:border-gray-300"
-        }
-      `}
-      onClick={() => router.push(`/productdetail/${review.productId}`)}
-    >
-      <div className="flex space-x-3">
-        <div className="relative w-16 h-16 flex-shrink-0">
-          <Image
-            src={review.productImage || "/placeholder-product.png"}
-            alt={review.productName}
-            fill
-            className="object-cover rounded-lg"
-          />
-        </div>
-        <div className="flex-1 min-w-0">
-          <h4
-            className={`
-            font-medium text-sm line-clamp-2
-            ${isDarkMode ? "text-white" : "text-gray-900"}
-          `}
-          >
-            {review.productName}
-          </h4>
-          <div className="flex items-center space-x-2 mt-1">
-            <span
-              className={`
-              font-bold text-sm
-              ${isDarkMode ? "text-green-400" : "text-green-600"}
-            `}
-            >
-              ₺{review.productPrice.toLocaleString()}
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  const StarRating = ({
-    value,
-    onChange,
-    readonly = false,
-  }: {
-    value: number;
-    onChange?: (rating: number) => void;
-    readonly?: boolean;
-  }) => (
-    <div className="flex space-x-1">
+  const renderStars = (ratingValue: number, size: "sm" | "md" = "sm") => (
+    <div className="flex items-center gap-px">
       {[1, 2, 3, 4, 5].map((star) => (
-        <button
+        <Star
           key={star}
-          type="button"
-          disabled={readonly}
-          onClick={() => !readonly && onChange?.(star)}
-          className={`
-            ${readonly ? "cursor-default" : "cursor-pointer hover:scale-110"}
-            transition-transform duration-150
-          `}
-        >
-          <Star
-            size={24}
-            className={`
-              ${
-                star <= value ? "text-yellow-400 fill-current" : "text-gray-300"
-              }
-            `}
-          />
-        </button>
+          className={`${size === "sm" ? "w-3 h-3" : "w-5 h-5"} ${
+            star <= ratingValue
+              ? "fill-amber-400 text-amber-400"
+              : "text-gray-200"
+          }`}
+        />
       ))}
     </div>
   );
 
-  const LoadingModal = () => (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div
-        className={`
-          rounded-2xl p-8 max-w-sm w-full
-          ${isDarkMode ? "bg-gray-800" : "bg-white"}
-          shadow-2xl
-        `}
-      >
-        <div className="flex flex-col items-center space-y-4">
-          {/* Animated Icon */}
-          <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-green-400 to-green-600 rounded-full blur-xl opacity-50 animate-pulse"></div>
-            <div
-              className="relative w-20 h-20 bg-gradient-to-r from-green-400 to-green-600 rounded-full flex items-center justify-center animate-spin"
-              style={{ animationDuration: "3s" }}
-            >
-              <Star size={32} className="text-white" />
-            </div>
-          </div>
-
-          {/* Text */}
-          <div className="text-center space-y-2">
-            <h3
-              className={`
-                text-lg font-semibold
-                ${isDarkMode ? "text-white" : "text-gray-900"}
-              `}
-            >
-              {t("submittingReview") || "Submitting Review..."}
-            </h3>
-            <p
-              className={`
-                text-sm
-                ${isDarkMode ? "text-gray-400" : "text-gray-600"}
-              `}
-            >
-              {t("pleaseWaitWhileWeProcessYourReview") ||
-                "Please wait while we process your review"}
-            </p>
-          </div>
-
-          {/* Progress Bar */}
-          <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-green-400 to-green-600 rounded-full animate-pulse"
-              style={{
-                animation: "progress 2s ease-in-out infinite",
-              }}
-            ></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  const activeFilterCount = getActiveFiltersCount();
+  const currentCount =
+    activeTab === "pending"
+      ? pendingReviews.length
+      : getFilteredMyReviews().length;
 
   // ============================================================================
   // RENDER
   // ============================================================================
 
-  // Show loading while auth state is being determined
   if (authLoading) {
     return (
-      <div className={`min-h-screen flex items-center justify-center ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}>
-        <RefreshCw size={32} className="animate-spin text-green-500" />
+      <div className={`min-h-screen flex items-center justify-center pt-20 ${isDarkMode ? "bg-gray-950" : "bg-gray-50"}`}>
+        <div className="w-5 h-5 border-[3px] border-orange-200 border-t-orange-600 rounded-full animate-spin" />
       </div>
     );
   }
@@ -1002,453 +842,422 @@ export default function ReviewsPage() {
 
   const filteredMyReviews = getFilteredMyReviews();
 
+  const cardClass = isDarkMode
+    ? "bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all"
+    : "bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all";
+  const cardBorderClass = isDarkMode ? "border-b border-gray-800" : "border-b border-gray-50";
+  const headingColor = isDarkMode ? "text-white" : "text-gray-900";
+  const mutedColor = isDarkMode ? "text-gray-500" : "text-gray-400";
+  const bodyColor = isDarkMode ? "text-gray-300" : "text-gray-600";
+  const thumbBg = isDarkMode ? "bg-gray-800" : "bg-gray-50";
+  const inputClass = isDarkMode
+    ? "w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 text-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all"
+    : "w-full px-3 py-2 text-sm bg-gray-50/80 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500/20 focus:border-orange-300 outline-none transition-all";
+
   return (
-    <>
-      <div
-        className={`min-h-screen isolate ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
-      >
-        {/* Header */}
-        <div
-          className={`
-          sticky top-0 z-10 border-b
-          ${
-            isDarkMode
-              ? "bg-gray-900 border-gray-700"
-              : "bg-white border-gray-200"
-          }
-        `}
-        >
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <button
-                  onClick={() => router.back()}
-                  className={`
-                    p-2 rounded-lg transition-colors
-                    ${
-                      isDarkMode
-                        ? "hover:bg-gray-800 text-gray-400 hover:text-white"
-                        : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
-                    }
-                  `}
-                >
-                  <ArrowLeft size={20} />
-                </button>
-                <h1
-                  className={`
-                  text-xl font-bold
-                  ${isDarkMode ? "text-white" : "text-gray-900"}
-                `}
-                >
-                  {t("title") || "My Reviews"}
-                </h1>
-              </div>
-              <button
-                className={`
-                  p-2 rounded-lg transition-colors
-                  ${
-                    isDarkMode
-                      ? "hover:bg-gray-800 text-gray-400 hover:text-white"
-                      : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
-                  }
-                `}
-              >
-                <Calendar size={20} />
-              </button>
-            </div>
-
-            {/* Tab Bar */}
-            <div
-              className={`
-              mt-4 p-1 rounded-lg
-              ${isDarkMode ? "bg-gray-800" : "bg-gray-100"}
-            `}
+    <div className={`min-h-screen ${isDarkMode ? "bg-gray-950" : "bg-gray-50"}`}>
+      {/* Sticky Toolbar */}
+      <div className={`sticky top-14 z-30 backdrop-blur-xl border-b ${isDarkMode ? "bg-gray-950/80 border-gray-800/80" : "bg-white/80 border-gray-100/80"}`}>
+        <div className="max-w-4xl mx-auto">
+          {/* Row 1: Nav + Title + Actions */}
+          <div className="flex items-center gap-3 px-3 sm:px-6 py-2">
+            <button
+              onClick={() => router.back()}
+              className={`w-9 h-9 flex items-center justify-center border rounded-xl transition-colors flex-shrink-0 ${isDarkMode ? "bg-gray-800 border-gray-700 hover:bg-gray-700" : "bg-gray-50 border-gray-200 hover:bg-gray-100"}`}
             >
-              <div className="flex">
-                {(["pending", "myReviews"] as const).map((tab) => (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`
-                      flex-1 flex items-center justify-center space-x-2 py-2 px-4 rounded-md text-sm font-medium transition-all duration-200
-                      ${
-                        activeTab === tab
-                          ? "bg-green-500 text-white shadow-lg"
-                          : isDarkMode
-                          ? "text-gray-400 hover:text-white hover:bg-gray-700"
-                          : "text-gray-600 hover:text-gray-900 hover:bg-gray-200"
-                      }
-                    `}
-                  >
-                    {tab === "pending" ? (
-                      <>
-                        <ShoppingBag size={16} />
-                        <span>{t("toReview") || "To Review"}</span>
-                      </>
-                    ) : (
-                      <>
-                        <Star size={16} />
-                        <span>{t("myRatings") || "My Ratings"}</span>
-                      </>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
+              <ArrowLeft className={`w-4 h-4 ${isDarkMode ? "text-gray-300" : "text-gray-600"}`} />
+            </button>
+            <h1 className={`text-lg font-bold truncate ${headingColor}`}>
+              {t("title") || "My Reviews"}
+            </h1>
+            {currentCount > 0 && (
+              <span className={`px-2 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 ${isDarkMode ? "bg-orange-950/50 text-orange-400" : "bg-orange-50 text-orange-600"}`}>
+                {currentCount}
+              </span>
+            )}
+            <div className="flex-1" />
 
-            {/* Filters */}
-            <div className="flex items-center space-x-2 mt-4">
-              <button
-                className={`
-                  flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium border transition-colors
-                  ${
-                    getActiveFiltersCount() > 0
-                      ? "bg-orange-500 text-white border-orange-500"
-                      : isDarkMode
-                      ? "border-gray-600 text-gray-300 hover:bg-gray-800"
-                      : "border-gray-300 text-gray-700 hover:bg-gray-50"
-                  }
-                `}
-              >
-                <Filter size={16} />
-                <span>
-                  {getActiveFiltersCount() > 0
-                    ? `${t("filter")} (${getActiveFiltersCount()})`
-                    : t("filter") || "Filter"}
+            {/* Filter button */}
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`relative w-9 h-9 flex items-center justify-center border rounded-xl transition-all flex-shrink-0 ${
+                showFilters
+                  ? "bg-orange-500 border-orange-500 text-white"
+                  : isDarkMode
+                    ? "bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700"
+                    : "bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100"
+              }`}
+            >
+              <Filter className="w-4 h-4" />
+              {activeFilterCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                  {activeFilterCount}
                 </span>
-              </button>
-
-              {activeTab === "myReviews" && (
-                <>
-                  <button
-                    onClick={() =>
-                      setFilters((prev) => ({
-                        ...prev,
-                        reviewType:
-                          prev.reviewType === "product" ? "all" : "product",
-                      }))
-                    }
-                    className={`
-                      px-4 py-2 rounded-full text-sm font-medium border transition-colors
-                      ${
-                        filters.reviewType === "product"
-                          ? "bg-orange-500 text-white border-orange-500"
-                          : isDarkMode
-                          ? "border-gray-600 text-gray-300 hover:bg-gray-800"
-                          : "border-gray-300 text-gray-700 hover:bg-gray-50"
-                      }
-                    `}
-                  >
-                    {t("product") || "Product"}
-                  </button>
-
-                  <button
-                    onClick={() =>
-                      setFilters((prev) => ({
-                        ...prev,
-                        reviewType:
-                          prev.reviewType === "seller" ? "all" : "seller",
-                      }))
-                    }
-                    className={`
-                      px-4 py-2 rounded-full text-sm font-medium border transition-colors
-                      ${
-                        filters.reviewType === "seller"
-                          ? "bg-orange-500 text-white border-orange-500"
-                          : isDarkMode
-                          ? "border-gray-600 text-gray-300 hover:bg-gray-800"
-                          : "border-gray-300 text-gray-700 hover:bg-gray-50"
-                      }
-                    `}
-                  >
-                    {t("seller") || "Seller"}
-                  </button>
-                </>
               )}
+            </button>
+          </div>
+
+          {/* Row 2: Tab pills */}
+          <div className="px-3 sm:px-6 pb-2.5">
+            <div className={`flex gap-1 rounded-xl p-1 ${isDarkMode ? "bg-gray-800/80" : "bg-gray-100/80"}`}>
+              <button
+                onClick={() => setActiveTab("pending")}
+                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                  activeTab === "pending"
+                    ? isDarkMode ? "bg-gray-700 text-white shadow-sm" : "bg-white text-gray-900 shadow-sm"
+                    : isDarkMode ? "text-gray-400 hover:text-gray-300" : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                <ShoppingBag className="w-3.5 h-3.5" />
+                {t("toReview") || "To Review"}
+                {pendingReviews.length > 0 && (
+                  <span
+                    className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                      activeTab === "pending"
+                        ? isDarkMode ? "bg-orange-900/50 text-orange-400" : "bg-orange-100 text-orange-600"
+                        : isDarkMode ? "bg-gray-700 text-gray-400" : "bg-gray-200 text-gray-500"
+                    }`}
+                  >
+                    {pendingReviews.length}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setActiveTab("myReviews")}
+                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                  activeTab === "myReviews"
+                    ? isDarkMode ? "bg-gray-700 text-white shadow-sm" : "bg-white text-gray-900 shadow-sm"
+                    : isDarkMode ? "text-gray-400 hover:text-gray-300" : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                <Star className="w-3.5 h-3.5" />
+                {t("myRatings") || "My Ratings"}
+                {filteredMyReviews.length > 0 && (
+                  <span
+                    className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                      activeTab === "myReviews"
+                        ? isDarkMode ? "bg-green-900/50 text-green-400" : "bg-green-100 text-green-600"
+                        : isDarkMode ? "bg-gray-700 text-gray-400" : "bg-gray-200 text-gray-500"
+                    }`}
+                  >
+                    {filteredMyReviews.length}
+                  </span>
+                )}
+              </button>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Content */}
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 pb-16">
-          {activeTab === "pending" ? (
-            pendingReviews.length === 0 && !pendingLoading ? (
-              <div className="flex flex-col items-center justify-center py-16">
-                <div
-                  className={`
-                  w-24 h-24 rounded-full flex items-center justify-center mb-6
-                  ${isDarkMode ? "bg-gray-800" : "bg-gray-100"}
-                `}
+      {/* Content */}
+      <div className="max-w-4xl mx-auto px-3 sm:px-6 py-4">
+        {/* Filter Panel */}
+        {showFilters && (
+          <div className={`rounded-2xl border p-4 mb-4 ${isDarkMode ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"}`}>
+            <div className="flex items-center justify-between mb-3">
+              <span className={`text-[11px] font-semibold uppercase tracking-wider ${mutedColor}`}>
+                {t("filter") || "Filters"}
+              </span>
+              {activeFilterCount > 0 && (
+                <button
+                  onClick={() => {
+                    setFilters({ reviewType: "all" });
+                  }}
+                  className="text-[11px] text-orange-600 hover:text-orange-700 font-semibold"
                 >
-                  <Star
-                    size={32}
-                    className={isDarkMode ? "text-gray-400" : "text-gray-500"}
-                  />
+                  {t("clearFilters") || "Clear filters"}
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {activeTab === "myReviews" && (
+                <div>
+                  <label className={`text-[11px] font-semibold uppercase tracking-wider mb-1.5 block ${mutedColor}`}>
+                    {t("type") || "Type"}
+                  </label>
+                  <select
+                    value={filters.reviewType}
+                    onChange={(e) =>
+                      setFilters((prev) => ({
+                        ...prev,
+                        reviewType: e.target.value as
+                          | "all"
+                          | "product"
+                          | "seller",
+                      }))
+                    }
+                    className={inputClass}
+                  >
+                    <option value="all">{t("all") || "All"}</option>
+                    <option value="product">{t("product") || "Product"}</option>
+                    <option value="seller">{t("seller") || "Seller"}</option>
+                  </select>
                 </div>
-                <h3
-                  className={`
-                  text-lg font-medium mb-2
-                  ${isDarkMode ? "text-white" : "text-gray-900"}
-                `}
-                >
+              )}
+
+              <div>
+                <label className={`text-[11px] font-semibold uppercase tracking-wider mb-1.5 block ${mutedColor}`}>
+                  {t("startDate") || "Start Date"}
+                </label>
+                <input
+                  type="date"
+                  value={filters.startDate?.toISOString().split("T")[0] || ""}
+                  onChange={(e) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      startDate: e.target.value
+                        ? new Date(e.target.value)
+                        : undefined,
+                    }))
+                  }
+                  className={inputClass}
+                />
+              </div>
+
+              <div>
+                <label className={`text-[11px] font-semibold uppercase tracking-wider mb-1.5 block ${mutedColor}`}>
+                  {t("endDate") || "End Date"}
+                </label>
+                <input
+                  type="date"
+                  value={filters.endDate?.toISOString().split("T")[0] || ""}
+                  onChange={(e) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      endDate: e.target.value
+                        ? new Date(e.target.value)
+                        : undefined,
+                    }))
+                  }
+                  className={inputClass}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Pending Reviews Tab */}
+        {activeTab === "pending" ? (
+          <div className="space-y-3">
+            {pendingReviews.length === 0 && !pendingLoading ? (
+              <div className="text-center py-16">
+                <Star className={`w-12 h-12 mx-auto mb-3 ${isDarkMode ? "text-gray-700" : "text-gray-300"}`} />
+                <h3 className={`text-sm font-semibold mb-1 ${headingColor}`}>
                   {t("nothingToReview") || "Nothing to Review"}
                 </h3>
-                <p
-                  className={`
-                  text-center
-                  ${isDarkMode ? "text-gray-400" : "text-gray-600"}
-                `}
-                >
+                <p className={`text-xs max-w-xs mx-auto ${mutedColor}`}>
                   {t("noUnreviewedPurchases") ||
                     "You have no unreviewed purchases"}
                 </p>
               </div>
             ) : (
-              <div className="space-y-4">
-                {pendingReviews.map((review) => (
+              pendingReviews.map((review) => (
+                <div
+                  key={`${review.orderId}_${review.id}`}
+                  className={cardClass}
+                >
+                  {/* Product header */}
                   <div
-                    key={review.id}
-                    className={`
-                      rounded-lg border p-4 space-y-4
-                      ${
-                        isDarkMode
-                          ? "bg-gray-800 border-gray-700"
-                          : "bg-white border-gray-200"
-                      }
-                    `}
+                    className={`px-4 py-3 ${cardBorderClass} flex items-center gap-3 cursor-pointer`}
+                    onClick={() =>
+                      router.push(`/productdetail/${review.productId}`)
+                    }
                   >
-                    <ProductCard review={review} />
-
-                    <div className="flex space-x-2">
-                      {review.needsProductReview && (
-                        <button
-                          onClick={() => openReviewModal(review, "product")}
-                          className="
-                            flex-1 flex items-center justify-center space-x-2 py-2 px-4 rounded-lg text-sm font-medium
-                            bg-green-500 text-white hover:bg-green-600 transition-colors
-                          "
-                        >
-                          <Star size={16} />
-                          <span>
-                            {t("writeYourReview") || "Write Your Review"}
-                          </span>
-                        </button>
-                      )}
-
-                      {review.needsSellerReview && (
-                        <button
-                          onClick={() => openReviewModal(review, "seller")}
-                          className="
-                            flex-1 flex items-center justify-center space-x-2 py-2 px-4 rounded-lg text-sm font-medium
-                            bg-orange-500 text-white hover:bg-orange-600 transition-colors
-                          "
-                        >
-                          <Store size={16} />
-                          <span>
-                            {review.isShopProduct
-                              ? t("shopReview") || "Shop Review"
-                              : t("sellerReview") || "Seller Review"}
-                          </span>
-                        </button>
+                    <div className={`w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 relative ${thumbBg}`}>
+                      {review.productImage ? (
+                        <Image
+                          src={review.productImage}
+                          alt={review.productName}
+                          fill
+                          className="object-cover"
+                          sizes="40px"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Package className={`w-4 h-4 ${isDarkMode ? "text-gray-600" : "text-gray-300"}`} />
+                        </div>
                       )}
                     </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className={`font-semibold text-sm truncate ${headingColor}`}>
+                        {review.productName}
+                      </h3>
+                      <p className="text-xs font-bold text-orange-600 mt-0.5">
+                        ₺{review.productPrice.toLocaleString()}
+                      </p>
+                    </div>
+                    <span className={`text-[11px] flex-shrink-0 ${mutedColor}`}>
+                      {review.timestamp?.toDate().toLocaleDateString("tr-TR")}
+                    </span>
                   </div>
-                ))}
+
+                  {/* Action buttons */}
+                  <div className="px-4 py-3 flex items-center gap-2">
+                    {review.needsProductReview && (
+                      <button
+                        onClick={() => openReviewModal(review, "product")}
+                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-orange-500 text-white rounded-xl hover:bg-orange-600 transition-colors text-xs font-medium"
+                      >
+                        <Star className="w-3.5 h-3.5" />
+                        {t("writeYourReview") || "Write Your Review"}
+                      </button>
+                    )}
+                    {review.needsSellerReview && (
+                      <button
+                        onClick={() => openReviewModal(review, "seller")}
+                        className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl transition-colors text-xs font-medium ${isDarkMode ? "bg-gray-800 text-gray-300 hover:bg-gray-700" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+                      >
+                        <Store className="w-3.5 h-3.5" />
+                        {review.isShopProduct
+                          ? t("shopReview") || "Shop Review"
+                          : t("sellerReview") || "Seller Review"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+
+            {pendingLoading && (
+              <div className="flex justify-center py-8">
+                <div className="w-5 h-5 border-[3px] border-orange-200 border-t-orange-600 rounded-full animate-spin" />
               </div>
-            )
-          ) : filteredMyReviews.length === 0 && !myReviewsLoading ? (
-            <div className="flex flex-col items-center justify-center py-16">
-              <div
-                className={`
-                  w-24 h-24 rounded-full flex items-center justify-center mb-6
-                  ${isDarkMode ? "bg-gray-800" : "bg-gray-100"}
-                `}
-              >
-                <Star
-                  size={32}
-                  className={isDarkMode ? "text-gray-400" : "text-gray-500"}
-                />
+            )}
+          </div>
+        ) : (
+          /* My Reviews Tab */
+          <div className="space-y-3">
+            {filteredMyReviews.length === 0 && !myReviewsLoading ? (
+              <div className="text-center py-16">
+                <Star className={`w-12 h-12 mx-auto mb-3 ${isDarkMode ? "text-gray-700" : "text-gray-300"}`} />
+                <h3 className={`text-sm font-semibold mb-1 ${headingColor}`}>
+                  {t("youHaveNoReviews") || "You Have No Reviews"}
+                </h3>
+                <p className={`text-xs max-w-xs mx-auto ${mutedColor}`}>
+                  {t("startReviewingProducts") ||
+                    "Start reviewing products you've purchased"}
+                </p>
               </div>
-              <h3
-                className={`
-                  text-lg font-medium mb-2
-                  ${isDarkMode ? "text-white" : "text-gray-900"}
-                `}
-              >
-                {t("youHaveNoReviews") || "You Have No Reviews"}
-              </h3>
-              <p
-                className={`
-                  text-center
-                  ${isDarkMode ? "text-gray-400" : "text-gray-600"}
-                `}
-              >
-                {t("startReviewingProducts") ||
-                  "Start reviewing products you've purchased"}
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {filteredMyReviews.map((review) => (
+            ) : (
+              filteredMyReviews.map((review) => (
                 <div
-                  key={review.id}
-                  className={`
-                      rounded-lg border p-4 space-y-4
-                      ${
-                        isDarkMode
-                          ? "bg-gray-800 border-gray-700"
-                          : "bg-white border-gray-200"
-                      }
-                    `}
+                  key={`${review.orderId}_${review.id}`}
+                  className={cardClass}
                 >
+                  {/* Product/Seller header */}
                   {review.productId ? (
                     <div
-                      className={`
-                          p-4 rounded-lg border cursor-pointer transition-colors duration-200
-                          ${
-                            isDarkMode
-                              ? "bg-gray-700 border-gray-600 hover:border-gray-500"
-                              : "bg-gray-50 border-gray-200 hover:border-gray-300"
-                          }
-                        `}
+                      className={`px-4 py-3 ${cardBorderClass} flex items-center gap-3 cursor-pointer`}
                       onClick={() =>
                         router.push(`/productdetail/${review.productId}`)
                       }
                     >
-                      <div className="flex space-x-3">
-                        <div className="relative w-16 h-16 flex-shrink-0">
+                      <div className={`w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 relative ${thumbBg}`}>
+                        {review.productImage ? (
                           <Image
-                            src={
-                              review.productImage || "/placeholder-product.png"
-                            }
+                            src={review.productImage}
                             alt={review.productName || "Product"}
                             fill
-                            className="object-cover rounded-lg"
+                            className="object-cover"
+                            sizes="40px"
                           />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h4
-                            className={`
-                              font-medium text-sm line-clamp-2
-                              ${isDarkMode ? "text-white" : "text-gray-900"}
-                            `}
-                          >
-                            {review.productName}
-                          </h4>
-                          {review.productPrice && (
-                            <div className="flex items-center space-x-2 mt-1">
-                              <span
-                                className={`
-                                  font-bold text-sm
-                                  ${
-                                    isDarkMode
-                                      ? "text-green-400"
-                                      : "text-green-600"
-                                  }
-                                `}
-                              >
-                                ₺{review.productPrice.toLocaleString()}
-                              </span>
-                            </div>
-                          )}
-                        </div>
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Package className={`w-4 h-4 ${isDarkMode ? "text-gray-600" : "text-gray-300"}`} />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className={`font-semibold text-sm truncate ${headingColor}`}>
+                          {review.productName}
+                        </h3>
+                        {review.productPrice && (
+                          <p className="text-xs font-bold text-orange-600 mt-0.5">
+                            ₺{review.productPrice.toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                        {renderStars(review.rating)}
+                        <span className={`text-[11px] ${mutedColor}`}>
+                          {review.timestamp
+                            ?.toDate()
+                            .toLocaleDateString("tr-TR")}
+                        </span>
                       </div>
                     </div>
                   ) : (
-                    <div
-                      className={`
-                        p-4 rounded-lg
-                        ${isDarkMode ? "bg-gray-700" : "bg-gray-50"}
-                      `}
-                    >
-                      <p
-                        className={`
-                          font-medium
-                          ${isDarkMode ? "text-white" : "text-gray-900"}
-                        `}
-                      >
-                        {t("sellerReview")}:{" "}
-                        {review.sellerName || "Unknown Seller"}
-                      </p>
+                    <div className={`px-4 py-3 ${cardBorderClass} flex items-center gap-3`}>
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isDarkMode ? "bg-orange-950/50" : "bg-orange-50"}`}>
+                        <Store className="w-4 h-4 text-orange-500" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className={`font-semibold text-sm ${headingColor}`}>
+                          {t("sellerReview") || "Seller Review"}
+                        </h3>
+                        <p className={`text-xs mt-0.5 ${mutedColor}`}>
+                          {review.sellerName || "Unknown Seller"}
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                        {renderStars(review.rating)}
+                        <span className={`text-[11px] ${mutedColor}`}>
+                          {review.timestamp
+                            ?.toDate()
+                            .toLocaleDateString("tr-TR")}
+                        </span>
+                      </div>
                     </div>
                   )}
 
-                  <div
-                    className={`
-                      p-4 rounded-lg
-                      ${isDarkMode ? "bg-gray-700" : "bg-gray-50"}
-                    `}
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <StarRating value={review.rating} readonly />
-                      <span
-                        className={`
-                          text-xs
-                          ${isDarkMode ? "text-gray-400" : "text-gray-600"}
-                        `}
-                      >
-                        {formatDate(review.timestamp)}
-                      </span>
-                    </div>
-
-                    <p
-                      className={`
-                        text-sm mb-3
-                        ${isDarkMode ? "text-gray-200" : "text-gray-800"}
-                      `}
-                    >
-                      {review.review}
-                    </p>
-
+                  {/* Review body */}
+                  <div className="px-4 py-3">
                     {review.imageUrls && review.imageUrls.length > 0 && (
-                      <div className="flex space-x-2 overflow-x-auto">
-                        {review.imageUrls.map((url, index) => (
-                          <div
-                            key={index}
-                            className="relative w-16 h-16 flex-shrink-0"
+                      <div className="flex gap-2 mb-2.5">
+                        {review.imageUrls.map((url, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => setSelectedImage(url)}
+                            className={`w-14 h-14 rounded-xl overflow-hidden hover:opacity-80 transition-opacity relative flex-shrink-0 ${thumbBg}`}
                           >
                             <Image
                               src={url}
-                              alt={`Review image ${index + 1}`}
+                              alt={`Review image ${idx + 1}`}
                               fill
-                              className="object-cover rounded-lg cursor-pointer"
-                              onClick={() => window.open(url, "_blank")}
+                              className="object-cover"
+                              sizes="56px"
                             />
-                          </div>
+                          </button>
                         ))}
                       </div>
                     )}
+
+                    {review.review && (
+                      <p className={`text-sm leading-relaxed ${bodyColor}`}>
+                        {review.review}
+                      </p>
+                    )}
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
+              ))
+            )}
 
-          {(pendingLoading || myReviewsLoading) && (
-            <div className="flex justify-center py-8">
-              <RefreshCw size={24} className="animate-spin text-green-500" />
-            </div>
-          )}
-        </div>
+            {myReviewsLoading && (
+              <div className="flex justify-center py-8">
+                <div className="w-5 h-5 border-[3px] border-orange-200 border-t-orange-600 rounded-full animate-spin" />
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Review Modal */}
       {showReviewModal && selectedReview && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div
-            className={`
-              w-full max-w-md rounded-xl p-6
-              ${isDarkMode ? "bg-gray-800" : "bg-white"}
-              shadow-2xl max-h-[90vh] overflow-y-auto
-            `}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h3
-                className={`
-                  text-lg font-bold
-                  ${isDarkMode ? "text-white" : "text-gray-900"}
-                `}
-              >
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className={`rounded-2xl max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto ${isDarkMode ? "bg-gray-900" : "bg-white"}`}>
+            {/* Header */}
+            <div className={`flex items-center justify-between p-4 border-b ${isDarkMode ? "border-gray-800" : "border-gray-100"}`}>
+              <h3 className={`text-base font-bold ${headingColor}`}>
                 {reviewType === "product"
                   ? t("productReview") || "Product Review"
                   : t("sellerReview") || "Seller Review"}
@@ -1458,79 +1267,81 @@ export default function ReviewsPage() {
                   setShowReviewModal(false);
                   resetReviewForm();
                 }}
-                className={`
-                    p-1 rounded-full transition-colors
-                    ${
-                      isDarkMode
-                        ? "hover:bg-gray-700 text-gray-400"
-                        : "hover:bg-gray-100 text-gray-500"
-                    }
-                  `}
+                className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${isDarkMode ? "hover:bg-gray-800" : "hover:bg-gray-100"}`}
               >
-                <X size={20} />
+                <X className={`w-4 h-4 ${mutedColor}`} />
               </button>
             </div>
 
-            <div className="space-y-4">
-              <div className="flex flex-col items-center space-y-2">
-                <StarRating value={rating} onChange={setRating} />
-                <p
-                  className={`
-                    text-sm
-                    ${isDarkMode ? "text-gray-400" : "text-gray-600"}
-                  `}
-                >
+            {/* Body */}
+            <div className="p-4 space-y-4">
+              {/* Star Rating */}
+              <div className="flex flex-col items-center gap-2">
+                <div className="flex items-center gap-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setRating(star)}
+                      className="hover:scale-110 transition-transform"
+                    >
+                      <Star
+                        className={`w-7 h-7 ${
+                          star <= rating
+                            ? "fill-amber-400 text-amber-400"
+                            : isDarkMode ? "text-gray-600" : "text-gray-200"
+                        }`}
+                      />
+                    </button>
+                  ))}
+                </div>
+                <p className={`text-[11px] ${mutedColor}`}>
                   {t("tapToRate") || "Tap to rate"}
                 </p>
               </div>
 
-              <textarea
-                value={reviewText}
-                onChange={(e) => setReviewText(e.target.value)}
-                placeholder={
-                  t("pleaseEnterYourReview") || "Please enter your review..."
-                }
-                rows={4}
-                className={`
-                    w-full px-3 py-2 rounded-lg border resize-none
-                    ${
-                      isDarkMode
-                        ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-                        : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
-                    }
-                    focus:ring-2 focus:ring-green-500 focus:border-transparent
-                  `}
-              />
+              {/* Review Text */}
+              <div>
+                <label className={`text-[11px] font-semibold uppercase tracking-wider mb-1.5 block ${mutedColor}`}>
+                  {t("yourReview") || "Your Review"}
+                </label>
+                <textarea
+                  value={reviewText}
+                  onChange={(e) => setReviewText(e.target.value)}
+                  placeholder={
+                    t("pleaseEnterYourReview") || "Please enter your review..."
+                  }
+                  rows={4}
+                  className={`w-full px-3 py-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 outline-none resize-none transition-all ${isDarkMode ? "bg-gray-800 border-gray-700 text-gray-200 focus:border-orange-500 placeholder-gray-500" : "border-gray-200 focus:border-orange-300"}`}
+                />
+              </div>
 
+              {/* Image Upload - product reviews only */}
               {reviewType === "product" && (
-                <div className="space-y-3">
-                  <p
-                    className={`
-                      text-sm font-medium
-                      ${isDarkMode ? "text-white" : "text-gray-900"}
-                    `}
-                  >
+                <div>
+                  <label className={`text-[11px] font-semibold uppercase tracking-wider mb-1.5 block ${mutedColor}`}>
                     {t("uploadPhotos") || "Upload Photos"}
-                  </p>
+                  </label>
 
                   {reviewImages.length > 0 && (
-                    <div className="flex space-x-2 overflow-x-auto">
+                    <div className="flex gap-2 mb-2.5">
                       {reviewImages.map((file, index) => (
                         <div
                           key={index}
-                          className="relative w-16 h-16 flex-shrink-0"
+                          className={`w-14 h-14 rounded-xl overflow-hidden relative flex-shrink-0 ${thumbBg}`}
                         >
                           <Image
                             src={URL.createObjectURL(file)}
                             alt={`New image ${index + 1}`}
                             fill
-                            className="object-cover rounded-lg"
+                            className="object-cover"
+                            sizes="56px"
                           />
                           <button
                             onClick={() => removeImage(index)}
-                            className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs"
+                            className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center"
                           >
-                            <X size={12} />
+                            <X className="w-2.5 h-2.5" />
                           </button>
                         </div>
                       ))}
@@ -1540,20 +1351,10 @@ export default function ReviewsPage() {
                   {reviewImages.length < MAX_IMAGES && (
                     <button
                       onClick={() => fileInputRef.current?.click()}
-                      className="
-                          flex items-center space-x-2 px-4 py-2 rounded-lg border-2 border-dashed
-                          border-gray-300 hover:border-green-500 transition-colors
-                        "
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 border-dashed transition-colors text-xs ${isDarkMode ? "border-gray-700 text-gray-400 hover:border-orange-500" : "border-gray-200 text-gray-500 hover:border-orange-300"}`}
                     >
-                      <Camera size={16} className="text-gray-400" />
-                      <span
-                        className={`
-                          text-sm
-                          ${isDarkMode ? "text-gray-400" : "text-gray-600"}
-                        `}
-                      >
-                        {t("addImage") || "Add Image"}
-                      </span>
+                      <Camera className="w-3.5 h-3.5" />
+                      {t("addImage") || "Add Image"}
                     </button>
                   )}
 
@@ -1567,47 +1368,82 @@ export default function ReviewsPage() {
                   />
                 </div>
               )}
+            </div>
 
-              <div className="flex space-x-3 mt-6">
-                <button
-                  onClick={() => {
-                    setShowReviewModal(false);
-                    resetReviewForm();
-                  }}
-                  className={`
-                      flex-1 py-2 px-4 rounded-lg
-                      ${
-                        isDarkMode
-                          ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                      }
-                      transition-colors duration-200
-                    `}
-                >
-                  {t("cancel") || "Cancel"}
-                </button>
-                <button
-                  onClick={handleReviewSubmit}
-                  disabled={rating === 0 || !reviewText.trim()}
-                  className="
-                      flex-1 flex items-center justify-center space-x-2 py-2 px-4 rounded-lg
-                      bg-green-500 text-white hover:bg-green-600
-                      disabled:opacity-50 disabled:cursor-not-allowed
-                      transition-colors duration-200
-                    "
-                >
-                  <Send size={16} />
-                  <span>{t("submit") || "Submit"}</span>
-                </button>
-              </div>
+            {/* Footer */}
+            <div className={`flex gap-2 p-4 border-t ${isDarkMode ? "border-gray-800" : "border-gray-100"}`}>
+              <button
+                onClick={() => {
+                  setShowReviewModal(false);
+                  resetReviewForm();
+                }}
+                className={`flex-1 px-4 py-2.5 rounded-xl transition-colors text-sm font-medium ${isDarkMode ? "bg-gray-800 text-gray-300 hover:bg-gray-700" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+              >
+                {t("cancel") || "Cancel"}
+              </button>
+              <button
+                onClick={handleReviewSubmit}
+                disabled={rating === 0 || !reviewText.trim()}
+                className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 bg-orange-500 text-white rounded-xl hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+              >
+                <Send className="w-3.5 h-3.5" />
+                {t("submit") || "Submit"}
+              </button>
             </div>
           </div>
         </div>
       )}
 
       {/* Loading Modal */}
-      {showLoadingModal && <LoadingModal />}
-    
-    </>
+      {showLoadingModal && (
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className={`rounded-2xl p-8 max-w-sm w-full shadow-2xl ${isDarkMode ? "bg-gray-900" : "bg-white"}`}>
+            <div className="flex flex-col items-center gap-4">
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${isDarkMode ? "bg-orange-950/50" : "bg-orange-50"}`}>
+                <div className="w-5 h-5 border-[3px] border-orange-200 border-t-orange-600 rounded-full animate-spin" />
+              </div>
+              <div className="text-center">
+                <h3 className={`text-sm font-semibold mb-1 ${headingColor}`}>
+                  {t("submittingReview") || "Submitting Review..."}
+                </h3>
+                <p className={`text-xs ${mutedColor}`}>
+                  {t("pleaseWaitWhileWeProcessYourReview") ||
+                    "Please wait while we process your review"}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Image Lightbox */}
+      {selectedImage && (
+        <div
+          className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={() => setSelectedImage(null)}
+        >
+          <button
+            onClick={() => setSelectedImage(null)}
+            className="fixed top-4 right-4 z-50 w-9 h-9 flex items-center justify-center bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-xl text-white transition-colors"
+            aria-label="Close"
+          >
+            <X className="w-4 h-4" />
+          </button>
+          <div
+            className="relative max-w-4xl max-h-[90vh] w-full flex items-center justify-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Image
+              src={selectedImage}
+              alt="Review image"
+              width={800}
+              height={600}
+              className="max-w-full max-h-[90vh] w-auto h-auto object-contain rounded-2xl"
+              priority
+            />
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
