@@ -125,11 +125,8 @@ interface SellerInfo {
   iban: string;
 }
 
-interface SellerInfoPageProps {
-  shopId?: string;
-}
-
-export default function SellerInfoPage({ shopId }: SellerInfoPageProps) {
+export default function SellerInfoPage() {
+  const shopId = undefined;
   const router = useRouter();
   const { user } = useUser();
   const t = useTranslations();
