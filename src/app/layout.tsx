@@ -7,7 +7,7 @@ const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
   weight: ["400", "500", "600", "700"], // Reduced from 9 weights to 4
-  display: "swap", // Prevents render-blocking
+  display: "optional", // Prevents CLS from font swap
   preload: true,
 });
 
@@ -15,7 +15,7 @@ const figtree = Figtree({
   subsets: ["latin"],
   variable: "--font-figtree",
   weight: ["400", "500", "600", "700"], // Reduced from 7 weights to 4
-  display: "swap", // Prevents render-blocking
+  display: "optional", // Prevents CLS from font swap
   preload: true,
 });
 

@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, useEffect, lazy, Suspense, useMemo, useCallback, memo } from "react";
+import React, { lazy, Suspense, useMemo, useCallback, memo } from "react";
 import { useLocale } from "next-intl";
 import { useTheme } from "@/hooks/useTheme";
-import { MarketWidgetConfig, WidgetType } from "@/types/MarketLayout";
+import { MarketWidgetConfig } from "@/types/MarketLayout";
 
 // ============================================================================
 // EAGERLY LOADED — above-the-fold critical components
@@ -74,19 +74,11 @@ interface WidgetRendererProps {
   isDarkMode: boolean;
   locale: string;
   onNavigation: (index: number) => void;
-  hasScrolled: boolean;
 }
 
-const CRITICAL_WIDGETS: WidgetType[] = ["market_bubbles", "preference_product"];
-
 const WidgetRenderer = memo(
-  ({ widget, isDarkMode, locale, onNavigation, hasScrolled }: WidgetRendererProps) => {
+  ({ widget, isDarkMode, locale, onNavigation }: WidgetRendererProps) => {
     const bgClass = isDarkMode ? "bg-gray-900" : "bg-gray-50";
-
-    // Below-fold widgets wait for scroll before rendering
-    if (!CRITICAL_WIDGETS.includes(widget.type) && !hasScrolled) {
-      return null;
-    }
 
     let content: React.ReactNode = null;
 
@@ -201,28 +193,7 @@ interface HomeWidgetsProps {
 
 export default function HomeWidgets({ widgets }: HomeWidgetsProps) {
   const isDarkMode = useTheme();
-  const [hasScrolled, setHasScrolled] = useState(false);
   const locale = useLocale();
-
-  // Scroll detection for lazy loading below-fold widgets
-  useEffect(() => {
-    const checkInitialState = () => {
-      if (window.scrollY > 200 || window.innerHeight > 900) {
-        setHasScrolled(true);
-      }
-    };
-
-    checkInitialState();
-
-    const handleScroll = () => {
-      if (!hasScrolled && window.scrollY > 200) {
-        setHasScrolled(true);
-      }
-    };
-
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [hasScrolled]);
 
   const handleNavigation = useCallback((index: number) => {
     console.log("Navigate to:", index);
@@ -237,10 +208,9 @@ export default function HomeWidgets({ widgets }: HomeWidgetsProps) {
           isDarkMode={isDarkMode}
           locale={locale}
           onNavigation={handleNavigation}
-          hasScrolled={hasScrolled}
         />
       )),
-    [widgets, isDarkMode, locale, handleNavigation, hasScrolled]
+    [widgets, isDarkMode, locale, handleNavigation]
   );
 
   return (

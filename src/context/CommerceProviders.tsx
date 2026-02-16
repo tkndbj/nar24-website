@@ -45,7 +45,7 @@ export const CommerceProviders: React.FC<CommerceProvidersProps> = ({
   return (
     <ProductCacheProvider>
       <CartProvider user={user} db={db} functions={functions}>
-        <FavoritesProvider>
+        <FavoritesProvider db={db}>
           <CouponProvider user={user} db={db}>
             <DiscountSelectionProvider>
               {children}

@@ -10,17 +10,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  query,
-  where,
-  orderBy,
-  limit,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { getFirebaseDb } from "@/lib/firebase-lazy";
 
 // ============================================================================
 // TYPES
@@ -82,10 +72,13 @@ export function useShops(): UseShopsReturn {
 
   const setupSubscription = useCallback(async () => {
     safeSetState({ isLoading: true, error: null });
-  
+
     try {
+      const [db, { collection, doc, getDoc, getDocs, query, where, orderBy, limit }] =
+        await Promise.all([getFirebaseDb(), import("firebase/firestore")]);
+
       const shops: Shop[] = [];
-  
+
       // ========================================
       // 1. Try to get configured featured shops
       // ========================================

@@ -1,28 +1,38 @@
 "use client";
 
 import { useEffect, ReactNode } from "react";
-import { memoryManager } from "@/app/utils/memoryManager";
-import { userActivityService } from "@/services/userActivity";
 
 /**
  * AppInitializer - Handles global app initialization
+ * Defers non-critical work to avoid blocking the main thread during initial render.
  * Should be included at the root level (outside UserProvider)
  */
 export function AppInitializer({ children }: { children: ReactNode }) {
   useEffect(() => {
-    // Initialize memory manager
-    memoryManager.setupMemoryManagement();
-    console.log("✅ Memory manager initialized");
+    // Defer initialization to avoid blocking first paint / TBT
+    const schedule =
+      typeof requestIdleCallback !== "undefined"
+        ? requestIdleCallback
+        : (cb: () => void) => setTimeout(cb, 1);
 
-    // Initialize UserActivityService
-    userActivityService.initialize();
-    console.log("✅ UserActivityService initialized");
+    const id = schedule(async () => {
+      const [{ memoryManager }, { userActivityService }] = await Promise.all([
+        import("@/app/utils/memoryManager"),
+        import("@/services/userActivity"),
+      ]);
+      memoryManager.setupMemoryManagement();
+      userActivityService.initialize();
+    });
 
-    // Cleanup on unmount
     return () => {
-      memoryManager.dispose();
-      userActivityService.dispose();
-      console.log("✅ Services disposed");
+      if (typeof cancelIdleCallback !== "undefined") {
+        cancelIdleCallback(id as number);
+      }
+      // Lazy cleanup — only dispose if modules were loaded
+      import("@/app/utils/memoryManager").then((m) => m.memoryManager.dispose());
+      import("@/services/userActivity").then((m) =>
+        m.userActivityService.dispose()
+      );
     };
   }, []);
 

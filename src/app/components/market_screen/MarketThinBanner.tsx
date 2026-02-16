@@ -3,15 +3,8 @@
 import React, { useState, useEffect, useRef, useCallback, memo } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  onSnapshot,
-  Unsubscribe,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import type { Unsubscribe } from "firebase/firestore";
+import { getFirebaseDb } from "@/lib/firebase-lazy";
 
 /**
  * MarketThinBanner Component
@@ -96,11 +89,13 @@ const MarketThinBanner = memo(
     useEffect(() => {
       isMountedRef.current = true;
 
-      const setupSubscription = () => {
+      const setupSubscription = async () => {
         try {
-          // Query matching Flutter:
-          // .where('isActive', isEqualTo: true)
-          // .orderBy('createdAt', descending: true)
+          const [db, { collection, query, where, orderBy, onSnapshot }] =
+            await Promise.all([getFirebaseDb(), import("firebase/firestore")]);
+
+          if (!isMountedRef.current) return;
+
           const bannersQuery = query(
             collection(db, "market_thin_banners"),
             where("isActive", "==", true),

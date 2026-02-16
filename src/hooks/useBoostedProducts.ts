@@ -11,16 +11,8 @@
  */
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  limit,
-  onSnapshot,
-  Unsubscribe,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import type { Unsubscribe } from "firebase/firestore";
+import { getFirebaseDb } from "@/lib/firebase-lazy";
 
 // ============================================================================
 // TYPES
@@ -86,7 +78,7 @@ export function useBoostedProducts(): UseBoostedProductsReturn {
     []
   );
 
-  const setupSubscription = useCallback(() => {
+  const setupSubscription = useCallback(async () => {
     // Cleanup existing
     if (unsubscribeRef.current) {
       unsubscribeRef.current();
@@ -95,6 +87,9 @@ export function useBoostedProducts(): UseBoostedProductsReturn {
     safeSetState({ isLoading: true, error: null });
 
     try {
+      const [db, { collection, query, where, orderBy, limit, onSnapshot }] =
+        await Promise.all([getFirebaseDb(), import("firebase/firestore")]);
+
       // Query for boosted products
       // Matches Flutter: products where isBoosted == true, ordered by boostStartedAt
       const boostedQuery = query(
@@ -145,7 +140,7 @@ export function useBoostedProducts(): UseBoostedProductsReturn {
             isLoading: false,
             error: null,
             hasProducts: products.length > 0,
-            totalBoosted: snapshot.size, // This gives us the count from this query
+            totalBoosted: snapshot.size,
           });
         },
         (error) => {

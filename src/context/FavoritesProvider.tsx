@@ -32,9 +32,8 @@ import {
   FieldValue,
   orderBy,
   startAfter as firestoreStartAfter,
+  Firestore,
 } from "firebase/firestore";
-
-import { db } from "@/lib/firebase";
 import { useUser } from "./UserProvider";
 
 import metricsEventService from "@/services/cartfavoritesmetricsEventService";
@@ -260,12 +259,18 @@ const MAX_PAGINATED_CACHE = 200;
 
 interface FavoritesProviderProps {
   children: ReactNode;
+  db: Firestore | null;
 }
 
 export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   children,
+  db: dbProp,
 }) => {
   const { user } = useUser();
+
+  // Stable ref so callbacks always access the latest db without needing it in deps
+  const dbRef = useRef<Firestore | null>(dbProp);
+  dbRef.current = dbProp;
 
   // Rate limiters
   const addFavoriteLimiter = useRef(new RateLimiter(300));
@@ -366,11 +371,11 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
           // ✅ Query BOTH collections in parallel (like Flutter)
           const [productsSnap, shopProductsSnap] = await Promise.all([
             getDocs(
-              query(collection(db, "products"), where("__name__", "in", chunk))
+              query(collection(dbRef.current!, "products"), where("__name__", "in", chunk))
             ),
             getDocs(
               query(
-                collection(db, "shop_products"),
+                collection(dbRef.current!, "shop_products"),
                 where("__name__", "in", chunk)
               )
             ),
@@ -458,7 +463,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
     async (productId: string): Promise<string | null> => {
       try {
         // Try products collection first
-        const productDoc = await getDoc(doc(db, "products", productId));
+        const productDoc = await getDoc(doc(dbRef.current!, "products", productId));
 
         if (productDoc.exists()) {
           const data = productDoc.data();
@@ -467,7 +472,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
         // Try shop_products collection
         const shopProductDoc = await getDoc(
-          doc(db, "shop_products", productId)
+          doc(dbRef.current!, "shop_products", productId)
         );
 
         if (shopProductDoc.exists()) {
@@ -499,8 +504,8 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
       try {
         // ✅ Fetch BOTH collections in parallel
         const [productDoc, shopProductDoc] = await Promise.all([
-          getDoc(doc(db, "products", productId)),
-          getDoc(doc(db, "shop_products", productId)),
+          getDoc(doc(dbRef.current!, "products", productId)),
+          getDoc(doc(dbRef.current!, "shop_products", productId)),
         ]);
 
         // Prefer products collection if it exists
@@ -569,7 +574,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         ? `users/${user.uid}/favorite_baskets/${basketId}/favorites`
         : `users/${user.uid}/favorites`;
 
-      const snapshot = await getDocs(collection(db, collectionPath));
+      const snapshot = await getDocs(collection(dbRef.current!, collectionPath));
 
       const ids = new Set<string>();
       snapshot.docs.forEach((doc) => {
@@ -629,7 +634,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
       : `users/${user.uid}/favorites`;
 
     favoriteSubscription.current = onSnapshot(
-      collection(db, collectionPath),
+      collection(dbRef.current!, collectionPath),
       (snapshot) => {
         if (snapshot.metadata.fromCache) {
           console.log("⏭️ Skipping cache event");
@@ -715,7 +720,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
           // Check if already exists
           const existingSnap = await getDocs(
             query(
-              collection(db, collectionPath),
+              collection(dbRef.current!, collectionPath),
               where("productId", "==", productId),
               firestoreLimit(1)
             )
@@ -786,7 +791,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
               }
             });
 
-            await addDoc(collection(db, collectionPath), favoriteData);
+            await addDoc(collection(dbRef.current!, collectionPath), favoriteData);
 
             const metadata = await getProductMetadata(productId);
             userActivityService.trackFavorite({
@@ -804,8 +809,8 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
             try {
               // Fetch product details from BOTH collections
               const [productDoc, shopProductDoc] = await Promise.all([
-                getDoc(doc(db, "products", productId)),
-                getDoc(doc(db, "shop_products", productId)),
+                getDoc(doc(dbRef.current!, "products", productId)),
+                getDoc(doc(dbRef.current!, "shop_products", productId)),
               ]);
 
               let productData: ProductData | null = null;
@@ -974,13 +979,13 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
     async (productIds: string[], collectionPath: string) => {
       if (!user) return;
 
-      const batch = writeBatch(db);
+      const batch = writeBatch(dbRef.current!);
 
       // Process in chunks of 10 (Firestore whereIn limit)
       for (let i = 0; i < productIds.length; i += FIRESTORE_IN_LIMIT) {
         const chunk = productIds.slice(i, i + FIRESTORE_IN_LIMIT);
         const snap = await getDocs(
-          query(collection(db, collectionPath), where("productId", "in", chunk))
+          query(collection(dbRef.current!, collectionPath), where("productId", "in", chunk))
         );
 
         snap.docs.forEach((doc) => {
@@ -1012,12 +1017,12 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         // ✅ STEP 1: Get shopId BEFORE removal (NEW)
         const shopId = await getProductShopId(productId);
 
-        const batch = writeBatch(db);
+        const batch = writeBatch(dbRef.current!);
 
         // STEP 2: Remove from default favorites
         const defaultFavsSnap = await getDocs(
           query(
-            collection(db, `users/${user.uid}/favorites`),
+            collection(dbRef.current!, `users/${user.uid}/favorites`),
             where("productId", "==", productId)
           )
         );
@@ -1028,7 +1033,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
         // STEP 3: Remove from all baskets
         const basketsSnapshot = await getDocs(
-          collection(db, `users/${user.uid}/favorite_baskets`)
+          collection(dbRef.current!, `users/${user.uid}/favorite_baskets`)
         );
 
         for (const basketDoc of basketsSnapshot.docs) {
@@ -1137,7 +1142,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
         const itemSnapshot = await getDocs(
           query(
-            collection(db, currentCollectionPath),
+            collection(dbRef.current!, currentCollectionPath),
             where("productId", "==", productId),
             firestoreLimit(1)
           )
@@ -1154,7 +1159,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
           ? `users/${user.uid}/favorite_baskets/${targetBasketId}/favorites`
           : `users/${user.uid}/favorites`;
 
-        await addDoc(collection(db, targetCollectionPath), {
+        await addDoc(collection(dbRef.current!, targetCollectionPath), {
           ...itemData,
           addedAt: serverTimestamp(),
         });
@@ -1189,14 +1194,14 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
       try {
         const basketsSnapshot = await getDocs(
-          collection(db, `users/${user.uid}/favorite_baskets`)
+          collection(dbRef.current!, `users/${user.uid}/favorite_baskets`)
         );
 
         if (basketsSnapshot.docs.length >= MAX_BASKETS) {
           return "Maximum basket limit reached";
         }
 
-        await addDoc(collection(db, `users/${user.uid}/favorite_baskets`), {
+        await addDoc(collection(dbRef.current!, `users/${user.uid}/favorite_baskets`), {
           name,
           createdAt: serverTimestamp(),
         });
@@ -1217,7 +1222,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
       try {
         await deleteDoc(
-          doc(db, `users/${user.uid}/favorite_baskets/${basketId}`)
+          doc(dbRef.current!, `users/${user.uid}/favorite_baskets/${basketId}`)
         );
 
         if (selectedBasketIdRef.current === basketId) {
@@ -1258,7 +1263,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
       );
 
       let q = query(
-        collection(db, collectionPath),
+        collection(dbRef.current!, collectionPath),
         orderBy("addedAt", "desc"),
         firestoreLimit(limit + 1)
       );
@@ -1460,7 +1465,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
       try {
         const basketsSnap = await getDocs(
-          collection(db, `users/${user.uid}/favorite_baskets`)
+          collection(dbRef.current!, `users/${user.uid}/favorite_baskets`)
         );
 
         for (const basketDoc of basketsSnap.docs) {
@@ -1491,7 +1496,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
       try {
         const basketsSnap = await getDocs(
-          collection(db, `users/${user.uid}/favorite_baskets`)
+          collection(dbRef.current!, `users/${user.uid}/favorite_baskets`)
         );
 
         for (const basketDoc of basketsSnap.docs) {
@@ -1545,7 +1550,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
     }
 
     const basketsCollection = collection(
-      db,
+      dbRef.current!,
       `users/${user.uid}/favorite_baskets`
     );
 
@@ -1582,13 +1587,13 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   // EFFECTS
   // ========================================================================
 
-  // Handle user changes
+  // Handle user changes (guard on dbProp so we wait for Firebase to load)
   useEffect(() => {
-    if (user) {
+    if (user && dbProp) {
       clearUserData();
       initializeIfNeeded();
       subscribeToBaskets();
-    } else {
+    } else if (!user) {
       disableLiveUpdates();
       if (basketsSubscription.current) {
         basketsSubscription.current();
@@ -1598,6 +1603,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
     }
   }, [
     user,
+    dbProp,
     initializeIfNeeded,
     subscribeToBaskets,
     disableLiveUpdates,
@@ -1606,13 +1612,14 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
   // Re-subscribe when basket changes
   useEffect(() => {
-    if (user) {
+    if (user && dbProp) {
       disableLiveUpdates();
       loadFavoriteIds();
       enableLiveUpdates();
     }
   }, [
     user,
+    dbProp,
     selectedBasketId,
     loadFavoriteIds,
     enableLiveUpdates,

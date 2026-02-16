@@ -17,12 +17,12 @@ export default async function LocaleLayout({
 
   return (
     <>
-      {/* ✅ Google Analytics */}
+      {/* Google Analytics — lazyOnload to avoid blocking LCP/TBT */}
       <Script
         src="https://www.googletagmanager.com/gtag/js?id=G-WY8NC5PBFL"
-        strategy="afterInteractive"
+        strategy="lazyOnload"
       />
-      <Script id="google-analytics" strategy="afterInteractive">
+      <Script id="google-analytics" strategy="lazyOnload">
         {`
           window.dataLayer = window.dataLayer || [];
           function gtag(){dataLayer.push(arguments);}

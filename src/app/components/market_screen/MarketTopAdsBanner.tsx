@@ -7,16 +7,7 @@ import React, {
   useRef,
   useMemo,
 } from "react";
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  onSnapshot,
-  QuerySnapshot,
-  DocumentData,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { getFirebaseDb } from "@/lib/firebase-lazy";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 
@@ -120,67 +111,75 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
       console.error("Failed to restore banner color:", error);
     }
 
-    // ✅ MATCHES FLUTTER: Query with isActive filter and descending order
-    const q = query(
-      collection(db, "market_top_ads_banners"),
-      where("isActive", "==", true),
-      orderBy("createdAt", "desc")
-    );
+    let unsubscribe: (() => void) | null = null;
 
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot: QuerySnapshot<DocumentData>) => {
-        const items: BannerItem[] = [];
+    (async () => {
+      try {
+        const [db, { collection, query, where, orderBy, onSnapshot }] =
+          await Promise.all([getFirebaseDb(), import("firebase/firestore")]);
 
-        snapshot.docs.forEach((doc, index) => {
-          const data = doc.data();
-          const url = data.imageUrl as string;
+        const q = query(
+          collection(db, "market_top_ads_banners"),
+          where("isActive", "==", true),
+          orderBy("createdAt", "desc")
+        );
 
-          if (!url) return;
+        unsubscribe = onSnapshot(
+          q,
+          (snapshot) => {
+            const items: BannerItem[] = [];
 
-          const color = convertDominantColor(data.dominantColor as number);
+            snapshot.docs.forEach((doc, index) => {
+              const data = doc.data();
+              const url = data.imageUrl as string;
 
-          // ✅ MATCHES FLUTTER: Extract linkId from linkedShopId or linkedProductId
-          const linkId = data.linkedShopId || data.linkedProductId;
+              if (!url) return;
 
-          items.push({
-            id: doc.id, // ✅ MATCHES FLUTTER: Store document ID
-            url,
-            color,
-            linkType: data.linkType as string | undefined,
-            linkId: linkId as string | undefined,
-          });
+              const color = convertDominantColor(data.dominantColor as number);
+              const linkId = data.linkedShopId || data.linkedProductId;
 
-          // ✅ MATCHES FLUTTER: Prefetch images that aren't cached
-          if (!cachedUrls.current.has(url)) {
-            cachedUrls.current.add(url);
-            
-            // Prefetch with delay for non-first images
-            if (index > 0) {
-              setTimeout(() => {
-                const img = new window.Image();
-                img.src = url;
-              }, index * 100);
+              items.push({
+                id: doc.id,
+                url,
+                color,
+                linkType: data.linkType as string | undefined,
+                linkId: linkId as string | undefined,
+              });
+
+              if (!cachedUrls.current.has(url)) {
+                cachedUrls.current.add(url);
+                if (index > 0) {
+                  setTimeout(() => {
+                    const img = new window.Image();
+                    img.src = url;
+                  }, index * 100);
+                }
+              }
+            });
+
+            setBanners(items);
+            setIsLoading(false);
+
+            if (items.length > 0) {
+              updateBackgroundColor(items[0].color);
             }
+          },
+          (error) => {
+            console.error("Firestore error in AdsBanner:", error);
+            setIsLoading(false);
           }
-        });
+        );
 
-        setBanners(items);
-        setIsLoading(false);
-
-        // ✅ MATCHES FLUTTER: Update background with first banner's color
-        if (items.length > 0) {
-          updateBackgroundColor(items[0].color);
-        }
-      },
-      (error) => {
-        console.error("Firestore error in AdsBanner:", error);
+        unsubscribeRef.current = unsubscribe;
+      } catch (error) {
+        console.error("Failed to setup AdsBanner listener:", error);
         setIsLoading(false);
       }
-    );
+    })();
 
-    unsubscribeRef.current = unsubscribe;
-    return () => unsubscribe();
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [isClient, updateBackgroundColor]);
 
   // ✅ OPTIMIZED: Auto-slide with proper cleanup
