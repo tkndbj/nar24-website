@@ -16,7 +16,7 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
   OAuthProvider,
-  sendPasswordResetEmail,
+
   AuthError,
   getAdditionalUserInfo,
 } from "firebase/auth";
@@ -70,8 +70,8 @@ function LoginContent() {
     setNameComplete, // ✅ NEW: For Apple Sign-In
   } = useUser();
 
-  const [resetLoading, setResetLoading] = useState(false);
-  const [resetMessage, setResetMessage] = useState("");
+ 
+  const [resetMessage, ] = useState("");
 
   // State management
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
@@ -159,58 +159,9 @@ function LoginContent() {
     return () => clearTimeout(timer);
   }, [resendCooldown]);
 
-  const handleForgotPassword = async () => {
-    if (!email.trim()) {
-      toast.error(
-        t("LoginPage.emailRequired") || "Please enter your email address"
-      );
-      return;
-    }
-
-    if (!validateEmail(email)) {
-      toast.error(
-        t("LoginPage.invalidEmail") || "Please enter a valid email address"
-      );
-      return;
-    }
-
-    setResetLoading(true);
-    setResetMessage("");
-
-    try {
-      await sendPasswordResetEmail(auth, email.trim());
-      setResetMessage(
-        t("LoginPage.resetEmailSent") ||
-          "Password reset email sent! Please check your inbox."
-      );
-      toast.success(
-        t("LoginPage.resetEmailSent") || "Password reset email sent!"
-      );
-    } catch (error) {
-      const authError = error as AuthError;
-      let errorMessage =
-        t("LoginPage.resetEmailFailed") || "Failed to send reset email";
-
-      switch (authError.code) {
-        case "auth/user-not-found":
-          errorMessage =
-            t("LoginPage.userNotFound") || "No account found with this email";
-          break;
-        case "auth/invalid-email":
-          errorMessage = t("LoginPage.invalidEmail") || "Invalid email address";
-          break;
-        case "auth/too-many-requests":
-          errorMessage =
-            t("LoginPage.tooManyRequests") ||
-            "Too many requests. Please try again later";
-          break;
-      }
-
-      toast.error(errorMessage);
-    } finally {
-      setResetLoading(false);
-    }
-  };
+  const handleForgotPassword = () => {
+    router.push("/password-reset");
+};
 
   // Language switching function
   const switchLanguage = (newLocale: string, event?: React.MouseEvent) => {
@@ -1285,23 +1236,19 @@ function LoginContent() {
 
               {/* Forgot Password Link */}
               <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={handleForgotPassword}
-                  className={`text-sm font-medium transition-colors duration-200 ${
-                    isDark
-                      ? "text-gray-400 hover:text-gray-200"
-                      : "text-gray-600 hover:text-gray-800"
-                  } ${resetLoading ? "opacity-50 cursor-not-allowed" : ""}`}
-                  disabled={
-                    isLoading || isPending2FA || twoFAPending || resetLoading
-                  }
-                >
-                  {resetLoading
-                    ? t("LoginPage.sendingEmail") || "Sending..."
-                    : t("LoginPage.forgotPassword") || "Forgot Password?"}
-                </button>
-              </div>
+  <button
+    type="button"
+    onClick={handleForgotPassword}
+    className={`text-sm font-medium transition-colors duration-200 ${
+      isDark
+        ? "text-gray-400 hover:text-gray-200"
+        : "text-gray-600 hover:text-gray-800"
+    }`}
+    disabled={isLoading || isPending2FA || twoFAPending}
+  >
+    {t("LoginPage.forgotPassword") || "Forgot Password?"}
+  </button>
+</div>
 
               {/* Password Reset Success Message */}
               {resetMessage && (

@@ -16,6 +16,7 @@ export default function ConditionalHeader() {
     "/email-verification",
     "/complete-profile",
     "/complete-name",
+    "/password-reset",
   ];
 
   const shouldHideHeader =
