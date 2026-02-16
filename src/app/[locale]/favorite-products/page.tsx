@@ -14,7 +14,7 @@ import {
   User,
   LogIn,
   ShoppingBag,
-  RefreshCw,
+ 
   Search,
   CheckCircle,
   Circle,

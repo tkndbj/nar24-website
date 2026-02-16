@@ -7,7 +7,7 @@ import {
   PlusIcon,
   PencilSquareIcon,
   TrashIcon,
-  StarIcon,
+  
   UserIcon,
   ArrowPathIcon,
   ChevronDownIcon,
