@@ -25,6 +25,7 @@ import {
 import { useRouter } from "next/navigation";
 import { AllInOneCategoryData } from "@/constants/productData";
 import { useTranslations } from "next-intl";
+import { useTheme } from "@/hooks/useTheme";
 
 interface SecondHeaderProps {
   className?: string;
@@ -117,7 +118,7 @@ const REVERSE_CATEGORY_MAPPING: { [key: string]: string } = Object.entries(
 type DrawerState = "main" | "subcategory" | "subsubcategory";
 
 export default function SecondHeader({ className = "" }: SecondHeaderProps) {
-  const [isDark, setIsDark] = useState(false);
+  const isDark = useTheme();
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [showCategoriesMenu, setShowCategoriesMenu] = useState(false);
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
@@ -265,24 +266,6 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
     }
     return chunks;
   };
-
-  // Handle theme detection - same as main header
-  useEffect(() => {
-    const checkTheme = () => {
-      if (typeof document !== "undefined") {
-        setIsDark(document.documentElement.classList.contains("dark"));
-      }
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    if (typeof document !== "undefined") {
-      observer.observe(document.documentElement, {
-        attributes: true,
-        attributeFilter: ["class"],
-      });
-    }
-    return () => observer.disconnect();
-  }, []);
 
   useEffect(() => {
     if (typeof window !== "undefined") {

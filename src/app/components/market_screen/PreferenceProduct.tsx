@@ -7,13 +7,8 @@ import { ChevronRight, ChevronLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { personalizedFeedService } from "@/services/personalizedFeedService";
-import {
-  getFirestore,
-  query,
-  where,
-  getDocs,
-  collection,
-} from "firebase/firestore";
+import { getFirebaseDb } from "@/lib/firebase-lazy";
+import { useTheme } from "@/hooks/useTheme";
 import type { Product } from "@/app/models/Product";
 
 // GPU-accelerated shimmer loading component
@@ -155,25 +150,11 @@ export const PreferenceProduct = React.memo(
     const [error, setError] = useState<string | null>(null);
     const [canScrollLeft, setCanScrollLeft] = useState(false);
     const [canScrollRight, setCanScrollRight] = useState(false);
-    const [isDarkMode, setIsDarkMode] = useState(false);
+    const isDarkMode = useTheme();
 
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const router = useRouter();
     const t = useTranslations("MarketScreen");
-
-    // Detect app theme
-    useEffect(() => {
-      const checkTheme = () => {
-        setIsDarkMode(document.documentElement.classList.contains("dark"));
-      };
-      checkTheme();
-      const observer = new MutationObserver(checkTheme);
-      observer.observe(document.documentElement, {
-        attributes: true,
-        attributeFilter: ["class"],
-      });
-      return () => observer.disconnect();
-    }, []);
 
     // Fixed dimensions (matches Flutter)
     const portraitImageHeight = 380;
@@ -209,7 +190,10 @@ export const PreferenceProduct = React.memo(
         if (productIds.length === 0) return [];
 
         try {
-          const db = getFirestore();
+          const [db, { collection, query, where, getDocs }] = await Promise.all([
+            getFirebaseDb(),
+            import("firebase/firestore"),
+          ]);
           const productsRef = collection(db, "shop_products");
 
           // Firestore whereIn limit is 30

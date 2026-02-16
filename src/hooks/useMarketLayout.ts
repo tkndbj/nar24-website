@@ -15,8 +15,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { getFirebaseDb } from "@/lib/firebase-lazy";
 import {
   MarketWidgetConfig,
   MarketLayoutState,
@@ -182,6 +181,12 @@ export function useMarketLayout(
     log("Fetching layout...");
 
     try {
+      // Lazy load Firestore — keeps firebase out of the initial bundle
+      const [db, { doc, getDoc }] = await Promise.all([
+        getFirebaseDb(),
+        import("firebase/firestore"),
+      ]);
+
       let parsedWidgets: MarketWidgetConfig[] = [];
 
       // ========================================

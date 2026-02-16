@@ -1,8 +1,7 @@
 // lib/services/personalizedFeedService.ts
 // Production-ready personalized feed service for web with caching and fallbacks
 
-import { getFirestore, doc, getDoc } from "firebase/firestore";
-import { getAuth } from "firebase/auth";
+import { getFirebaseDb, getFirebaseAuth } from "@/lib/firebase-lazy";
 
 /**
  * Service for fetching personalized product recommendations
@@ -164,15 +163,13 @@ class PersonalizedFeedService {
     try {
       // Return cached trending if still valid
       if (this.isCacheValid(false) && this.cachedTrendingProducts) {
-        console.log(
-          `✅ Returning cached trending products (${this.cachedTrendingProducts.length})`
-        );
         return this.cachedTrendingProducts;
       }
 
-      console.log("📡 Fetching trending products from Firestore...");
-
-      const db = getFirestore();
+      const [db, { doc, getDoc }] = await Promise.all([
+        getFirebaseDb(),
+        import("firebase/firestore"),
+      ]);
       const trendingDoc = await getDoc(doc(db, "trending_products", "global"));
 
       if (!trendingDoc.exists()) {
@@ -216,15 +213,13 @@ class PersonalizedFeedService {
     try {
       // Return cached personalized feed if still valid
       if (this.isCacheValid(true) && this.cachedPersonalizedFeed) {
-        console.log(
-          `✅ Returning cached personalized feed (${this.cachedPersonalizedFeed.length})`
-        );
         return this.cachedPersonalizedFeed;
       }
 
-      console.log("📡 Fetching personalized feed from Firestore...");
-
-      const db = getFirestore();
+      const [db, { doc, getDoc }] = await Promise.all([
+        getFirebaseDb(),
+        import("firebase/firestore"),
+      ]);
       const feedDoc = await getDoc(
         doc(db, "user_profiles", userId, "personalized_feed", "current")
       );
@@ -291,7 +286,7 @@ class PersonalizedFeedService {
    */
   async getProductIds(): Promise<string[]> {
     try {
-      const auth = getAuth();
+      const auth = await getFirebaseAuth();
       const user = auth.currentUser;
 
       if (!user) {
@@ -325,7 +320,7 @@ class PersonalizedFeedService {
    */
   async forceRefresh(): Promise<string[]> {
     try {
-      const auth = getAuth();
+      const auth = await getFirebaseAuth();
       const user = auth.currentUser;
 
       if (!user) {
@@ -381,7 +376,7 @@ class PersonalizedFeedService {
    */
   async hasPersonalizedFeed(): Promise<boolean> {
     try {
-      const auth = getAuth();
+      const auth = await getFirebaseAuth();
       const user = auth.currentUser;
       if (!user) return false;
 
@@ -391,7 +386,10 @@ class PersonalizedFeedService {
       }
 
       // Check Firestore
-      const db = getFirestore();
+      const [db, { doc, getDoc }] = await Promise.all([
+        getFirebaseDb(),
+        import("firebase/firestore"),
+      ]);
       const feedDoc = await getDoc(
         doc(db, "user_profiles", user.uid, "personalized_feed", "current")
       );
@@ -408,11 +406,14 @@ class PersonalizedFeedService {
    */
   async getFeedMetadata(): Promise<Record<string, unknown> | null> {
     try {
-      const auth = getAuth();
+      const auth = await getFirebaseAuth();
       const user = auth.currentUser;
       if (!user) return null;
 
-      const db = getFirestore();
+      const [db, { doc, getDoc }] = await Promise.all([
+        getFirebaseDb(),
+        import("firebase/firestore"),
+      ]);
       const feedDoc = await getDoc(
         doc(db, "user_profiles", user.uid, "personalized_feed", "current")
       );

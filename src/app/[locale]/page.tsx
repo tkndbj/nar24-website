@@ -5,24 +5,25 @@ import { useLocale } from "next-intl";
 import SecondHeader from "../components/market_screen/SecondHeader";
 import Footer from "../components/Footer";
 import { useMarketLayout } from "@/hooks/useMarketLayout";
+import { useTheme } from "@/hooks/useTheme";
 import { MarketWidgetConfig, WidgetType } from "@/types/MarketLayout";
 
 // ============================================================================
 // LAZY LOADED COMPONENTS
 // ============================================================================
 
-// Critical components - loaded eagerly
+// Critical above-the-fold components — loaded eagerly
 import { MarketBubbles } from "../components/market_screen/MarketBubbles";
 import { PreferenceProduct } from "../components/market_screen/PreferenceProduct";
-import DynamicHorizontalList from "../components/market_screen/DynamicHorizontalList";
 
-// Below-the-fold components - lazy loaded
+// Below-the-fold components — lazy loaded (only fetched when needed)
 const MarketBanner = lazy(() => import("../components/market_screen/MarketBanner"));
-const AdsBanner = lazy(() => 
+const AdsBanner = lazy(() =>
   import("../components/market_screen/MarketTopAdsBanner").then(mod => ({ default: mod.AdsBanner }))
 );
 const ThinBanner = lazy(() => import("../components/market_screen/MarketThinBanner"));
 const BoostedProductCarousel = lazy(() => import("../components/market_screen/BoostedProductCarousel"));
+const DynamicHorizontalList = lazy(() => import("../components/market_screen/DynamicHorizontalList"));
 const ShopHorizontalList = lazy(() => import("../components/market_screen/ShopHorizontalList"));
 
 // ============================================================================
@@ -135,15 +136,8 @@ const WidgetRenderer = memo(({
       case "preference_product":
         return (
           <div className={`w-full ${bgClass}`}>
-            {/* Mobile: full width */}
-            <div className="block lg:hidden">
-              <PreferenceProduct keyPrefix="mobile-" />
-            </div>
-            {/* Desktop: centered layout */}
-            <div className="hidden lg:block">
-              <div className="max-w-[1400px] mx-auto">
-                <PreferenceProduct keyPrefix="desktop-" />
-              </div>
+            <div className="lg:max-w-[1400px] lg:mx-auto">
+              <PreferenceProduct keyPrefix="pref-" />
             </div>
           </div>
         );
@@ -159,18 +153,13 @@ const WidgetRenderer = memo(({
 
       case "dynamic_product_list":
         return (
-          <div className={`w-full ${bgClass}`}>
-            {/* Mobile: full width */}
-            <div className="block lg:hidden">
-              <DynamicHorizontalList keyPrefix="mobile-" />
-            </div>
-            {/* Desktop: centered layout */}
-            <div className="hidden lg:block">
-              <div className="max-w-[1400px] mx-auto">
-                <DynamicHorizontalList keyPrefix="desktop-" />
+          <Suspense fallback={<ComponentLoader isDark={isDarkMode} height="h-64" />}>
+            <div className={`w-full ${bgClass}`}>
+              <div className="lg:max-w-[1400px] lg:mx-auto">
+                <DynamicHorizontalList keyPrefix="dynamic-" />
               </div>
             </div>
-          </div>
+          </Suspense>
         );
 
       case "market_banner":
@@ -186,15 +175,8 @@ const WidgetRenderer = memo(({
         return (
           <Suspense fallback={<ComponentLoader isDark={isDarkMode} height="h-32" />}>
             <div className={`w-full ${bgClass}`}>
-              {/* Mobile: full width */}
-              <div className="block lg:hidden">
+              <div className="lg:max-w-[1400px] lg:mx-auto">
                 <ShopHorizontalList />
-              </div>
-              {/* Desktop: centered layout */}
-              <div className="hidden lg:block">
-                <div className="max-w-[1400px] mx-auto">
-                  <ShopHorizontalList />
-                </div>
               </div>
             </div>
           </Suspense>
@@ -302,43 +284,21 @@ LoadingState.displayName = "LoadingState";
 // ============================================================================
 
 export default function Home() {
-  // Theme state
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  // Shared theme hook — single MutationObserver for the whole app
+  const isDarkMode = useTheme();
   const [hasScrolled, setHasScrolled] = useState(false);
-  
+
   // Locale
   const locale = useLocale();
-  
+
   // Market layout hook
-  const { 
-    visibleWidgets, 
-    isLoading, 
-    error, 
+  const {
+    visibleWidgets,
+    isLoading,
+    error,
     isInitialized,
-    refresh 
+    refresh
   } = useMarketLayout({ debug: process.env.NODE_ENV === "development" });
-
-  // ============================================================================
-  // THEME DETECTION
-  // ============================================================================
-  
-  useEffect(() => {
-    const updateTheme = () => {
-      setIsDarkMode(document.documentElement.classList.contains("dark"));
-    };
-
-    // Initial check
-    updateTheme();
-
-    // Watch for theme changes
-    const observer = new MutationObserver(updateTheme);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["class"],
-    });
-
-    return () => observer.disconnect();
-  }, []);
 
   // ============================================================================
   // SCROLL DETECTION FOR LAZY LOADING

@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
+import { useTheme } from "@/hooks/useTheme";
 
 interface MarketBubblesProps {
   onNavItemTapped: (index: number) => void;
@@ -20,41 +21,8 @@ interface BubbleData {
 
 export const MarketBubbles: React.FC<MarketBubblesProps> = ({}) => {
   const router = useRouter();
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const isDarkMode = useTheme();
   const t = useTranslations("MarketBubbles");
-
-  // Handle theme detection - same logic as other components
-  useEffect(() => {
-    const checkTheme = () => {
-      if (typeof document !== "undefined") {
-        setIsDarkMode(document.documentElement.classList.contains("dark"));
-      }
-    };
-
-    // Initialize theme from localStorage or system preference
-    if (typeof document !== "undefined") {
-      const savedTheme = localStorage.getItem("theme");
-      const systemPrefersDark = window.matchMedia(
-        "(prefers-color-scheme: dark)"
-      ).matches;
-
-      if (savedTheme === "dark" || (!savedTheme && systemPrefersDark)) {
-        document.documentElement.classList.add("dark");
-      } else {
-        document.documentElement.classList.remove("dark");
-      }
-    }
-
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    if (typeof document !== "undefined") {
-      observer.observe(document.documentElement, {
-        attributes: true,
-        attributeFilter: ["class"],
-      });
-    }
-    return () => observer.disconnect();
-  }, []);
 
   const bubbles: BubbleData[] = [
     {
@@ -169,26 +137,7 @@ export const MarketBubblesWithIcons: React.FC<MarketBubblesProps> = ({
   onNavItemTapped,
 }) => {
   const router = useRouter();
-  const [isDarkMode, setIsDarkMode] = useState(false);
-
-  // Handle theme detection
-  useEffect(() => {
-    const checkTheme = () => {
-      if (typeof document !== "undefined") {
-        setIsDarkMode(document.documentElement.classList.contains("dark"));
-      }
-    };
-
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    if (typeof document !== "undefined") {
-      observer.observe(document.documentElement, {
-        attributes: true,
-        attributeFilter: ["class"],
-      });
-    }
-    return () => observer.disconnect();
-  }, []);
+  const isDarkMode = useTheme();
 
   const bubbles = [
     {

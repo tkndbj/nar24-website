@@ -18,9 +18,9 @@ import {
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
-import { signOut } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { getFirebaseAuth } from "@/lib/firebase-lazy";
 import { useUser } from "@/context/UserProvider";
+import { useTheme } from "@/hooks/useTheme";
 import { useBadgeProvider } from "@/context/BadgeProvider";
 import { useCartCount } from "@/hooks/selectors/useCartSelectors";
 import { useFavoriteCount } from "@/hooks/selectors/useFavoriteSelectors";
@@ -46,8 +46,8 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
   const { unreadNotificationsCount } = useBadgeProvider();
   const cartCount = useCartCount();
   const favoriteCount = useFavoriteCount();
+  const isDark = useTheme();
 
-  const [isDark, setIsDark] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -55,16 +55,6 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
 
   const languageMenuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const updateTheme = () => {
-      setIsDark(document.documentElement.classList.contains("dark"));
-    };
-    updateTheme();
-    const observer = new MutationObserver(updateTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-    return () => observer.disconnect();
-  }, []);
 
   useEffect(() => {
     if (!pathname.includes("/search-results")) {
@@ -121,6 +111,10 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
     if (isLoggingOut) return;
     try {
       setIsLoggingOut(true);
+      const [{ signOut }, auth] = await Promise.all([
+        import("firebase/auth"),
+        getFirebaseAuth(),
+      ]);
       await signOut(auth);
       router.push("/login");
     } catch (error) {

@@ -3,19 +3,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ProductCard } from "../ProductCard";
 import { ChevronRight, ChevronLeft } from "lucide-react";
-
-import {
-  collection,
-  query,
-  where,
-  doc,
-  getDoc,
-  getDocs,
-  limit as firestoreLimit,
-} from "firebase/firestore";
-
-import { db } from "@/lib/firebase"; // Adjust import path as needed
-
+import { getFirebaseDb } from "@/lib/firebase-lazy";
+import { useTheme } from "@/hooks/useTheme";
 import { Product } from "@/app/models/Product";
 
 
@@ -190,10 +179,14 @@ const DynamicList: React.FC<{
   // Fetch products based on list configuration
   const fetchProducts = React.useCallback(async () => {
     setLoading(true);
-    console.log(`Fetching products for list: ${listData.title}`);
-    console.log("Full list data:", JSON.stringify(listData, null, 2));
 
     try {
+      const [db, { collection, query, where, doc, getDoc, getDocs, limit: firestoreLimit }] =
+        await Promise.all([
+          getFirebaseDb(),
+          import("firebase/firestore"),
+        ]);
+
       let fetchedProducts: Product[] = [];
 
       // Check for individual product IDs (exactly like Flutter)
@@ -202,28 +195,16 @@ const DynamicList: React.FC<{
         Array.isArray(listData.selectedProductIds) &&
         listData.selectedProductIds.length > 0
       ) {
-        console.log(
-          `Fetching ${listData.selectedProductIds.length} individual products for list ${listData.id}`
-        );
-        console.log("Product IDs:", listData.selectedProductIds);
-
         for (const productId of listData.selectedProductIds) {
           try {
-            console.log(`Fetching product: ${productId}`);
             const productDoc = await getDoc(
               doc(db, "shop_products", productId)
             );
             if (productDoc.exists()) {
-              const productData = {
+              fetchedProducts.push({
                 id: productDoc.id,
                 ...productDoc.data(),
-              } as Product;
-              fetchedProducts.push(productData);
-              console.log(
-                `Added individual product: ${productData.productName}`
-              );
-            } else {
-              console.log(`Product not found: ${productId}`);
+              } as Product);
             }
           } catch (e) {
             console.error(`Error fetching individual product ${productId}:`, e);
@@ -238,10 +219,6 @@ const DynamicList: React.FC<{
         const shopId = listData.selectedShopId.toString();
         const limitCount = listData.limit || 10;
 
-        console.log(
-          `Fetching products from shop ${shopId} with limit ${limitCount}`
-        );
-
         const q = query(
           collection(db, "shop_products"),
           where("shopId", "==", shopId),
@@ -250,28 +227,15 @@ const DynamicList: React.FC<{
 
         const snapshot = await getDocs(q);
         fetchedProducts = snapshot.docs.map(
-          (doc) =>
+          (d) =>
             ({
-              id: doc.id,
-              ...doc.data(),
+              id: d.id,
+              ...d.data(),
             } as Product)
         );
-
-        console.log(
-          `Found ${fetchedProducts.length} products from shop ${shopId}`
-        );
-      } else {
-        console.log(
-          "No selectedProductIds or selectedShopId found in list data"
-        );
-        console.log("selectedProductIds:", listData.selectedProductIds);
-        console.log("selectedShopId:", listData.selectedShopId);
       }
 
       setProducts(fetchedProducts);
-      console.log(
-        `Total products fetched for list ${listData.id}: ${fetchedProducts.length}`
-      );
 
       // Check scroll after products load
       setTimeout(checkScrollPosition, 100);
@@ -431,7 +395,7 @@ export default function DynamicHorizontalList({ keyPrefix = '' }: DynamicHorizon
   const [dynamicLists, setDynamicLists] = useState<DynamicListData[]>([]);
   const [loading, setLoading] = useState(true);
   const [isClient, setIsClient] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const isDarkMode = useTheme();
 
   // Fixed dimensions
   const portraitImageHeight = 380;
@@ -443,28 +407,17 @@ export default function DynamicHorizontalList({ keyPrefix = '' }: DynamicHorizon
     setIsClient(true);
   }, []);
 
-  // Detect app theme
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDarkMode(document.documentElement.classList.contains("dark"));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["class"],
-    });
-    return () => observer.disconnect();
-  }, []);
-
   // Fetch dynamic lists from Firestore (one-time fetch, fresh on every page visit)
   useEffect(() => {
     if (!isClient) return;
 
     const fetchDynamicLists = async () => {
-      console.log("Fetching dynamic lists (one-time)");
-
       try {
+        const [db, { collection, query, where, getDocs }] = await Promise.all([
+          getFirebaseDb(),
+          import("firebase/firestore"),
+        ]);
+
         const q = query(
           collection(db, "dynamic_product_lists"),
           where("isActive", "==", true)
@@ -472,25 +425,15 @@ export default function DynamicHorizontalList({ keyPrefix = '' }: DynamicHorizon
 
         const snapshot = await getDocs(q);
 
-        console.log("Firestore fetch complete");
-        console.log("Snapshot size:", snapshot.size);
-
         if (snapshot.empty) {
-          console.log("No dynamic product lists found");
           setDynamicLists([]);
         } else {
-          const lists = snapshot.docs.map((doc) => {
-            const data = doc.data();
-            return {
-              id: doc.id,
-              ...data,
-            } as DynamicListData;
-          });
+          const lists = snapshot.docs.map((d) => ({
+            id: d.id,
+            ...d.data(),
+          } as DynamicListData));
 
-          // Sort by order
           lists.sort((a, b) => (a.order || 0) - (b.order || 0));
-
-          console.log(`Found ${lists.length} dynamic product lists`);
           setDynamicLists(lists);
         }
       } catch (error) {
