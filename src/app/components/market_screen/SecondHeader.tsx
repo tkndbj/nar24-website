@@ -137,6 +137,13 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
   const categoriesButtonRef = useRef<HTMLButtonElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
   const categoriesContainerRef = useRef<HTMLDivElement>(null);
+
+  // Cached dropdown position — avoids forced reflow during render
+  const [menuPosition, setMenuPosition] = useState<{
+    top: string;
+    left: string;
+    width: string;
+  } | null>(null);
   const router = useRouter();
   const t = useTranslations();
   const l10n = createAppLocalizations(t);
@@ -362,6 +369,14 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
 
   const handleCategoriesMouseEnter = () => {
     if (!isMobile) {
+      // Read geometry ONCE when opening, not during every render
+      if (headerRef.current && categoriesContainerRef.current) {
+        setMenuPosition({
+          top: `${headerRef.current.offsetTop + headerRef.current.offsetHeight - 1}px`,
+          left: `${categoriesContainerRef.current.offsetLeft}px`,
+          width: `${categoriesContainerRef.current.offsetWidth}px`,
+        });
+      }
       setShowCategoriesMenu(true);
     }
   };
@@ -648,19 +663,9 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
             rounded-b-lg
           `}
           style={{
-            top: headerRef.current
-              ? `${
-                  headerRef.current.offsetTop +
-                  headerRef.current.offsetHeight -
-                  1
-                }px`
-              : "119px",
-            left: categoriesContainerRef.current
-              ? `${categoriesContainerRef.current.offsetLeft}px`
-              : "0px",
-            width: categoriesContainerRef.current
-              ? `${categoriesContainerRef.current.offsetWidth}px`
-              : "auto",
+            top: menuPosition?.top ?? "119px",
+            left: menuPosition?.left ?? "0px",
+            width: menuPosition?.width ?? "auto",
           }}
           onMouseEnter={handleMenuMouseEnter}
           onMouseLeave={handleMenuMouseLeave}
