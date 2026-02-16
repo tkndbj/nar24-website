@@ -2,7 +2,9 @@
 
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
+import { ArrowLeft } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
+import { useTheme } from "@/hooks/useTheme";
 import {
   doc,
   getDoc,
@@ -138,21 +140,10 @@ export default function ListProductForm() {
     null
   );
   const [isDirty, setIsDirty] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const isDarkMode = useTheme();
 
   // Edit mode detection (like Flutter)
   const isEditMode = false; // TODO: Add edit mode support
-
-  // Dark mode detection
-  useEffect(() => {
-    const checkDarkMode = () => {
-      setIsDarkMode(document.documentElement.classList.contains("dark"));
-    };
-    checkDarkMode();
-    const observer = new MutationObserver(checkDarkMode);
-    observer.observe(document.documentElement, { attributes: true });
-    return () => observer.disconnect();
-  }, []);
 
   // Flow data loading from Firestore (matching Flutter)
   useEffect(() => {
@@ -1272,56 +1263,54 @@ export default function ListProductForm() {
     </svg>
   );
 
+  const headingColor = isDarkMode ? "text-white" : "text-gray-900";
+  const labelColor = isDarkMode ? "text-gray-200" : "text-gray-700";
+  const mutedColor = isDarkMode ? "text-gray-500" : "text-gray-400";
+  const cardClass = isDarkMode
+    ? "bg-gray-900 rounded-2xl border border-gray-800 p-4 sm:p-5"
+    : "bg-white rounded-2xl border border-gray-100 p-4 sm:p-5 shadow-sm";
+  const inputClass = isDarkMode
+    ? "w-full px-3 py-2.5 text-sm bg-gray-800 border border-gray-700 text-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all"
+    : "w-full px-3 py-2.5 text-sm bg-gray-50/80 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500/20 focus:border-orange-300 outline-none transition-all";
+  const selectClass = isDarkMode
+    ? "w-full px-3 py-2.5 text-sm bg-gray-800 border border-gray-700 text-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all"
+    : "w-full px-3 py-2.5 text-sm bg-gray-50/80 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500/20 focus:border-orange-300 outline-none transition-all";
+
   return (
-    <div className={`min-h-screen ${isDarkMode ? "bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900" : "bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50"}`}>
-      {/* Header Section */}
-      <div className={`sticky top-0 z-40 backdrop-blur-lg border-b ${isDarkMode ? "bg-gray-900/90 border-gray-700" : "bg-white/90 border-gray-200"}`}>
-        <div className="max-w-5xl mx-auto px-3 sm:px-4">
-          <div className="flex items-center h-14">
+    <div className={`min-h-screen ${isDarkMode ? "bg-gray-950" : "bg-gray-50/50"}`}>
+      {/* Sticky Toolbar */}
+      <div className={`sticky top-14 z-30 backdrop-blur-xl border-b ${isDarkMode ? "bg-gray-950/80 border-gray-800/80" : "bg-white/80 border-gray-100/80"}`}>
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center gap-3 px-3 sm:px-6 py-2">
             <button
               onClick={() => router.back()}
-              className={`p-1.5 sm:p-2 rounded-lg transition-colors ${isDarkMode ? "hover:bg-gray-800 text-gray-300" : "hover:bg-gray-100 text-gray-700"}`}
+              className={`w-9 h-9 flex items-center justify-center border rounded-xl transition-colors flex-shrink-0 ${isDarkMode ? "bg-gray-800 border-gray-700 hover:bg-gray-700" : "bg-gray-50 border-gray-200 hover:bg-gray-100"}`}
             >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                />
-              </svg>
+              <ArrowLeft className={`w-4 h-4 ${isDarkMode ? "text-gray-300" : "text-gray-600"}`} />
             </button>
-            <h1 className={`ml-3 text-base sm:text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+            <h1 className={`text-lg font-bold truncate ${headingColor}`}>
               {t("pageTitle")}
             </h1>
           </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-3 sm:px-4 pt-4 pb-8">
-        <form onSubmit={handleSubmit} className="max-w-5xl mx-auto space-y-4">
+      <div className="max-w-4xl mx-auto px-3 sm:px-6 py-4">
+        <form onSubmit={handleSubmit} className="space-y-3">
           {/* Media Upload Section */}
-          <div className={`backdrop-blur-sm rounded-lg shadow-lg border p-4 sm:p-6 transition-shadow ${isDarkMode ? "bg-gray-800/90 border-gray-700" : "bg-white/90 border-gray-200"}`}>
-            <h2 className={`text-lg sm:text-xl font-bold mb-4 flex items-center gap-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-              <div className="w-7 h-7 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">📸</span>
-              </div>
+          <div className={cardClass}>
+            <h2 className={`text-sm font-bold mb-3 ${headingColor}`}>
               {t("sections.mediaGallery")}
             </h2>
 
             {/* Drag & Drop Zone */}
             <div
-              className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-all duration-300 ${
+              className={`relative border-2 border-dashed rounded-xl p-6 text-center transition-all duration-200 ${
                 dragActive
-                  ? "border-blue-500 bg-blue-500/10 scale-[1.01]"
+                  ? "border-orange-500 bg-orange-500/10"
                   : isDarkMode
-                  ? "border-gray-600 hover:border-blue-400 hover:bg-gray-700/50"
-                  : "border-gray-300 hover:border-blue-400 hover:bg-gray-50"
+                  ? "border-gray-700 hover:border-orange-500/50 hover:bg-gray-800/50"
+                  : "border-gray-200 hover:border-orange-300 hover:bg-orange-50/30"
               }`}
               onDrop={handleDrop}
               onDragOver={(e) => {
@@ -1335,55 +1324,22 @@ export default function ListProductForm() {
             >
               {/* Compression Loading Overlay */}
               {isCompressing && (
-                <div className="absolute inset-0 bg-white/90 backdrop-blur-sm flex items-center justify-center rounded-2xl z-20">
+                <div className={`absolute inset-0 backdrop-blur-sm flex items-center justify-center rounded-xl z-20 ${isDarkMode ? "bg-gray-900/90" : "bg-white/90"}`}>
                   <div className="text-center">
-                    <div className="w-16 h-16 mx-auto mb-4">
-                      <svg
-                        className="w-full h-full animate-spin text-blue-500"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        ></circle>
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        ></path>
-                      </svg>
-                    </div>
-                    <p className="text-lg font-semibold text-slate-700">
-                      {t("media.compressing", {
-                        fallback: "Compressing images...",
-                      })}
-                    </p>
-                    <p className="text-sm text-slate-500 mt-1">
-                      {t("media.compressionNote", {
-                        fallback:
-                          "Optimizing for storage while maintaining quality",
-                      })}
+                    <div className="w-5 h-5 border-[3px] border-orange-200 border-t-orange-600 rounded-full animate-spin mx-auto mb-3" />
+                    <p className={`text-sm font-semibold ${headingColor}`}>
+                      {t("media.compressing", { fallback: "Compressing images..." })}
                     </p>
                   </div>
                 </div>
               )}
 
               <UploadIcon />
-              <h3 className={`text-base font-semibold mt-3 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
+              <h3 className={`text-sm font-semibold mt-2 ${labelColor}`}>
                 {t("media.dragDropTitle")}
               </h3>
-              <p className={`text-sm mt-2 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+              <p className={`text-xs mt-1 ${mutedColor}`}>
                 {t("media.dragDropSubtitle")}
-              </p>
-              <p className={`text-xs mt-1.5 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
-                {t("media.autoCompressionNote", {
-                  fallback: "Images will be automatically optimized",
-                })}
               </p>
               <input
                 type="file"
@@ -1397,71 +1353,21 @@ export default function ListProductForm() {
 
             {/* Compression Stats Display */}
             {compressionStats.compressionRatio > 0 && (
-              <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-xl">
-                <div className="flex items-center gap-2 text-green-800">
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                  <span className="font-semibold">
-                    {t("media.compressionSuccess", {
-                      fallback: "Images optimized successfully!",
-                    })}
-                  </span>
-                </div>
-                <div className="mt-2 text-sm text-green-700">
-                  <div className="flex justify-between">
-                    <span>
-                      {t("media.originalSize", { fallback: "Original size" })}:
-                    </span>
-                    <span className="font-medium">
-                      {formatFileSize(compressionStats.originalSize)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>
-                      {t("media.compressedSize", {
-                        fallback: "Optimized size",
-                      })}
-                      :
-                    </span>
-                    <span className="font-medium">
-                      {formatFileSize(compressionStats.compressedSize)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between border-t border-green-200 mt-2 pt-2">
-                    <span className="font-semibold">
-                      {t("media.spaceSaved", { fallback: "Space saved" })}:
-                    </span>
-                    <span className="font-bold text-green-600">
-                      {compressionStats.compressionRatio.toFixed(1)}% (
-                      {formatFileSize(
-                        compressionStats.originalSize -
-                          compressionStats.compressedSize
-                      )}
-                      )
-                    </span>
-                  </div>
-                </div>
+              <div className={`mt-3 p-3 rounded-xl border text-xs ${isDarkMode ? "bg-green-950/30 border-green-900/50 text-green-400" : "bg-green-50 border-green-200 text-green-700"}`}>
+                <span className="font-semibold">
+                  {t("media.spaceSaved", { fallback: "Space saved" })}:{" "}
+                  {compressionStats.compressionRatio.toFixed(1)}% ({formatFileSize(compressionStats.originalSize - compressionStats.compressedSize)})
+                </span>
               </div>
             )}
 
             {/* Image Preview Grid */}
             {images.length > 0 && (
-              <div className="mt-6">
-                <h4 className={`text-base font-semibold mb-3 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
+              <div className="mt-4">
+                <h4 className={`text-xs font-semibold mb-2 ${labelColor}`}>
                   {t("media.uploadedImages")} ({images.length})
                 </h4>
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
                   {images.map((file, idx) => (
                     <div key={idx} className="group relative aspect-square">
                       <Image
@@ -1469,19 +1375,13 @@ export default function ListProductForm() {
                         alt={t("media.preview")}
                         width={200}
                         height={200}
-                        className="w-full h-full object-cover rounded-xl shadow-md group-hover:shadow-lg transition-all duration-300"
+                        className="w-full h-full object-cover rounded-xl"
                         unoptimized
                       />
-
-                      {/* File Size Indicator */}
-                      <div className="absolute bottom-1 left-1 bg-black/70 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
-                        {formatFileSize(file.size)}
-                      </div>
-
                       <button
                         type="button"
                         onClick={() => removeImage(idx)}
-                        className="absolute -top-2 -right-2 w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-lg transition-all duration-200 flex items-center justify-center z-20"
+                        className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-md flex items-center justify-center z-20 text-xs"
                       >
                         ✕
                       </button>
@@ -1492,16 +1392,13 @@ export default function ListProductForm() {
             )}
 
             {/* Video Upload */}
-            <div className={`mt-6 pt-6 border-t ${isDarkMode ? "border-gray-700" : "border-gray-200"}`}>
-              <div className="flex items-center gap-2 mb-3">
-                <VideoIcon />
-                <h4 className={`text-base font-semibold ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
-                  {t("media.video")}
-                </h4>
-              </div>
+            <div className={`mt-4 pt-4 border-t ${isDarkMode ? "border-gray-800" : "border-gray-100"}`}>
+              <h4 className={`text-xs font-semibold mb-2 ${labelColor}`}>
+                {t("media.video")}
+              </h4>
 
               {!video ? (
-                <div className={`border-2 border-dashed rounded-lg p-6 text-center transition-all duration-300 relative ${isDarkMode ? "border-gray-600 hover:border-blue-400 hover:bg-gray-700/50" : "border-gray-300 hover:border-blue-400 hover:bg-gray-50"}`}>
+                <div className={`border-2 border-dashed rounded-xl p-4 text-center relative ${isDarkMode ? "border-gray-700 hover:border-orange-500/50" : "border-gray-200 hover:border-orange-300"}`}>
                   <input
                     type="file"
                     accept="video/*"
@@ -1509,7 +1406,7 @@ export default function ListProductForm() {
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                   />
                   <VideoIcon />
-                  <p className={`text-sm mt-2 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                  <p className={`text-xs mt-1 ${mutedColor}`}>
                     {t("media.uploadVideo")}
                   </p>
                 </div>
@@ -1518,12 +1415,12 @@ export default function ListProductForm() {
                   <video
                     src={URL.createObjectURL(video)}
                     controls
-                    className="w-64 h-auto rounded-xl shadow-lg"
+                    className="w-48 h-auto rounded-xl"
                   />
                   <button
                     type="button"
                     onClick={removeVideo}
-                    className="absolute -top-2 -right-2 w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-lg transition-all duration-200 flex items-center justify-center z-20"
+                    className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-md flex items-center justify-center z-20 text-xs"
                   >
                     ✕
                   </button>
@@ -1533,43 +1430,40 @@ export default function ListProductForm() {
           </div>
 
           {/* Basic Information */}
-          <div className={`backdrop-blur-sm rounded-lg shadow-lg border p-4 sm:p-6 transition-shadow ${isDarkMode ? "bg-gray-800/90 border-gray-700" : "bg-white/90 border-gray-200"}`}>
-            <h2 className={`text-lg sm:text-xl font-bold mb-4 flex items-center gap-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-              <div className="w-7 h-7 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">📝</span>
-              </div>
+          <div className={cardClass}>
+            <h2 className={`text-sm font-bold mb-3 ${headingColor}`}>
               {t("sections.productDetails")}
             </h2>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               <div className="lg:col-span-2">
-                <label className={`block text-sm font-semibold mb-2 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
+                <label className={`text-[11px] font-semibold uppercase tracking-wider mb-1.5 block ${mutedColor}`}>
                   {t("form.productTitle")}
                 </label>
                 <input
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${isDarkMode ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400" : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"}`}
+                  className={inputClass}
                   placeholder={t("form.productTitlePlaceholder")}
                 />
               </div>
 
               <div className="lg:col-span-2">
-                <label className={`block text-sm font-semibold mb-2 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
+                <label className={`text-[11px] font-semibold uppercase tracking-wider mb-1.5 block ${mutedColor}`}>
                   {t("form.description")}
                 </label>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  rows={4}
-                  className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors resize-none ${isDarkMode ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400" : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"}`}
+                  rows={3}
+                  className={`${inputClass} resize-none`}
                   placeholder={t("form.descriptionPlaceholder")}
                 />
               </div>
 
               <div>
-                <label className={`block text-sm font-semibold mb-2 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
+                <label className={`text-[11px] font-semibold uppercase tracking-wider mb-1.5 block ${mutedColor}`}>
                   {t("form.price")}
                 </label>
                 <input
@@ -1577,37 +1471,34 @@ export default function ListProductForm() {
                   step="0.01"
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
-                  className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${isDarkMode ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400" : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"}`}
+                  className={inputClass}
                   placeholder={t("form.pricePlaceholder")}
                 />
               </div>
 
               <div>
-                <label className={`block text-sm font-semibold mb-2 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
+                <label className={`text-[11px] font-semibold uppercase tracking-wider mb-1.5 block ${mutedColor}`}>
                   {t("form.quantity")}
                 </label>
                 <input
                   type="number"
                   value={quantity}
                   onChange={(e) => setQuantity(e.target.value)}
-                  className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${isDarkMode ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400" : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"}`}
+                  className={inputClass}
                 />
               </div>
 
               <div className="lg:col-span-2">
-                <label className={`block text-sm font-semibold mb-2 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
+                <label className={`text-[11px] font-semibold uppercase tracking-wider mb-1.5 block ${mutedColor}`}>
                   {t("form.condition.title")}
                 </label>
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-wrap gap-2">
                   {[
                     { key: "Brand New", label: t("form.condition.brandNew") },
                     { key: "Used", label: t("form.condition.used") },
-                    {
-                      key: "Refurbished",
-                      label: t("form.condition.refurbished"),
-                    },
+                    { key: "Refurbished", label: t("form.condition.refurbished") },
                   ].map((opt) => (
-                    <label key={opt.key} className="group cursor-pointer">
+                    <label key={opt.key} className="cursor-pointer">
                       <input
                         type="radio"
                         name="condition"
@@ -1617,12 +1508,12 @@ export default function ListProductForm() {
                         className="sr-only"
                       />
                       <div
-                        className={`px-4 py-2 rounded-lg border-2 transition-all duration-200 text-sm ${
+                        className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${
                           condition === opt.key
-                            ? "border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                            ? "border-orange-500 bg-orange-500/10 text-orange-600"
                             : isDarkMode
-                            ? "border-gray-600 bg-gray-700 text-gray-300 hover:border-blue-400"
-                            : "border-gray-300 bg-white text-gray-700 hover:border-blue-300"
+                            ? "border-gray-700 bg-gray-800 text-gray-300 hover:border-gray-600"
+                            : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300"
                         }`}
                       >
                         {opt.label}
@@ -1633,21 +1524,15 @@ export default function ListProductForm() {
               </div>
 
               <div className="lg:col-span-2">
-                <label className={`block text-sm font-semibold mb-2 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
+                <label className={`text-[11px] font-semibold uppercase tracking-wider mb-1.5 block ${mutedColor}`}>
                   {t("form.delivery.title")}
                 </label>
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-wrap gap-2">
                   {[
-                    {
-                      key: "Fast Delivery",
-                      label: t("form.delivery.fastDelivery"),
-                    },
-                    {
-                      key: "Self Delivery",
-                      label: t("form.delivery.selfDelivery"),
-                    },
+                    { key: "Fast Delivery", label: t("form.delivery.fastDelivery") },
+                    { key: "Self Delivery", label: t("form.delivery.selfDelivery") },
                   ].map((opt) => (
-                    <label key={opt.key} className="group cursor-pointer">
+                    <label key={opt.key} className="cursor-pointer">
                       <input
                         type="radio"
                         name="deliveryOption"
@@ -1657,12 +1542,12 @@ export default function ListProductForm() {
                         className="sr-only"
                       />
                       <div
-                        className={`px-4 py-2 rounded-lg border-2 transition-all duration-200 text-sm ${
+                        className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${
                           deliveryOption === opt.key
-                            ? "border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                            ? "border-orange-500 bg-orange-500/10 text-orange-600"
                             : isDarkMode
-                            ? "border-gray-600 bg-gray-700 text-gray-300 hover:border-blue-400"
-                            : "border-gray-300 bg-white text-gray-700 hover:border-blue-300"
+                            ? "border-gray-700 bg-gray-800 text-gray-300 hover:border-gray-600"
+                            : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300"
                         }`}
                       >
                         {opt.label}
@@ -1675,17 +1560,14 @@ export default function ListProductForm() {
           </div>
 
           {/* Category Selection */}
-          <div className={`backdrop-blur-sm rounded-lg shadow-lg border p-4 sm:p-6 transition-shadow ${isDarkMode ? "bg-gray-800/90 border-gray-700" : "bg-white/90 border-gray-200"}`}>
-            <h2 className={`text-lg sm:text-xl font-bold mb-4 flex items-center gap-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-              <div className="w-7 h-7 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">🏷️</span>
-              </div>
+          <div className={cardClass}>
+            <h2 className={`text-sm font-bold mb-3 ${headingColor}`}>
               {t("sections.categoryClassification")}
             </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div>
-                <label className={`block text-sm font-semibold mb-2 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
+                <label className={`text-[11px] font-semibold uppercase tracking-wider mb-1.5 block ${mutedColor}`}>
                   {t("form.category")}
                 </label>
                 <select
@@ -1700,7 +1582,7 @@ export default function ListProductForm() {
                     setFlowCompleted(false);
                     setShowDynamicStep(false);
                   }}
-                  className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${isDarkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"}`}
+                  className={selectClass}
                 >
                   <option value="">{t("form.selectCategory")}</option>
                   {AllInOneCategoryData.kCategories.map((cat) => (
@@ -1713,7 +1595,7 @@ export default function ListProductForm() {
 
               {category && (
                 <div className="animate-fadeIn">
-                  <label className={`block text-sm font-semibold mb-2 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
+                  <label className={`text-[11px] font-semibold uppercase tracking-wider mb-1.5 block ${mutedColor}`}>
                     {t("form.subcategory")}
                   </label>
                   <select
@@ -1727,7 +1609,7 @@ export default function ListProductForm() {
                       setFlowCompleted(false);
                       setShowDynamicStep(false);
                     }}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${isDarkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"}`}
+                    className={selectClass}
                   >
                     <option value="">{t("form.selectSubcategory")}</option>
                     {(AllInOneCategoryData.kSubcategories[category] || []).map(
@@ -1743,7 +1625,7 @@ export default function ListProductForm() {
 
               {subcategory && (
                 <div className="animate-fadeIn">
-                  <label className={`block text-sm font-semibold mb-2 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
+                  <label className={`text-[11px] font-semibold uppercase tracking-wider mb-1.5 block ${mutedColor}`}>
                     {t("form.subsubcategory")}
                   </label>
                   <select
@@ -1756,7 +1638,7 @@ export default function ListProductForm() {
                         newSubsubcategory
                       );
                     }}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${isDarkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"}`}
+                    className={selectClass}
                   >
                     <option value="">{t("form.selectSubsubcategory")}</option>
                     {(
@@ -1778,78 +1660,39 @@ export default function ListProductForm() {
           {(brand ||
             Object.keys(attributes).length > 0 ||
             Object.keys(selectedColorImages).length > 0) && (
-            <div className={`backdrop-blur-sm rounded-lg shadow-lg border p-4 sm:p-6 ${isDarkMode ? "bg-gray-800/90 border-gray-700" : "bg-white/90 border-gray-200"}`}>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+            <div className={cardClass}>
+              <div className="flex justify-between items-center mb-3">
+                <h3 className={`text-sm font-bold ${headingColor}`}>
                   {t("attributes.title")}
                 </h3>
-
-                {/* Change Details Button */}
                 <button
                   type="button"
                   onClick={restartFlow}
                   disabled={isRestartingFlow}
-                  className="group relative px-6 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 disabled:from-amber-400 disabled:to-orange-400 text-white font-semibold rounded-xl shadow-md hover:shadow-lg transform hover:scale-[1.02] transition-all duration-200 disabled:cursor-not-allowed disabled:transform-none"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs font-medium"
                 >
-                  <span className="relative flex items-center gap-2">
-                    {isRestartingFlow ? (
-                      <svg
-                        className="w-4 h-4 animate-spin"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        ></circle>
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        ></path>
-                      </svg>
-                    ) : (
-                      <svg
-                        className="w-4 h-4 transform group-hover:rotate-45 transition-transform duration-200"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                        />
-                      </svg>
-                    )}
-                    {isRestartingFlow
-                      ? t("buttons.updating")
-                      : t("buttons.changeDetails")}
-                  </span>
+                  {isRestartingFlow
+                    ? t("buttons.updating")
+                    : t("buttons.changeDetails")}
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {brand && (
                   <div className="flex justify-between">
-                    <span className={`font-medium text-sm ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+                    <span className={`font-medium text-xs ${labelColor}`}>
                       {t("attributes.brand", { fallback: "Brand" })}:
                     </span>
-                    <span className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>{brand}</span>
+                    <span className={`text-xs ${mutedColor}`}>{brand}</span>
                   </div>
                 )}
 
                 {Object.entries(attributes).map(([key, value]) => (
                   <div key={key} className="flex justify-between">
-                    <span className={`font-medium text-sm capitalize ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+                    <span className={`font-medium text-xs capitalize ${labelColor}`}>
                       {getAttributeLabel(key)}:
                     </span>
-                    <span className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                    <span className={`text-xs ${mutedColor}`}>
                       {getLocalizedAttributeValue(key, value)}
                     </span>
                   </div>
@@ -1857,10 +1700,10 @@ export default function ListProductForm() {
 
                 {Object.keys(selectedColorImages).length > 0 && (
                   <div className="flex justify-between md:col-span-2">
-                    <span className={`font-medium text-sm ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+                    <span className={`font-medium text-xs ${labelColor}`}>
                       {t("attributes.colors", { fallback: "Colors" })}:
                     </span>
-                    <span className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                    <span className={`text-xs ${mutedColor}`}>
                       {Object.keys(selectedColorImages)
                         .map((color) =>
                           tColor(`colors.${color}`, { fallback: color })
@@ -1870,49 +1713,22 @@ export default function ListProductForm() {
                   </div>
                 )}
               </div>
-
-              {/* Enhanced info section */}
-              <div className={`mt-3 pt-3 border-t ${isDarkMode ? "border-gray-700" : "border-gray-200"}`}>
-                <p className={`text-xs text-center ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-                  {t("attributes.changeDetailsHint", {
-                    fallback:
-                      "Click 'Change Details' to update your product specifications",
-                  })}
-                </p>
-              </div>
             </div>
           )}
 
-          {/* Submit Button - Only show when flow is completed */}
+          {/* Submit Button */}
           {flowCompleted && (
-            <div className="text-center pt-4">
+            <div className="pt-2">
               <button
                 type="submit"
                 disabled={isLoading}
-                className="group relative px-8 py-3 bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 hover:from-blue-700 hover:via-purple-700 hover:to-indigo-700 text-white font-bold text-base rounded-lg shadow-lg hover:shadow-xl transform hover:scale-[1.01] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-orange-500 text-white font-semibold text-sm rounded-xl hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                <span className="relative flex items-center gap-3">
-                  {isLoading
-                    ? t("buttons.processing")
-                    : isEditMode
-                    ? t("buttons.editProduct")
-                    : t("buttons.continueToPreview")}
-                  {!isLoading && (
-                    <svg
-                      className="w-5 h-5 transform group-hover:translate-x-1 transition-transform duration-200"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M13 7l5 5m0 0l-5 5m5-5H6"
-                      />
-                    </svg>
-                  )}
-                </span>
+                {isLoading
+                  ? t("buttons.processing")
+                  : isEditMode
+                  ? t("buttons.editProduct")
+                  : t("buttons.continueToPreview")}
               </button>
             </div>
           )}
@@ -1920,37 +1736,26 @@ export default function ListProductForm() {
 
         {/* Exit Modal */}
         {showExitModal && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-            <div className={`rounded-2xl p-6 max-w-md mx-4 text-center shadow-2xl ${isDarkMode ? "bg-gray-800" : "bg-white"}`}>
-              <div className="w-14 h-14 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center mx-auto mb-3">
-                <svg
-                  className="w-7 h-7 text-amber-600 dark:text-amber-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
-                  />
-                </svg>
+          <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className={`rounded-2xl max-w-sm w-full shadow-2xl ${isDarkMode ? "bg-gray-900" : "bg-white"}`}>
+              <div className={`p-4 border-b ${isDarkMode ? "border-gray-800" : "border-gray-100"}`}>
+                <h3 className={`text-base font-bold ${headingColor}`}>
+                  {t("modal.exitTitle")}
+                </h3>
               </div>
-              <h3 className={`text-lg font-bold mb-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-                {t("modal.exitTitle")}
-              </h3>
-              <p className={`text-sm mb-5 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>{t("modal.exitMessage")}</p>
-              <div className="flex gap-3">
+              <div className="p-4">
+                <p className={`text-sm ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>{t("modal.exitMessage")}</p>
+              </div>
+              <div className={`flex gap-2 p-4 border-t ${isDarkMode ? "border-gray-800" : "border-gray-100"}`}>
                 <button
                   onClick={handleExitCancel}
-                  className={`flex-1 px-4 py-2.5 rounded-lg transition-colors font-medium text-sm ${isDarkMode ? "bg-gray-700 text-gray-200 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+                  className={`flex-1 px-4 py-2.5 rounded-xl transition-colors font-medium text-sm ${isDarkMode ? "bg-gray-800 text-gray-300 hover:bg-gray-700" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
                 >
                   {t("modal.cancel")}
                 </button>
                 <button
                   onClick={handleExitConfirm}
-                  className="flex-1 px-4 py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-medium text-sm"
+                  className="flex-1 px-4 py-2.5 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors font-medium text-sm"
                 >
                   {t("modal.confirmExit")}
                 </button>

@@ -8,12 +8,12 @@ import { db } from "@/lib/firebase";
 import { httpsCallable, getFunctions } from "firebase/functions";
 import {
   ArrowLeft,
-  Settings,
   Shield,
   AlertTriangle,
   Key,
   Trash2,
   ChevronRight,
+  LogIn,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 
@@ -36,58 +36,46 @@ export default function AccountSettingsPage() {
   const t = useTranslations();
 
   useEffect(() => {
-    const checkTheme = () => {
-      if (typeof document !== "undefined") {
+    const check = () => {
+      if (typeof document !== "undefined")
         setIsDarkMode(document.documentElement.classList.contains("dark"));
-      }
     };
-
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    if (typeof document !== "undefined") {
-      observer.observe(document.documentElement, {
+    check();
+    const obs = new MutationObserver(check);
+    if (typeof document !== "undefined")
+      obs.observe(document.documentElement, {
         attributes: true,
         attributeFilter: ["class"],
       });
-    }
-    return () => observer.disconnect();
+    return () => obs.disconnect();
   }, []);
 
   useEffect(() => {
-    if (user) {
-      loadUserSettings();
-    }
+    if (user) loadUserSettings();
   }, [user]);
 
   const loadUserSettings = async () => {
     if (!user) return;
-
     setIsLoading(true);
     try {
       const userDoc = await getDoc(doc(db, "users", user.uid));
-      if (userDoc.exists()) {
-        const data = userDoc.data();
+      if (userDoc.exists())
         setSettings({
-          twoFactorEnabled: data.twoFactorEnabled ?? false,
+          twoFactorEnabled: userDoc.data().twoFactorEnabled ?? false,
         });
-      }
     } catch (error) {
-      console.error("Error loading user settings:", error);
+      console.error("Error loading settings:", error);
     } finally {
       setIsLoading(false);
     }
   };
 
- 
-
   const handle2FAToggle = async (value: boolean) => {
-    if (value) {
-      // Enable 2FA - navigate to setup
-      router.push("/two-factor-verification?type=setup");
-    } else {
-      // Disable 2FA - navigate to disable
-      router.push("/two-factor-verification?type=disable");
-    }
+    router.push(
+      value
+        ? "/two-factor-verification?type=setup"
+        : "/two-factor-verification?type=disable",
+    );
   };
 
   const handleDeleteAccount = async () => {
@@ -95,62 +83,82 @@ export default function AccountSettingsPage() {
       alert(t("AccountSettings.emailMismatch"));
       return;
     }
-
     setIsDeleting(true);
     try {
       const functions = getFunctions(undefined, "europe-west3");
-      const deleteUserAccount = httpsCallable(functions, "deleteUserAccount");
-      
-      await deleteUserAccount({ email: deleteEmail });
-      
-      // Logout and redirect
+      await httpsCallable(
+        functions,
+        "deleteUserAccount",
+      )({ email: deleteEmail });
       router.push("/login");
     } catch (error) {
       console.error("Error deleting account:", error);
-      alert(error instanceof Error ? error.message : t("AccountSettings.deleteAccountFailed"));
+      alert(
+        error instanceof Error
+          ? error.message
+          : t("AccountSettings.deleteAccountFailed"),
+      );
     } finally {
       setIsDeleting(false);
       setShowDeleteDialog(false);
     }
   };
 
-  // Show loading while auth state is being determined
+  // Toolbar shared across states
+  const Toolbar = () => (
+    <div
+      className={`sticky top-14 z-30 border-b ${isDarkMode ? "bg-gray-900/80 backdrop-blur-xl border-gray-700/80" : "bg-white/80 backdrop-blur-xl border-gray-100/80"}`}
+    >
+      <div className="max-w-4xl mx-auto flex items-center gap-3 px-3 sm:px-6 py-3">
+        <button
+          onClick={() => router.back()}
+          className={`w-9 h-9 flex items-center justify-center border rounded-xl transition-colors flex-shrink-0 ${
+            isDarkMode
+              ? "bg-gray-800 border-gray-700 hover:bg-gray-700"
+              : "bg-gray-50 border-gray-200 hover:bg-gray-100"
+          }`}
+        >
+          <ArrowLeft
+            className={`w-4 h-4 ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}
+          />
+        </button>
+        <h1
+          className={`text-lg font-bold truncate ${isDarkMode ? "text-white" : "text-gray-900"}`}
+        >
+          {t("AccountSettings.accountSettings")}
+        </h1>
+      </div>
+    </div>
+  );
+
   if (authLoading) {
     return (
       <div
-        className={`min-h-screen flex items-center justify-center ${
-          isDarkMode ? "bg-gray-900" : "bg-gray-50"
-        }`}
+        className={`min-h-screen flex items-center justify-center pt-20 ${isDarkMode ? "bg-gray-900" : "bg-gray-50/50"}`}
       >
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+        <div className="w-5 h-5 border-[3px] border-orange-200 border-t-orange-600 rounded-full animate-spin" />
       </div>
     );
   }
 
-  // Show login required only after auth loading is complete
   if (!user) {
     return (
       <div
-        className={`min-h-screen flex items-center justify-center ${
-          isDarkMode ? "bg-gray-900" : "bg-gray-50"
-        }`}
-        style={{
-          transform: 'translateZ(0)',
-          backfaceVisibility: 'hidden',
-          WebkitFontSmoothing: 'antialiased'
-        }}
+        className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50/50"}`}
       >
-        <div className="text-center">
-          <h1
-            className={`text-2xl font-bold mb-4 ${
-              isDarkMode ? "text-white" : "text-gray-900"
-            }`}
+        <Toolbar />
+        <div className="text-center py-16 px-3">
+          <LogIn
+            className={`w-12 h-12 mx-auto mb-3 ${isDarkMode ? "text-gray-600" : "text-gray-300"}`}
+          />
+          <h3
+            className={`text-sm font-semibold mb-1 ${isDarkMode ? "text-white" : "text-gray-900"}`}
           >
             {t("AccountSettings.loginRequired")}
-          </h1>
+          </h3>
           <button
             onClick={() => router.push("/login")}
-            className="px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium transition-colors"
+            className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 bg-orange-500 text-white rounded-xl hover:bg-orange-600 transition-colors text-xs font-medium"
           >
             {t("AccountSettings.login")}
           </button>
@@ -161,257 +169,204 @@ export default function AccountSettingsPage() {
 
   return (
     <div
-      className={`h-screen md:min-h-screen flex flex-col overflow-hidden md:overflow-auto ${
-        isDarkMode ? "bg-gray-900" : "bg-gray-50"
-      }`}
-      style={{
-        transform: 'translateZ(0)',
-        backfaceVisibility: 'hidden',
-        WebkitFontSmoothing: 'antialiased'
-      }}
+      className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50/50"}`}
     >
-      {/* Header */}
-      <div
-        className={`flex-shrink-0 ${
-          isDarkMode ? "bg-gray-900" : "bg-gray-50"
-        } border-b ${isDarkMode ? "border-gray-700" : "border-gray-200"}`}
-      >
-        <div className="max-w-6xl mx-auto px-3 md:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-12 md:h-16">
-            <button
-              onClick={() => router.back()}
-              className={`p-1.5 md:p-2 rounded-lg transition-colors ${
-                isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"
-              }`}
-            >
-              <ArrowLeft
-                className={`w-5 h-5 ${
-                  isDarkMode ? "text-white" : "text-gray-900"
-                }`}
-              />
-            </button>
-            <h1
-              className={`text-base md:text-lg font-semibold ${
-                isDarkMode ? "text-white" : "text-gray-900"
-              }`}
-            >
-              {t("AccountSettings.accountSettings")}
-            </h1>
-            <div className="w-8 md:w-9" />
-          </div>
-        </div>
-      </div>
+      <Toolbar />
 
-      <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full px-3 md:px-6 lg:px-8 py-2 md:py-6 overflow-hidden md:overflow-auto">
-        {/* Header Section - More compact on mobile */}
-        <div className="flex-shrink-0 mb-3 md:mb-8">
+      <div className="max-w-4xl mx-auto px-3 sm:px-6 py-4 space-y-3">
+        {/* Header Banner */}
+        <div
+          className={`rounded-2xl p-4 text-center ${isDarkMode ? "bg-orange-900/10 border border-orange-700/30" : "bg-orange-50 border border-orange-100"}`}
+        >
           <div
-            className={`rounded-lg md:rounded-3xl p-3 md:p-8 text-center ${
-              isDarkMode
-                ? "bg-gradient-to-br from-orange-900/20 to-pink-900/20"
-                : "bg-gradient-to-br from-orange-50 to-pink-50"
-            }`}
+            className={`w-10 h-10 mx-auto mb-2 rounded-xl flex items-center justify-center ${isDarkMode ? "bg-orange-900/30" : "bg-orange-100"}`}
           >
-            <div className="flex justify-center mb-1.5 md:mb-4">
-              <div className="p-2 md:p-4 bg-gradient-to-r from-orange-500 to-pink-500 rounded-full">
-                <Settings className="w-5 h-5 md:w-8 md:h-8 text-white" />
-              </div>
-            </div>
-            <h2
-              className={`text-lg md:text-3xl font-bold mb-0.5 md:mb-2 ${
-                isDarkMode ? "text-white" : "text-gray-900"
-              }`}
-            >
-              {t("AccountSettings.accountSettingsTitle")}
-            </h2>
-            <p
-              className={`text-xs md:text-lg ${
-                isDarkMode ? "text-gray-300" : "text-gray-600"
-              }`}
-            >
-              {t("AccountSettings.accountSettingsSubtitle")}
-            </p>
+            <Shield className="w-5 h-5 text-orange-500" />
           </div>
+          <h2
+            className={`text-sm font-bold mb-0.5 ${isDarkMode ? "text-white" : "text-gray-900"}`}
+          >
+            {t("AccountSettings.accountSettingsTitle")}
+          </h2>
+          <p
+            className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+          >
+            {t("AccountSettings.accountSettingsSubtitle")}
+          </p>
         </div>
 
         {isLoading ? (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500" />
+          <div className="flex justify-center py-12">
+            <div className="w-5 h-5 border-[3px] border-orange-200 border-t-orange-600 rounded-full animate-spin" />
           </div>
         ) : (
-          <div className="flex-1 flex flex-col space-y-3 md:space-y-8">
+          <>
             {/* Security Section */}
-            <div className="flex-shrink-0">
-              <div className="flex items-center gap-2 mb-2 md:mb-6">
-                <div className="p-1.5 md:p-2 bg-gradient-to-r from-orange-500 to-pink-500 rounded-md md:rounded-lg">
-                  <Shield className="w-4 h-4 md:w-5 md:h-5 text-white" />
+            <div>
+              <div className="flex items-center gap-2 mb-2 px-1">
+                <div
+                  className={`w-6 h-6 rounded-lg flex items-center justify-center ${isDarkMode ? "bg-orange-900/30" : "bg-orange-50"}`}
+                >
+                  <Shield className="w-3 h-3 text-orange-500" />
                 </div>
-                <h3
-                  className={`text-base md:text-xl font-bold ${
-                    isDarkMode ? "text-white" : "text-gray-900"
-                  }`}
+                <span
+                  className={`text-xs font-semibold ${isDarkMode ? "text-white" : "text-gray-900"}`}
                 >
                   {t("AccountSettings.securitySettings")}
-                </h3>
+                </span>
               </div>
 
               <div
-                className={`rounded-lg md:rounded-xl overflow-hidden ${
-                  isDarkMode
-                    ? "bg-gray-800 border border-gray-700"
-                    : "bg-white border border-gray-100"
-                } shadow-sm`}
+                className={`rounded-2xl border ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-100"}`}
               >
-                <div className="p-2.5 md:p-4">
-                  <div className="flex items-center gap-2.5 md:gap-4">
-                    <div
-                      className={`p-1.5 md:p-2 rounded-md md:rounded-lg ${
-                        settings.twoFactorEnabled
-                          ? isDarkMode ? "bg-green-900/30" : "bg-green-100"
-                          : isDarkMode ? "bg-gray-700" : "bg-gray-100"
-                      }`}
-                    >
-                      <Key
-                        className={`w-4 h-4 md:w-5 md:h-5 ${
-                          settings.twoFactorEnabled
-                            ? isDarkMode ? "text-green-400" : "text-green-600"
-                            : "text-gray-500"
-                        }`}
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4
-                        className={`text-sm md:text-base font-semibold ${
-                          isDarkMode ? "text-white" : "text-gray-900"
-                        }`}
-                      >
-                        {t("AccountSettings.twoFactorAuth")}
-                      </h4>
-                      <p
-                        className={`text-xs md:text-sm ${
-                          isDarkMode ? "text-gray-300" : "text-gray-600"
-                        }`}
-                      >
-                        {t("AccountSettings.twoFactorAuthDesc")}
-                      </p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
-                      <input
-                        type="checkbox"
-                        checked={settings.twoFactorEnabled}
-                        onChange={(e) => handle2FAToggle(e.target.checked)}
-                        className="sr-only peer"
-                      />
-                      <div className={`w-10 h-5 md:w-11 md:h-6 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 md:after:h-5 md:after:w-5 after:transition-all peer-checked:bg-green-600 ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`} />
-                    </label>
+                <div className="px-4 py-3 flex items-center gap-3">
+                  <div
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                      settings.twoFactorEnabled
+                        ? isDarkMode
+                          ? "bg-green-900/30"
+                          : "bg-green-50"
+                        : isDarkMode
+                          ? "bg-gray-700"
+                          : "bg-gray-100"
+                    }`}
+                  >
+                    <Key
+                      className={`w-4 h-4 ${settings.twoFactorEnabled ? (isDarkMode ? "text-green-400" : "text-green-600") : "text-gray-400"}`}
+                    />
                   </div>
+                  <div className="flex-1 min-w-0">
+                    <h4
+                      className={`text-sm font-semibold ${isDarkMode ? "text-white" : "text-gray-900"}`}
+                    >
+                      {t("AccountSettings.twoFactorAuth")}
+                    </h4>
+                    <p
+                      className={`text-[11px] ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                    >
+                      {t("AccountSettings.twoFactorAuthDesc")}
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={settings.twoFactorEnabled}
+                      onChange={(e) => handle2FAToggle(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div
+                      className={`w-10 h-5 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-600 ${isDarkMode ? "bg-gray-600" : "bg-gray-200"}`}
+                    />
+                  </label>
                 </div>
               </div>
             </div>
 
             {/* Danger Zone */}
-            <div className="flex-shrink-0">
-              <div className="flex items-center gap-2 mb-2 md:mb-6">
-                <div className={`p-1.5 md:p-2 rounded-md md:rounded-lg ${isDarkMode ? "bg-red-900/30" : "bg-red-100"}`}>
-                  <AlertTriangle className={`w-4 h-4 md:w-5 md:h-5 ${isDarkMode ? "text-red-400" : "text-red-600"}`} />
+            <div>
+              <div className="flex items-center gap-2 mb-2 px-1">
+                <div
+                  className={`w-6 h-6 rounded-lg flex items-center justify-center ${isDarkMode ? "bg-red-900/30" : "bg-red-50"}`}
+                >
+                  <AlertTriangle
+                    className={`w-3 h-3 ${isDarkMode ? "text-red-400" : "text-red-500"}`}
+                  />
                 </div>
-                <h3 className={`text-base md:text-xl font-bold ${isDarkMode ? "text-red-400" : "text-red-600"}`}>
+                <span
+                  className={`text-xs font-semibold ${isDarkMode ? "text-red-400" : "text-red-600"}`}
+                >
                   {t("AccountSettings.dangerZone")}
-                </h3>
+                </span>
               </div>
 
               <div
-                className={`rounded-lg md:rounded-xl overflow-hidden border-2 ${
-                  isDarkMode ? "border-red-800 bg-gray-800" : "border-red-200 bg-white"
-                } shadow-sm`}
+                className={`rounded-2xl border-2 overflow-hidden ${isDarkMode ? "border-red-800/50 bg-gray-800" : "border-red-100 bg-white"}`}
               >
                 <button
                   onClick={() => setShowDeleteDialog(true)}
-                  className={`w-full p-2.5 md:p-4 text-left transition-colors ${isDarkMode ? "hover:bg-red-900/20" : "hover:bg-red-50"}`}
+                  className={`w-full px-4 py-3 text-left transition-colors ${isDarkMode ? "hover:bg-red-900/10" : "hover:bg-red-50/50"}`}
                 >
-                  <div className="flex items-center gap-2.5 md:gap-4">
-                    <div className={`p-1.5 md:p-2 rounded-md md:rounded-lg ${isDarkMode ? "bg-red-900/30" : "bg-red-100"}`}>
-                      <Trash2 className={`w-4 h-4 md:w-5 md:h-5 ${isDarkMode ? "text-red-400" : "text-red-600"}`} />
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${isDarkMode ? "bg-red-900/30" : "bg-red-50"}`}
+                    >
+                      <Trash2
+                        className={`w-4 h-4 ${isDarkMode ? "text-red-400" : "text-red-500"}`}
+                      />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h4 className={`text-sm md:text-base font-semibold ${isDarkMode ? "text-red-400" : "text-red-600"}`}>
+                      <h4
+                        className={`text-sm font-semibold ${isDarkMode ? "text-red-400" : "text-red-600"}`}
+                      >
                         {t("AccountSettings.deleteAccount")}
                       </h4>
                       <p
-                        className={`text-xs md:text-sm ${
-                          isDarkMode ? "text-gray-300" : "text-gray-600"
-                        }`}
+                        className={`text-[11px] ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
                       >
                         {t("AccountSettings.deleteAccountDesc")}
                       </p>
                     </div>
-                    <ChevronRight className={`w-4 h-4 md:w-5 md:h-5 flex-shrink-0 ${isDarkMode ? "text-red-400" : "text-red-600"}`} />
+                    <ChevronRight
+                      className={`w-4 h-4 flex-shrink-0 ${isDarkMode ? "text-red-400/50" : "text-red-300"}`}
+                    />
                   </div>
                 </button>
               </div>
             </div>
-          </div>
+          </>
         )}
       </div>
 
-      {/* Delete Account Dialog */}
+      {/* Delete Account Modal */}
       {showDeleteDialog && (
-        <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center p-3 md:p-4 z-50"
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}
-        >
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div
-            className={`w-full max-w-md rounded-xl md:rounded-2xl p-4 md:p-6 mx-3 md:mx-4 ${
-              isDarkMode ? "bg-gray-800" : "bg-white"
-            }`}
+            className={`w-full max-w-sm rounded-2xl shadow-2xl ${isDarkMode ? "bg-gray-800" : "bg-white"}`}
           >
-            <h3
-              className={`text-base md:text-xl font-bold mb-2 md:mb-4 ${isDarkMode ? "text-red-400" : "text-red-600"}`}
+            <div
+              className={`p-4 border-b ${isDarkMode ? "border-gray-700" : "border-gray-100"}`}
             >
-              {t("AccountSettings.deleteAccount")}
-            </h3>
-            <p
-              className={`mb-2.5 md:mb-4 text-xs md:text-base ${
-                isDarkMode ? "text-gray-300" : "text-gray-600"
-              }`}
+              <h3
+                className={`text-sm font-bold ${isDarkMode ? "text-red-400" : "text-red-600"}`}
+              >
+                {t("AccountSettings.deleteAccount")}
+              </h3>
+            </div>
+            <div className="p-4 space-y-3">
+              <p
+                className={`text-xs ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}
+              >
+                {t("AccountSettings.deleteAccountConfirmation")}
+              </p>
+              <input
+                type="email"
+                value={deleteEmail}
+                onChange={(e) => setDeleteEmail(e.target.value)}
+                placeholder={t("AccountSettings.enterEmailToConfirm")}
+                className={`w-full px-3 py-2 rounded-xl text-sm border transition-all focus:outline-none focus:ring-2 focus:ring-red-500/20 ${
+                  isDarkMode
+                    ? "bg-gray-700 border-gray-600 text-white placeholder-gray-500"
+                    : "bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400"
+                }`}
+              />
+            </div>
+            <div
+              className={`flex gap-2 p-4 border-t ${isDarkMode ? "border-gray-700" : "border-gray-100"}`}
             >
-              {t("AccountSettings.deleteAccountConfirmation")}
-            </p>
-            <input
-              type="email"
-              value={deleteEmail}
-              onChange={(e) => setDeleteEmail(e.target.value)}
-              placeholder={t("AccountSettings.enterEmailToConfirm")}
-              className={`w-full p-2 md:p-3 rounded-lg border mb-2.5 md:mb-4 text-sm md:text-base ${
-                isDarkMode
-                  ? "bg-gray-700 border-gray-600 text-white"
-                  : "bg-white border-gray-300 text-gray-900"
-              }`}
-            />
-            <div className="flex gap-2 md:gap-3">
               <button
                 onClick={() => setShowDeleteDialog(false)}
-                className={`flex-1 py-2 md:py-3 rounded-lg font-medium text-sm md:text-base ${
+                className={`flex-1 py-2.5 rounded-xl text-xs font-medium transition-colors ${
                   isDarkMode
-                    ? "bg-gray-700 text-white hover:bg-gray-600"
-                    : "bg-gray-100 text-gray-900 hover:bg-gray-200"
-                } transition-colors`}
+                    ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
               >
                 {t("AccountSettings.cancel")}
               </button>
               <button
                 onClick={handleDeleteAccount}
                 disabled={isDeleting || deleteEmail !== user.email}
-                className="flex-1 py-2 md:py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium text-sm md:text-base transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isDeleting
                   ? t("AccountSettings.deleting")
