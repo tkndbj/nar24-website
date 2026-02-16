@@ -258,7 +258,7 @@ export default function ProfilePage() {
         className={`min-h-screen flex flex-col ${isDarkMode ? "bg-gray-950" : "bg-gray-50"}`}
         style={{ WebkitFontSmoothing: "antialiased" }}
       >
-        <div className="max-w-4xl mx-auto px-5 md:px-10 flex-1">
+        <div className="w-full max-w-4xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-5 md:px-10 flex-1">
           {/* Top bar */}
           <div className="flex items-center justify-end py-4">
             <button
@@ -312,7 +312,7 @@ export default function ProfilePage() {
       className={`min-h-screen flex flex-col ${isDarkMode ? "bg-gray-950" : "bg-gray-50"}`}
       style={{ WebkitFontSmoothing: "antialiased" }}
     >
-      <div className="max-w-4xl mx-auto px-5 md:px-10 pb-12 flex-1">
+      <div className="w-full max-w-4xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-5 md:px-10 pb-12 flex-1">
         {/* Top bar */}
         <div className="flex items-center justify-end py-4">
           <button
