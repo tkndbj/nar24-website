@@ -33,24 +33,10 @@ import {
   Store,
 } from "lucide-react";
 import Image from "next/image";
-import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
+import Footer from "@/app/components/Footer";
 
-const SellerInfoDrawer = dynamic(
-  () =>
-    import("@/app/components/profile/SellerInfoDrawer").then((mod) => ({
-      default: mod.SellerInfoDrawer,
-    })),
-  { ssr: false }
-);
 
-const SavedAddressesDrawer = dynamic(
-  () =>
-    import("@/app/components/profile/AddressesDrawer").then((mod) => ({
-      default: mod.SavedAddressesDrawer,
-    })),
-  { ssr: false }
-);
 
 interface NavItem {
   icon: React.ElementType;
@@ -70,8 +56,6 @@ export default function ProfilePage() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isSellerInfoDrawerOpen, setIsSellerInfoDrawerOpen] = useState(false);
-  const [isAddressesDrawerOpen, setIsAddressesDrawerOpen] = useState(false);
   const t = useTranslations();
   const router = useRouter();
 
@@ -205,8 +189,8 @@ export default function ProfilePage() {
 
   const shortcutItems: NavItem[] = [
     { icon: Box, label: t("ProfilePage.myProducts"), path: "/myproducts", color: "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40" },
-    { icon: MapPin, label: t("ProfilePage.myAddresses"), action: () => setIsAddressesDrawerOpen(true), color: "text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/40" },
-    { icon: Info, label: t("ProfilePage.sellerInfo"), action: () => setIsSellerInfoDrawerOpen(true), color: "text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/40" },
+    { icon: MapPin, label: t("ProfilePage.myAddresses"), path: "/saved-addresses", color: "text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/40" },
+    { icon: Info, label: t("ProfilePage.sellerInfo"), path: "/seller-info", color: "text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/40" },
     { icon: Ticket, label: t("ProfilePage.coupons"), path: "/coupon-and-benefits", color: "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40" },
   ];
 
@@ -271,10 +255,10 @@ export default function ProfilePage() {
   if (!user) {
     return (
       <div
-        className={`min-h-screen ${isDarkMode ? "bg-gray-950" : "bg-gray-50"}`}
+        className={`min-h-screen flex flex-col ${isDarkMode ? "bg-gray-950" : "bg-gray-50"}`}
         style={{ WebkitFontSmoothing: "antialiased" }}
       >
-        <div className="max-w-4xl mx-auto px-5 md:px-10">
+        <div className="max-w-4xl mx-auto px-5 md:px-10 flex-1">
           {/* Top bar */}
           <div className="flex items-center justify-end py-4">
             <button
@@ -316,6 +300,8 @@ export default function ProfilePage() {
               ))}
           </div>
         </div>
+
+        <Footer />
       </div>
     );
   }
@@ -323,10 +309,10 @@ export default function ProfilePage() {
   // --- Authenticated ---
   return (
     <div
-      className={`min-h-screen ${isDarkMode ? "bg-gray-950" : "bg-gray-50"}`}
+      className={`min-h-screen flex flex-col ${isDarkMode ? "bg-gray-950" : "bg-gray-50"}`}
       style={{ WebkitFontSmoothing: "antialiased" }}
     >
-      <div className="max-w-4xl mx-auto px-5 md:px-10 pb-12">
+      <div className="max-w-4xl mx-auto px-5 md:px-10 pb-12 flex-1">
         {/* Top bar */}
         <div className="flex items-center justify-end py-4">
           <button
@@ -481,19 +467,7 @@ export default function ProfilePage() {
         </button>
       </div>
 
-      {/* Drawers */}
-      <SellerInfoDrawer
-        isOpen={isSellerInfoDrawerOpen}
-        onClose={() => setIsSellerInfoDrawerOpen(false)}
-        isDarkMode={isDarkMode}
-        localization={t}
-      />
-      <SavedAddressesDrawer
-        isOpen={isAddressesDrawerOpen}
-        onClose={() => setIsAddressesDrawerOpen(false)}
-        isDarkMode={isDarkMode}
-        localization={t}
-      />
+      <Footer />
     </div>
   );
 }

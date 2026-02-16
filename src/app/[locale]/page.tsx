@@ -411,12 +411,12 @@ export default function Home() {
   // ============================================================================
   
   return (
-    <>
+    <div className="min-h-screen flex flex-col">
       {/* SecondHeader - Always visible */}
       <SecondHeader />
 
       <div
-        className={`min-h-screen w-full ${
+        className={`flex-1 w-full ${
           isDarkMode ? "bg-gray-900" : "bg-gray-50"
         }`}
       >
@@ -442,6 +442,6 @@ export default function Home() {
 
       {/* Footer - Only on home page */}
       <Footer />
-    </>
+    </div>
   );
 }
