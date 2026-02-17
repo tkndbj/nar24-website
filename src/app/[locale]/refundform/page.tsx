@@ -42,6 +42,8 @@ interface OrderData {
   sellerName?: string;
   selectedColorImage?: string;
   productImage?: string;
+  productId?: string;
+  shopId?: string;
   timestamp?: Timestamp;
   [key: string]: string | number | boolean | Timestamp | undefined;
 }
@@ -62,10 +64,12 @@ export default function RefundFormPage() {
   const { user, profileData, isLoading: authLoading } = useUser();
   const router = useRouter();
   const t = useTranslations();
-
+  const [selectedOrderData, setSelectedOrderData] = useState<OrderData | null>(
+    null,
+  );
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
-  const [, setSelectedOrderData] = useState<OrderData | null>(null);
+
   const [isLoadingOrders, setIsLoadingOrders] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [lastDoc, setLastDoc] = useState<DocumentSnapshot | null>(null);
@@ -158,7 +162,9 @@ export default function RefundFormPage() {
 
   const handleConfirmOrder = () => {
     if (selectedOrderId) {
+      const order = orders.find((o) => o.id === selectedOrderId);
       setReceiptNo(selectedOrderId);
+      setSelectedOrderData(order?.data || null); // ← ADD THIS
       setShowOrderModal(false);
       if (errors.receiptNo) setErrors({ ...errors, receiptNo: "" });
     }
@@ -189,6 +195,20 @@ export default function RefundFormPage() {
         description: description.trim(),
         status: "pending",
         createdAt: Timestamp.now(),
+        // ← ADD THESE
+        ...(selectedOrderData && {
+          productName: selectedOrderData.productName || "",
+          sellerName: selectedOrderData.sellerName || "",
+          price: selectedOrderData.price || 0,
+          currency: selectedOrderData.currency || "TL",
+          quantity: selectedOrderData.quantity || 1,
+          productImage:
+            selectedOrderData.selectedColorImage ||
+            selectedOrderData.productImage ||
+            "",
+          productId: selectedOrderData.productId || "",
+          shopId: selectedOrderData.shopId || "",
+        }),
       });
       setShowSuccessModal(true);
       setTimeout(() => {
