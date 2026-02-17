@@ -969,7 +969,7 @@ export default function CartPage() {
           )}
 
           {/* Item Row */}
-          <div className={`py-4 ${index < cartItems.length - 1 ? `border-b ${isDark ? "border-gray-800/60" : "border-gray-100"}` : ""}`}>
+          <div className={`py-4 px-2 sm:px-0 ${index < cartItems.length - 1 ? `border-b ${isDark ? "border-gray-800/60" : "border-gray-100"}` : ""}`}>
             {/* Desktop layout */}
             <div className="hidden lg:grid lg:grid-cols-[auto_auto_1fr_100px_120px_100px_auto] lg:items-center lg:gap-4">
               {/* Checkbox */}
@@ -1111,7 +1111,7 @@ export default function CartPage() {
 
             {/* Mobile layout */}
             <div className="lg:hidden">
-              <div className="flex items-start space-x-3">
+              <div className="flex items-start space-x-2 sm:space-x-3">
                 {/* Checkbox */}
                 <div
                   onClick={(e) => {
@@ -1298,9 +1298,9 @@ export default function CartPage() {
 
   return (
     <div className={`min-h-screen flex flex-col transition-colors duration-200 ${isDark ? "bg-gray-950" : "bg-gray-50"}`}>
-      <div className="max-w-6xl mx-auto px-2 sm:px-4 pt-4 pb-6 lg:px-8 lg:pt-8 lg:pb-8 flex-1">
+      <div className="max-w-6xl mx-auto px-0 sm:px-4 pt-4 pb-0 lg:px-8 lg:pt-8 lg:pb-8 flex-1 w-full">
         {/* Back Button */}
-        <div className="mb-4 lg:mb-6">
+        <div className="mb-4 lg:mb-6 px-2 sm:px-0">
           <button
             onClick={() => router.back()}
             className={`p-2 rounded-lg transition-colors border ${
@@ -1376,7 +1376,7 @@ export default function CartPage() {
             {/* Left: Cart Items */}
             <div className="flex-1 min-w-0">
               {/* Title */}
-              <div className="flex items-center space-x-3 mb-4">
+              <div className="flex items-center space-x-3 mb-4 px-2 sm:px-0">
                 <h1 className={`text-xl font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
                   {t("title", "My Cart")}
                 </h1>
@@ -1451,11 +1451,11 @@ export default function CartPage() {
               </div>
             </div>
 
-            {/* Right: Order Summary */}
+            {/* Right: Order Summary — bottom of page on mobile, sidebar on desktop */}
             <div className="w-full lg:w-[380px] lg:flex-shrink-0 mt-4 lg:mt-0">
               <div className="lg:sticky lg:top-6">
-                <div className={`rounded-2xl border shadow-sm ${isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"}`}>
-                  <div className="px-5 py-4 sm:px-6 sm:py-5">
+                <div className={`rounded-none lg:rounded-2xl border-t lg:border shadow-sm ${isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"}`}>
+                  <div className="px-4 py-3 sm:px-6 sm:py-5">
                     {/* Order Summary Title */}
                     <h2 className={`text-sm font-bold mb-4 ${isDark ? "text-white" : "text-gray-900"}`}>
                       {t("orderSummary", "Order Summary")}
