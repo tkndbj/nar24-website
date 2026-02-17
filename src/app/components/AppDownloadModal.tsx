@@ -11,13 +11,6 @@ const XIcon: React.FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
-// Smartphone icon
-const SmartphoneIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-  </svg>
-);
-
 const STORAGE_KEY = "nar24_app_modal_dismissed";
 
 // Google Play link
@@ -107,7 +100,22 @@ function isAndroid(): boolean {
 export default function AppDownloadModal() {
   const [isVisible, setIsVisible] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [isDark, setIsDark] = useState(false);
   const t = useTranslations();
+
+  useEffect(() => {
+    const checkTheme = () => {
+      if (typeof document !== "undefined") {
+        setIsDark(document.documentElement.classList.contains("dark"));
+      }
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    if (typeof document !== "undefined") {
+      observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    }
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     // Check if we should show the modal
@@ -180,7 +188,9 @@ export default function AppDownloadModal() {
       onClick={handleBackdropClick}
     >
       <div
-        className={`w-full max-w-md bg-white dark:bg-gray-900 rounded-3xl shadow-2xl overflow-hidden transition-all duration-300 ${
+        className={`w-full max-w-md rounded-3xl shadow-2xl overflow-hidden transition-all duration-300 ${
+          isDark ? "bg-gray-900" : "bg-white"
+        } ${
           isAnimating
             ? "opacity-100 translate-y-0 scale-100"
             : "opacity-0 translate-y-8 scale-95"
@@ -191,36 +201,44 @@ export default function AppDownloadModal() {
           {/* Close button */}
           <button
             onClick={handleDismiss}
-            className="absolute top-4 right-4 p-2 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            className={`absolute top-4 right-4 p-2 rounded-full transition-colors ${
+              isDark
+                ? "bg-gray-800 hover:bg-gray-700"
+                : "bg-gray-100 hover:bg-gray-200"
+            }`}
             aria-label={t("common.cancel")}
           >
-            <XIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+            <XIcon className={`w-5 h-5 ${isDark ? "text-gray-400" : "text-gray-600"}`} />
           </button>
 
-          {/* Icon */}
+          {/* Logo */}
           <div className="flex justify-center mb-4">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center shadow-lg">
-              <SmartphoneIcon className="w-8 h-8 text-white" />
-            </div>
+            <Image
+              src={isDark ? "/images/beyazlogo.png" : "/images/siyahlogo.png"}
+              alt="Nar24"
+              width={64}
+              height={64}
+              className="w-16 h-16 object-contain"
+            />
           </div>
 
           {/* Title */}
-          <h2 className="text-xl font-bold text-center text-gray-900 dark:text-white mb-2">
+          <h2 className={`text-xl font-bold text-center mb-2 ${isDark ? "text-white" : "text-gray-900"}`}>
             {t("appDownload.title")}
           </h2>
 
           {/* Description */}
-          <p className="text-center text-gray-600 dark:text-gray-400 text-sm">
+          <p className={`text-center text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>
             {t("appDownload.description")}
           </p>
         </div>
 
         {/* Features */}
         <div className="px-6 pb-4">
-          <div className="bg-gray-50 dark:bg-gray-800/50 rounded-2xl p-4 space-y-3">
-            <FeatureItem text={t("appDownload.feature1")} />
-            <FeatureItem text={t("appDownload.feature2")} />
-            <FeatureItem text={t("appDownload.feature3")} />
+          <div className={`rounded-2xl p-4 space-y-3 ${isDark ? "bg-gray-800/50" : "bg-gray-50"}`}>
+            <FeatureItem text={t("appDownload.feature1")} isDark={isDark} />
+            <FeatureItem text={t("appDownload.feature2")} isDark={isDark} />
+            <FeatureItem text={t("appDownload.feature3")} isDark={isDark} />
           </div>
         </div>
 
@@ -235,11 +253,13 @@ export default function AppDownloadModal() {
                   imageSrc="/appstore.png"
                   alt="Download on the App Store"
                   primary
+                  isDark={isDark}
                 />
                 <StoreButton
                   href={GOOGLE_PLAY_URL}
                   imageSrc="/googleplay.png"
                   alt="Get it on Google Play"
+                  isDark={isDark}
                 />
               </>
             ) : deviceIsAndroid ? (
@@ -249,11 +269,13 @@ export default function AppDownloadModal() {
                   imageSrc="/googleplay.png"
                   alt="Get it on Google Play"
                   primary
+                  isDark={isDark}
                 />
                 <StoreButton
                   href={APP_STORE_URL}
                   imageSrc="/appstore.png"
                   alt="Download on the App Store"
+                  isDark={isDark}
                 />
               </>
             ) : (
@@ -264,12 +286,14 @@ export default function AppDownloadModal() {
                   imageSrc="/appstore.png"
                   alt="Download on the App Store"
                   primary
+                  isDark={isDark}
                 />
                 <StoreButton
                   href={GOOGLE_PLAY_URL}
                   imageSrc="/googleplay.png"
                   alt="Get it on Google Play"
                   primary
+                  isDark={isDark}
                 />
               </>
             )}
@@ -280,7 +304,11 @@ export default function AppDownloadModal() {
         <div className="px-6 pb-6">
           <button
             onClick={handleDismiss}
-            className="w-full py-3 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+            className={`w-full py-3 text-sm font-medium transition-colors ${
+              isDark
+                ? "text-gray-400 hover:text-gray-300"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
           >
             {t("appDownload.maybeLater")}
           </button>
@@ -290,12 +318,14 @@ export default function AppDownloadModal() {
   );
 }
 
-function FeatureItem({ text }: { text: string }) {
+function FeatureItem({ text, isDark = false }: { text: string; isDark?: boolean }) {
   return (
     <div className="flex items-center gap-3">
-      <div className="w-5 h-5 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center flex-shrink-0">
+      <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${
+        isDark ? "bg-green-900/30" : "bg-green-100"
+      }`}>
         <svg
-          className="w-3 h-3 text-green-600 dark:text-green-400"
+          className={`w-3 h-3 ${isDark ? "text-green-400" : "text-green-600"}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -308,7 +338,7 @@ function FeatureItem({ text }: { text: string }) {
           />
         </svg>
       </div>
-      <span className="text-sm text-gray-700 dark:text-gray-300">{text}</span>
+      <span className={`text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>{text}</span>
     </div>
   );
 }
@@ -318,11 +348,13 @@ function StoreButton({
   imageSrc,
   alt,
   primary = false,
+  isDark = false,
 }: {
   href: string;
   imageSrc: string;
   alt: string;
   primary?: boolean;
+  isDark?: boolean;
 }) {
   return (
     <a
@@ -331,8 +363,12 @@ function StoreButton({
       rel="noopener noreferrer"
       className={`flex items-center justify-center h-14 rounded-xl transition-all duration-200 ${
         primary
-          ? "bg-gray-900 dark:bg-white hover:bg-gray-800 dark:hover:bg-gray-100"
-          : "bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
+          ? isDark
+            ? "bg-white hover:bg-gray-100"
+            : "bg-gray-900 hover:bg-gray-800"
+          : isDark
+            ? "bg-gray-800 hover:bg-gray-700"
+            : "bg-gray-100 hover:bg-gray-200"
       }`}
     >
       <Image

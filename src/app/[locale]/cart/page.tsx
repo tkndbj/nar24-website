@@ -1298,7 +1298,7 @@ export default function CartPage() {
 
   return (
     <div className={`min-h-screen flex flex-col transition-colors duration-200 ${isDark ? "bg-gray-950" : "bg-gray-50"}`}>
-      <div className="max-w-6xl mx-auto px-4 pt-6 pb-6 lg:px-8 lg:pt-8 lg:pb-8 flex-1">
+      <div className="max-w-6xl mx-auto px-2 sm:px-4 pt-4 pb-6 lg:px-8 lg:pt-8 lg:pb-8 flex-1">
         {/* Back Button */}
         <div className="mb-4 lg:mb-6">
           <button

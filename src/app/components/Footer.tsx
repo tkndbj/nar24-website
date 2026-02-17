@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
-import { ShoppingBag, Mail, Phone, MapPin } from "lucide-react";
+import { Mail, Phone, MapPin } from "lucide-react";
+import Image from "next/image";
 
 export default function Footer() {
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -84,9 +85,13 @@ export default function Footer() {
           {/* Brand Section */}
           <div className="space-y-4">
             <div className="flex items-center gap-2">
-              <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-pink-500 rounded-xl flex items-center justify-center">
-                <ShoppingBag className="w-6 h-6 text-white" />
-              </div>
+              <Image
+                src={isDarkMode ? "/images/beyazlogo.png" : "/images/siyahlogo.png"}
+                alt="Nar24"
+                width={40}
+                height={40}
+                className="w-10 h-10 object-contain"
+              />
               <span
                 className={`text-2xl font-bold bg-gradient-to-r ${
                   isDarkMode
