@@ -17,8 +17,9 @@ body {
 }
 
 /* Prevent horizontal scroll on all devices */
+/* Use 'clip' instead of 'hidden' to avoid breaking position:sticky */
 html, body {
-  overflow-x: hidden;
+  overflow-x: clip;
   max-width: 100vw;
 }
 
@@ -66,23 +67,46 @@ html, body {
 
 /* Sticky positioning that accounts for safe area on mobile devices */
 /* Used for headers that need to stack below the MarketHeader */
+/* MarketHeader heights: mobile h-11+h-10+pb-2 = 5.75rem, tablet(md) h-12 = 3rem, desktop(lg) h-13 = 3.25rem, xl h-14 = 3.5rem, +1px border */
 .sticky-below-market-header {
-  /* Mobile: MarketHeader height (116px = 64px first row + 40px SearchBar + 12px pb-3) + safe area inset */
-  top: calc(116px + env(safe-area-inset-top, 0px));
+  /* Mobile (<md): h-11 + SearchBar h-10 + pb-2 + border = 5.75rem + 1px */
+  top: calc(5.75rem + 1px + env(safe-area-inset-top, 0px));
+}
+
+@media (min-width: 768px) {
+  .sticky-below-market-header {
+    /* Tablet (md): single row h-12 + border = 3rem + 1px */
+    top: calc(3rem + 1px);
+  }
 }
 
 @media (min-width: 1024px) {
   .sticky-below-market-header {
-    /* Desktop: MarketHeader is single row (64px), no safe area needed */
-    top: 64px;
+    /* Desktop (lg): single row h-13 + border = 3.25rem + 1px */
+    top: calc(3.25rem + 1px);
+  }
+}
+
+@media (min-width: 1280px) {
+  .sticky-below-market-header {
+    /* Desktop (xl): single row h-14 + border = 3.5rem + 1px */
+    top: calc(3.5rem + 1px);
   }
 }
 
 /* Sticky positioning for mobile only - used by product detail header */
-/* Sets top value only on mobile, desktop uses lg:static to disable sticky */
-@media (max-width: 1023px) {
+/* Sets top value only on mobile/tablet, desktop uses inline lg:top-* classes */
+@media (max-width: 767px) {
   .sticky-below-market-header-mobile {
-    top: calc(116px + env(safe-area-inset-top, 0px));
+    /* Mobile: h-11 + SearchBar h-10 + pb-2 + border = 5.75rem + 1px */
+    top: calc(5.75rem + 1px + env(safe-area-inset-top, 0px));
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .sticky-below-market-header-mobile {
+    /* Tablet: single row h-12 + border = 3rem + 1px */
+    top: calc(3rem + 1px);
   }
 }
 

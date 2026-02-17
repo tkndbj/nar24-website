@@ -110,7 +110,7 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
         return key;
       }
     },
-    [localization]
+    [localization],
   );
 
   const isShop = shopId && shopId.trim().length > 0;
@@ -136,7 +136,7 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
         setError(null);
 
         const response = await fetch(
-          `/api/seller/${sellerId}${shopId ? `?shopId=${shopId}` : ""}`
+          `/api/seller/${sellerId}${shopId ? `?shopId=${shopId}` : ""}`,
         );
 
         if (!response.ok) {
@@ -148,7 +148,7 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
       } catch (err) {
         console.error("Error fetching seller info:", err);
         setError(
-          err instanceof Error ? err.message : t("failedToLoadSellerInfo")
+          err instanceof Error ? err.message : t("failedToLoadSellerInfo"),
         );
         setSellerInfo({
           sellerName: sellerName || t("unknownSeller"),
@@ -226,7 +226,10 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
 
             {sellerInfo.sellerIsVerified && (
               <div className="absolute -top-1 -right-1 bg-blue-500 rounded-full p-0.5 md:p-1">
-                <Verified className="w-2.5 h-2.5 md:w-3 md:h-3 text-white" fill="currentColor" />
+                <Verified
+                  className="w-2.5 h-2.5 md:w-3 md:h-3 text-white"
+                  fill="currentColor"
+                />
               </div>
             )}
           </div>
@@ -315,7 +318,7 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
             }`}
           >
             <Verified className="w-2.5 h-2.5 md:w-3 md:h-3" />
-            {t("verified")} {isShop ? t("store") : t("seller")}
+            {t("verified2")} {isShop ? t("store") : t("seller")}
           </div>
 
           <div
