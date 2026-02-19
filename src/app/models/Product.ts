@@ -58,10 +58,32 @@ export interface Product {
   campaignName?: string;
   colorImages: Record<string, string[]>;
   videoUrl?: string;
-  attributes: Record<string, unknown>;
   relatedProductIds: string[];
   relatedLastUpdated?: Date;
   relatedCount: number;
+
+  // ── Classification ────────────────────────────────────────────────────────
+  productType?: string;
+
+  // ── Spec fields (top-level in Firestore, typed here) ──────────────────────
+  // Mirrors Flutter's typed spec fields exactly for cross-platform consistency.
+  // Read: top-level first, attributes sub-map fallback (legacy docs).
+  // Write: always top-level. attributes map holds only truly misc fields.
+  clothingSizes?: string[];
+  clothingFit?: string;
+  clothingTypes?: string[];
+  pantSizes?: string[];
+  pantFabricTypes?: string[];
+  footwearSizes?: string[];
+  jewelryMaterials?: string[];
+  consoleBrand?: string;
+  curtainMaxWidth?: number;
+  curtainMaxHeight?: number;
+
+  // ── Misc ──────────────────────────────────────────────────────────────────
+  /** Truly miscellaneous fields with no dedicated property. Spec fields are NOT stored here. */
+  attributes?: Record<string, unknown>;
+
   // Simplified Firestore document reference
   reference?: {
     id: string;
@@ -144,7 +166,6 @@ export class ProductUtils {
   ): Array<Record<string, unknown>> | undefined {
     if (value == null) return undefined;
     if (!Array.isArray(value)) return undefined;
-
     try {
       return value.map((item) => {
         if (item && typeof item === "object" && !Array.isArray(item)) {
@@ -160,8 +181,6 @@ export class ProductUtils {
 
   static safeDate(value: unknown): Date {
     if (value == null) return new Date();
-
-    // Handle Firestore Timestamp objects
     if (
       typeof value === "object" &&
       value !== null &&
@@ -170,7 +189,6 @@ export class ProductUtils {
     ) {
       return (value as { toDate: () => Date }).toDate();
     }
-
     if (value instanceof Date) return value;
     if (typeof value === "number") return new Date(value);
     if (typeof value === "string") {
@@ -182,8 +200,6 @@ export class ProductUtils {
 
   static safeDateNullable(value: unknown): Date | undefined {
     if (value == null) return undefined;
-
-    // Handle Firestore Timestamp objects
     if (
       typeof value === "object" &&
       value !== null &&
@@ -192,7 +208,6 @@ export class ProductUtils {
     ) {
       return (value as { toDate: () => Date }).toDate();
     }
-
     if (value instanceof Date) return value;
     if (typeof value === "number") return new Date(value);
     if (typeof value === "string") {
@@ -206,13 +221,6 @@ export class ProductUtils {
     if (value == null) return undefined;
     const str = String(value).trim();
     return str.length === 0 ? undefined : str;
-  }
-
-  static safeAttributes(value: unknown): Record<string, unknown> {
-    if (value != null && typeof value === "object" && !Array.isArray(value)) {
-      return value as Record<string, unknown>;
-    }
-    return {};
   }
 
   static safeReference(value: unknown): Product["reference"] {
@@ -232,7 +240,45 @@ export class ProductUtils {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // Matches Flutter's Parse.sourceCollectionFromRef / sourceCollectionFromJson
+  // SPEC FIELD HELPERS — top-level first, attributes fallback (legacy docs)
+  // Mirrors Flutter's _specList / _specStr / _specDouble helpers exactly.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  static specStringArray(
+    json: ApiData,
+    attrs: Record<string, unknown>,
+    key: string,
+  ): string[] | undefined {
+    const raw = json[key] ?? attrs[key];
+    if (raw == null) return undefined;
+    if (Array.isArray(raw)) return raw.map(String);
+    return undefined;
+  }
+
+  static specString(
+    json: ApiData,
+    attrs: Record<string, unknown>,
+    key: string,
+  ): string | undefined {
+    const raw = json[key] ?? attrs[key];
+    if (raw == null) return undefined;
+    const str = String(raw).trim();
+    return str.length > 0 ? str : undefined;
+  }
+
+  static specNumber(
+    json: ApiData,
+    attrs: Record<string, unknown>,
+    key: string,
+  ): number | undefined {
+    const raw = json[key] ?? attrs[key];
+    if (raw == null) return undefined;
+    const n = Number(raw);
+    return isNaN(n) ? undefined : n;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SOURCE COLLECTION HELPERS
   // ═══════════════════════════════════════════════════════════════════════════
 
   static sourceCollectionFromReference(
@@ -242,17 +288,14 @@ export class ProductUtils {
     const path = reference.path || "";
     if (path.startsWith("products/")) return "products";
     if (path.startsWith("shop_products/")) return "shop_products";
-    // Fallback: use parent collection id
     if (reference.parent?.id) return reference.parent.id;
     return undefined;
   }
 
   static sourceCollectionFromJson(json: ApiData): string | undefined {
-    // 1. Explicit field (matches Flutter's Parse.sourceCollectionFromJson)
     if (typeof json.sourceCollection === "string" && json.sourceCollection) {
       return json.sourceCollection;
     }
-    // 2. Derive from reference path
     if (json.reference && typeof json.reference === "object") {
       const ref = ProductUtils.safeReference(json.reference);
       return ProductUtils.sourceCollectionFromReference(ref);
@@ -264,9 +307,35 @@ export class ProductUtils {
   // FACTORIES — matching Flutter's fromJson / fromDocument / fromAlgolia
   // ═══════════════════════════════════════════════════════════════════════════
 
-  // Factory method to create Product from API response — matches Flutter's fromJson
   static fromJson(json: ApiData): Product {
-    const attributes = ProductUtils.safeAttributes(json.attributes);
+    // Raw attributes sub-map (legacy format)
+    const rawAttrs =
+      json.attributes != null &&
+      typeof json.attributes === "object" &&
+      !Array.isArray(json.attributes)
+        ? (json.attributes as Record<string, unknown>)
+        : {};
+
+    // Strip spec keys + promoted keys from attributes so the map is truly misc.
+    // Mirrors Flutter's cleanAttrs block in Product._fromMap.
+    const cleanAttrs = { ...rawAttrs };
+    const specKeys = [
+      "gender",
+      "productType",
+      "clothingSizes",
+      "clothingFit",
+      "clothingTypes",
+      "clothingType",
+      "pantSizes",
+      "pantFabricTypes",
+      "pantFabricType",
+      "footwearSizes",
+      "jewelryMaterials",
+      "consoleBrand",
+      "curtainMaxWidth",
+      "curtainMaxHeight",
+    ];
+    specKeys.forEach((k) => delete cleanAttrs[k]);
 
     return {
       id: ProductUtils.safeString(json.id),
@@ -282,7 +351,10 @@ export class ProductUtils {
       imageUrls: ProductUtils.safeStringArray(json.imageUrls),
       averageRating: ProductUtils.safeDouble(json.averageRating),
       reviewCount: ProductUtils.safeInt(json.reviewCount),
-      gender: ProductUtils.safeStringNullable(json.gender),
+      // gender: top-level first, attributes fallback
+      gender:
+        ProductUtils.safeStringNullable(json.gender) ??
+        ProductUtils.safeStringNullable(rawAttrs.gender),
       bundleIds: ProductUtils.safeStringArray(json.bundleIds),
       bundleData: ProductUtils.safeBundleData(json.bundleData),
       originalPrice:
@@ -358,8 +430,52 @@ export class ProductUtils {
       campaignName: ProductUtils.safeStringNullable(json.campaignName),
       colorImages: ProductUtils.safeColorImages(json.colorImages),
       videoUrl: ProductUtils.safeStringNullable(json.videoUrl),
-      attributes,
       reference: ProductUtils.safeReference(json.reference),
+      // ── Classification ────────────────────────────────────────────────────
+      productType: ProductUtils.specString(json, rawAttrs, "productType"),
+      // ── Spec fields — top-level first, attributes fallback ────────────────
+      clothingSizes: ProductUtils.specStringArray(
+        json,
+        rawAttrs,
+        "clothingSizes",
+      ),
+      clothingFit: ProductUtils.specString(json, rawAttrs, "clothingFit"),
+      // clothingTypes: also promote legacy singular 'clothingType'
+      clothingTypes:
+        ProductUtils.specStringArray(json, rawAttrs, "clothingTypes") ??
+        (ProductUtils.specString(json, rawAttrs, "clothingType") != null
+          ? [ProductUtils.specString(json, rawAttrs, "clothingType")!]
+          : undefined),
+      pantSizes: ProductUtils.specStringArray(json, rawAttrs, "pantSizes"),
+      // pantFabricTypes: also promote legacy singular 'pantFabricType'
+      pantFabricTypes:
+        ProductUtils.specStringArray(json, rawAttrs, "pantFabricTypes") ??
+        (ProductUtils.specString(json, rawAttrs, "pantFabricType") != null
+          ? [ProductUtils.specString(json, rawAttrs, "pantFabricType")!]
+          : undefined),
+      footwearSizes: ProductUtils.specStringArray(
+        json,
+        rawAttrs,
+        "footwearSizes",
+      ),
+      jewelryMaterials: ProductUtils.specStringArray(
+        json,
+        rawAttrs,
+        "jewelryMaterials",
+      ),
+      consoleBrand: ProductUtils.specString(json, rawAttrs, "consoleBrand"),
+      curtainMaxWidth: ProductUtils.specNumber(
+        json,
+        rawAttrs,
+        "curtainMaxWidth",
+      ),
+      curtainMaxHeight: ProductUtils.specNumber(
+        json,
+        rawAttrs,
+        "curtainMaxHeight",
+      ),
+      // ── Misc ──────────────────────────────────────────────────────────────
+      attributes: Object.keys(cleanAttrs).length > 0 ? cleanAttrs : undefined,
     };
   }
 
@@ -367,7 +483,6 @@ export class ProductUtils {
   // SERIALIZATION — matching Flutter's toJson / toMap
   // ═══════════════════════════════════════════════════════════════════════════
 
-  // Convert Product to JSON for API calls — matches Flutter's toJson
   static toJson(product: Product): Record<string, unknown> {
     const json: Record<string, unknown> = {
       id: product.id,
@@ -426,26 +541,38 @@ export class ProductUtils {
       campaign: product.campaign,
       campaignName: product.campaignName,
       colorImages: product.colorImages,
+      colorQuantities: product.colorQuantities,
+      bundleIds: product.bundleIds,
+      bundleData: product.bundleData,
       videoUrl: product.videoUrl,
+      // ── Classification & spec fields — always top-level ───────────────────
+      productType: product.productType,
+      clothingSizes: product.clothingSizes,
+      clothingFit: product.clothingFit,
+      clothingTypes: product.clothingTypes,
+      pantSizes: product.pantSizes,
+      pantFabricTypes: product.pantFabricTypes,
+      footwearSizes: product.footwearSizes,
+      jewelryMaterials: product.jewelryMaterials,
+      consoleBrand: product.consoleBrand,
+      curtainMaxWidth: product.curtainMaxWidth,
+      curtainMaxHeight: product.curtainMaxHeight,
+      // ── Misc ──────────────────────────────────────────────────────────────
       attributes: product.attributes,
     };
 
     // Remove null/undefined values (matching Flutter's removeWhere)
     Object.keys(json).forEach((key) => {
-      if (json[key] == null) {
-        delete json[key];
-      }
+      if (json[key] == null) delete json[key];
     });
 
     return json;
   }
 
-  // Factory method for Algolia data — matches Flutter's fromAlgolia
   static fromAlgolia(json: ApiData): Product {
     let normalizedId = String(json.objectID ?? "");
     let sourceCollection: string | undefined;
 
-    // Match Flutter's prefix-based sourceCollection detection
     if (normalizedId.startsWith("products_")) {
       sourceCollection = "products";
       normalizedId = normalizedId.substring("products_".length);
@@ -453,23 +580,19 @@ export class ProductUtils {
       sourceCollection = "shop_products";
       normalizedId = normalizedId.substring("shop_products_".length);
     } else {
-      // Fallback: derive from shopId presence (matches Flutter)
       sourceCollection =
         json.shopId != null && String(json.shopId).length > 0
           ? "shop_products"
           : "products";
     }
 
-    const modifiedJson: ApiData = {
+    return ProductUtils.fromJson({
       ...json,
       id: normalizedId,
       sourceCollection,
-    };
-
-    return ProductUtils.fromJson(modifiedJson);
+    });
   }
 
-  // Create Product with copyWith functionality — matches Flutter's copyWith
   static copyWith(
     product: Product,
     updates: Partial<Product> & {
@@ -556,6 +679,18 @@ export class ProductUtils {
       relatedProductIds: product.relatedProductIds,
       relatedLastUpdated: product.relatedLastUpdated,
       relatedCount: product.relatedCount,
+      // ── Classification & spec fields — always top-level ───────────────────
+      productType: product.productType,
+      clothingSizes: product.clothingSizes,
+      clothingFit: product.clothingFit,
+      clothingTypes: product.clothingTypes,
+      pantSizes: product.pantSizes,
+      pantFabricTypes: product.pantFabricTypes,
+      footwearSizes: product.footwearSizes,
+      jewelryMaterials: product.jewelryMaterials,
+      consoleBrand: product.consoleBrand,
+      curtainMaxWidth: product.curtainMaxWidth,
+      curtainMaxHeight: product.curtainMaxHeight,
     };
 
     // Add attributes only if not empty (matches Flutter)
@@ -565,9 +700,7 @@ export class ProductUtils {
 
     // Remove null/undefined values
     Object.keys(map).forEach((key) => {
-      if (map[key] == null) {
-        delete map[key];
-      }
+      if (map[key] == null) delete map[key];
     });
 
     return map;

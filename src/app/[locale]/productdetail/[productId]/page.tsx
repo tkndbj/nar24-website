@@ -53,7 +53,7 @@ import dynamic from "next/dynamic";
 
 const ProductOptionSelector = dynamic(
   () => import("@/app/components/ProductOptionSelector"),
-  { ssr: false }
+  { ssr: false },
 );
 import { useCart } from "@/context/CartProvider";
 import { useUser } from "@/context/UserProvider";
@@ -69,25 +69,25 @@ import translationService, {
 
 // ✅ LAZY LOAD: Heavy components
 const ProductCollectionWidget = lazy(
-  () => import("../../../components/product_detail/ProductCollectionWidget")
+  () => import("../../../components/product_detail/ProductCollectionWidget"),
 );
 const FullScreenImageViewer = lazy(
-  () => import("../../../components/product_detail/FullScreenImageViewer")
+  () => import("../../../components/product_detail/FullScreenImageViewer"),
 );
 const ProductDetailReviewsTab = lazy(
-  () => import("../../../components/product_detail/Reviews")
+  () => import("../../../components/product_detail/Reviews"),
 );
 const ProductQuestionsWidget = lazy(
-  () => import("../../../components/product_detail/Questions")
+  () => import("../../../components/product_detail/Questions"),
 );
 const ProductDetailRelatedProducts = lazy(
-  () => import("../../../components/product_detail/RelatedProducts")
+  () => import("../../../components/product_detail/RelatedProducts"),
 );
 const BundleComponent = lazy(
-  () => import("@/app/components/product_detail/BundleComponent")
+  () => import("@/app/components/product_detail/BundleComponent"),
 );
 const AskToSellerBubble = lazy(
-  () => import("@/app/components/product_detail/AskToSeller")
+  () => import("@/app/components/product_detail/AskToSeller"),
 );
 
 // ============= TYPES =============
@@ -146,11 +146,11 @@ interface CollectionData {
 interface BundleData {
   bundleId: string;
   product: Product;
-  totalBundlePrice: number;      // ✅ Changed from bundlePrice
-  totalOriginalPrice: number;    // ✅ Changed from originalPrice  
+  totalBundlePrice: number; // ✅ Changed from bundlePrice
+  totalOriginalPrice: number; // ✅ Changed from originalPrice
   discountPercentage: number;
   currency: string;
-  totalProductCount: number;     // ✅ Added (replaces isMainProduct)
+  totalProductCount: number; // ✅ Added (replaces isMainProduct)
 }
 
 interface SellerInfo {
@@ -220,44 +220,42 @@ function cacheBatchData(productId: string, data: ProductDetailBatchResponse) {
 const hasSelectableOptions = (product: Product | null): boolean => {
   if (!product) return false;
 
-  if (product.subsubcategory === "Curtains") return true;
+  if (product.subsubcategory?.toLowerCase() === "curtains") return true;
+  if (Object.keys(product.colorImages || {}).length > 0) return true;
 
-  const hasColors = Object.keys(product.colorImages || {}).length > 0;
-  if (hasColors) return true;
+  // Top-level spec arrays
+  if ((product.clothingSizes?.length ?? 0) > 1) return true;
+  if ((product.pantSizes?.length ?? 0) > 1) return true;
+  if ((product.footwearSizes?.length ?? 0) > 1) return true;
+  if ((product.jewelryMaterials?.length ?? 0) > 1) return true;
 
-  // Keys that should NOT be selectable by buyers (same as ProductOptionSelector)
+  // Backward compat — old products still in attributes map
   const nonSelectableKeys = new Set([
-    'clothingType',
-    'clothingTypes',
-    'pantFabricType',
-    'pantFabricTypes',
-    'gender',
-    'clothingFit',
+    "clothingType",
+    "clothingTypes",
+    "pantFabricType",
+    "pantFabricTypes",
+    "gender",
+    "clothingFit",
+    "productType",
+    "consoleBrand",
+    "curtainMaxWidth",
+    "curtainMaxHeight",
   ]);
 
-  const selectableAttrs = Object.entries(product.attributes || {}).filter(
-    ([key, value]) => {
-      // Skip non-selectable attributes
-      if (nonSelectableKeys.has(key)) return false;
-
-      let options: string[] = [];
-
-      if (Array.isArray(value)) {
-        options = value
-          .map((item) => item.toString())
-          .filter((item) => item.trim() !== "");
-      } else if (typeof value === "string" && value.trim() !== "") {
-        options = value
+  return Object.entries(product.attributes || {}).some(([key, value]) => {
+    if (nonSelectableKeys.has(key)) return false;
+    if (Array.isArray(value))
+      return value.filter((v) => v?.toString().trim()).length > 1;
+    if (typeof value === "string")
+      return (
+        value
           .split(",")
-          .map((item) => item.trim())
-          .filter((item) => item !== "");
-      }
-
-      return options.length > 1;
-    }
-  );
-
-  return selectableAttrs.length > 0;
+          .map((v) => v.trim())
+          .filter(Boolean).length > 1
+      );
+    return false;
+  });
 };
 
 // ============= LOADING SKELETON =============
@@ -312,7 +310,7 @@ const LoadingSkeleton = React.memo(
         </div>
       </div>
     </div>
-  )
+  ),
 );
 LoadingSkeleton.displayName = "LoadingSkeleton";
 
@@ -332,7 +330,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
   // ✅ NEW: Batch data state
   const [batchData, setBatchData] = useState<ProductDetailBatchResponse | null>(
-    null
+    null,
   );
 
   // UI States
@@ -340,7 +338,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [previousImageIndex, setPreviousImageIndex] = useState(0);
   const [slideDirection, setSlideDirection] = useState<"left" | "right">(
-    "right"
+    "right",
   );
   const [showFullScreenViewer, setShowFullScreenViewer] = useState(false);
   const [showVideoModal, setShowVideoModal] = useState(false);
@@ -350,12 +348,15 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   // Description translation states
   const [isDescriptionTranslated, setIsDescriptionTranslated] = useState(false);
   const [translatedDescription, setTranslatedDescription] = useState("");
-  const [isDescriptionTranslating, setIsDescriptionTranslating] = useState(false);
-  const [descriptionTranslationError, setDescriptionTranslationError] = useState<string | null>(null);
+  const [isDescriptionTranslating, setIsDescriptionTranslating] =
+    useState(false);
+  const [descriptionTranslationError, setDescriptionTranslationError] =
+    useState<string | null>(null);
   const [hasScrolled, setHasScrolled] = useState(false);
   const [, setIsLargeScreen] = useState(false);
   const [showHeaderButtons, setShowHeaderButtons] = useState(false);
-  const [shouldLoadBottomSections, setShouldLoadBottomSections] = useState(false);
+  const [shouldLoadBottomSections, setShouldLoadBottomSections] =
+    useState(false);
 
   // Cart states
   const [cartButtonState, setCartButtonState] = useState<
@@ -403,7 +404,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
       (error) => {
         console.error("Error listening to sales config:", error);
         setSalesPaused(false);
-      }
+      },
     );
 
     return () => unsubscribe();
@@ -427,20 +428,20 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         return key;
       }
     },
-    [localization]
+    [localization],
   );
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const isOutOfStock = useMemo(() => {
     if (!product) return false;
-  
+
     const hasNoBaseStock = product.quantity === 0;
     const colorQuantities = product.colorQuantities || {};
     const allColorQuantitiesZero = Object.values(colorQuantities).every(
-      (qty) => (qty as number) === 0
+      (qty) => (qty as number) === 0,
     );
-  
+
     return hasNoBaseStock && allColorQuantitiesZero;
   }, [product]);
 
@@ -452,7 +453,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
       if (cachedBatch) {
         console.log(
-          `✅ Client cache ${isStale ? "(stale)" : "(fresh)"} for ${id}`
+          `✅ Client cache ${isStale ? "(stale)" : "(fresh)"} for ${id}`,
         );
         setBatchData(cachedBatch);
 
@@ -475,7 +476,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         console.log(
           `✅ Batch data fetched (source: ${data.source || "unknown"}, ${
             data.timings?.total || "?"
-          }ms)`
+          }ms)`,
         );
 
         setBatchData(data);
@@ -497,7 +498,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         // Don't clear existing data on error - graceful degradation
       }
     },
-    [setProductCache]
+    [setProductCache],
   );
 
   // ============= MAIN INITIALIZATION =============
@@ -587,7 +588,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           console.log(
             `✅ Batch data fetched (source: ${data.source}, ${
               data.timings?.total || "?"
-            }ms)`
+            }ms)`,
           );
 
           if (data.product) {
@@ -599,11 +600,11 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
             try {
               sessionStorage.setItem(
                 `product_${id}`,
-                JSON.stringify(data.product)
+                JSON.stringify(data.product),
               );
               sessionStorage.setItem(
                 `product_${id}_timestamp`,
-                Date.now().toString()
+                Date.now().toString(),
               );
             } catch (e) {
               console.warn("SessionStorage write failed:", e);
@@ -624,7 +625,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
           console.error("Error fetching product:", err);
           setError(
-            err instanceof Error ? err.message : "Failed to load product"
+            err instanceof Error ? err.message : "Failed to load product",
           );
           setIsLoading(false);
         });
@@ -643,7 +644,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     // Check theme from localStorage (app preference) or system preference as fallback
     const savedTheme = localStorage.getItem("theme");
     const systemPrefersDark = window.matchMedia(
-      "(prefers-color-scheme: dark)"
+      "(prefers-color-scheme: dark)",
     ).matches;
 
     // Only apply theme if not already set by the app
@@ -787,10 +788,10 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   const navigateToBuyNow = useCallback(
     (selectedOptions: { quantity?: number; [key: string]: unknown }) => {
       if (!product) return;
-  
+
       try {
         const selectedAttributes: Record<string, unknown> = {};
-  
+
         Object.entries(selectedOptions).forEach(([key, value]) => {
           if (
             key !== "quantity" &&
@@ -801,13 +802,13 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
             selectedAttributes[key] = value;
           }
         });
-  
+
         const productData = buildProductDataForCart(
           product,
           selectedOptions.selectedColor as string | undefined,
-          undefined
+          undefined,
         );
-  
+
         const buyNowItem = {
           ...productData,
           quantity: selectedOptions.quantity || 1,
@@ -816,13 +817,13 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               ? selectedAttributes
               : undefined,
         };
-  
+
         // ✅ FIX: Use encodeURIComponent for Unicode-safe encoding
         const jsonString = JSON.stringify(buyNowItem);
         const encodedData = encodeURIComponent(jsonString);
-        
+
         console.log("🛒 Navigating to payment with data:", buyNowItem);
-        
+
         router.push(`/${locale}/productpayment?buyNowData=${encodedData}`);
       } catch (error) {
         console.error("❌ Navigation error:", error);
@@ -830,7 +831,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         router.push(`/${locale}/productpayment`);
       }
     },
-    [product, router, locale]
+    [product, router, locale],
   );
 
   const handleAddToCart = useCallback(
@@ -912,7 +913,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
             selectedColor,
             Object.keys(attributesToAdd).length > 0
               ? attributesToAdd
-              : undefined
+              : undefined,
           );
         } else {
           result = await removeFromCart(product.id);
@@ -947,7 +948,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
       router,
       addProductToCart,
       removeFromCart,
-    ]
+    ],
   );
 
   const handleCartOptionSelectorConfirm = useCallback(
@@ -955,7 +956,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
       setShowCartOptionSelector(false);
       await handleAddToCart(selectedOptions);
     },
-    [handleAddToCart]
+    [handleAddToCart],
   );
 
   const handleCartOptionSelectorClose = useCallback(() => {
@@ -989,7 +990,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
       setShowBuyNowOptionSelector(false);
       navigateToBuyNow(selectedOptions);
     },
-    [navigateToBuyNow]
+    [navigateToBuyNow],
   );
 
   const handleBuyNowOptionSelectorClose = useCallback(() => {
@@ -1026,7 +1027,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     try {
       const translation = await translationService.translate(
         product.description,
-        locale
+        locale,
       );
 
       if (translation) {
@@ -1047,7 +1048,15 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     } finally {
       setIsDescriptionTranslating(false);
     }
-  }, [product?.description, isDescriptionTranslating, isDescriptionTranslated, translatedDescription, t, user, locale]);
+  }, [
+    product?.description,
+    isDescriptionTranslating,
+    isDescriptionTranslated,
+    translatedDescription,
+    t,
+    user,
+    locale,
+  ]);
 
   // Reset translation state when product changes
   useEffect(() => {
@@ -1222,11 +1231,11 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                         ? "border border-red-500 text-red-400 hover:bg-red-900/20"
                         : "border border-red-500 text-red-600 hover:bg-red-50"
                       : cartButtonState === "added" ||
-                        cartButtonState === "removed"
-                      ? "border border-green-500 text-green-600 bg-green-50"
-                      : isDarkMode
-                      ? "border border-orange-500 text-orange-400 hover:bg-orange-900/20"
-                      : "border border-orange-500 text-orange-600 hover:bg-orange-50"
+                          cartButtonState === "removed"
+                        ? "border border-green-500 text-green-600 bg-green-50"
+                        : isDarkMode
+                          ? "border border-orange-500 text-orange-400 hover:bg-orange-900/20"
+                          : "border border-orange-500 text-orange-600 hover:bg-orange-50"
                   }
                   ${
                     isProcessing || isAddToCartDisabled
@@ -1240,14 +1249,20 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               </button>
 
               <button
-  onClick={handleBuyNow}
-  disabled={isOutOfStock || salesPaused}
-  className={`py-2 px-3 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white rounded-lg font-semibold text-xs transition-all duration-300 flex items-center justify-center whitespace-nowrap shadow-lg flex-shrink-0 ${
-    isOutOfStock || salesPaused ? "opacity-50 cursor-not-allowed" : ""
-  }`}
->
-  {isOutOfStock ? t("outOfStock") : salesPaused ? t("salesPaused") || "Sales Paused" : t("buyNow")}
-</button>
+                onClick={handleBuyNow}
+                disabled={isOutOfStock || salesPaused}
+                className={`py-2 px-3 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white rounded-lg font-semibold text-xs transition-all duration-300 flex items-center justify-center whitespace-nowrap shadow-lg flex-shrink-0 ${
+                  isOutOfStock || salesPaused
+                    ? "opacity-50 cursor-not-allowed"
+                    : ""
+                }`}
+              >
+                {isOutOfStock
+                  ? t("outOfStock")
+                  : salesPaused
+                    ? t("salesPaused") || "Sales Paused"
+                    : t("buyNow")}
+              </button>
             </div>
 
             <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
@@ -1436,8 +1451,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                         index === currentImageIndex
                           ? "border-orange-500 shadow-lg scale-105"
                           : isDarkMode
-                          ? "border-gray-600 hover:border-gray-500"
-                          : "border-gray-200 hover:border-gray-300"
+                            ? "border-gray-600 hover:border-gray-500"
+                            : "border-gray-200 hover:border-gray-300"
                       }`}
                     >
                       <Image
@@ -1512,11 +1527,11 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                         ? "border-2 border-red-500 text-red-400 hover:bg-red-900/20"
                         : "border-2 border-red-500 text-red-600 hover:bg-red-50"
                       : cartButtonState === "added" ||
-                        cartButtonState === "removed"
-                      ? "border-2 border-green-500 text-green-600 bg-green-50"
-                      : isDarkMode
-                      ? "border-2 border-orange-500 text-orange-400 hover:bg-orange-900/20"
-                      : "border-2 border-orange-500 text-orange-600 hover:bg-orange-50"
+                          cartButtonState === "removed"
+                        ? "border-2 border-green-500 text-green-600 bg-green-50"
+                        : isDarkMode
+                          ? "border-2 border-orange-500 text-orange-400 hover:bg-orange-900/20"
+                          : "border-2 border-orange-500 text-orange-600 hover:bg-orange-50"
                   }
                   ${
                     isProcessing || isAddToCartDisabled
@@ -1550,14 +1565,20 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               </button>
 
               <button
-  onClick={handleBuyNow}
-  disabled={isOutOfStock || salesPaused}
-  className={`flex-1 py-2 px-3 sm:py-2.5 sm:px-4 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white rounded-lg font-semibold text-xs sm:text-sm transition-all duration-300 flex items-center justify-center gap-1.5 sm:gap-2 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 ${
-    isOutOfStock || salesPaused ? "opacity-50 cursor-not-allowed !from-gray-400 !to-gray-500" : ""
-  }`}
->
-  {isOutOfStock ? t("ProductDetailPage.outOfStock") : salesPaused ? t("salesPaused") || "Sales Paused" : t("ProductDetailPage.buyNow")}
-</button>
+                onClick={handleBuyNow}
+                disabled={isOutOfStock || salesPaused}
+                className={`flex-1 py-2 px-3 sm:py-2.5 sm:px-4 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white rounded-lg font-semibold text-xs sm:text-sm transition-all duration-300 flex items-center justify-center gap-1.5 sm:gap-2 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 ${
+                  isOutOfStock || salesPaused
+                    ? "opacity-50 cursor-not-allowed !from-gray-400 !to-gray-500"
+                    : ""
+                }`}
+              >
+                {isOutOfStock
+                  ? t("ProductDetailPage.outOfStock")
+                  : salesPaused
+                    ? t("salesPaused") || "Sales Paused"
+                    : t("ProductDetailPage.buyNow")}
+              </button>
             </div>
 
             {/* ✅ OPTIMIZED: Seller Info with batch data */}
@@ -1609,8 +1630,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                           ? "bg-orange-900/30 text-orange-400 border border-orange-700"
                           : "bg-orange-100 text-orange-600 border border-orange-300"
                         : isDarkMode
-                        ? "bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-orange-400"
-                        : "bg-gray-100 text-gray-600 hover:bg-orange-50 hover:text-orange-600"
+                          ? "bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-orange-400"
+                          : "bg-gray-100 text-gray-600 hover:bg-orange-50 hover:text-orange-600"
                     }`}
                   >
                     <Languages
@@ -1622,8 +1643,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                       {isDescriptionTranslating
                         ? t("translating")
                         : isDescriptionTranslated
-                        ? t("original")
-                        : t("translate")}
+                          ? t("original")
+                          : t("translate")}
                     </span>
                   </button>
                 </div>
@@ -1633,7 +1654,12 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                   {isDescriptionTranslating ? (
                     // Shimmer loading effect
                     <div className="space-y-2">
-                      {Array.from({ length: Math.min(Math.ceil(product.description.length / 60), 5) }).map((_, i) => (
+                      {Array.from({
+                        length: Math.min(
+                          Math.ceil(product.description.length / 60),
+                          5,
+                        ),
+                      }).map((_, i) => (
                         <div
                           key={i}
                           className={`h-3 rounded animate-pulse ${
@@ -1647,9 +1673,15 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                       ))}
                       <style jsx>{`
                         @keyframes shimmer {
-                          0% { opacity: 0.5; }
-                          50% { opacity: 1; }
-                          100% { opacity: 0.5; }
+                          0% {
+                            opacity: 0.5;
+                          }
+                          50% {
+                            opacity: 1;
+                          }
+                          100% {
+                            opacity: 0.5;
+                          }
                         }
                       `}</style>
                     </div>
@@ -1660,17 +1692,20 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                           isDarkMode ? "text-gray-300" : "text-gray-700"
                         } line-clamp-[6]`}
                       >
-                        {isDescriptionTranslated ? translatedDescription : product.description}
+                        {isDescriptionTranslated
+                          ? translatedDescription
+                          : product.description}
                       </p>
-                      {product.description.length > 250 && !isDescriptionTranslating && (
-                        <div
-                          className={`absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t ${
-                            isDarkMode
-                              ? "from-gray-800 via-gray-800/80 to-transparent"
-                              : "from-white via-white/80 to-transparent"
-                          } pointer-events-none`}
-                        />
-                      )}
+                      {product.description.length > 250 &&
+                        !isDescriptionTranslating && (
+                          <div
+                            className={`absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t ${
+                              isDarkMode
+                                ? "from-gray-800 via-gray-800/80 to-transparent"
+                                : "from-white via-white/80 to-transparent"
+                            } pointer-events-none`}
+                          />
+                        )}
                     </>
                   )}
                 </div>
@@ -1687,29 +1722,35 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                   </div>
                 )}
 
-                {product.description.length > 250 && !isDescriptionTranslating && (
-                  <button
-                    onClick={() => setShowDescriptionModal(true)}
-                    className={`mt-2 text-xs sm:text-sm font-semibold transition-colors ${
-                      isDarkMode
-                        ? "text-orange-400 hover:text-orange-300"
-                        : "text-orange-600 hover:text-orange-700"
-                    }`}
-                  >
-                    {t("readAll") || "Read All"}
-                  </button>
-                )}
+                {product.description.length > 250 &&
+                  !isDescriptionTranslating && (
+                    <button
+                      onClick={() => setShowDescriptionModal(true)}
+                      className={`mt-2 text-xs sm:text-sm font-semibold transition-colors ${
+                        isDarkMode
+                          ? "text-orange-400 hover:text-orange-300"
+                          : "text-orange-600 hover:text-orange-700"
+                      }`}
+                    >
+                      {t("readAll") || "Read All"}
+                    </button>
+                  )}
               </div>
             )}
           </div>
         </div>
 
         {/* ✅ OPTIMIZED: Bottom sections with prefetched data */}
-        <div ref={bottomSectionsRef} className="mt-4 sm:mt-6 space-y-3 sm:space-y-4">
+        <div
+          ref={bottomSectionsRef}
+          className="mt-4 sm:mt-6 space-y-3 sm:space-y-4"
+        >
           {shouldLoadBottomSections && (
             <Suspense
               fallback={
-                <div className={`h-40 animate-pulse rounded-lg ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`} />
+                <div
+                  className={`h-40 animate-pulse rounded-lg ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`}
+                />
               }
             >
               <ProductCollectionWidget
@@ -1726,7 +1767,9 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           {shouldLoadBottomSections && (
             <Suspense
               fallback={
-                <div className={`h-40 animate-pulse rounded-lg ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`} />
+                <div
+                  className={`h-40 animate-pulse rounded-lg ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`}
+                />
               }
             >
               <BundleComponent
@@ -1743,7 +1786,9 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           {shouldLoadBottomSections && (
             <Suspense
               fallback={
-                <div className={`h-40 animate-pulse rounded-lg ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`} />
+                <div
+                  className={`h-40 animate-pulse rounded-lg ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`}
+                />
               }
             >
               <ProductDetailReviewsTab
@@ -1767,7 +1812,9 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           {shouldLoadBottomSections && (
             <Suspense
               fallback={
-                <div className={`h-40 animate-pulse rounded-lg ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`} />
+                <div
+                  className={`h-40 animate-pulse rounded-lg ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`}
+                />
               }
             >
               <ProductQuestionsWidget
@@ -1794,7 +1841,9 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           {shouldLoadBottomSections && (
             <Suspense
               fallback={
-                <div className={`h-40 animate-pulse rounded-lg ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`} />
+                <div
+                  className={`h-40 animate-pulse rounded-lg ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`}
+                />
               }
             >
               <ProductDetailRelatedProducts
@@ -1876,7 +1925,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               const isShop = !!product.shopId;
 
               router.push(
-                `/asktoseller?productId=${product.id}&sellerId=${sellerId}&isShop=${isShop}`
+                `/asktoseller?productId=${product.id}&sellerId=${sellerId}&isShop=${isShop}`,
               );
             }}
             isDarkMode={isDarkMode}
@@ -1928,8 +1977,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                           ? "bg-orange-900/30 text-orange-400 border border-orange-700"
                           : "bg-orange-100 text-orange-600 border border-orange-300"
                         : isDarkMode
-                        ? "bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-orange-400"
-                        : "bg-gray-100 text-gray-600 hover:bg-orange-50 hover:text-orange-600"
+                          ? "bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-orange-400"
+                          : "bg-gray-100 text-gray-600 hover:bg-orange-50 hover:text-orange-600"
                     }`}
                   >
                     <Languages
@@ -1941,8 +1990,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                       {isDescriptionTranslating
                         ? t("translating")
                         : isDescriptionTranslated
-                        ? t("original")
-                        : t("translate")}
+                          ? t("original")
+                          : t("translate")}
                     </span>
                   </button>
                   <button
@@ -1965,7 +2014,12 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                 {isDescriptionTranslating ? (
                   // Shimmer loading effect in modal
                   <div className="space-y-2">
-                    {Array.from({ length: Math.min(Math.ceil(product.description.length / 50), 8) }).map((_, i) => (
+                    {Array.from({
+                      length: Math.min(
+                        Math.ceil(product.description.length / 50),
+                        8,
+                      ),
+                    }).map((_, i) => (
                       <div
                         key={i}
                         className={`h-3 rounded animate-pulse ${
@@ -1981,7 +2035,9 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                 ) : (
                   <>
                     <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap">
-                      {isDescriptionTranslated ? translatedDescription : product.description}
+                      {isDescriptionTranslated
+                        ? translatedDescription
+                        : product.description}
                     </p>
                     {/* Translation error message */}
                     {descriptionTranslationError && (
@@ -2010,9 +2066,15 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
                 }
               }
               @keyframes shimmer {
-                0% { opacity: 0.5; }
-                50% { opacity: 1; }
-                100% { opacity: 0.5; }
+                0% {
+                  opacity: 0.5;
+                }
+                50% {
+                  opacity: 1;
+                }
+                100% {
+                  opacity: 0.5;
+                }
               }
             `}</style>
           </div>
@@ -2036,7 +2098,9 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
             `}
           >
             {/* Header */}
-            <div className={`px-6 py-5 ${isDarkMode ? "bg-gray-700" : "bg-orange-50"}`}>
+            <div
+              className={`px-6 py-5 ${isDarkMode ? "bg-gray-700" : "bg-orange-50"}`}
+            >
               <div className="flex items-center space-x-3">
                 <div
                   className={`
@@ -2084,7 +2148,9 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
             </div>
 
             {/* Footer */}
-            <div className={`px-6 py-4 ${isDarkMode ? "bg-gray-700/50" : "bg-gray-50"}`}>
+            <div
+              className={`px-6 py-4 ${isDarkMode ? "bg-gray-700/50" : "bg-gray-50"}`}
+            >
               <button
                 onClick={() => setShowSalesPausedDialog(false)}
                 className="

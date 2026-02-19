@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import {
   X,
   Plus,
@@ -83,8 +89,8 @@ const ColorThumb: React.FC<ColorThumbProps> = ({
           isSelected
             ? "border-orange-500 border-[3px] shadow-lg"
             : isDarkMode
-            ? "border-gray-600 border-2 hover:border-orange-400"
-            : "border-gray-300 border-2 hover:border-orange-400"
+              ? "border-gray-600 border-2 hover:border-orange-400"
+              : "border-gray-300 border-2 hover:border-orange-400"
         }
         ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
       `}
@@ -148,8 +154,8 @@ const AttributeChip: React.FC<AttributeChipProps> = ({
           isSelected
             ? "border-orange-500 border-2 text-orange-500 font-semibold"
             : isDarkMode
-            ? "border-gray-600 border text-gray-300 hover:border-orange-400 font-medium"
-            : "border-gray-300 border text-gray-700 hover:border-orange-400 font-medium"
+              ? "border-gray-600 border text-gray-300 hover:border-orange-400 font-medium"
+              : "border-gray-300 border text-gray-700 hover:border-orange-400 font-medium"
         }
       `}
     >
@@ -251,7 +257,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
         return key;
       }
     },
-    [localization]
+    [localization],
   );
 
   // ============================================================================
@@ -272,25 +278,35 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
 
   const getSelectableAttributes = useMemo((): Record<string, string[]> => {
     const selectableAttrs: Record<string, string[]> = {};
-  
-    // ✅ ADD: Keys that should NOT be selectable by buyers
+
     const nonSelectableKeys = new Set([
-      'clothingType',
-      'clothingTypes',
-      'pantFabricType',
-      'pantFabricTypes',
-      'gender',
-      'clothingFit',
+      "clothingType",
+      "clothingTypes",
+      "pantFabricType",
+      "pantFabricTypes",
+      "gender",
+      "clothingFit",
+      "productType",
+      "consoleBrand",
+      "curtainMaxWidth",
+      "curtainMaxHeight",
     ]);
-  
+
+    // Top-level spec arrays — buyer-selectable
+    const addIfMultiple = (key: string, values?: string[]) => {
+      if (values && values.length > 1) selectableAttrs[key] = values;
+    };
+
+    addIfMultiple("clothingSizes", currentProduct.clothingSizes);
+    addIfMultiple("pantSizes", currentProduct.pantSizes);
+    addIfMultiple("footwearSizes", currentProduct.footwearSizes);
+    addIfMultiple("jewelryMaterials", currentProduct.jewelryMaterials);
+
+    // Backward compat — attributes map for old products
     Object.entries(currentProduct.attributes || {}).forEach(([key, value]) => {
-      // ✅ ADD: Skip non-selectable attributes
-      if (nonSelectableKeys.has(key)) {
-        return;
-      }
-  
+      if (nonSelectableKeys.has(key)) return;
+
       let options: string[] = [];
-  
       if (Array.isArray(value)) {
         options = value
           .map((item) => item?.toString() || "")
@@ -301,15 +317,12 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
           .map((item) => item.trim())
           .filter((item) => item !== "");
       }
-  
-      // Only include attributes with multiple options
-      if (options.length > 1) {
-        selectableAttrs[key] = options;
-      }
+
+      if (options.length > 1) selectableAttrs[key] = options;
     });
-  
+
     return selectableAttrs;
-  }, [currentProduct.attributes]);
+  }, [currentProduct]);
 
   // ============================================================================
   // FETCH FRESH PRODUCT DATA (matches Flutter exactly)
@@ -321,7 +334,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
 
       // ✅ Try shop_products first (optimization matching Flutter)
       const shopProductDoc = await getDoc(
-        doc(db, "shop_products", initialProduct.id)
+        doc(db, "shop_products", initialProduct.id),
       );
 
       let validDoc = null;
@@ -331,7 +344,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
       } else {
         // Fallback to products collection
         const productsDoc = await getDoc(
-          doc(db, "products", initialProduct.id)
+          doc(db, "products", initialProduct.id),
         );
         if (productsDoc.exists()) {
           validDoc = productsDoc;
@@ -397,9 +410,19 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
   const initializeDefaultSelections = useCallback(() => {
     const newSelections: Record<string, string> = {};
 
+    // Auto-select top-level spec arrays if single option
+    const autoSelectIfSingle = (key: string, values?: string[]) => {
+      if (values && values.length === 1) newSelections[key] = values[0];
+    };
+
+    autoSelectIfSingle("clothingSizes", currentProduct.clothingSizes);
+    autoSelectIfSingle("pantSizes", currentProduct.pantSizes);
+    autoSelectIfSingle("footwearSizes", currentProduct.footwearSizes);
+    autoSelectIfSingle("jewelryMaterials", currentProduct.jewelryMaterials);
+
+    // Backward compat — attributes map for old products
     Object.entries(currentProduct.attributes || {}).forEach(([key, value]) => {
       let options: string[] = [];
-
       if (Array.isArray(value)) {
         options = value
           .map((item) => item?.toString() || "")
@@ -410,22 +433,17 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
           .map((item) => item.trim())
           .filter((item) => item !== "");
       }
-
-      // Auto-select single options (matches Flutter)
-      if (options.length === 1) {
-        newSelections[key] = options[0];
-      }
+      if (options.length === 1) newSelections[key] = options[0];
     });
 
     setSelections(newSelections);
 
-    // Auto-select default color if no color options (matches Flutter)
     if (!hasColors) {
       setSelectedColor("default");
     } else {
       setSelectedColor(null);
     }
-  }, [currentProduct.attributes, hasColors]);
+  }, [currentProduct, hasColors]);
 
   // ============================================================================
   // QUANTITY HELPERS (matching Flutter)
@@ -446,7 +464,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
 
       return Math.min(stockQuantity, preferences.maxQuantity);
     },
-    [getMaxQuantity, salePreferences]
+    [getMaxQuantity, salePreferences],
   );
 
   // ============================================================================
@@ -466,8 +484,12 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
     if (isNaN(width) || width <= 0) return false;
     if (isNaN(height) || height <= 0) return false;
 
-    const maxWidth = currentProduct.attributes?.curtainMaxWidth;
-    const maxHeight = currentProduct.attributes?.curtainMaxHeight;
+    const maxWidth =
+      currentProduct.curtainMaxWidth ??
+      currentProduct.attributes?.curtainMaxWidth;
+    const maxHeight =
+      currentProduct.curtainMaxHeight ??
+      currentProduct.attributes?.curtainMaxHeight;
 
     if (maxWidth != null) {
       const maxW = parseFloat(maxWidth.toString());
@@ -480,7 +502,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
     }
 
     return true;
-  }, [isCurtain, curtainWidth, curtainHeight, currentProduct.attributes]);
+  }, [isCurtain, curtainWidth, curtainHeight, currentProduct]);
 
   // ============================================================================
   // CONFIRM ENABLED CHECK (matches Flutter exactly)
@@ -619,7 +641,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
       currentProduct.quantity,
       currentProduct.colorQuantities,
       salePreferences,
-    ]
+    ],
   );
 
   const handleConfirm = useCallback(() => {
@@ -701,7 +723,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
           {hasDiscount
             ? `${t("discountApplied")}: ${bulkDiscountPercentage}%`
             : `${t("buyText")} ${discountThreshold} ${t(
-                "forDiscount"
+                "forDiscount",
               )} ${bulkDiscountPercentage}%!`}
         </p>
       </div>
@@ -772,7 +794,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
             {localization
               ? AttributeLocalizationUtils.getLocalizedAttributeTitle(
                   attributeKey,
-                  localization
+                  localization,
                 )
               : attributeKey}
           </h3>
@@ -785,7 +807,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
                     ? AttributeLocalizationUtils.getLocalizedSingleValue(
                         attributeKey,
                         option,
-                        localization
+                        localization,
                       )
                     : option
                 }
@@ -803,14 +825,18 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
         </div>
       );
     },
-    [selections, localization, isDarkMode]
+    [selections, localization, isDarkMode],
   );
 
   const renderCurtainDimensionsInput = useCallback(() => {
     if (!isCurtain) return null;
 
-    const maxWidth = currentProduct.attributes?.curtainMaxWidth;
-    const maxHeight = currentProduct.attributes?.curtainMaxHeight;
+    const maxWidth =
+      currentProduct.curtainMaxWidth ??
+      currentProduct.attributes?.curtainMaxWidth;
+    const maxHeight =
+      currentProduct.curtainMaxHeight ??
+      currentProduct.attributes?.curtainMaxHeight;
 
     const widthValue = parseFloat(curtainWidth);
     const heightValue = parseFloat(curtainHeight);
@@ -926,14 +952,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
         </div>
       </div>
     );
-  }, [
-    isCurtain,
-    curtainWidth,
-    curtainHeight,
-    currentProduct.attributes,
-    t,
-    isDarkMode,
-  ]);
+  }, [isCurtain, curtainWidth, curtainHeight, currentProduct, t, isDarkMode]);
 
   const renderQuantitySelector = useCallback(() => {
     if (isCurtain) return null;
@@ -1124,8 +1143,8 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
               <div className="p-4">
                 {renderColorSelector()}
 
-                {Object.entries(getSelectableAttributes).map(
-                  ([key, options]) => renderAttributeSelector(key, options)
+                {Object.entries(getSelectableAttributes).map(([key, options]) =>
+                  renderAttributeSelector(key, options),
                 )}
 
                 {isCurtain

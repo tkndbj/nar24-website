@@ -38,7 +38,7 @@ import dynamic from "next/dynamic";
 
 const ProductOptionSelector = dynamic(
   () => import("@/app/components/ProductOptionSelector"),
-  { ssr: false }
+  { ssr: false },
 );
 import { Product } from "@/app/models/Product";
 import { analyticsBatcher } from "@/app/utils/analyticsBatcher";
@@ -121,35 +121,43 @@ const getColorFromName = (colorName: string): string => {
 const hasSelectableOptionsForCart = (product: Product | null): boolean => {
   if (!product) return false;
 
-  const colorImages = product.colorImages;
-  const hasColors =
-    colorImages != null &&
-    typeof colorImages === "object" &&
-    Object.keys(colorImages).length > 0;
-  if (hasColors) return true;
+  if (Object.keys(product.colorImages || {}).length > 0) return true;
+  if (product.subsubcategory?.toLowerCase() === "curtains") return true;
 
-  const selectableAttrs = Object.entries(product.attributes || {}).filter(
-    ([, value]) => {
-      let options: string[] = [];
+  // Top-level spec arrays
+  if ((product.clothingSizes?.length ?? 0) > 1) return true;
+  if ((product.pantSizes?.length ?? 0) > 1) return true;
+  if ((product.footwearSizes?.length ?? 0) > 1) return true;
+  if ((product.jewelryMaterials?.length ?? 0) > 1) return true;
 
-      if (Array.isArray(value)) {
-        options = value
-          .map((item) => item.toString())
-          .filter((item) => item.trim() !== "");
-      } else if (typeof value === "string" && value.trim() !== "") {
-        options = value
+  // Backward compat — old products still in attributes map
+  const nonSelectableKeys = new Set([
+    "clothingType",
+    "clothingTypes",
+    "pantFabricType",
+    "pantFabricTypes",
+    "gender",
+    "clothingFit",
+    "productType",
+    "consoleBrand",
+    "curtainMaxWidth",
+    "curtainMaxHeight",
+  ]);
+
+  return Object.entries(product.attributes || {}).some(([key, value]) => {
+    if (nonSelectableKeys.has(key)) return false;
+    if (Array.isArray(value))
+      return value.filter((v) => v?.toString().trim()).length > 1;
+    if (typeof value === "string")
+      return (
+        value
           .split(",")
-          .map((item) => item.trim())
-          .filter((item) => item !== "");
-      }
-
-      return options.length > 1;
-    }
-  );
-
-  return selectableAttrs.length > 0;
+          .map((v) => v.trim())
+          .filter(Boolean).length > 1
+      );
+    return false;
+  });
 };
-
 
 // ✅ Optimized rotating text component
 interface RotatingTextProps {
@@ -173,7 +181,7 @@ export const RotatingText = memo<RotatingTextProps>(
         (entries) => {
           isVisibleRef.current = entries[0]?.isIntersecting ?? false;
         },
-        { threshold: 0.1 }
+        { threshold: 0.1 },
       );
 
       if (containerRef.current) {
@@ -216,7 +224,7 @@ export const RotatingText = memo<RotatingTextProps>(
         observer.disconnect();
         document.removeEventListener(
           "visibilitychange",
-          handleVisibilityChange
+          handleVisibilityChange,
         );
       };
     }, [children.length, duration]);
@@ -252,7 +260,7 @@ export const RotatingText = memo<RotatingTextProps>(
         ))}
       </div>
     );
-  }
+  },
 );
 
 RotatingText.displayName = "RotatingText";
@@ -279,7 +287,7 @@ export const RotatingBanner = memo<RotatingBannerProps>(
         (entries) => {
           isVisibleRef.current = entries[0]?.isIntersecting ?? false;
         },
-        { threshold: 0.1 }
+        { threshold: 0.1 },
       );
 
       if (containerRef.current) {
@@ -321,7 +329,7 @@ export const RotatingBanner = memo<RotatingBannerProps>(
         observer.disconnect();
         document.removeEventListener(
           "visibilitychange",
-          handleVisibilityChange
+          handleVisibilityChange,
         );
       };
     }, [children.length, duration]);
@@ -356,7 +364,7 @@ export const RotatingBanner = memo<RotatingBannerProps>(
         ))}
       </div>
     );
-  }
+  },
 );
 
 RotatingBanner.displayName = "RotatingBanner";
@@ -385,7 +393,7 @@ const StarRating = memo<{ rating: number; size?: number }>(
         ))}
       </div>
     );
-  }
+  },
 );
 StarRating.displayName = "StarRating";
 
@@ -404,7 +412,7 @@ const ExtraLabel = memo<{ text: string; gradientColors: string[] }>(
         {text}
       </div>
     );
-  }
+  },
 );
 ExtraLabel.displayName = "ExtraLabel";
 
@@ -551,7 +559,6 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
     product.imageUrls,
   ]);
 
-
   // ✅ Cache product on mount (matches Flutter's ProductDetailProvider pattern)
   useEffect(() => {
     setProduct(product.id, product);
@@ -679,7 +686,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
           product,
           quantityToAdd,
           selectedColor,
-          attributes
+          attributes,
         );
 
         if (result.includes("Added") || result.includes("Updated")) {
@@ -697,7 +704,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
         setCartButtonState("idle");
       }
     },
-    [product, addProductToCart, onAddToCart]
+    [product, addProductToCart, onAddToCart],
   );
 
   const performCartRemoval = useCallback(async () => {
@@ -753,7 +760,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
       router,
       performCartRemoval,
       performCartOperation,
-    ]
+    ],
   );
 
   // ✅ FAVORITE OPERATIONS (matches Flutter - NO selector, direct add)
@@ -817,7 +824,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
       setShowCartOptionSelector(false);
       await performCartOperation(selectedOptions);
     },
-    [performCartOperation]
+    [performCartOperation],
   );
 
   const handleCartOptionSelectorClose = useCallback(() => {
@@ -931,7 +938,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
       children.push(
         <span key="brand" className="text-gray-500 text-xs truncate">
           {product.brandModel}
-        </span>
+        </span>,
       );
     }
 
@@ -943,7 +950,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
           style={{ color: JADE_GREEN, fontSize: "12px" }}
         >
           {t("ProductCard.onlyLeft", { quantity })}
-        </span>
+        </span>,
       );
     }
 
@@ -961,7 +968,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
           className="w-full h-full bg-orange-500 flex items-center justify-center text-white text-xs font-medium"
         >
           {t("ProductCard.fastDelivery")}
-        </div>
+        </div>,
       );
     }
 
@@ -973,7 +980,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
           style={{ backgroundColor: JADE_GREEN }}
         >
           {t("ProductCard.discount")}
-        </div>
+        </div>,
       );
     }
 
@@ -988,35 +995,35 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
       setCurrentImageIndex(0);
       onColorSelect?.(newColor || "");
     },
-    [internalSelectedColor, onColorSelect]
+    [internalSelectedColor, onColorSelect],
   );
 
   const handleNextImage = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
       setCurrentImageIndex((prev) =>
-        prev === currentImageUrls.length - 1 ? 0 : prev + 1
+        prev === currentImageUrls.length - 1 ? 0 : prev + 1,
       );
       // Reset image loading state for new image
       setImageLoading(true);
       setImageError(false);
       setImageRetryCount(0);
     },
-    [currentImageUrls.length]
+    [currentImageUrls.length],
   );
 
   const handlePrevImage = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
       setCurrentImageIndex((prev) =>
-        prev === 0 ? currentImageUrls.length - 1 : prev - 1
+        prev === 0 ? currentImageUrls.length - 1 : prev - 1,
       );
       // Reset image loading state for new image
       setImageLoading(true);
       setImageError(false);
       setImageRetryCount(0);
     },
-    [currentImageUrls.length]
+    [currentImageUrls.length],
   );
 
   const imageContainerRef = useRef<HTMLDivElement>(null);
@@ -1099,8 +1106,12 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
     imageLoadTimeoutRef.current = setTimeout(() => {
       if (imageLoading && imageRetryCount < MAX_IMAGE_RETRIES) {
         // Image is still loading after timeout, trigger retry
-        console.log(`Image load timeout for ${product.id}, retry ${imageRetryCount + 1}/${MAX_IMAGE_RETRIES}`);
-        const retryDelay = RETRY_DELAYS[imageRetryCount] || RETRY_DELAYS[RETRY_DELAYS.length - 1];
+        console.log(
+          `Image load timeout for ${product.id}, retry ${imageRetryCount + 1}/${MAX_IMAGE_RETRIES}`,
+        );
+        const retryDelay =
+          RETRY_DELAYS[imageRetryCount] ||
+          RETRY_DELAYS[RETRY_DELAYS.length - 1];
 
         setTimeout(() => {
           setImageRetryCount((prev) => prev + 1);
@@ -1125,8 +1136,11 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
   // ✅ Image error handler with retry
   const handleImageError = useCallback(() => {
     if (imageRetryCount < MAX_IMAGE_RETRIES) {
-      console.log(`Image error for ${product.id}, retry ${imageRetryCount + 1}/${MAX_IMAGE_RETRIES}`);
-      const retryDelay = RETRY_DELAYS[imageRetryCount] || RETRY_DELAYS[RETRY_DELAYS.length - 1];
+      console.log(
+        `Image error for ${product.id}, retry ${imageRetryCount + 1}/${MAX_IMAGE_RETRIES}`,
+      );
+      const retryDelay =
+        RETRY_DELAYS[imageRetryCount] || RETRY_DELAYS[RETRY_DELAYS.length - 1];
 
       setTimeout(() => {
         setImageRetryCount((prev) => prev + 1);
@@ -1232,16 +1246,18 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
             onMouseLeave={handleImageLeave}
           >
             <div
-                className="w-full h-full rounded-t-xl overflow-hidden relative"
-                style={{ backgroundColor: isDarkMode ? '#1f2937' : '#f3f4f6' }}
-              >
+              className="w-full h-full rounded-t-xl overflow-hidden relative"
+              style={{ backgroundColor: isDarkMode ? "#1f2937" : "#f3f4f6" }}
+            >
               {currentImageUrls.length > 0 && currentImageUrl ? (
                 <div className="relative w-full h-full">
                   {/* Loading placeholder with narsiyah logo (no shimmer) */}
                   {imageLoading && (
                     <div
                       className="absolute inset-0 flex items-center justify-center z-10"
-                      style={{ backgroundColor: isDarkMode ? '#1f2937' : '#f3f4f6' }}
+                      style={{
+                        backgroundColor: isDarkMode ? "#1f2937" : "#f3f4f6",
+                      }}
                     >
                       <Image
                         src="/images/narsiyah.png"
@@ -1260,12 +1276,14 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
                       src={currentImageUrl}
                       alt={product.productName}
                       fill
-                      className={`object-cover transition-opacity duration-300 ${imageLoading ? 'opacity-0' : 'opacity-100'}`}
+                      className={`object-cover transition-opacity duration-300 ${imageLoading ? "opacity-0" : "opacity-100"}`}
                       onError={handleImageError}
                       onLoad={handleImageLoad}
                       sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
                       priority={priority || currentImageIndex === 0}
-                      loading={priority || currentImageIndex === 0 ? "eager" : "lazy"}
+                      loading={
+                        priority || currentImageIndex === 0 ? "eager" : "lazy"
+                      }
                       unoptimized={imageRetryCount > 0} // Bypass cache on retry
                     />
                   ) : (
@@ -1338,7 +1356,9 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
               ) : (
                 <div
                   className="w-full h-full flex items-center justify-center"
-                  style={{ backgroundColor: isDarkMode ? '#1f2937' : '#f3f4f6' }}
+                  style={{
+                    backgroundColor: isDarkMode ? "#1f2937" : "#f3f4f6",
+                  }}
                 >
                   <LogoPlaceholder size={80} />
                 </div>
@@ -1451,7 +1471,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
                           }`}
                         />
                       );
-                    }
+                    },
                   )}
                 </div>
               </div>
@@ -1601,7 +1621,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
               }}
               sizes="550px"
               priority
-              unoptimized={currentImageUrl.includes('firebasestorage')}
+              unoptimized={currentImageUrl.includes("firebasestorage")}
             />
           </div>
         </div>
