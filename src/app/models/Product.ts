@@ -19,12 +19,11 @@ export interface Product {
   availableColors: string[];
   gender?: string;
   bundleIds: string[];
-  bundleData?: Array<Record<string, unknown>>; // ✅ ADDED: Matches Flutter's List<Map<String, dynamic>>?
+  bundleData?: Array<Record<string, unknown>>;
   maxQuantity?: number;
   discountThreshold?: number;
-  bulkDiscountPercentage?: number; // ✅ ADDED: Was missing
+  bulkDiscountPercentage?: number;
   userId: string;
-  rankingScore: number;
   promotionScore: number;
   needsUpdate?: boolean;
   archiveReason?: string;
@@ -51,11 +50,9 @@ export interface Product {
   boostedImpressionCount: number;
   boostImpressionCountAtStart: number;
   isFeatured: boolean;
-  isTrending: boolean;
   isBoosted: boolean;
   boostStartTime?: Date;
   boostEndTime?: Date;
-  dailyClickCount: number;
   lastClickDate?: Date;
   paused: boolean;
   campaignName?: string;
@@ -65,7 +62,7 @@ export interface Product {
   relatedProductIds: string[];
   relatedLastUpdated?: Date;
   relatedCount: number;
-  // Add reference property for Firestore document reference
+  // Simplified Firestore document reference
   reference?: {
     id: string;
     path: string;
@@ -90,7 +87,10 @@ type ApiData = Record<string, unknown>;
 
 // Utility class for Product operations
 export class ProductUtils {
-  // Safe parsing helpers - Matching Flutter implementation
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SAFE PARSING HELPERS — matching Flutter Parse helpers
+  // ═══════════════════════════════════════════════════════════════════════════
+
   static safeDouble(value: unknown, defaultValue: number = 0): number {
     if (value == null) return defaultValue;
     if (typeof value === "number") return value;
@@ -139,9 +139,8 @@ export class ProductUtils {
     return result;
   }
 
-  // ✅ ADDED: Safe bundle data parser matching Flutter's _safeBundleData
   static safeBundleData(
-    value: unknown
+    value: unknown,
   ): Array<Record<string, unknown>> | undefined {
     if (value == null) return undefined;
     if (!Array.isArray(value)) return undefined;
@@ -232,39 +231,59 @@ export class ProductUtils {
     return undefined;
   }
 
-  // Factory method to create Product from API response - Matching Flutter's fromJson
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Matches Flutter's Parse.sourceCollectionFromRef / sourceCollectionFromJson
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  static sourceCollectionFromReference(
+    reference: Product["reference"],
+  ): string | undefined {
+    if (!reference) return undefined;
+    const path = reference.path || "";
+    if (path.startsWith("products/")) return "products";
+    if (path.startsWith("shop_products/")) return "shop_products";
+    // Fallback: use parent collection id
+    if (reference.parent?.id) return reference.parent.id;
+    return undefined;
+  }
+
+  static sourceCollectionFromJson(json: ApiData): string | undefined {
+    // 1. Explicit field (matches Flutter's Parse.sourceCollectionFromJson)
+    if (typeof json.sourceCollection === "string" && json.sourceCollection) {
+      return json.sourceCollection;
+    }
+    // 2. Derive from reference path
+    if (json.reference && typeof json.reference === "object") {
+      const ref = ProductUtils.safeReference(json.reference);
+      return ProductUtils.sourceCollectionFromReference(ref);
+    }
+    return undefined;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FACTORIES — matching Flutter's fromJson / fromDocument / fromAlgolia
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // Factory method to create Product from API response — matches Flutter's fromJson
   static fromJson(json: ApiData): Product {
     const attributes = ProductUtils.safeAttributes(json.attributes);
 
-    // Determine sourceCollection from reference path if available
-    let sourceCollection: string | undefined;
-    if (json.reference && typeof json.reference === "object") {
-      const ref = json.reference as Record<string, unknown>;
-      const path = String(ref.path || "");
-      if (path.startsWith("products/")) {
-        sourceCollection = "products";
-      } else if (path.startsWith("shop_products/")) {
-        sourceCollection = "shop_products";
-      }
-    }
-
     return {
       id: ProductUtils.safeString(json.id),
-      sourceCollection,
+      sourceCollection: ProductUtils.sourceCollectionFromJson(json),
       productName: ProductUtils.safeString(json.productName ?? json.title),
       description: ProductUtils.safeString(json.description),
       price: ProductUtils.safeDouble(json.price),
       currency: ProductUtils.safeString(json.currency, "TL"),
       condition: ProductUtils.safeString(json.condition, "Brand New"),
       brandModel: ProductUtils.safeStringNullable(
-        json.brandModel ?? json.brand
+        json.brandModel ?? json.brand,
       ),
       imageUrls: ProductUtils.safeStringArray(json.imageUrls),
       averageRating: ProductUtils.safeDouble(json.averageRating),
       reviewCount: ProductUtils.safeInt(json.reviewCount),
       gender: ProductUtils.safeStringNullable(json.gender),
       bundleIds: ProductUtils.safeStringArray(json.bundleIds),
-      // ✅ FIXED: Use safeBundleData instead of simple undefined check
       bundleData: ProductUtils.safeBundleData(json.bundleData),
       originalPrice:
         json.originalPrice != null
@@ -282,7 +301,7 @@ export class ProductUtils {
       archivedByAdmin: json.archivedByAdmin === true ? true : undefined,
       archivedByAdminAt: ProductUtils.safeDateNullable(json.archivedByAdminAt),
       archivedByAdminId: ProductUtils.safeStringNullable(
-        json.archivedByAdminId
+        json.archivedByAdminId,
       ),
       userId: ProductUtils.safeString(json.userId),
       maxQuantity:
@@ -293,12 +312,10 @@ export class ProductUtils {
         json.discountThreshold != null
           ? ProductUtils.safeInt(json.discountThreshold)
           : undefined,
-      // ✅ ADDED: bulkDiscountPercentage (was missing)
       bulkDiscountPercentage:
         json.bulkDiscountPercentage != null
           ? ProductUtils.safeInt(json.bulkDiscountPercentage)
           : undefined,
-      rankingScore: ProductUtils.safeDouble(json.rankingScore),
       promotionScore: ProductUtils.safeDouble(json.promotionScore),
       campaign: ProductUtils.safeStringNullable(json.campaign),
       ownerId: ProductUtils.safeString(json.ownerId),
@@ -310,18 +327,15 @@ export class ProductUtils {
       subcategory: ProductUtils.safeString(json.subcategory),
       subsubcategory: ProductUtils.safeString(json.subsubcategory),
       quantity: ProductUtils.safeInt(json.quantity),
-      // ✅ FIXED: relatedProductIds should default to empty array, not undefined
       relatedProductIds: ProductUtils.safeStringArray(json.relatedProductIds),
       relatedLastUpdated: ProductUtils.safeDateNullable(
-        json.relatedLastUpdated
+        json.relatedLastUpdated,
       ),
-      // ✅ FIXED: relatedCount should default to 0, not undefined
       relatedCount: ProductUtils.safeInt(json.relatedCount),
       bestSellerRank:
         json.bestSellerRank != null
           ? ProductUtils.safeInt(json.bestSellerRank)
           : undefined,
-
       clickCount: ProductUtils.safeInt(json.clickCount),
       clickCountAtStart: ProductUtils.safeInt(json.clickCountAtStart),
       favoritesCount: ProductUtils.safeInt(json.favoritesCount),
@@ -329,18 +343,16 @@ export class ProductUtils {
       purchaseCount: ProductUtils.safeInt(json.purchaseCount),
       deliveryOption: ProductUtils.safeString(
         json.deliveryOption,
-        "Self Delivery"
+        "Self Delivery",
       ),
       boostedImpressionCount: ProductUtils.safeInt(json.boostedImpressionCount),
       boostImpressionCountAtStart: ProductUtils.safeInt(
-        json.boostImpressionCountAtStart
+        json.boostImpressionCountAtStart,
       ),
       isFeatured: Boolean(json.isFeatured),
-      isTrending: Boolean(json.isTrending),
       isBoosted: Boolean(json.isBoosted),
       boostStartTime: ProductUtils.safeDateNullable(json.boostStartTime),
       boostEndTime: ProductUtils.safeDateNullable(json.boostEndTime),
-      dailyClickCount: ProductUtils.safeInt(json.dailyClickCount),
       lastClickDate: ProductUtils.safeDateNullable(json.lastClickDate),
       paused: Boolean(json.paused),
       campaignName: ProductUtils.safeStringNullable(json.campaignName),
@@ -351,10 +363,15 @@ export class ProductUtils {
     };
   }
 
-  // Convert Product to JSON for API calls - Matching Flutter's toJson
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SERIALIZATION — matching Flutter's toJson / toMap
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // Convert Product to JSON for API calls — matches Flutter's toJson
   static toJson(product: Product): Record<string, unknown> {
     const json: Record<string, unknown> = {
       id: product.id,
+      sourceCollection: product.sourceCollection,
       productName: product.productName,
       description: product.description,
       price: product.price,
@@ -368,23 +385,19 @@ export class ProductUtils {
       discountPercentage: product.discountPercentage,
       discountThreshold: product.discountThreshold,
       maxQuantity: product.maxQuantity,
-      // ✅ ADDED: bulkDiscountPercentage
       bulkDiscountPercentage: product.bulkDiscountPercentage,
       boostClickCountAtStart: product.boostClickCountAtStart,
       userId: product.userId,
-      bundleIds: product.bundleIds,
-      needsUpdate: product.needsUpdate,
-      archiveReason: product.archiveReason,
-      archivedByAdmin: product.archivedByAdmin,
-      archivedByAdminAt: product.archivedByAdminAt?.getTime(),
-      archivedByAdminId: product.archivedByAdminId,
-      // ✅ ADDED: bundleData
-      bundleData: product.bundleData,
       ownerId: product.ownerId,
       shopId: product.shopId,
       ilan_no: product.ilanNo,
       gender: product.gender,
       availableColors: product.availableColors,
+      needsUpdate: product.needsUpdate,
+      archiveReason: product.archiveReason,
+      archivedByAdmin: product.archivedByAdmin,
+      archivedByAdminAt: product.archivedByAdminAt?.getTime(),
+      archivedByAdminId: product.archivedByAdminId,
       createdAt: product.createdAt.getTime(),
       sellerName: product.sellerName,
       category: product.category,
@@ -392,34 +405,29 @@ export class ProductUtils {
       subsubcategory: product.subsubcategory,
       quantity: product.quantity,
       bestSellerRank: product.bestSellerRank,
-
       clickCount: product.clickCount,
       clickCountAtStart: product.clickCountAtStart,
       favoritesCount: product.favoritesCount,
       cartCount: product.cartCount,
       purchaseCount: product.purchaseCount,
       deliveryOption: product.deliveryOption,
+      relatedProductIds: product.relatedProductIds,
+      relatedLastUpdated: product.relatedLastUpdated?.getTime(),
+      relatedCount: product.relatedCount,
       boostedImpressionCount: product.boostedImpressionCount,
       boostImpressionCountAtStart: product.boostImpressionCountAtStart,
       isFeatured: product.isFeatured,
-      isTrending: product.isTrending,
       isBoosted: product.isBoosted,
       boostStartTime: product.boostStartTime?.getTime(),
       boostEndTime: product.boostEndTime?.getTime(),
-      dailyClickCount: product.dailyClickCount,
       lastClickDate: product.lastClickDate?.getTime(),
       paused: product.paused,
       promotionScore: product.promotionScore,
-      rankingScore: product.rankingScore,
       campaign: product.campaign,
       campaignName: product.campaignName,
       colorImages: product.colorImages,
       videoUrl: product.videoUrl,
       attributes: product.attributes,
-      reference: product.reference,
-      relatedProductIds: product.relatedProductIds,
-      relatedLastUpdated: product.relatedLastUpdated?.getTime(),
-      relatedCount: product.relatedCount,
     };
 
     // Remove null/undefined values (matching Flutter's removeWhere)
@@ -432,33 +440,42 @@ export class ProductUtils {
     return json;
   }
 
-  // Factory method for Algolia data - Matching Flutter's fromAlgolia
+  // Factory method for Algolia data — matches Flutter's fromAlgolia
   static fromAlgolia(json: ApiData): Product {
-    // Extract and normalize the ID
-    let normalizedId = String(json.objectID ?? json.id ?? "");
+    let normalizedId = String(json.objectID ?? "");
+    let sourceCollection: string | undefined;
 
-    // Remove common Algolia prefixes (matching Flutter implementation)
+    // Match Flutter's prefix-based sourceCollection detection
     if (normalizedId.startsWith("products_")) {
+      sourceCollection = "products";
       normalizedId = normalizedId.substring("products_".length);
     } else if (normalizedId.startsWith("shop_products_")) {
+      sourceCollection = "shop_products";
       normalizedId = normalizedId.substring("shop_products_".length);
+    } else {
+      // Fallback: derive from shopId presence (matches Flutter)
+      sourceCollection =
+        json.shopId != null && String(json.shopId).length > 0
+          ? "shop_products"
+          : "products";
     }
 
     const modifiedJson: ApiData = {
       ...json,
       id: normalizedId,
+      sourceCollection,
     };
 
     return ProductUtils.fromJson(modifiedJson);
   }
 
-  // Create Product with copyWith functionality - Matching Flutter's copyWith
+  // Create Product with copyWith functionality — matches Flutter's copyWith
   static copyWith(
     product: Product,
     updates: Partial<Product> & {
       setOriginalPriceNull?: boolean;
       setDiscountPercentageNull?: boolean;
-    }
+    },
   ): Product {
     const {
       setOriginalPriceNull = false,
@@ -469,18 +486,16 @@ export class ProductUtils {
     return {
       ...product,
       ...otherUpdates,
-      // Handle originalPrice with explicit null control
       originalPrice: setOriginalPriceNull
         ? undefined
-        : otherUpdates.originalPrice ?? product.originalPrice,
-      // Handle discountPercentage with explicit null control
+        : (otherUpdates.originalPrice ?? product.originalPrice),
       discountPercentage: setDiscountPercentageNull
         ? undefined
-        : otherUpdates.discountPercentage ?? product.discountPercentage,
+        : (otherUpdates.discountPercentage ?? product.discountPercentage),
     };
   }
 
-  // ✅ ADDED: toMap method for Firestore serialization (matching Flutter)
+  // toMap for Firestore serialization — matches Flutter's toMap
   static toMap(product: Product): Record<string, unknown> {
     const map: Record<string, unknown> = {
       productName: product.productName,
@@ -503,7 +518,6 @@ export class ProductUtils {
       userId: product.userId,
       discountThreshold: product.discountThreshold,
       bulkDiscountPercentage: product.bulkDiscountPercentage,
-      rankingScore: product.rankingScore,
       promotionScore: product.promotionScore,
       campaign: product.campaign,
       ownerId: product.ownerId,
@@ -522,7 +536,6 @@ export class ProductUtils {
       subsubcategory: product.subsubcategory,
       quantity: product.quantity,
       bestSellerRank: product.bestSellerRank,
-
       clickCount: product.clickCount,
       clickCountAtStart: product.clickCountAtStart,
       favoritesCount: product.favoritesCount,
@@ -532,11 +545,9 @@ export class ProductUtils {
       boostedImpressionCount: product.boostedImpressionCount,
       boostImpressionCountAtStart: product.boostImpressionCountAtStart,
       isFeatured: product.isFeatured,
-      isTrending: product.isTrending,
       isBoosted: product.isBoosted,
       boostStartTime: product.boostStartTime,
       boostEndTime: product.boostEndTime,
-      dailyClickCount: product.dailyClickCount,
       lastClickDate: product.lastClickDate,
       paused: product.paused,
       campaignName: product.campaignName,
@@ -547,7 +558,7 @@ export class ProductUtils {
       relatedCount: product.relatedCount,
     };
 
-    // Add attributes if not empty
+    // Add attributes only if not empty (matches Flutter)
     if (product.attributes && Object.keys(product.attributes).length > 0) {
       map.attributes = product.attributes;
     }
