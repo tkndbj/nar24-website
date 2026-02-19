@@ -128,7 +128,7 @@ async function withRetry<T>(
     maxRetries?: number;
     baseDelay?: number;
     shouldRetry?: (error: unknown) => boolean;
-  } = {}
+  } = {},
 ): Promise<T> {
   const {
     maxRetries = CONFIG.MAX_RETRIES,
@@ -161,7 +161,7 @@ async function withRetry<T>(
 async function withTimeout<T>(
   promise: Promise<T>,
   timeoutMs: number,
-  errorMessage: string = "Request timeout"
+  errorMessage: string = "Request timeout",
 ): Promise<T> {
   let timeoutId: NodeJS.Timeout;
 
@@ -207,10 +207,10 @@ function parseQueryParams(searchParams: URLSearchParams): QueryFilters {
       1,
       parseInt(
         searchParams.get("limit") || String(CONFIG.DEFAULT_PAGE_SIZE),
-        10
-      )
+        10,
+      ),
     ),
-    CONFIG.MAX_PAGE_SIZE
+    CONFIG.MAX_PAGE_SIZE,
   );
 
   const filterSubcategories =
@@ -263,7 +263,7 @@ function applyClientSideFilters(
     brands: string[];
     minPrice?: number;
     maxPrice?: number;
-  }
+  },
 ): Product[] {
   const hasFilters =
     filters.filterSubcategories.length > 0 ||
@@ -291,7 +291,7 @@ function applyClientSideFilters(
         (filterSub) =>
           normalizedProductSub === filterSub ||
           normalizedProductSub.includes(filterSub) ||
-          filterSub.includes(normalizedProductSub)
+          filterSub.includes(normalizedProductSub),
       );
 
       if (!matchesSubcategory) return false;
@@ -311,7 +311,7 @@ function applyClientSideFilters(
             normalizedProductColor.includes(filterColor) ||
             filterColor.includes(normalizedProductColor)
           );
-        })
+        }),
       );
 
       if (!hasMatchingColor) return false;
@@ -326,7 +326,7 @@ function applyClientSideFilters(
         (filterBrand) =>
           normalizedProductBrand === filterBrand ||
           normalizedProductBrand.includes(filterBrand) ||
-          filterBrand.includes(normalizedProductBrand)
+          filterBrand.includes(normalizedProductBrand),
       );
 
       if (!matchesBrand) return false;
@@ -348,7 +348,7 @@ function applyClientSideFilters(
 // ============= CORE DATA FETCHING =============
 
 async function fetchCategoryProducts(
-  filters: QueryFilters
+  filters: QueryFilters,
 ): Promise<CategoryProductsResponse> {
   const startTime = Date.now();
   const db = getFirestoreAdmin();
@@ -362,67 +362,82 @@ async function fetchCategoryProducts(
     ? formatCategoryName(filters.subsubcategory)
     : undefined;
 
-  // Handle Women/Men categories using gender field
+  // ─────────────────────────────────────────────────────────────────────
+  // Gender-based query (Women / Men)
+  // Matches Flutter: .where('gender', whereIn: [buyerCategory, 'Unisex'])
+  //   .where('quantity', isGreaterThan: 0)
+  //   .orderBy('quantity')
+  //   .orderBy('isBoosted', descending: true)
+  //   .orderBy('promotionScore', descending: true)
+  // ─────────────────────────────────────────────────────────────────────
   if (filters.category === "women" || filters.category === "men") {
     const genderValue = formattedCategory;
-    const gendersToFetch = [genderValue, "Unisex"];
 
-    const genderResults = await Promise.all(
-      gendersToFetch.map(async (gender) => {
-        try {
-          let query: FirebaseFirestore.Query = db
-            .collection("shop_products")
-            .where("gender", "==", gender)
-            .where("quantity", ">", 0);
+    try {
+      let query: FirebaseFirestore.Query = db
+        .collection("shop_products")
+        .where("gender", "in", [genderValue, "Unisex"])
+        .where("quantity", ">", 0);
 
-          if (formattedSubcategory) {
-            query = query.where("subcategory", "==", formattedSubcategory);
-          }
-
-          if (formattedSubsubcategory) {
-            query = query.where(
-              "subsubcategory",
-              "==",
-              formattedSubsubcategory
-            );
-          }
-
-          if (filters.minPrice !== undefined) {
-            query = query.where("price", ">=", filters.minPrice);
-          }
-
-          if (filters.maxPrice !== undefined) {
-            query = query.where("price", "<=", filters.maxPrice);
-          }
-
-          query = query
-            .orderBy("quantity")
-            .orderBy("isBoosted", "desc")
-            .orderBy("rankingScore", "desc")
-            .limit(CONFIG.MAX_FETCH_LIMIT);
-
-          const snapshot = await query.get();
-          return snapshot.docs.map(documentToProduct);
-        } catch (error) {
-          console.error(
-            `[category-products] Gender query failed for ${gender}:`,
-            error
-          );
-          return [];
-        }
-      })
-    );
-
-    // Flatten and deduplicate
-    const productMap = new Map<string, Product>();
-    genderResults.flat().forEach((product) => {
-      if (!productMap.has(product.id)) {
-        productMap.set(product.id, product);
+      if (formattedSubcategory) {
+        query = query.where("subcategory", "==", formattedSubcategory);
       }
-    });
-    allProducts = Array.from(productMap.values());
+
+      if (formattedSubsubcategory) {
+        query = query.where("subsubcategory", "==", formattedSubsubcategory);
+      }
+
+      if (filters.minPrice !== undefined) {
+        query = query.where("price", ">=", filters.minPrice);
+      }
+
+      if (filters.maxPrice !== undefined) {
+        query = query.where("price", "<=", filters.maxPrice);
+      }
+
+      query = query
+        .orderBy("quantity")
+        .orderBy("isBoosted", "desc")
+        .orderBy("promotionScore", "desc")
+        .limit(CONFIG.MAX_FETCH_LIMIT);
+
+      const snapshot = await query.get();
+      allProducts = snapshot.docs.map(documentToProduct);
+    } catch (error) {
+      console.error(`[category-products] Gender query failed:`, error);
+
+      // Fallback: simpler query matching Flutter's fallback
+      // Flutter fallback: .where('gender', whereIn: [...])
+      //   .orderBy('createdAt', descending: true).limit(20)
+      try {
+        const fallbackQuery: FirebaseFirestore.Query = db
+          .collection("shop_products")
+          .where("gender", "in", [genderValue, "Unisex"])
+          .orderBy("createdAt", "desc")
+          .limit(CONFIG.MAX_FETCH_LIMIT);
+
+        const snapshot = await fallbackQuery.get();
+        allProducts = snapshot.docs.map(documentToProduct);
+        console.log(
+          `[category-products] Fallback returned ${allProducts.length} products`,
+        );
+      } catch (fallbackError) {
+        console.error(
+          `[category-products] Fallback also failed:`,
+          fallbackError,
+        );
+        allProducts = [];
+      }
+    }
   } else {
+    // ─────────────────────────────────────────────────────────────────
     // Standard category query
+    // Matches Flutter: .where('category', isEqualTo: buyerCategory)
+    //   .where('quantity', isGreaterThan: 0)
+    //   .orderBy('quantity')
+    //   .orderBy('isBoosted', descending: true)
+    //   .orderBy('promotionScore', descending: true)
+    // ─────────────────────────────────────────────────────────────────
     try {
       let query: FirebaseFirestore.Query = db
         .collection("shop_products")
@@ -448,14 +463,36 @@ async function fetchCategoryProducts(
       query = query
         .orderBy("quantity")
         .orderBy("isBoosted", "desc")
-        .orderBy("rankingScore", "desc")
+        .orderBy("promotionScore", "desc")
         .limit(CONFIG.MAX_FETCH_LIMIT);
 
       const snapshot = await query.get();
       allProducts = snapshot.docs.map(documentToProduct);
     } catch (error) {
       console.error(`[category-products] Category query failed:`, error);
-      allProducts = [];
+
+      // Fallback: simpler query matching Flutter's fallback
+      // Flutter fallback: .where('category', isEqualTo: buyerCategory)
+      //   .orderBy('createdAt', descending: true).limit(20)
+      try {
+        const fallbackQuery: FirebaseFirestore.Query = db
+          .collection("shop_products")
+          .where("category", "==", formattedCategory)
+          .orderBy("createdAt", "desc")
+          .limit(CONFIG.MAX_FETCH_LIMIT);
+
+        const snapshot = await fallbackQuery.get();
+        allProducts = snapshot.docs.map(documentToProduct);
+        console.log(
+          `[category-products] Fallback returned ${allProducts.length} products`,
+        );
+      } catch (fallbackError) {
+        console.error(
+          `[category-products] Fallback also failed:`,
+          fallbackError,
+        );
+        allProducts = [];
+      }
     }
   }
 
@@ -468,19 +505,19 @@ async function fetchCategoryProducts(
     maxPrice: filters.maxPrice,
   });
 
-  // Sort: boosted first, then by ranking score
+  // Sort: boosted first, then by promotionScore (matches Flutter orderBy)
   allProducts.sort((a, b) => {
     if (a.isBoosted !== b.isBoosted) {
       return a.isBoosted ? -1 : 1;
     }
-    return (b.rankingScore ?? 0) - (a.rankingScore ?? 0);
+    return (b.promotionScore ?? 0) - (a.promotionScore ?? 0);
   });
 
   // Paginate
   const startIndex = filters.page * filters.limit;
   const paginatedProducts = allProducts.slice(
     startIndex,
-    startIndex + filters.limit
+    startIndex + filters.limit,
   );
   const hasMore = allProducts.length > startIndex + filters.limit;
 
@@ -512,7 +549,7 @@ function revalidateInBackground(cacheKey: string, filters: QueryFilters): void {
     .catch((error) => {
       console.error(
         `[category-products] Background revalidation failed:`,
-        error
+        error,
       );
     })
     .finally(() => {
@@ -540,7 +577,7 @@ export async function GET(request: NextRequest) {
           page: 0,
           total: 0,
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -559,7 +596,7 @@ export async function GET(request: NextRequest) {
             "X-Cache": "HIT",
             "X-Response-Time": `${Date.now() - requestStart}ms`,
           },
-        }
+        },
       );
     }
 
@@ -578,7 +615,7 @@ export async function GET(request: NextRequest) {
               "X-Cache": "STALE",
               "X-Response-Time": `${Date.now() - requestStart}ms`,
             },
-          }
+          },
         );
       }
 
@@ -586,7 +623,7 @@ export async function GET(request: NextRequest) {
         const result = await withTimeout(
           pendingRequest,
           CONFIG.REQUEST_TIMEOUT,
-          "Deduplicated request timeout"
+          "Deduplicated request timeout",
         );
         return NextResponse.json(
           { ...result, source: "dedupe" },
@@ -596,7 +633,7 @@ export async function GET(request: NextRequest) {
               "X-Cache": "DEDUPE",
               "X-Response-Time": `${Date.now() - requestStart}ms`,
             },
-          }
+          },
         );
       } catch {
         // Fall through to fresh fetch
@@ -606,7 +643,7 @@ export async function GET(request: NextRequest) {
     // ========== STEP 3: Stale-while-revalidate ==========
     if (cacheResult.status === "stale" && cacheResult.data) {
       console.log(
-        `[category-products] Returning stale, revalidating in background`
+        `[category-products] Returning stale, revalidating in background`,
       );
       revalidateInBackground(cacheKey, filters);
 
@@ -618,7 +655,7 @@ export async function GET(request: NextRequest) {
             "X-Cache": "STALE",
             "X-Response-Time": `${Date.now() - requestStart}ms`,
           },
-        }
+        },
       );
     }
 
@@ -642,13 +679,13 @@ export async function GET(request: NextRequest) {
       const result = await withTimeout(
         fetchPromise,
         CONFIG.REQUEST_TIMEOUT,
-        "Request timeout"
+        "Request timeout",
       );
 
       cacheResponse(cacheKey, result);
 
       console.log(
-        `[category-products] Fetched ${result.products.length}/${result.total} products in ${result.timing}ms`
+        `[category-products] Fetched ${result.products.length}/${result.total} products in ${result.timing}ms`,
       );
 
       return NextResponse.json(
@@ -660,7 +697,7 @@ export async function GET(request: NextRequest) {
             "X-Response-Time": `${Date.now() - requestStart}ms`,
             "X-Timing": `${result.timing}ms`,
           },
-        }
+        },
       );
     } catch (error) {
       console.error(`[category-products] Fetch error:`, error);
@@ -674,7 +711,7 @@ export async function GET(request: NextRequest) {
             page: 0,
             total: 0,
           },
-          { status: 504 }
+          { status: 504 },
         );
       }
 
@@ -690,7 +727,7 @@ export async function GET(request: NextRequest) {
           page: 0,
           total: 0,
         },
-        { status: statusCode }
+        { status: statusCode },
       );
     } finally {
       pendingRequests.delete(cacheKey);
@@ -706,7 +743,7 @@ export async function GET(request: NextRequest) {
         page: 0,
         total: 0,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
