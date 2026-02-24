@@ -178,8 +178,10 @@ const EmptyState: React.FC<{
 // Main component
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function Page({ params }: { params: { id: string } }) {
-  const shopId = params.id;
+import { use } from "react";
+
+export default function Page({ params }: { params: Promise<{ id: string }> }) {
+  const { id: shopId } = use(params);
   const router = useRouter();
   const abortRef = useRef<AbortController | null>(null);
   const fetchDoneRef = useRef(false);
