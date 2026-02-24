@@ -178,11 +178,8 @@ const EmptyState: React.FC<{
 // Main component
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface ShopDetailPageProps {
-  shopId: string;
-}
-
-export default function ShopDetailPage({ shopId }: ShopDetailPageProps) {
+export default function Page({ params }: { params: { id: string } }) {
+  const shopId = params.id;
   const router = useRouter();
   const abortRef = useRef<AbortController | null>(null);
   const fetchDoneRef = useRef(false);
