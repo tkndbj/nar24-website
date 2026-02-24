@@ -1,47 +1,68 @@
 "use client";
 
+// ═══════════════════════════════════════════════════════════════════════════
+// ShopDetailPage
+//
+// Mirrors Flutter's ShopDetailScreen + ShopProvider exactly:
+//
+//  Products  → always /api/shopProducts (Typesense, shopId-scoped)
+//              Mirrors _fetchProductsFromTypesense()
+//  Search    → debounced 300 ms, Typesense via same route (q param)
+//              Mirrors _performTypesenseSearch()
+//  SpecFacets → fetched on page-0 response, scoped to shopId
+//              Mirrors _fetchSpecFacets()
+//
+//  Tabs      → Home (only if homeImageUrls), All Products, Collections,
+//               Deals, Best Sellers, Reviews
+//  Filters   → Sort | Filter (FilterSidebar) | Category
+//  Layout    → Desktop: sticky cover + sidebar + grid
+//              Mobile : FAB → portal drawer
+// ═══════════════════════════════════════════════════════════════════════════
+
 import React, {
   useState,
   useEffect,
   useCallback,
   useRef,
   useMemo,
-  useTransition,
 } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import {
-  doc,
-  getDoc,
-  collection,
-  query,
-  where,
-  orderBy,
-  limit,
-  getDocs,
-  startAfter,
-  QueryDocumentSnapshot,
-  DocumentData,
-  QueryConstraint,
-} from "firebase/firestore";
-import { db } from "../../../../lib/firebase";
-import SecondHeader from "@/app/components/market_screen/SecondHeader";
+  ArrowLeft,
+  Filter,
+  Search,
+  X,
+  Star,
+  Users,
+  ChevronDown,
+  RefreshCw,
+  Layers,
+  ShoppingBag,
+  Tag,
+  Award,
+  MessageSquare,
+  Home,
+  AlertCircle,
+  WifiOff,
+  ThumbsUp,
+  Globe,
+  Check,
+} from "lucide-react";
 import { ProductCard } from "@/app/components/ProductCard";
-import AlgoliaServiceManager from "@/lib/algolia";
-import {
-  MagnifyingGlassIcon,
-  AdjustmentsHorizontalIcon,
-  FunnelIcon,
-  StarIcon,
-  UsersIcon,
-  EyeIcon,
-  HeartIcon,
-  ArrowLeftIcon,
-  PhotoIcon,
-  XMarkIcon,
-} from "@heroicons/react/24/outline";
-import { HeartIcon as HeartSolidIcon } from "@heroicons/react/24/solid";
+import { Product, ProductUtils } from "@/app/models/Product";
+import FilterSidebar, {
+  FilterState,
+  SpecFacets,
+  EMPTY_FILTER_STATE,
+  getActiveFiltersCount,
+} from "@/app/components/FilterSideBar";
+import { impressionBatcher } from "@/app/utils/impressionBatcher";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────────────────────
 
 interface ShopData {
   id: string;
@@ -49,49 +70,34 @@ interface ShopData {
   profileImageUrl: string;
   coverImageUrls: string[];
   homeImageUrls?: string[];
-  address: string;
+  homeImageLinks?: Record<string, string>;
+  address?: string;
   averageRating: number;
-  reviewCount: number;
-  followerCount: number;
-  clickCount: number;
+  reviewCount?: number;
+  followerCount?: number;
   categories: string[];
-  contactNo: string;
-  ownerId: string;
-  isBoosted: boolean;
-  createdAt: {
-    seconds: number;
-    nanoseconds: number;
-  };
+  contactNo?: string;
+  ownerId?: string;
+  isActive?: boolean;
 }
-
-import { Product, ProductUtils } from "@/app/models/Product";
-import { AllInOneCategoryData } from "@/constants/productData";
 
 interface Collection {
   id: string;
   name: string;
   imageUrl?: string;
-  productIds: string[];
-  createdAt: {
-    seconds: number;
-    nanoseconds: number;
-  };
+  productIds?: string[];
 }
 
 interface Review {
   id: string;
   rating: number;
   review: string;
-  timestamp: {
-    seconds: number;
-    nanoseconds: number;
-  };
-  userId: string;
-  userName?: string;
-  likes: string[];
+  timestamp: number;
+  likes?: string[];
+  userId?: string;
 }
 
-type TabType =
+type TabId =
   | "home"
   | "allProducts"
   | "collections"
@@ -99,1269 +105,1267 @@ type TabType =
   | "bestSellers"
   | "reviews";
 
-// Helper function to get the translation key for any category
-const getCategoryTranslationKey = (category: string): string => {
-  switch (category) {
-    case "Clothing & Fashion":
-      return "categoryClothingFashion";
-    case "Footwear":
-      return "categoryFootwear";
-    case "Accessories":
-      return "categoryAccessories";
-    case "Mother & Child":
-      return "categoryMotherChild";
-    case "Home & Furniture":
-      return "categoryHomeFurniture";
-    case "Beauty & Personal Care":
-      return "categoryBeautyPersonalCare";
-    case "Bags & Luggage":
-      return "categoryBagsLuggage";
-    case "Electronics":
-      return "categoryElectronics";
-    case "Sports & Outdoor":
-      return "categorySportsOutdoor";
-    case "Books, Stationery & Hobby":
-      return "categoryBooksStationeryHobby";
-    case "Tools & Hardware":
-      return "categoryToolsHardware";
-    case "Pet Supplies":
-      return "categoryPetSupplies";
-    case "Automotive":
-      return "categoryAutomotive";
-    case "Health & Wellness":
-      return "categoryHealthWellness";
-    default:
-      return category;
-  }
+// ─────────────────────────────────────────────────────────────────────────────
+// Sort helpers – mirror Flutter's ShopProvider.setSortOption
+// ─────────────────────────────────────────────────────────────────────────────
+
+type SortOption = "date" | "alphabetical" | "price_asc" | "price_desc";
+
+const SORT_OPTIONS: { value: SortOption; label: string }[] = [
+  { value: "date", label: "Newest" },
+  { value: "alphabetical", label: "A–Z" },
+  { value: "price_asc", label: "Price ↑" },
+  { value: "price_desc", label: "Price ↓" },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sub-components
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ProductShimmer: React.FC<{ isDark: boolean }> = ({ isDark }) => {
+  const base = isDark ? "bg-gray-700" : "bg-gray-200";
+  const card = isDark ? "bg-gray-800" : "bg-white";
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 lg:gap-4">
+      {Array.from({ length: 8 }).map((_, i) => (
+        <div
+          key={i}
+          className={`rounded-xl overflow-hidden ${card} animate-pulse`}
+        >
+          <div className={`w-full h-52 ${base}`} />
+          <div className="p-3 space-y-2">
+            <div className={`h-3 rounded ${base} w-4/5`} />
+            <div className={`h-3 rounded ${base} w-3/5`} />
+            <div className={`h-4 rounded ${base} w-2/5`} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 };
 
-export default function ShopDetailPage() {
-  const params = useParams();
+const EmptyState: React.FC<{
+  icon: React.ReactNode;
+  message: string;
+  subMessage?: string;
+  onClear?: () => void;
+  isDark: boolean;
+}> = ({ icon, message, subMessage, onClear, isDark }) => (
+  <div className="flex flex-col items-center justify-center min-h-64 gap-4 py-16 px-4 text-center">
+    <div className={isDark ? "text-gray-600" : "text-gray-300"}>{icon}</div>
+    <p
+      className={`text-base font-medium ${isDark ? "text-gray-400" : "text-gray-500"}`}
+    >
+      {message}
+    </p>
+    {subMessage && (
+      <p className={`text-sm ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+        {subMessage}
+      </p>
+    )}
+    {onClear && (
+      <button
+        onClick={onClear}
+        className="mt-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium transition-colors"
+      >
+        Clear Filters
+      </button>
+    )}
+  </div>
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main component
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface ShopDetailPageProps {
+  shopId: string;
+}
+
+export default function ShopDetailPage({ shopId }: ShopDetailPageProps) {
   const router = useRouter();
-  const t = useTranslations("shopDetail");
-  const tRoot = useTranslations(); // For root-level category translations
+  const abortRef = useRef<AbortController | null>(null);
+  const fetchDoneRef = useRef(false);
 
-  const shopId = params.id as string;
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  const [shopData, setShopData] = useState<ShopData | null>(null);
-  const [allProducts, setAllProducts] = useState<Product[]>([]);
-  const [collections, setCollections] = useState<Collection[]>([]);
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<TabType>("allProducts");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isFavorite, setIsFavorite] = useState(false);
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [lastProductDoc, setLastProductDoc] =
-    useState<QueryDocumentSnapshot<DocumentData> | null>(null);
-  const [hasMoreProducts, setHasMoreProducts] = useState(true);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchResults, setSearchResults] = useState<Product[]>([]);
-
-  // Category filter and sorting states
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [showCategoryFilter, setShowCategoryFilter] = useState(false);
-  const [sortOption, setSortOption] = useState<string>("date"); // date, alphabetical, priceLowHigh, priceHighLow
+  // ── UI ────────────────────────────────────────────────────────────────────
+  const [isDark, setIsDark] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [showSortDropdown, setShowSortDropdown] = useState(false);
+  const [showCategoryMenu, setShowCategoryMenu] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabId>("allProducts");
 
-  const observerTarget = useRef<HTMLDivElement>(null);
-  const isFetchingRef = useRef(false);
-  const lastProductDocRef = useRef<QueryDocumentSnapshot<DocumentData> | null>(
-    null
+  // ── Shop ──────────────────────────────────────────────────────────────────
+  const [shopData, setShopData] = useState<ShopData | null>(null);
+  const [shopLoading, setShopLoading] = useState(true);
+  const [shopError, setShopError] = useState(false);
+
+  // ── Products ──────────────────────────────────────────────────────────────
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [productError, setProductError] = useState(false);
+  const [searchResultCount, setSearchResultCount] = useState<number | null>(
+    null,
   );
-  const currentTabRef = useRef<TabType>(activeTab);
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const searchAbortRef = useRef<boolean>(false);
-  const sortDropdownRef = useRef<HTMLDivElement>(null);
-  const categoryFilterRef = useRef<HTMLDivElement>(null);
-  const [, startTransition] = useTransition();
 
-  // Sync refs with state
+  // ── Collections ───────────────────────────────────────────────────────────
+  const [collections, setCollections] = useState<Collection[]>([]);
+  const [collectionsLoading, setCollectionsLoading] = useState(false);
+
+  // ── Reviews ───────────────────────────────────────────────────────────────
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+
+  // ── Filters ───────────────────────────────────────────────────────────────
+  const [filters, setFilters] = useState<FilterState>(EMPTY_FILTER_STATE);
+  const [specFacets, setSpecFacets] = useState<SpecFacets>({});
+  const [sortOption, setSortOption] = useState<SortOption>("date");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(
+    null,
+  );
+
+  // ── Available subcategories (derived from products) ───────────────────────
+  const [availableSubcategories, setAvailableSubcategories] = useState<
+    string[]
+  >([]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Stable filter key to prevent excess renders
+  // ─────────────────────────────────────────────────────────────────────────
+  const filterKey = useMemo(
+    () =>
+      JSON.stringify({
+        colors: [...filters.colors].sort(),
+        brands: [...filters.brands].sort(),
+        specFilters: filters.specFilters,
+        minPrice: filters.minPrice,
+        maxPrice: filters.maxPrice,
+        subcategory: selectedSubcategory,
+        sort: sortOption,
+      }),
+    [filters, selectedSubcategory, sortOption],
+  );
+
+  const activeFilterCount =
+    getActiveFiltersCount(filters) + (selectedSubcategory ? 1 : 0);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Theme / responsive setup
+  // ─────────────────────────────────────────────────────────────────────────
   useEffect(() => {
-    lastProductDocRef.current = lastProductDoc;
-  }, [lastProductDoc]);
+    const check = () => setIsMobile(window.innerWidth < 1024);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   useEffect(() => {
-    currentTabRef.current = activeTab;
-  }, [activeTab]);
+    const check = () =>
+      setIsDark(document.documentElement.classList.contains("dark"));
+    check();
+    const obs = new MutationObserver(check);
+    obs.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => obs.disconnect();
+  }, []);
 
-  // Cleanup on unmount or shopId change
   useEffect(() => {
+    document.body.style.overflow = showMobileSidebar ? "hidden" : "";
     return () => {
-      isFetchingRef.current = false;
-      // Cleanup search timeout
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-        searchTimeoutRef.current = null;
-      }
-      // Abort ongoing search
-      searchAbortRef.current = true;
+      document.body.style.overflow = "";
     };
+  }, [showMobileSidebar]);
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handler = () => {
+      setShowSortDropdown(false);
+      setShowCategoryMenu(false);
+    };
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
+  }, []);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Flush impressions
+  // ─────────────────────────────────────────────────────────────────────────
+  useEffect(
+    () => () => {
+      impressionBatcher.flush();
+    },
+    [],
+  );
+  useEffect(() => {
+    const f = () => {
+      if (document.hidden) impressionBatcher.flush();
+    };
+    document.addEventListener("visibilitychange", f);
+    return () => document.removeEventListener("visibilitychange", f);
+  }, []);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Search debounce — 300ms (mirrors Flutter)
+  // ─────────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    const tid = setTimeout(() => setDebouncedQuery(searchQuery.trim()), 300);
+    return () => clearTimeout(tid);
+  }, [searchQuery]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Shop data fetch
+  // ─────────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!shopId) return;
+    setShopLoading(true);
+    setShopError(false);
+    fetch(`/api/shops/${shopId}`)
+      .then((r) => {
+        if (!r.ok) throw new Error(`${r.status}`);
+        return r.json();
+      })
+      .then((data) => {
+        const shop = data.shop ?? data;
+        setShopData({
+          id: shopId,
+          name: shop.name ?? "",
+          profileImageUrl: shop.profileImageUrl ?? "",
+          coverImageUrls: shop.coverImageUrls ?? [],
+          homeImageUrls: shop.homeImageUrls ?? [],
+          homeImageLinks: shop.homeImageLinks ?? {},
+          address: shop.address ?? "",
+          averageRating: shop.averageRating ?? 0,
+          reviewCount: shop.reviewCount ?? 0,
+          followerCount: shop.followerCount ?? 0,
+          categories: shop.categories ?? [],
+          contactNo: shop.contactNo ?? "",
+          ownerId: shop.ownerId ?? "",
+          isActive: shop.isActive ?? true,
+        });
+        // If shop has home images, make Home tab default
+        if ((shop.homeImageUrls ?? []).length > 0) {
+          setActiveTab("home");
+        }
+      })
+      .catch(() => setShopError(true))
+      .finally(() => setShopLoading(false));
   }, [shopId]);
 
-  // Handle theme detection
+  // ─────────────────────────────────────────────────────────────────────────
+  // Collections fetch (Firestore via existing API or direct)
+  // ─────────────────────────────────────────────────────────────────────────
   useEffect(() => {
-    const checkTheme = () => {
-      if (typeof document !== "undefined") {
-        setIsDarkMode(document.documentElement.classList.contains("dark"));
-      }
-    };
-
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    if (typeof document !== "undefined") {
-      observer.observe(document.documentElement, {
-        attributes: true,
-        attributeFilter: ["class"],
-      });
-    }
-    return () => observer.disconnect();
-  }, []);
-
-  // Handle scroll for header effect
-  useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 50);
-    };
-
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
-
-  // Click outside handler for dropdowns
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        sortDropdownRef.current &&
-        !sortDropdownRef.current.contains(event.target as Node)
-      ) {
-        setShowSortDropdown(false);
-      }
-      if (
-        categoryFilterRef.current &&
-        !categoryFilterRef.current.contains(event.target as Node)
-      ) {
-        setShowCategoryFilter(false);
-      }
-    };
-
-    if (showSortDropdown || showCategoryFilter) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () =>
-        document.removeEventListener("mousedown", handleClickOutside);
-    }
-  }, [showSortDropdown, showCategoryFilter]);
-
-  // Fetch shop data
-  const fetchShopData = useCallback(async () => {
     if (!shopId) return;
+    setCollectionsLoading(true);
+    fetch(`/api/shops/${shopId}/collections`)
+      .then((r) => (r.ok ? r.json() : { collections: [] }))
+      .then((data) => setCollections(data.collections ?? []))
+      .catch(() => setCollections([]))
+      .finally(() => setCollectionsLoading(false));
+  }, [shopId]);
 
-    try {
-      setIsLoading(true);
-      setError(null);
+  // ─────────────────────────────────────────────────────────────────────────
+  // Reviews fetch
+  // ─────────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!shopId) return;
+    setReviewsLoading(true);
+    fetch(`/api/shops/${shopId}/reviews`)
+      .then((r) => (r.ok ? r.json() : { reviews: [] }))
+      .then((data) => setReviews(data.reviews ?? []))
+      .catch(() => setReviews([]))
+      .finally(() => setReviewsLoading(false));
+  }, [shopId]);
 
-      const shopDoc = await getDoc(doc(db, "shops", shopId));
-
-      if (!shopDoc.exists()) {
-        setError(t("shopNotFound"));
-        return;
-      }
-
-      const data = { id: shopDoc.id, ...shopDoc.data() } as ShopData;
-      setShopData(data);
-
-      // Set initial tab based on available content
-      if (data.homeImageUrls && data.homeImageUrls.length > 0) {
-        setActiveTab("home");
-      } else {
-        setActiveTab("allProducts");
-      }
-    } catch (err) {
-      console.error("Error fetching shop data:", err);
-      setError(t("failedToLoad"));
-    } finally {
-      setIsLoading(false);
-    }
-  }, [shopId, t]);
-
-  // Fetch products
+  // ─────────────────────────────────────────────────────────────────────────
+  // Products fetch — mirrors Flutter's _fetchProductsFromTypesense()
+  // Always Typesense (via /api/shopProducts), scoped to shopId
+  // ─────────────────────────────────────────────────────────────────────────
   const fetchProducts = useCallback(
-    async (
-      productType: "all" | "deals" | "bestSellers" = "all",
-      loadMore = false
-    ) => {
+    async (page: number, reset: boolean) => {
       if (!shopId) return;
-      if (isFetchingRef.current) return; // Prevent duplicate requests
 
-      const fetchStartTab = currentTabRef.current;
-      isFetchingRef.current = true;
+      abortRef.current?.abort();
+      abortRef.current = new AbortController();
 
       try {
-        if (loadMore) {
-          setIsLoadingMore(true);
-        } else {
+        if (reset) {
           setIsLoadingProducts(true);
+          setProducts([]);
+          setCurrentPage(0);
+          setHasMore(false);
+          setProductError(false);
+          setSearchResultCount(null);
+          fetchDoneRef.current = false;
+        } else {
+          setIsLoadingMore(true);
         }
 
-        // Build base query with category filter if selected
-        const constraints: QueryConstraint[] = [where("shopId", "==", shopId)];
+        const qp = new URLSearchParams({
+          shopId,
+          page: page.toString(),
+          hitsPerPage: "20",
+          sort: sortOption,
+        });
 
-        // Add category filter
-        if (selectedCategory) {
-          constraints.push(where("category", "==", selectedCategory));
+        if (debouncedQuery) qp.set("q", debouncedQuery);
+        if (selectedSubcategory) qp.set("subcategory", selectedSubcategory);
+        if (filters.colors.length > 0)
+          qp.set("colors", filters.colors.join(","));
+        if (filters.brands.length > 0)
+          qp.set("brands", filters.brands.join(","));
+        if (filters.minPrice !== undefined)
+          qp.set("minPrice", String(filters.minPrice));
+        if (filters.maxPrice !== undefined)
+          qp.set("maxPrice", String(filters.maxPrice));
+        for (const [field, vals] of Object.entries(filters.specFilters)) {
+          if (vals.length > 0) qp.set(`spec_${field}`, vals.join(","));
         }
 
-        // Determine sort order
-        let sortField = "createdAt";
-        let sortDirection: "asc" | "desc" = "desc";
+        const res = await fetch(`/api/shopProducts?${qp}`, {
+          signal: abortRef.current.signal,
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
 
-        switch (sortOption) {
-          case "alphabetical":
-            sortField = "title";
-            sortDirection = "asc";
-            break;
-          case "priceLowHigh":
-            sortField = "price";
-            sortDirection = "asc";
-            break;
-          case "priceHighLow":
-            sortField = "price";
-            sortDirection = "desc";
-            break;
-          case "date":
-          default:
-            sortField = "createdAt";
-            sortDirection = "desc";
-            break;
-        }
-
-        constraints.push(orderBy(sortField, sortDirection));
-        constraints.push(limit(20));
-
-        // Add cursor for pagination
-        if (loadMore && lastProductDocRef.current) {
-          constraints.push(startAfter(lastProductDocRef.current));
-        }
-
-        const productsQuery = query(
-          collection(db, "shop_products"),
-          ...constraints
+        const newProducts: Product[] = (data.products ?? []).map(
+          (raw: Record<string, unknown>) => ProductUtils.fromJson(raw),
         );
 
-        const snapshot = await getDocs(productsQuery);
-
-        // Check if tab changed during fetch - if so, discard results
-        if (fetchStartTab !== currentTabRef.current) {
-          return;
-        }
-
-        let fetchedProducts = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Product[];
-
-        // Store last document for pagination
-        if (snapshot.docs.length > 0) {
-          setLastProductDoc(snapshot.docs[snapshot.docs.length - 1]);
-        }
-
-        // Check if there are more products
-        setHasMoreProducts(snapshot.docs.length === 20);
-
-        // Client-side filtering for now
-        if (productType === "deals") {
-          fetchedProducts = fetchedProducts.filter(
-            (p) => (p.discountPercentage || 0) > 0
-          );
-        } else if (productType === "bestSellers") {
-          fetchedProducts = fetchedProducts.sort(
-            (a, b) => b.averageRating - a.averageRating
-          );
-        }
-
-        if (loadMore) {
-          // Use transition for smoother pagination updates
-          startTransition(() => {
-            setAllProducts((prev) => [...prev, ...fetchedProducts]);
-          });
+        if (reset) {
+          setProducts(newProducts);
+          // SpecFacets arrive on page 0 (mirrors Flutter _fetchSpecFacets)
+          if (data.specFacets) setSpecFacets(data.specFacets as SpecFacets);
+          if (debouncedQuery) setSearchResultCount(newProducts.length);
+          // Derive available subcategories from product data
+          const subs = Array.from(
+            new Set(newProducts.map((p) => p.subcategory).filter(Boolean)),
+          ).sort() as string[];
+          if (subs.length > 0) setAvailableSubcategories(subs);
         } else {
-          setAllProducts(fetchedProducts);
+          setProducts((prev) => [...prev, ...newProducts]);
         }
+
+        setHasMore(data.hasMore ?? false);
+        setCurrentPage(page);
+        fetchDoneRef.current = true;
       } catch (err) {
-        console.error("Error fetching products:", err);
-        // Don't update hasMoreProducts on error, allow retry
-        // Show error in production via toast or error state if needed
-        if (loadMore) {
-          // On pagination error, allow user to retry
-          setHasMoreProducts(true);
-        }
+        if (err instanceof Error && err.name === "AbortError") return;
+        setProductError(true);
       } finally {
-        isFetchingRef.current = false;
         setIsLoadingProducts(false);
         setIsLoadingMore(false);
       }
     },
-    [shopId, selectedCategory, sortOption]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [shopId, sortOption, debouncedQuery, filterKey],
   );
 
-  // Algolia search function
-  const performAlgoliaSearch = useCallback(
-    async (query: string, currentShopId: string) => {
-      if (!query.trim()) {
-        setSearchResults([]);
-        setIsSearching(false);
-        return;
-      }
+  // Trigger fetch on any filter / sort / query change
+  useEffect(() => {
+    fetchProducts(0, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shopId, sortOption, debouncedQuery, filterKey]);
 
-      // Reset abort flag for new search
-      searchAbortRef.current = false;
-
-      try {
-        setIsSearching(true);
-
-        const algolia = AlgoliaServiceManager.getInstance();
-
-        // Search with shopId filter
-        const algoliaResults = await algolia.searchProducts(
-          query,
-          0, // page
-          100, // hitsPerPage - get more results for shop-specific search
-          "shop_products", // index name
-          undefined, // no filterType
-          "None" // sortOption
-        );
-
-        // Check if this search was aborted
-        if (searchAbortRef.current) {
-          console.log("🚫 Search aborted:", query);
-          return;
+  // Infinite scroll
+  useEffect(() => {
+    let tid: NodeJS.Timeout;
+    const onScroll = () => {
+      clearTimeout(tid);
+      tid = setTimeout(() => {
+        if (
+          window.innerHeight + document.documentElement.scrollTop >=
+          document.documentElement.offsetHeight - 2000
+        ) {
+          if (hasMore && !isLoadingMore && fetchDoneRef.current) {
+            fetchProducts(currentPage + 1, false);
+          }
         }
+      }, 100);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      clearTimeout(tid);
+    };
+  }, [hasMore, isLoadingMore, currentPage, fetchProducts]);
 
-        // Convert Algolia results to app's Product model and filter by shopId
-        const convertedResults: Product[] = algoliaResults
-          .map((algoliaProduct) =>
-            ProductUtils.fromAlgolia(
-              algoliaProduct as unknown as Record<string, unknown>
-            )
-          )
-          .filter((product) => product.shopId === currentShopId);
+  // ─────────────────────────────────────────────────────────────────────────
+  // Derived product lists — mirrors Flutter's dealProducts / bestSellers
+  // ─────────────────────────────────────────────────────────────────────────
+  const dealProducts = useMemo(
+    () => products.filter((p) => (p.discountPercentage ?? 0) > 0),
+    [products],
+  );
+  const bestSellers = useMemo(
+    () =>
+      [...products].sort(
+        (a, b) => (b.purchaseCount ?? 0) - (a.purchaseCount ?? 0),
+      ),
+    [products],
+  );
 
-        console.log(
-          `✅ Algolia search complete: ${convertedResults.length} products found for shop ${currentShopId}`
-        );
-        setSearchResults(convertedResults);
-      } catch (error) {
-        console.error("❌ Algolia search error:", error);
-        // On error, show no results but don't crash
-        if (!searchAbortRef.current) {
-          setSearchResults([]);
-        }
-      } finally {
-        if (!searchAbortRef.current) {
-          setIsSearching(false);
-        }
-      }
+  // ─────────────────────────────────────────────────────────────────────────
+  // Tab config — Home tab only shown if shop has homeImageUrls (mirrors Flutter)
+  // ─────────────────────────────────────────────────────────────────────────
+  const hasHomeTab = (shopData?.homeImageUrls?.length ?? 0) > 0;
+  const tabs: { id: TabId; label: string; icon: React.ReactNode }[] = [
+    ...(hasHomeTab
+      ? [{ id: "home" as TabId, label: "Home", icon: <Home size={14} /> }]
+      : []),
+    {
+      id: "allProducts",
+      label: "All Products",
+      icon: <ShoppingBag size={14} />,
     },
-    []
-  );
+    { id: "collections", label: "Collections", icon: <Layers size={14} /> },
+    { id: "deals", label: "Deals", icon: <Tag size={14} /> },
+    { id: "bestSellers", label: "Best Sellers", icon: <Award size={14} /> },
+    { id: "reviews", label: "Reviews", icon: <MessageSquare size={14} /> },
+  ];
 
-  // Debounced search effect
-  useEffect(() => {
-    // Clear previous timeout
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-
-    // Abort any ongoing search
-    searchAbortRef.current = true;
-
-    if (!searchQuery.trim()) {
-      setSearchResults([]);
-      setIsSearching(false);
-      return;
-    }
-
-    // Set searching state immediately for better UX
-    setIsSearching(true);
-
-    // Debounce search by 300ms
-    searchTimeoutRef.current = setTimeout(() => {
-      if (shopId) {
-        performAlgoliaSearch(searchQuery, shopId);
-      }
-    }, 300);
-
-    // Cleanup
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
-  }, [searchQuery, shopId, performAlgoliaSearch]);
-
-  // Determine which products to display
-  const products = useMemo(() => {
-    // If user is searching, show search results
-    if (searchQuery.trim()) {
-      return searchResults;
-    }
-    // Otherwise show regular products
-    return allProducts;
-  }, [searchQuery, searchResults, allProducts]);
-
-  // Fetch collections
-  const fetchCollections = useCallback(async () => {
-    if (!shopId) return;
-
-    try {
-      const collectionsQuery = query(
-        collection(db, "shops", shopId, "collections"),
-        orderBy("createdAt", "desc")
-      );
-
-      const snapshot = await getDocs(collectionsQuery);
-      const fetchedCollections = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Collection[];
-
-      setCollections(fetchedCollections);
-    } catch (err) {
-      console.error("Error fetching collections:", err);
-    }
-  }, [shopId]);
-
-  // Fetch reviews
-  const fetchReviews = useCallback(async () => {
-    if (!shopId) return;
-
-    try {
-      const reviewsQuery = query(
-        collection(db, "shops", shopId, "reviews"),
-        orderBy("timestamp", "desc"),
-        limit(10)
-      );
-
-      const snapshot = await getDocs(reviewsQuery);
-      const fetchedReviews = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Review[];
-
-      setReviews(fetchedReviews);
-    } catch (err) {
-      console.error("Error fetching reviews:", err);
-    }
-  }, [shopId]);
-
-  // Initial data fetch
-  useEffect(() => {
-    fetchShopData();
-  }, [fetchShopData]);
-
-  // Fetch additional data when shop data is loaded
-  useEffect(() => {
-    if (shopData) {
-      fetchCollections();
-      fetchReviews();
-      fetchProducts();
-    }
-  }, [shopData, fetchCollections, fetchReviews, fetchProducts]);
-
-  // Update products when tab changes
-  useEffect(() => {
-    if (
-      shopData &&
-      ["allProducts", "deals", "bestSellers"].includes(activeTab)
-    ) {
-      const productType =
-        activeTab === "allProducts"
-          ? "all"
-          : activeTab === "deals"
-          ? "deals"
-          : "bestSellers";
-      fetchProducts(productType);
-    }
-  }, [activeTab, shopData, fetchProducts]);
-
-  const handleTabChange = (tab: TabType) => {
-    setActiveTab(tab);
-    // Reset pagination when changing tabs
-    setLastProductDoc(null);
-    lastProductDocRef.current = null;
-    setHasMoreProducts(true);
+  // ─────────────────────────────────────────────────────────────────────────
+  // Helpers
+  // ─────────────────────────────────────────────────────────────────────────
+  const handleClearAllFilters = () => {
+    setFilters(EMPTY_FILTER_STATE);
+    setSelectedSubcategory(null);
+    setSortOption("date");
   };
 
-  // Handle category filter change
-  const handleCategoryFilter = (category: string | null) => {
-    setSelectedCategory(category);
-    setShowCategoryFilter(false);
-    // Reset pagination
-    setLastProductDoc(null);
-    lastProductDocRef.current = null;
-    setHasMoreProducts(true);
-  };
+  const isProductTab =
+    activeTab === "allProducts" ||
+    activeTab === "deals" ||
+    activeTab === "bestSellers";
+  const activeProducts =
+    activeTab === "deals"
+      ? dealProducts
+      : activeTab === "bestSellers"
+        ? bestSellers
+        : products;
 
-  // Handle sort change
-  const handleSortChange = (sort: string) => {
-    setSortOption(sort);
-    setShowSortDropdown(false);
-    // Reset pagination
-    setLastProductDoc(null);
-    lastProductDocRef.current = null;
-    setHasMoreProducts(true);
-  };
-
-  // Refetch when category or sort changes
-  useEffect(() => {
-    if (
-      shopData &&
-      ["allProducts", "deals", "bestSellers"].includes(activeTab)
-    ) {
-      const productType =
-        activeTab === "allProducts"
-          ? "all"
-          : activeTab === "deals"
-          ? "deals"
-          : "bestSellers";
-      fetchProducts(productType);
-    }
-  }, [selectedCategory, sortOption, activeTab, shopData, fetchProducts]);
-
-  // Load more products function
-  const loadMoreProducts = useCallback(() => {
-    if (isLoadingMore || !hasMoreProducts || isLoadingProducts) return;
-
-    if (["allProducts", "deals", "bestSellers"].includes(activeTab)) {
-      const productType =
-        activeTab === "allProducts"
-          ? "all"
-          : activeTab === "deals"
-          ? "deals"
-          : "bestSellers";
-      fetchProducts(productType, true);
-    }
-  }, [
-    activeTab,
-    isLoadingMore,
-    hasMoreProducts,
-    isLoadingProducts,
-    fetchProducts,
-  ]);
-
-  // Infinite scroll observer with debouncing
-  useEffect(() => {
-    // Only set up observer if we're on a products tab and have products
-    if (!["allProducts", "deals", "bestSellers"].includes(activeTab)) {
-      return;
-    }
-
-    let debounceTimer: NodeJS.Timeout;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMoreProducts && !isLoadingMore) {
-          // Debounce to prevent rapid-fire requests
-          clearTimeout(debounceTimer);
-          debounceTimer = setTimeout(() => {
-            loadMoreProducts();
-          }, 150);
-        }
-      },
-      { threshold: 0.1, rootMargin: "100px" }
-    );
-
-    const currentTarget = observerTarget.current;
-    if (currentTarget && allProducts.length > 0) {
-      observer.observe(currentTarget);
-    }
-
-    return () => {
-      clearTimeout(debounceTimer);
-      if (currentTarget) {
-        observer.unobserve(currentTarget);
-      }
-    };
-  }, [
-    loadMoreProducts,
-    activeTab,
-    allProducts.length,
-    hasMoreProducts,
-    isLoadingMore,
-  ]);
-
-  const handleFavoriteToggle = () => {
-    setIsFavorite(!isFavorite);
-    // TODO: Implement Firebase favorite functionality
-  };
-
-  const handleBack = () => {
-    router.back();
-  };
-
-  const formatNumber = (num: number) => {
-    if (num >= 1000000) {
-      return (num / 1000000).toFixed(1) + "M";
-    } else if (num >= 1000) {
-      return (num / 1000).toFixed(1) + "K";
-    }
-    return num.toString();
-  };
-
-  if (isLoading) {
+  // ─────────────────────────────────────────────────────────────────────────
+  // Render: error / loading states
+  // ─────────────────────────────────────────────────────────────────────────
+  if (shopError) {
     return (
-      <>
-        <SecondHeader />
-        <div
-          className={`min-h-screen ${
-            isDarkMode ? "bg-gray-900" : "bg-gray-50"
-          }`}
-        >
-          <div className="max-w-6xl mx-auto">
-            <div className="animate-pulse">
-              {/* Header skeleton */}
-              <div className="h-64 bg-gray-300" />
-              <div className="p-4 space-y-4">
-                <div className="h-4 bg-gray-300 rounded w-3/4" />
-                <div className="h-4 bg-gray-300 rounded w-1/2" />
-                <div className="flex space-x-4">
-                  {Array.from({ length: 4 }).map((_, i) => (
-                    <div key={i} className="h-8 bg-gray-300 rounded w-20" />
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </>
-    );
-  }
-
-  if (error || !shopData) {
-    return (
-      <>
-        <SecondHeader />
-        <div
-          className={`min-h-screen flex items-center justify-center ${
-            isDarkMode ? "bg-gray-900" : "bg-gray-50"
-          }`}
-        >
-          <div className="text-center">
-            <h2
-              className={`text-xl font-semibold mb-4 ${
-                isDarkMode ? "text-white" : "text-gray-900"
-              }`}
-            >
-              {error || "Shop not found"}
-            </h2>
+      <div
+        className={`min-h-screen flex items-center justify-center ${isDark ? "bg-gray-950" : "bg-gray-50"}`}
+      >
+        <div className="text-center space-y-4 px-4">
+          <AlertCircle size={64} className="mx-auto text-red-400" />
+          <h2
+            className={`text-lg font-semibold ${isDark ? "text-white" : "text-gray-900"}`}
+          >
+            Failed to load shop
+          </h2>
+          <p
+            className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}
+          >
+            Please check your connection and try again.
+          </p>
+          <div className="flex gap-3 justify-center">
             <button
               onClick={() => router.back()}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium"
             >
-              {t("goBack")}
+              Go back
+            </button>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 rounded-lg bg-orange-500 text-white text-sm font-medium"
+            >
+              Retry
             </button>
           </div>
         </div>
-      </>
+      </div>
     );
   }
 
-  const availableTabs: TabType[] = [];
-  if (shopData.homeImageUrls && shopData.homeImageUrls.length > 0) {
-    availableTabs.push("home");
-  }
-  availableTabs.push("allProducts");
-  if (collections.length > 0) {
-    availableTabs.push("collections");
-  }
-  availableTabs.push("deals", "bestSellers", "reviews");
+  // ─────────────────────────────────────────────────────────────────────────
+  // Render
+  // ─────────────────────────────────────────────────────────────────────────
+  return (
+    <div
+      className={`min-h-screen ${isDark ? "bg-gray-950 text-white" : "bg-gray-50 text-gray-900"}`}
+    >
+      {/* ── Cover / Header ── */}
+      <div className="relative">
+        {/* Cover image */}
+        <div className="relative w-full h-44 sm:h-56 md:h-64 overflow-hidden">
+          {shopLoading ? (
+            <div
+              className={`w-full h-full ${isDark ? "bg-gray-800" : "bg-gray-200"} animate-pulse`}
+            />
+          ) : shopData?.coverImageUrls?.[0] ? (
+            <Image
+              src={shopData.coverImageUrls[0]}
+              alt={shopData.name}
+              fill
+              className="object-cover"
+              priority
+            />
+          ) : (
+            <div
+              className={`w-full h-full ${isDark ? "bg-gray-800" : "bg-gray-300"}`}
+            />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/60" />
+        </div>
 
-  const renderTabContent = () => {
-    switch (activeTab) {
-      case "home":
-        return (
-          <div className="space-y-4">
-            {shopData.homeImageUrls?.map((imageUrl, index) => (
-              <div key={index} className="relative">
-                <Image
-                  src={imageUrl}
-                  alt={`${shopData.name} home image ${index + 1}`}
-                  width={800}
-                  height={400}
-                  className="w-full h-auto rounded-lg"
-                />
-              </div>
-            ))}
-          </div>
-        );
+        {/* Back button */}
+        <button
+          onClick={() => router.back()}
+          className="absolute top-4 left-4 p-2 rounded-full bg-black/30 backdrop-blur-sm text-white hover:bg-black/50 transition-colors"
+        >
+          <ArrowLeft size={20} />
+        </button>
 
-      case "collections":
-        return (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {collections.map((collection) => (
-              <div
-                key={collection.id}
-                className={`p-4 rounded-lg border cursor-pointer hover:shadow-lg transition-shadow ${
-                  isDarkMode
-                    ? "bg-gray-800 border-gray-700 hover:border-gray-600"
-                    : "bg-white border-gray-200 hover:border-gray-300"
-                }`}
-              >
-                <div className="flex items-center space-x-4">
-                  <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-200">
-                    {collection.imageUrl ? (
-                      <Image
-                        src={collection.imageUrl}
-                        alt={collection.name}
-                        width={64}
-                        height={64}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <PhotoIcon className="w-6 h-6 text-gray-400" />
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <h3
-                      className={`font-semibold ${
-                        isDarkMode ? "text-white" : "text-gray-900"
-                      }`}
-                    >
-                      {collection.name}
-                    </h3>
-                    <p
-                      className={`text-sm ${
-                        isDarkMode ? "text-gray-400" : "text-gray-600"
-                      }`}
-                    >
-                      {collection.productIds.length} {t("products")}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        );
-
-      case "reviews":
-        return (
-          <div className="space-y-4">
-            {reviews.length === 0 ? (
-              <div className="text-center py-8">
-                <p
-                  className={`${
-                    isDarkMode ? "text-gray-400" : "text-gray-600"
-                  }`}
-                >
-                  {t("noReviewsYet")}
-                </p>
-              </div>
-            ) : (
-              reviews.map((review) => (
-                <div
-                  key={review.id}
-                  className={`p-4 rounded-lg ${
-                    isDarkMode ? "bg-gray-800" : "bg-white"
-                  }`}
-                >
-                  <div className="flex items-center space-x-2 mb-2">
-                    <div className="flex">
-                      {[...Array(5)].map((_, i) => (
-                        <StarIcon
-                          key={i}
-                          className={`w-4 h-4 ${
-                            i < review.rating
-                              ? "text-yellow-400 fill-current"
-                              : "text-gray-300"
-                          }`}
-                        />
-                      ))}
-                    </div>
-                    <span
-                      className={`text-sm ${
-                        isDarkMode ? "text-gray-400" : "text-gray-600"
-                      }`}
-                    >
-                      {new Date(
-                        review.timestamp.seconds * 1000
-                      ).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <p
-                    className={`${isDarkMode ? "text-white" : "text-gray-900"}`}
-                  >
-                    {review.review}
-                  </p>
-                  <div className="flex items-center justify-between mt-2">
-                    <span
-                      className={`text-xs ${
-                        isDarkMode ? "text-gray-400" : "text-gray-600"
-                      }`}
-                    >
-                      {review.userName || t("anonymous")}
-                    </span>
-                    <span
-                      className={`text-xs ${
-                        isDarkMode ? "text-gray-400" : "text-gray-600"
-                      }`}
-                    >
-                      {(review.likes || []).length} {t("likes")}
-                    </span>
-                  </div>
-                </div>
-              ))
+        {/* Shop info overlay */}
+        <div className="absolute bottom-4 left-4 flex items-end gap-3">
+          {/* Profile image */}
+          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden border-2 border-white shadow-lg flex-shrink-0 bg-gray-300">
+            {shopData?.profileImageUrl && (
+              <Image
+                src={shopData.profileImageUrl}
+                alt={shopData.name ?? ""}
+                width={64}
+                height={64}
+                className="w-full h-full object-cover"
+              />
             )}
           </div>
-        );
-
-      default: // Products tabs
-        return (
-          <div>
-            {isLoadingProducts || isSearching ? (
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <div key={i} className="animate-pulse">
-                    <div
-                      className={`h-48 rounded-t-lg ${
-                        isDarkMode ? "bg-gray-700" : "bg-gray-300"
-                      }`}
-                    />
-                    <div className="p-3 space-y-2">
-                      <div
-                        className={`h-4 rounded ${
-                          isDarkMode ? "bg-gray-700" : "bg-gray-300"
-                        }`}
-                      />
-                      <div
-                        className={`h-4 rounded w-3/4 ${
-                          isDarkMode ? "bg-gray-700" : "bg-gray-300"
-                        }`}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : products.length === 0 ? (
-              <div className="text-center py-12">
-                <p
-                  className={`text-lg ${
-                    isDarkMode ? "text-gray-400" : "text-gray-600"
-                  }`}
-                >
-                  {t("noProductsFound")}
-                </p>
+          {/* Name + stats */}
+          <div className="pb-0.5">
+            {shopLoading ? (
+              <div className="space-y-1.5">
+                <div className="h-5 w-40 bg-white/40 rounded animate-pulse" />
+                <div className="h-3 w-28 bg-white/30 rounded animate-pulse" />
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                  {products.map((product) => (
-                    <ProductCard
-                      key={product.id}
-                      product={product}
-                      onTap={() => router.push(`/productdetail/${product.id}`)}
-                      onFavoriteToggle={() => {}}
-                      onAddToCart={() => {}}
-                      onColorSelect={() => {}}
-                      showCartIcon={true}
-                      isFavorited={false}
-                      isInCart={false}
-                      portraitImageHeight={320}
+                <h1 className="text-white font-bold text-base sm:text-lg leading-tight drop-shadow">
+                  {shopData?.name}
+                </h1>
+                <div className="flex items-center gap-3 mt-0.5">
+                  <span className="flex items-center gap-1 text-white text-xs">
+                    <Star
+                      size={12}
+                      className="fill-yellow-400 text-yellow-400"
                     />
-                  ))}
+                    {(shopData?.averageRating ?? 0).toFixed(1)}
+                  </span>
+                  <span className="flex items-center gap-1 text-white text-xs">
+                    <Users size={12} />
+                    {shopData?.followerCount?.toLocaleString() ?? 0} followers
+                  </span>
                 </div>
-
-                {/* Loading more indicator */}
-                {isLoadingMore && (
-                  <div className="flex justify-center items-center py-8">
-                    <div className="flex space-x-2">
-                      <div
-                        className={`w-2 h-2 rounded-full animate-bounce ${
-                          isDarkMode ? "bg-orange-400" : "bg-orange-500"
-                        }`}
-                        style={{ animationDelay: "0ms" }}
-                      />
-                      <div
-                        className={`w-2 h-2 rounded-full animate-bounce ${
-                          isDarkMode ? "bg-orange-400" : "bg-orange-500"
-                        }`}
-                        style={{ animationDelay: "150ms" }}
-                      />
-                      <div
-                        className={`w-2 h-2 rounded-full animate-bounce ${
-                          isDarkMode ? "bg-orange-400" : "bg-orange-500"
-                        }`}
-                        style={{ animationDelay: "300ms" }}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* Infinite scroll trigger - only show when not searching */}
-                {!searchQuery.trim() && hasMoreProducts && !isLoadingMore && (
-                  <div ref={observerTarget} className="h-10" />
-                )}
               </>
             )}
           </div>
-        );
-    }
-  };
+        </div>
+      </div>
 
-  return (
-    <>
-      <SecondHeader />
+      {/* ── Search bar ── */}
       <div
-        className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
+        className={`sticky top-0 z-20 px-4 py-2.5 ${
+          isDark
+            ? "bg-gray-900/95 border-b border-white/10"
+            : "bg-white/95 border-b border-gray-100"
+        } backdrop-blur-xl`}
       >
-        <div className="max-w-6xl mx-auto">
-          <div>
-            {/* Header with Cover Image */}
-            <div className="relative h-80 hover:h-[32rem] overflow-hidden bg-gradient-to-br from-orange-500 to-pink-500 transition-all duration-500 ease-in-out cursor-pointer group">
-              {shopData.coverImageUrls &&
-                shopData.coverImageUrls.length > 0 && (
-                  <>
-                    {/* Image */}
-                    <Image
-                      src={shopData.coverImageUrls[0]}
-                      alt={`${shopData.name} cover`}
-                      fill
-                      sizes="100vw"
-                      className="object-cover object-center"
-                      priority
-                      unoptimized
-                      onLoad={() => console.log("✅ Next Image loaded")}
-                      onError={() => console.error("❌ Next Image failed")}
-                    />
-
-                    {/* Overlay using pseudo-element approach */}
-                    <div className="absolute inset-0 bg-black/30 group-hover:bg-black/10 transition-all duration-500 pointer-events-none" />
-                  </>
-                )}
-
-              {/* Back Button */}
-              <button
-                onClick={handleBack}
-                className="absolute top-4 left-4 z-20 w-10 h-10 bg-black/50 rounded-full flex items-center justify-center text-white hover:bg-black/70 transition-all"
-              >
-                <ArrowLeftIcon className="w-6 h-6" />
-              </button>
-
-              {/* Shop Info */}
-              <div className="absolute bottom-4 left-4 right-4 z-20">
-                <div className="flex items-end space-x-4">
-                  {/* Profile Image */}
-                  <div className="relative w-24 h-24 rounded-full border-4 border-white overflow-hidden shadow-lg bg-white">
-                    {shopData.profileImageUrl ? (
-                      <Image
-                        src={shopData.profileImageUrl}
-                        alt={shopData.name}
-                        fill
-                        className="object-cover object-center"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-gray-300 flex items-center justify-center">
-                        <span className="text-2xl">🏪</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Shop Details */}
-                  <div className="flex-1 text-white">
-                    <h1 className="text-2xl font-bold mb-2">{shopData.name}</h1>
-                    <div className="flex items-center space-x-4 text-sm">
-                      <div className="flex items-center space-x-1">
-                        <StarIcon className="w-4 h-4 text-yellow-400" />
-                        <span>{shopData.averageRating.toFixed(1)}</span>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <UsersIcon className="w-4 h-4" />
-                        <span>
-                          {formatNumber(shopData.followerCount)}{" "}
-                          {t("followers")}
-                        </span>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <EyeIcon className="w-4 h-4" />
-                        <span>
-                          {formatNumber(shopData.clickCount)} {t("views")}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Follow Button */}
-                  <button
-                    onClick={handleFavoriteToggle}
-                    className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                      isFavorite
-                        ? "bg-red-500 text-white hover:bg-red-600"
-                        : "bg-white text-gray-900 hover:bg-gray-100"
-                    }`}
-                  >
-                    <div className="flex items-center space-x-2">
-                      {isFavorite ? (
-                        <HeartSolidIcon className="w-4 h-4" />
-                      ) : (
-                        <HeartIcon className="w-4 h-4" />
-                      )}
-                      <span>{isFavorite ? t("following") : t("follow")}</span>
-                    </div>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Search Bar */}
-            <div
-              className={`sticky top-0 z-10 px-4 py-3 transition-all ${
-                isScrolled
-                  ? "bg-opacity-95 backdrop-blur-sm shadow-sm"
-                  : "bg-opacity-50"
-              } ${isDarkMode ? "bg-gray-900" : "bg-white"}`}
+        <div
+          className={`flex items-center gap-2 px-3 py-2 rounded-xl ${
+            isDark ? "bg-gray-800" : "bg-gray-100"
+          }`}
+        >
+          {isLoadingProducts && searchQuery ? (
+            <RefreshCw
+              size={16}
+              className="text-orange-500 animate-spin flex-shrink-0"
+            />
+          ) : (
+            <Search
+              size={16}
+              className={`flex-shrink-0 ${isDark ? "text-gray-400" : "text-gray-500"}`}
+            />
+          )}
+          <input
+            type="text"
+            placeholder="Search in store…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className={`flex-1 text-sm bg-transparent outline-none placeholder:text-gray-400 ${
+              isDark ? "text-white" : "text-gray-900"
+            }`}
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className={`p-0.5 rounded-full ${isDark ? "hover:bg-gray-700" : "hover:bg-gray-200"}`}
             >
-              <div className="relative">
-                <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder={t("searchInStore")}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className={`w-full pl-10 pr-4 py-3 rounded-full border ${
-                    isDarkMode
-                      ? "bg-gray-800 border-gray-700 text-white placeholder-gray-400"
-                      : "bg-white border-gray-200 text-gray-900 placeholder-gray-500"
-                  }`}
-                />
-              </div>
-            </div>
+              <X
+                size={14}
+                className={isDark ? "text-gray-400" : "text-gray-500"}
+              />
+            </button>
+          )}
+        </div>
+      </div>
 
-            {/* Tabs */}
-            <div
-              className={`sticky top-16 z-10 border-b ${
-                isDarkMode
-                  ? "bg-gray-900 border-gray-700"
-                  : "bg-white border-gray-200"
-              }`}
-            >
-              <div className="flex overflow-x-auto">
-                {availableTabs.map((tab) => (
-                  <button
-                    key={tab}
-                    onClick={() => handleTabChange(tab)}
-                    className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-                      activeTab === tab
-                        ? "border-orange-500 text-orange-500"
-                        : isDarkMode
-                        ? "border-transparent text-gray-400 hover:text-gray-300"
-                        : "border-transparent text-gray-600 hover:text-gray-900"
-                    }`}
-                  >
-                    {t(tab)}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Filter Row */}
-            {["allProducts", "deals", "bestSellers"].includes(activeTab) && (
-              <div
-                className={`px-4 py-3 border-b ${
-                  isDarkMode ? "border-gray-700" : "border-gray-200"
-                }`}
-              >
-                <div className="flex space-x-3 relative">
-                  {/* Sort Button with Dropdown */}
-                  <div className="relative" ref={sortDropdownRef}>
-                    <button
-                      onClick={() => setShowSortDropdown(!showSortDropdown)}
-                      className={`flex items-center space-x-2 px-3 py-2 rounded-lg border ${
-                        isDarkMode
-                          ? "border-gray-700 text-gray-300 hover:bg-gray-800"
-                          : "border-gray-300 text-gray-700 hover:bg-gray-50"
-                      }`}
-                    >
-                      <AdjustmentsHorizontalIcon className="w-4 h-4 text-orange-500" />
-                      <span>{t("sort")}</span>
-                    </button>
-
-                    {/* Sort Dropdown */}
-                    <div
-                      className={`absolute top-full left-0 mt-2 w-56 rounded-lg shadow-xl border z-50 transition-all duration-200 origin-top ${
-                        showSortDropdown
-                          ? "opacity-100 scale-y-100 pointer-events-auto"
-                          : "opacity-0 scale-y-95 pointer-events-none"
-                      } ${
-                        isDarkMode
-                          ? "bg-gray-800 border-gray-700"
-                          : "bg-white border-gray-200"
-                      }`}
-                    >
-                      <div className="p-2">
-                        <button
-                          onClick={() => handleSortChange("date")}
-                          className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
-                            sortOption === "date"
-                              ? "bg-orange-500 text-white"
-                              : isDarkMode
-                              ? "text-gray-300 hover:bg-gray-700"
-                              : "text-gray-700 hover:bg-gray-100"
-                          }`}
-                        >
-                          {t("sortDateNewest")}
-                        </button>
-                        <button
-                          onClick={() => handleSortChange("alphabetical")}
-                          className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
-                            sortOption === "alphabetical"
-                              ? "bg-orange-500 text-white"
-                              : isDarkMode
-                              ? "text-gray-300 hover:bg-gray-700"
-                              : "text-gray-700 hover:bg-gray-100"
-                          }`}
-                        >
-                          {t("sortAlphabetical")}
-                        </button>
-                        <button
-                          onClick={() => handleSortChange("priceLowHigh")}
-                          className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
-                            sortOption === "priceLowHigh"
-                              ? "bg-orange-500 text-white"
-                              : isDarkMode
-                              ? "text-gray-300 hover:bg-gray-700"
-                              : "text-gray-700 hover:bg-gray-100"
-                          }`}
-                        >
-                          {t("sortPriceLowHigh")}
-                        </button>
-                        <button
-                          onClick={() => handleSortChange("priceHighLow")}
-                          className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
-                            sortOption === "priceHighLow"
-                              ? "bg-orange-500 text-white"
-                              : isDarkMode
-                              ? "text-gray-300 hover:bg-gray-700"
-                              : "text-gray-700 hover:bg-gray-100"
-                          }`}
-                        >
-                          {t("sortPriceHighLow")}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Category Filter Button */}
-                  <button
-                    onClick={() => setShowCategoryFilter(!showCategoryFilter)}
-                    className={`flex items-center space-x-2 px-3 py-2 rounded-lg border ${
-                      isDarkMode
-                        ? "border-gray-700 text-gray-300 hover:bg-gray-800"
-                        : "border-gray-300 text-gray-700 hover:bg-gray-50"
-                    } ${selectedCategory ? "ring-2 ring-orange-500" : ""}`}
-                  >
-                    <FunnelIcon className="w-4 h-4 text-orange-500" />
-                    <span>{t("filter")}</span>
-                    {selectedCategory && (
-                      <span className="ml-1 px-2 py-0.5 text-xs bg-orange-600 text-white rounded-full">
-                        1
-                      </span>
-                    )}
-                  </button>
-
-                  {/* Clear Filters */}
-                  {selectedCategory && (
-                    <button
-                      onClick={() => handleCategoryFilter(null)}
-                      className={`text-sm px-3 py-2 rounded-lg transition-colors ${
-                        isDarkMode
-                          ? "text-gray-400 hover:text-white hover:bg-gray-800"
-                          : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                      }`}
-                    >
-                      Clear Filter
-                    </button>
-                  )}
-                </div>
-
-                {/* Category Filter Panel */}
-                <div
-                  className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                    showCategoryFilter
-                      ? "max-h-96 opacity-100 mt-3"
-                      : "max-h-0 opacity-0"
+      {/* ── Tabs ── */}
+      <div
+        className={`sticky top-[57px] z-20 ${isDark ? "bg-gray-900 border-b border-white/10" : "bg-white border-b border-gray-100"}`}
+      >
+        <div className="overflow-x-auto scrollbar-hide">
+          <div className="flex gap-0 min-w-max px-2">
+            {tabs.map((tab) => {
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+                    isActive
+                      ? "border-orange-500 text-orange-500"
+                      : `border-transparent ${isDark ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"}`
                   }`}
                 >
+                  {tab.icon}
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Filter row — only for product tabs */}
+        {isProductTab && (
+          <div
+            className={`flex items-center gap-2 px-4 pb-2.5 pt-1 ${
+              isDark ? "bg-gray-900" : "bg-white"
+            }`}
+          >
+            {/* Sort button */}
+            <div className="relative" onClick={(e) => e.stopPropagation()}>
+              <button
+                onClick={() => {
+                  setShowSortDropdown((v) => !v);
+                  setShowCategoryMenu(false);
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                  sortOption !== "date"
+                    ? "border-orange-400 text-orange-500 bg-orange-50 dark:bg-orange-900/20"
+                    : isDark
+                      ? "border-gray-600 text-gray-300"
+                      : "border-gray-300 text-gray-600"
+                }`}
+              >
+                <ChevronDown size={12} />
+                {SORT_OPTIONS.find((o) => o.value === sortOption)?.label ??
+                  "Sort"}
+              </button>
+              {showSortDropdown && (
+                <div
+                  className={`absolute top-full left-0 mt-1.5 w-40 rounded-xl shadow-xl border overflow-hidden z-50 ${
+                    isDark
+                      ? "bg-gray-800 border-gray-700"
+                      : "bg-white border-gray-100"
+                  }`}
+                >
+                  {SORT_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => {
+                        setSortOption(opt.value);
+                        setShowSortDropdown(false);
+                      }}
+                      className={`w-full text-left px-4 py-2.5 text-sm flex items-center justify-between transition-colors ${
+                        sortOption === opt.value
+                          ? "text-orange-500 font-medium"
+                          : isDark
+                            ? "text-gray-300 hover:bg-gray-700"
+                            : "text-gray-700 hover:bg-gray-50"
+                      }`}
+                    >
+                      {opt.label}
+                      {sortOption === opt.value && (
+                        <Check size={13} className="text-orange-500" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Filter button */}
+            <button
+              onClick={() => setShowMobileSidebar(true)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                activeFilterCount > 0
+                  ? "border-orange-400 text-orange-500 bg-orange-50 dark:bg-orange-900/20"
+                  : isDark
+                    ? "border-gray-600 text-gray-300"
+                    : "border-gray-300 text-gray-600"
+              }`}
+            >
+              <Filter size={12} />
+              Filter{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+            </button>
+
+            {/* Category button */}
+            {availableSubcategories.length > 0 && (
+              <div className="relative" onClick={(e) => e.stopPropagation()}>
+                <button
+                  onClick={() => {
+                    setShowCategoryMenu((v) => !v);
+                    setShowSortDropdown(false);
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                    selectedSubcategory
+                      ? "border-orange-400 text-orange-500 bg-orange-50 dark:bg-orange-900/20"
+                      : isDark
+                        ? "border-gray-600 text-gray-300"
+                        : "border-gray-300 text-gray-600"
+                  }`}
+                >
+                  <Layers size={12} />
+                  {selectedSubcategory ?? "Category"}
+                </button>
+                {showCategoryMenu && (
                   <div
-                    ref={categoryFilterRef}
-                    className={`p-4 rounded-lg border transform transition-transform duration-200 ${
-                      showCategoryFilter ? "scale-100" : "scale-95"
-                    } ${
-                      isDarkMode
+                    className={`absolute top-full left-0 mt-1.5 w-48 rounded-xl shadow-xl border overflow-hidden z-50 max-h-64 overflow-y-auto ${
+                      isDark
                         ? "bg-gray-800 border-gray-700"
-                        : "bg-white border-gray-200"
+                        : "bg-white border-gray-100"
                     }`}
                   >
-                    <h3
-                      className={`font-semibold mb-3 ${
-                        isDarkMode ? "text-white" : "text-gray-900"
+                    <button
+                      onClick={() => {
+                        setSelectedSubcategory(null);
+                        setShowCategoryMenu(false);
+                      }}
+                      className={`w-full text-left px-4 py-2.5 text-sm flex items-center justify-between transition-colors ${
+                        !selectedSubcategory
+                          ? "text-orange-500 font-medium"
+                          : isDark
+                            ? "text-gray-300 hover:bg-gray-700"
+                            : "text-gray-700 hover:bg-gray-50"
                       }`}
                     >
-                      {t("category")}
-                    </h3>
-                    <div className="flex flex-wrap gap-2">
-                      {AllInOneCategoryData.kCategories.map((cat) => (
-                        <button
-                          key={cat.key}
-                          onClick={() => handleCategoryFilter(cat.key)}
-                          className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                            selectedCategory === cat.key
-                              ? "bg-orange-500 text-white"
-                              : isDarkMode
-                              ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                          }`}
-                        >
-                          {tRoot(getCategoryTranslationKey(cat.key))}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Active Category Filter Display */}
-                {selectedCategory && (
-                  <div className="mt-3 flex items-center gap-2">
-                    <div
-                      className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm ${
-                        isDarkMode
-                          ? "bg-orange-900/50 text-orange-300"
-                          : "bg-orange-100 text-orange-800"
-                      }`}
-                    >
-                      <span>
-                        {tRoot(getCategoryTranslationKey(selectedCategory))}
-                      </span>
+                      All
+                      {!selectedSubcategory && (
+                        <Check size={13} className="text-orange-500" />
+                      )}
+                    </button>
+                    {availableSubcategories.map((cat) => (
                       <button
-                        onClick={() => handleCategoryFilter(null)}
-                        className="ml-1 hover:opacity-70"
+                        key={cat}
+                        onClick={() => {
+                          setSelectedSubcategory(cat);
+                          setShowCategoryMenu(false);
+                        }}
+                        className={`w-full text-left px-4 py-2.5 text-sm flex items-center justify-between transition-colors ${
+                          selectedSubcategory === cat
+                            ? "text-orange-500 font-medium"
+                            : isDark
+                              ? "text-gray-300 hover:bg-gray-700"
+                              : "text-gray-700 hover:bg-gray-50"
+                        }`}
                       >
-                        <XMarkIcon className="w-4 h-4" />
+                        {cat}
+                        {selectedSubcategory === cat && (
+                          <Check size={13} className="text-orange-500" />
+                        )}
                       </button>
-                    </div>
+                    ))}
                   </div>
                 )}
               </div>
             )}
-
-            {/* Content */}
-            <div className="p-4">{renderTabContent()}</div>
           </div>
+        )}
+      </div>
+
+      {/* ── Main layout ── */}
+      <div className="flex max-w-7xl mx-auto">
+        {/* ── Desktop FilterSidebar ── */}
+        {isProductTab && (
+          <div className="hidden lg:block w-60 flex-shrink-0">
+            <FilterSidebar
+              category={shopData?.categories?.[0] ?? ""}
+              buyerCategory=""
+              filters={filters}
+              onFiltersChange={setFilters}
+              specFacets={specFacets}
+              isDarkMode={isDark}
+              className="w-60"
+            />
+          </div>
+        )}
+
+        {/* ── Mobile sidebar FAB ── */}
+        {isProductTab && (
+          <div className="lg:hidden fixed bottom-6 right-5 z-50">
+            <button
+              onClick={() => setShowMobileSidebar(true)}
+              className="relative p-3.5 rounded-full shadow-xl bg-orange-500 text-white"
+            >
+              <Filter size={20} />
+              {activeFilterCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+          </div>
+        )}
+
+        {/* ── Mobile sidebar drawer ── */}
+        {isMobile && (
+          <FilterSidebar
+            category={shopData?.categories?.[0] ?? ""}
+            buyerCategory=""
+            filters={filters}
+            onFiltersChange={(f) => {
+              setFilters(f);
+              setShowMobileSidebar(false);
+            }}
+            specFacets={specFacets}
+            isOpen={showMobileSidebar}
+            onClose={() => setShowMobileSidebar(false)}
+            isDarkMode={isDark}
+          />
+        )}
+
+        {/* ── Tab content ── */}
+        <div className="flex-1 min-w-0 px-3 sm:px-4 py-4">
+          {/* ───── HOME TAB ───── */}
+          {activeTab === "home" && (
+            <div className="space-y-2">
+              {(shopData?.homeImageUrls ?? []).length === 0 ? (
+                <EmptyState
+                  icon={<Home size={64} strokeWidth={1} />}
+                  message="No home content available"
+                  isDark={isDark}
+                />
+              ) : (
+                shopData!.homeImageUrls!.map((url, i) => {
+                  const linkedProductId = shopData?.homeImageLinks?.[url];
+                  const img = (
+                    <Image
+                      key={i}
+                      src={url}
+                      alt={`Home image ${i + 1}`}
+                      width={1200}
+                      height={600}
+                      className="w-full object-cover"
+                    />
+                  );
+                  return linkedProductId ? (
+                    <Link key={i} href={`/product/${linkedProductId}`}>
+                      {img}
+                    </Link>
+                  ) : (
+                    <div key={i}>{img}</div>
+                  );
+                })
+              )}
+            </div>
+          )}
+
+          {/* ───── ALL PRODUCTS / DEALS / BEST SELLERS ───── */}
+          {isProductTab && (
+            <>
+              {/* Search results header */}
+              {debouncedQuery && searchResultCount !== null && (
+                <div
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg mb-3 ${
+                    isDark
+                      ? "bg-teal-900/30 border border-teal-700/40"
+                      : "bg-teal-50 border border-teal-200"
+                  }`}
+                >
+                  <Search size={14} className="text-teal-500 flex-shrink-0" />
+                  <span className="text-sm font-medium text-teal-600 dark:text-teal-400">
+                    {searchResultCount}{" "}
+                    {searchResultCount === 1 ? "result" : "results"} for &ldquo;
+                    {debouncedQuery}&rdquo;
+                  </span>
+                </div>
+              )}
+
+              {/* Active filter chips */}
+              {activeFilterCount > 0 && (
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {filters.colors.map((c) => (
+                    <span
+                      key={c}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full text-xs"
+                    >
+                      {c}
+                      <button
+                        onClick={() =>
+                          setFilters((f) => ({
+                            ...f,
+                            colors: f.colors.filter((x) => x !== c),
+                          }))
+                        }
+                      >
+                        <X size={10} />
+                      </button>
+                    </span>
+                  ))}
+                  {filters.brands.map((b) => (
+                    <span
+                      key={b}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full text-xs"
+                    >
+                      {b}
+                      <button
+                        onClick={() =>
+                          setFilters((f) => ({
+                            ...f,
+                            brands: f.brands.filter((x) => x !== b),
+                          }))
+                        }
+                      >
+                        <X size={10} />
+                      </button>
+                    </span>
+                  ))}
+                  {selectedSubcategory && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full text-xs">
+                      {selectedSubcategory}
+                      <button onClick={() => setSelectedSubcategory(null)}>
+                        <X size={10} />
+                      </button>
+                    </span>
+                  )}
+                  {(filters.minPrice !== undefined ||
+                    filters.maxPrice !== undefined) && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full text-xs">
+                      {filters.minPrice ?? "0"} – {filters.maxPrice ?? "∞"} TL
+                      <button
+                        onClick={() =>
+                          setFilters((f) => ({
+                            ...f,
+                            minPrice: undefined,
+                            maxPrice: undefined,
+                          }))
+                        }
+                      >
+                        <X size={10} />
+                      </button>
+                    </span>
+                  )}
+                  <button
+                    onClick={handleClearAllFilters}
+                    className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                      isDark
+                        ? "border-gray-600 text-gray-400 hover:bg-gray-700"
+                        : "border-gray-300 text-gray-500 hover:bg-gray-100"
+                    }`}
+                  >
+                    Clear all
+                  </button>
+                </div>
+              )}
+
+              {/* Products grid */}
+              {isLoadingProducts && products.length === 0 ? (
+                <ProductShimmer isDark={isDark} />
+              ) : productError ? (
+                <div className="flex flex-col items-center justify-center min-h-64 gap-4">
+                  <WifiOff
+                    size={48}
+                    className={isDark ? "text-gray-600" : "text-gray-300"}
+                  />
+                  <p
+                    className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}
+                  >
+                    Failed to load products
+                  </p>
+                  <button
+                    onClick={() => fetchProducts(0, true)}
+                    className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : activeProducts.length === 0 ? (
+                <EmptyState
+                  icon={<ShoppingBag size={64} strokeWidth={1} />}
+                  message={
+                    debouncedQuery
+                      ? `No results for "${debouncedQuery}"`
+                      : activeTab === "deals"
+                        ? "No deals available right now"
+                        : activeTab === "bestSellers"
+                          ? "No best sellers yet"
+                          : "No products found"
+                  }
+                  subMessage={
+                    activeFilterCount > 0
+                      ? "Try removing some filters"
+                      : undefined
+                  }
+                  onClear={
+                    activeFilterCount > 0 ? handleClearAllFilters : undefined
+                  }
+                  isDark={isDark}
+                />
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 lg:gap-4">
+                  {activeProducts.map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      isDarkMode={isDark}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Load more spinner */}
+              {isLoadingMore && (
+                <div className="flex justify-center py-8">
+                  <RefreshCw
+                    size={24}
+                    className="text-orange-500 animate-spin"
+                  />
+                </div>
+              )}
+
+              {/* End of results */}
+              {!hasMore && !isLoadingProducts && products.length > 0 && (
+                <p
+                  className={`text-center text-xs py-8 ${isDark ? "text-gray-600" : "text-gray-400"}`}
+                >
+                  All products loaded
+                </p>
+              )}
+            </>
+          )}
+
+          {/* ───── COLLECTIONS TAB ───── */}
+          {activeTab === "collections" && (
+            <>
+              {collectionsLoading ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className={`h-20 rounded-xl animate-pulse ${isDark ? "bg-gray-800" : "bg-gray-200"}`}
+                    />
+                  ))}
+                </div>
+              ) : collections.length === 0 ? (
+                <EmptyState
+                  icon={<Layers size={64} strokeWidth={1} />}
+                  message="No collections available"
+                  isDark={isDark}
+                />
+              ) : (
+                <div className="space-y-3">
+                  {collections.map((col) => (
+                    <Link
+                      key={col.id}
+                      href={`/collection/${col.id}?shopId=${shopId}&name=${encodeURIComponent(col.name)}`}
+                      className={`flex items-center gap-4 p-4 rounded-xl shadow-sm transition-colors ${
+                        isDark
+                          ? "bg-gray-800 hover:bg-gray-750"
+                          : "bg-white hover:bg-gray-50"
+                      }`}
+                    >
+                      <div
+                        className={`w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 ${
+                          isDark ? "bg-gray-700" : "bg-gray-100"
+                        }`}
+                      >
+                        {col.imageUrl ? (
+                          <Image
+                            src={col.imageUrl}
+                            alt={col.name}
+                            width={64}
+                            height={64}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Layers
+                              size={24}
+                              className={
+                                isDark ? "text-gray-600" : "text-gray-400"
+                              }
+                            />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p
+                          className={`font-semibold text-sm truncate ${isDark ? "text-white" : "text-gray-900"}`}
+                        >
+                          {col.name}
+                        </p>
+                        <p
+                          className={`text-xs mt-0.5 ${isDark ? "text-gray-400" : "text-gray-500"}`}
+                        >
+                          {col.productIds?.length ?? 0}{" "}
+                          {(col.productIds?.length ?? 0) === 1
+                            ? "product"
+                            : "products"}
+                        </p>
+                      </div>
+                      <ChevronDown
+                        size={16}
+                        className={`rotate-[-90deg] flex-shrink-0 ${isDark ? "text-gray-500" : "text-gray-400"}`}
+                      />
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ───── REVIEWS TAB ───── */}
+          {activeTab === "reviews" && (
+            <>
+              {reviewsLoading ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className={`h-24 rounded-xl animate-pulse ${isDark ? "bg-gray-800" : "bg-gray-200"}`}
+                    />
+                  ))}
+                </div>
+              ) : reviews.length === 0 ? (
+                <EmptyState
+                  icon={<MessageSquare size={64} strokeWidth={1} />}
+                  message="No reviews yet"
+                  isDark={isDark}
+                />
+              ) : (
+                <div className="space-y-3">
+                  {reviews.map((review) => (
+                    <ReviewCard
+                      key={review.id}
+                      review={review}
+                      shopId={shopId}
+                      isDark={isDark}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
-    </>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ReviewCard — mirrors Flutter's _ReviewTile
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ReviewCard({
+  review,
+  shopId,
+  isDark,
+}: {
+  review: Review;
+  shopId: string;
+  isDark: boolean;
+}) {
+  const [likeCount, setLikeCount] = useState(review.likes?.length ?? 0);
+  const [liked, setLiked] = useState(false);
+
+  const handleLike = async () => {
+    const next = !liked;
+    setLiked(next);
+    setLikeCount((c) => c + (next ? 1 : -1));
+    try {
+      await fetch(`/api/shops/${shopId}/reviews/${review.id}/like`, {
+        method: "POST",
+        body: JSON.stringify({ like: next }),
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch {
+      // revert on error
+      setLiked(!next);
+      setLikeCount((c) => c + (next ? -1 : 1));
+    }
+  };
+
+  const date = new Date(review.timestamp).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+
+  return (
+    <div className={`p-4 rounded-xl ${isDark ? "bg-gray-800" : "bg-gray-100"}`}>
+      <div className="flex items-center justify-between mb-2">
+        <StarRating rating={review.rating} />
+        <span
+          className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}
+        >
+          {date}
+        </span>
+      </div>
+      <p
+        className={`text-sm leading-relaxed mb-3 ${isDark ? "text-gray-200" : "text-gray-700"}`}
+      >
+        {review.review}
+      </p>
+      <div className="flex items-center gap-4">
+        <button
+          onClick={handleLike}
+          className={`flex items-center gap-1.5 text-xs transition-colors ${
+            liked
+              ? "text-blue-500"
+              : isDark
+                ? "text-gray-400 hover:text-gray-200"
+                : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          <ThumbsUp size={13} className={liked ? "fill-blue-500" : ""} />
+          {likeCount}
+        </button>
+        <button
+          className={`flex items-center gap-1.5 text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}
+        >
+          <Globe size={13} />
+          Translate
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function StarRating({ rating, size = 13 }: { rating: number; size?: number }) {
+  return (
+    <span className="inline-flex gap-0.5">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <Star
+          key={i}
+          size={size}
+          className={
+            i < Math.round(rating)
+              ? "fill-amber-400 text-amber-400"
+              : "text-gray-300"
+          }
+        />
+      ))}
+    </span>
   );
 }

@@ -1,500 +1,397 @@
-// src/app/api/shops/[shopId]/route.ts
+// src/app/api/shopProducts/route.ts
 //
 // ═══════════════════════════════════════════════════════════════════════════
-// SHOP DETAIL API - PRODUCTION OPTIMIZED
-// ═══════════════════════════════════════════════════════════════════════════
+// SHOP PRODUCTS API  (100 % Typesense — scoped to shopId)
 //
-// OPTIMIZATIONS:
-// 1. Request Deduplication - Prevents duplicate in-flight requests
-// 2. Retry with Exponential Backoff - Handles transient Firestore failures
-// 3. Stale-While-Revalidate Caching - Fast responses with background refresh
-// 4. Request Timeout - Prevents hanging requests
-// 5. Rate Limiting Integration - Preserved from original
-// 6. Structured Error Handling - Consistent error responses
+// Mirrors Flutter's ShopProvider._fetchProductsFromTypesense():
+//   • Always Typesense — no Firestore fallback needed server-side
+//   • shopId:=$shopId baked into every query (additionalFilterBy pattern)
+//   • Facet filters: gender, subcategory, brands, colors, dynamic spec
+//   • Numeric / string filters: price range + shopId scope
+//   • specFacets scoped to shopId on page 0
 //
+// Search (debounced in-store):
+//   Mirrors Flutter's ShopProvider._performTypesenseSearch()
+//   Uses query param; all active filters still applied.
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { NextRequest, NextResponse } from "next/server";
-import { getFirestoreAdmin } from "@/lib/firebase-admin";
-import { checkRateLimit } from "@/lib/auth-middleware";
+import TypeSenseServiceManager from "@/lib/typesense_service_manager";
+import { ProductUtils } from "@/app/models/Product";
+import type { FacetCount } from "@/app/components/FilterSideBar";
 
-// ============= CONFIGURATION =============
+// ─────────────────────────────────────────────────────────────────────────────
+// Config
+// ─────────────────────────────────────────────────────────────────────────────
 
 const CONFIG = {
-  // Caching
-  CACHE_TTL: 2 * 60 * 1000, // 2 minutes - fresh
-  STALE_TTL: 5 * 60 * 1000, // 5 minutes - stale but usable
-  MAX_CACHE_SIZE: 100,
-
-  // Resilience
-  REQUEST_TIMEOUT: 8000, // 8 seconds
-  MAX_RETRIES: 2,
-  BASE_RETRY_DELAY: 100,
-
-  // Rate Limiting
-  RATE_LIMIT_MAX: 100,
-  RATE_LIMIT_WINDOW: 60000, // 1 minute
+  DEFAULT_HITS: 20,
+  MAX_HITS: 50,
+  CACHE_TTL: 30 * 1000, // 30s — shop products change often
+  STALE_TTL: 2 * 60 * 1000,
+  MAX_CACHE: 500,
+  TIMEOUT_MS: 8_000,
 } as const;
 
-// ============= TYPES =============
+// ─────────────────────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────────────────────
 
-interface ShopResponse {
-  id: string;
-  name: string;
-  profileImageUrl: string;
-  averageRating: number;
-  description: string;
-  ownerId: string;
-  coOwners: string[];
-  editors: string[];
-  viewers: string[];
-  createdAt: string | null;
-  updatedAt: string | null;
-  isActive: boolean;
-  contactEmail: string;
-  contactPhone: string;
-  address: Record<string, unknown>;
-  socialLinks: Record<string, unknown>;
-  businessHours: Record<string, unknown>;
-  categories: string[];
-  totalProducts: number;
-  totalSales: number;
-  source?: "cache" | "stale" | "dedupe" | "fresh";
+type SpecFilters = Record<string, string[]>;
+
+interface ShopProductsParams {
+  shopId: string;
+  query: string;
+  page: number;
+  hitsPerPage: number;
+  sortOption: string;
+  gender: string | null;
+  subcategory: string | null;
+  brands: string[];
+  colors: string[];
+  specFilters: SpecFilters;
+  minPrice: number | null;
+  maxPrice: number | null;
+}
+
+interface ShopProductsResponse {
+  products: ReturnType<typeof ProductUtils.fromTypeSense>[];
+  specFacets?: Record<string, FacetCount[]>;
+  hasMore: boolean;
+  page: number;
+  total: number;
+  source?: string;
   timing?: number;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Cache
+// ─────────────────────────────────────────────────────────────────────────────
+
 interface CacheEntry {
-  data: ShopResponse;
-  timestamp: number;
+  data: ShopProductsResponse;
+  ts: number;
+  accessed: number;
+}
+const cache = new Map<string, CacheEntry>();
+const pending = new Map<string, Promise<ShopProductsResponse>>();
+
+function cacheKey(p: ShopProductsParams): string {
+  return JSON.stringify({
+    sid: p.shopId,
+    q: p.query,
+    pg: p.page,
+    hpp: p.hitsPerPage,
+    so: p.sortOption,
+    g: p.gender ?? "",
+    sub: p.subcategory ?? "",
+    br: [...p.brands].sort().join(","),
+    col: [...p.colors].sort().join(","),
+    sf: JSON.stringify(
+      Object.fromEntries(
+        Object.entries(p.specFilters).map(([k, v]) => [k, [...v].sort()]),
+      ),
+    ),
+    minP: p.minPrice ?? "",
+    maxP: p.maxPrice ?? "",
+  });
 }
 
-interface CacheResult {
-  data: ShopResponse | null;
-  status: "fresh" | "stale" | "expired" | "miss";
+function getCache(
+  key: string,
+): { data: ShopProductsResponse; stale: boolean } | null {
+  const e = cache.get(key);
+  if (!e) return null;
+  const age = Date.now() - e.ts;
+  if (age > CONFIG.STALE_TTL) {
+    cache.delete(key);
+    return null;
+  }
+  e.accessed = Date.now();
+  return { data: e.data, stale: age > CONFIG.CACHE_TTL };
 }
 
-// ============= REQUEST DEDUPLICATION =============
-
-const pendingRequests = new Map<string, Promise<ShopResponse>>();
-
-// ============= RESPONSE CACHING =============
-
-const responseCache = new Map<string, CacheEntry>();
-
-function getCachedResponse(shopId: string): CacheResult {
-  const entry = responseCache.get(shopId);
-
-  if (!entry) {
-    return { data: null, status: "miss" };
+function setCache(key: string, data: ShopProductsResponse): void {
+  if (cache.size >= CONFIG.MAX_CACHE) {
+    const sorted = [...cache.entries()].sort(
+      (a, b) => a[1].accessed - b[1].accessed,
+    );
+    sorted
+      .slice(0, Math.floor(CONFIG.MAX_CACHE * 0.2))
+      .forEach(([k]) => cache.delete(k));
   }
-
-  const age = Date.now() - entry.timestamp;
-
-  if (age <= CONFIG.CACHE_TTL) {
-    return { data: entry.data, status: "fresh" };
-  }
-
-  if (age <= CONFIG.STALE_TTL) {
-    return { data: entry.data, status: "stale" };
-  }
-
-  responseCache.delete(shopId);
-  return { data: null, status: "expired" };
+  cache.set(key, { data, ts: Date.now(), accessed: Date.now() });
 }
 
-function cacheResponse(shopId: string, data: ShopResponse): void {
-  // LRU eviction if needed
-  if (responseCache.size >= CONFIG.MAX_CACHE_SIZE) {
-    const firstKey = responseCache.keys().next().value;
-    if (firstKey) responseCache.delete(firstKey);
-  }
+// ─────────────────────────────────────────────────────────────────────────────
+// Param extraction
+// ─────────────────────────────────────────────────────────────────────────────
 
-  responseCache.set(shopId, { data, timestamp: Date.now() });
-}
+function extractParams(sp: URLSearchParams): ShopProductsParams | null {
+  const shopId = sp.get("shopId")?.trim() || "";
+  if (!shopId) return null;
 
-// ============= RETRY LOGIC =============
-
-async function withRetry<T>(
-  fn: () => Promise<T>,
-  options: {
-    maxRetries?: number;
-    baseDelay?: number;
-    shouldRetry?: (error: unknown) => boolean;
-  } = {}
-): Promise<T> {
-  const {
-    maxRetries = CONFIG.MAX_RETRIES,
-    baseDelay = CONFIG.BASE_RETRY_DELAY,
-    shouldRetry = () => true,
-  } = options;
-
-  let lastError: Error | null = null;
-
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      return await fn();
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-
-      if (!shouldRetry(error) || attempt === maxRetries) {
-        throw lastError;
-      }
-
-      const delay = baseDelay * Math.pow(2, attempt);
-      await new Promise((resolve) => setTimeout(resolve, delay));
+  const specFilters: SpecFilters = {};
+  sp.forEach((value, key) => {
+    if (key.startsWith("spec_")) {
+      const vals = value.split(",").filter(Boolean);
+      if (vals.length) specFilters[key.slice(5)] = vals;
     }
-  }
-
-  throw lastError;
-}
-
-// ============= TIMEOUT WRAPPER =============
-
-async function withTimeout<T>(
-  promise: Promise<T>,
-  timeoutMs: number,
-  errorMessage: string = "Request timeout"
-): Promise<T> {
-  let timeoutId: NodeJS.Timeout;
-
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => reject(new Error(errorMessage)), timeoutMs);
   });
 
-  try {
-    const result = await Promise.race([promise, timeoutPromise]);
-    clearTimeout(timeoutId!);
-    return result;
-  } catch (error) {
-    clearTimeout(timeoutId!);
-    throw error;
-  }
-}
+  const hpp = Math.min(
+    CONFIG.MAX_HITS,
+    Math.max(
+      1,
+      parseInt(sp.get("hitsPerPage") || String(CONFIG.DEFAULT_HITS), 10),
+    ),
+  );
 
-// ============= TIMESTAMP PARSER =============
-
-function parseTimestamp(value: unknown): string | null {
-  if (!value) return null;
-
-  // Handle Firestore Timestamp with toDate()
-  if (
-    value &&
-    typeof value === "object" &&
-    "toDate" in value &&
-    typeof (value as { toDate: () => Date }).toDate === "function"
-  ) {
-    return (value as { toDate: () => Date }).toDate().toISOString();
-  }
-
-  // Handle _seconds format
-  if (
-    value &&
-    typeof value === "object" &&
-    "_seconds" in value &&
-    typeof (value as { _seconds: unknown })._seconds === "number"
-  ) {
-    return new Date(
-      (value as { _seconds: number })._seconds * 1000
-    ).toISOString();
-  }
-
-  // Handle number (milliseconds or seconds)
-  if (typeof value === "number") {
-    const ms = value > 10000000000 ? value : value * 1000;
-    return new Date(ms).toISOString();
-  }
-
-  // Handle string
-  if (typeof value === "string") {
-    const date = new Date(value);
-    return isNaN(date.getTime()) ? null : date.toISOString();
-  }
-
-  return null;
-}
-
-// ============= SHOP DATA TRANSFORMER =============
-
-function transformShopData(
-  shopId: string,
-  shopData: FirebaseFirestore.DocumentData
-): ShopResponse {
   return {
-    id: shopId,
-    name: shopData.name || "",
-    profileImageUrl: shopData.profileImageUrl || shopData.logoUrl || "",
-    averageRating:
-      typeof shopData.averageRating === "number" ? shopData.averageRating : 0,
-    description: shopData.description || "",
-    ownerId: shopData.ownerId || "",
-    coOwners: Array.isArray(shopData.coOwners) ? shopData.coOwners : [],
-    editors: Array.isArray(shopData.editors) ? shopData.editors : [],
-    viewers: Array.isArray(shopData.viewers) ? shopData.viewers : [],
-    createdAt: parseTimestamp(shopData.createdAt),
-    updatedAt: parseTimestamp(shopData.updatedAt),
-    isActive: shopData.isActive !== false,
-    contactEmail: shopData.contactEmail || "",
-    contactPhone: shopData.contactPhone || "",
-    address:
-      typeof shopData.address === "object" && shopData.address
-        ? shopData.address
-        : {},
-    socialLinks:
-      typeof shopData.socialLinks === "object" && shopData.socialLinks
-        ? shopData.socialLinks
-        : {},
-    businessHours:
-      typeof shopData.businessHours === "object" && shopData.businessHours
-        ? shopData.businessHours
-        : {},
-    categories: Array.isArray(shopData.categories) ? shopData.categories : [],
-    totalProducts:
-      typeof shopData.totalProducts === "number" ? shopData.totalProducts : 0,
-    totalSales:
-      typeof shopData.totalSales === "number" ? shopData.totalSales : 0,
+    shopId,
+    query: (sp.get("q") || "").trim(),
+    page: Math.max(0, parseInt(sp.get("page") || "0", 10)),
+    hitsPerPage: hpp,
+    sortOption: sp.get("sort") || "date",
+    gender: sp.get("gender") || null,
+    subcategory: sp.get("subcategory") || null,
+    brands: sp.get("brands")?.split(",").filter(Boolean) ?? [],
+    colors: sp.get("colors")?.split(",").filter(Boolean) ?? [],
+    specFilters,
+    minPrice: sp.get("minPrice") ? parseFloat(sp.get("minPrice")!) : null,
+    maxPrice: sp.get("maxPrice") ? parseFloat(sp.get("maxPrice")!) : null,
   };
 }
 
-// ============= CORE DATA FETCHING =============
+// ─────────────────────────────────────────────────────────────────────────────
+// Build Typesense filter arrays
+// Mirrors Flutter's _fetchProductsFromTypesense facetFilters / numericFilters
+// ─────────────────────────────────────────────────────────────────────────────
 
-async function fetchShopData(shopId: string): Promise<ShopResponse> {
-  const startTime = Date.now();
-  const db = getFirestoreAdmin();
+function buildFacetFilters(p: ShopProductsParams): string[][] {
+  const groups: string[][] = [];
 
-  const shopDoc = await withRetry(
-    () => db.collection("shops").doc(shopId).get(),
-    {
-      maxRetries: CONFIG.MAX_RETRIES,
-      shouldRetry: (error) => {
-        // Don't retry on permission errors
-        if (error instanceof Error && error.message.includes("permission")) {
-          return false;
-        }
-        return true;
-      },
-    }
+  // Gender — single value, wrapped in group for consistency
+  if (p.gender) groups.push([`gender:${p.gender}`]);
+
+  // Subcategory filter (Flutter: _selectedSubcategory)
+  if (p.subcategory) groups.push([`subcategory:${p.subcategory}`]);
+
+  // Brands — OR within group (Flutter: _selectedBrands.map((b) => 'brandModel:$b'))
+  if (p.brands.length > 0) groups.push(p.brands.map((b) => `brandModel:${b}`));
+
+  // Colors — OR within group (Flutter: _selectedColors.map((c) => 'availableColors:$c'))
+  if (p.colors.length > 0)
+    groups.push(p.colors.map((c) => `availableColors:${c}`));
+
+  // Dynamic spec filters — one OR group per field
+  // (Flutter: _dynamicSpecFilters.entries → entry.value.map((v) => '${entry.key}:$v'))
+  for (const [field, vals] of Object.entries(p.specFilters)) {
+    if (vals.length > 0) groups.push(vals.map((v) => `${field}:${v}`));
+  }
+
+  return groups;
+}
+
+function buildNumericFilters(p: ShopProductsParams): string[] {
+  const filters: string[] = [];
+  // Price range (Flutter: numericFilters.add('price >= $_minPrice'))
+  if (p.minPrice !== null) filters.push(`price>=${Math.floor(p.minPrice)}`);
+  if (p.maxPrice !== null) filters.push(`price<=${Math.ceil(p.maxPrice)}`);
+  // Scope to this shop — mirrors Flutter's additionalFilterBy: 'shopId:=$shopId'
+  filters.push(`shopId:=${p.shopId}`);
+  return filters;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Timeout wrapper
+// ─────────────────────────────────────────────────────────────────────────────
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let id: NodeJS.Timeout;
+  const t = new Promise<never>((_, rej) => {
+    id = setTimeout(() => rej(new Error("timeout")), ms);
+  });
+  return Promise.race([promise, t]).finally(() => clearTimeout(id));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Core fetch — always Typesense
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function fetchShopProducts(
+  p: ShopProductsParams,
+): Promise<ShopProductsResponse> {
+  const t0 = Date.now();
+  const svc = TypeSenseServiceManager.instance.shopService;
+
+  const facetFilters = buildFacetFilters(p);
+  const numericFilters = buildNumericFilters(p); // includes shopId:=$shopId
+
+  const res = await svc.searchIdsWithFacets({
+    indexName: "shop_products",
+    query: p.query,
+    page: p.page,
+    hitsPerPage: p.hitsPerPage,
+    facetFilters,
+    numericFilters,
+    sortOption: p.sortOption,
+  });
+
+  const products = res.hits.map((hit) =>
+    ProductUtils.fromTypeSense(hit as unknown as Record<string, unknown>),
   );
 
-  if (!shopDoc.exists) {
-    throw new Error("Shop not found");
+  // specFacets on page 0, scoped to this shop
+  // Pass shopId as a single-element facet filter group so it goes into filter_by
+  let specFacets: Record<string, FacetCount[]> | undefined;
+  if (p.page === 0) {
+    specFacets = await svc
+      .fetchSpecFacets({
+        indexName: "shop_products",
+        query: p.query,
+        facetFilters: [[`shopId:=${p.shopId}`]],
+      })
+      .catch(() => ({}));
   }
 
-  const shopData = shopDoc.data();
-  if (!shopData) {
-    throw new Error("Shop data is empty");
-  }
-
-  const response = transformShopData(shopId, shopData);
-  response.source = "fresh";
-  response.timing = Date.now() - startTime;
-
-  return response;
+  return {
+    products,
+    specFacets: p.page === 0 ? specFacets : undefined,
+    hasMore: res.page < res.nbPages - 1,
+    page: p.page,
+    total: res.hits.length,
+    timing: Date.now() - t0,
+  };
 }
 
-// ============= BACKGROUND REVALIDATION =============
+// ─────────────────────────────────────────────────────────────────────────────
+// Background revalidation
+// ─────────────────────────────────────────────────────────────────────────────
 
-function revalidateInBackground(shopId: string): void {
-  if (pendingRequests.has(shopId)) {
-    return;
-  }
-
-  const fetchPromise = fetchShopData(shopId);
-  pendingRequests.set(shopId, fetchPromise);
-
-  fetchPromise
-    .then((result) => {
-      cacheResponse(shopId, result);
-      console.log(`[shops] Background revalidation complete for ${shopId}`);
+function revalidate(key: string, params: ShopProductsParams): void {
+  if (pending.has(key)) return;
+  const p = fetchShopProducts(params);
+  pending.set(key, p);
+  p.then((r) => setCache(key, r))
+    .catch(() => {
+      /* swallow */
     })
-    .catch((error) => {
-      console.error(
-        `[shops] Background revalidation failed for ${shopId}:`,
-        error
-      );
-    })
-    .finally(() => {
-      pendingRequests.delete(shopId);
-    });
+    .finally(() => pending.delete(key));
 }
 
-// ============= MAIN HANDLER =============
+// ─────────────────────────────────────────────────────────────────────────────
+// Handler
+// ─────────────────────────────────────────────────────────────────────────────
 
-export async function GET(
-  request: NextRequest,
-  context: { params: Promise<{ shopId: string }> }
-) {
-  const requestStart = Date.now();
-
+export async function GET(request: NextRequest) {
+  const t0 = Date.now();
   try {
-    const { shopId } = await context.params;
+    const params = extractParams(new URL(request.url).searchParams);
 
-    // Validate shopId
-    if (!shopId || shopId.trim() === "") {
+    if (!params) {
       return NextResponse.json(
-        { error: "Shop ID is required" },
-        { status: 400 }
-      );
-    }
-
-    const normalizedShopId = shopId.trim();
-
-    // Rate limiting
-    const clientIp =
-      request.headers.get("x-forwarded-for") ||
-      request.headers.get("x-real-ip") ||
-      "unknown";
-    const rateLimitResult = await checkRateLimit(
-      clientIp,
-      CONFIG.RATE_LIMIT_MAX,
-      CONFIG.RATE_LIMIT_WINDOW
-    );
-    if (rateLimitResult.error) {
-      return rateLimitResult.error;
-    }
-
-    // ========== STEP 1: Check cache ==========
-    const cacheResult = getCachedResponse(normalizedShopId);
-
-    if (cacheResult.status === "fresh") {
-      console.log(`[shops] Cache HIT (fresh) for ${normalizedShopId}`);
-      return NextResponse.json(
-        { ...cacheResult.data, source: "cache" },
         {
-          headers: {
-            "Cache-Control": "public, max-age=120, stale-while-revalidate=60",
-            "X-Cache": "HIT",
-            "X-Response-Time": `${Date.now() - requestStart}ms`,
-          },
-        }
+          error: "shopId is required",
+          products: [],
+          hasMore: false,
+          page: 0,
+          total: 0,
+        },
+        { status: 400 },
       );
     }
 
-    // ========== STEP 2: Check for in-flight request ==========
-    const pendingRequest = pendingRequests.get(normalizedShopId);
+    const key = cacheKey(params);
+    const cached = getCache(key);
 
-    if (pendingRequest) {
-      console.log(`[shops] Deduplicating request for ${normalizedShopId}`);
+    const headers = (extra: Record<string, string> = {}) => ({
+      "Cache-Control": "public, max-age=30, stale-while-revalidate=90",
+      "X-Response-Time": `${Date.now() - t0}ms`,
+      ...extra,
+    });
 
-      // Return stale data if available
-      if (cacheResult.status === "stale" && cacheResult.data) {
-        return NextResponse.json(
-          { ...cacheResult.data, source: "stale" },
-          {
-            headers: {
-              "Cache-Control": "public, max-age=0, stale-while-revalidate=120",
-              "X-Cache": "STALE",
-              "X-Response-Time": `${Date.now() - requestStart}ms`,
-            },
-          }
-        );
-      }
+    // ── Fresh cache hit ──
+    if (cached && !cached.stale) {
+      return NextResponse.json(
+        { ...cached.data, source: "cache" },
+        { headers: headers({ "X-Cache": "HIT" }) },
+      );
+    }
 
-      // Wait for pending request
+    // ── Stale-while-revalidate ──
+    if (cached?.stale) {
+      revalidate(key, params);
+      return NextResponse.json(
+        { ...cached.data, source: "stale" },
+        { headers: headers({ "X-Cache": "STALE" }) },
+      );
+    }
+
+    // ── Deduplicate in-flight ──
+    const inFlight = pending.get(key);
+    if (inFlight) {
       try {
-        const result = await withTimeout(
-          pendingRequest,
-          CONFIG.REQUEST_TIMEOUT,
-          "Deduplicated request timeout"
-        );
+        const r = await withTimeout(inFlight, CONFIG.TIMEOUT_MS);
         return NextResponse.json(
-          { ...result, source: "dedupe" },
-          {
-            headers: {
-              "Cache-Control": "public, max-age=120, stale-while-revalidate=60",
-              "X-Cache": "DEDUPE",
-              "X-Response-Time": `${Date.now() - requestStart}ms`,
-            },
-          }
+          { ...r, source: "dedupe" },
+          { headers: headers({ "X-Cache": "DEDUPE" }) },
         );
       } catch {
-        // Fall through to fresh fetch
+        /* fall through */
       }
     }
 
-    // ========== STEP 3: Stale-while-revalidate ==========
-    if (cacheResult.status === "stale" && cacheResult.data) {
-      console.log(
-        `[shops] Returning stale, revalidating in background for ${normalizedShopId}`
-      );
-      revalidateInBackground(normalizedShopId);
-
-      return NextResponse.json(
-        { ...cacheResult.data, source: "stale" },
-        {
-          headers: {
-            "Cache-Control": "public, max-age=0, stale-while-revalidate=120",
-            "X-Cache": "STALE",
-            "X-Response-Time": `${Date.now() - requestStart}ms`,
-          },
-        }
-      );
-    }
-
-    // ========== STEP 4: Fresh fetch ==========
-    console.log(`[shops] Fresh fetch for ${normalizedShopId}`);
-
-    const fetchPromise = fetchShopData(normalizedShopId);
-    pendingRequests.set(normalizedShopId, fetchPromise);
+    // ── Fresh fetch ──
+    const fetchPromise = fetchShopProducts(params);
+    pending.set(key, fetchPromise);
 
     try {
-      const result = await withTimeout(
-        fetchPromise,
-        CONFIG.REQUEST_TIMEOUT,
-        "Request timeout"
-      );
-
-      cacheResponse(normalizedShopId, result);
-
-      console.log(
-        `[shops] Fetched shop ${normalizedShopId} in ${result.timing}ms`
-      );
-
+      const result = await withTimeout(fetchPromise, CONFIG.TIMEOUT_MS);
+      setCache(key, result);
       return NextResponse.json(
         { ...result, source: "fresh" },
         {
-          headers: {
-            "Cache-Control": "public, max-age=120, stale-while-revalidate=60",
+          headers: headers({
             "X-Cache": "MISS",
-            "X-Response-Time": `${Date.now() - requestStart}ms`,
             "X-Timing": `${result.timing}ms`,
-          },
-        }
+          }),
+        },
       );
-    } catch (error) {
-      console.error(`[shops] Fetch error for ${normalizedShopId}:`, error);
-
-      // Handle "not found"
-      if (error instanceof Error && error.message === "Shop not found") {
-        return NextResponse.json({ error: "Shop not found" }, { status: 404 });
-      }
-
-      // Handle timeout
-      if (error instanceof Error && error.message.includes("timeout")) {
-        return NextResponse.json(
-          { error: "Request timeout", message: "Please try again" },
-          { status: 504 }
-        );
-      }
-
-      // Handle permission errors
-      if (error instanceof Error && error.message.includes("permission")) {
-        return NextResponse.json({ error: "Access denied" }, { status: 403 });
-      }
-
-      // Generic error
+    } catch (err) {
+      const isTimeout = err instanceof Error && err.message === "timeout";
       return NextResponse.json(
-        { error: "Internal server error" },
-        { status: 500 }
+        {
+          error: isTimeout ? "Search timeout" : "Fetch failed",
+          products: [],
+          hasMore: false,
+          page: params.page,
+          total: 0,
+        },
+        { status: isTimeout ? 504 : 500 },
       );
     } finally {
-      pendingRequests.delete(normalizedShopId);
+      pending.delete(key);
     }
-  } catch (error) {
-    console.error("[shops] Unexpected error:", error);
-
+  } catch (err) {
+    console.error("[shopProducts] unexpected error:", err);
     return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+      {
+        error: "Internal server error",
+        products: [],
+        hasMore: false,
+        page: 0,
+        total: 0,
+      },
+      { status: 500 },
     );
   }
+}
+
+// Cache management endpoint
+export async function DELETE() {
+  const n = cache.size;
+  cache.clear();
+  pending.clear();
+  return NextResponse.json({ cleared: n });
 }

@@ -1,33 +1,50 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef, useTransition, useMemo } from "react";
+// ═══════════════════════════════════════════════════════════════════════════
+// ShopsPage
+//
+// Mirrors Flutter's ShopProvider + shop list screen:
+//
+//   BROWSE  (no query): Firestore cursor-pagination, optional category filter
+//           Mirrors _getShopsQuery() / _fetchInitialShops() / _fetchMoreShops()
+//
+//   SEARCH  (query typed): Typesense via /api/shopsList
+//           Mirrors performAlgoliaSearch(query, category)
+//           Debounced 300 ms, category filter applied after results
+//
+//   Category filter: inline pill row (same as Flutter's category selector)
+//   Infinite scroll: IntersectionObserver — browse only
+// ═══════════════════════════════════════════════════════════════════════════
+
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
 import { useTranslations } from "next-intl";
+import { Timestamp } from "firebase/firestore";
 import {
-  collection,
-  query,
-  orderBy,
-  limit,
-  startAfter,
-  getDocs,
-  QueryDocumentSnapshot,
-  DocumentData,
-  where,
-  Timestamp,
-  doc,
-  getDoc,
-} from "firebase/firestore";
-import { db } from "../../../lib/firebase";
+  Search,
+  X,
+  Filter,
+  RefreshCw,
+  Store,
+  AlertCircle,
+  WifiOff,
+  Check,
+  ChevronDown,
+} from "lucide-react";
 import SecondHeader from "../../components/market_screen/SecondHeader";
 import ShopCard from "../../components/shops/ShopCard";
 import CreateShopButton from "../../components/shops/CreateShopButton";
 import LoadingShopCard from "../../components/shops/LoadingShopCard";
-import AlgoliaServiceManager from "@/lib/algolia";
-import {
-  MagnifyingGlassIcon,
-  FunnelIcon,
-  XMarkIcon,
-} from "@heroicons/react/24/outline";
 import { AllInOneCategoryData } from "@/constants/productData";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────────────────────
 
 interface Shop {
   id: string;
@@ -47,870 +64,650 @@ interface Shop {
   isActive?: boolean;
 }
 
-// Get categories from productData
-const CATEGORIES = AllInOneCategoryData.kCategories.map((cat) => cat.key);
+// ─────────────────────────────────────────────────────────────────────────────
+// Static data
+// ─────────────────────────────────────────────────────────────────────────────
 
-// Helper function to get the translation key for any category
-const getCategoryTranslationKey = (category: string): string => {
-  switch (category) {
-    case "Women":
-      return "buyerCategoryWomen";
-    case "Men":
-      return "buyerCategoryMen";
-    case "Clothing & Fashion":
-      return "categoryClothingFashion";
-    case "Footwear":
-      return "categoryFootwear";
-    case "Accessories":
-      return "categoryAccessories";
-    case "Mother & Child":
-      return "categoryMotherChild";
-    case "Home & Furniture":
-      return "categoryHomeFurniture";
-    case "Beauty & Personal Care":
-      return "categoryBeautyPersonalCare";
-    case "Bags & Luggage":
-      return "categoryBagsLuggage";
-    case "Electronics":
-      return "categoryElectronics";
-    case "Sports & Outdoor":
-      return "categorySportsOutdoor";
-    case "Books, Stationery & Hobby":
-      return "categoryBooksStationeryHobby";
-    case "Tools & Hardware":
-      return "categoryToolsHardware";
-    case "Pet Supplies":
-      return "categoryPetSupplies";
-    case "Automotive":
-      return "categoryAutomotive";
-    case "Health & Wellness":
-      return "categoryHealthWellness";
-    case "Kids":
-      return "categoryMotherChild";
-    case "Beauty":
-      return "categoryBeautyPersonalCare";
-    case "Jewelry":
-      return "categoryAccessories";
-    case "Home & Garden":
-      return "categoryHomeFurniture";
-    case "Sports":
-      return "categorySportsOutdoor";
-    case "Books":
-      return "categoryBooksStationeryHobby";
-    default:
-      return category;
-  }
+const CATEGORIES = AllInOneCategoryData.kCategories.map((c) => c.key);
+
+const CATEGORY_I18N_KEYS: Record<string, string> = {
+  "Clothing & Fashion": "categoryClothingFashion",
+  Footwear: "categoryFootwear",
+  Accessories: "categoryAccessories",
+  "Mother & Child": "categoryMotherChild",
+  "Home & Furniture": "categoryHomeFurniture",
+  "Beauty & Personal Care": "categoryBeautyPersonalCare",
+  "Bags & Luggage": "categoryBagsLuggage",
+  Electronics: "categoryElectronics",
+  "Sports & Outdoor": "categorySportsOutdoor",
+  "Books, Stationery & Hobby": "categoryBooksStationeryHobby",
+  "Tools & Hardware": "categoryToolsHardware",
+  "Pet Supplies": "categoryPetSupplies",
+  Automotive: "categoryAutomotive",
+  "Health & Wellness": "categoryHealthWellness",
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Normalise API shop → component Shop (reconstruct Timestamp)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function toShop(raw: Record<string, unknown>): Shop {
+  const ct = raw.createdAt as { seconds?: number; nanoseconds?: number } | null;
+  return {
+    id: String(raw.id ?? ""),
+    name: String(raw.name ?? ""),
+    profileImageUrl: String(raw.profileImageUrl ?? ""),
+    coverImageUrls: (raw.coverImageUrls as string[]) ?? [],
+    address: String(raw.address ?? ""),
+    averageRating: Number(raw.averageRating ?? 0),
+    reviewCount: Number(raw.reviewCount ?? 0),
+    followerCount: Number(raw.followerCount ?? 0),
+    clickCount: Number(raw.clickCount ?? 0),
+    categories: (raw.categories as string[]) ?? [],
+    contactNo: String(raw.contactNo ?? ""),
+    ownerId: String(raw.ownerId ?? ""),
+    isBoosted: Boolean(raw.isBoosted ?? false),
+    isActive: raw.isActive !== false,
+    createdAt:
+      ct?.seconds !== undefined
+        ? new Timestamp(ct.seconds, ct.nanoseconds ?? 0)
+        : Timestamp.now(),
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Component
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function ShopsPage() {
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const t = useTranslations("shops");
+  const tRoot = useTranslations();
+
+  // ── Theme ──────────────────────────────────────────────────────────────────
+  const [isDark, setIsDark] = useState(false);
+  useEffect(() => {
+    const check = () =>
+      setIsDark(document.documentElement.classList.contains("dark"));
+    check();
+    const obs = new MutationObserver(check);
+    obs.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => obs.disconnect();
+  }, []);
+
+  // ── Shop state ─────────────────────────────────────────────────────────────
   const [shops, setShops] = useState<Shop[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  // Use ref for lastDocument to avoid stale closure issues in IntersectionObserver
-  const lastDocumentRef = useRef<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [isNetworkErr, setIsNetworkErr] = useState(false);
+  const cursorRef = useRef<string | null>(null);
 
-  // Algolia search states
+  // ── Search state ───────────────────────────────────────────────────────────
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedQ, setDebouncedQ] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<Shop[]>([]);
 
-  // Use transition to prevent flickering
-  const [isPending, startTransition] = useTransition();
+  // ── Filter ────────────────────────────────────────────────────────────────
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [showCategoryPanel, setShowCategoryPanel] = useState(false);
 
-  // Track if we're actively filtering to show shimmer
-  const [isFiltering, setIsFiltering] = useState(false);
-  const [isFilterExpanded, setIsFilterExpanded] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+  const loadMoreEl = useRef<HTMLDivElement>(null);
+  const fetchingRef = useRef(false);
 
-  const t = useTranslations("shops");
-  const tRoot = useTranslations();
-  const loadMoreRef = useRef<HTMLDivElement>(null);
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const searchAbortRef = useRef<boolean>(false);
-
-  // Track if a fetch is in progress to prevent concurrent requests
-  const isFetchingRef = useRef(false);
-
-  // Use refs for values needed in IntersectionObserver callback to avoid stale closures
-  const hasMoreRef = useRef(true);
-  const isLoadingMoreRef = useRef(false);
-  const isLoadingRef = useRef(true);
-
-  const SHOPS_PER_PAGE = 20;
-
-
-  // Handle theme detection
+  // ─────────────────────────────────────────────────────────────────────────
+  // Search debounce — 300 ms (mirrors Flutter)
+  // ─────────────────────────────────────────────────────────────────────────
   useEffect(() => {
-    const checkTheme = () => {
-      if (typeof document !== "undefined") {
-        setIsDarkMode(document.documentElement.classList.contains("dark"));
-      }
-    };
+    const tid = setTimeout(() => setDebouncedQ(searchQuery.trim()), 300);
+    return () => clearTimeout(tid);
+  }, [searchQuery]);
 
-    if (typeof document !== "undefined") {
-      const savedTheme = localStorage.getItem("theme");
-      const systemPrefersDark = window.matchMedia(
-        "(prefers-color-scheme: dark)"
-      ).matches;
-
-      if (savedTheme === "dark" || (!savedTheme && systemPrefersDark)) {
-        document.documentElement.classList.add("dark");
-      } else {
-        document.documentElement.classList.remove("dark");
-      }
-    }
-
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    if (typeof document !== "undefined") {
-      observer.observe(document.documentElement, {
-        attributes: true,
-        attributeFilter: ["class"],
-      });
-    }
-    return () => observer.disconnect();
-  }, []);
-
-  // Cleanup on unmount
+  // ─────────────────────────────────────────────────────────────────────────
+  // Close category panel on outside click
+  // ─────────────────────────────────────────────────────────────────────────
   useEffect(() => {
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-        searchTimeoutRef.current = null;
-      }
-      searchAbortRef.current = true;
-    };
-  }, []);
+    if (!showCategoryPanel) return;
+    const handler = () => setShowCategoryPanel(false);
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
+  }, [showCategoryPanel]);
 
-  // Algolia search function with Firestore enrichment
-  const performAlgoliaSearch = useCallback(
-    async (query: string, categoryFilter: string | null = null) => {
-      if (!query.trim()) {
+  // ─────────────────────────────────────────────────────────────────────────
+  // BROWSE fetch — Firestore via /api/shopsList (no query param)
+  // ─────────────────────────────────────────────────────────────────────────
+  const fetchBrowse = useCallback(
+    async (loadMore = false) => {
+      if (fetchingRef.current) return;
+      if (loadMore && !cursorRef.current) return;
+
+      fetchingRef.current = true;
+      abortRef.current?.abort();
+      abortRef.current = new AbortController();
+
+      try {
+        if (!loadMore) {
+          setIsLoading(true);
+          setError(null);
+          setIsNetworkErr(false);
+          cursorRef.current = null;
+        } else {
+          setIsLoadingMore(true);
+        }
+
+        const qp = new URLSearchParams();
+        if (selectedCategory) qp.set("category", selectedCategory);
+        if (loadMore && cursorRef.current) qp.set("cursor", cursorRef.current);
+
+        const res = await fetch(`/api/shopsList?${qp}`, {
+          signal: abortRef.current.signal,
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        const newShops: Shop[] = (data.shops ?? []).map(toShop);
+        cursorRef.current = data.cursor ?? null;
+        setHasMore(data.hasMore ?? false);
+
+        if (loadMore) {
+          setShops((prev) => {
+            const ids = new Set(prev.map((s) => s.id));
+            return [...prev, ...newShops.filter((s) => !ids.has(s.id))];
+          });
+        } else {
+          setShops(newShops);
+        }
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") return;
+        const isNet =
+          !navigator.onLine ||
+          (err instanceof Error && err.message.includes("fetch"));
+        setIsNetworkErr(isNet);
+        setError("Failed to load shops");
+      } finally {
+        setIsLoading(false);
+        setIsLoadingMore(false);
+        fetchingRef.current = false;
+      }
+    },
+    [selectedCategory],
+  );
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // SEARCH fetch — Typesense via /api/shopsList?q=…
+  // ─────────────────────────────────────────────────────────────────────────
+  const fetchSearch = useCallback(
+    async (q: string) => {
+      if (!q) {
         setSearchResults([]);
         setIsSearching(false);
         return;
       }
 
-      searchAbortRef.current = false;
+      abortRef.current?.abort();
+      abortRef.current = new AbortController();
+      setIsSearching(true);
 
       try {
-        setIsSearching(true);
+        const qp = new URLSearchParams({ q });
+        if (selectedCategory) qp.set("category", selectedCategory);
 
-        const algolia = AlgoliaServiceManager.getInstance();
+        const res = await fetch(`/api/shopsList?${qp}`, {
+          signal: abortRef.current.signal,
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
 
-        // Search shops index using dedicated method
-        const algoliaResults = await algolia.searchShops(
-          query,
-          100,
-          0,
-          'isActive:true' // ✅ Correct - just pass the string directly
-        );
-
-        // Check if search was aborted
-        if (searchAbortRef.current) {
-          console.log("🚫 Shop search aborted:", query);
-          return;
-        }
-
-        // Convert Algolia Shop results to component Shop interface
-        let shopResults: Shop[] = algoliaResults.map((result) => ({
-          id: result.id,
-          name: result.name,
-          profileImageUrl: result.profileImageUrl,
-          coverImageUrls: result.coverImageUrls,
-          address: result.address,
-          averageRating: result.averageRating,
-          reviewCount: result.reviewCount,
-          followerCount: result.followerCount,
-          clickCount: result.clickCount,
-          categories: result.categories,
-          contactNo: result.contactNo,
-          ownerId: result.ownerId,
-          isBoosted: result.isBoosted,
-          createdAt: result.createdAt
-            ? Timestamp.fromDate(new Date(result.createdAt))
-            : Timestamp.now(),
-        }));
-
-        // Enrich with Firestore data if cover images are missing
-        const shopsNeedingEnrichment = shopResults.filter(
-          (shop) => !shop.coverImageUrls || shop.coverImageUrls.length === 0
-        );
-
-        if (shopsNeedingEnrichment.length > 0) {
-          console.log(
-            `🔄 Enriching ${shopsNeedingEnrichment.length} shops with Firestore data...`
-          );
-
-          // Batch fetch from Firestore
-          const enrichmentPromises = shopsNeedingEnrichment.map(
-            async (shop) => {
-              try {
-                const shopDocRef = doc(db, "shops", shop.id);
-                const shopDocSnap = await getDoc(shopDocRef);
-
-                if (shopDocSnap.exists()) {
-                  const firestoreData = shopDocSnap.data();
-                  return {
-                    shopId: shop.id,
-                    coverImageUrls: firestoreData.coverImageUrls || [],
-                  };
-                }
-              } catch (err) {
-                console.error(`Failed to enrich shop ${shop.id}:`, err);
-              }
-              return null;
-            }
-          );
-
-          const enrichmentResults = await Promise.all(enrichmentPromises);
-
-          // Merge enriched data back into results
-          const enrichmentMap = new Map(
-            enrichmentResults
-              .filter((r) => r !== null)
-              .map((r) => [r!.shopId, r!.coverImageUrls])
-          );
-
-          shopResults = shopResults.map((shop) => ({
-            ...shop,
-            coverImageUrls: enrichmentMap.get(shop.id) || shop.coverImageUrls,
-          }));
-
-          console.log(
-            `✅ Enrichment complete: ${enrichmentMap.size} shops updated`
-          );
-        }
-
-        // Check if search was aborted during enrichment
-        if (searchAbortRef.current) {
-          console.log("🚫 Shop search aborted during enrichment:", query);
-          return;
-        }
-
-        // Filter by category if selected
-        const filteredResults = categoryFilter
-          ? shopResults.filter((shop) =>
-              shop.categories.includes(categoryFilter)
-            )
-          : shopResults;
-
-        console.log(
-          `✅ Algolia shop search complete: ${filteredResults.length} shops found`
-        );
-        setSearchResults(filteredResults);
-      } catch (error) {
-        console.error("❌ Algolia shop search error:", error);
-        if (!searchAbortRef.current) {
-          setSearchResults([]);
-        }
-      } finally {
-        if (!searchAbortRef.current) {
-          setIsSearching(false);
-        }
-      }
-    },
-    []
-  );
-
-  // Debounced search effect
-  useEffect(() => {
-    // Clear previous timeout
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-
-    // Abort ongoing search
-    searchAbortRef.current = true;
-
-    if (!searchTerm.trim()) {
-      setSearchResults([]);
-      setIsSearching(false);
-      return;
-    }
-
-    // Set searching state immediately
-    setIsSearching(true);
-
-    // Debounce search by 300ms
-    searchTimeoutRef.current = setTimeout(() => {
-      performAlgoliaSearch(searchTerm, selectedCategory);
-    }, 300);
-
-    // Cleanup
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
-  }, [searchTerm, selectedCategory, performAlgoliaSearch]);
-
-  // Fetch shops function (Firebase - used only when not searching)
-  const fetchShops = useCallback(
-    async (
-      isLoadMore = false,
-      categoryFilter: string | null = null
-    ) => {
-      // Prevent concurrent fetches using ref
-      if (isFetchingRef.current) {
-        return Promise.resolve();
-      }
-
-      // For load more, check if we have a cursor document
-      if (isLoadMore && !lastDocumentRef.current) {
-        console.log("No more shops to load (no cursor)");
-        return Promise.resolve();
-      }
-
-      isFetchingRef.current = true;
-
-      try {
-        if (!isLoadMore) {
-          setIsLoading(true);
-          isLoadingRef.current = true;
-          setError(null);
-        } else {
-          setIsLoadingMore(true);
-          isLoadingMoreRef.current = true;
-        }
-
-        // Build base query
-        let shopsQuery;
-
-        if (isLoadMore && lastDocumentRef.current) {
-          // Paginated query with cursor
-          if (categoryFilter) {
-            shopsQuery = query(
-              collection(db, "shops"),
-              where("isActive", "==", true),
-              where("categories", "array-contains", categoryFilter),
-              orderBy("createdAt", "desc"),
-              startAfter(lastDocumentRef.current),
-              limit(SHOPS_PER_PAGE)
-            );
-          } else {
-            shopsQuery = query(
-              collection(db, "shops"),
-              where("isActive", "==", true),
-              orderBy("createdAt", "desc"),
-              startAfter(lastDocumentRef.current),
-              limit(SHOPS_PER_PAGE)
-            );
-          }
-        } else {
-          // Initial query (no cursor)
-          if (categoryFilter) {
-            shopsQuery = query(
-              collection(db, "shops"),
-              where("isActive", "==", true),
-              where("categories", "array-contains", categoryFilter),
-              orderBy("createdAt", "desc"),
-              limit(SHOPS_PER_PAGE)
-            );
-          } else {
-            shopsQuery = query(
-              collection(db, "shops"),
-              where("isActive", "==", true),
-              orderBy("createdAt", "desc"),
-              limit(SHOPS_PER_PAGE)
-            );
-          }
-        }
-
-        const snapshot = await getDocs(shopsQuery);
-        const newShops: Shop[] = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Shop[];
-
-        // Update cursor ref
-        const lastDoc = snapshot.docs[snapshot.docs.length - 1] || null;
-        lastDocumentRef.current = lastDoc;
-
-        // Determine if there are more results
-        const hasMoreResults = snapshot.docs.length === SHOPS_PER_PAGE;
-        setHasMore(hasMoreResults);
-        hasMoreRef.current = hasMoreResults;
-
-        if (isLoadMore) {
-          // Deduplicate when adding more shops
-          setShops((prev) => {
-            const existingIds = new Set(prev.map(shop => shop.id));
-            const uniqueNewShops = newShops.filter(shop => !existingIds.has(shop.id));
-            return [...prev, ...uniqueNewShops];
-          });
-        } else {
-          // Use transition to prevent flickering
-          startTransition(() => {
-            setShops(newShops);
-          });
-        }
+        setSearchResults((data.shops ?? []).map(toShop));
       } catch (err) {
-        console.error("Error fetching shops:", err);
-        setError("Failed to load shops. Please try again.");
+        if (err instanceof Error && err.name === "AbortError") return;
+        setSearchResults([]);
       } finally {
-        setIsLoading(false);
-        isLoadingRef.current = false;
-        setIsLoadingMore(false);
-        isLoadingMoreRef.current = false;
-        isFetchingRef.current = false;
+        setIsSearching(false);
       }
     },
-    [startTransition]
+    [selectedCategory],
   );
 
-  // Track initial mount to prevent filter effect from running
-  const isInitialMount = useRef(true);
+  // ─────────────────────────────────────────────────────────────────────────
+  // Trigger: initial browse + on category change
+  // ─────────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!debouncedQ) fetchBrowse(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCategory]);
 
   // Initial load
   useEffect(() => {
-    fetchShops(false, null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    fetchBrowse(false);
+  }, []); // eslint-disable-line
 
-  // Handle category filter changes (only for Firebase, Algolia handles it in search)
+  // ─────────────────────────────────────────────────────────────────────────
+  // Trigger: search when debounced query changes
+  // ─────────────────────────────────────────────────────────────────────────
   useEffect(() => {
-    // Skip on initial mount
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-
-    if (!searchTerm.trim()) {
-      // Clear shops immediately to prevent duplicates
-      setShops([]);
-      lastDocumentRef.current = null;
-      setHasMore(true);
-      hasMoreRef.current = true;
-      fetchShops(false, selectedCategory).finally(() => {
-        setIsFiltering(false);
-      });
+    if (debouncedQ) {
+      fetchSearch(debouncedQ);
     } else {
-      // If searching, make sure to clear filtering state
-      setIsFiltering(false);
+      setSearchResults([]);
+      setIsSearching(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCategory, searchTerm]);
+  }, [debouncedQ, selectedCategory]);
 
-  // Intersection Observer for infinite scroll (only when not searching)
+  // ─────────────────────────────────────────────────────────────────────────
+  // Infinite scroll (browse only)
+  // ─────────────────────────────────────────────────────────────────────────
   useEffect(() => {
-    // Disable infinite scroll when searching with Algolia
-    if (searchTerm.trim()) {
-      return;
-    }
-
-    let debounceTimer: NodeJS.Timeout;
+    if (debouncedQ) return; // Algolia/Typesense returns all results at once
 
     const observer = new IntersectionObserver(
       (entries) => {
         if (
           entries[0].isIntersecting &&
-          hasMoreRef.current &&
-          !isLoadingMoreRef.current &&
-          !isFetchingRef.current
+          hasMore &&
+          !isLoadingMore &&
+          !fetchingRef.current
         ) {
-          // Debounce to prevent rapid-fire requests
-          clearTimeout(debounceTimer);
-          debounceTimer = setTimeout(() => {
-            console.log("Loading more shops...");
-            fetchShops(true, selectedCategory);
-          }, 150);
+          fetchBrowse(true);
         }
       },
-      { threshold: 0.1, rootMargin: "100px" }
+      { threshold: 0.1, rootMargin: "150px" },
     );
 
-    const currentTarget = loadMoreRef.current;
-    if (currentTarget && shops.length > 0) {
-      observer.observe(currentTarget);
-    }
-
+    const el = loadMoreEl.current;
+    if (el && shops.length > 0) observer.observe(el);
     return () => {
-      clearTimeout(debounceTimer);
-      if (currentTarget) {
-        observer.unobserve(currentTarget);
-      }
+      if (el) observer.unobserve(el);
       observer.disconnect();
     };
-  }, [searchTerm, shops.length, hasMore, isLoadingMore, selectedCategory, fetchShops]);
+  }, [debouncedQ, hasMore, isLoadingMore, shops.length, fetchBrowse]);
 
-  const handleRefresh = async () => {
-    setShops([]);
-    setSearchResults([]);
-    lastDocumentRef.current = null;
-    setHasMore(true);
-    hasMoreRef.current = true;
+  // ─────────────────────────────────────────────────────────────────────────
+  // Displayed list
+  // ─────────────────────────────────────────────────────────────────────────
+  const displayedShops = useMemo(() => {
+    const base = debouncedQ ? searchResults : shops;
+    // Deduplicate as safety measure
+    const seen = new Set<string>();
+    return base.filter((s) => {
+      if (seen.has(s.id)) return false;
+      seen.add(s.id);
+      return true;
+    });
+  }, [debouncedQ, searchResults, shops]);
 
-    if (searchTerm.trim()) {
-      await performAlgoliaSearch(searchTerm, selectedCategory);
-    } else {
-      await fetchShops(false, selectedCategory);
+  // ─────────────────────────────────────────────────────────────────────────
+  // Handlers
+  // ─────────────────────────────────────────────────────────────────────────
+  const handleCategorySelect = (cat: string | null) => {
+    setShowCategoryPanel(false);
+    const next = cat === selectedCategory ? null : cat;
+    setSelectedCategory(next);
+    if (!debouncedQ) {
+      setShops([]);
+      cursorRef.current = null;
+      setHasMore(true);
     }
   };
 
-  const handleSearch = (term: string) => {
-    setSearchTerm(term);
+  const handleRetry = () => {
+    setError(null);
+    setShops([]);
+    cursorRef.current = null;
+    setHasMore(true);
+    fetchBrowse(false);
   };
 
-  const handleCategoryFilter = (category: string | null) => {
-    setIsFiltering(true);
-    setIsFilterExpanded(false);
-    startTransition(() => {
-      setSelectedCategory(category === selectedCategory ? null : category);
-    });
+  const catLabel = (key: string) => {
+    const i18nKey = CATEGORY_I18N_KEYS[key];
+    return i18nKey ? tRoot(i18nKey) || key : key;
   };
 
-  const getGridCols = () => {
-    return "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5";
-  };
-
-  // Memoize the displayed shops to prevent unnecessary re-renders
-  // Also deduplicate as a safety measure
-  const displayedShops = useMemo(() => {
-    const shopsList = searchTerm.trim() ? searchResults : shops;
-
-    // Deduplicate by ID as a safety measure
-    const uniqueShops = shopsList.reduce((acc, shop) => {
-      if (!acc.some(s => s.id === shop.id)) {
-        acc.push(shop);
-      }
-      return acc;
-    }, [] as Shop[]);
-
-    return uniqueShops;
-  }, [searchTerm, searchResults, shops]);
-
+  // ─────────────────────────────────────────────────────────────────────────
+  // Render: full error
+  // ─────────────────────────────────────────────────────────────────────────
   if (error && shops.length === 0) {
     return (
       <>
         <SecondHeader />
         <div
-          className={`min-h-screen ${
-            isDarkMode ? "bg-gray-900" : "bg-gray-50"
-          }`}
+          className={`min-h-screen ${isDark ? "bg-gray-900" : "bg-gray-50"}`}
         >
-          <div className="max-w-7xl mx-auto px-4 py-8">
-            <div className="text-center py-20">
-              <div className={`text-5xl mb-4 ${
-                isDarkMode ? "text-gray-600" : "text-gray-400"
-              }`}>
-                ⚠️
-              </div>
-
-              <h3
-                className={`text-xl font-semibold mb-3 ${
-                  isDarkMode ? "text-white" : "text-gray-900"
-                }`}
-              >
-                {t("errorLoading")}
-              </h3>
-              <p
-                className={`text-sm mb-6 max-w-md mx-auto ${
-                  isDarkMode ? "text-gray-400" : "text-gray-600"
-                }`}
-              >
-                {error}
-              </p>
-              <button
-                onClick={handleRefresh}
-                className={`px-5 py-2.5 rounded-lg font-medium transition-colors ${
-                  isDarkMode
-                    ? "bg-blue-600 hover:bg-blue-700 text-white"
-                    : "bg-blue-600 hover:bg-blue-700 text-white"
-                }`}
-              >
-                {t("retry")}
-              </button>
-            </div>
+          <div className="max-w-7xl mx-auto px-4 py-20 flex flex-col items-center gap-5 text-center">
+            {isNetworkErr ? (
+              <WifiOff
+                size={64}
+                className={isDark ? "text-gray-600" : "text-gray-300"}
+              />
+            ) : (
+              <AlertCircle size={64} className="text-red-400" />
+            )}
+            <h3
+              className={`text-lg font-semibold ${isDark ? "text-white" : "text-gray-900"}`}
+            >
+              {t("errorLoading")}
+            </h3>
+            <p
+              className={`text-sm max-w-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}
+            >
+              {error}
+            </p>
+            <button
+              onClick={handleRetry}
+              className="flex items-center gap-2 px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              <RefreshCw size={15} />
+              {t("retry")}
+            </button>
           </div>
         </div>
       </>
     );
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Render: main
+  // ─────────────────────────────────────────────────────────────────────────
   return (
     <>
       <SecondHeader />
-      <div
-        className={`min-h-screen ${
-          isDarkMode ? "bg-gray-900" : "bg-gray-50"
-        }`}
-        style={{
-          transform: 'translateZ(0)',
-          backfaceVisibility: 'hidden',
-          WebkitFontSmoothing: 'antialiased'
-        }}
-      >
+      <div className={`min-h-screen ${isDark ? "bg-gray-900" : "bg-gray-50"}`}>
         <div className="max-w-7xl mx-auto px-4 py-6">
-          {/* Compact Header Row */}
-          <div className="mb-5">
-            <div className="flex flex-col lg:flex-row lg:items-center gap-4 mb-4">
-              {/* Title and Create Button */}
-              <div className="flex items-center gap-3">
+          {/* ── Page header ── */}
+          <div className="mb-5 space-y-3">
+            {/* Row 1: title + create + search + filter */}
+            <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+              {/* Title + create */}
+              <div className="flex items-center gap-3 flex-shrink-0">
                 <h1
-                  className={`text-xl md:text-2xl font-semibold whitespace-nowrap ${
-                    isDarkMode ? "text-white" : "text-gray-900"
-                  }`}
+                  className={`text-xl md:text-2xl font-semibold ${isDark ? "text-white" : "text-gray-900"}`}
                 >
                   {t("title")}
                 </h1>
                 <CreateShopButton />
               </div>
 
-              {/* Search and Filter in Same Row */}
-              <div className="flex-1 flex items-center gap-3">
-                {/* Search Bar */}
+              {/* Search + filter */}
+              <div className="flex-1 flex items-center gap-2">
+                {/* Search bar */}
                 <div className="relative flex-1">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <MagnifyingGlassIcon
-                      className={`h-4 w-4 ${
-                        isDarkMode ? "text-gray-400" : "text-gray-500"
-                      }`}
-                    />
+                    {isSearching ? (
+                      <RefreshCw
+                        size={15}
+                        className="text-orange-500 animate-spin"
+                      />
+                    ) : (
+                      <Search
+                        size={15}
+                        className={isDark ? "text-gray-400" : "text-gray-500"}
+                      />
+                    )}
                   </div>
                   <input
                     type="text"
                     placeholder={t("searchShops")}
-                    value={searchTerm}
-                    onChange={(e) => handleSearch(e.target.value)}
-                    className={`w-full pl-9 pr-10 py-2 text-sm rounded-lg border transition-colors focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      isDarkMode
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className={`w-full pl-9 pr-9 py-2 text-sm rounded-lg border transition-colors focus:ring-2 focus:ring-orange-400 focus:outline-none ${
+                      isDark
                         ? "bg-gray-800 border-gray-700 text-white placeholder-gray-400"
                         : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
                     }`}
                   />
-                  {searchTerm && (
+                  {searchQuery && (
                     <button
-                      onClick={() => handleSearch("")}
+                      onClick={() => setSearchQuery("")}
                       className="absolute inset-y-0 right-0 pr-3 flex items-center"
                     >
-                      <XMarkIcon
-                        className={`h-4 w-4 ${
-                          isDarkMode
+                      <X
+                        size={14}
+                        className={
+                          isDark
                             ? "text-gray-400 hover:text-gray-300"
-                            : "text-gray-500 hover:text-gray-700"
-                        }`}
+                            : "text-gray-400 hover:text-gray-700"
+                        }
                       />
                     </button>
                   )}
                 </div>
 
-                {/* Filter Dropdown */}
-                <div className="relative">
+                {/* Category filter button */}
+                <div className="relative" onClick={(e) => e.stopPropagation()}>
                   <button
-                    onClick={() => setIsFilterExpanded(!isFilterExpanded)}
-                    className={`flex items-center gap-2 px-3 py-2 text-sm rounded-lg border transition-colors whitespace-nowrap ${
-                      isDarkMode
-                        ? "bg-gray-800 border-gray-700 text-white hover:bg-gray-700"
-                        : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
-                    } ${selectedCategory ? "ring-2 ring-blue-500" : ""}`}
+                    onClick={() => setShowCategoryPanel((v) => !v)}
+                    className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border transition-colors whitespace-nowrap ${
+                      selectedCategory
+                        ? "border-orange-400 text-orange-500 bg-orange-50 dark:bg-orange-900/20 ring-1 ring-orange-400"
+                        : isDark
+                          ? "bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700"
+                          : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
+                    }`}
                   >
-                    <FunnelIcon className="w-4 h-4" />
+                    <Filter size={14} />
                     {t("filter")}
                     {selectedCategory && (
-                      <span className="ml-1 px-1.5 py-0.5 text-xs bg-blue-600 text-white rounded-full">
+                      <span className="ml-0.5 px-1.5 py-0.5 text-[10px] bg-orange-500 text-white rounded-full font-bold">
                         1
                       </span>
                     )}
+                    <ChevronDown
+                      size={12}
+                      className={`transition-transform ${showCategoryPanel ? "rotate-180" : ""}`}
+                    />
                   </button>
 
-                  {/* Filter Dropdown Menu */}
-                  {isFilterExpanded && (
-                    <>
-                      {/* Backdrop */}
-                      <div
-                        className="fixed inset-0 z-10"
-                        onClick={() => setIsFilterExpanded(false)}
-                      />
-
-                      {/* Dropdown */}
-                      <div
-                        className={`absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto rounded-lg border shadow-lg z-50 ${
-                          isDarkMode
-                            ? "bg-gray-800 border-gray-700"
-                            : "bg-white border-gray-200"
-                        }`}
-                      >
-                        <div className="p-4">
-                          <div className="flex items-center justify-between mb-3">
-                            <h3
-                              className={`font-semibold text-sm ${
-                                isDarkMode ? "text-white" : "text-gray-900"
+                  {/* Category dropdown */}
+                  {showCategoryPanel && (
+                    <div
+                      className={`absolute right-0 mt-2 w-72 max-h-96 overflow-y-auto rounded-xl border shadow-xl z-50 ${
+                        isDark
+                          ? "bg-gray-800 border-gray-700"
+                          : "bg-white border-gray-200"
+                      }`}
+                    >
+                      <div className="p-3">
+                        <div className="flex items-center justify-between mb-2 px-1">
+                          <span
+                            className={`text-xs font-semibold uppercase tracking-wide ${isDark ? "text-gray-400" : "text-gray-500"}`}
+                          >
+                            {t("categories")}
+                          </span>
+                          {selectedCategory && (
+                            <button
+                              onClick={() => handleCategorySelect(null)}
+                              className="text-xs text-orange-500 hover:text-orange-600 font-medium"
+                            >
+                              {t("clearFilters")}
+                            </button>
+                          )}
+                        </div>
+                        <div className="space-y-0.5">
+                          {CATEGORIES.map((cat) => (
+                            <button
+                              key={cat}
+                              onClick={() => handleCategorySelect(cat)}
+                              className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center justify-between transition-colors ${
+                                selectedCategory === cat
+                                  ? "bg-orange-500 text-white font-medium"
+                                  : isDark
+                                    ? "text-gray-300 hover:bg-gray-700"
+                                    : "text-gray-700 hover:bg-gray-50"
                               }`}
                             >
-                              {t("categories")}
-                            </h3>
-                            {selectedCategory && (
-                              <button
-                                onClick={() => handleCategoryFilter(null)}
-                                className={`text-xs px-2 py-1 rounded transition-colors ${
-                                  isDarkMode
-                                    ? "text-gray-400 hover:text-white hover:bg-gray-700"
-                                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                                }`}
-                              >
-                                {t("clearFilters")}
-                              </button>
-                            )}
-                          </div>
-
-                          <div className="space-y-1">
-                            {CATEGORIES.map((category) => (
-                              <button
-                                key={category}
-                                onClick={() => handleCategoryFilter(category)}
-                                className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                                  selectedCategory === category
-                                    ? "bg-blue-600 text-white"
-                                    : isDarkMode
-                                    ? "text-gray-300 hover:bg-gray-700"
-                                    : "text-gray-700 hover:bg-gray-100"
-                                }`}
-                              >
-                                {tRoot(getCategoryTranslationKey(category))}
-                              </button>
-                            ))}
-                          </div>
+                              {catLabel(cat)}
+                              {selectedCategory === cat && <Check size={14} />}
+                            </button>
+                          ))}
                         </div>
                       </div>
-                    </>
+                    </div>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* Active Filters Display */}
-            {(searchTerm.trim() || selectedCategory) && (
+            {/* Row 2: active filter chips */}
+            {(searchQuery.trim() || selectedCategory) && (
               <div className="flex flex-wrap gap-2">
-                {searchTerm.trim() && (
-                  <div
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs ${
-                      isDarkMode
-                        ? "bg-blue-900/50 text-blue-300"
+                {searchQuery.trim() && (
+                  <span
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                      isDark
+                        ? "bg-blue-900/40 text-blue-300"
                         : "bg-blue-100 text-blue-800"
                     }`}
                   >
-                    <span>&quot;{searchTerm}&quot;</span>
+                    &ldquo;{searchQuery}&rdquo;
                     <button
-                      onClick={() => handleSearch("")}
-                      className="ml-1 hover:opacity-70"
+                      onClick={() => setSearchQuery("")}
+                      className="hover:opacity-70"
                     >
-                      <XMarkIcon className="w-3 h-3" />
+                      <X size={11} />
                     </button>
-                  </div>
+                  </span>
                 )}
-
                 {selectedCategory && (
-                  <div
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs ${
-                      isDarkMode
-                        ? "bg-green-900/50 text-green-300"
-                        : "bg-green-100 text-green-800"
+                  <span
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                      isDark
+                        ? "bg-orange-900/40 text-orange-300"
+                        : "bg-orange-100 text-orange-700"
                     }`}
                   >
-                    <span>{tRoot(getCategoryTranslationKey(selectedCategory))}</span>
+                    {catLabel(selectedCategory)}
                     <button
-                      onClick={() => handleCategoryFilter(null)}
-                      className="ml-1 hover:opacity-70"
+                      onClick={() => handleCategorySelect(null)}
+                      className="hover:opacity-70"
                     >
-                      <XMarkIcon className="w-3 h-3" />
+                      <X size={11} />
                     </button>
-                  </div>
+                  </span>
                 )}
               </div>
             )}
           </div>
 
-          {/* Shops Grid */}
-          {(isLoading && shops.length === 0) || isSearching || isFiltering ? (
-            <div className={`grid ${getGridCols()} gap-4`}>
-              {Array.from({ length: 8 }).map((_, index) => (
-                <LoadingShopCard key={index} isDarkMode={isDarkMode} />
+          {/* ── Category pills (horizontal scroll) ── */}
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-3 mb-4 -mx-4 px-4">
+            <button
+              onClick={() => handleCategorySelect(null)}
+              className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                !selectedCategory
+                  ? "bg-orange-500 text-white border-orange-500"
+                  : isDark
+                    ? "bg-transparent border-gray-600 text-gray-300 hover:border-gray-400"
+                    : "bg-white border-gray-300 text-gray-600 hover:border-gray-400"
+              }`}
+            >
+              All
+            </button>
+            {CATEGORIES.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => handleCategorySelect(cat)}
+                className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-medium border transition-colors whitespace-nowrap ${
+                  selectedCategory === cat
+                    ? "bg-orange-500 text-white border-orange-500"
+                    : isDark
+                      ? "bg-transparent border-gray-600 text-gray-300 hover:border-gray-400"
+                      : "bg-white border-gray-300 text-gray-600 hover:border-gray-400"
+                }`}
+              >
+                {catLabel(cat)}
+              </button>
+            ))}
+          </div>
+
+          {/* ── Grid ── */}
+          {(isLoading && shops.length === 0) || isSearching ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+              {Array.from({ length: 10 }).map((_, i) => (
+                <LoadingShopCard key={i} isDarkMode={isDark} />
               ))}
             </div>
           ) : displayedShops.length === 0 ? (
-            <div className="text-center py-16">
-              <div className={`text-5xl mb-4 ${
-                isDarkMode ? "text-gray-600" : "text-gray-400"
-              }`}>
-                🏪
-              </div>
-
+            <div className="flex flex-col items-center justify-center min-h-64 gap-4 py-16 text-center">
+              <Store
+                size={64}
+                strokeWidth={1}
+                className={isDark ? "text-gray-700" : "text-gray-300"}
+              />
               <h3
-                className={`text-xl font-semibold mb-2 ${
-                  isDarkMode ? "text-white" : "text-gray-900"
-                }`}
+                className={`text-lg font-semibold ${isDark ? "text-white" : "text-gray-900"}`}
               >
                 {t("noShopsFound")}
               </h3>
               <p
-                className={`text-sm max-w-md mx-auto ${
-                  isDarkMode ? "text-gray-400" : "text-gray-600"
-                }`}
+                className={`text-sm max-w-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}
               >
-                {searchTerm || selectedCategory
+                {searchQuery || selectedCategory
                   ? t("noShopsMatchFilter")
                   : t("noShopsAvailable")}
               </p>
+              {(searchQuery || selectedCategory) && (
+                <button
+                  onClick={() => {
+                    setSearchQuery("");
+                    handleCategorySelect(null);
+                  }}
+                  className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                  {t("clearFilters")}
+                </button>
+              )}
             </div>
           ) : (
             <>
-              {/* Subtle loading indicator when filtering */}
-              {isPending && (
-                <div className="flex justify-center mb-3">
-                  <div className={`px-3 py-2 rounded-lg text-sm ${
-                    isDarkMode ? "bg-gray-800 text-gray-400" : "bg-gray-100 text-gray-600"
-                  }`}>
-                    <div className="flex items-center gap-2">
-                      <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-blue-500 border-t-transparent"></div>
-                      <span>{t("loading")}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className={`grid ${getGridCols()} gap-4 ${isPending ? 'opacity-60 transition-opacity duration-200' : ''}`}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
                 {displayedShops.map((shop) => (
-                  <ShopCard key={shop.id} shop={shop} isDarkMode={isDarkMode} />
+                  <ShopCard key={shop.id} shop={shop} isDarkMode={isDark} />
                 ))}
               </div>
 
-              {/* Load More Trigger - only for Firebase pagination */}
-              {!searchTerm.trim() && hasMore && (
+              {/* Load more — browse only */}
+              {!debouncedQ && hasMore && (
                 <>
-                  {/* Invisible sentinel for IntersectionObserver */}
-                  {!isLoadingMore && <div ref={loadMoreRef} className="h-10" />}
-
-                  {/* Loading state */}
-                  {isLoadingMore && (
-                    <div className={`grid ${getGridCols()} gap-4 mt-6`}>
-                      {Array.from({ length: 4 }).map((_, index) => (
-                        <LoadingShopCard key={`loading-${index}`} isDarkMode={isDarkMode} />
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Fallback Load More button */}
                   {!isLoadingMore && (
-                    <div className="flex justify-center py-6">
-                      <button
-                        onClick={() => fetchShops(true, selectedCategory)}
-                        className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-                          isDarkMode
-                            ? "bg-gray-800 hover:bg-gray-700 text-white border border-gray-700"
-                            : "bg-white hover:bg-gray-50 text-gray-900 border border-gray-300"
-                        }`}
-                      >
-                        {t("loadMore") || "Load More"}
-                      </button>
+                    <div ref={loadMoreEl} className="h-10 mt-4" />
+                  )}
+                  {isLoadingMore && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 mt-4">
+                      {Array.from({ length: 4 }).map((_, i) => (
+                        <LoadingShopCard key={i} isDarkMode={isDark} />
+                      ))}
                     </div>
                   )}
                 </>
               )}
 
+              {/* End of results message */}
+              {!hasMore &&
+                !isLoadingMore &&
+                shops.length > 0 &&
+                !debouncedQ && (
+                  <p
+                    className={`text-center text-xs py-8 ${isDark ? "text-gray-600" : "text-gray-400"}`}
+                  >
+                    All shops loaded
+                  </p>
+                )}
+
+              {/* Search result count */}
+              {debouncedQ && displayedShops.length > 0 && (
+                <p
+                  className={`text-center text-xs py-6 ${isDark ? "text-gray-500" : "text-gray-400"}`}
+                >
+                  {displayedShops.length}{" "}
+                  {displayedShops.length === 1 ? "shop" : "shops"} found
+                </p>
+              )}
             </>
           )}
         </div>
