@@ -350,6 +350,36 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
     };
   }, [showCategoriesMenu, isMobile]);
 
+  // Prevent background page scroll when cursor is over desktop dropdown
+  useEffect(() => {
+    const el = categoriesMenuRef.current;
+    if (!el || !showCategoriesMenu || isMobile) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      // Walk up from the event target to find a scrollable ancestor within the dropdown
+      let target = e.target as HTMLElement | null;
+      while (target && target !== el) {
+        const { scrollHeight, clientHeight, scrollTop } = target;
+        if (scrollHeight > clientHeight) {
+          // This element is scrollable — allow scroll if not at boundary
+          const atTop = scrollTop <= 0 && e.deltaY < 0;
+          const atBottom =
+            scrollTop + clientHeight >= scrollHeight - 1 && e.deltaY > 0;
+          if (!atTop && !atBottom) {
+            return; // Scroll is consumed by this element, no need to block
+          }
+          break;
+        }
+        target = target.parentElement;
+      }
+      // Either no scrollable child found, or at scroll boundary — block body scroll
+      e.preventDefault();
+    };
+
+    el.addEventListener("wheel", handleWheel, { passive: false });
+    return () => el.removeEventListener("wheel", handleWheel);
+  }, [showCategoriesMenu, isMobile]);
+
   const handleCategoryClick = (category: CategoryItem) => {
     if (category.id === "categories") {
       if (isMobile) {
@@ -675,7 +705,7 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
             <div
               className={`
               w-1/3 h-full border-r ${isDark ? "border-gray-700" : "border-gray-200"}
-              ${isDark ? "bg-gray-800/50" : "bg-gray-50"} overflow-y-auto
+              ${isDark ? "bg-gray-800/50" : "bg-gray-50"} overflow-y-auto overscroll-y-contain
             `}
             >
               <div className="p-3">
@@ -738,7 +768,7 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
             </div>
 
             {/* Right side - Subcategories */}
-            <div className="w-2/3 h-full overflow-y-auto">
+            <div className="w-2/3 h-full overflow-y-auto overscroll-y-contain">
               <div className="p-4">
               {hoveredCategory && (
                 <div>
