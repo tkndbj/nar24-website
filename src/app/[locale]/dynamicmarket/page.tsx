@@ -111,7 +111,7 @@ export default function DynamicMarketPage() {
   const [AllInOneCategoryData, setAllInOneCategoryData] = useState<typeof AllInOneCategoryDataType | null>(null);
   const [globalBrands, setGlobalBrands] = useState<typeof globalBrandsType>([]);
   useEffect(() => {
-    import("../../../constants/productData").then((mod) => setAllInOneCategoryData(mod.AllInOneCategoryData));
+    import("../../../constants/productData").then((mod) => setAllInOneCategoryData(() => mod.AllInOneCategoryData));
     import("../../../constants/brands").then((mod) => setGlobalBrands(mod.globalBrands));
   }, []);
 

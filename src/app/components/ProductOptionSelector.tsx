@@ -213,7 +213,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
   // Dynamic import for AttributeLocalizationUtils
   const [AttributeLocalizationUtils, setAttributeLocalizationUtils] = useState<typeof AttributeLocalizationUtilsType | null>(null);
   useEffect(() => {
-    import("@/constants/AttributeLocalization").then((mod) => setAttributeLocalizationUtils(mod.AttributeLocalizationUtils));
+    import("@/constants/AttributeLocalization").then((mod) => setAttributeLocalizationUtils(() => mod.AttributeLocalizationUtils));
   }, []);
 
   // ============================================================================

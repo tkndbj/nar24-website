@@ -108,7 +108,7 @@ const DynamicAttributesWidget: React.FC<DynamicAttributesWidgetProps> = ({
   // Dynamic import for AttributeLocalizationUtils
   const [AttributeLocalizationUtils, setAttributeLocalizationUtils] = useState<typeof AttributeLocalizationUtilsType | null>(null);
   useEffect(() => {
-    import("@/constants/AttributeLocalization").then((mod) => setAttributeLocalizationUtils(mod.AttributeLocalizationUtils));
+    import("@/constants/AttributeLocalization").then((mod) => setAttributeLocalizationUtils(() => mod.AttributeLocalizationUtils));
   }, []);
 
   // Get icon for attribute key

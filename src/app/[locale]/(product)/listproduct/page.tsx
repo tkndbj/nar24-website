@@ -72,7 +72,7 @@ export default function ListProductForm() {
   // Dynamic import for AllInOneCategoryData
   const [AllInOneCategoryData, setAllInOneCategoryData] = useState<typeof AllInOneCategoryDataType | null>(null);
   useEffect(() => {
-    import("@/constants/productData").then((mod) => setAllInOneCategoryData(mod.AllInOneCategoryData));
+    import("@/constants/productData").then((mod) => setAllInOneCategoryData(() => mod.AllInOneCategoryData));
   }, []);
   const tGender = useTranslations("genderStep");
   const tFootwear = useTranslations("footwearSizeStep");

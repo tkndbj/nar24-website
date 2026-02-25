@@ -64,7 +64,7 @@ export default function CreateShopPage() {
   // Dynamic import for AllInOneCategoryData
   const [AllInOneCategoryData, setAllInOneCategoryData] = useState<typeof AllInOneCategoryDataType | null>(null);
   useEffect(() => {
-    import("../../../constants/productData").then((mod) => setAllInOneCategoryData(mod.AllInOneCategoryData));
+    import("../../../constants/productData").then((mod) => setAllInOneCategoryData(() => mod.AllInOneCategoryData));
   }, []);
 
   const [isDarkMode, setIsDarkMode] = useState(false);

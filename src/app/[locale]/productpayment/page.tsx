@@ -504,6 +504,15 @@ const DeliveryOption: React.FC<{
 
 // Main Payment Page Component
 export default function ProductPaymentPage() {
+  const { user } = useUser();
+  return (
+    <CouponProviders user={user} db={db}>
+      <ProductPaymentPageContent />
+    </CouponProviders>
+  );
+}
+
+function ProductPaymentPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, isLoading: userLoading } = useUser();
@@ -1323,7 +1332,6 @@ const isValidPhoneNumber = (phone: string): boolean => {
   const currency = cartItems[0]?.currency || "TL";
 
   return (
-    <CouponProviders user={user} db={db}>
     <div
       className={`min-h-screen ${
         isDarkMode
@@ -2255,6 +2263,5 @@ const isValidPhoneNumber = (phone: string): boolean => {
         />
       )}
     </div>
-    </CouponProviders>
   );
 }

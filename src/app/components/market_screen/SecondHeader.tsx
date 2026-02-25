@@ -123,7 +123,7 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
 
   // Lazy-load productData (202KB) — avoids blocking initial paint
   useEffect(() => {
-    import("@/constants/productData").then((mod) => setCategoryData(mod.AllInOneCategoryData));
+    import("@/constants/productData").then((mod) => setCategoryData(() => mod.AllInOneCategoryData));
   }, []);
 
   const [activeCategory, setActiveCategory] = useState<string | null>(null);

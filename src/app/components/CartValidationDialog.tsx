@@ -512,7 +512,7 @@ interface ErrorProductCardProps {
     // Dynamic import for AttributeLocalizationUtils
     const [AttrLocUtils, setAttrLocUtils] = useState<typeof AttributeLocalizationUtilsType | null>(null);
     useEffect(() => {
-      import('@/constants/AttributeLocalization').then((mod) => setAttrLocUtils(mod.AttributeLocalizationUtils));
+      import('@/constants/AttributeLocalization').then((mod) => setAttrLocUtils(() => mod.AttributeLocalizationUtils));
     }, []);
 
     // ✅ Localize color name
@@ -592,7 +592,7 @@ const WarningProductCard: React.FC<WarningProductCardProps> = ({
   // Dynamic import for AttributeLocalizationUtils
   const [AttrLocUtils, setAttrLocUtils] = useState<typeof AttributeLocalizationUtilsType | null>(null);
   useEffect(() => {
-    import('@/constants/AttributeLocalization').then((mod) => setAttrLocUtils(mod.AttributeLocalizationUtils));
+    import('@/constants/AttributeLocalization').then((mod) => setAttrLocUtils(() => mod.AttributeLocalizationUtils));
   }, []);
 
   const localizedColor = selectedColor && localization && AttrLocUtils

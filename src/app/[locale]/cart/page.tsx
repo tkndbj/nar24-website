@@ -89,6 +89,15 @@ interface CartItem {
 }
 
 export default function CartPage() {
+  const { user } = useUser();
+  return (
+    <CouponProviders user={user} db={db}>
+      <CartPageContent />
+    </CouponProviders>
+  );
+}
+
+function CartPageContent() {
   const router = useRouter();
   const { user, isLoading: isAuthLoading } = useUser();
   const localization = useTranslations();
@@ -96,7 +105,7 @@ export default function CartPage() {
   // Dynamic import for AttributeLocalizationUtils
   const [AttributeLocalizationUtils, setAttributeLocalizationUtils] = useState<typeof AttributeLocalizationUtilsType | null>(null);
   useEffect(() => {
-    import("@/constants/AttributeLocalization").then((mod) => setAttributeLocalizationUtils(mod.AttributeLocalizationUtils));
+    import("@/constants/AttributeLocalization").then((mod) => setAttributeLocalizationUtils(() => mod.AttributeLocalizationUtils));
   }, []);
   const {
     cartItems,
@@ -1305,7 +1314,6 @@ export default function CartPage() {
   // ========================================================================
 
   return (
-    <CouponProviders user={user} db={db}>
     <div className={`min-h-screen flex flex-col transition-colors duration-200 ${isDark ? "bg-gray-950" : "bg-gray-50"}`}>
       <div className="max-w-6xl mx-auto px-0 sm:px-4 pt-4 pb-0 lg:px-8 lg:pt-8 lg:pb-8 flex-1 w-full">
         {/* Back Button */}
@@ -1670,6 +1678,5 @@ export default function CartPage() {
 
       <Footer />
     </div>
-    </CouponProviders>
   );
 }

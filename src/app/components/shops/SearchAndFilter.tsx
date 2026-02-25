@@ -86,7 +86,7 @@ export default function SearchAndFilter({
   // Dynamic import for AllInOneCategoryData
   const [CategoryData, setCategoryData] = useState<typeof AllInOneCategoryDataType | null>(null);
   useEffect(() => {
-    import("@/constants/productData").then((mod) => setCategoryData(mod.AllInOneCategoryData));
+    import("@/constants/productData").then((mod) => setCategoryData(() => mod.AllInOneCategoryData));
   }, []);
   const CATEGORIES = CategoryData?.kCategories.map((cat) => cat.key) ?? [];
 
