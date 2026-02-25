@@ -5,9 +5,9 @@ const TYPESENSE_SEARCH_KEY = process.env.TYPESENSE_SEARCH_KEY!;
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { collection: string } },
+  { params }: { params: Promise<{ collection: string }> },
 ) {
-  const { collection } = params;
+  const { collection } = await params;
 
   const searchParams = request.nextUrl.searchParams;
   const typesenseUrl = `https://${TYPESENSE_HOST}/collections/${collection}/documents/search?${searchParams.toString()}`;
