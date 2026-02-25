@@ -110,13 +110,22 @@ export async function getFirebaseDb(): Promise<Firestore> {
     _dbPromise = (async () => {
       // Initialize App Check first (non-blocking, runs in parallel)
       const appCheckPromise = getFirebaseAppCheck();
-      const [app, { getFirestore }] = await Promise.all([
+      const [app, { initializeFirestore, getFirestore }] = await Promise.all([
         getFirebaseApp(),
         import("firebase/firestore"),
       ]);
       // Wait for App Check to be ready before returning db
       await appCheckPromise;
-      _db = getFirestore(app);
+      // Use initializeFirestore with long polling auto-detection to prevent
+      // "Could not reach Cloud Firestore backend" errors when WebSockets are blocked.
+      try {
+        _db = initializeFirestore(app, {
+          experimentalAutoDetectLongPolling: true,
+        });
+      } catch {
+        // Already initialized (e.g. by eager firebase.ts), get existing instance
+        _db = getFirestore(app);
+      }
       return _db;
     })();
   }

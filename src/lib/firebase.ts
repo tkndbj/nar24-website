@@ -1,7 +1,7 @@
 // src/lib/firebase.ts
 import { initializeApp, getApps } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore, getFirestore, type Firestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
 import { initializeAppCheckOnce, getCachedAppCheck } from "./firebase-appcheck";
@@ -27,7 +27,21 @@ if (typeof window !== "undefined") {
 // Export getter for App Check
 export const getAppCheck = getCachedAppCheck;
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+
+// Initialize Firestore with long polling auto-detection.
+// This prevents "Could not reach Cloud Firestore backend" errors when
+// WebSocket connections are blocked by firewalls/proxies.
+let db: Firestore;
+try {
+  db = initializeFirestore(app, {
+    experimentalAutoDetectLongPolling: true,
+  });
+} catch {
+  // Already initialized (e.g. by firebase-lazy.ts), get existing instance
+  db = getFirestore(app);
+}
+export { db };
+
 export const storage = getStorage(app);
 
 // Initialize Functions with europe-west3 region
