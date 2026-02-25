@@ -1,7 +1,7 @@
 // Fixed SecondHeader.tsx
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
 import {
   Grid3x3,
@@ -117,6 +117,15 @@ const REVERSE_CATEGORY_MAPPING: { [key: string]: string } = Object.entries(
 // Mobile drawer states
 type DrawerState = "main" | "subcategory" | "subsubcategory";
 
+// Pure utility — no need to recreate inside component
+const chunkArray = <T,>(array: T[], size: number): T[][] => {
+  const chunks: T[][] = [];
+  for (let i = 0; i < array.length; i += size) {
+    chunks.push(array.slice(i, i + size));
+  }
+  return chunks;
+};
+
 export default function SecondHeader({ className = "" }: SecondHeaderProps) {
   const isDark = useTheme();
   const [CategoryData, setCategoryData] = useState<typeof AllInOneCategoryDataType | null>(null);
@@ -153,7 +162,7 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
   } | null>(null);
   const router = useRouter();
   const t = useTranslations();
-  const l10n = createAppLocalizations(t);
+  const l10n = useMemo(() => createAppLocalizations(t), [t]);
 
   // Check if screen is mobile
   useEffect(() => {
@@ -244,11 +253,11 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
     return [categoriesButton, ...categoryItems];
   };
 
-  const buyerCategories = getBuyerCategories();
-  const categories = getCategories();
+  const buyerCategories = useMemo(() => getBuyerCategories(), [CategoryData, l10n]);
+  const categories = useMemo(() => getCategories(), [CategoryData, l10n, t]);
 
   // Helper function to get localized subcategory name
-  const getLocalizedSubcategory = (
+  const getLocalizedSubcategory = useCallback((
     buyerCategory: string,
     subcategory: string
   ): string => {
@@ -257,10 +266,10 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
       subcategory,
       l10n
     ) ?? subcategory;
-  };
+  }, [CategoryData, l10n]);
 
   // Helper function to get localized sub-subcategory name
-  const getLocalizedSubSubcategory = (
+  const getLocalizedSubSubcategory = useCallback((
     buyerCategory: string,
     subcategory: string,
     subSubcategory: string
@@ -271,16 +280,7 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
       subSubcategory,
       l10n
     ) ?? subSubcategory;
-  };
-
-  // Helper function to chunk array into groups of 3
-  const chunkArray = <T,>(array: T[], size: number): T[][] => {
-    const chunks: T[][] = [];
-    for (let i = 0; i < array.length; i += size) {
-      chunks.push(array.slice(i, i + size));
-    }
-    return chunks;
-  };
+  }, [CategoryData, l10n]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -493,14 +493,6 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
           REVERSE_CATEGORY_MAPPING[productCategory] ||
           productCategory.toLowerCase().replace(/[&\s]+/g, "-");
 
-        console.log("🔄 Women/Men navigation:", {
-          buyerCategory: selectedMainCategory.key,
-          buyerSubcategory: selectedSubcategory,
-          subSubcategory,
-          mappedProductCategory: productCategory,
-          urlCategory,
-        });
-
         params.set("category", urlCategory);
         params.set("subcategory", subSubcategory); // subSubcategory becomes the product subcategory
         params.set("buyerCategory", selectedMainCategory.key); // For gender filtering
@@ -527,7 +519,6 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
         )
       );
 
-      console.log("🔄 Final navigation params:", params.toString());
       router.push(`/dynamicmarket2?${params.toString()}`);
       closeMobileDrawer();
     }

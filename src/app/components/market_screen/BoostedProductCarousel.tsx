@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useEffect, memo } from "react";
+import React, { memo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useBoostedProducts, BoostedProduct } from "@/hooks/useBoostedProducts";
+import { useTheme } from "@/hooks/useTheme";
 
 /**
  * BoostedProductCarousel Component
@@ -213,24 +214,7 @@ ProductCard.displayName = "ProductCard";
 
 const BoostedProductsCarousel = memo(
   ({ className = "" }: BoostedProductsCarouselProps) => {
-    const [isDarkMode, setIsDarkMode] = useState(false);
-
-    // Theme detection
-    useEffect(() => {
-      const updateTheme = () => {
-        setIsDarkMode(document.documentElement.classList.contains("dark"));
-      };
-
-      updateTheme();
-
-      const observer = new MutationObserver(updateTheme);
-      observer.observe(document.documentElement, {
-        attributes: true,
-        attributeFilter: ["class"],
-      });
-
-      return () => observer.disconnect();
-    }, []);
+    const isDarkMode = useTheme();
 
     // Fetch boosted products
     const {

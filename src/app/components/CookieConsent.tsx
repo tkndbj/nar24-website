@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { Cookie, X, Settings, Check } from "lucide-react";
 import Link from "next/link";
+import { useTheme } from "@/hooks/useTheme";
 
 interface CookiePreferences {
   necessary: boolean;
@@ -15,7 +16,7 @@ interface CookiePreferences {
 export default function CookieConsent() {
   const [isVisible, setIsVisible] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const isDarkMode = useTheme();
   const t = useTranslations("cookieConsent");
 
   const [preferences, setPreferences] = useState<CookiePreferences>({
@@ -26,21 +27,6 @@ export default function CookieConsent() {
   });
 
   useEffect(() => {
-    // Check theme
-    const checkTheme = () => {
-      if (typeof document !== "undefined") {
-        setIsDarkMode(document.documentElement.classList.contains("dark"));
-      }
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    if (typeof document !== "undefined") {
-      observer.observe(document.documentElement, {
-        attributes: true,
-        attributeFilter: ["class"],
-      });
-    }
-
     // Check if user has already made a choice
     const consentGiven = localStorage.getItem("cookieConsent");
     if (!consentGiven) {
@@ -65,7 +51,6 @@ export default function CookieConsent() {
     window.addEventListener("openCookieSettings", handleOpenSettings);
 
     return () => {
-      observer.disconnect();
       window.removeEventListener("openCookieSettings", handleOpenSettings);
     };
   }, []);

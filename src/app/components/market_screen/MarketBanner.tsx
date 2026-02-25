@@ -1,5 +1,8 @@
+"use client";
+
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import NextImage from "next/image";
+import { useTheme } from "@/hooks/useTheme";
 import {
   getFirestore,
   collection,
@@ -200,32 +203,13 @@ const useMarketBanners = () => {
 
 // Main Market Banner component
 export default function MarketBannerGrid() {
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const isDarkMode = useTheme();
   const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
   const [loadingImages, setLoadingImages] = useState<Set<string>>(new Set());
   const { banners, isLoading, error, hasMore, fetchNextPage } =
     useMarketBanners();
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
-
-  // Handle theme detection
-  useEffect(() => {
-    const checkTheme = () => {
-      if (typeof document !== "undefined") {
-        setIsDarkMode(document.documentElement.classList.contains("dark"));
-      }
-    };
-
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    if (typeof document !== "undefined") {
-      observer.observe(document.documentElement, {
-        attributes: true,
-        attributeFilter: ["class"],
-      });
-    }
-    return () => observer.disconnect();
-  }, []);
 
   // Infinite scroll - automatically load more when reaching bottom
   useEffect(() => {

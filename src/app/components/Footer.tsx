@@ -1,32 +1,15 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { Mail, Phone, MapPin } from "lucide-react";
 import Image from "next/image";
+import { useTheme } from "@/hooks/useTheme";
 
 export default function Footer() {
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const isDarkMode = useTheme();
   const t = useTranslations("footer");
-
-  useEffect(() => {
-    const checkTheme = () => {
-      if (typeof document !== "undefined") {
-        setIsDarkMode(document.documentElement.classList.contains("dark"));
-      }
-    };
-
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    if (typeof document !== "undefined") {
-      observer.observe(document.documentElement, {
-        attributes: true,
-        attributeFilter: ["class"],
-      });
-    }
-    return () => observer.disconnect();
-  }, []);
 
   const handleLinkClick = (
     e: React.MouseEvent,

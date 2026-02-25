@@ -44,6 +44,7 @@ import { Product } from "@/app/models/Product";
 import { analyticsBatcher } from "@/app/utils/analyticsBatcher";
 import { useProductCache } from "@/context/ProductCacheProvider";
 import { userActivityService } from "@/services/userActivity";
+import { useTheme } from "@/hooks/useTheme";
 
 interface ProductCardProps {
   product: Product;
@@ -490,9 +491,9 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
   const { addProductToCart, removeFromCart } = useCartActions();
   const { addToFavorites, removeMultipleFromFavorites } = useFavoriteActions();
 
-  const [isDarkModeState, setIsDarkMode] = useState(false);
+  const isDarkModeTheme = useTheme();
   const isDarkMode =
-    isDarkModeProp !== undefined ? isDarkModeProp : isDarkModeState;
+    isDarkModeProp !== undefined ? isDarkModeProp : isDarkModeTheme;
 
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [internalSelectedColor, setInternalSelectedColor] = useState<
@@ -510,7 +511,6 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
     left: number;
   } | null>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const [, setIsMobile] = useState(false);
 
   // ✅ CRITICAL: Only show selector for CART operations, not favorites
   const [showCartOptionSelector, setShowCartOptionSelector] = useState(false);
@@ -604,38 +604,6 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
     }
   }, [product, router, onTap]);
 
-  // ✅ Check theme changes
-  useEffect(() => {
-    const checkTheme = () => {
-      if (typeof document !== "undefined") {
-        setIsDarkMode(document.documentElement.classList.contains("dark"));
-      }
-    };
-
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    if (typeof document !== "undefined") {
-      observer.observe(document.documentElement, {
-        attributes: true,
-        attributeFilter: ["class"],
-      });
-    }
-    return () => observer.disconnect();
-  }, []);
-
-  // ✅ Detect mobile/touch devices to disable hover zoom
-  useEffect(() => {
-    const checkMobile = () => {
-      const isTouchDevice =
-        "ontouchstart" in window || navigator.maxTouchPoints > 0;
-      const isSmallScreen = window.innerWidth < 768;
-      setIsMobile(isTouchDevice || isSmallScreen);
-    };
-
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
 
   // Reset image state when color changes (matches Flutter's didUpdateWidget)
   useEffect(() => {
