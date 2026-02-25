@@ -41,9 +41,14 @@ let _functionsPromise: Promise<Functions> | null = null;
 // Re-export App Check getter from shared module
 export { getCachedAppCheck };
 
+// App Check readiness promise — resolved once a token is available (or timed out)
+let _appCheckReady: Promise<void> | null = null;
+const APP_CHECK_TIMEOUT_MS = 3000;
+
 /**
  * Get or initialize the Firebase App instance
  * This is the core initialization - all other services depend on this
+ * Also kicks off App Check immediately so the token is ready ASAP.
  */
 export async function getFirebaseApp(): Promise<FirebaseApp> {
   if (_app) return _app;
@@ -52,6 +57,12 @@ export async function getFirebaseApp(): Promise<FirebaseApp> {
     _appPromise = (async () => {
       const { initializeApp, getApps } = await import("firebase/app");
       _app = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0];
+
+      // Start App Check as early as possible (non-blocking)
+      if (typeof window !== "undefined") {
+        initializeAppCheckOnce(_app);
+      }
+
       return _app;
     })();
   }
@@ -61,7 +72,6 @@ export async function getFirebaseApp(): Promise<FirebaseApp> {
 
 /**
  * Get or initialize Firebase App Check
- * Must be initialized before using other Firebase services for security
  * Only runs on client-side (returns null on server)
  */
 export async function getFirebaseAppCheck(): Promise<AppCheck | null> {
@@ -73,21 +83,37 @@ export async function getFirebaseAppCheck(): Promise<AppCheck | null> {
 }
 
 /**
+ * Wait for App Check to be ready, but only up to APP_CHECK_TIMEOUT_MS.
+ * - Cached tokens resolve instantly
+ * - Fresh tokens typically take 1-2s
+ * - If reCAPTCHA is very slow, we proceed after the timeout
+ */
+function waitForAppCheck(): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve();
+
+  if (!_appCheckReady) {
+    _appCheckReady = Promise.race([
+      getFirebaseAppCheck().then(() => {}),
+      new Promise<void>((resolve) => setTimeout(resolve, APP_CHECK_TIMEOUT_MS)),
+    ]);
+  }
+
+  return _appCheckReady;
+}
+
+/**
  * Get or initialize Firebase Auth
- * Lazy loads the auth module only when needed
- * Kicks off App Check in the background (does NOT block on it —
- * the Firebase SDK auto-attaches tokens once available)
+ * Waits for App Check (with timeout) so tokens are attached to requests.
  */
 export async function getFirebaseAuth(): Promise<Auth> {
   if (_auth) return _auth;
 
   if (!_authPromise) {
     _authPromise = (async () => {
-      // Kick off App Check in background — don't await
-      getFirebaseAppCheck();
       const [app, { getAuth }] = await Promise.all([
         getFirebaseApp(),
         import("firebase/auth"),
+        waitForAppCheck(),
       ]);
       _auth = getAuth(app);
       return _auth;
@@ -99,23 +125,19 @@ export async function getFirebaseAuth(): Promise<Auth> {
 
 /**
  * Get or initialize Firestore
- * Lazy loads the firestore module only when needed
- * Kicks off App Check in the background (does NOT block on it —
- * the Firebase SDK auto-attaches tokens once available)
+ * Waits for App Check (with timeout) so tokens are attached to requests.
+ * Uses long polling auto-detection to handle blocked WebSockets.
  */
 export async function getFirebaseDb(): Promise<Firestore> {
   if (_db) return _db;
 
   if (!_dbPromise) {
     _dbPromise = (async () => {
-      // Kick off App Check in background — don't await
-      getFirebaseAppCheck();
       const [app, { initializeFirestore, getFirestore }] = await Promise.all([
         getFirebaseApp(),
         import("firebase/firestore"),
+        waitForAppCheck(),
       ]);
-      // Use initializeFirestore with long polling auto-detection to prevent
-      // "Could not reach Cloud Firestore backend" errors when WebSockets are blocked.
       try {
         _db = initializeFirestore(app, {
           experimentalAutoDetectLongPolling: true,
@@ -133,19 +155,17 @@ export async function getFirebaseDb(): Promise<Firestore> {
 
 /**
  * Get or initialize Firebase Storage
- * Lazy loads the storage module only when needed
- * Kicks off App Check in the background (does NOT block on it)
+ * Waits for App Check (with timeout) so tokens are attached to requests.
  */
 export async function getFirebaseStorage(): Promise<FirebaseStorage> {
   if (_storage) return _storage;
 
   if (!_storagePromise) {
     _storagePromise = (async () => {
-      // Kick off App Check in background — don't await
-      getFirebaseAppCheck();
       const [app, { getStorage }] = await Promise.all([
         getFirebaseApp(),
         import("firebase/storage"),
+        waitForAppCheck(),
       ]);
       _storage = getStorage(app);
       return _storage;
@@ -157,18 +177,19 @@ export async function getFirebaseStorage(): Promise<FirebaseStorage> {
 
 /**
  * Get or initialize Firebase Functions
- * Lazy loads the functions module only when needed
- * Kicks off App Check in the background (does NOT block on it)
+ * Waits for App Check (with timeout) so tokens are attached to requests.
  */
 export async function getFirebaseFunctions(): Promise<Functions> {
   if (_functions) return _functions;
 
   if (!_functionsPromise) {
     _functionsPromise = (async () => {
-      // Kick off App Check in background — don't await
-      getFirebaseAppCheck();
       const [app, { getFunctions, connectFunctionsEmulator }] =
-        await Promise.all([getFirebaseApp(), import("firebase/functions")]);
+        await Promise.all([
+          getFirebaseApp(),
+          import("firebase/functions"),
+          waitForAppCheck(),
+        ]);
       _functions = getFunctions(app, "europe-west3");
 
       // Connect to emulator in development
