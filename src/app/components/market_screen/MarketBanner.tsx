@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import NextImage from "next/image";
 import { useTheme } from "@/hooks/useTheme";
+import type { PrefetchedBannerItem } from "@/types/MarketLayout";
 import {
   getFirestore,
   collection,
@@ -63,9 +64,19 @@ const ErrorCard = ({ isDarkMode }: { isDarkMode: boolean }) => {
 };
 
 // Hook for Firebase collection listener - matches Flutter provider exactly
-const useMarketBanners = () => {
-  const [banners, setBanners] = useState<MarketBannerItem[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+const useMarketBanners = (initialItems?: PrefetchedBannerItem[] | null) => {
+  const ssrBanners = useMemo(() => {
+    if (!initialItems || initialItems.length === 0) return [];
+    return initialItems.map((item) => ({
+      id: item.id,
+      url: item.imageUrl,
+      linkType: item.linkType,
+      linkId: item.linkedShopId || item.linkedProductId,
+    }));
+  }, [initialItems]);
+
+  const [banners, setBanners] = useState<MarketBannerItem[]>(ssrBanners);
+  const [isLoading, setIsLoading] = useState(ssrBanners.length === 0 ? false : false);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [lastDoc, setLastDoc] =
@@ -189,10 +200,10 @@ const useMarketBanners = () => {
     await fetchNextPage();
   }, [fetchNextPage]);
 
-  // Initial load - matches Flutter's behavior
+  // Initial load - matches Flutter's behavior (skip if SSR data available)
   useEffect(() => {
     // Only fetch if we haven't loaded anything yet
-    if (!isLoading && banners.length === 0 && hasMore) {
+    if (banners.length === 0 && !isLoading && hasMore) {
       fetchNextPage();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -202,12 +213,12 @@ const useMarketBanners = () => {
 };
 
 // Main Market Banner component
-export default function MarketBannerGrid() {
+export default function MarketBannerGrid({ initialData }: { initialData?: PrefetchedBannerItem[] | null }) {
   const isDarkMode = useTheme();
   const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
   const [loadingImages, setLoadingImages] = useState<Set<string>>(new Set());
   const { banners, isLoading, error, hasMore, fetchNextPage } =
-    useMarketBanners();
+    useMarketBanners(initialData);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
 

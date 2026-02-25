@@ -10,6 +10,7 @@ import React, {
 import { getFirebaseDb } from "@/lib/firebase-lazy";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import type { PrefetchedBannerItem } from "@/types/MarketLayout";
 
 interface BannerItem {
   id: string;
@@ -21,6 +22,7 @@ interface BannerItem {
 
 interface AdsBannerProps {
   onBackgroundColorChange?: (color: string) => void;
+  initialData?: PrefetchedBannerItem[] | null;
 }
 
 // ✅ OPTIMIZED: Color conversion with validation
@@ -41,13 +43,26 @@ const convertDominantColor = (cInt: number | null | undefined): string => {
 
 export const AdsBanner: React.FC<AdsBannerProps> = ({
   onBackgroundColorChange,
+  initialData,
 }) => {
   const router = useRouter();
-  
-  // ✅ OPTIMIZED: Minimal state
-  const [banners, setBanners] = useState<BannerItem[]>([]);
+
+  // Convert server-prefetched data to component format
+  const ssrBanners = useMemo(() => {
+    if (!initialData || initialData.length === 0) return [];
+    return initialData.map((item) => ({
+      id: item.id,
+      url: item.imageUrl,
+      color: convertDominantColor(item.dominantColor),
+      linkType: item.linkType,
+      linkId: item.linkedShopId || item.linkedProductId,
+    }));
+  }, [initialData]);
+
+  // ✅ OPTIMIZED: Minimal state — use SSR data as initial values
+  const [banners, setBanners] = useState<BannerItem[]>(ssrBanners);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(ssrBanners.length === 0);
   const [isClient, setIsClient] = useState(false);
   const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
 
@@ -96,7 +111,7 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
     [onBackgroundColorChange, isClient]
   );
 
-  // ✅ OPTIMIZED: One-time Firestore fetch
+  // ✅ OPTIMIZED: One-time Firestore fetch (skipped if SSR data available)
   useEffect(() => {
     if (!isClient) return;
 
@@ -108,6 +123,13 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
       }
     } catch (error) {
       console.error("Failed to restore banner color:", error);
+    }
+
+    // Skip client fetch if we have server-prefetched data
+    if (banners.length > 0) {
+      setIsLoading(false);
+      updateBackgroundColor(banners[0].color);
+      return;
     }
 
     let cancelled = false;

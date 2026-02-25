@@ -7,6 +7,7 @@ import { ChevronRight, ChevronLeft } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useShops, Shop } from "@/hooks/useShops";
 import { useTheme } from "@/hooks/useTheme";
+import type { PrefetchedShop } from "@/types/MarketLayout";
 
 // ============================================================================
 // TYPES
@@ -14,6 +15,7 @@ import { useTheme } from "@/hooks/useTheme";
 
 interface ShopHorizontalListProps {
   className?: string;
+  initialData?: PrefetchedShop[] | null;
 }
 
 // ============================================================================
@@ -228,15 +230,15 @@ ShopCard.displayName = "ShopCard";
 // ============================================================================
 
 const ShopHorizontalList = memo(
-  ({ className = "" }: ShopHorizontalListProps) => {
+  ({ className = "", initialData }: ShopHorizontalListProps) => {
     const isDarkMode = useTheme();
     const [canScrollLeft, setCanScrollLeft] = useState(false);
     const [canScrollRight, setCanScrollRight] = useState(false);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const t = useTranslations("MarketScreen");
 
-    // Fetch shops
-    const { shops, isLoading } = useShops();
+    // Fetch shops (with optional SSR data)
+    const { shops, isLoading } = useShops(initialData);
 
     // Check scroll position
     const checkScrollPosition = useCallback(() => {

@@ -110,3 +110,77 @@ export const VALID_WIDGET_TYPES: readonly WidgetType[] = [
   "market_banner",
   "shop_horizontal_list",
 ] as const;
+
+// ============================================================================
+// SERVER-SIDE PREFETCHED DATA TYPES
+// ============================================================================
+
+/** Serialized banner item for server-side prefetch (shared by all banner widgets) */
+export interface PrefetchedBannerItem {
+  id: string;
+  imageUrl: string;
+  dominantColor?: number;
+  linkType?: string;
+  linkedShopId?: string;
+  linkedProductId?: string;
+}
+
+/** Serialized boosted product for server-side prefetch */
+export interface PrefetchedBoostedProduct {
+  id: string;
+  name: string;
+  price: number;
+  originalPrice?: number;
+  currency: string;
+  imageUrl: string;
+  shopId: string;
+  shopName?: string;
+  isBoosted: true;
+  boostExpiresAt?: number;
+  category?: string;
+  subcategory?: string;
+  rating?: number;
+  reviewCount?: number;
+}
+
+/** Serialized shop for server-side prefetch */
+export interface PrefetchedShop {
+  id: string;
+  name: string;
+  description?: string;
+  logoUrl?: string;
+  coverImageUrl?: string;
+  coverImageUrls?: string[];
+  profileImageUrl?: string;
+  averageRating: number;
+  reviewCount: number;
+  productCount: number;
+  category?: string;
+  isVerified: boolean;
+  ownerId: string;
+}
+
+/** Dynamic list config (serialized) */
+export interface PrefetchedDynamicListConfig {
+  id: string;
+  title: string;
+  isActive: boolean;
+  order: number;
+  gradientStart?: string;
+  gradientEnd?: string;
+  selectedProductIds?: string[];
+  selectedShopId?: string;
+  limit?: number;
+  showViewAllButton?: boolean;
+}
+
+/** Container for all prefetched widget data. null = prefetch failed, undefined = not attempted */
+export interface PrefetchedWidgetData {
+  ads_banner?: PrefetchedBannerItem[] | null;
+  thin_banner?: PrefetchedBannerItem[] | null;
+  market_banner?: PrefetchedBannerItem[] | null;
+  boosted_product_carousel?: PrefetchedBoostedProduct[] | null;
+  preference_product?: string[] | null;
+  dynamic_product_list?: PrefetchedDynamicListConfig[] | null;
+  shop_horizontal_list?: PrefetchedShop[] | null;
+}

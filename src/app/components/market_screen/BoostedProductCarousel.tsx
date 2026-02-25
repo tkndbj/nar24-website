@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useBoostedProducts, BoostedProduct } from "@/hooks/useBoostedProducts";
 import { useTheme } from "@/hooks/useTheme";
+import type { PrefetchedBoostedProduct } from "@/types/MarketLayout";
 
 /**
  * BoostedProductCarousel Component
@@ -27,6 +28,7 @@ import { useTheme } from "@/hooks/useTheme";
 
 interface BoostedProductsCarouselProps {
   className?: string;
+  initialData?: PrefetchedBoostedProduct[] | null;
 }
 
 // ============================================================================
@@ -213,10 +215,10 @@ ProductCard.displayName = "ProductCard";
 // ============================================================================
 
 const BoostedProductsCarousel = memo(
-  ({ className = "" }: BoostedProductsCarouselProps) => {
+  ({ className = "", initialData }: BoostedProductsCarouselProps) => {
     const isDarkMode = useTheme();
 
-    // Fetch boosted products
+    // Fetch boosted products (with optional SSR data)
     const {
       boostedProducts,
       isLoading,
@@ -224,7 +226,7 @@ const BoostedProductsCarousel = memo(
       hasProducts,
       totalBoosted,
       refresh,
-    } = useBoostedProducts();
+    } = useBoostedProducts(initialData);
 
     // Calculate row height based on viewport - matches Flutter logic
     const [rowHeight, setRowHeight] = useState(380);

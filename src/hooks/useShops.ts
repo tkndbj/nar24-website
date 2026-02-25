@@ -11,6 +11,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { getFirebaseDb } from "@/lib/firebase-lazy";
+import type { PrefetchedShop } from "@/types/MarketLayout";
 
 // ============================================================================
 // TYPES
@@ -56,10 +57,15 @@ const CONFIG_DOC = "featured_shops";
 // HOOK
 // ============================================================================
 
-export function useShops(): UseShopsReturn {
+export function useShops(initialShops?: PrefetchedShop[] | null): UseShopsReturn {
+  const hydrated = useMemo(() => {
+    if (!initialShops || initialShops.length === 0) return null;
+    return initialShops as Shop[];
+  }, [initialShops]);
+
   const [state, setState] = useState<UseShopsState>({
-    shops: [],
-    isLoading: true,
+    shops: hydrated || [],
+    isLoading: !hydrated,
     error: null,
   });
 
@@ -199,12 +205,16 @@ export function useShops(): UseShopsReturn {
   }, [setupSubscription]);
 
   useEffect(() => {
+    // Skip client fetch if we have server-prefetched data
+    if (state.shops.length > 0 && !state.isLoading) return;
+
     isMountedRef.current = true;
     setupSubscription();
 
     return () => {
       isMountedRef.current = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setupSubscription]);
 
   return useMemo(

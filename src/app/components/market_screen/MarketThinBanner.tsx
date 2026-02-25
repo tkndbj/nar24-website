@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback, memo } from "react";
+import React, { useState, useEffect, useRef, useCallback, memo, useMemo } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { getFirebaseDb } from "@/lib/firebase-lazy";
+import type { PrefetchedBannerItem } from "@/types/MarketLayout";
 
 /**
  * MarketThinBanner Component
@@ -32,6 +33,7 @@ interface ThinBannerItem {
 interface MarketThinBannerProps {
   shouldAutoPlay?: boolean;
   className?: string;
+  initialData?: PrefetchedBannerItem[] | null;
 }
 
 // ============================================================================
@@ -68,11 +70,22 @@ const AdAnalyticsService = {
 // ============================================================================
 
 const MarketThinBanner = memo(
-  ({ shouldAutoPlay = true, className = "" }: MarketThinBannerProps) => {
+  ({ shouldAutoPlay = true, className = "", initialData }: MarketThinBannerProps) => {
     const router = useRouter();
 
-    // State
-    const [banners, setBanners] = useState<ThinBannerItem[]>([]);
+    // Convert server-prefetched data
+    const ssrBanners = useMemo(() => {
+      if (!initialData || initialData.length === 0) return [];
+      return initialData.map((item) => ({
+        id: item.id,
+        url: item.imageUrl,
+        linkType: item.linkType,
+        linkId: item.linkedShopId || item.linkedProductId,
+      }));
+    }, [initialData]);
+
+    // State — use SSR data as initial values
+    const [banners, setBanners] = useState<ThinBannerItem[]>(ssrBanners);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isTransitioning, setIsTransitioning] = useState(false);
 
@@ -86,6 +99,9 @@ const MarketThinBanner = memo(
 
     useEffect(() => {
       isMountedRef.current = true;
+
+      // Skip client fetch if we have server-prefetched data
+      if (banners.length > 0) return;
 
       const fetchBanners = async () => {
         try {

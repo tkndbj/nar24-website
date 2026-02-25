@@ -137,6 +137,7 @@ ShimmerList.displayName = "ShimmerList";
 
 interface PreferenceProductProps {
   keyPrefix?: string;
+  initialProductIds?: string[] | null;
 }
 
 let cachedProducts: Product[] | null = null;
@@ -144,7 +145,7 @@ let productsCacheExpiry: Date | null = null;
 const PRODUCTS_CACHE_DURATION = 60 * 60 * 1000;
 
 export const PreferenceProduct = React.memo(
-  ({ keyPrefix = "" }: PreferenceProductProps) => {
+  ({ keyPrefix = "", initialProductIds }: PreferenceProductProps) => {
     const [products, setProducts] = useState<Product[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -245,7 +246,13 @@ export const PreferenceProduct = React.memo(
       setError(null);
 
       try {
-        const productIds = await personalizedFeedService.getProductIds();
+        // Use server-prefetched trending IDs if available, otherwise fetch from client
+        let productIds: string[];
+        if (initialProductIds && initialProductIds.length > 0) {
+          productIds = initialProductIds;
+        } else {
+          productIds = await personalizedFeedService.getProductIds();
+        }
 
         if (productIds.length === 0) {
           setProducts([]);

@@ -3,7 +3,7 @@
 import React, { lazy, Suspense, useMemo, useCallback, memo } from "react";
 import { useLocale } from "next-intl";
 import { useTheme } from "@/hooks/useTheme";
-import { MarketWidgetConfig } from "@/types/MarketLayout";
+import { MarketWidgetConfig, PrefetchedWidgetData } from "@/types/MarketLayout";
 
 // ============================================================================
 // EAGERLY LOADED — above-the-fold critical components
@@ -74,10 +74,11 @@ interface WidgetRendererProps {
   isDarkMode: boolean;
   locale: string;
   onNavigation: (index: number) => void;
+  prefetchedData?: PrefetchedWidgetData;
 }
 
 const WidgetRenderer = memo(
-  ({ widget, isDarkMode, locale, onNavigation }: WidgetRendererProps) => {
+  ({ widget, isDarkMode, locale, onNavigation, prefetchedData }: WidgetRendererProps) => {
     const bgClass = isDarkMode ? "bg-gray-900" : "bg-gray-50";
 
     let content: React.ReactNode = null;
@@ -88,7 +89,7 @@ const WidgetRenderer = memo(
           <Suspense
             fallback={<FullWidthLoader isDark={isDarkMode} height="h-48" />}
           >
-            <AdsBanner />
+            <AdsBanner initialData={prefetchedData?.ads_banner} />
           </Suspense>
         );
         break;
@@ -110,7 +111,7 @@ const WidgetRenderer = memo(
           >
             <div className={`w-full ${bgClass}`}>
               <div className="max-w-7xl mx-auto px-4">
-                <ThinBanner />
+                <ThinBanner initialData={prefetchedData?.thin_banner} />
               </div>
             </div>
           </Suspense>
@@ -121,7 +122,7 @@ const WidgetRenderer = memo(
         content = (
           <div className={`w-full ${bgClass}`}>
             <div className="lg:max-w-[1400px] lg:mx-auto">
-              <PreferenceProduct keyPrefix="pref-" />
+              <PreferenceProduct keyPrefix="pref-" initialProductIds={prefetchedData?.preference_product} />
             </div>
           </div>
         );
@@ -133,7 +134,7 @@ const WidgetRenderer = memo(
             fallback={<ComponentLoader isDark={isDarkMode} height="h-64" />}
           >
             <div className={`w-full ${bgClass}`}>
-              <BoostedProductCarousel />
+              <BoostedProductCarousel initialData={prefetchedData?.boosted_product_carousel} />
             </div>
           </Suspense>
         );
@@ -143,7 +144,7 @@ const WidgetRenderer = memo(
         content = (
           <div className={`w-full ${bgClass}`}>
             <div className="lg:max-w-[1400px] lg:mx-auto">
-              <DynamicHorizontalList />
+              <DynamicHorizontalList initialConfigs={prefetchedData?.dynamic_product_list} />
             </div>
           </div>
         );
@@ -155,7 +156,7 @@ const WidgetRenderer = memo(
             fallback={<ComponentLoader isDark={isDarkMode} height="h-48" />}
           >
             <div className={`w-full ${bgClass}`}>
-              <MarketBanner />
+              <MarketBanner initialData={prefetchedData?.market_banner} />
             </div>
           </Suspense>
         );
@@ -165,7 +166,7 @@ const WidgetRenderer = memo(
         content = (
           <div className={`w-full ${bgClass}`}>
             <div className="lg:max-w-[1400px] lg:mx-auto">
-              <ShopHorizontalList />
+              <ShopHorizontalList initialData={prefetchedData?.shop_horizontal_list} />
             </div>
           </div>
         );
@@ -193,9 +194,10 @@ WidgetRenderer.displayName = "WidgetRenderer";
 
 interface HomeWidgetsProps {
   widgets: MarketWidgetConfig[];
+  prefetchedData?: PrefetchedWidgetData;
 }
 
-export default function HomeWidgets({ widgets }: HomeWidgetsProps) {
+export default function HomeWidgets({ widgets, prefetchedData }: HomeWidgetsProps) {
   const isDarkMode = useTheme();
   const locale = useLocale();
 
@@ -212,9 +214,10 @@ export default function HomeWidgets({ widgets }: HomeWidgetsProps) {
           isDarkMode={isDarkMode}
           locale={locale}
           onNavigation={handleNavigation}
+          prefetchedData={prefetchedData}
         />
       )),
-    [widgets, isDarkMode, locale, handleNavigation],
+    [widgets, isDarkMode, locale, handleNavigation, prefetchedData],
   );
 
   return (

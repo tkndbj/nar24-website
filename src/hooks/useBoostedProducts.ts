@@ -13,6 +13,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import type { Unsubscribe } from "firebase/firestore";
 import { getFirebaseDb } from "@/lib/firebase-lazy";
+import type { PrefetchedBoostedProduct } from "@/types/MarketLayout";
 
 // ============================================================================
 // TYPES
@@ -58,13 +59,23 @@ const COLLECTION_NAME = "products";
 // HOOK
 // ============================================================================
 
-export function useBoostedProducts(): UseBoostedProductsReturn {
+export function useBoostedProducts(
+  initialProducts?: PrefetchedBoostedProduct[] | null,
+): UseBoostedProductsReturn {
+  const hydrated = useMemo(() => {
+    if (!initialProducts || initialProducts.length === 0) return null;
+    return initialProducts.map((p) => ({
+      ...p,
+      boostExpiresAt: p.boostExpiresAt ? new Date(p.boostExpiresAt) : undefined,
+    }));
+  }, [initialProducts]);
+
   const [state, setState] = useState<UseBoostedProductsState>({
-    boostedProducts: [],
-    isLoading: true,
+    boostedProducts: hydrated || [],
+    isLoading: !hydrated,
     error: null,
-    hasProducts: false,
-    totalBoosted: 0,
+    hasProducts: (hydrated?.length || 0) > 0,
+    totalBoosted: hydrated?.length || 0,
   });
 
   const unsubscribeRef = useRef<Unsubscribe | null>(null);

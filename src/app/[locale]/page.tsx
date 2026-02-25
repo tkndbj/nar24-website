@@ -8,6 +8,11 @@ import {
   DEFAULT_WIDGETS,
   VALID_WIDGET_TYPES,
   WidgetType,
+  PrefetchedWidgetData,
+  PrefetchedBannerItem,
+  PrefetchedBoostedProduct,
+  PrefetchedShop,
+  PrefetchedDynamicListConfig,
 } from "@/types/MarketLayout";
 
 // ============================================================================
@@ -105,16 +110,325 @@ const getMarketLayout = unstable_cache(
 );
 
 // ============================================================================
+// WIDGET DATA PREFETCHING
+// ============================================================================
+
+/** Convert Firestore Admin Timestamp to epoch milliseconds */
+function toEpoch(value: unknown): number | undefined {
+  if (!value) return undefined;
+  if (typeof value === "number") return value;
+  if (typeof (value as { toMillis?: () => number }).toMillis === "function") {
+    return (value as { toMillis: () => number }).toMillis();
+  }
+  if (typeof (value as { toDate?: () => Date }).toDate === "function") {
+    return (value as { toDate: () => Date }).toDate().getTime();
+  }
+  if (value instanceof Date) return value.getTime();
+  return undefined;
+}
+
+/** Helper to extract banner fields from Firestore doc */
+function parseBannerDoc(
+  doc: FirebaseFirestore.QueryDocumentSnapshot,
+): PrefetchedBannerItem | null {
+  const d = doc.data();
+  if (!d.imageUrl) return null;
+  return {
+    id: doc.id,
+    imageUrl: d.imageUrl as string,
+    dominantColor: d.dominantColor as number | undefined,
+    linkType: d.linkType as string | undefined,
+    linkedShopId: d.linkedShopId as string | undefined,
+    linkedProductId: d.linkedProductId as string | undefined,
+  };
+}
+
+const prefetchAdsBanners = unstable_cache(
+  async (): Promise<PrefetchedBannerItem[]> => {
+    const db = getFirestoreAdmin();
+    const snapshot = await db
+      .collection("market_top_ads_banners")
+      .where("isActive", "==", true)
+      .orderBy("createdAt", "desc")
+      .get();
+    const items: PrefetchedBannerItem[] = [];
+    for (const doc of snapshot.docs) {
+      const item = parseBannerDoc(doc);
+      if (item) items.push(item);
+    }
+    return items;
+  },
+  ["prefetch-ads-banners"],
+  { revalidate: 120 },
+);
+
+const prefetchThinBanners = unstable_cache(
+  async (): Promise<PrefetchedBannerItem[]> => {
+    const db = getFirestoreAdmin();
+    const snapshot = await db
+      .collection("market_thin_banners")
+      .where("isActive", "==", true)
+      .orderBy("createdAt", "desc")
+      .get();
+    const items: PrefetchedBannerItem[] = [];
+    for (const doc of snapshot.docs) {
+      const item = parseBannerDoc(doc);
+      if (item) items.push(item);
+    }
+    return items;
+  },
+  ["prefetch-thin-banners"],
+  { revalidate: 120 },
+);
+
+const prefetchMarketBanners = unstable_cache(
+  async (): Promise<PrefetchedBannerItem[]> => {
+    const db = getFirestoreAdmin();
+    const snapshot = await db
+      .collection("market_banners")
+      .where("isActive", "==", true)
+      .orderBy("createdAt", "desc")
+      .limit(20)
+      .get();
+    const items: PrefetchedBannerItem[] = [];
+    for (const doc of snapshot.docs) {
+      const item = parseBannerDoc(doc);
+      if (item) items.push(item);
+    }
+    return items;
+  },
+  ["prefetch-market-banners"],
+  { revalidate: 120 },
+);
+
+const prefetchBoostedProducts = unstable_cache(
+  async (): Promise<PrefetchedBoostedProduct[]> => {
+    const db = getFirestoreAdmin();
+    const snapshot = await db
+      .collection("products")
+      .where("isBoosted", "==", true)
+      .where("isActive", "==", true)
+      .orderBy("boostStartedAt", "desc")
+      .limit(10)
+      .get();
+    const items: PrefetchedBoostedProduct[] = [];
+    for (const doc of snapshot.docs) {
+      const d = doc.data();
+      if (!d.name || !d.price) continue;
+      items.push({
+        id: doc.id,
+        name: d.name as string,
+        price: Number(d.price) || 0,
+        originalPrice: d.originalPrice ? Number(d.originalPrice) : undefined,
+        currency: (d.currency as string) || "TRY",
+        imageUrl: (d.imageUrl || d.images?.[0] || "") as string,
+        shopId: (d.shopId || "") as string,
+        shopName: d.shopName as string | undefined,
+        isBoosted: true as const,
+        boostExpiresAt: toEpoch(d.boostExpiresAt),
+        category: d.category as string | undefined,
+        subcategory: d.subcategory as string | undefined,
+        rating: d.rating ? Number(d.rating) : undefined,
+        reviewCount: d.reviewCount ? Number(d.reviewCount) : undefined,
+      });
+    }
+    return items;
+  },
+  ["prefetch-boosted-products"],
+  { revalidate: 60 },
+);
+
+const prefetchTrendingProducts = unstable_cache(
+  async (): Promise<string[]> => {
+    const db = getFirestoreAdmin();
+    const doc = await db.collection("trending_products").doc("global").get();
+    if (!doc.exists) return [];
+    const data = doc.data();
+    return (data?.products || []) as string[];
+  },
+  ["prefetch-trending-products"],
+  { revalidate: 300 },
+);
+
+const prefetchDynamicListConfigs = unstable_cache(
+  async (): Promise<PrefetchedDynamicListConfig[]> => {
+    const db = getFirestoreAdmin();
+    const snapshot = await db
+      .collection("dynamic_product_lists")
+      .where("isActive", "==", true)
+      .orderBy("order")
+      .get();
+    return snapshot.docs.map((doc) => {
+      const d = doc.data();
+      return {
+        id: doc.id,
+        title: (d.title || "Product List") as string,
+        isActive: true,
+        order: Number(d.order) || 0,
+        gradientStart: d.gradientStart as string | undefined,
+        gradientEnd: d.gradientEnd as string | undefined,
+        selectedProductIds: d.selectedProductIds as string[] | undefined,
+        selectedShopId: d.selectedShopId as string | undefined,
+        limit: d.limit ? Number(d.limit) : undefined,
+        showViewAllButton: d.showViewAllButton as boolean | undefined,
+      };
+    });
+  },
+  ["prefetch-dynamic-list-configs"],
+  { revalidate: 120 },
+);
+
+const prefetchShops = unstable_cache(
+  async (): Promise<PrefetchedShop[]> => {
+    const db = getFirestoreAdmin();
+    const shops: PrefetchedShop[] = [];
+
+    // 1. Try configured featured shops
+    try {
+      const configDoc = await db
+        .collection("app_config")
+        .doc("featured_shops")
+        .get();
+      if (configDoc.exists) {
+        const shopIds = configDoc.data()?.shopIds as string[] | undefined;
+        if (shopIds && shopIds.length > 0) {
+          for (const id of shopIds) {
+            try {
+              const shopDoc = await db.collection("shops").doc(id).get();
+              if (!shopDoc.exists) continue;
+              const d = shopDoc.data()!;
+              if (d.isActive === false || !d.name) continue;
+              shops.push({
+                id: shopDoc.id,
+                name: d.name as string,
+                description: d.description as string | undefined,
+                logoUrl: (d.logoUrl || d.profileImageUrl) as string | undefined,
+                coverImageUrl: d.coverImageUrl as string | undefined,
+                coverImageUrls: Array.isArray(d.coverImageUrls) ? d.coverImageUrls as string[] : undefined,
+                profileImageUrl: d.profileImageUrl as string | undefined,
+                averageRating: Number(d.averageRating) || 0,
+                reviewCount: Number(d.reviewCount) || 0,
+                productCount: Number(d.productCount) || 0,
+                category: d.category as string | undefined,
+                isVerified: Boolean(d.isVerified),
+                ownerId: (d.ownerId || "") as string,
+              });
+            } catch { /* skip individual shop errors */ }
+          }
+          if (shops.length > 0) return shops;
+        }
+      }
+    } catch { /* fall through to fallback */ }
+
+    // 2. Fallback: top-rated active shops
+    const snapshot = await db
+      .collection("shops")
+      .where("isActive", "==", true)
+      .orderBy("averageRating", "desc")
+      .limit(10)
+      .get();
+    snapshot.docs.forEach((doc) => {
+      const d = doc.data();
+      if (!d.name) return;
+      shops.push({
+        id: doc.id,
+        name: d.name as string,
+        description: d.description as string | undefined,
+        logoUrl: (d.logoUrl || d.profileImageUrl) as string | undefined,
+        coverImageUrl: d.coverImageUrl as string | undefined,
+        coverImageUrls: Array.isArray(d.coverImageUrls) ? d.coverImageUrls as string[] : undefined,
+        profileImageUrl: d.profileImageUrl as string | undefined,
+        averageRating: Number(d.averageRating) || 0,
+        reviewCount: Number(d.reviewCount) || 0,
+        productCount: Number(d.productCount) || 0,
+        category: d.category as string | undefined,
+        isVerified: Boolean(d.isVerified),
+        ownerId: (d.ownerId || "") as string,
+      });
+    });
+    return shops;
+  },
+  ["prefetch-shops"],
+  { revalidate: 180 },
+);
+
+/**
+ * Prefetch all widget data in parallel based on visible widgets.
+ * Each fetch is independent — one failure doesn't block others.
+ */
+async function prefetchAllWidgetData(
+  widgets: MarketWidgetConfig[],
+): Promise<PrefetchedWidgetData> {
+  const visibleTypes = new Set(widgets.map((w) => w.type));
+  const data: PrefetchedWidgetData = {};
+  const fetches: Promise<void>[] = [];
+
+  if (visibleTypes.has("ads_banner")) {
+    fetches.push(
+      prefetchAdsBanners()
+        .then((r) => { data.ads_banner = r; })
+        .catch(() => { data.ads_banner = null; }),
+    );
+  }
+  if (visibleTypes.has("thin_banner")) {
+    fetches.push(
+      prefetchThinBanners()
+        .then((r) => { data.thin_banner = r; })
+        .catch(() => { data.thin_banner = null; }),
+    );
+  }
+  if (visibleTypes.has("market_banner")) {
+    fetches.push(
+      prefetchMarketBanners()
+        .then((r) => { data.market_banner = r; })
+        .catch(() => { data.market_banner = null; }),
+    );
+  }
+  if (visibleTypes.has("boosted_product_carousel")) {
+    fetches.push(
+      prefetchBoostedProducts()
+        .then((r) => { data.boosted_product_carousel = r; })
+        .catch(() => { data.boosted_product_carousel = null; }),
+    );
+  }
+  if (visibleTypes.has("preference_product")) {
+    fetches.push(
+      prefetchTrendingProducts()
+        .then((r) => { data.preference_product = r; })
+        .catch(() => { data.preference_product = null; }),
+    );
+  }
+  if (visibleTypes.has("dynamic_product_list")) {
+    fetches.push(
+      prefetchDynamicListConfigs()
+        .then((r) => { data.dynamic_product_list = r; })
+        .catch(() => { data.dynamic_product_list = null; }),
+    );
+  }
+  if (visibleTypes.has("shop_horizontal_list")) {
+    fetches.push(
+      prefetchShops()
+        .then((r) => { data.shop_horizontal_list = r; })
+        .catch(() => { data.shop_horizontal_list = null; }),
+    );
+  }
+
+  await Promise.allSettled(fetches);
+  return data;
+}
+
+// ============================================================================
 // SERVER COMPONENT
 // ============================================================================
 
 export default async function Home() {
   const widgets = await getMarketLayout();
+  const prefetchedData = await prefetchAllWidgetData(widgets);
 
   return (
     <div className="min-h-screen flex flex-col overflow-x-hidden">
       <SecondHeader />
-      <HomeWidgets widgets={widgets} />
+      <HomeWidgets widgets={widgets} prefetchedData={prefetchedData} />
       <Footer />
     </div>
   );

@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { ProductCard } from "../ProductCard";
 import { ChevronRight, ChevronLeft } from "lucide-react";
 import { getFirebaseDb } from "@/lib/firebase-lazy";
 import { useTheme } from "@/hooks/useTheme";
 import type { Product } from "@/app/models/Product";
+import type { PrefetchedDynamicListConfig } from "@/types/MarketLayout";
 
 // ===============================================
 // DynamicHorizontalList
@@ -487,13 +488,28 @@ DynamicListSection.displayName = "DynamicListSection";
 // MAIN COMPONENT
 // ============================================================================
 
-export default function DynamicHorizontalList() {
-  const [lists, setLists] = useState<DynamicListData[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+export default function DynamicHorizontalList({
+  initialConfigs,
+}: {
+  initialConfigs?: PrefetchedDynamicListConfig[] | null;
+} = {}) {
+  const ssrLists = useMemo(() => {
+    if (!initialConfigs || initialConfigs.length === 0) return [];
+    return initialConfigs as DynamicListData[];
+  }, [initialConfigs]);
+
+  const [lists, setLists] = useState<DynamicListData[]>(ssrLists);
+  const [isLoading, setIsLoading] = useState(ssrLists.length === 0);
   const isDarkMode = useTheme();
 
-  // One-time fetch for dynamic lists config (lazy Firebase)
+  // One-time fetch for dynamic lists config (skipped if SSR data available)
   useEffect(() => {
+    // Skip if we have server-prefetched configs
+    if (lists.length > 0) {
+      setIsLoading(false);
+      return;
+    }
+
     let cancelled = false;
 
     async function fetchDynamicLists() {
