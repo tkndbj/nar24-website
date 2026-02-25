@@ -8,6 +8,29 @@ initializeFirebaseAdmin();
 
 export async function POST(request: NextRequest) {
   try {
+    // ── Auth check ────────────────────────────────────────────────────────
+    const { getAuth } = await import('firebase-admin/auth');
+    const authHeader = request.headers.get('authorization');
+    const cookieToken = request.cookies.get('__session')?.value;
+    const token = authHeader?.replace('Bearer ', '') || cookieToken;
+
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
+    try {
+      await getAuth().verifyIdToken(token);
+    } catch {
+      return NextResponse.json(
+        { error: 'Invalid authentication token' },
+        { status: 401 }
+      );
+    }
+    // ── End auth check ────────────────────────────────────────────────────
+
     const body = await request.json();
     const { productIds, userGender, userAge } = body;
 
@@ -31,12 +54,13 @@ export async function POST(request: NextRequest) {
     const functionUrl = process.env.FIREBASE_FUNCTION_URL || 
       `https://europe-west3-${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}.cloudfunctions.net/incrementImpressionCount`;
 
-    const response = await fetch(functionUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+      const response = await fetch(functionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
         data: {
           productIds: uniqueIds,
           userGender: userGender || null,

@@ -35,9 +35,22 @@
     private readonly MAX_BATCH_SIZE = 100;
     private readonly MAX_RETRIES = 3;
     
-    // Retry mechanism
-    private retryCount = 0;
-    private isDisposed = false;
+   // Retry mechanism
+   private retryCount = 0;
+   private isDisposed = false;
+
+   // Auth token getter (lazy import to avoid SSR issues)
+   private async getAuthToken(): Promise<string | null> {
+     try {
+       const { getAuth } = await import('firebase/auth');
+       const auth = getAuth();
+       const user = auth.currentUser;
+       if (!user) return null;
+       return await user.getIdToken();
+     } catch {
+       return null;
+     }
+   }
     
     // LocalStorage key prefix
     private readonly PAGE_IMPRESSIONS_PREFIX = 'page_impressions_';
@@ -53,19 +66,26 @@
       return ImpressionBatcherClass.instance;
     }
   
+    private readonly BUFFER_PERSIST_KEY = 'pending_impression_buffer';
+
     private initialize(): void {
       if (typeof window === 'undefined') return;
-  
+
       this.startCleanupTimer();
-  
-      // Flush on page unload
+
+      // Restore any buffered impressions from previous session
+      this.loadPersistedBuffer();
+
+      // Persist on page unload (async flush won't complete during beforeunload)
       window.addEventListener('beforeunload', () => {
-        this.flush();
+        this.persistImpressionBuffer();
+        this.persistPageImpressions();
       });
-  
-      // Flush on visibility change
+
+      // Flush on visibility change (tab hidden still has time for async)
       document.addEventListener('visibilitychange', () => {
         if (document.hidden) {
+          this.persistImpressionBuffer(); // Safety net
           this.flush();
         }
       });
@@ -145,9 +165,6 @@
       }
     }
   
-    /**
-     * Persist page impressions to localStorage
-     */
     private persistPageImpressions(): void {
       try {
         const storageKey = this.getStorageKey();
@@ -160,6 +177,56 @@
         localStorage.setItem(storageKey, JSON.stringify(data));
       } catch (e) {
         console.error('Error persisting page impressions:', e);
+      }
+    }
+
+    /**
+     * Persist impression send-buffer to localStorage (for beforeunload recovery)
+     */
+    private persistImpressionBuffer(): void {
+      if (this.impressionBuffer.size === 0) {
+        localStorage.removeItem(this.BUFFER_PERSIST_KEY);
+        return;
+      }
+
+      try {
+        const data: Record<string, number> = {};
+        this.impressionBuffer.forEach((count, id) => {
+          data[id] = count;
+        });
+        localStorage.setItem(this.BUFFER_PERSIST_KEY, JSON.stringify(data));
+        console.log(`💾 ImpressionBatcher: persisted ${this.impressionBuffer.size} buffered impressions`);
+      } catch (e) {
+        console.error('❌ ImpressionBatcher: error persisting buffer:', e);
+      }
+    }
+
+    /**
+     * Load persisted impression buffer from previous session
+     */
+    private loadPersistedBuffer(): void {
+      try {
+        const stored = localStorage.getItem(this.BUFFER_PERSIST_KEY);
+        if (!stored) return;
+
+        const data: Record<string, number> = JSON.parse(stored);
+        let restored = 0;
+
+        for (const [id, count] of Object.entries(data)) {
+          const existing = this.impressionBuffer.get(id) || 0;
+          this.impressionBuffer.set(id, existing + count);
+          restored++;
+        }
+
+        localStorage.removeItem(this.BUFFER_PERSIST_KEY);
+
+        if (restored > 0) {
+          console.log(`📦 ImpressionBatcher: restored ${restored} buffered impressions`);
+          this.scheduleBatch();
+        }
+      } catch (e) {
+        console.warn('⚠️ ImpressionBatcher: error loading persisted buffer:', e);
+        localStorage.removeItem(this.BUFFER_PERSIST_KEY);
       }
     }
   
@@ -259,6 +326,22 @@
       this.scheduleBatch();
   
       // Force flush if buffer gets too large
+      if (this.pageImpressions.size > 1000) {
+        const entries = [...this.pageImpressions.entries()]
+          .map(([key, pages]) => ({
+            key,
+            oldest: Math.min(...pages.map(p => p.timestamp)),
+          }))
+          .sort((a, b) => a.oldest - b.oldest);
+
+        while (this.pageImpressions.size > 900) {
+          const entry = entries.shift();
+          if (entry) this.pageImpressions.delete(entry.key);
+        }
+        console.log(`🧹 ImpressionBatcher: evicted old entries, now ${this.pageImpressions.size} products tracked`);
+      }
+
+      // Force flush if buffer gets too large
       if (this.impressionBuffer.size >= this.MAX_BATCH_SIZE) {
         console.warn('⚠️ Buffer size limit reached, forcing flush');
         this.flush();
@@ -330,11 +413,18 @@
       try {
         const demographics = await this.getUserDemographics();
   
+        const authToken = await this.getAuthToken();
+        
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        };
+        if (authToken) {
+          headers['Authorization'] = `Bearer ${authToken}`;
+        }
+
         const response = await fetch('/api/analytics/impressions', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers,
           body: JSON.stringify({
             productIds: idsToSend,
             userGender: demographics.gender,
@@ -357,6 +447,7 @@
         );
         
         this.retryCount = 0;
+        localStorage.removeItem(this.BUFFER_PERSIST_KEY);
       } catch (e) {
         console.error('❌ Error sending impression batch:', e);
   
@@ -379,7 +470,14 @@
             }
           }, delay);
         } else {
-          console.error(`❌ Max retries reached, dropping ${idsToSend.length} impressions`);
+          console.warn(`💾 Max retries reached, persisting ${idsToSend.length} impressions to localStorage`);
+          // Re-add to buffer then persist
+          bufferCopy.forEach((count, id) => {
+            const current = this.impressionBuffer.get(id) || 0;
+            this.impressionBuffer.set(id, current + count);
+          });
+          this.persistImpressionBuffer();
+          this.impressionBuffer.clear();
           this.retryCount = 0;
         }
       }

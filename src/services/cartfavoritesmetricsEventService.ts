@@ -38,6 +38,16 @@ class MetricsEventService {
   // ── Retry state ─────────────────────────────────────────────────────────
   private retryAttempts = 0;
 
+  // Cached auth reference
+  private _auth: ReturnType<typeof getAuth> | null = null;
+
+  private get auth() {
+    if (!this._auth) {
+      this._auth = getAuth();
+    }
+    return this._auth;
+  }
+
   private constructor() {
     // Load persisted events from previous session
     this.loadPersistedEvents();
@@ -64,8 +74,7 @@ class MetricsEventService {
 
   // ── Batch ID (matches Flutter: deterministic, 30s window) ──────────────
   private async generateBatchId(): Promise<string> {
-    const auth = getAuth();
-    const userId = auth.currentUser?.uid ?? "anonymous";
+    const userId = this.auth.currentUser?.uid ?? "anonymous";
     const timestamp = Date.now();
     const roundedTimestamp = Math.floor(timestamp / 30000) * 30000;
     const input = `${userId}-cart_fav-${roundedTimestamp}`;
@@ -75,8 +84,7 @@ class MetricsEventService {
 
   // ── Core enqueue (matches Flutter _enqueue) ────────────────────────────
   private enqueue(eventType: string, productId: string, shopId?: string | null): void {
-    const auth = getAuth();
-    if (!auth.currentUser) {
+    if (!this.auth.currentUser) {
       console.warn("⚠️ MetricsEventService: user not authenticated, skipping");
       return;
     }

@@ -1,16 +1,8 @@
 // lib/services/userActivity.ts
 // Production-ready user activity tracking with batching, persistence, and non-blocking writes
 
-import { 
-    getAuth, 
-    onAuthStateChanged, 
-    User 
-  } from 'firebase/auth';
-  import { 
-    getFunctions, 
-    httpsCallable, 
-    
-  } from 'firebase/functions';
+import type { User } from 'firebase/auth';
+  import { getFirebaseAuth, getFirebaseFunctions } from '@/lib/firebase-lazy';
   
   // ============================================================================
   // TYPES & ENUMS
@@ -254,23 +246,9 @@ import {
     private currentUser: User | null = null;
     private isOnline = true;
   
-    // Firebase - lazily initialized to avoid SSR issues
-    private _auth: ReturnType<typeof getAuth> | null = null;
-    private _functions: ReturnType<typeof getFunctions> | null = null;
-
-    private get auth() {
-      if (!this._auth) {
-        this._auth = getAuth();
-      }
-      return this._auth;
-    }
-
-    private get functions() {
-      if (!this._functions) {
-        this._functions = getFunctions(undefined, 'europe-west3');
-      }
-      return this._functions;
-    }
+    // Firebase - lazily initialized via firebase-lazy.ts
+    private _auth: Awaited<ReturnType<typeof getFirebaseAuth>> | null = null;
+    private _functions: Awaited<ReturnType<typeof getFirebaseFunctions>> | null = null;
   
     /**
      * Get singleton instance
@@ -293,8 +271,17 @@ import {
       if (this.isInitialized) return;
   
       try {
+        // Initialize Firebase lazily
+        const [auth, functions, { onAuthStateChanged }] = await Promise.all([
+          getFirebaseAuth(),
+          getFirebaseFunctions(),
+          import('firebase/auth'),
+        ]);
+        this._auth = auth;
+        this._functions = functions;
+
         // Setup auth listener
-        onAuthStateChanged(this.auth, (user) => {
+        onAuthStateChanged(auth, (user) => {
           this.currentUser = user;
           if (!user) {
             this.clearUserData();
@@ -639,7 +626,7 @@ import {
       if (!trimmedQuery) return;
       
       this.queueEvent({
-        eventId: this.generateEventId(ActivityType.SEARCH, trimmedQuery.hashCode().toString()),
+        eventId: this.generateEventId(ActivityType.SEARCH, hashString(trimmedQuery).toString()),
         type: ActivityType.SEARCH,
         timestamp: Date.now(),
         searchQuery: trimmedQuery.toLowerCase(),
@@ -726,7 +713,11 @@ import {
       try {
         console.log(`📤 Flushing ${eventCount} activity events...`);
   
-        const callable = httpsCallable(this.functions, 'batchUserActivity', {
+        if (!this._functions) {
+          this._functions = await getFirebaseFunctions();
+        }
+        const { httpsCallable } = await import('firebase/functions');
+        const callable = httpsCallable(this._functions, 'batchUserActivity', {
           timeout: 30000,
         });
   
@@ -885,22 +876,18 @@ import {
   // UTILITY EXTENSIONS
   // ============================================================================
   
-  // Add hashCode to String prototype for search event IDs
-  declare global {
-    interface String {
-      hashCode(): number;
-    }
+/**
+   * Hash a string to a positive integer (matches Dart's String.hashCode behavior)
+   */
+function hashString(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
   }
-  
-  String.prototype.hashCode = function(): number {
-    let hash = 0;
-    for (let i = 0; i < this.length; i++) {
-      const char = this.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32bit integer
-    }
-    return Math.abs(hash);
-  };
+  return Math.abs(hash);
+}
   
   // ============================================================================
   // EXPORTS

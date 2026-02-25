@@ -3,6 +3,7 @@
 
 import { useEffect } from "react";
 import { analyticsBatcher } from "@/app/utils/analyticsBatcher";
+import { impressionBatcher } from "@/app/utils/impressionBatcher";
 import { useUser } from "@/context/UserProvider";
 
 /**
@@ -16,8 +17,10 @@ export function useAnalytics() {
     // Set current user ID for preference tracking
     if (user?.uid) {
       analyticsBatcher.setCurrentUserId(user.uid);
+      impressionBatcher.setUserId(user.uid);
     } else {
       analyticsBatcher.setCurrentUserId(null);
+      impressionBatcher.setUserId(null);
     }
   }, [user?.uid]);
 
