@@ -1,6 +1,6 @@
 "use client";
 
-import React, { memo } from "react";
+import React, { useState, useEffect, memo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useBoostedProducts, BoostedProduct } from "@/hooks/useBoostedProducts";
