@@ -160,6 +160,35 @@ export interface PrefetchedShop {
   ownerId: string;
 }
 
+/** Serialized product for server-side prefetch (fields ProductCard needs) */
+export interface PrefetchedProduct {
+  id: string;
+  productName: string;
+  imageUrls: string[];
+  price: number;
+  currency: string;
+  condition?: string;
+  brandModel?: string;
+  quantity?: number;
+  colorQuantities?: Record<string, number>;
+  colorImages?: Record<string, string[]>;
+  averageRating?: number;
+  discountPercentage?: number;
+  deliveryOption?: string;
+  campaignName?: string;
+  isBoosted?: boolean;
+  category?: string;
+  subcategory?: string;
+  subsubcategory?: string;
+  gender?: string;
+  shopId?: string;
+  clothingSizes?: string[];
+  pantSizes?: string[];
+  footwearSizes?: string[];
+  jewelryMaterials?: string[];
+  attributes?: Record<string, unknown>;
+}
+
 /** Dynamic list config (serialized) */
 export interface PrefetchedDynamicListConfig {
   id: string;
@@ -172,6 +201,7 @@ export interface PrefetchedDynamicListConfig {
   selectedShopId?: string;
   limit?: number;
   showViewAllButton?: boolean;
+  prefetchedProducts?: PrefetchedProduct[];
 }
 
 /** Container for all prefetched widget data. null = prefetch failed, undefined = not attempted */
@@ -180,7 +210,7 @@ export interface PrefetchedWidgetData {
   thin_banner?: PrefetchedBannerItem[] | null;
   market_banner?: PrefetchedBannerItem[] | null;
   boosted_product_carousel?: PrefetchedBoostedProduct[] | null;
-  preference_product?: string[] | null;
+  preference_product?: PrefetchedProduct[] | null;
   dynamic_product_list?: PrefetchedDynamicListConfig[] | null;
   shop_horizontal_list?: PrefetchedShop[] | null;
 }

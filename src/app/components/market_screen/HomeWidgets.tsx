@@ -122,7 +122,7 @@ const WidgetRenderer = memo(
         content = (
           <div className={`w-full ${bgClass}`}>
             <div className="lg:max-w-[1400px] lg:mx-auto">
-              <PreferenceProduct keyPrefix="pref-" initialProductIds={prefetchedData?.preference_product} />
+              <PreferenceProduct keyPrefix="pref-" initialProducts={prefetchedData?.preference_product} />
             </div>
           </div>
         );

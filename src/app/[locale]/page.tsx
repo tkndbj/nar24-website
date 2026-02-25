@@ -13,6 +13,7 @@ import {
   PrefetchedBoostedProduct,
   PrefetchedShop,
   PrefetchedDynamicListConfig,
+  PrefetchedProduct,
 } from "@/types/MarketLayout";
 
 // ============================================================================
@@ -238,29 +239,149 @@ const prefetchBoostedProducts = unstable_cache(
   { revalidate: 60 },
 );
 
-const prefetchTrendingProducts = unstable_cache(
-  async (): Promise<string[]> => {
+/** Convert a Firestore Admin document to PrefetchedProduct (fields ProductCard needs) */
+function parseProductDoc(
+  doc: FirebaseFirestore.QueryDocumentSnapshot,
+): PrefetchedProduct | null {
+  const d = doc.data();
+  if (!d.productName && !d.title) return null;
+  if (!d.price) return null;
+
+  // Parse colorImages safely
+  let colorImages: Record<string, string[]> | undefined;
+  if (d.colorImages && typeof d.colorImages === "object") {
+    colorImages = {};
+    for (const [key, val] of Object.entries(d.colorImages)) {
+      if (Array.isArray(val)) colorImages[key] = val as string[];
+    }
+  }
+
+  // Parse colorQuantities safely
+  let colorQuantities: Record<string, number> | undefined;
+  if (d.colorQuantities && typeof d.colorQuantities === "object") {
+    colorQuantities = {};
+    for (const [key, val] of Object.entries(d.colorQuantities)) {
+      colorQuantities[key] = Number(val) || 0;
+    }
+  }
+
+  // Parse attributes safely (strip spec keys, keep misc only)
+  let attributes: Record<string, unknown> | undefined;
+  if (d.attributes && typeof d.attributes === "object" && !Array.isArray(d.attributes)) {
+    const raw = { ...(d.attributes as Record<string, unknown>) };
+    const specKeys = [
+      "clothingSizes", "clothingFit", "clothingTypes", "pantSizes",
+      "pantFabricTypes", "footwearSizes", "jewelryMaterials",
+      "consoleBrand", "curtainMaxWidth", "curtainMaxHeight",
+      "productType", "gender",
+    ];
+    for (const k of specKeys) delete raw[k];
+    if (Object.keys(raw).length > 0) attributes = raw;
+  }
+
+  return {
+    id: doc.id,
+    productName: (d.productName || d.title || "") as string,
+    imageUrls: Array.isArray(d.imageUrls) ? (d.imageUrls as string[]) : [],
+    price: Number(d.price) || 0,
+    currency: (d.currency as string) || "TL",
+    condition: d.condition as string | undefined,
+    brandModel: (d.brandModel || d.brand) as string | undefined,
+    quantity: d.quantity != null ? Number(d.quantity) : undefined,
+    colorQuantities,
+    colorImages,
+    averageRating: d.averageRating != null ? Number(d.averageRating) : undefined,
+    discountPercentage: d.discountPercentage != null ? Number(d.discountPercentage) : undefined,
+    deliveryOption: d.deliveryOption as string | undefined,
+    campaignName: d.campaignName as string | undefined,
+    isBoosted: d.isBoosted === true ? true : undefined,
+    category: d.category as string | undefined,
+    subcategory: d.subcategory as string | undefined,
+    subsubcategory: d.subsubcategory as string | undefined,
+    gender: d.gender as string | undefined,
+    shopId: d.shopId as string | undefined,
+    clothingSizes: Array.isArray(d.clothingSizes) ? (d.clothingSizes as string[]) : undefined,
+    pantSizes: Array.isArray(d.pantSizes) ? (d.pantSizes as string[]) : undefined,
+    footwearSizes: Array.isArray(d.footwearSizes) ? (d.footwearSizes as string[]) : undefined,
+    jewelryMaterials: Array.isArray(d.jewelryMaterials) ? (d.jewelryMaterials as string[]) : undefined,
+    attributes,
+  };
+}
+
+/** Batch-fetch product docs from shop_products by IDs (Firestore Admin, max 30 per batch) */
+async function fetchProductDocsByIds(
+  db: FirebaseFirestore.Firestore,
+  productIds: string[],
+  maxProducts: number = 30,
+): Promise<PrefetchedProduct[]> {
+  const products: PrefetchedProduct[] = [];
+  const BATCH_SIZE = 30; // Firestore "in" limit
+
+  for (let i = 0; i < productIds.length && products.length < maxProducts; i += BATCH_SIZE) {
+    const batch = productIds.slice(i, i + BATCH_SIZE);
+    const snapshot = await db
+      .collection("shop_products")
+      .where("__name__", "in", batch)
+      .get();
+
+    for (const doc of snapshot.docs) {
+      if (products.length >= maxProducts) break;
+      const parsed = parseProductDoc(doc);
+      if (parsed) products.push(parsed);
+    }
+  }
+
+  // Maintain the original order from productIds
+  const productMap = new Map(products.map((p) => [p.id, p]));
+  return productIds
+    .filter((id) => productMap.has(id))
+    .map((id) => productMap.get(id)!)
+    .slice(0, maxProducts);
+}
+
+const prefetchPreferenceProducts = unstable_cache(
+  async (): Promise<PrefetchedProduct[]> => {
     const db = getFirestoreAdmin();
-    const doc = await db.collection("trending_products").doc("global").get();
-    if (!doc.exists) return [];
-    const data = doc.data();
-    return (data?.products || []) as string[];
+
+    // 1. Fetch trending product IDs
+    const trendingDoc = await db.collection("trending_products").doc("global").get();
+    if (!trendingDoc.exists) return [];
+    const allIds = (trendingDoc.data()?.products || []) as string[];
+    if (allIds.length === 0) return [];
+
+    // 2. Sample up to 30 random IDs
+    const sampleSize = Math.min(30, allIds.length);
+    const sampled: string[] = [];
+    const indices = new Set<number>();
+    while (indices.size < sampleSize) {
+      indices.add(Math.floor(Math.random() * allIds.length));
+    }
+    for (const i of indices) sampled.push(allIds[i]);
+
+    // 3. Fetch full product documents
+    return fetchProductDocsByIds(db, sampled, 30);
   },
-  ["prefetch-trending-products"],
-  { revalidate: 300 },
+  ["prefetch-preference-products"],
+  { revalidate: 60 },
 );
 
 const prefetchDynamicListConfigs = unstable_cache(
   async (): Promise<PrefetchedDynamicListConfig[]> => {
     const db = getFirestoreAdmin();
+
+    // 1. Fetch list configs
     const snapshot = await db
       .collection("dynamic_product_lists")
       .where("isActive", "==", true)
       .orderBy("order")
       .get();
-    return snapshot.docs.map((doc) => {
+
+    const configs: PrefetchedDynamicListConfig[] = [];
+
+    // 2. For each config, fetch its products in parallel
+    const configPromises = snapshot.docs.map(async (doc) => {
       const d = doc.data();
-      return {
+      const config: PrefetchedDynamicListConfig = {
         id: doc.id,
         title: (d.title || "Product List") as string,
         isActive: true,
@@ -272,9 +393,44 @@ const prefetchDynamicListConfigs = unstable_cache(
         limit: d.limit ? Number(d.limit) : undefined,
         showViewAllButton: d.showViewAllButton as boolean | undefined,
       };
+
+      // Fetch products for this list
+      try {
+        if (config.selectedProductIds && config.selectedProductIds.length > 0) {
+          config.prefetchedProducts = await fetchProductDocsByIds(
+            db,
+            config.selectedProductIds,
+            20,
+          );
+        } else if (config.selectedShopId) {
+          const shopLimit = Math.min(Math.max(config.limit ?? 10, 1), 20);
+          const shopSnapshot = await db
+            .collection("shop_products")
+            .where("shopId", "==", config.selectedShopId)
+            .limit(shopLimit)
+            .get();
+          const products: PrefetchedProduct[] = [];
+          for (const productDoc of shopSnapshot.docs) {
+            const parsed = parseProductDoc(productDoc);
+            if (parsed) products.push(parsed);
+          }
+          config.prefetchedProducts = products;
+        }
+      } catch (e) {
+        console.error(`[Prefetch] Error fetching products for list ${doc.id}:`, e);
+      }
+
+      return config;
     });
+
+    const results = await Promise.allSettled(configPromises);
+    for (const result of results) {
+      if (result.status === "fulfilled") configs.push(result.value);
+    }
+
+    return configs.sort((a, b) => a.order - b.order);
   },
-  ["prefetch-dynamic-list-configs"],
+  ["prefetch-dynamic-list-configs-with-products"],
   { revalidate: 120 },
 );
 
@@ -393,7 +549,7 @@ async function prefetchAllWidgetData(
   }
   if (visibleTypes.has("preference_product")) {
     fetches.push(
-      prefetchTrendingProducts()
+      prefetchPreferenceProducts()
         .then((r) => { data.preference_product = r; })
         .catch(() => { data.preference_product = null; }),
     );

@@ -5,8 +5,9 @@ import { ProductCard } from "../ProductCard";
 import { ChevronRight, ChevronLeft } from "lucide-react";
 import { getFirebaseDb } from "@/lib/firebase-lazy";
 import { useTheme } from "@/hooks/useTheme";
+import { ProductUtils } from "@/app/models/Product";
 import type { Product } from "@/app/models/Product";
-import type { PrefetchedDynamicListConfig } from "@/types/MarketLayout";
+import type { PrefetchedDynamicListConfig, PrefetchedProduct } from "@/types/MarketLayout";
 
 // ===============================================
 // DynamicHorizontalList
@@ -30,6 +31,7 @@ interface DynamicListData {
   selectedShopId?: string;
   limit?: number;
   showViewAllButton?: boolean;
+  prefetchedProducts?: PrefetchedProduct[];
 }
 
 // ============================================================================
@@ -270,9 +272,28 @@ interface DynamicListSectionProps {
 
 const DynamicListSection = React.memo(
   ({ listData, isDarkMode }: DynamicListSectionProps) => {
+    // Hydrate server-prefetched products immediately
+    const hydratedFromServer = useMemo(() => {
+      if (!listData.prefetchedProducts || listData.prefetchedProducts.length === 0) return null;
+      return listData.prefetchedProducts
+        .map((p) => {
+          try {
+            return ProductUtils.fromJson(p as unknown as Record<string, unknown>);
+          } catch {
+            return null;
+          }
+        })
+        .filter((p): p is Product => p !== null);
+    }, [listData.prefetchedProducts]);
+
     const [products, setProducts] = useState<Product[] | null>(
-      () => productCache.get(listData.id) ?? null,
+      () => {
+        // Priority: server data > LRU cache > null
+        if (hydratedFromServer && hydratedFromServer.length > 0) return hydratedFromServer;
+        return productCache.get(listData.id) ?? null;
+      },
     );
+    const hasServerData = hydratedFromServer !== null && hydratedFromServer.length > 0;
     const [loading, setLoading] = useState(false);
     const [isVisible, setIsVisible] = useState(false);
     const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -282,8 +303,18 @@ const DynamicListSection = React.memo(
     const sectionRef = useRef<HTMLDivElement>(null);
     const hasFetchedRef = useRef(products !== null);
 
-    // Progressive loading: start fetching 200px before section enters viewport
+    // Populate LRU cache from server data (once)
     useEffect(() => {
+      if (hydratedFromServer && hydratedFromServer.length > 0 && !productCache.has(listData.id)) {
+        productCache.set(listData.id, hydratedFromServer);
+      }
+    }, [hydratedFromServer, listData.id]);
+
+    // Progressive loading: start fetching 200px before section enters viewport
+    // (skipped entirely when server data is available)
+    useEffect(() => {
+      if (hasServerData) return; // No need to observe — already have data
+
       const el = sectionRef.current;
       if (!el) return;
 
@@ -299,10 +330,11 @@ const DynamicListSection = React.memo(
 
       observer.observe(el);
       return () => observer.disconnect();
-    }, []);
+    }, [hasServerData]);
 
-    // Load products when visible (one-time fetch)
+    // Load products when visible (one-time fetch, fallback only)
     useEffect(() => {
+      if (hasServerData) return; // Server data available, skip client fetch
       if (!isVisible || hasFetchedRef.current) return;
 
       const cached = productCache.get(listData.id);
@@ -326,7 +358,7 @@ const DynamicListSection = React.memo(
       return () => {
         cancelled = true;
       };
-    }, [isVisible, listData]);
+    }, [isVisible, listData, hasServerData]);
 
     // Scroll position check
     const checkScrollPosition = useCallback(() => {

@@ -83,7 +83,11 @@ class MetricsEventService {
   }
 
   // ── Core enqueue (matches Flutter _enqueue) ────────────────────────────
-  private enqueue(eventType: string, productId: string, shopId?: string | null): void {
+  private enqueue(
+    eventType: string,
+    productId: string,
+    shopId?: string | null,
+  ): void {
     if (!this.auth.currentUser) {
       console.warn("⚠️ MetricsEventService: user not authenticated, skipping");
       return;
@@ -105,7 +109,7 @@ class MetricsEventService {
     this.pendingEvents.push(event);
 
     console.log(
-      `📥 MetricsEventService: queued ${eventType} for ${productId} (buffer: ${this.pendingEvents.length})`
+      `📥 MetricsEventService: queued ${eventType} for ${productId} (buffer: ${this.pendingEvents.length})`,
     );
 
     if (this.pendingEvents.length >= MAX_BUFFER_SIZE) {
@@ -138,7 +142,7 @@ class MetricsEventService {
       const batchId = await this.generateBatchId();
 
       console.log(
-        `📤 MetricsEventService: flushing ${eventsToSend.length} events (batchId: ${batchId})`
+        `📤 MetricsEventService: flushing ${eventsToSend.length} events (batchId: ${batchId})`,
       );
 
       const functions = getFunctions(undefined, "europe-west3");
@@ -152,7 +156,9 @@ class MetricsEventService {
       this.retryAttempts = 0;
       this.clearPersistedEvents();
 
-      console.log(`✅ MetricsEventService: flushed ${eventsToSend.length} events`);
+      console.log(
+        `✅ MetricsEventService: flushed ${eventsToSend.length} events`,
+      );
     } catch (error) {
       console.error("❌ MetricsEventService: flush failed —", error);
 
@@ -163,13 +169,13 @@ class MetricsEventService {
       if (this.retryAttempts < MAX_RETRY_ATTEMPTS) {
         const retryDelay = 10_000 * this.retryAttempts;
         console.log(
-          `🔄 MetricsEventService: retry ${this.retryAttempts}/${MAX_RETRY_ATTEMPTS} in ${retryDelay / 1000}s`
+          `🔄 MetricsEventService: retry ${this.retryAttempts}/${MAX_RETRY_ATTEMPTS} in ${retryDelay / 1000}s`,
         );
         if (this.flushTimer) clearTimeout(this.flushTimer);
         this.flushTimer = setTimeout(() => void this.flush(), retryDelay);
       } else {
         console.warn(
-          `💾 MetricsEventService: max retries, persisting ${this.pendingEvents.length} events`
+          `💾 MetricsEventService: max retries, persisting ${this.pendingEvents.length} events`,
         );
         this.persistPendingEvents();
         this.pendingEvents = [];
@@ -189,26 +195,27 @@ class MetricsEventService {
         timestamp: Date.now(),
       };
       localStorage.setItem(PERSIST_KEY, JSON.stringify(data));
-      console.log(`💾 MetricsEventService: persisted ${this.pendingEvents.length} events`);
+      console.log(
+        `💾 MetricsEventService: persisted ${this.pendingEvents.length} events`,
+      );
     } catch (e) {
       console.error("❌ MetricsEventService: persist failed —", e);
     }
   }
 
   private loadPersistedEvents(): void {
+    if (typeof window === "undefined") return;
     try {
       const stored = localStorage.getItem(PERSIST_KEY);
       if (!stored) return;
 
       const data: PersistedData = JSON.parse(stored);
 
-      // Discard events older than 24h (matches Flutter _maxEventAge)
       if (Date.now() - data.timestamp > MAX_EVENT_AGE_MS) {
         localStorage.removeItem(PERSIST_KEY);
         return;
       }
 
-      // Cap at MAX_BUFFER_SIZE (matches Flutter _loadPersistedEvents)
       const toLoad = data.events.slice(0, MAX_BUFFER_SIZE);
       this.pendingEvents.push(...toLoad);
       localStorage.removeItem(PERSIST_KEY);
@@ -219,7 +226,9 @@ class MetricsEventService {
       }
     } catch (e) {
       console.warn("⚠️ MetricsEventService: load persisted failed —", e);
-      localStorage.removeItem(PERSIST_KEY);
+      if (typeof window !== "undefined") {
+        localStorage.removeItem(PERSIST_KEY);
+      }
     }
   }
 
@@ -255,19 +264,43 @@ class MetricsEventService {
     }
   }
 
-  logCartAdded({ productId, shopId }: { productId: string; shopId?: string | null }): void {
+  logCartAdded({
+    productId,
+    shopId,
+  }: {
+    productId: string;
+    shopId?: string | null;
+  }): void {
     this.enqueue("cart_added", productId, shopId);
   }
 
-  logCartRemoved({ productId, shopId }: { productId: string; shopId?: string | null }): void {
+  logCartRemoved({
+    productId,
+    shopId,
+  }: {
+    productId: string;
+    shopId?: string | null;
+  }): void {
     this.enqueue("cart_removed", productId, shopId);
   }
 
-  logFavoriteAdded({ productId, shopId }: { productId: string; shopId?: string | null }): void {
+  logFavoriteAdded({
+    productId,
+    shopId,
+  }: {
+    productId: string;
+    shopId?: string | null;
+  }): void {
     this.enqueue("favorite_added", productId, shopId);
   }
 
-  logFavoriteRemoved({ productId, shopId }: { productId: string; shopId?: string | null }): void {
+  logFavoriteRemoved({
+    productId,
+    shopId,
+  }: {
+    productId: string;
+    shopId?: string | null;
+  }): void {
     this.enqueue("favorite_removed", productId, shopId);
   }
 

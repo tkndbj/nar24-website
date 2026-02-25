@@ -9,7 +9,9 @@ import { useTranslations } from "next-intl";
 import { personalizedFeedService } from "@/services/personalizedFeedService";
 import { getFirebaseDb } from "@/lib/firebase-lazy";
 import { useTheme } from "@/hooks/useTheme";
+import { ProductUtils } from "@/app/models/Product";
 import type { Product } from "@/app/models/Product";
+import type { PrefetchedProduct } from "@/types/MarketLayout";
 
 // GPU-accelerated shimmer loading component
 const ShimmerCard = React.memo(
@@ -137,7 +139,20 @@ ShimmerList.displayName = "ShimmerList";
 
 interface PreferenceProductProps {
   keyPrefix?: string;
-  initialProductIds?: string[] | null;
+  initialProducts?: PrefetchedProduct[] | null;
+}
+
+/** Hydrate server-prefetched products into Product objects */
+function hydrateProducts(prefetched: PrefetchedProduct[]): Product[] {
+  return prefetched
+    .map((p) => {
+      try {
+        return ProductUtils.fromJson(p as unknown as Record<string, unknown>);
+      } catch {
+        return null;
+      }
+    })
+    .filter((p): p is Product => p !== null);
 }
 
 let cachedProducts: Product[] | null = null;
@@ -145,9 +160,24 @@ let productsCacheExpiry: Date | null = null;
 const PRODUCTS_CACHE_DURATION = 60 * 60 * 1000;
 
 export const PreferenceProduct = React.memo(
-  ({ keyPrefix = "", initialProductIds }: PreferenceProductProps) => {
-    const [products, setProducts] = useState<Product[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+  ({ keyPrefix = "", initialProducts }: PreferenceProductProps) => {
+    // Hydrate server data immediately (no loading state, no shimmer)
+    const hydratedFromServer = React.useMemo(() => {
+      if (!initialProducts || initialProducts.length === 0) return null;
+      return hydrateProducts(initialProducts);
+    }, [initialProducts]);
+
+    const [products, setProducts] = useState<Product[]>(() => {
+      // Priority: server data > module cache > empty
+      if (hydratedFromServer && hydratedFromServer.length > 0) return hydratedFromServer;
+      if (cachedProducts && cachedProducts.length > 0 && productsCacheExpiry && productsCacheExpiry > new Date()) return cachedProducts;
+      return [];
+    });
+    const [isLoading, setIsLoading] = useState(
+      // No loading if we have server data or valid cache
+      !(hydratedFromServer && hydratedFromServer.length > 0) &&
+      !(cachedProducts && cachedProducts.length > 0 && productsCacheExpiry && productsCacheExpiry > new Date())
+    );
     const [error, setError] = useState<string | null>(null);
     const [canScrollLeft, setCanScrollLeft] = useState(false);
     const [canScrollRight, setCanScrollRight] = useState(false);
@@ -224,10 +254,10 @@ export const PreferenceProduct = React.memo(
     );
 
     /**
-     * Load recommendations
+     * Load recommendations (skipped when server data is available)
      */
     const loadRecommendations = useCallback(async () => {
-      // ✅ CHECK CACHE FIRST
+      // ✅ CHECK CACHE FIRST (includes server-hydrated data)
       if (
         cachedProducts &&
         cachedProducts.length > 0 &&
@@ -246,13 +276,8 @@ export const PreferenceProduct = React.memo(
       setError(null);
 
       try {
-        // Use server-prefetched trending IDs if available, otherwise fetch from client
-        let productIds: string[];
-        if (initialProductIds && initialProductIds.length > 0) {
-          productIds = initialProductIds;
-        } else {
-          productIds = await personalizedFeedService.getProductIds();
-        }
+        // Client-side fallback: fetch trending IDs then product details
+        const productIds = await personalizedFeedService.getProductIds();
 
         if (productIds.length === 0) {
           setProducts([]);
@@ -292,9 +317,21 @@ export const PreferenceProduct = React.memo(
     }, [loadRecommendations]);
 
     /**
-     * Initial load
+     * Populate module cache from server-hydrated data (once)
      */
     useEffect(() => {
+      if (hydratedFromServer && hydratedFromServer.length > 0 && !cachedProducts) {
+        cachedProducts = hydratedFromServer;
+        productsCacheExpiry = new Date(Date.now() + PRODUCTS_CACHE_DURATION);
+      }
+    }, [hydratedFromServer]);
+
+    /**
+     * Initial load — skipped when server data is available
+     */
+    useEffect(() => {
+      // If we already have products (from server or cache), skip client fetch
+      if (products.length > 0 && !isLoading) return;
       loadRecommendations();
     }, [loadRecommendations]);
 
