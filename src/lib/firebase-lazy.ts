@@ -75,21 +75,20 @@ export async function getFirebaseAppCheck(): Promise<AppCheck | null> {
 /**
  * Get or initialize Firebase Auth
  * Lazy loads the auth module only when needed
- * Ensures App Check is initialized first for security
+ * Kicks off App Check in the background (does NOT block on it —
+ * the Firebase SDK auto-attaches tokens once available)
  */
 export async function getFirebaseAuth(): Promise<Auth> {
   if (_auth) return _auth;
 
   if (!_authPromise) {
     _authPromise = (async () => {
-      // Initialize App Check first (non-blocking, runs in parallel)
-      const appCheckPromise = getFirebaseAppCheck();
+      // Kick off App Check in background — don't await
+      getFirebaseAppCheck();
       const [app, { getAuth }] = await Promise.all([
         getFirebaseApp(),
         import("firebase/auth"),
       ]);
-      // Wait for App Check to be ready before returning auth
-      await appCheckPromise;
       _auth = getAuth(app);
       return _auth;
     })();
@@ -101,21 +100,20 @@ export async function getFirebaseAuth(): Promise<Auth> {
 /**
  * Get or initialize Firestore
  * Lazy loads the firestore module only when needed
- * Ensures App Check is initialized first for security
+ * Kicks off App Check in the background (does NOT block on it —
+ * the Firebase SDK auto-attaches tokens once available)
  */
 export async function getFirebaseDb(): Promise<Firestore> {
   if (_db) return _db;
 
   if (!_dbPromise) {
     _dbPromise = (async () => {
-      // Initialize App Check first (non-blocking, runs in parallel)
-      const appCheckPromise = getFirebaseAppCheck();
+      // Kick off App Check in background — don't await
+      getFirebaseAppCheck();
       const [app, { initializeFirestore, getFirestore }] = await Promise.all([
         getFirebaseApp(),
         import("firebase/firestore"),
       ]);
-      // Wait for App Check to be ready before returning db
-      await appCheckPromise;
       // Use initializeFirestore with long polling auto-detection to prevent
       // "Could not reach Cloud Firestore backend" errors when WebSockets are blocked.
       try {
@@ -136,21 +134,19 @@ export async function getFirebaseDb(): Promise<Firestore> {
 /**
  * Get or initialize Firebase Storage
  * Lazy loads the storage module only when needed
- * Ensures App Check is initialized first for security
+ * Kicks off App Check in the background (does NOT block on it)
  */
 export async function getFirebaseStorage(): Promise<FirebaseStorage> {
   if (_storage) return _storage;
 
   if (!_storagePromise) {
     _storagePromise = (async () => {
-      // Initialize App Check first (non-blocking, runs in parallel)
-      const appCheckPromise = getFirebaseAppCheck();
+      // Kick off App Check in background — don't await
+      getFirebaseAppCheck();
       const [app, { getStorage }] = await Promise.all([
         getFirebaseApp(),
         import("firebase/storage"),
       ]);
-      // Wait for App Check to be ready before returning storage
-      await appCheckPromise;
       _storage = getStorage(app);
       return _storage;
     })();
@@ -162,19 +158,17 @@ export async function getFirebaseStorage(): Promise<FirebaseStorage> {
 /**
  * Get or initialize Firebase Functions
  * Lazy loads the functions module only when needed
- * Ensures App Check is initialized first for security
+ * Kicks off App Check in the background (does NOT block on it)
  */
 export async function getFirebaseFunctions(): Promise<Functions> {
   if (_functions) return _functions;
 
   if (!_functionsPromise) {
     _functionsPromise = (async () => {
-      // Initialize App Check first (non-blocking, runs in parallel)
-      const appCheckPromise = getFirebaseAppCheck();
+      // Kick off App Check in background — don't await
+      getFirebaseAppCheck();
       const [app, { getFunctions, connectFunctionsEmulator }] =
         await Promise.all([getFirebaseApp(), import("firebase/functions")]);
-      // Wait for App Check to be ready before returning functions
-      await appCheckPromise;
       _functions = getFunctions(app, "europe-west3");
 
       // Connect to emulator in development
