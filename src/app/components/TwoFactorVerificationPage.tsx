@@ -15,7 +15,6 @@ import {
   ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
 import TwoFactorService from "@/services/TwoFactorService";
-import QRCode from "qrcode";
 // 🔥 CRITICAL FIX: Import useUser to access complete2FA
 import { useUser } from "@/context/UserProvider";
 
@@ -108,9 +107,10 @@ export default function TwoFactorVerificationPage({
           setOtpauth(result.otpauth || null);
           setSecretBase32(result.secretBase32 || null);
 
-          // Generate QR code
+          // Generate QR code (lazy load qrcode library — only needed during 2FA setup)
           if (result.otpauth) {
             try {
+              const QRCode = (await import("qrcode")).default;
               const qrDataUrl = await QRCode.toDataURL(result.otpauth, {
                 width: 200,
                 margin: 2,

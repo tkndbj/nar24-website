@@ -144,11 +144,18 @@ export async function GET(request: NextRequest) {
       return orderA - orderB;
     });
 
-    return NextResponse.json({
-      products: allProducts,
-      count: allProducts.length,
-      source: cachedProducts.length === allProducts.length ? "cache" : "mixed",
-    });
+    return NextResponse.json(
+      {
+        products: allProducts,
+        count: allProducts.length,
+        source: cachedProducts.length === allProducts.length ? "cache" : "mixed",
+      },
+      {
+        headers: {
+          "Cache-Control": "public, max-age=120, stale-while-revalidate=300",
+        },
+      }
+    );
   } catch (error) {
     console.error("Error in batch fetch:", error);
 

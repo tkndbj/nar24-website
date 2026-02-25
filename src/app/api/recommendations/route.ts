@@ -1,16 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/firebase";
+import { getFirestoreAdmin } from "@/lib/firebase-admin";
 import { Product, ProductUtils } from "@/app/models/Product";
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  limit as firestoreLimit,
-  getDocs,
-  doc,
-  getDoc,
-} from "firebase/firestore";
 
 // Cache interface
 interface CacheEntry {
@@ -24,75 +14,75 @@ interface CacheEntry {
 const cache = new Map<string, CacheEntry>();
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
+function documentToProduct(
+  doc: FirebaseFirestore.DocumentSnapshot
+): Product | null {
+  const data = doc.data();
+  if (!data) return null;
+
+  try {
+    return ProductUtils.fromJson({
+      ...data,
+      id: doc.id,
+      reference: {
+        id: doc.id,
+        path: doc.ref.path,
+        parent: { id: doc.ref.parent.id },
+      },
+    });
+  } catch (error) {
+    console.error(`Error parsing product ${doc.id}:`, error);
+    return null;
+  }
+}
+
 // Firebase database operations
 class ProductDatabase {
   static async getTopRankedShopProducts(limit: number): Promise<Product[]> {
     try {
-      console.log("Fetching top-ranked shop products from Firebase");
+      const db = getFirestoreAdmin();
 
       // Query shop_products by ranking score, filtering out of stock items
-      const q = query(
-        collection(db, "shop_products"),
-        where("quantity", ">", 0),
-        orderBy("quantity"),
-        orderBy("rankingScore", "desc"),
-        firestoreLimit(limit * 2) // Fetch extra in case some fail validation
-      );
+      const snapshot = await db
+        .collection("shop_products")
+        .where("quantity", ">", 0)
+        .orderBy("quantity")
+        .orderBy("rankingScore", "desc")
+        .limit(limit * 2) // Fetch extra in case some fail validation
+        .get();
 
-      const snapshot = await getDocs(q);
       const products: Product[] = [];
 
-      for (const docSnap of snapshot.docs) {
-        try {
-          const product = ProductUtils.fromJson({
-            id: docSnap.id,
-            ...docSnap.data(),
-          });
-
-          // Basic validation
-          if (this.validateProduct(product)) {
-            products.push(product);
-            if (products.length >= limit) break;
-          }
-        } catch (e) {
-          console.error(`Error parsing product ${docSnap.id}:`, e);
-          continue;
+      for (const doc of snapshot.docs) {
+        const product = documentToProduct(doc);
+        if (product && this.validateProduct(product)) {
+          products.push(product);
+          if (products.length >= limit) break;
         }
       }
 
       // If we don't have enough products, try a simpler query
       if (products.length < limit) {
-        console.log("Not enough ranked products, fetching by creation date");
-        const additionalQ = query(
-          collection(db, "shop_products"),
-          where("quantity", ">", 0),
-          orderBy("quantity"),
-          orderBy("createdAt", "desc"),
-          firestoreLimit(limit - products.length)
-        );
+        const additionalSnapshot = await db
+          .collection("shop_products")
+          .where("quantity", ">", 0)
+          .orderBy("quantity")
+          .orderBy("createdAt", "desc")
+          .limit(limit - products.length)
+          .get();
 
-        const additionalSnapshot = await getDocs(additionalQ);
-
-        for (const docSnap of additionalSnapshot.docs) {
-          try {
-            const product = ProductUtils.fromJson({
-              id: docSnap.id,
-              ...docSnap.data(),
-            });
-
-            if (
-              !products.some((p) => p.id === product.id) &&
-              this.validateProduct(product)
-            ) {
-              products.push(product);
-            }
-          } catch (e) {
-            console.error(`Error parsing additional product ${docSnap.id}:`, e);
+        for (const doc of additionalSnapshot.docs) {
+          const product = documentToProduct(doc);
+          if (
+            product &&
+            !products.some((p) => p.id === product.id) &&
+            this.validateProduct(product)
+          ) {
+            products.push(product);
           }
         }
       }
 
-      console.log(`Fetched ${products.length} top-ranked products`);
       return products;
     } catch (error) {
       console.error("Error fetching top-ranked shop products:", error);
@@ -106,90 +96,75 @@ class ProductDatabase {
     limit: number = 20
   ): Promise<Product[]> {
     try {
-      console.log(`Fetching recommendations for user: ${userId}`);
+      const db = getFirestoreAdmin();
 
-      // For authenticated users, you might want to implement more sophisticated logic
-      // For now, we'll use a combination of user activity and top products
+      // Fetch activity score and products in parallel
+      const productsQuery = (() => {
+        let ref: FirebaseFirestore.Query = db
+          .collection("shop_products")
+          .where("quantity", ">", 0);
 
-      // Get user activity score (you might want to implement this based on your user activity tracking)
-      const activityScore = await this.getUserActivityScore(userId);
+        if (category && !category.includes(" > ")) {
+          ref = ref.where("category", "==", category);
+        }
 
-      let products: Product[] = [];
+        return ref
+          .orderBy("quantity")
+          .orderBy("rankingScore", "desc")
+          .limit(limit * 2)
+          .get();
+      })();
 
-      // Build filter based on category
-      let filterQuery = query(
-        collection(db, "shop_products"),
-        where("quantity", ">", 0)
-      );
+      const [activityScore, snapshot] = await Promise.all([
+        this.getUserActivityScore(userId),
+        productsQuery,
+      ]);
 
-      if (category && !category.includes(" > ")) {
-        // Add category filter if specified
-        filterQuery = query(filterQuery, where("category", "==", category));
-      }
+      const products: Product[] = [];
 
-      // Order by ranking score and limit results
-      const q = query(
-        filterQuery,
-        orderBy("quantity"),
-        orderBy("rankingScore", "desc"),
-        firestoreLimit(limit * 2)
-      );
-
-      const snapshot = await getDocs(q);
-
-      for (const docSnap of snapshot.docs) {
-        try {
-          const product = ProductUtils.fromJson({
-            id: docSnap.id,
-            ...docSnap.data(),
-          });
-
-          if (this.validateProduct(product)) {
-            products.push(product);
-            if (products.length >= limit) break;
-          }
-        } catch (e) {
-          console.error(`Error parsing recommended product ${docSnap.id}:`, e);
-          continue;
+      for (const doc of snapshot.docs) {
+        const product = documentToProduct(doc);
+        if (product && this.validateProduct(product)) {
+          products.push(product);
+          if (products.length >= limit) break;
         }
       }
 
       // If we don't have enough products or user has low activity, blend with fallback
       if (products.length < limit || activityScore < 20) {
-        console.log("Blending with fallback products");
         const fallbackProducts = await this.getFallbackShopProducts(limit);
 
         if (products.length === 0) {
-          products = fallbackProducts;
-        } else {
-          // Blend recommendations with fallback
-          const blended: Product[] = [];
-          const seen = new Set<string>();
-          let ri = 0,
-            fi = 0;
-
-          while (
-            blended.length < limit &&
-            (ri < products.length || fi < fallbackProducts.length)
-          ) {
-            const takeRec =
-              ri < products.length && (activityScore >= 20 || fi % 2 === 0);
-
-            if (takeRec) {
-              const product = products[ri++];
-              if (seen.has(product.id)) continue;
-              seen.add(product.id);
-              blended.push(product);
-            } else if (fi < fallbackProducts.length) {
-              const product = fallbackProducts[fi++];
-              if (seen.has(product.id)) continue;
-              seen.add(product.id);
-              blended.push(product);
-            }
-          }
-
-          products = blended;
+          return fallbackProducts.slice(0, limit);
         }
+
+        // Blend recommendations with fallback
+        const blended: Product[] = [];
+        const seen = new Set<string>();
+        let ri = 0,
+          fi = 0;
+
+        while (
+          blended.length < limit &&
+          (ri < products.length || fi < fallbackProducts.length)
+        ) {
+          const takeRec =
+            ri < products.length && (activityScore >= 20 || fi % 2 === 0);
+
+          if (takeRec) {
+            const product = products[ri++];
+            if (seen.has(product.id)) continue;
+            seen.add(product.id);
+            blended.push(product);
+          } else if (fi < fallbackProducts.length) {
+            const product = fallbackProducts[fi++];
+            if (seen.has(product.id)) continue;
+            seen.add(product.id);
+            blended.push(product);
+          }
+        }
+
+        return blended.slice(0, limit);
       }
 
       return products.slice(0, limit);
@@ -202,30 +177,22 @@ class ProductDatabase {
 
   static async getFallbackShopProducts(limit: number): Promise<Product[]> {
     try {
-      const q = query(
-        collection(db, "shop_products"),
-        where("quantity", ">", 0),
-        orderBy("quantity", "desc"),
-        orderBy("createdAt", "desc"),
-        firestoreLimit(limit)
-      );
+      const db = getFirestoreAdmin();
 
-      const snapshot = await getDocs(q);
+      const snapshot = await db
+        .collection("shop_products")
+        .where("quantity", ">", 0)
+        .orderBy("quantity", "desc")
+        .orderBy("createdAt", "desc")
+        .limit(limit)
+        .get();
+
       const products: Product[] = [];
 
-      for (const docSnap of snapshot.docs) {
-        try {
-          const product = ProductUtils.fromJson({
-            id: docSnap.id,
-            ...docSnap.data(),
-          });
-
-          if (this.validateProduct(product)) {
-            products.push(product);
-          }
-        } catch (e) {
-          console.error(`Error parsing fallback product ${docSnap.id}:`, e);
-          continue;
+      for (const doc of snapshot.docs) {
+        const product = documentToProduct(doc);
+        if (product && this.validateProduct(product)) {
+          products.push(product);
         }
       }
 
@@ -238,20 +205,19 @@ class ProductDatabase {
 
   static async getUserActivityScore(userId: string): Promise<number> {
     try {
-      // Check if user has activity data
-      // You might want to implement this based on your user activity collection
-      const userDoc = await getDoc(doc(db, "users", userId));
+      const db = getFirestoreAdmin();
+      const userDoc = await db.collection("users").doc(userId).get();
 
-      if (!userDoc.exists()) {
+      if (!userDoc.exists) {
         return 0; // New user
       }
 
       const userData = userDoc.data();
-      // Calculate activity score based on user's purchase history, clicks, etc.
-      // This is a simplified version - you can enhance based on your needs
-      const purchases = (userData?.purchaseCount as number) || 0;
-      const clicks = (userData?.clickCount as number) || 0;
-      const views = (userData?.viewCount as number) || 0;
+      if (!userData) return 0;
+
+      const purchases = (userData.purchaseCount as number) || 0;
+      const clicks = (userData.clickCount as number) || 0;
+      const views = (userData.viewCount as number) || 0;
 
       return Math.min(100, purchases * 10 + clicks * 2 + views);
     } catch (error) {
@@ -281,6 +247,10 @@ function isCacheValid(entry: CacheEntry): boolean {
   return Date.now() - entry.timestamp < CACHE_TTL;
 }
 
+const RESPONSE_HEADERS = {
+  "Cache-Control": "public, max-age=300, stale-while-revalidate=600",
+};
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -292,14 +262,6 @@ export async function GET(request: NextRequest) {
     );
     const pageToken = searchParams.get("pageToken");
 
-    console.log("Fetching recommendations:", {
-      userId,
-      category,
-      maxProducts,
-      pageSize,
-      pageToken,
-    });
-
     // Generate cache key
     const cacheKey = generateCacheKey(
       userId || undefined,
@@ -310,12 +272,14 @@ export async function GET(request: NextRequest) {
     if (!pageToken) {
       const cachedEntry = cache.get(cacheKey);
       if (cachedEntry && isCacheValid(cachedEntry)) {
-        console.log("Returning cached recommendations");
-        return NextResponse.json({
-          products: cachedEntry.products.slice(0, pageSize),
-          cached: true,
-          timestamp: cachedEntry.timestamp,
-        });
+        return NextResponse.json(
+          {
+            products: cachedEntry.products.slice(0, pageSize),
+            cached: true,
+            timestamp: cachedEntry.timestamp,
+          },
+          { headers: RESPONSE_HEADERS }
+        );
       }
     }
 
@@ -323,11 +287,9 @@ export async function GET(request: NextRequest) {
 
     if (!userId) {
       // Unauthenticated user - fetch top-ranked shop products
-      console.log("Fetching top-ranked products for unauthenticated user");
       products = await ProductDatabase.getTopRankedShopProducts(pageSize);
     } else {
       // Authenticated user - get personalized recommendations
-      console.log("Fetching personalized recommendations for user:", userId);
       try {
         products = await ProductDatabase.getRecommendationsForUser(
           userId,
@@ -349,12 +311,6 @@ export async function GET(request: NextRequest) {
         userId: userId || undefined,
         category: category || undefined,
       });
-
-      console.log(
-        `Cached ${products.length} recommendations for ${
-          userId ? "user " + userId : "anonymous user"
-        }`
-      );
     }
 
     // Simulate pagination token (in real implementation, this would be more sophisticated)
@@ -363,12 +319,15 @@ export async function GET(request: NextRequest) {
         ? Buffer.from(`${Date.now()}-${Math.random()}`).toString("base64")
         : null;
 
-    return NextResponse.json({
-      products: products,
-      nextPageToken,
-      cached: false,
-      total: products.length,
-    });
+    return NextResponse.json(
+      {
+        products: products,
+        nextPageToken,
+        cached: false,
+        total: products.length,
+      },
+      { headers: RESPONSE_HEADERS }
+    );
   } catch (error) {
     console.error("Error in recommendations API:", error);
 
@@ -377,11 +336,14 @@ export async function GET(request: NextRequest) {
       const fallbackProducts = await ProductDatabase.getTopRankedShopProducts(
         20
       );
-      return NextResponse.json({
-        products: fallbackProducts,
-        error: "Partial failure - showing fallback products",
-        fallback: true,
-      });
+      return NextResponse.json(
+        {
+          products: fallbackProducts,
+          error: "Partial failure - showing fallback products",
+          fallback: true,
+        },
+        { headers: RESPONSE_HEADERS }
+      );
     } catch (fallbackError) {
       console.error("Fallback also failed:", fallbackError);
       return NextResponse.json(
@@ -399,14 +361,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { userId, category, filters, maxProducts = 20, preferences } = body;
-
-    console.log("POST recommendations request:", {
-      userId,
-      category,
-      filters,
-      preferences,
-    });
+    const { userId, category, filters, maxProducts = 20 } = body;
 
     let products: Product[];
 
@@ -426,11 +381,14 @@ export async function POST(request: NextRequest) {
       // e.g., price range, brand, condition, etc.
     }
 
-    return NextResponse.json({
-      products,
-      requestId: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      processedAt: new Date().toISOString(),
-    });
+    return NextResponse.json(
+      {
+        products,
+        requestId: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        processedAt: new Date().toISOString(),
+      },
+      { headers: RESPONSE_HEADERS }
+    );
   } catch (error) {
     console.error("Error in POST recommendations:", error);
     return NextResponse.json(

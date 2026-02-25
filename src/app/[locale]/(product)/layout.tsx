@@ -1,5 +1,3 @@
-"use client";
-
 import { ProductProvider } from "@/context/ProductContext";
 
 export default function ProductLayout({

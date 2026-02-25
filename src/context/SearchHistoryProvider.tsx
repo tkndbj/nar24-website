@@ -438,6 +438,7 @@ export const SearchHistoryProvider: React.FC<SearchHistoryProviderProps> = ({ ch
           clearTimeout(deferredId as ReturnType<typeof setTimeout>);
         }
         historyUnsubscribe.current?.();
+        historyUnsubscribe.current = null;
         deletingRef.clear();
         optimisticRef.clear();
       };
@@ -446,8 +447,9 @@ export const SearchHistoryProvider: React.FC<SearchHistoryProviderProps> = ({ ch
     }
 
     return () => {
-      // Cleanup on unmount or user change
+      // Cleanup on unmount
       historyUnsubscribe.current?.();
+      historyUnsubscribe.current = null;
       deletingRef.clear();
       optimisticRef.clear();
     };
