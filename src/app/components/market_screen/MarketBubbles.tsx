@@ -51,7 +51,7 @@ export const MarketBubbles: React.FC<MarketBubblesProps> = ({}) => {
       image: "/images/foodbubble.png",
       borderColor: "#3b82f6", // blue-500
       backgroundColor: "rgba(59, 130, 246, 0.2)", // blue-500 with opacity
-      showComingSoon: true,
+      showComingSoon: false,
     },
     {
       label: t("market"),
@@ -69,6 +69,8 @@ export const MarketBubbles: React.FC<MarketBubblesProps> = ({}) => {
       router.push("/createshop"); // Navigate to /create-shop for Become a Seller bubble
     } else if (index === 2) {
       router.push("/dynamicteras"); // Navigate to /dynamicteras for Showcase bubble
+    } else if (index === 3) {
+      router.push("/restaurants"); // Navigate to /restaurants for Restaurants bubble
     }
   };
 

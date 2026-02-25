@@ -1,6 +1,13 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, useMemo, useRef, UIEvent } from "react";
+import React, {
+  useEffect,
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+  UIEvent,
+} from "react";
 import dynamic from "next/dynamic";
 import {
   Trash2,
@@ -38,7 +45,7 @@ import Footer from "@/app/components/Footer";
 // Lazy load CartValidationDialog - only shown when validation needed
 const CartValidationDialog = dynamic(
   () => import("@/app/components/CartValidationDialog"),
-  { ssr: false }
+  { ssr: false },
 );
 
 interface ValidationMessage {
@@ -103,9 +110,13 @@ function CartPageContent() {
   const localization = useTranslations();
 
   // Dynamic import for AttributeLocalizationUtils
-  const [AttributeLocalizationUtils, setAttributeLocalizationUtils] = useState<typeof AttributeLocalizationUtilsType | null>(null);
+  const [AttributeLocalizationUtils, setAttributeLocalizationUtils] = useState<
+    typeof AttributeLocalizationUtilsType | null
+  >(null);
   useEffect(() => {
-    import("@/constants/AttributeLocalization").then((mod) => setAttributeLocalizationUtils(() => mod.AttributeLocalizationUtils));
+    import("@/constants/AttributeLocalization").then((mod) =>
+      setAttributeLocalizationUtils(() => mod.AttributeLocalizationUtils),
+    );
   }, []);
   const {
     cartItems,
@@ -157,7 +168,7 @@ function CartPageContent() {
   const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
   const isLoadingMoreRef = useRef(false); // Prevents race conditions
   const [deselectedProducts, setDeselectedProducts] = useState<Set<string>>(
-    new Set()
+    new Set(),
   );
 
   // Totals state
@@ -184,7 +195,9 @@ function CartPageContent() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const savedTheme = localStorage.getItem("theme");
-    const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const systemPrefersDark = window.matchMedia(
+      "(prefers-color-scheme: dark)",
+    ).matches;
     if (savedTheme === "dark" || (!savedTheme && systemPrefersDark)) {
       document.documentElement.classList.add("dark");
       setIsDark(true);
@@ -192,9 +205,13 @@ function CartPageContent() {
       document.documentElement.classList.remove("dark");
       setIsDark(false);
     }
-    const checkTheme = () => setIsDark(document.documentElement.classList.contains("dark"));
+    const checkTheme = () =>
+      setIsDark(document.documentElement.classList.contains("dark"));
     const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
     return () => observer.disconnect();
   }, []);
 
@@ -223,7 +240,7 @@ function CartPageContent() {
         return fallback ?? key;
       }
     },
-    [localization]
+    [localization],
   );
 
   // ========================================================================
@@ -261,10 +278,19 @@ function CartPageContent() {
 
   // Auto-clear free shipping if no longer applicable
   useEffect(() => {
-    if (useFreeShipping && !isFreeShippingApplicable(calculatedTotals.total) && calculatedTotals.total > 0) {
+    if (
+      useFreeShipping &&
+      !isFreeShippingApplicable(calculatedTotals.total) &&
+      calculatedTotals.total > 0
+    ) {
       setFreeShipping(false);
     }
-  }, [useFreeShipping, calculatedTotals.total, isFreeShippingApplicable, setFreeShipping]);
+  }, [
+    useFreeShipping,
+    calculatedTotals.total,
+    isFreeShippingApplicable,
+    setFreeShipping,
+  ]);
 
   // ========================================================================
   // EFFECTS
@@ -297,7 +323,7 @@ function CartPageContent() {
       (error) => {
         console.error("Error listening to sales config:", error);
         setSalesPaused(false);
-      }
+      },
     );
 
     return () => unsubscribe();
@@ -317,9 +343,7 @@ function CartPageContent() {
       return;
     }
 
-    const currentProductIds = new Set(
-      cartItems.map((item) => item.productId)
-    );
+    const currentProductIds = new Set(cartItems.map((item) => item.productId));
 
     setDeselectedProducts((prev) => {
       const newDeselected = new Set<string>();
@@ -378,7 +402,12 @@ function CartPageContent() {
     const observer = new IntersectionObserver(
       (entries) => {
         const [entry] = entries;
-        if (entry.isIntersecting && hasMore && !isLoadingMore && !isLoadingMoreRef.current) {
+        if (
+          entry.isIntersecting &&
+          hasMore &&
+          !isLoadingMore &&
+          !isLoadingMoreRef.current
+        ) {
           console.log("📜 Sentinel visible, loading more items...");
           handleLoadMore();
         }
@@ -387,7 +416,7 @@ function CartPageContent() {
         root: scrollContainerRef.current,
         rootMargin: "200px", // Trigger 200px before reaching the sentinel
         threshold: 0,
-      }
+      },
     );
 
     observer.observe(sentinel);
@@ -414,7 +443,7 @@ function CartPageContent() {
         handleLoadMore();
       }
     },
-    [hasMore, isLoadingMore, handleLoadMore]
+    [hasMore, isLoadingMore, handleLoadMore],
   );
 
   useEffect(() => {
@@ -439,7 +468,7 @@ function CartPageContent() {
         // ✅ Pass excluded IDs to Cloud Function (matching Flutter)
         const excludedIds = Array.from(deselectedProducts);
         const serverTotals = await calculateCartTotals(
-          excludedIds.length > 0 ? excludedIds : undefined
+          excludedIds.length > 0 ? excludedIds : undefined,
         );
         setCalculatedTotals(serverTotals);
       } catch (error) {
@@ -466,7 +495,7 @@ function CartPageContent() {
     }
 
     const selectedItems = cartItems.filter((item) =>
-      selectedIds.includes(item.productId)
+      selectedIds.includes(item.productId),
     );
 
     let total = 0;
@@ -583,12 +612,15 @@ function CartPageContent() {
           if (typeof value === "string" || typeof value === "number") {
             const localizedValue = AttributeLocalizationUtils
               ? AttributeLocalizationUtils.getLocalizedAttributeValue(
-                key,
-                value,
-                localization
-              )
+                  key,
+                  value,
+                  localization,
+                )
               : String(value);
-            if (localizedValue.trim() !== "" && !displayValues.includes(localizedValue)) {
+            if (
+              localizedValue.trim() !== "" &&
+              !displayValues.includes(localizedValue)
+            ) {
               displayValues.push(localizedValue);
             }
           }
@@ -597,7 +629,7 @@ function CartPageContent() {
 
       return displayValues.join(", ");
     },
-    [localization]
+    [localization],
   );
 
   // ========================================================================
@@ -612,7 +644,7 @@ function CartPageContent() {
         console.error("Failed to remove item:", error);
       }
     },
-    [removeFromCart]
+    [removeFromCart],
   );
 
   const handleQuantityChange = useCallback(
@@ -623,7 +655,7 @@ function CartPageContent() {
         console.error("Failed to update quantity:", error);
       }
     },
-    [updateQuantity]
+    [updateQuantity],
   );
 
   // ========================================================================
@@ -634,18 +666,19 @@ function CartPageContent() {
     (coupon: Coupon | null) => {
       selectCoupon(coupon);
     },
-    [selectCoupon]
+    [selectCoupon],
   );
 
   const handleFreeShippingToggled = useCallback(
     (use: boolean, benefit?: UserBenefit | null) => {
       // Find the first valid free shipping benefit if toggling on and no benefit provided
-      const benefitToUse = use && !benefit && activeFreeShippingBenefits.length > 0
-        ? activeFreeShippingBenefits[0]
-        : benefit;
+      const benefitToUse =
+        use && !benefit && activeFreeShippingBenefits.length > 0
+          ? activeFreeShippingBenefits[0]
+          : benefit;
       setFreeShipping(use, benefitToUse);
     },
-    [setFreeShipping, activeFreeShippingBenefits]
+    [setFreeShipping, activeFreeShippingBenefits],
   );
 
   const showCouponSelectionSheet = useCallback(() => {
@@ -667,7 +700,8 @@ function CartPageContent() {
       // Filter cart items to only include those with calculated pricing
       const itemsWithPricing = cartItems.filter(
         (item) =>
-          selectedIds.includes(item.productId) && pricingMap.has(item.productId)
+          selectedIds.includes(item.productId) &&
+          pricingMap.has(item.productId),
       );
 
       // Check if we lost any items
@@ -675,7 +709,10 @@ function CartPageContent() {
         const missingIds = selectedIds.filter((id) => !pricingMap.has(id));
         console.error("❌ Missing pricing for items:", missingIds);
         alert(
-          t("pricingError", "Some items are missing pricing information. Please refresh and try again.")
+          t(
+            "pricingError",
+            "Some items are missing pricing information. Please refresh and try again.",
+          ),
         );
         return;
       }
@@ -687,7 +724,7 @@ function CartPageContent() {
           JSON.stringify({
             selectedIds,
             timestamp: Date.now(),
-          })
+          }),
         );
 
         // ✅ Store discount selections (matching Flutter's passing to ProductPaymentScreen)
@@ -701,13 +738,21 @@ function CartPageContent() {
             useFreeShipping: useFreeShipping,
             benefitId: selectedBenefit?.id ?? null,
             timestamp: Date.now(),
-          })
+          }),
         );
       }
 
       router.push("/productpayment");
     },
-    [cartItems, selectedIds, selectedCoupon, selectedBenefit, useFreeShipping, router, t]
+    [
+      cartItems,
+      selectedIds,
+      selectedCoupon,
+      selectedBenefit,
+      useFreeShipping,
+      router,
+      t,
+    ],
   );
 
   const handleCheckout = useCallback(async () => {
@@ -736,12 +781,18 @@ function CartPageContent() {
         while (retries > 0) {
           try {
             freshTotals = await calculateCartTotals(
-              excludedIds.length > 0 ? excludedIds : undefined
+              excludedIds.length > 0 ? excludedIds : undefined,
             );
             break;
           } catch (error) {
-            if (error instanceof Error && error.message.includes("Too many requests") && retries > 1) {
-              console.log(`⏳ Rate limited, waiting 2s... (${retries - 1} retries left)`);
+            if (
+              error instanceof Error &&
+              error.message.includes("Too many requests") &&
+              retries > 1
+            ) {
+              console.log(
+                `⏳ Rate limited, waiting 2s... (${retries - 1} retries left)`,
+              );
               await new Promise((resolve) => setTimeout(resolve, 2000));
               retries--;
             } else {
@@ -766,7 +817,12 @@ function CartPageContent() {
     } catch (error) {
       setIsValidating(false);
       console.error("❌ Checkout error:", error);
-      alert(t("validationFailed", "Checkout failed. Please wait a moment and try again."));
+      alert(
+        t(
+          "validationFailed",
+          "Checkout failed. Please wait a moment and try again.",
+        ),
+      );
     }
   }, [
     selectedIds,
@@ -810,10 +866,10 @@ function CartPageContent() {
         console.log("💰 Calculating fresh totals after validation...");
         const allProductIds = cartItems.map((item) => item.productId);
         const excludedForTotals = allProductIds.filter(
-          (id) => !validIds.includes(id)
+          (id) => !validIds.includes(id),
         );
         const freshTotals = await calculateCartTotals(
-          excludedForTotals.length > 0 ? excludedForTotals : undefined
+          excludedForTotals.length > 0 ? excludedForTotals : undefined,
         );
         console.log("💰 Fresh totals:", freshTotals);
 
@@ -844,13 +900,19 @@ function CartPageContent() {
     const subtotal = calculatedTotals.total;
 
     return (
-      <div className={`p-3 rounded-xl mb-3 border ${isDark ? "bg-emerald-900/15 border-emerald-800/40" : "bg-emerald-50/50 border-emerald-200"}`}>
+      <div
+        className={`p-3 rounded-xl mb-3 border ${isDark ? "bg-emerald-900/15 border-emerald-800/40" : "bg-emerald-50/50 border-emerald-200"}`}
+      >
         {/* Subtotal row */}
         <div className="flex justify-between items-center">
-          <span className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+          <span
+            className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}
+          >
             {t("subtotal", "Subtotal")}
           </span>
-          <span className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+          <span
+            className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}
+          >
             {subtotal.toFixed(2)} {calculatedTotals.currency}
           </span>
         </div>
@@ -953,7 +1015,7 @@ function CartPageContent() {
       const salePrefs = item.salePreferences || item.salePreferenceInfo;
       const maxQuantity = Math.min(
         availableStock,
-        salePrefs?.maxQuantity ?? 99
+        salePrefs?.maxQuantity ?? 99,
       );
       const attributesDisplay = formatItemAttributes(item);
 
@@ -964,7 +1026,8 @@ function CartPageContent() {
         salePrefs?.bulkDiscountPercentage &&
         item.quantity >= salePrefs.discountThreshold;
       if (hasBulkDiscount) {
-        effectivePrice = effectivePrice * (1 - (salePrefs!.bulkDiscountPercentage! / 100));
+        effectivePrice =
+          effectivePrice * (1 - salePrefs!.bulkDiscountPercentage! / 100);
       }
       const subtotal = effectivePrice * item.quantity;
       const currency = item.product?.currency || "TL";
@@ -979,14 +1042,18 @@ function CartPageContent() {
               }`}
             >
               <ShoppingBag size={11} className="text-orange-500" />
-              <span className={`text-[11px] font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+              <span
+                className={`text-[11px] font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}
+              >
                 {item.sellerName}
               </span>
             </div>
           )}
 
           {/* Item Row */}
-          <div className={`py-4 px-2 sm:px-0 ${index < cartItems.length - 1 ? `border-b ${isDark ? "border-gray-800/60" : "border-gray-100"}` : ""}`}>
+          <div
+            className={`py-4 px-2 sm:px-0 ${index < cartItems.length - 1 ? `border-b ${isDark ? "border-gray-800/60" : "border-gray-100"}` : ""}`}
+          >
             {/* Desktop layout */}
             <div className="hidden lg:grid lg:grid-cols-[auto_auto_1fr_100px_120px_100px_auto] lg:items-center lg:gap-4">
               {/* Checkbox */}
@@ -1022,7 +1089,11 @@ function CartPageContent() {
                 onClick={() => router.push(`/productdetail/${item.productId}`)}
               >
                 <Image
-                  src={item.selectedColorImage || item.product?.imageUrls?.[0] || ""}
+                  src={
+                    item.selectedColorImage ||
+                    item.product?.imageUrls?.[0] ||
+                    ""
+                  }
                   alt={item.product?.productName || ""}
                   fill
                   className="object-cover"
@@ -1036,15 +1107,22 @@ function CartPageContent() {
                 onClick={() => router.push(`/productdetail/${item.productId}`)}
               >
                 {item.product?.brandModel && (
-                  <p className={`text-[10px] font-medium mb-0.5 ${isDark ? "text-blue-400" : "text-blue-600"}`}>
+                  <p
+                    className={`text-[10px] font-medium mb-0.5 ${isDark ? "text-blue-400" : "text-blue-600"}`}
+                  >
                     {item.product.brandModel}
                   </p>
                 )}
-                <h3 className={`text-sm font-medium line-clamp-2 leading-snug ${isDark ? "text-white" : "text-gray-900"}`}>
-                  {item.product?.productName || t("loadingProduct", "Loading...")}
+                <h3
+                  className={`text-sm font-medium line-clamp-2 leading-snug ${isDark ? "text-white" : "text-gray-900"}`}
+                >
+                  {item.product?.productName ||
+                    t("loadingProduct", "Loading...")}
                 </h3>
                 {attributesDisplay && (
-                  <p className={`text-[11px] mt-0.5 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                  <p
+                    className={`text-[11px] mt-0.5 ${isDark ? "text-gray-500" : "text-gray-400"}`}
+                  >
                     {attributesDisplay}
                   </p>
                 )}
@@ -1057,11 +1135,15 @@ function CartPageContent() {
 
               {/* Price */}
               <div className="text-right">
-                <span className={`text-sm font-semibold ${isDark ? "text-gray-200" : "text-gray-800"}`}>
+                <span
+                  className={`text-sm font-semibold ${isDark ? "text-gray-200" : "text-gray-800"}`}
+                >
                   {effectivePrice.toFixed(2)} {currency}
                 </span>
                 {hasBulkDiscount && (
-                  <p className={`text-[10px] line-through ${isDark ? "text-gray-600" : "text-gray-400"}`}>
+                  <p
+                    className={`text-[10px] line-through ${isDark ? "text-gray-600" : "text-gray-400"}`}
+                  >
                     {item.product?.price.toFixed(2)} {currency}
                   </p>
                 )}
@@ -1069,7 +1151,9 @@ function CartPageContent() {
 
               {/* Quantity */}
               <div className="flex items-center justify-center">
-                <div className={`inline-flex items-center rounded-lg border ${isDark ? "border-gray-700" : "border-gray-200"}`}>
+                <div
+                  className={`inline-flex items-center rounded-lg border ${isDark ? "border-gray-700" : "border-gray-200"}`}
+                >
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -1079,12 +1163,16 @@ function CartPageContent() {
                     }}
                     disabled={item.quantity <= 1 || item.isOptimistic}
                     className={`p-1.5 transition-colors ${
-                      isDark ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-100 text-gray-500"
+                      isDark
+                        ? "hover:bg-gray-700 text-gray-400"
+                        : "hover:bg-gray-100 text-gray-500"
                     } disabled:opacity-40 disabled:cursor-not-allowed`}
                   >
                     <Minus size={13} />
                   </button>
-                  <span className={`min-w-[32px] text-center text-sm font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>
+                  <span
+                    className={`min-w-[32px] text-center text-sm font-semibold ${isDark ? "text-white" : "text-gray-900"}`}
+                  >
                     {item.quantity}
                   </span>
                   <button
@@ -1096,7 +1184,9 @@ function CartPageContent() {
                     }}
                     disabled={item.quantity >= maxQuantity || item.isOptimistic}
                     className={`p-1.5 transition-colors ${
-                      isDark ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-100 text-gray-500"
+                      isDark
+                        ? "hover:bg-gray-700 text-gray-400"
+                        : "hover:bg-gray-100 text-gray-500"
                     } disabled:opacity-40 disabled:cursor-not-allowed`}
                   >
                     <Plus size={13} />
@@ -1106,7 +1196,9 @@ function CartPageContent() {
 
               {/* Subtotal */}
               <div className="text-right">
-                <span className={`text-sm font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
+                <span
+                  className={`text-sm font-bold ${isDark ? "text-white" : "text-gray-900"}`}
+                >
                   {subtotal.toFixed(2)} {currency}
                 </span>
               </div>
@@ -1119,7 +1211,9 @@ function CartPageContent() {
                 }}
                 disabled={item.isOptimistic}
                 className={`p-1.5 rounded-lg transition-colors ${
-                  isDark ? "text-gray-600 hover:text-red-400 hover:bg-red-900/20" : "text-gray-300 hover:text-red-500 hover:bg-red-50"
+                  isDark
+                    ? "text-gray-600 hover:text-red-400 hover:bg-red-900/20"
+                    : "text-gray-300 hover:text-red-500 hover:bg-red-50"
                 } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 <Trash2 size={15} />
@@ -1159,10 +1253,16 @@ function CartPageContent() {
                   className={`relative w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden cursor-pointer border ${
                     isDark ? "border-gray-700" : "border-gray-200"
                   }`}
-                  onClick={() => router.push(`/productdetail/${item.productId}`)}
+                  onClick={() =>
+                    router.push(`/productdetail/${item.productId}`)
+                  }
                 >
                   <Image
-                    src={item.selectedColorImage || item.product?.imageUrls?.[0] || ""}
+                    src={
+                      item.selectedColorImage ||
+                      item.product?.imageUrls?.[0] ||
+                      ""
+                    }
                     alt={item.product?.productName || ""}
                     fill
                     className="object-cover"
@@ -1174,18 +1274,27 @@ function CartPageContent() {
                 <div className="flex-1 min-w-0">
                   <div
                     className="cursor-pointer"
-                    onClick={() => router.push(`/productdetail/${item.productId}`)}
+                    onClick={() =>
+                      router.push(`/productdetail/${item.productId}`)
+                    }
                   >
                     {item.product?.brandModel && (
-                      <p className={`text-[10px] font-medium mb-0.5 ${isDark ? "text-blue-400" : "text-blue-600"}`}>
+                      <p
+                        className={`text-[10px] font-medium mb-0.5 ${isDark ? "text-blue-400" : "text-blue-600"}`}
+                      >
                         {item.product.brandModel}
                       </p>
                     )}
-                    <h3 className={`text-sm font-medium line-clamp-2 leading-snug ${isDark ? "text-white" : "text-gray-900"}`}>
-                      {item.product?.productName || t("loadingProduct", "Loading...")}
+                    <h3
+                      className={`text-sm font-medium line-clamp-2 leading-snug ${isDark ? "text-white" : "text-gray-900"}`}
+                    >
+                      {item.product?.productName ||
+                        t("loadingProduct", "Loading...")}
                     </h3>
                     {attributesDisplay && (
-                      <p className={`text-[11px] mt-0.5 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                      <p
+                        className={`text-[11px] mt-0.5 ${isDark ? "text-gray-500" : "text-gray-400"}`}
+                      >
                         {attributesDisplay}
                       </p>
                     )}
@@ -1194,7 +1303,9 @@ function CartPageContent() {
                   <p className="text-sm font-bold text-orange-500 mt-1">
                     {subtotal.toFixed(2)} {currency}
                     {item.quantity > 1 && (
-                      <span className={`text-[10px] font-normal ml-1.5 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                      <span
+                        className={`text-[10px] font-normal ml-1.5 ${isDark ? "text-gray-500" : "text-gray-400"}`}
+                      >
                         ({effectivePrice.toFixed(2)} x {item.quantity})
                       </span>
                     )}
@@ -1202,40 +1313,57 @@ function CartPageContent() {
 
                   {availableStock < 10 && (
                     <p className="text-[10px] text-red-500 mt-0.5">
-                      {t("onlyLeft", "Only")} {availableStock} {t("left", "left")}
+                      {t("onlyLeft", "Only")} {availableStock}{" "}
+                      {t("left", "left")}
                     </p>
                   )}
 
                   {/* Mobile: Quantity + Remove row */}
                   <div className="flex items-center justify-between mt-2">
-                    <div className={`inline-flex items-center rounded-lg border ${isDark ? "border-gray-700" : "border-gray-200"}`}>
+                    <div
+                      className={`inline-flex items-center rounded-lg border ${isDark ? "border-gray-700" : "border-gray-200"}`}
+                    >
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           if (item.quantity > 1) {
-                            handleQuantityChange(item.productId, item.quantity - 1);
+                            handleQuantityChange(
+                              item.productId,
+                              item.quantity - 1,
+                            );
                           }
                         }}
                         disabled={item.quantity <= 1 || item.isOptimistic}
                         className={`p-1 transition-colors ${
-                          isDark ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-100 text-gray-500"
+                          isDark
+                            ? "hover:bg-gray-700 text-gray-400"
+                            : "hover:bg-gray-100 text-gray-500"
                         } disabled:opacity-40 disabled:cursor-not-allowed`}
                       >
                         <Minus size={13} />
                       </button>
-                      <span className={`min-w-[28px] text-center text-xs font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>
+                      <span
+                        className={`min-w-[28px] text-center text-xs font-semibold ${isDark ? "text-white" : "text-gray-900"}`}
+                      >
                         {item.quantity}
                       </span>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           if (item.quantity < maxQuantity) {
-                            handleQuantityChange(item.productId, item.quantity + 1);
+                            handleQuantityChange(
+                              item.productId,
+                              item.quantity + 1,
+                            );
                           }
                         }}
-                        disabled={item.quantity >= maxQuantity || item.isOptimistic}
+                        disabled={
+                          item.quantity >= maxQuantity || item.isOptimistic
+                        }
                         className={`p-1 transition-colors ${
-                          isDark ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-100 text-gray-500"
+                          isDark
+                            ? "hover:bg-gray-700 text-gray-400"
+                            : "hover:bg-gray-100 text-gray-500"
                         } disabled:opacity-40 disabled:cursor-not-allowed`}
                       >
                         <Plus size={13} />
@@ -1248,7 +1376,9 @@ function CartPageContent() {
                       }}
                       disabled={item.isOptimistic}
                       className={`p-1.5 rounded-lg transition-colors ${
-                        isDark ? "text-gray-600 hover:text-red-400" : "text-gray-400 hover:text-red-500"
+                        isDark
+                          ? "text-gray-600 hover:text-red-400"
+                          : "text-gray-400 hover:text-red-500"
                       } disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
                       <Trash2 size={14} />
@@ -1259,27 +1389,34 @@ function CartPageContent() {
             </div>
 
             {/* Sale Preference Label */}
-            {salePrefs?.discountThreshold && salePrefs?.bulkDiscountPercentage && (
-              <div className="mt-2 lg:ml-[88px]">
-                <div
-                  className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                    item.quantity >= salePrefs.discountThreshold
-                      ? isDark
-                        ? "bg-emerald-900/40 text-emerald-300"
-                        : "bg-emerald-50 text-emerald-700"
-                      : isDark
-                      ? "bg-orange-900/40 text-orange-300"
-                      : "bg-orange-50 text-orange-700"
-                  }`}
-                >
-                  <span>
-                    {item.quantity >= salePrefs.discountThreshold
-                      ? t("youGotDiscount", `You got ${salePrefs.bulkDiscountPercentage}% discount!`)
-                      : t("buyForDiscount", `Buy ${salePrefs.discountThreshold}+ for ${salePrefs.bulkDiscountPercentage}% off`)}
-                  </span>
+            {salePrefs?.discountThreshold &&
+              salePrefs?.bulkDiscountPercentage && (
+                <div className="mt-2 lg:ml-[88px]">
+                  <div
+                    className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                      item.quantity >= salePrefs.discountThreshold
+                        ? isDark
+                          ? "bg-emerald-900/40 text-emerald-300"
+                          : "bg-emerald-50 text-emerald-700"
+                        : isDark
+                          ? "bg-orange-900/40 text-orange-300"
+                          : "bg-orange-50 text-orange-700"
+                    }`}
+                  >
+                    <span>
+                      {item.quantity >= salePrefs.discountThreshold
+                        ? t(
+                            "youGotDiscount",
+                            `You got ${salePrefs.bulkDiscountPercentage}% discount!`,
+                          )
+                        : t(
+                            "buyForDiscount",
+                            `Buy ${salePrefs.discountThreshold}+ for ${salePrefs.bulkDiscountPercentage}% off`,
+                          )}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
             {/* Compact Bundle Widget */}
             {item.isShop && item.sellerId && (
@@ -1314,7 +1451,9 @@ function CartPageContent() {
   // ========================================================================
 
   return (
-    <div className={`min-h-screen flex flex-col transition-colors duration-200 ${isDark ? "bg-gray-950" : "bg-gray-50"}`}>
+    <div
+      className={`min-h-screen flex flex-col transition-colors duration-200 ${isDark ? "bg-gray-950" : "bg-gray-50"}`}
+    >
       <div className="max-w-6xl mx-auto px-0 sm:px-4 pt-4 pb-0 lg:px-8 lg:pt-8 lg:pb-8 flex-1 w-full">
         {/* Back Button */}
         <div className="mb-4 lg:mb-6 px-2 sm:px-0">
@@ -1337,14 +1476,25 @@ function CartPageContent() {
           </div>
         ) : !user ? (
           /* Not Authenticated */
-          <div className={`max-w-md mx-auto rounded-2xl border shadow-sm p-8 text-center ${isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"}`}>
-            <div className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4 ${isDark ? "bg-gray-800" : "bg-gray-100"}`}>
-              <User size={24} className={isDark ? "text-gray-500" : "text-gray-400"} />
+          <div
+            className={`max-w-md mx-auto rounded-2xl border shadow-sm p-8 text-center ${isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"}`}
+          >
+            <div
+              className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4 ${isDark ? "bg-gray-800" : "bg-gray-100"}`}
+            >
+              <User
+                size={24}
+                className={isDark ? "text-gray-500" : "text-gray-400"}
+              />
             </div>
-            <h3 className={`text-base font-bold mb-1.5 ${isDark ? "text-white" : "text-gray-900"}`}>
+            <h3
+              className={`text-base font-bold mb-1.5 ${isDark ? "text-white" : "text-gray-900"}`}
+            >
               {t("loginRequired", "Login Required")}
             </h3>
-            <p className={`text-sm mb-5 leading-relaxed ${isDark ? "text-gray-500" : "text-gray-500"}`}>
+            <p
+              className={`text-sm mb-5 leading-relaxed ${isDark ? "text-gray-500" : "text-gray-500"}`}
+            >
               {t("loginToViewCart", "Please log in to view your cart")}
             </p>
             <button
@@ -1359,7 +1509,9 @@ function CartPageContent() {
           /* Cart Loading */
           <div className="flex flex-col items-center py-20">
             <div className="w-6 h-6 border-[2px] border-orange-200 border-t-orange-500 rounded-full animate-spin mb-3" />
-            <p className={`text-sm ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+            <p
+              className={`text-sm ${isDark ? "text-gray-500" : "text-gray-400"}`}
+            >
               {t("loading", "Loading...")}
             </p>
           </div>
@@ -1373,10 +1525,14 @@ function CartPageContent() {
               height={180}
               className="mb-6 opacity-90"
             />
-            <h3 className={`text-lg font-bold mb-1.5 ${isDark ? "text-white" : "text-gray-900"}`}>
+            <h3
+              className={`text-lg font-bold mb-1.5 ${isDark ? "text-white" : "text-gray-900"}`}
+            >
               {t("emptyCart", "Your cart is empty")}
             </h3>
-            <p className={`text-sm mb-6 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+            <p
+              className={`text-sm mb-6 ${isDark ? "text-gray-500" : "text-gray-400"}`}
+            >
               {t("emptyCartDescription", "Start shopping to add items")}
             </p>
             <button
@@ -1394,28 +1550,42 @@ function CartPageContent() {
             <div className="flex-1 min-w-0">
               {/* Title */}
               <div className="flex items-center space-x-3 mb-4 px-2 sm:px-0">
-                <h1 className={`text-xl font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
+                <h1
+                  className={`text-xl font-bold ${isDark ? "text-white" : "text-gray-900"}`}
+                >
                   {t("title", "My Cart")}
                 </h1>
-                <span className={`text-sm ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                <span
+                  className={`text-sm ${isDark ? "text-gray-500" : "text-gray-400"}`}
+                >
                   ({cartCount} {t("itemsCount", "items")})
                 </span>
               </div>
 
               {/* Column Headers - desktop only */}
-              <div className={`hidden lg:grid lg:grid-cols-[auto_auto_1fr_100px_120px_100px_auto] lg:gap-4 lg:items-center px-0 pb-3 mb-1 border-b ${isDark ? "border-gray-800" : "border-gray-200"}`}>
+              <div
+                className={`hidden lg:grid lg:grid-cols-[auto_auto_1fr_100px_120px_100px_auto] lg:gap-4 lg:items-center px-0 pb-3 mb-1 border-b ${isDark ? "border-gray-800" : "border-gray-200"}`}
+              >
                 <div className="w-4" />
                 <div className="w-16" />
-                <span className={`text-xs font-semibold uppercase tracking-wider ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                <span
+                  className={`text-xs font-semibold uppercase tracking-wider ${isDark ? "text-gray-500" : "text-gray-400"}`}
+                >
                   {t("product", "Product")}
                 </span>
-                <span className={`text-xs font-semibold uppercase tracking-wider text-right ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                <span
+                  className={`text-xs font-semibold uppercase tracking-wider text-right ${isDark ? "text-gray-500" : "text-gray-400"}`}
+                >
                   {t("price", "Price")}
                 </span>
-                <span className={`text-xs font-semibold uppercase tracking-wider text-center ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                <span
+                  className={`text-xs font-semibold uppercase tracking-wider text-center ${isDark ? "text-gray-500" : "text-gray-400"}`}
+                >
                   {t("quantity", "Quantity")}
                 </span>
-                <span className={`text-xs font-semibold uppercase tracking-wider text-right ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                <span
+                  className={`text-xs font-semibold uppercase tracking-wider text-right ${isDark ? "text-gray-500" : "text-gray-400"}`}
+                >
                   {t("subtotal", "Subtotal")}
                 </span>
                 <div className="w-[30px]" />
@@ -1424,7 +1594,9 @@ function CartPageContent() {
               {/* Items List */}
               <div
                 ref={scrollContainerRef}
-                onScroll={handleScroll as unknown as React.UIEventHandler<HTMLDivElement>}
+                onScroll={
+                  handleScroll as unknown as React.UIEventHandler<HTMLDivElement>
+                }
               >
                 {renderCartItems}
 
@@ -1438,7 +1610,9 @@ function CartPageContent() {
                     {isLoadingMore ? (
                       <div className="flex items-center space-x-2">
                         <div className="w-4 h-4 border-[2px] border-orange-200 border-t-orange-500 rounded-full animate-spin" />
-                        <span className={`text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                        <span
+                          className={`text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}
+                        >
                           {t("loadingMore", "Loading more...")}
                         </span>
                       </div>
@@ -1456,25 +1630,20 @@ function CartPageContent() {
                     )}
                   </div>
                 )}
-
-                {/* End of list indicator */}
-                {!hasMore && cartItems.length > 0 && (
-                  <div className="flex justify-center py-3">
-                    <span className={`text-[10px] ${isDark ? "text-gray-600" : "text-gray-400"}`}>
-                      {t("allItemsLoaded", "All items loaded")}
-                    </span>
-                  </div>
-                )}
               </div>
             </div>
 
             {/* Right: Order Summary — bottom of page on mobile, sidebar on desktop */}
             <div className="w-full lg:w-[380px] lg:flex-shrink-0 mt-4 lg:mt-0">
               <div className="lg:sticky lg:top-6">
-                <div className={`rounded-none lg:rounded-2xl border-t lg:border shadow-sm ${isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"}`}>
+                <div
+                  className={`rounded-none lg:rounded-2xl border-t lg:border shadow-sm ${isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"}`}
+                >
                   <div className="px-4 py-3 sm:px-6 sm:py-5">
                     {/* Order Summary Title */}
-                    <h2 className={`text-sm font-bold mb-4 ${isDark ? "text-white" : "text-gray-900"}`}>
+                    <h2
+                      className={`text-sm font-bold mb-4 ${isDark ? "text-white" : "text-gray-900"}`}
+                    >
                       {t("orderSummary", "Order Summary")}
                     </h2>
 
@@ -1500,8 +1669,14 @@ function CartPageContent() {
                             d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                           />
                         </svg>
-                        <p className={`text-xs font-medium ${isDark ? "text-orange-400" : "text-orange-700"}`}>
-                          {pauseReason || t("salesTemporarilyPaused", "Sales are temporarily paused")}
+                        <p
+                          className={`text-xs font-medium ${isDark ? "text-orange-400" : "text-orange-700"}`}
+                        >
+                          {pauseReason ||
+                            t(
+                              "salesTemporarilyPaused",
+                              "Sales are temporarily paused",
+                            )}
                         </p>
                       </div>
                     )}
@@ -1512,20 +1687,28 @@ function CartPageContent() {
                     {/* Total Row + Coupon Button */}
                     <div className="flex items-end justify-between mb-4">
                       <div className="flex flex-col">
-                        <span className={`text-[10px] ${isDark ? "text-gray-600" : "text-gray-400"}`}>
+                        <span
+                          className={`text-[10px] ${isDark ? "text-gray-600" : "text-gray-400"}`}
+                        >
                           {selectedIds.length} {t("items", "items")}
                         </span>
                         <div className="flex items-baseline space-x-2 mt-0.5">
                           {couponDiscount > 0 && (
-                            <span className={`text-xs line-through ${isDark ? "text-gray-600" : "text-gray-400"}`}>
-                              {calculatedTotals.total.toFixed(2)} {calculatedTotals.currency}
+                            <span
+                              className={`text-xs line-through ${isDark ? "text-gray-600" : "text-gray-400"}`}
+                            >
+                              {calculatedTotals.total.toFixed(2)}{" "}
+                              {calculatedTotals.currency}
                             </span>
                           )}
                           {isCalculatingTotals ? (
                             <div className="w-5 h-5 border-[2px] border-orange-200 border-t-orange-500 rounded-full animate-spin" />
                           ) : (
-                            <span className={`text-xl font-bold ${hasAnyDiscount ? "text-emerald-500" : "text-orange-500"}`}>
-                              {finalTotal.toFixed(2)} {calculatedTotals.currency}
+                            <span
+                              className={`text-xl font-bold ${hasAnyDiscount ? "text-emerald-500" : "text-orange-500"}`}
+                            >
+                              {finalTotal.toFixed(2)}{" "}
+                              {calculatedTotals.currency}
                             </span>
                           )}
                         </div>
@@ -1599,14 +1782,20 @@ function CartPageContent() {
         >
           <div
             className={`w-full max-w-sm rounded-2xl border shadow-lg overflow-hidden ${
-              isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"
+              isDark
+                ? "bg-gray-900 border-gray-800"
+                : "bg-white border-gray-100"
             }`}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className={`px-5 py-4 ${isDark ? "bg-gray-800" : "bg-orange-50"}`}>
+            <div
+              className={`px-5 py-4 ${isDark ? "bg-gray-800" : "bg-orange-50"}`}
+            >
               <div className="flex items-center space-x-3">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isDark ? "bg-orange-500/20" : "bg-orange-100"}`}>
+                <div
+                  className={`w-10 h-10 rounded-full flex items-center justify-center ${isDark ? "bg-orange-500/20" : "bg-orange-100"}`}
+                >
                   <svg
                     className="w-5 h-5 text-orange-500"
                     fill="none"
@@ -1621,7 +1810,9 @@ function CartPageContent() {
                     />
                   </svg>
                 </div>
-                <h3 className={`text-base font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
+                <h3
+                  className={`text-base font-bold ${isDark ? "text-white" : "text-gray-900"}`}
+                >
                   {t("salesPausedTitle", "Sales Temporarily Paused")}
                 </h3>
               </div>
@@ -1629,13 +1820,21 @@ function CartPageContent() {
 
             {/* Content */}
             <div className="px-5 py-4">
-              <p className={`text-sm text-center ${isDark ? "text-gray-400" : "text-gray-500"}`}>
-                {pauseReason || t("salesPausedMessage", "We are currently not accepting orders. Please try again later.")}
+              <p
+                className={`text-sm text-center ${isDark ? "text-gray-400" : "text-gray-500"}`}
+              >
+                {pauseReason ||
+                  t(
+                    "salesPausedMessage",
+                    "We are currently not accepting orders. Please try again later.",
+                  )}
               </p>
             </div>
 
             {/* Footer */}
-            <div className={`px-5 py-4 ${isDark ? "bg-gray-800/50" : "bg-gray-50"}`}>
+            <div
+              className={`px-5 py-4 ${isDark ? "bg-gray-800/50" : "bg-gray-50"}`}
+            >
               <button
                 onClick={() => setShowSalesPausedDialog(false)}
                 className="w-full py-2.5 px-4 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-[13px] font-semibold transition-colors"
