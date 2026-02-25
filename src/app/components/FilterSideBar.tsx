@@ -3,21 +3,22 @@
 /**
  * FilterSidebar.tsx
  *
- * Reusable filter sidebar — full parity with Flutter's DynamicFilterScreen.
+ * Full-parity rewrite matching Flutter's shop_detail_filter_screen.dart + DynamicFilterScreen.
  *
- * Sections (same order as Flutter):
- *  1. Categories    — Women/Men only; shows subcategories or sub-subcategories
- *  2. Spec facets   — one collapsible section per Typesense facet field (dynamic)
- *  3. Brand         — searchable list
- *  4. Color         — swatch list
- *  5. Rating        — star chips (4+, 3+, 2+, 1+)
- *  6. Price range   — text inputs + quick-range chips
+ * Sections (same order and conditional logic as Flutter):
+ *  1. Gender         — hidden for Books/Tools/Pet/Automotive shops (mirrors Flutter _shouldShowGenderFilter)
+ *  2. Clothing       — Type, Fit, Size; only for 'Clothing & Fashion' shops (mirrors _shouldShowClothingFilters)
+ *  3. Spec facets    — one collapsible section per Typesense facet field (dynamic)
+ *  4. Brand          — searchable list (globalBrands)
+ *  5. Color          — swatch list
+ *  6. Rating         — star chips
+ *  7. Price range    — text inputs + quick-range chips
  *
  * Modes:
  *  Desktop — inline sticky column (no onClose prop)
  *  Mobile  — full-height portal drawer (pass isOpen + onClose)
  *
- * No `any` — Vercel-safe.
+ * No `any` types — Vercel-safe.
  */
 
 import React, {
@@ -37,11 +38,10 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { AllInOneCategoryData } from "@/constants/productData";
 import { globalBrands } from "@/constants/brands";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Public types (re-export so callers only import from this file)
+// Public types
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface FacetCount {
@@ -53,20 +53,20 @@ export interface FacetCount {
 export type SpecFacets = Record<string, FacetCount[]>;
 
 /**
- * Canonical filter state shared by every page that uses FilterSidebar.
- * Mirrors the combined state across Flutter's DynamicFilterScreen +
- * ShopMarketProvider.
+ * Canonical filter state — mirrors the combined state across Flutter's
+ * DynamicFilterScreen + ShopMarketProvider.
  */
 export interface FilterState {
-  /** Selected sub-subcategories (Women/Men category section) */
-  subcategories: string[];
+  subcategories: string[]; // subsubcategory selections
   colors: string[];
   brands: string[];
-  /** Generic spec filters — field → selected values */
-  specFilters: Record<string, string[]>;
+  gender?: string; // mirrors Flutter _selectedGender
+  types: string[]; // mirrors Flutter _selectedTypes (clothingType)
+  fits: string[]; // mirrors Flutter _selectedFits (clothingFit)
+  sizes: string[]; // mirrors Flutter _selectedSizes (clothingSizes)
+  specFilters: Record<string, string[]>; // mirrors Flutter _dynamicSpecFilters
   minPrice?: number;
   maxPrice?: number;
-  /** Minimum star rating 1–4 */
   minRating?: number;
 }
 
@@ -74,18 +74,32 @@ export const EMPTY_FILTER_STATE: FilterState = {
   subcategories: [],
   colors: [],
   brands: [],
+  gender: undefined,
+  types: [],
+  fits: [],
+  sizes: [],
   specFilters: {},
   minPrice: undefined,
   maxPrice: undefined,
   minRating: undefined,
 };
 
-/** Mirrors Flutter's activeFiltersCount getter */
-export function getActiveFiltersCount(f: FilterState): number {
+/** Mirrors Flutter's totalFiltersApplied getter */
+export function getActiveFiltersCount(
+  f: FilterState,
+  mode: "dynamicMarket" | "shopDetail" = "shopDetail",
+): number {
   let n = 0;
   n += f.subcategories.length;
   n += f.colors.length;
   n += f.brands.length;
+  // Only count these in shopDetail mode
+  if (mode === "shopDetail") {
+    n += (f.types ?? []).length;
+    n += (f.fits ?? []).length;
+    n += (f.sizes ?? []).length;
+    if (f.gender) n++;
+  }
   for (const vals of Object.values(f.specFilters)) n += vals.length;
   if (f.minPrice !== undefined || f.maxPrice !== undefined) n++;
   if (f.minRating !== undefined) n++;
@@ -93,8 +107,82 @@ export function getActiveFiltersCount(f: FilterState): number {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Static data
+// Static filter data (mirrors Flutter's filter screen static lists)
 // ─────────────────────────────────────────────────────────────────────────────
+
+const GENDER_OPTIONS = ["Women", "Men", "Unisex"] as const;
+
+/**
+ * Categories where gender filter is hidden.
+ * Mirrors Flutter's _shouldShowGenderFilter exclusion list.
+ */
+const GENDER_EXCLUDED_CATEGORIES = new Set([
+  "Books, Stationery & Hobby",
+  "Tools & Hardware",
+  "Pet Supplies",
+  "Automotive",
+]);
+
+/**
+ * Mirrors Flutter's clothing type options displayed in ShopDetailFilterScreen.
+ */
+const CLOTHING_TYPES = [
+  "T-Shirt",
+  "Shirt",
+  "Blouse",
+  "Dress",
+  "Skirt",
+  "Pants",
+  "Jeans",
+  "Shorts",
+  "Jacket",
+  "Coat",
+  "Blazer",
+  "Sweater",
+  "Hoodie",
+  "Cardigan",
+  "Suit",
+  "Activewear",
+  "Underwear",
+  "Swimwear",
+] as const;
+
+/**
+ * Mirrors Flutter's clothing fit options.
+ */
+const CLOTHING_FITS = [
+  "Regular",
+  "Slim",
+  "Relaxed",
+  "Oversize",
+  "Tight",
+  "Straight",
+  "Bootcut",
+  "Flare",
+] as const;
+
+/**
+ * Mirrors Flutter's clothing size options.
+ */
+const CLOTHING_SIZES = [
+  "XS",
+  "S",
+  "M",
+  "L",
+  "XL",
+  "XXL",
+  "3XL",
+  "4XL",
+  "34",
+  "36",
+  "38",
+  "40",
+  "42",
+  "44",
+  "46",
+  "48",
+  "50",
+] as const;
 
 const COLORS: { name: string; hex: string }[] = [
   { name: "Blue", hex: "#2196F3" },
@@ -130,28 +218,54 @@ const COLORS: { name: string; hex: string }[] = [
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Visibility helpers (mirrors Flutter's conditional filter section logic)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Mirrors Flutter's _shouldShowGenderFilter().
+ * Hidden when ALL shop categories are in the exclusion list.
+ */
+function shouldShowGenderFilter(shopCategories: string[]): boolean {
+  if (shopCategories.length === 0) return true; // default: show
+  return shopCategories.some((c) => !GENDER_EXCLUDED_CATEGORIES.has(c));
+}
+
+/**
+ * Mirrors Flutter's _shouldShowClothingFilters().
+ * Shown only when shop has 'Clothing & Fashion' category.
+ */
+function shouldShowClothingFilters(shopCategories: string[]): boolean {
+  return shopCategories.includes("Clothing & Fashion");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Props
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface FilterSidebarProps {
-  // Category context (determines which sections render)
-  category: string;
-  selectedSubcategory?: string;
-  buyerCategory?: string;
+  /** Shop categories — determines which filter sections are shown */
+  shopCategories?: string[];
 
-  // Filter state
+  /** Filter state managed by parent */
   filters: FilterState;
   onFiltersChange: (next: FilterState) => void;
 
-  // Typesense spec facets (dynamic sections)
+  mode?: "dynamicMarket" | "shopDetail";
+
+  /** Typesense spec facets (dynamic sections) */
   specFacets?: SpecFacets;
 
-  // Mobile drawer
+  /** Mobile drawer controls */
   isOpen?: boolean;
   onClose?: () => void;
 
   isDarkMode?: boolean;
   className?: string;
+
+  // Legacy props kept for backwards compatibility with other pages
+  category?: string;
+  selectedSubcategory?: string;
+  buyerCategory?: string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -159,9 +273,8 @@ export interface FilterSidebarProps {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const FilterSidebar: React.FC<FilterSidebarProps> = ({
-  category,
-  selectedSubcategory = "",
-  buyerCategory = "",
+  mode = "shopDetail",
+  shopCategories = [],
   filters,
   onFiltersChange,
   specFacets = {},
@@ -172,11 +285,22 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
 }) => {
   const t = useTranslations();
   const isMobileDrawer = onClose !== undefined;
+  const dk = isDarkMode;
+
+  // ── Section visibility (mirrors Flutter's conditional filter rendering) ──
+  const showGender = useMemo(
+    () => mode !== "dynamicMarket" && shouldShowGenderFilter(shopCategories),
+    [mode, shopCategories],
+  );
+  const showClothing = useMemo(
+    () => mode !== "dynamicMarket" && shouldShowClothingFilters(shopCategories),
+    [mode, shopCategories],
+  );
 
   // ── Expansion state ──────────────────────────────────────────────────────
-  // Spec-facet sections are keyed by `spec_${fieldName}` and start expanded
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
-    categories: true,
+    gender: true,
+    clothing: true,
     brand: false,
     color: false,
     rating: false,
@@ -187,7 +311,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
     [],
   );
 
-  // Auto-expand new spec-facet sections when they first arrive
+  // Auto-expand new spec-facet sections
   useEffect(() => {
     const next: Record<string, boolean> = {};
     let changed = false;
@@ -211,13 +335,13 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
     filters.maxPrice?.toString() ?? "",
   );
 
-  // Sync price inputs when filters are cleared externally
+  // Sync price inputs when filters cleared externally
   useEffect(() => {
     setMinPriceInput(filters.minPrice?.toString() ?? "");
     setMaxPriceInput(filters.maxPrice?.toString() ?? "");
   }, [filters.minPrice, filters.maxPrice]);
 
-  // ── Touch-to-close ───────────────────────────────────────────────────────
+  // ── Touch-to-close (mobile drawer) ───────────────────────────────────────
   const touchStartX = useRef<number | null>(null);
   const onTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.targetTouches[0].clientX;
@@ -228,32 +352,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
     touchStartX.current = null;
   };
 
-  // ── Category data (mirrors Flutter's _getAvailableSubSubcategories) ──────
-  const shouldShowCategories =
-    buyerCategory === "Women" || buyerCategory === "Men";
-
-  const availableSubSubs: string[] = useMemo(() => {
-    if (!shouldShowCategories) return [];
-
-    // Normalise "clothing-fashion" → "Clothing & Fashion"
-    const norm = category
-      .split("-")
-      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(" ");
-
-    if (!selectedSubcategory) {
-      // No subcategory selected → show subcategories of the product category
-      return AllInOneCategoryData.kSubcategories?.[norm] ?? [];
-    }
-
-    // Subcategory selected → show sub-subcategories
-    return (
-      AllInOneCategoryData.kSubSubcategories?.[norm]?.[selectedSubcategory] ??
-      []
-    );
-  }, [shouldShowCategories, category, selectedSubcategory]);
-
-  // ── Localization helpers ─────────────────────────────────────────────────
+  // ── Localisation helpers ─────────────────────────────────────────────────
   const loc = (key: string, fallback: string) => {
     try {
       return t(key) || fallback;
@@ -265,20 +364,17 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
   const localizeColor = (name: string) =>
     loc(`DynamicMarket.color${name.replace(/\s+/g, "")}`, name);
 
-  /** Mirrors Flutter's AttributeLocalizationUtils.getLocalizedAttributeTitle */
   const localizeField = (field: string) => {
     try {
       return t(`Attributes.${field}`);
     } catch {
       /* noop */
     }
-    // Fallback: camelCase → Title Case
     return field
       .replace(/([A-Z])/g, " $1")
       .replace(/^./, (s) => s.toUpperCase());
   };
 
-  /** Mirrors Flutter's AttributeLocalizationUtils.getLocalizedSingleValue */
   const localizeValue = (field: string, value: string) => {
     try {
       return t(`AttributeValues.${field}.${value}`);
@@ -288,18 +384,33 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
     return value;
   };
 
-  // ── Mutations ────────────────────────────────────────────────────────────
+  // ── Mutation helpers ─────────────────────────────────────────────────────
 
-  const setList = <K extends "subcategories" | "colors" | "brands">(
+  const toggleList = <
+    K extends
+      | "subcategories"
+      | "colors"
+      | "brands"
+      | "types"
+      | "fits"
+      | "sizes",
+  >(
     key: K,
     value: string,
   ) => {
-    const list = filters[key] as string[];
+    const list = (filters[key] ?? []) as string[];
     onFiltersChange({
       ...filters,
       [key]: list.includes(value)
         ? list.filter((i) => i !== value)
         : [...list, value],
+    });
+  };
+
+  const setGender = (value: string) => {
+    onFiltersChange({
+      ...filters,
+      gender: filters.gender === value ? undefined : value,
     });
   };
 
@@ -351,8 +462,6 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
   const activeCount = getActiveFiltersCount(filters);
 
   // ── Sub-components ───────────────────────────────────────────────────────
-
-  const dk = isDarkMode;
 
   const Divider = () => (
     <div className={`h-px ${dk ? "bg-white/[0.06]" : "bg-gray-100"} my-0.5`} />
@@ -438,6 +547,26 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
     </label>
   );
 
+  /** Pill chip used for gender and size selections */
+  const PillChip: React.FC<{
+    label: string;
+    selected: boolean;
+    onClick: () => void;
+  }> = ({ label, selected, onClick }) => (
+    <button
+      onClick={onClick}
+      className={`px-3 py-1 text-[11px] font-medium rounded-full border transition-all ${
+        selected
+          ? "bg-orange-500 border-orange-500 text-white shadow-sm"
+          : dk
+            ? "bg-gray-800 border-gray-700 text-gray-300 hover:border-orange-400"
+            : "bg-white border-gray-200 text-gray-600 hover:border-orange-400"
+      }`}
+    >
+      {label}
+    </button>
+  );
+
   // ── Body ──────────────────────────────────────────────────────────────────
 
   const body = (
@@ -489,34 +618,33 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
 
       {/* ── Scrollable sections ── */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden pb-10 pt-1 space-y-0">
-        {/* ═══ 1. CATEGORIES (Women / Men only) ═══════════════════════════ */}
-        {shouldShowCategories && availableSubSubs.length > 0 && (
+        {/* ═══ 1. GENDER ═════════════════════════════════════════════════════
+              Mirrors Flutter's _shouldShowGenderFilter conditional.
+              Hidden for Books/Tools/Pet/Automotive shops.           ══════ */}
+        {showGender && (
           <>
             <SectionHeader
-              sectionKey="categories"
-              label={loc("DynamicMarket.categories", "Categories")}
-              badge={filters.subcategories.length}
+              sectionKey="gender"
+              label={loc("DynamicMarket.gender", "Gender")}
+              badge={!!filters.gender}
             />
-            {expanded.categories && (
-              <div className="pb-2">
-                {filters.subcategories.length > 0 && (
+            {expanded.gender && (
+              <div className="pb-2 px-3">
+                {filters.gender && (
                   <ClearBtn
-                    label={loc(
-                      "DynamicMarket.clearAllCategories",
-                      "Clear categories",
-                    )}
+                    label={loc("DynamicMarket.clearGender", "Clear gender")}
                     onClick={() =>
-                      onFiltersChange({ ...filters, subcategories: [] })
+                      onFiltersChange({ ...filters, gender: undefined })
                     }
                   />
                 )}
-                <div className="max-h-44 overflow-y-auto">
-                  {availableSubSubs.map((sub) => (
-                    <CheckRow
-                      key={sub}
-                      label={sub}
-                      checked={filters.subcategories.includes(sub)}
-                      onChange={() => setList("subcategories", sub)}
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {GENDER_OPTIONS.map((g) => (
+                    <PillChip
+                      key={g}
+                      label={loc(`DynamicMarket.gender${g}`, g)}
+                      selected={filters.gender === g}
+                      onClick={() => setGender(g)}
                     />
                   ))}
                 </div>
@@ -526,7 +654,130 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
           </>
         )}
 
-        {/* ═══ 2. SPEC FACETS (Typesense-driven, one section per field) ═══ */}
+        {/* ═══ 2. CLOTHING FILTERS (Type / Fit / Size) ══════════════════════
+              Mirrors Flutter's _shouldShowClothingFilters conditional.
+              Shown only when shop has 'Clothing & Fashion' category.  ════ */}
+        {showClothing && (
+          <>
+            <SectionHeader
+              sectionKey="clothing"
+              label={loc("DynamicMarket.clothingFilters", "Clothing")}
+              badge={
+                (filters.types ?? []).length +
+                (filters.fits ?? []).length +
+                (filters.sizes ?? []).length
+              }
+            />
+            {expanded.clothing && (
+              <div className="pb-2 space-y-3">
+                {/* Clothing Type */}
+                <div>
+                  <div className="flex items-center justify-between px-3 pb-1">
+                    <span
+                      className={`text-[10px] font-semibold uppercase tracking-wider ${
+                        dk ? "text-gray-500" : "text-gray-400"
+                      }`}
+                    >
+                      {loc("DynamicMarket.clothingType", "Type")}
+                    </span>
+                    {(filters.types ?? []).length > 0 && (
+                      <button
+                        onClick={() =>
+                          onFiltersChange({ ...filters, types: [] })
+                        }
+                        className="text-[10px] text-orange-400 hover:text-orange-500"
+                      >
+                        {loc("DynamicMarket.clear", "Clear")}
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-36 overflow-y-auto">
+                    {CLOTHING_TYPES.map((type) => (
+                      <CheckRow
+                        key={type}
+                        label={loc(
+                          `DynamicMarket.clothingType${type.replace(/\s+/g, "")}`,
+                          type,
+                        )}
+                        checked={(filters.types ?? []).includes(type)}
+                        onChange={() => toggleList("types", type)}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Clothing Fit */}
+                <div>
+                  <div className="flex items-center justify-between px-3 pb-1">
+                    <span
+                      className={`text-[10px] font-semibold uppercase tracking-wider ${
+                        dk ? "text-gray-500" : "text-gray-400"
+                      }`}
+                    >
+                      {loc("DynamicMarket.clothingFit", "Fit")}
+                    </span>
+                    {(filters.fits ?? []).length > 0 && (
+                      <button
+                        onClick={() =>
+                          onFiltersChange({ ...filters, fits: [] })
+                        }
+                        className="text-[10px] text-orange-400 hover:text-orange-500"
+                      >
+                        {loc("DynamicMarket.clear", "Clear")}
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 px-3">
+                    {CLOTHING_FITS.map((fit) => (
+                      <PillChip
+                        key={fit}
+                        label={loc(`DynamicMarket.clothingFit${fit}`, fit)}
+                        selected={(filters.fits ?? []).includes(fit)}
+                        onClick={() => toggleList("fits", fit)}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Clothing Size */}
+                <div>
+                  <div className="flex items-center justify-between px-3 pb-1">
+                    <span
+                      className={`text-[10px] font-semibold uppercase tracking-wider ${
+                        dk ? "text-gray-500" : "text-gray-400"
+                      }`}
+                    >
+                      {loc("DynamicMarket.clothingSize", "Size")}
+                    </span>
+                    {(filters.sizes ?? []).length > 0 && (
+                      <button
+                        onClick={() =>
+                          onFiltersChange({ ...filters, sizes: [] })
+                        }
+                        className="text-[10px] text-orange-400 hover:text-orange-500"
+                      >
+                        {loc("DynamicMarket.clear", "Clear")}
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 px-3">
+                    {CLOTHING_SIZES.map((size) => (
+                      <PillChip
+                        key={size}
+                        label={size}
+                        selected={(filters.sizes ?? []).includes(size)}
+                        onClick={() => toggleList("sizes", size)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+            <Divider />
+          </>
+        )}
+
+        {/* ═══ 3. SPEC FACETS (Typesense-driven, one section per field) ════ */}
         {Object.entries(specFacets).map(([field, facetValues]) => {
           if (!facetValues.length) return null;
           const sectionKey = `spec_${field}`;
@@ -569,7 +820,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
           );
         })}
 
-        {/* ═══ 3. BRAND ════════════════════════════════════════════════════ */}
+        {/* ═══ 4. BRAND ════════════════════════════════════════════════════ */}
         <SectionHeader
           sectionKey="brand"
           label={loc("DynamicMarket.brands", "Brand")}
@@ -583,7 +834,6 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
                 onClick={() => onFiltersChange({ ...filters, brands: [] })}
               />
             )}
-            {/* Search */}
             <div className="relative mx-3 mb-2">
               <Search
                 size={11}
@@ -614,7 +864,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
                     key={brand}
                     label={brand}
                     checked={filters.brands.includes(brand)}
-                    onChange={() => setList("brands", brand)}
+                    onChange={() => toggleList("brands", brand)}
                   />
                 ))}
             </div>
@@ -622,7 +872,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
         )}
         <Divider />
 
-        {/* ═══ 4. COLOR ════════════════════════════════════════════════════ */}
+        {/* ═══ 5. COLOR ════════════════════════════════════════════════════ */}
         <SectionHeader
           sectionKey="color"
           label={loc("DynamicMarket.colors", "Color")}
@@ -643,7 +893,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
                   label={localizeColor(name)}
                   swatch={hex}
                   checked={filters.colors.includes(name)}
-                  onChange={() => setList("colors", name)}
+                  onChange={() => toggleList("colors", name)}
                 />
               ))}
             </div>
@@ -651,7 +901,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
         )}
         <Divider />
 
-        {/* ═══ 5. RATING ═══════════════════════════════════════════════════ */}
+        {/* ═══ 6. RATING ═══════════════════════════════════════════════════ */}
         <SectionHeader
           sectionKey="rating"
           label={loc("DynamicMarket.rating", "Rating")}
@@ -659,7 +909,6 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
         />
         {expanded.rating && (
           <div className="px-3 pb-3 pt-1 space-y-2">
-            {/* Active label */}
             {filters.minRating !== undefined && (
               <div
                 className={`flex items-center justify-between px-2.5 py-1.5 rounded-md ${
@@ -688,7 +937,6 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
                 </button>
               </div>
             )}
-            {/* Star chips */}
             <div className="flex flex-wrap gap-1.5">
               {([4, 3, 2, 1] as const).map((stars) => {
                 const sel = filters.minRating === stars;
@@ -729,7 +977,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
         )}
         <Divider />
 
-        {/* ═══ 6. PRICE RANGE ══════════════════════════════════════════════ */}
+        {/* ═══ 7. PRICE RANGE ══════════════════════════════════════════════ */}
         <SectionHeader
           sectionKey="price"
           label={loc("DynamicMarket.priceRange", "Price Range")}
@@ -739,7 +987,6 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
         />
         {expanded.price && (
           <div className="px-3 pb-3 pt-1 space-y-2">
-            {/* Active price display */}
             {(filters.minPrice !== undefined ||
               filters.maxPrice !== undefined) && (
               <div
@@ -768,7 +1015,6 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
                 </button>
               </div>
             )}
-            {/* Inputs */}
             <div className="flex items-center gap-2">
               <input
                 type="number"
@@ -804,7 +1050,6 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
             >
               {loc("DynamicMarket.applyPriceFilter", "Apply")}
             </button>
-            {/* Quick ranges */}
             <p
               className={`text-[10px] uppercase tracking-wider ${dk ? "text-gray-600" : "text-gray-400"}`}
             >
@@ -850,14 +1095,12 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
     if (!isOpen || typeof document === "undefined") return null;
     return createPortal(
       <>
-        {/* Backdrop */}
         <div
           className="fixed inset-0 bg-black/50 z-[10000]"
           onClick={onClose}
         />
-        {/* Drawer */}
         <div
-          className={`fixed top-0 left-0 h-[100dvh] w-64 z-[10001] shadow-2xl overflow-hidden ${
+          className={`fixed top-0 left-0 h-[100dvh] w-72 z-[10001] shadow-2xl overflow-hidden ${
             dk ? "bg-gray-900" : "bg-white"
           }`}
         >

@@ -78,7 +78,7 @@ const DynamicMarketPage: React.FC = () => {
 
   // ── Product state ──────────────────────────────────────────────────────────
   const [products, setProducts] = useState<Product[]>([]);
-  const [boostedProducts, setBoostedProducts] = useState<Product[]>([]);
+
   const [streamedProducts, setStreamedProducts] = useState<Product[]>([]);
   const streamIndexRef = useRef(0);
 
@@ -191,13 +191,14 @@ const DynamicMarketPage: React.FC = () => {
   const fetchProducts = useCallback(
     async (page: number = 0, reset = false) => {
       abortRef.current?.abort();
-      abortRef.current = new AbortController();
+      const controller = new AbortController();
+      abortRef.current = controller;
 
       try {
         if (reset) {
           setIsProductsLoading(true);
           setProducts([]);
-          setBoostedProducts([]);
+
           setCurrentPage(0);
           setHasMore(true);
         } else {
@@ -241,14 +242,14 @@ const DynamicMarketPage: React.FC = () => {
         }
 
         const res = await fetch(`/api/fetchDynamicProducts?${qp}`, {
-          signal: abortRef.current.signal,
+          signal: controller.signal,
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
 
         if (reset) {
           setProducts(data.products || []);
-          setBoostedProducts(data.boostedProducts || []);
+
           // Spec facets arrive on the initial load response
           if (data.specFacets) setSpecFacets(data.specFacets as SpecFacets);
         } else {
@@ -263,12 +264,15 @@ const DynamicMarketPage: React.FC = () => {
         setHasMore(false);
         if (reset) {
           setProducts([]);
-          setBoostedProducts([]);
         }
       } finally {
-        setIsInitialLoading(false);
-        setIsProductsLoading(false);
-        setIsLoadingMore(false);
+        // Only clear loading states if this request wasn't superseded by a newer one.
+        // Aborted requests should not touch state — the newer request owns it.
+        if (!controller.signal.aborted) {
+          setIsInitialLoading(false);
+          setIsProductsLoading(false);
+          setIsLoadingMore(false);
+        }
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -316,7 +320,7 @@ const DynamicMarketPage: React.FC = () => {
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
-  const activeCount = getActiveFiltersCount(filters);
+  const activeCount = getActiveFiltersCount(filters, "dynamicMarket");
 
   const getSortLabel = (opt: SortOption): string => {
     switch (opt) {
@@ -380,6 +384,7 @@ const DynamicMarketPage: React.FC = () => {
         {/* ── Desktop sidebar (always rendered, sticky) ── */}
         <div className="hidden lg:block w-60 flex-shrink-0">
           <FilterSidebar
+            mode="dynamicMarket"
             category={urlParams.category}
             selectedSubcategory={urlParams.selectedSubcategory}
             buyerCategory={urlParams.buyerCategory}
@@ -551,53 +556,12 @@ const DynamicMarketPage: React.FC = () => {
               </div>
             )}
 
-            {/* Filter-change overlay */}
+            {/* Filter-change shimmer */}
             {!isInitialLoading && isProductsLoading && (
-              <div
-                className={`absolute inset-0 z-10 flex items-center justify-center backdrop-blur-sm ${
-                  isDarkMode ? "bg-gray-950/80" : "bg-white/80"
-                }`}
-              >
-                <div className="text-center">
-                  <div className="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-orange-500" />
-                  <p
-                    className={`mt-3 text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
-                  >
-                    {t("DynamicMarket.updatingProducts")}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Boosted products */}
-            {!isInitialLoading && boostedProducts.length > 0 && (
-              <div className="mb-8">
-                <div
-                  className={`flex items-center gap-2 mb-4 ${isDarkMode ? "text-white" : "text-gray-900"}`}
-                >
-                  <div className="w-1 h-7 bg-gradient-to-b from-orange-500 to-pink-500 rounded-full" />
-                  <h3 className="text-base font-bold">
-                    {t("DynamicMarket.featuredProducts")}
-                  </h3>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2">
-                  {boostedProducts.map((p) => (
-                    <ProductCard
-                      key={`b-${p.id}`}
-                      product={p}
-                      onTap={() => router.push(`/productdetail/${p.id}`)}
-                      onFavoriteToggle={() => {}}
-                      onAddToCart={() => {}}
-                      onColorSelect={() => {}}
-                      showCartIcon
-                      isFavorited={false}
-                      isInCart={false}
-                      portraitImageHeight={320}
-                      isDarkMode={isDarkMode}
-                      localization={t}
-                    />
-                  ))}
-                </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 lg:gap-4">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <Skeleton key={i} />
+                ))}
               </div>
             )}
 

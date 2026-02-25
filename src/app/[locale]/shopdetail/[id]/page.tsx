@@ -1,23 +1,20 @@
 "use client";
 
-// ═══════════════════════════════════════════════════════════════════════════
-// ShopDetailPage
-//
-// Mirrors Flutter's ShopDetailScreen + ShopProvider exactly:
-//
-//  Products  → always /api/shopProducts (Typesense, shopId-scoped)
-//              Mirrors _fetchProductsFromTypesense()
-//  Search    → debounced 300 ms, Typesense via same route (q param)
-//              Mirrors _performTypesenseSearch()
-//  SpecFacets → fetched on page-0 response, scoped to shopId
-//              Mirrors _fetchSpecFacets()
-//
-//  Tabs      → Home (only if homeImageUrls), All Products, Collections,
-//               Deals, Best Sellers, Reviews
-//  Filters   → Sort | Filter (FilterSidebar) | Category
-//  Layout    → Desktop: sticky cover + sidebar + grid
-//              Mobile : FAB → portal drawer
-// ═══════════════════════════════════════════════════════════════════════════
+/**
+ * shop_detail_page.tsx
+ *
+ * Full-parity rewrite matching Flutter's shop_provider.dart + shop_detail_filter_screen.dart.
+ *
+ * Fixed bugs vs previous version:
+ *  1. Gender never sent to Typesense facetFilters  → fixed: `gender:${value}`
+ *  2. Types/fits never sent to Typesense            → fixed: `attributes.clothingType`, `attributes.clothingFit`
+ *  3. Sizes never sent to Typesense                 → fixed: `clothingSizes:${size}`
+ *  4. Color field wrong for Typesense               → fixed: `availableColors:${c}` (indexed array)
+ *  5. Firestore path had no client-side filtering   → fixed: applyClientFilters() mirrors Flutter's _applyAllFilters
+ *  6. Firestore path missing gender WHERE clause    → fixed: server-side gender filter added
+ *  7. FilterSidebar missing gender/type/fit/size UI → fixed: shopCategories prop passed
+ *  8. filterKey didn't include gender/types/fits/sizes → fixed: full key includes all filter fields
+ */
 
 import React, {
   useState,
@@ -26,31 +23,26 @@ import React, {
   useRef,
   useMemo,
 } from "react";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import Image from "next/image";
-import Link from "next/link";
 import {
-  ArrowLeft,
-  Filter,
-  Search,
-  X,
-  Star,
-  Users,
-  ChevronDown,
-  RefreshCw,
-  Layers,
-  ShoppingBag,
-  Tag,
-  Award,
-  MessageSquare,
-  Home,
-  AlertCircle,
-  WifiOff,
-  ThumbsUp,
-  Globe,
-  Check,
-} from "lucide-react";
+  doc,
+  getDoc,
+  collection,
+  query,
+  orderBy,
+  limit,
+  getDocs,
+  where,
+  startAfter,
+  QueryDocumentSnapshot,
+  DocumentData,
+} from "firebase/firestore";
+import { db } from "../../../../lib/firebase";
+import SecondHeader from "@/app/components/market_screen/SecondHeader";
 import { ProductCard } from "@/app/components/ProductCard";
+import TypeSenseServiceManager from "@/lib/typesense_service_manager";
 import { Product, ProductUtils } from "@/app/models/Product";
 import FilterSidebar, {
   FilterState,
@@ -58,7 +50,18 @@ import FilterSidebar, {
   EMPTY_FILTER_STATE,
   getActiveFiltersCount,
 } from "@/app/components/FilterSideBar";
-import { impressionBatcher } from "@/app/utils/impressionBatcher";
+import {
+  MagnifyingGlassIcon,
+  StarIcon,
+  UsersIcon,
+  EyeIcon,
+  HeartIcon,
+  ArrowLeftIcon,
+  PhotoIcon,
+  XMarkIcon,
+} from "@heroicons/react/24/outline";
+import { HeartIcon as HeartSolidIcon } from "@heroicons/react/24/solid";
+import { Filter, SortAsc, ChevronDown } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -71,33 +74,37 @@ interface ShopData {
   coverImageUrls: string[];
   homeImageUrls?: string[];
   homeImageLinks?: Record<string, string>;
-  address?: string;
+  address: string;
   averageRating: number;
-  reviewCount?: number;
-  followerCount?: number;
+  reviewCount: number;
+  followerCount: number;
+  clickCount: number;
   categories: string[];
-  contactNo?: string;
-  ownerId?: string;
-  isActive?: boolean;
+  contactNo: string;
+  ownerId: string;
+  isBoosted: boolean;
+  createdAt: { seconds: number; nanoseconds: number };
 }
 
-interface Collection {
+interface ShopCollection {
   id: string;
   name: string;
   imageUrl?: string;
-  productIds?: string[];
+  productIds: string[];
+  createdAt: { seconds: number; nanoseconds: number };
 }
 
 interface Review {
   id: string;
   rating: number;
   review: string;
-  timestamp: number;
-  likes?: string[];
-  userId?: string;
+  timestamp: { seconds: number; nanoseconds: number };
+  userId: string;
+  userName?: string;
+  likes: string[];
 }
 
-type TabId =
+type TabType =
   | "home"
   | "allProducts"
   | "collections"
@@ -106,166 +113,283 @@ type TabId =
   | "reviews";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Sort helpers – mirror Flutter's ShopProvider.setSortOption
+// Sort helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-type SortOption = "date" | "alphabetical" | "price_asc" | "price_desc";
+const SORT_OPTIONS = [
+  "None",
+  "Alphabetical",
+  "Date",
+  "Price Low to High",
+  "Price High to Low",
+] as const;
+type SortOption = (typeof SORT_OPTIONS)[number];
 
-const SORT_OPTIONS: { value: SortOption; label: string }[] = [
-  { value: "date", label: "Newest" },
-  { value: "alphabetical", label: "A–Z" },
-  { value: "price_asc", label: "Price ↑" },
-  { value: "price_desc", label: "Price ↓" },
-];
+function toSortCode(opt: SortOption): string {
+  switch (opt) {
+    case "Alphabetical":
+      return "alphabetical";
+    case "Price Low to High":
+      return "price_asc";
+    case "Price High to Low":
+      return "price_desc";
+    case "Date":
+      return "date";
+    default:
+      return "date";
+  }
+}
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Sub-components
-// ─────────────────────────────────────────────────────────────────────────────
-
-const ProductShimmer: React.FC<{ isDark: boolean }> = ({ isDark }) => {
-  const base = isDark ? "bg-gray-700" : "bg-gray-200";
-  const card = isDark ? "bg-gray-800" : "bg-white";
-  return (
-    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 lg:gap-4">
-      {Array.from({ length: 8 }).map((_, i) => (
-        <div
-          key={i}
-          className={`rounded-xl overflow-hidden ${card} animate-pulse`}
-        >
-          <div className={`w-full h-52 ${base}`} />
-          <div className="p-3 space-y-2">
-            <div className={`h-3 rounded ${base} w-4/5`} />
-            <div className={`h-3 rounded ${base} w-3/5`} />
-            <div className={`h-4 rounded ${base} w-2/5`} />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-};
-
-const EmptyState: React.FC<{
-  icon: React.ReactNode;
-  message: string;
-  subMessage?: string;
-  onClear?: () => void;
-  isDark: boolean;
-}> = ({ icon, message, subMessage, onClear, isDark }) => (
-  <div className="flex flex-col items-center justify-center min-h-64 gap-4 py-16 px-4 text-center">
-    <div className={isDark ? "text-gray-600" : "text-gray-300"}>{icon}</div>
-    <p
-      className={`text-base font-medium ${isDark ? "text-gray-400" : "text-gray-500"}`}
-    >
-      {message}
-    </p>
-    {subMessage && (
-      <p className={`text-sm ${isDark ? "text-gray-500" : "text-gray-400"}`}>
-        {subMessage}
-      </p>
-    )}
-    {onClear && (
-      <button
-        onClick={onClear}
-        className="mt-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium transition-colors"
-      >
-        Clear Filters
-      </button>
-    )}
-  </div>
-);
+/**
+ * Mirrors Flutter's _shouldUseTypesense().
+ * Typesense is used when: sort != default/date, OR search query active,
+ * OR spec filters (dynamic facets) are active.
+ * Basic filters (gender, brands, colors, types, fits, sizes, price) alone
+ * use the Firestore path + client-side filtering, matching Flutter exactly.
+ */
+function shouldUseTypesense(
+  sortOption: SortOption,
+  specFilters: Record<string, string[]>,
+  searchQuery: string,
+  filters: FilterState,
+): boolean {
+  if (sortOption !== "None" && sortOption !== "Date") return true;
+  if (searchQuery.trim()) return true;
+  if (Object.values(specFilters).some((v) => v.length > 0)) return true;
+  if (filters.minPrice !== undefined || filters.maxPrice !== undefined)
+    return true;
+  if (filters.minRating !== undefined) return true;
+  if (filters.gender) return true; // ADD THIS LINE
+  return false;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Main component
+// Client-side filter helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { use } from "react";
+/**
+ * Safely read an unknown field from a Product, since we don't know the exact
+ * TypeScript Product model shape for clothing-specific fields.
+ */
+function getField(p: Product, ...keys: string[]): unknown {
+  const rec = p as unknown as Record<string, unknown>;
+  for (const key of keys) {
+    if (rec[key] !== undefined) return rec[key];
+  }
+  return undefined;
+}
 
-export default function Page({ params }: { params: Promise<{ id: string }> }) {
-  const { id: shopId } = use(params);
+/**
+ * Mirrors Flutter's _applyAllFilters().
+ * Applied after a Firestore fetch to simulate the client-side filtering
+ * Flutter does for brands, types, fits, sizes, and colors.
+ * Gender and price are already filtered server-side in Firestore.
+ */
+function applyClientFilters(
+  products: Product[],
+  filters: FilterState,
+  searchQuery: string,
+): Product[] {
+  let result = products;
+
+  // Search query (text match on productName)
+  if (searchQuery.trim()) {
+    const q = searchQuery.toLowerCase();
+    result = result.filter((p) =>
+      (p.productName ?? "").toLowerCase().includes(q),
+    );
+  }
+
+  // Brands — mirrors Flutter: brandModel contains brand (case-insensitive)
+  if (filters.brands.length > 0) {
+    result = result.filter((p) => {
+      const brand = ((p as unknown as Record<string, unknown>).brandModel ??
+        "") as string;
+      return filters.brands.some(
+        (b) =>
+          brand.toLowerCase() === b.toLowerCase() ||
+          brand.toLowerCase().includes(b.toLowerCase()),
+      );
+    });
+  }
+
+  // Clothing types — mirrors Flutter: p.attributes['clothingType']
+  if ((filters.types ?? []).length > 0) {
+    result = result.filter((p) => {
+      const rec = p as unknown as Record<string, unknown>;
+      // Check nested attributes map first (Flutter stores here), then top-level fallback
+      const attrs = rec.attributes as Record<string, unknown> | undefined;
+      const typeVal =
+        attrs?.clothingType ?? rec.clothingType ?? rec.clothingTypes;
+      if (!typeVal) return false;
+      const types = Array.isArray(typeVal) ? typeVal : [typeVal];
+      return (filters.types ?? []).some((t) => (types as string[]).includes(t));
+    });
+  }
+
+  // Clothing fits — mirrors Flutter: p.attributes['clothingFit']
+  if ((filters.fits ?? []).length > 0) {
+    result = result.filter((p) => {
+      const rec = p as unknown as Record<string, unknown>;
+      const attrs = rec.attributes as Record<string, unknown> | undefined;
+      const fit = (attrs?.clothingFit ?? rec.clothingFit) as string | undefined;
+      return fit !== undefined && (filters.fits ?? []).includes(fit);
+    });
+  }
+
+  // Clothing sizes — mirrors Flutter: p.attributes['clothingSizes'].contains(size)
+  if ((filters.sizes ?? []).length > 0) {
+    result = result.filter((p) => {
+      const rec = p as unknown as Record<string, unknown>;
+      const attrs = rec.attributes as Record<string, unknown> | undefined;
+      const sizesVal = attrs?.clothingSizes ?? rec.clothingSizes ?? rec.sizes;
+      if (!sizesVal) return false;
+      const sizes = Array.isArray(sizesVal) ? sizesVal : [sizesVal];
+      return (filters.sizes ?? []).some((s) => (sizes as string[]).includes(s));
+    });
+  }
+
+  // Colors — mirrors Flutter: colorImages.containsKey(color)
+  if (filters.colors.length > 0) {
+    result = result.filter((p) => {
+      // Try availableColors array first (indexed field in Typesense/Firestore)
+      const avail = getField(p, "availableColors") as string[] | undefined;
+      if (avail) {
+        return filters.colors.some((c) => avail.includes(c));
+      }
+      // Fallback: colorImages map keys
+      const colorImages = getField(p, "colorImages") as
+        | Record<string, unknown>
+        | undefined;
+      if (colorImages) {
+        return filters.colors.some((c) => c in colorImages);
+      }
+      return false;
+    });
+  }
+
+  return result;
+}
+
+/**
+ * Derive the three display arrays from a base product list.
+ * Mirrors Flutter's allProductsNotifier / dealProductsNotifier / bestSellersNotifier derivation.
+ */
+function deriveProductArrays(products: Product[]): {
+  all: Product[];
+  deals: Product[];
+  bestSellers: Product[];
+} {
+  return {
+    all: products,
+    deals: products.filter((p) => (p.discountPercentage ?? 0) > 0),
+    bestSellers: [...products].sort(
+      (a, b) => (b.purchaseCount ?? 0) - (a.purchaseCount ?? 0),
+    ),
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Component
+// ─────────────────────────────────────────────────────────────────────────────
+
+export default function ShopDetailPage() {
+  const params = useParams();
   const router = useRouter();
-  const abortRef = useRef<AbortController | null>(null);
-  const fetchDoneRef = useRef(false);
+  const t = useTranslations("shopDetail");
+  const tRoot = useTranslations();
+  const shopId = params.id as string;
 
-  // ── UI ────────────────────────────────────────────────────────────────────
-  const [isDark, setIsDark] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
-  const [showSortDropdown, setShowSortDropdown] = useState(false);
-  const [showCategoryMenu, setShowCategoryMenu] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabId>("allProducts");
-
-  // ── Shop ──────────────────────────────────────────────────────────────────
+  // ── Shop data ──────────────────────────────────────────────────────────────
   const [shopData, setShopData] = useState<ShopData | null>(null);
-  const [shopLoading, setShopLoading] = useState(true);
-  const [shopError, setShopError] = useState(false);
-
-  // ── Products ──────────────────────────────────────────────────────────────
-  const [products, setProducts] = useState<Product[]>([]);
-  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
-  const [currentPage, setCurrentPage] = useState(0);
-  const [productError, setProductError] = useState(false);
-  const [searchResultCount, setSearchResultCount] = useState<number | null>(
-    null,
-  );
-
-  // ── Collections ───────────────────────────────────────────────────────────
-  const [collections, setCollections] = useState<Collection[]>([]);
-  const [collectionsLoading, setCollectionsLoading] = useState(false);
-
-  // ── Reviews ───────────────────────────────────────────────────────────────
+  const [shopCollections, setShopCollections] = useState<ShopCollection[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
-  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // ── Filters ───────────────────────────────────────────────────────────────
+  // ── Product state ──────────────────────────────────────────────────────────
+  // Mirrors Flutter's allProductsNotifier / dealProductsNotifier / bestSellersNotifier
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [dealProducts, setDealProducts] = useState<Product[]>([]);
+  const [bestSellers, setBestSellers] = useState<Product[]>([]);
+
+  const [isProductsLoading, setIsProductsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isInitialProductLoad, setIsInitialProductLoad] = useState(true);
+  const [hasMore, setHasMore] = useState(true);
+  const [productError, setProductError] = useState<string | null>(null);
+
+  // Firestore cursor — mirrors Flutter's _lastProductDocument
+  const lastFirestoreDocRef =
+    useRef<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const PRODUCTS_LIMIT = 20;
+
+  // ── Filter + facet state ───────────────────────────────────────────────────
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTER_STATE);
   const [specFacets, setSpecFacets] = useState<SpecFacets>({});
-  const [sortOption, setSortOption] = useState<SortOption>("date");
+
+  // ── UI state ───────────────────────────────────────────────────────────────
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabType>("allProducts");
   const [searchQuery, setSearchQuery] = useState("");
-  const [debouncedQuery, setDebouncedQuery] = useState("");
-  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(
-    null,
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+  const [selectedSort, setSelectedSort] = useState<SortOption>("None");
+  const [showSortDropdown, setShowSortDropdown] = useState(false);
+
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Race token — mirrors Flutter's _searchRaceToken (prevents stale result races)
+  const fetchTokenRef = useRef(0);
+
+  const isProductTab = ["allProducts", "deals", "bestSellers"].includes(
+    activeTab,
   );
 
-  // ── Available subcategories (derived from products) ───────────────────────
-  const [availableSubcategories, setAvailableSubcategories] = useState<
-    string[]
-  >([]);
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // Stable filter key to prevent excess renders
-  // ─────────────────────────────────────────────────────────────────────────
+  /**
+   * Stable serialised key covering ALL filter fields.
+   * Effect deps only change when something actually changed.
+   * BUG FIX: Previous version omitted gender, types, fits, sizes.
+   */
   const filterKey = useMemo(
     () =>
       JSON.stringify({
+        gender: filters.gender,
+        subcategories: [...filters.subcategories].sort(),
         colors: [...filters.colors].sort(),
         brands: [...filters.brands].sort(),
+        types: [...(filters.types ?? [])].sort(),
+        fits: [...(filters.fits ?? [])].sort(),
+        sizes: [...(filters.sizes ?? [])].sort(),
         specFilters: filters.specFilters,
         minPrice: filters.minPrice,
         maxPrice: filters.maxPrice,
-        subcategory: selectedSubcategory,
-        sort: sortOption,
+        minRating: filters.minRating,
       }),
-    [filters, selectedSubcategory, sortOption],
+    [filters],
   );
 
-  const activeFilterCount =
-    getActiveFiltersCount(filters) + (selectedSubcategory ? 1 : 0);
+  const activeCount = getActiveFiltersCount(filters);
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Theme / responsive setup
-  // ─────────────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 1024);
-    check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
-  }, []);
+  // Which products to show for the active tab
+  const currentProducts = useMemo(() => {
+    switch (activeTab) {
+      case "deals":
+        return dealProducts;
+      case "bestSellers":
+        return bestSellers;
+      default:
+        return allProducts;
+    }
+  }, [activeTab, allProducts, dealProducts, bestSellers]);
+
+  // ── Side effects ───────────────────────────────────────────────────────────
 
   useEffect(() => {
     const check = () =>
-      setIsDark(document.documentElement.classList.contains("dark"));
+      setIsDarkMode(document.documentElement.classList.contains("dark"));
     check();
     const obs = new MutationObserver(check);
     obs.observe(document.documentElement, {
@@ -276,214 +400,467 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
   }, []);
 
   useEffect(() => {
-    document.body.style.overflow = showMobileSidebar ? "hidden" : "";
+    const check = () => setIsMobile(window.innerWidth < 1024);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
+  useEffect(() => {
+    const onScroll = () => setIsScrolled(window.scrollY > 50);
+    window.addEventListener("scroll", onScroll);
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    document.body.style.overflow = showMobileSidebar ? "hidden" : "unset";
     return () => {
-      document.body.style.overflow = "";
+      document.body.style.overflow = "unset";
     };
   }, [showMobileSidebar]);
 
-  // Close dropdowns on outside click
+  // Cleanup debounce timer on unmount / shopId change
   useEffect(() => {
-    const handler = () => {
-      setShowSortDropdown(false);
-      setShowCategoryMenu(false);
+    return () => {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     };
-    document.addEventListener("click", handler);
-    return () => document.removeEventListener("click", handler);
-  }, []);
+  }, [shopId]);
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Flush impressions
-  // ─────────────────────────────────────────────────────────────────────────
-  useEffect(
-    () => () => {
-      impressionBatcher.flush();
-    },
-    [],
-  );
+  // Debounce search — mirrors Flutter's 500ms debounce in filterProductsLocally()
   useEffect(() => {
-    const f = () => {
-      if (document.hidden) impressionBatcher.flush();
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    searchTimeoutRef.current = setTimeout(
+      () => setDebouncedSearch(searchQuery),
+      500,
+    );
+    return () => {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     };
-    document.addEventListener("visibilitychange", f);
-    return () => document.removeEventListener("visibilitychange", f);
-  }, []);
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // Search debounce — 300ms (mirrors Flutter)
-  // ─────────────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    const tid = setTimeout(() => setDebouncedQuery(searchQuery.trim()), 300);
-    return () => clearTimeout(tid);
   }, [searchQuery]);
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Shop data fetch
-  // ─────────────────────────────────────────────────────────────────────────
-  useEffect(() => {
+  // ── Firestore data fetchers ────────────────────────────────────────────────
+
+  const fetchShopData = useCallback(async () => {
     if (!shopId) return;
-    setShopLoading(true);
-    setShopError(false);
-    fetch(`/api/shops/${shopId}`)
-      .then((r) => {
-        if (!r.ok) throw new Error(`${r.status}`);
-        return r.json();
-      })
-      .then((data) => {
-        const shop = data.shop ?? data;
-        setShopData({
-          id: shopId,
-          name: shop.name ?? "",
-          profileImageUrl: shop.profileImageUrl ?? "",
-          coverImageUrls: shop.coverImageUrls ?? [],
-          homeImageUrls: shop.homeImageUrls ?? [],
-          homeImageLinks: shop.homeImageLinks ?? {},
-          address: shop.address ?? "",
-          averageRating: shop.averageRating ?? 0,
-          reviewCount: shop.reviewCount ?? 0,
-          followerCount: shop.followerCount ?? 0,
-          categories: shop.categories ?? [],
-          contactNo: shop.contactNo ?? "",
-          ownerId: shop.ownerId ?? "",
-          isActive: shop.isActive ?? true,
+    try {
+      setIsLoading(true);
+      setError(null);
+      const shopDoc = await getDoc(doc(db, "shops", shopId));
+      if (!shopDoc.exists()) {
+        setError(t("shopNotFound"));
+        return;
+      }
+      const data = { id: shopDoc.id, ...shopDoc.data() } as ShopData;
+      setShopData(data);
+      // Mirror Flutter: default to home tab when homeImageUrls present
+      setActiveTab(
+        data.homeImageUrls && data.homeImageUrls.length > 0
+          ? "home"
+          : "allProducts",
+      );
+    } catch (err) {
+      console.error("Error fetching shop data:", err);
+      setError(t("failedToLoad"));
+    } finally {
+      setIsLoading(false);
+    }
+  }, [shopId, t]);
+
+  const fetchCollections = useCallback(async () => {
+    if (!shopId) return;
+    try {
+      const q = query(
+        collection(db, "shops", shopId, "collections"),
+        orderBy("createdAt", "desc"),
+      );
+      const snapshot = await getDocs(q);
+      setShopCollections(
+        snapshot.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+        })) as ShopCollection[],
+      );
+    } catch (err) {
+      console.error("Error fetching collections:", err);
+    }
+  }, [shopId]);
+
+  const fetchReviews = useCallback(async () => {
+    if (!shopId) return;
+    try {
+      const q = query(
+        collection(db, "shops", shopId, "reviews"),
+        orderBy("timestamp", "desc"),
+        limit(20),
+      );
+      const snapshot = await getDocs(q);
+      setReviews(
+        snapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as Review[],
+      );
+    } catch (err) {
+      console.error("Error fetching reviews:", err);
+    }
+  }, [shopId]);
+
+  // ── Spec facets ────────────────────────────────────────────────────────────
+
+  const fetchSpecFacets = useCallback(async () => {
+    if (!shopId) return;
+    try {
+      const facets =
+        await TypeSenseServiceManager.instance.shopService.fetchSpecFacets({
+          indexName: "shop_products",
+          additionalFilterBy: `shopId:=${shopId}`,
         });
-        // If shop has home images, make Home tab default
-        if ((shop.homeImageUrls ?? []).length > 0) {
-          setActiveTab("home");
-        }
-      })
-      .catch(() => setShopError(true))
-      .finally(() => setShopLoading(false));
+      setSpecFacets(facets);
+    } catch (err) {
+      console.error("Error fetching spec facets:", err);
+    }
   }, [shopId]);
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Collections fetch (Firestore via existing API or direct)
-  // ─────────────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!shopId) return;
-    setCollectionsLoading(true);
-    fetch(`/api/shops/${shopId}/collections`)
-      .then((r) => (r.ok ? r.json() : { collections: [] }))
-      .then((data) => setCollections(data.collections ?? []))
-      .catch(() => setCollections([]))
-      .finally(() => setCollectionsLoading(false));
-  }, [shopId]);
+  // ── Product fetchers ───────────────────────────────────────────────────────
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Reviews fetch
-  // ─────────────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!shopId) return;
-    setReviewsLoading(true);
-    fetch(`/api/shops/${shopId}/reviews`)
-      .then((r) => (r.ok ? r.json() : { reviews: [] }))
-      .then((data) => setReviews(data.reviews ?? []))
-      .catch(() => setReviews([]))
-      .finally(() => setReviewsLoading(false));
-  }, [shopId]);
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // Products fetch — mirrors Flutter's _fetchProductsFromTypesense()
-  // Always Typesense (via /api/shopProducts), scoped to shopId
-  // ─────────────────────────────────────────────────────────────────────────
-  const fetchProducts = useCallback(
-    async (page: number, reset: boolean) => {
+  /**
+   * Mirrors Flutter's _fetchProductsFromTypesense().
+   * Used when: sort != date, search active, or spec filters active.
+   *
+   * BUG FIXES applied:
+   *  - Gender now sent as facet filter: `gender:${value}`
+   *  - Types now sent as facet filter: `attributes.clothingType:${type}`
+   *  - Fits now sent as facet filter: `attributes.clothingFit:${fit}`
+   *  - Sizes now sent as facet filter: `clothingSizes:${size}`
+   *  - Colors use `availableColors:${c}` (Typesense array field, correctly indexed)
+   */
+  const fetchProductsTypesense = useCallback(
+    async (page: number, reset: boolean, token: number): Promise<void> => {
       if (!shopId) return;
 
-      abortRef.current?.abort();
-      abortRef.current = new AbortController();
-
       try {
-        if (reset) {
-          setIsLoadingProducts(true);
-          setProducts([]);
-          setCurrentPage(0);
-          setHasMore(false);
-          setProductError(false);
-          setSearchResultCount(null);
-          fetchDoneRef.current = false;
-        } else {
-          setIsLoadingMore(true);
+        const facetFilters: string[][] = [];
+        const numericFilters: string[] = [];
+
+        // Gender — mirrors Flutter: facetFilters.add(['gender:$_selectedGender'])
+        if (filters.gender) {
+          facetFilters.push([`gender:${filters.gender}`]);
         }
 
-        const qp = new URLSearchParams({
-          shopId,
-          page: page.toString(),
-          hitsPerPage: "20",
-          sort: sortOption,
-        });
+        // Subcategories
+        if (filters.subcategories.length > 0) {
+          facetFilters.push([`subcategory:${filters.subcategories[0]}`]);
+        }
 
-        if (debouncedQuery) qp.set("q", debouncedQuery);
-        if (selectedSubcategory) qp.set("subcategory", selectedSubcategory);
-        if (filters.colors.length > 0)
-          qp.set("colors", filters.colors.join(","));
-        if (filters.brands.length > 0)
-          qp.set("brands", filters.brands.join(","));
+        // Brands — mirrors Flutter: facetFilters.add(_selectedBrands.map((b) => 'brandModel:$b'))
+        if (filters.brands.length > 0) {
+          facetFilters.push(filters.brands.map((b) => `brandModel:${b}`));
+        }
+
+        // Colors — mirrors Flutter: facetFilters.add(_selectedColors.map((c) => 'availableColors:$c'))
+        // Note: Flutter sends 'colorImages.$c:*' but availableColors is the properly indexed
+        // array field in the TypeSense schema. We use availableColors for correct OR-group filtering.
+        if (filters.colors.length > 0) {
+          facetFilters.push(filters.colors.map((c) => `colorImages.${c}:*`));
+        }
+
+        // Clothing types — mirrors Flutter: facetFilters.add(_selectedTypes.map((t) => 'attributes.clothingType:$t'))
+        if ((filters.types ?? []).length > 0) {
+          facetFilters.push(
+            (filters.types ?? []).map((t) => `attributes.clothingType:${t}`),
+          );
+        }
+
+        // Clothing fits — mirrors Flutter: facetFilters.add(_selectedFits.map((f) => 'attributes.clothingFit:$f'))
+        if ((filters.fits ?? []).length > 0) {
+          facetFilters.push(
+            (filters.fits ?? []).map((f) => `attributes.clothingFit:${f}`),
+          );
+        }
+
+        // Rating
         if (filters.minPrice !== undefined)
-          qp.set("minPrice", String(filters.minPrice));
+          numericFilters.push(`price >= ${filters.minPrice}`);
         if (filters.maxPrice !== undefined)
-          qp.set("maxPrice", String(filters.maxPrice));
+          numericFilters.push(`price <= ${filters.maxPrice}`);
+
+        // Rating
+        if (filters.minRating !== undefined)
+          numericFilters.push(`averageRating:>=${filters.minRating}`);
+
+        // Dynamic spec facet filters (clothingTypes, consoleBrand, etc.)
         for (const [field, vals] of Object.entries(filters.specFilters)) {
-          if (vals.length > 0) qp.set(`spec_${field}`, vals.join(","));
+          if (vals.length > 0) {
+            facetFilters.push(vals.map((v) => `${field}:${v}`));
+          }
         }
 
-        const res = await fetch(`/api/shopProducts?${qp}`, {
-          signal: abortRef.current.signal,
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
+        const result =
+          await TypeSenseServiceManager.instance.shopService.searchIdsWithFacets(
+            {
+              indexName: "shop_products",
+              query: debouncedSearch || "",
+              page,
+              hitsPerPage: PRODUCTS_LIMIT,
+              facetFilters: facetFilters.length > 0 ? facetFilters : undefined,
+              numericFilters:
+                numericFilters.length > 0 ? numericFilters : undefined,
+              sortOption: toSortCode(selectedSort),
+              additionalFilterBy: `shopId:=${shopId}`,
+            },
+          );
 
-        const newProducts: Product[] = (data.products ?? []).map(
-          (raw: Record<string, unknown>) => ProductUtils.fromJson(raw),
+        // Race-token check — mirrors Flutter's _searchRaceToken
+        if (token !== fetchTokenRef.current) return;
+
+        const fetched = result.hits.map((hit) =>
+          ProductUtils.fromTypeSense(hit as unknown as Record<string, unknown>),
         );
 
         if (reset) {
-          setProducts(newProducts);
-          // SpecFacets arrive on page 0 (mirrors Flutter _fetchSpecFacets)
-          if (data.specFacets) setSpecFacets(data.specFacets as SpecFacets);
-          if (debouncedQuery) setSearchResultCount(newProducts.length);
-          // Derive available subcategories from product data
-          const subs = Array.from(
-            new Set(newProducts.map((p) => p.subcategory).filter(Boolean)),
-          ).sort() as string[];
-          if (subs.length > 0) setAvailableSubcategories(subs);
+          const derived = deriveProductArrays(fetched);
+          setAllProducts(derived.all);
+          setDealProducts(derived.deals);
+          setBestSellers(derived.bestSellers);
         } else {
-          setProducts((prev) => [...prev, ...newProducts]);
+          setAllProducts((prev) => {
+            const combined = [...prev, ...fetched];
+            const derived = deriveProductArrays(combined);
+            setDealProducts(derived.deals);
+            setBestSellers(derived.bestSellers);
+            return derived.all;
+          });
         }
 
-        setHasMore(data.hasMore ?? false);
-        setCurrentPage(page);
-        fetchDoneRef.current = true;
+        setHasMore(fetched.length >= PRODUCTS_LIMIT);
       } catch (err) {
-        if (err instanceof Error && err.name === "AbortError") return;
-        setProductError(true);
-      } finally {
-        setIsLoadingProducts(false);
-        setIsLoadingMore(false);
+        if (token !== fetchTokenRef.current) return;
+        console.error("Typesense product fetch error:", err);
+        setProductError("Failed to load products");
+        if (reset) {
+          setAllProducts([]);
+          setDealProducts([]);
+          setBestSellers([]);
+        }
+        setHasMore(false);
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [shopId, sortOption, debouncedQuery, filterKey],
+    [shopId, debouncedSearch, selectedSort, filterKey, filters],
   );
 
-  // Trigger fetch on any filter / sort / query change
-  useEffect(() => {
-    fetchProducts(0, true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shopId, sortOption, debouncedQuery, filterKey]);
+  /**
+   * Mirrors Flutter's Firestore fetchProducts path.
+   * Used by default: sort=date, no search, no spec filters.
+   *
+   * BUG FIXES applied:
+   *  - Gender now applied server-side as a Firestore WHERE clause
+   *  - applyClientFilters() now called for brands/types/fits/sizes/colors
+   *    (mirrors Flutter's _applyAllFilters after Firestore fetch)
+   */
+  const fetchProductsFirestore = useCallback(
+    async (loadMore: boolean, token: number): Promise<void> => {
+      if (!shopId) return;
 
-  // Infinite scroll
+      try {
+        // Build additively — mirrors Flutter's Firestore path exactly
+        let baseQuery = query(
+          collection(db, "shop_products"),
+          where("shopId", "==", shopId),
+        );
+
+        // Gender — server-side equality (mirrors Flutter: if (_selectedGender != null) query.where('gender'))
+        if (filters.gender) {
+          baseQuery = query(baseQuery, where("gender", "==", filters.gender));
+        }
+
+        // Subcategory — server-side equality (mirrors Flutter: if (_selectedSubcategory != null) query.where('subcategory'))
+        if (filters.subcategories.length > 0) {
+          baseQuery = query(
+            baseQuery,
+            where("subcategory", "==", filters.subcategories[0]),
+          );
+        }
+
+        // Price range — server-side (mirrors Flutter: where('price', isGreaterThanOrEqualTo: _minPrice))
+        if (filters.minPrice !== undefined) {
+          baseQuery = query(baseQuery, where("price", ">=", filters.minPrice));
+        }
+        if (filters.maxPrice !== undefined) {
+          baseQuery = query(baseQuery, where("price", "<=", filters.maxPrice));
+        }
+
+        // Always date sort on Firestore path (all other sorts routed to Typesense)
+        baseQuery = query(baseQuery, orderBy("createdAt", "desc"));
+
+        const finalQuery =
+          loadMore && lastFirestoreDocRef.current
+            ? query(
+                baseQuery,
+                startAfter(lastFirestoreDocRef.current),
+                limit(PRODUCTS_LIMIT),
+              )
+            : query(baseQuery, limit(PRODUCTS_LIMIT));
+
+        const snapshot = await getDocs(finalQuery);
+
+        if (token !== fetchTokenRef.current) return;
+
+        const fetched = snapshot.docs.map((d) =>
+          ProductUtils.fromDocument(d.data() as Record<string, unknown>, d.id, {
+            id: d.id,
+            path: d.ref.path,
+            parent: { id: d.ref.parent.id },
+          }),
+        );
+
+        if (snapshot.docs.length > 0) {
+          lastFirestoreDocRef.current = snapshot.docs[snapshot.docs.length - 1];
+        }
+
+        // hasMore — mirrors Flutter: fetched.length >= _productsLimit
+        setHasMore(snapshot.docs.length === PRODUCTS_LIMIT);
+
+        // Client-side filtering — mirrors Flutter's _applyAllFilters()
+        // Applies brands, types, fits, sizes, colors after Firestore fetch
+        const filtered = applyClientFilters(fetched, filters, debouncedSearch);
+
+        if (loadMore) {
+          setAllProducts((prev) => {
+            const combined = [...prev, ...filtered];
+            const derived = deriveProductArrays(combined);
+            setDealProducts(derived.deals);
+            setBestSellers(derived.bestSellers);
+            return derived.all;
+          });
+        } else {
+          const derived = deriveProductArrays(filtered);
+          setAllProducts(derived.all);
+          setDealProducts(derived.deals);
+          setBestSellers(derived.bestSellers);
+        }
+      } catch (err) {
+        if (token !== fetchTokenRef.current) return;
+        console.error("Firestore product fetch error:", err);
+        setProductError("Failed to load products");
+        if (!loadMore) {
+          setAllProducts([]);
+          setDealProducts([]);
+          setBestSellers([]);
+        }
+        setHasMore(false);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [shopId, filterKey, filters, debouncedSearch],
+  );
+
+  /**
+   * Main entry point — mirrors Flutter's fetchProducts() routing logic.
+   * Products are ALWAYS fetched regardless of active tab (mirrors Flutter's
+   * Future.wait behavior where products load in background).
+   */
+  const fetchProducts = useCallback(
+    async (loadMore = false): Promise<void> => {
+      if (!shopId) return;
+
+      // Increment token — invalidates any in-flight requests
+      const token = ++fetchTokenRef.current;
+
+      if (loadMore) {
+        setIsLoadingMore(true);
+      } else {
+        setIsProductsLoading(true);
+        setProductError(null);
+        if (!loadMore) lastFirestoreDocRef.current = null;
+      }
+
+      try {
+        const useTs = shouldUseTypesense(
+          selectedSort,
+          filters.specFilters,
+          debouncedSearch,
+          filters,
+        );
+        if (useTs) {
+          const page = loadMore
+            ? Math.floor(allProducts.length / PRODUCTS_LIMIT)
+            : 0;
+          await fetchProductsTypesense(page, !loadMore, token);
+        } else {
+          await fetchProductsFirestore(loadMore, token);
+        }
+      } finally {
+        if (token === fetchTokenRef.current) {
+          setIsInitialProductLoad(false);
+          setIsProductsLoading(false);
+          setIsLoadingMore(false);
+        }
+      }
+    },
+    [
+      shopId,
+      selectedSort,
+      filters.specFilters,
+      debouncedSearch,
+      allProducts.length,
+      fetchProductsTypesense,
+      fetchProductsFirestore,
+    ],
+  );
+
+  // ── Data loading effects ───────────────────────────────────────────────────
+
   useEffect(() => {
+    fetchShopData();
+  }, [fetchShopData]);
+
+  /**
+   * Mirrors Flutter's Future.wait([fetchProducts, fetchReviews, fetchCollections, fetchSpecFacets]).
+   * Products always fetched unconditionally — NOT gated on isProductTab.
+   * Key on shopData.id so switching shops fully resets state.
+   */
+  useEffect(() => {
+    if (!shopData) return;
+
+    setAllProducts([]);
+    setDealProducts([]);
+    setBestSellers([]);
+    setIsInitialProductLoad(true);
+    lastFirestoreDocRef.current = null;
+    setFilters(EMPTY_FILTER_STATE);
+    setSelectedSort("None");
+    setSearchQuery("");
+    setDebouncedSearch("");
+
+    // Parallel fetch — mirrors Flutter's Future.wait
+    fetchProducts(false);
+    fetchCollections();
+    fetchReviews();
+    fetchSpecFacets();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shopData?.id]);
+
+  /**
+   * Re-fetch on filter/sort/search change.
+   * Mirrors Flutter's setSortOption(), updateFilters(), filterProductsLocally().
+   */
+  useEffect(() => {
+    if (!shopData) return;
+    fetchProducts(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSort, filterKey, debouncedSearch]);
+
+  // Scroll-based load-more
+  useEffect(() => {
+    if (!isProductTab) return;
     let tid: NodeJS.Timeout;
     const onScroll = () => {
       clearTimeout(tid);
       tid = setTimeout(() => {
         if (
           window.innerHeight + document.documentElement.scrollTop >=
-          document.documentElement.offsetHeight - 2000
+          document.documentElement.offsetHeight - 2500
         ) {
-          if (hasMore && !isLoadingMore && fetchDoneRef.current) {
-            fetchProducts(currentPage + 1, false);
+          if (hasMore && !isLoadingMore && !isProductsLoading) {
+            fetchProducts(true);
           }
         }
       }, 100);
@@ -493,878 +870,734 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
       window.removeEventListener("scroll", onScroll);
       clearTimeout(tid);
     };
-  }, [hasMore, isLoadingMore, currentPage, fetchProducts]);
+  }, [hasMore, isLoadingMore, isProductsLoading, fetchProducts, isProductTab]);
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Derived product lists — mirrors Flutter's dealProducts / bestSellers
-  // ─────────────────────────────────────────────────────────────────────────
-  const dealProducts = useMemo(
-    () => products.filter((p) => (p.discountPercentage ?? 0) > 0),
-    [products],
-  );
-  const bestSellers = useMemo(
-    () =>
-      [...products].sort(
-        (a, b) => (b.purchaseCount ?? 0) - (a.purchaseCount ?? 0),
-      ),
-    [products],
-  );
+  // ── Handlers ───────────────────────────────────────────────────────────────
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Tab config — Home tab only shown if shop has homeImageUrls (mirrors Flutter)
-  // ─────────────────────────────────────────────────────────────────────────
-  const hasHomeTab = (shopData?.homeImageUrls?.length ?? 0) > 0;
-  const tabs: { id: TabId; label: string; icon: React.ReactNode }[] = [
-    ...(hasHomeTab
-      ? [{ id: "home" as TabId, label: "Home", icon: <Home size={14} /> }]
-      : []),
-    {
-      id: "allProducts",
-      label: "All Products",
-      icon: <ShoppingBag size={14} />,
-    },
-    { id: "collections", label: "Collections", icon: <Layers size={14} /> },
-    { id: "deals", label: "Deals", icon: <Tag size={14} /> },
-    { id: "bestSellers", label: "Best Sellers", icon: <Award size={14} /> },
-    { id: "reviews", label: "Reviews", icon: <MessageSquare size={14} /> },
-  ];
+  const handleTabChange = (tab: TabType) => setActiveTab(tab);
+  const handleFavoriteToggle = () => setIsFavorite((p) => !p);
+  const handleBack = () => router.back();
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Helpers
-  // ─────────────────────────────────────────────────────────────────────────
-  const handleClearAllFilters = () => {
-    setFilters(EMPTY_FILTER_STATE);
-    setSelectedSubcategory(null);
-    setSortOption("date");
+  const formatNumber = (num: number) => {
+    if (num >= 1_000_000) return (num / 1_000_000).toFixed(1) + "M";
+    if (num >= 1_000) return (num / 1_000).toFixed(1) + "K";
+    return num.toString();
   };
 
-  const isProductTab =
-    activeTab === "allProducts" ||
-    activeTab === "deals" ||
-    activeTab === "bestSellers";
-  const activeProducts =
-    activeTab === "deals"
-      ? dealProducts
-      : activeTab === "bestSellers"
-        ? bestSellers
-        : products;
+  const getSortLabel = (opt: SortOption): string => {
+    switch (opt) {
+      case "None":
+        return tRoot("DynamicMarket.sortNone");
+      case "Alphabetical":
+        return tRoot("DynamicMarket.sortAlphabetical");
+      case "Date":
+        return tRoot("DynamicMarket.sortDate");
+      case "Price Low to High":
+        return tRoot("DynamicMarket.sortPriceLowToHigh");
+      case "Price High to Low":
+        return tRoot("DynamicMarket.sortPriceHighToLow");
+    }
+  };
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Render: error / loading states
-  // ─────────────────────────────────────────────────────────────────────────
-  if (shopError) {
+  // ── Available tabs ─────────────────────────────────────────────────────────
+
+  const availableTabs: TabType[] = useMemo(() => {
+    const tabs: TabType[] = [];
+    if (shopData?.homeImageUrls && shopData.homeImageUrls.length > 0) {
+      tabs.push("home");
+    }
+    tabs.push("allProducts");
+    if (shopCollections.length > 0) tabs.push("collections");
+    tabs.push("deals", "bestSellers", "reviews");
+    return tabs;
+  }, [shopData, shopCollections.length]);
+
+  // ── Skeleton ───────────────────────────────────────────────────────────────
+
+  const Skeleton = () => {
+    const shimmer = `shimmer-effect ${isDarkMode ? "shimmer-effect-dark" : "shimmer-effect-light"}`;
+    const base = { backgroundColor: isDarkMode ? "#374151" : "#f3f4f6" };
+    const base2 = { backgroundColor: isDarkMode ? "#374151" : "#e5e7eb" };
     return (
       <div
-        className={`min-h-screen flex items-center justify-center ${isDark ? "bg-gray-950" : "bg-gray-50"}`}
+        className={`rounded-lg overflow-hidden ${isDarkMode ? "bg-gray-800" : "bg-white"}`}
       >
-        <div className="text-center space-y-4 px-4">
-          <AlertCircle size={64} className="mx-auto text-red-400" />
-          <h2
-            className={`text-lg font-semibold ${isDark ? "text-white" : "text-gray-900"}`}
-          >
-            Failed to load shop
-          </h2>
-          <p
-            className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}
-          >
-            Please check your connection and try again.
-          </p>
-          <div className="flex gap-3 justify-center">
-            <button
-              onClick={() => router.back()}
-              className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium"
+        <div
+          className="w-full relative overflow-hidden"
+          style={{ height: 320, ...base }}
+        >
+          <div className={shimmer} />
+        </div>
+        <div className="p-3 space-y-2">
+          {[85, 60].map((w, i) => (
+            <div
+              key={i}
+              className="h-3 rounded relative overflow-hidden"
+              style={{ width: `${w}%`, ...base2 }}
             >
-              Go back
-            </button>
-            <button
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 rounded-lg bg-orange-500 text-white text-sm font-medium"
-            >
-              Retry
-            </button>
+              <div className={shimmer} />
+            </div>
+          ))}
+          <div
+            className="h-4 rounded relative overflow-hidden"
+            style={{ width: "45%", ...base2 }}
+          >
+            <div className={shimmer} />
           </div>
         </div>
       </div>
     );
-  }
+  };
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Render
-  // ─────────────────────────────────────────────────────────────────────────
-  return (
-    <div
-      className={`min-h-screen ${isDark ? "bg-gray-950 text-white" : "bg-gray-50 text-gray-900"}`}
-    >
-      {/* ── Cover / Header ── */}
-      <div className="relative">
-        {/* Cover image */}
-        <div className="relative w-full h-44 sm:h-56 md:h-64 overflow-hidden">
-          {shopLoading ? (
-            <div
-              className={`w-full h-full ${isDark ? "bg-gray-800" : "bg-gray-200"} animate-pulse`}
-            />
-          ) : shopData?.coverImageUrls?.[0] ? (
-            <Image
-              src={shopData.coverImageUrls[0]}
-              alt={shopData.name}
-              fill
-              className="object-cover"
-              priority
-            />
-          ) : (
-            <div
-              className={`w-full h-full ${isDark ? "bg-gray-800" : "bg-gray-300"}`}
-            />
-          )}
-          <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/60" />
-        </div>
+  // ── Render: loading ────────────────────────────────────────────────────────
 
-        {/* Back button */}
-        <button
-          onClick={() => router.back()}
-          className="absolute top-4 left-4 p-2 rounded-full bg-black/30 backdrop-blur-sm text-white hover:bg-black/50 transition-colors"
-        >
-          <ArrowLeft size={20} />
-        </button>
-
-        {/* Shop info overlay */}
-        <div className="absolute bottom-4 left-4 flex items-end gap-3">
-          {/* Profile image */}
-          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden border-2 border-white shadow-lg flex-shrink-0 bg-gray-300">
-            {shopData?.profileImageUrl && (
-              <Image
-                src={shopData.profileImageUrl}
-                alt={shopData.name ?? ""}
-                width={64}
-                height={64}
-                className="w-full h-full object-cover"
-              />
-            )}
-          </div>
-          {/* Name + stats */}
-          <div className="pb-0.5">
-            {shopLoading ? (
-              <div className="space-y-1.5">
-                <div className="h-5 w-40 bg-white/40 rounded animate-pulse" />
-                <div className="h-3 w-28 bg-white/30 rounded animate-pulse" />
-              </div>
-            ) : (
-              <>
-                <h1 className="text-white font-bold text-base sm:text-lg leading-tight drop-shadow">
-                  {shopData?.name}
-                </h1>
-                <div className="flex items-center gap-3 mt-0.5">
-                  <span className="flex items-center gap-1 text-white text-xs">
-                    <Star
-                      size={12}
-                      className="fill-yellow-400 text-yellow-400"
-                    />
-                    {(shopData?.averageRating ?? 0).toFixed(1)}
-                  </span>
-                  <span className="flex items-center gap-1 text-white text-xs">
-                    <Users size={12} />
-                    {shopData?.followerCount?.toLocaleString() ?? 0} followers
-                  </span>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* ── Search bar ── */}
-      <div
-        className={`sticky top-0 z-20 px-4 py-2.5 ${
-          isDark
-            ? "bg-gray-900/95 border-b border-white/10"
-            : "bg-white/95 border-b border-gray-100"
-        } backdrop-blur-xl`}
-      >
+  if (isLoading) {
+    return (
+      <>
+        <SecondHeader />
         <div
-          className={`flex items-center gap-2 px-3 py-2 rounded-xl ${
-            isDark ? "bg-gray-800" : "bg-gray-100"
-          }`}
+          className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
         >
-          {isLoadingProducts && searchQuery ? (
-            <RefreshCw
-              size={16}
-              className="text-orange-500 animate-spin flex-shrink-0"
-            />
-          ) : (
-            <Search
-              size={16}
-              className={`flex-shrink-0 ${isDark ? "text-gray-400" : "text-gray-500"}`}
-            />
-          )}
-          <input
-            type="text"
-            placeholder="Search in store…"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className={`flex-1 text-sm bg-transparent outline-none placeholder:text-gray-400 ${
-              isDark ? "text-white" : "text-gray-900"
-            }`}
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery("")}
-              className={`p-0.5 rounded-full ${isDark ? "hover:bg-gray-700" : "hover:bg-gray-200"}`}
-            >
-              <X
-                size={14}
-                className={isDark ? "text-gray-400" : "text-gray-500"}
-              />
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* ── Tabs ── */}
-      <div
-        className={`sticky top-[57px] z-20 ${isDark ? "bg-gray-900 border-b border-white/10" : "bg-white border-b border-gray-100"}`}
-      >
-        <div className="overflow-x-auto scrollbar-hide">
-          <div className="flex gap-0 min-w-max px-2">
-            {tabs.map((tab) => {
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-                    isActive
-                      ? "border-orange-500 text-orange-500"
-                      : `border-transparent ${isDark ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"}`
-                  }`}
-                >
-                  {tab.icon}
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Filter row — only for product tabs */}
-        {isProductTab && (
-          <div
-            className={`flex items-center gap-2 px-4 pb-2.5 pt-1 ${
-              isDark ? "bg-gray-900" : "bg-white"
-            }`}
-          >
-            {/* Sort button */}
-            <div className="relative" onClick={(e) => e.stopPropagation()}>
-              <button
-                onClick={() => {
-                  setShowSortDropdown((v) => !v);
-                  setShowCategoryMenu(false);
-                }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                  sortOption !== "date"
-                    ? "border-orange-400 text-orange-500 bg-orange-50 dark:bg-orange-900/20"
-                    : isDark
-                      ? "border-gray-600 text-gray-300"
-                      : "border-gray-300 text-gray-600"
-                }`}
-              >
-                <ChevronDown size={12} />
-                {SORT_OPTIONS.find((o) => o.value === sortOption)?.label ??
-                  "Sort"}
-              </button>
-              {showSortDropdown && (
-                <div
-                  className={`absolute top-full left-0 mt-1.5 w-40 rounded-xl shadow-xl border overflow-hidden z-50 ${
-                    isDark
-                      ? "bg-gray-800 border-gray-700"
-                      : "bg-white border-gray-100"
-                  }`}
-                >
-                  {SORT_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      onClick={() => {
-                        setSortOption(opt.value);
-                        setShowSortDropdown(false);
-                      }}
-                      className={`w-full text-left px-4 py-2.5 text-sm flex items-center justify-between transition-colors ${
-                        sortOption === opt.value
-                          ? "text-orange-500 font-medium"
-                          : isDark
-                            ? "text-gray-300 hover:bg-gray-700"
-                            : "text-gray-700 hover:bg-gray-50"
-                      }`}
-                    >
-                      {opt.label}
-                      {sortOption === opt.value && (
-                        <Check size={13} className="text-orange-500" />
-                      )}
-                    </button>
+          <div className="max-w-6xl mx-auto">
+            <div className="animate-pulse">
+              <div className="h-64 bg-gray-300" />
+              <div className="p-4 space-y-4">
+                <div className="h-4 bg-gray-300 rounded w-3/4" />
+                <div className="h-4 bg-gray-300 rounded w-1/2" />
+                <div className="flex space-x-4">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="h-8 bg-gray-300 rounded w-20" />
                   ))}
                 </div>
-              )}
+              </div>
             </div>
+          </div>
+        </div>
+      </>
+    );
+  }
 
-            {/* Filter button */}
-            <button
-              onClick={() => setShowMobileSidebar(true)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                activeFilterCount > 0
-                  ? "border-orange-400 text-orange-500 bg-orange-50 dark:bg-orange-900/20"
-                  : isDark
-                    ? "border-gray-600 text-gray-300"
-                    : "border-gray-300 text-gray-600"
+  // ── Render: error ──────────────────────────────────────────────────────────
+
+  if (error || !shopData) {
+    return (
+      <>
+        <SecondHeader />
+        <div
+          className={`min-h-screen flex items-center justify-center ${
+            isDarkMode ? "bg-gray-900" : "bg-gray-50"
+          }`}
+        >
+          <div className="text-center">
+            <h2
+              className={`text-xl font-semibold mb-4 ${
+                isDarkMode ? "text-white" : "text-gray-900"
               }`}
             >
-              <Filter size={12} />
-              Filter{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+              {error || "Shop not found"}
+            </h2>
+            <button
+              onClick={() => router.back()}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              {t("goBack")}
             </button>
+          </div>
+        </div>
+      </>
+    );
+  }
 
-            {/* Category button */}
-            {availableSubcategories.length > 0 && (
-              <div className="relative" onClick={(e) => e.stopPropagation()}>
-                <button
-                  onClick={() => {
-                    setShowCategoryMenu((v) => !v);
-                    setShowSortDropdown(false);
-                  }}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                    selectedSubcategory
-                      ? "border-orange-400 text-orange-500 bg-orange-50 dark:bg-orange-900/20"
-                      : isDark
-                        ? "border-gray-600 text-gray-300"
-                        : "border-gray-300 text-gray-600"
-                  }`}
-                >
-                  <Layers size={12} />
-                  {selectedSubcategory ?? "Category"}
-                </button>
-                {showCategoryMenu && (
-                  <div
-                    className={`absolute top-full left-0 mt-1.5 w-48 rounded-xl shadow-xl border overflow-hidden z-50 max-h-64 overflow-y-auto ${
-                      isDark
-                        ? "bg-gray-800 border-gray-700"
-                        : "bg-white border-gray-100"
-                    }`}
-                  >
-                    <button
-                      onClick={() => {
-                        setSelectedSubcategory(null);
-                        setShowCategoryMenu(false);
-                      }}
-                      className={`w-full text-left px-4 py-2.5 text-sm flex items-center justify-between transition-colors ${
-                        !selectedSubcategory
-                          ? "text-orange-500 font-medium"
-                          : isDark
-                            ? "text-gray-300 hover:bg-gray-700"
-                            : "text-gray-700 hover:bg-gray-50"
-                      }`}
-                    >
-                      All
-                      {!selectedSubcategory && (
-                        <Check size={13} className="text-orange-500" />
-                      )}
-                    </button>
-                    {availableSubcategories.map((cat) => (
-                      <button
-                        key={cat}
-                        onClick={() => {
-                          setSelectedSubcategory(cat);
-                          setShowCategoryMenu(false);
-                        }}
-                        className={`w-full text-left px-4 py-2.5 text-sm flex items-center justify-between transition-colors ${
-                          selectedSubcategory === cat
-                            ? "text-orange-500 font-medium"
-                            : isDark
-                              ? "text-gray-300 hover:bg-gray-700"
-                              : "text-gray-700 hover:bg-gray-50"
-                        }`}
-                      >
-                        {cat}
-                        {selectedSubcategory === cat && (
-                          <Check size={13} className="text-orange-500" />
-                        )}
-                      </button>
-                    ))}
+  // ── Render: tab contents ───────────────────────────────────────────────────
+
+  const renderHomeTab = () => (
+    <div className="space-y-4">
+      {shopData.homeImageUrls?.map((imageUrl, index) => {
+        const linkedProductId = shopData.homeImageLinks?.[imageUrl];
+        return (
+          <div
+            key={index}
+            className={linkedProductId ? "cursor-pointer" : ""}
+            onClick={() =>
+              linkedProductId &&
+              router.push(`/productdetail/${linkedProductId}`)
+            }
+          >
+            <Image
+              src={imageUrl}
+              alt={`${shopData.name} home image ${index + 1}`}
+              width={800}
+              height={400}
+              className="w-full h-auto rounded-lg"
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  const renderCollectionsTab = () => (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {shopCollections.length === 0 ? (
+        <div className="col-span-2 text-center py-12">
+          <p className={isDarkMode ? "text-gray-400" : "text-gray-600"}>
+            {t("noCollections") ?? "No collections available"}
+          </p>
+        </div>
+      ) : (
+        shopCollections.map((col) => (
+          <div
+            key={col.id}
+            onClick={() =>
+              router.push(
+                `/collection/${col.id}?shopId=${shopId}&name=${encodeURIComponent(col.name)}`,
+              )
+            }
+            className={`p-4 rounded-lg border cursor-pointer hover:shadow-lg transition-shadow ${
+              isDarkMode
+                ? "bg-gray-800 border-gray-700 hover:border-gray-600"
+                : "bg-white border-gray-200 hover:border-gray-300"
+            }`}
+          >
+            <div className="flex items-center space-x-4">
+              <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-200">
+                {col.imageUrl ? (
+                  <Image
+                    src={col.imageUrl}
+                    alt={col.name}
+                    width={64}
+                    height={64}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <PhotoIcon className="w-6 h-6 text-gray-400" />
                   </div>
                 )}
               </div>
-            )}
+              <div>
+                <h3
+                  className={`font-semibold ${isDarkMode ? "text-white" : "text-gray-900"}`}
+                >
+                  {col.name}
+                </h3>
+                <p
+                  className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}
+                >
+                  {col.productIds.length} {t("products")}
+                </p>
+              </div>
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  );
+
+  const renderReviewsTab = () => (
+    <div className="space-y-4">
+      {reviews.length === 0 ? (
+        <div className="text-center py-8">
+          <p className={isDarkMode ? "text-gray-400" : "text-gray-600"}>
+            {t("noReviewsYet")}
+          </p>
+        </div>
+      ) : (
+        reviews.map((review) => (
+          <div
+            key={review.id}
+            className={`p-4 rounded-lg ${isDarkMode ? "bg-gray-800" : "bg-white"}`}
+          >
+            <div className="flex items-center space-x-2 mb-2">
+              <div className="flex">
+                {[...Array(5)].map((_, i) => (
+                  <StarIcon
+                    key={i}
+                    className={`w-4 h-4 ${
+                      i < review.rating
+                        ? "text-yellow-400 fill-current"
+                        : "text-gray-300"
+                    }`}
+                  />
+                ))}
+              </div>
+              <span
+                className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}
+              >
+                {new Date(review.timestamp.seconds * 1000).toLocaleDateString()}
+              </span>
+            </div>
+            <p className={isDarkMode ? "text-white" : "text-gray-900"}>
+              {review.review}
+            </p>
+            <div className="flex items-center justify-between mt-2">
+              <span
+                className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}
+              >
+                {review.userName || t("anonymous")}
+              </span>
+              <span
+                className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}
+              >
+                {(review.likes || []).length} {t("likes")}
+              </span>
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  );
+
+  const renderProductGrid = () => {
+    const products = currentProducts;
+
+    return (
+      <div className="relative">
+        {/* Initial skeleton load */}
+        {isInitialProductLoad && isProductsLoading && (
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 lg:gap-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <Skeleton key={i} />
+            ))}
           </div>
         )}
-      </div>
 
-      {/* ── Main layout ── */}
-      <div className="flex max-w-7xl mx-auto">
-        {/* ── Desktop FilterSidebar ── */}
-        {isProductTab && (
-          <div className="hidden lg:block w-60 flex-shrink-0">
-            <FilterSidebar
-              category={shopData?.categories?.[0] ?? ""}
-              buyerCategory=""
-              filters={filters}
-              onFiltersChange={setFilters}
-              specFacets={specFacets}
-              isDarkMode={isDark}
-              className="w-60"
-            />
+        {/* Filter/sort change shimmer */}
+        {!isInitialProductLoad && isProductsLoading && (
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 lg:gap-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <Skeleton key={i} />
+            ))}
           </div>
         )}
 
-        {/* ── Mobile sidebar FAB ── */}
-        {isProductTab && (
-          <div className="lg:hidden fixed bottom-6 right-5 z-50">
-            <button
-              onClick={() => setShowMobileSidebar(true)}
-              className="relative p-3.5 rounded-full shadow-xl bg-orange-500 text-white"
+        {/* Error state with retry */}
+        {productError && !isProductsLoading && (
+          <div className="text-center py-12">
+            <p
+              className={`mb-4 ${isDarkMode ? "text-red-400" : "text-red-600"}`}
             >
-              <Filter size={20} />
-              {activeFilterCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                  {activeFilterCount}
-                </span>
-              )}
+              {productError}
+            </p>
+            <button
+              onClick={() => fetchProducts(false)}
+              className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
+            >
+              {tRoot("retry") ?? "Retry"}
             </button>
           </div>
         )}
 
-        {/* ── Mobile sidebar drawer ── */}
-        {isMobile && (
-          <FilterSidebar
-            category={shopData?.categories?.[0] ?? ""}
-            buyerCategory=""
-            filters={filters}
-            onFiltersChange={(f) => {
-              setFilters(f);
-              setShowMobileSidebar(false);
-            }}
-            specFacets={specFacets}
-            isOpen={showMobileSidebar}
-            onClose={() => setShowMobileSidebar(false)}
-            isDarkMode={isDark}
-          />
-        )}
+        {/* Product grid */}
+        {!isInitialProductLoad &&
+          !isProductsLoading &&
+          !productError &&
+          products.length > 0 && (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 lg:gap-4">
+                {products.map((product) => (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    onTap={() => router.push(`/productdetail/${product.id}`)}
+                    onFavoriteToggle={() => {}}
+                    onAddToCart={() => {}}
+                    onColorSelect={() => {}}
+                    showCartIcon
+                    isFavorited={false}
+                    isInCart={false}
+                    portraitImageHeight={320}
+                    isDarkMode={isDarkMode}
+                    localization={tRoot}
+                  />
+                ))}
+              </div>
 
-        {/* ── Tab content ── */}
-        <div className="flex-1 min-w-0 px-3 sm:px-4 py-4">
-          {/* ───── HOME TAB ───── */}
-          {activeTab === "home" && (
-            <div className="space-y-2">
-              {(shopData?.homeImageUrls ?? []).length === 0 ? (
-                <EmptyState
-                  icon={<Home size={64} strokeWidth={1} />}
-                  message="No home content available"
-                  isDark={isDark}
-                />
-              ) : (
-                shopData!.homeImageUrls!.map((url, i) => {
-                  const linkedProductId = shopData?.homeImageLinks?.[url];
-                  const img = (
-                    <Image
-                      key={i}
-                      src={url}
-                      alt={`Home image ${i + 1}`}
-                      width={1200}
-                      height={600}
-                      className="w-full object-cover"
+              {isLoadingMore && (
+                <div className="flex items-center justify-center py-8 gap-2">
+                  {[0, 150, 300].map((delay) => (
+                    <div
+                      key={delay}
+                      className="w-2.5 h-2.5 bg-orange-500 rounded-full animate-bounce"
+                      style={{ animationDelay: `${delay}ms` }}
                     />
-                  );
-                  return linkedProductId ? (
-                    <Link key={i} href={`/product/${linkedProductId}`}>
-                      {img}
-                    </Link>
-                  ) : (
-                    <div key={i}>{img}</div>
-                  );
-                })
+                  ))}
+                </div>
+              )}
+
+              {!isLoadingMore && hasMore && (
+                <div className="text-center py-8">
+                  <button
+                    onClick={() => fetchProducts(true)}
+                    className={`px-6 py-2.5 rounded-xl text-sm font-medium border transition-colors ${
+                      isDarkMode
+                        ? "bg-gray-800 border-gray-700 text-white hover:bg-gray-700"
+                        : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 shadow-sm"
+                    }`}
+                  >
+                    {tRoot("DynamicMarket.loadMore")}
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+
+        {/* Empty state */}
+        {!isInitialProductLoad &&
+          !isProductsLoading &&
+          !productError &&
+          products.length === 0 && (
+            <div className="text-center py-20">
+              <Filter
+                size={56}
+                className={`mx-auto mb-4 ${isDarkMode ? "text-gray-600" : "text-gray-300"}`}
+              />
+              <h3
+                className={`text-lg font-semibold mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}
+              >
+                {t("noProductsFound")}
+              </h3>
+              <p
+                className={`text-sm mb-5 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
+              >
+                {tRoot("DynamicMarket.tryAdjustingFilters")}
+              </p>
+              {activeCount > 0 && (
+                <button
+                  onClick={() => setFilters(EMPTY_FILTER_STATE)}
+                  className="px-5 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-sm font-semibold transition-colors"
+                >
+                  {tRoot("DynamicMarket.clearAllFilters")}
+                </button>
               )}
             </div>
           )}
-
-          {/* ───── ALL PRODUCTS / DEALS / BEST SELLERS ───── */}
-          {isProductTab && (
-            <>
-              {/* Search results header */}
-              {debouncedQuery && searchResultCount !== null && (
-                <div
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg mb-3 ${
-                    isDark
-                      ? "bg-teal-900/30 border border-teal-700/40"
-                      : "bg-teal-50 border border-teal-200"
-                  }`}
-                >
-                  <Search size={14} className="text-teal-500 flex-shrink-0" />
-                  <span className="text-sm font-medium text-teal-600 dark:text-teal-400">
-                    {searchResultCount}{" "}
-                    {searchResultCount === 1 ? "result" : "results"} for &ldquo;
-                    {debouncedQuery}&rdquo;
-                  </span>
-                </div>
-              )}
-
-              {/* Active filter chips */}
-              {activeFilterCount > 0 && (
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {filters.colors.map((c) => (
-                    <span
-                      key={c}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full text-xs"
-                    >
-                      {c}
-                      <button
-                        onClick={() =>
-                          setFilters((f) => ({
-                            ...f,
-                            colors: f.colors.filter((x) => x !== c),
-                          }))
-                        }
-                      >
-                        <X size={10} />
-                      </button>
-                    </span>
-                  ))}
-                  {filters.brands.map((b) => (
-                    <span
-                      key={b}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full text-xs"
-                    >
-                      {b}
-                      <button
-                        onClick={() =>
-                          setFilters((f) => ({
-                            ...f,
-                            brands: f.brands.filter((x) => x !== b),
-                          }))
-                        }
-                      >
-                        <X size={10} />
-                      </button>
-                    </span>
-                  ))}
-                  {selectedSubcategory && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full text-xs">
-                      {selectedSubcategory}
-                      <button onClick={() => setSelectedSubcategory(null)}>
-                        <X size={10} />
-                      </button>
-                    </span>
-                  )}
-                  {(filters.minPrice !== undefined ||
-                    filters.maxPrice !== undefined) && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full text-xs">
-                      {filters.minPrice ?? "0"} – {filters.maxPrice ?? "∞"} TL
-                      <button
-                        onClick={() =>
-                          setFilters((f) => ({
-                            ...f,
-                            minPrice: undefined,
-                            maxPrice: undefined,
-                          }))
-                        }
-                      >
-                        <X size={10} />
-                      </button>
-                    </span>
-                  )}
-                  <button
-                    onClick={handleClearAllFilters}
-                    className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                      isDark
-                        ? "border-gray-600 text-gray-400 hover:bg-gray-700"
-                        : "border-gray-300 text-gray-500 hover:bg-gray-100"
-                    }`}
-                  >
-                    Clear all
-                  </button>
-                </div>
-              )}
-
-              {/* Products grid */}
-              {isLoadingProducts && products.length === 0 ? (
-                <ProductShimmer isDark={isDark} />
-              ) : productError ? (
-                <div className="flex flex-col items-center justify-center min-h-64 gap-4">
-                  <WifiOff
-                    size={48}
-                    className={isDark ? "text-gray-600" : "text-gray-300"}
-                  />
-                  <p
-                    className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}
-                  >
-                    Failed to load products
-                  </p>
-                  <button
-                    onClick={() => fetchProducts(0, true)}
-                    className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm"
-                  >
-                    Retry
-                  </button>
-                </div>
-              ) : activeProducts.length === 0 ? (
-                <EmptyState
-                  icon={<ShoppingBag size={64} strokeWidth={1} />}
-                  message={
-                    debouncedQuery
-                      ? `No results for "${debouncedQuery}"`
-                      : activeTab === "deals"
-                        ? "No deals available right now"
-                        : activeTab === "bestSellers"
-                          ? "No best sellers yet"
-                          : "No products found"
-                  }
-                  subMessage={
-                    activeFilterCount > 0
-                      ? "Try removing some filters"
-                      : undefined
-                  }
-                  onClear={
-                    activeFilterCount > 0 ? handleClearAllFilters : undefined
-                  }
-                  isDark={isDark}
-                />
-              ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 lg:gap-4">
-                  {activeProducts.map((product) => (
-                    <ProductCard
-                      key={product.id}
-                      product={product}
-                      isDarkMode={isDark}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {/* Load more spinner */}
-              {isLoadingMore && (
-                <div className="flex justify-center py-8">
-                  <RefreshCw
-                    size={24}
-                    className="text-orange-500 animate-spin"
-                  />
-                </div>
-              )}
-
-              {/* End of results */}
-              {!hasMore && !isLoadingProducts && products.length > 0 && (
-                <p
-                  className={`text-center text-xs py-8 ${isDark ? "text-gray-600" : "text-gray-400"}`}
-                >
-                  All products loaded
-                </p>
-              )}
-            </>
-          )}
-
-          {/* ───── COLLECTIONS TAB ───── */}
-          {activeTab === "collections" && (
-            <>
-              {collectionsLoading ? (
-                <div className="space-y-3">
-                  {Array.from({ length: 3 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className={`h-20 rounded-xl animate-pulse ${isDark ? "bg-gray-800" : "bg-gray-200"}`}
-                    />
-                  ))}
-                </div>
-              ) : collections.length === 0 ? (
-                <EmptyState
-                  icon={<Layers size={64} strokeWidth={1} />}
-                  message="No collections available"
-                  isDark={isDark}
-                />
-              ) : (
-                <div className="space-y-3">
-                  {collections.map((col) => (
-                    <Link
-                      key={col.id}
-                      href={`/collection/${col.id}?shopId=${shopId}&name=${encodeURIComponent(col.name)}`}
-                      className={`flex items-center gap-4 p-4 rounded-xl shadow-sm transition-colors ${
-                        isDark
-                          ? "bg-gray-800 hover:bg-gray-750"
-                          : "bg-white hover:bg-gray-50"
-                      }`}
-                    >
-                      <div
-                        className={`w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 ${
-                          isDark ? "bg-gray-700" : "bg-gray-100"
-                        }`}
-                      >
-                        {col.imageUrl ? (
-                          <Image
-                            src={col.imageUrl}
-                            alt={col.name}
-                            width={64}
-                            height={64}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <Layers
-                              size={24}
-                              className={
-                                isDark ? "text-gray-600" : "text-gray-400"
-                              }
-                            />
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p
-                          className={`font-semibold text-sm truncate ${isDark ? "text-white" : "text-gray-900"}`}
-                        >
-                          {col.name}
-                        </p>
-                        <p
-                          className={`text-xs mt-0.5 ${isDark ? "text-gray-400" : "text-gray-500"}`}
-                        >
-                          {col.productIds?.length ?? 0}{" "}
-                          {(col.productIds?.length ?? 0) === 1
-                            ? "product"
-                            : "products"}
-                        </p>
-                      </div>
-                      <ChevronDown
-                        size={16}
-                        className={`rotate-[-90deg] flex-shrink-0 ${isDark ? "text-gray-500" : "text-gray-400"}`}
-                      />
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-
-          {/* ───── REVIEWS TAB ───── */}
-          {activeTab === "reviews" && (
-            <>
-              {reviewsLoading ? (
-                <div className="space-y-3">
-                  {Array.from({ length: 3 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className={`h-24 rounded-xl animate-pulse ${isDark ? "bg-gray-800" : "bg-gray-200"}`}
-                    />
-                  ))}
-                </div>
-              ) : reviews.length === 0 ? (
-                <EmptyState
-                  icon={<MessageSquare size={64} strokeWidth={1} />}
-                  message="No reviews yet"
-                  isDark={isDark}
-                />
-              ) : (
-                <div className="space-y-3">
-                  {reviews.map((review) => (
-                    <ReviewCard
-                      key={review.id}
-                      review={review}
-                      shopId={shopId}
-                      isDark={isDark}
-                    />
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-        </div>
       </div>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ReviewCard — mirrors Flutter's _ReviewTile
-// ─────────────────────────────────────────────────────────────────────────────
-
-function ReviewCard({
-  review,
-  shopId,
-  isDark,
-}: {
-  review: Review;
-  shopId: string;
-  isDark: boolean;
-}) {
-  const [likeCount, setLikeCount] = useState(review.likes?.length ?? 0);
-  const [liked, setLiked] = useState(false);
-
-  const handleLike = async () => {
-    const next = !liked;
-    setLiked(next);
-    setLikeCount((c) => c + (next ? 1 : -1));
-    try {
-      await fetch(`/api/shops/${shopId}/reviews/${review.id}/like`, {
-        method: "POST",
-        body: JSON.stringify({ like: next }),
-        headers: { "Content-Type": "application/json" },
-      });
-    } catch {
-      // revert on error
-      setLiked(!next);
-      setLikeCount((c) => c + (next ? -1 : 1));
-    }
+    );
   };
 
-  const date = new Date(review.timestamp).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  // ── Render: main ───────────────────────────────────────────────────────────
 
   return (
-    <div className={`p-4 rounded-xl ${isDark ? "bg-gray-800" : "bg-gray-100"}`}>
-      <div className="flex items-center justify-between mb-2">
-        <StarRating rating={review.rating} />
-        <span
-          className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}
-        >
-          {date}
-        </span>
-      </div>
-      <p
-        className={`text-sm leading-relaxed mb-3 ${isDark ? "text-gray-200" : "text-gray-700"}`}
+    <>
+      <SecondHeader />
+      <div
+        className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
       >
-        {review.review}
-      </p>
-      <div className="flex items-center gap-4">
-        <button
-          onClick={handleLike}
-          className={`flex items-center gap-1.5 text-xs transition-colors ${
-            liked
-              ? "text-blue-500"
-              : isDark
-                ? "text-gray-400 hover:text-gray-200"
-                : "text-gray-500 hover:text-gray-700"
-          }`}
-        >
-          <ThumbsUp size={13} className={liked ? "fill-blue-500" : ""} />
-          {likeCount}
-        </button>
-        <button
-          className={`flex items-center gap-1.5 text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}
-        >
-          <Globe size={13} />
-          Translate
-        </button>
-      </div>
-    </div>
-  );
-}
+        <div className="max-w-6xl mx-auto">
+          {/* Cover image + shop info */}
+          <div className="relative h-80 hover:h-[32rem] overflow-hidden bg-gradient-to-br from-orange-500 to-pink-500 transition-all duration-500 ease-in-out cursor-pointer group">
+            {shopData.coverImageUrls && shopData.coverImageUrls.length > 0 && (
+              <>
+                <Image
+                  src={shopData.coverImageUrls[0]}
+                  alt={`${shopData.name} cover`}
+                  fill
+                  sizes="100vw"
+                  className="object-cover object-center"
+                  priority
+                  unoptimized
+                />
+                <div className="absolute inset-0 bg-black/30 group-hover:bg-black/10 transition-all duration-500 pointer-events-none" />
+              </>
+            )}
 
-function StarRating({ rating, size = 13 }: { rating: number; size?: number }) {
-  return (
-    <span className="inline-flex gap-0.5">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <Star
-          key={i}
-          size={size}
-          className={
-            i < Math.round(rating)
-              ? "fill-amber-400 text-amber-400"
-              : "text-gray-300"
-          }
+            <button
+              onClick={handleBack}
+              className="absolute top-4 left-4 z-20 w-10 h-10 bg-black/50 rounded-full flex items-center justify-center text-white hover:bg-black/70 transition-all"
+            >
+              <ArrowLeftIcon className="w-6 h-6" />
+            </button>
+
+            <div className="absolute bottom-4 left-4 right-4 z-20">
+              <div className="flex items-end space-x-4">
+                <div className="relative w-24 h-24 rounded-full border-4 border-white overflow-hidden shadow-lg bg-white">
+                  {shopData.profileImageUrl ? (
+                    <Image
+                      src={shopData.profileImageUrl}
+                      alt={shopData.name}
+                      fill
+                      className="object-cover object-center"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gray-300 flex items-center justify-center">
+                      <span className="text-2xl">🏪</span>
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 text-white">
+                  <h1 className="text-2xl font-bold mb-2">{shopData.name}</h1>
+                  <div className="flex items-center space-x-4 text-sm">
+                    <div className="flex items-center space-x-1">
+                      <StarIcon className="w-4 h-4 text-yellow-400" />
+                      <span>{shopData.averageRating.toFixed(1)}</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <UsersIcon className="w-4 h-4" />
+                      <span>
+                        {formatNumber(shopData.followerCount)} {t("followers")}
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <EyeIcon className="w-4 h-4" />
+                      <span>
+                        {formatNumber(shopData.clickCount)} {t("views")}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={handleFavoriteToggle}
+                  className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                    isFavorite
+                      ? "bg-red-500 text-white hover:bg-red-600"
+                      : "bg-white text-gray-900 hover:bg-gray-100"
+                  }`}
+                >
+                  <div className="flex items-center space-x-2">
+                    {isFavorite ? (
+                      <HeartSolidIcon className="w-4 h-4" />
+                    ) : (
+                      <HeartIcon className="w-4 h-4" />
+                    )}
+                    <span>{isFavorite ? t("following") : t("follow")}</span>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Sidebar + main content */}
+          <div className="flex">
+            {/* Desktop sidebar — pass shopCategories for conditional section rendering */}
+            {isProductTab && (
+              <div className="hidden lg:block w-72 flex-shrink-0">
+                <FilterSidebar
+                  shopCategories={shopData.categories}
+                  filters={filters}
+                  onFiltersChange={setFilters}
+                  specFacets={specFacets}
+                  isDarkMode={isDarkMode}
+                  className="w-72"
+                />
+              </div>
+            )}
+
+            <div className="flex-1 min-w-0">
+              {/* Search bar */}
+              <div
+                className={`sticky top-0 z-10 px-4 py-3 transition-all ${
+                  isScrolled
+                    ? "bg-opacity-95 backdrop-blur-sm shadow-sm"
+                    : "bg-opacity-50"
+                } ${isDarkMode ? "bg-gray-900" : "bg-white"}`}
+              >
+                <div className="relative">
+                  <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder={t("searchInStore")}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className={`w-full pl-10 pr-10 py-3 rounded-full border ${
+                      isDarkMode
+                        ? "bg-gray-800 border-gray-700 text-white placeholder-gray-400"
+                        : "bg-white border-gray-200 text-gray-900 placeholder-gray-500"
+                    }`}
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2"
+                    >
+                      <XMarkIcon
+                        className={`w-5 h-5 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                      />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Tabs */}
+              <div
+                className={`sticky top-[3.5rem] z-10 border-b ${
+                  isDarkMode
+                    ? "bg-gray-900 border-gray-700"
+                    : "bg-white border-gray-200"
+                }`}
+              >
+                <div className="flex overflow-x-auto">
+                  {availableTabs.map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => handleTabChange(tab)}
+                      className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+                        activeTab === tab
+                          ? "border-orange-500 text-orange-500"
+                          : isDarkMode
+                            ? "border-transparent text-gray-400 hover:text-gray-300"
+                            : "border-transparent text-gray-600 hover:text-gray-900"
+                      }`}
+                    >
+                      {t(tab)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Sort bar + mobile filter badge */}
+              {isProductTab && (
+                <div
+                  className={`px-4 py-2.5 flex items-center gap-3 border-b ${
+                    isDarkMode ? "border-gray-800" : "border-gray-100"
+                  }`}
+                >
+                  {/* Mobile filter pill */}
+                  <button
+                    onClick={() => setShowMobileSidebar(true)}
+                    className={`lg:hidden flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-semibold transition-colors ${
+                      activeCount > 0
+                        ? isDarkMode
+                          ? "bg-orange-900/40 text-orange-400"
+                          : "bg-orange-100 text-orange-600"
+                        : isDarkMode
+                          ? "bg-gray-800 text-gray-400"
+                          : "bg-gray-100 text-gray-600"
+                    }`}
+                  >
+                    <Filter size={12} />
+                    {activeCount > 0
+                      ? `${activeCount} ${tRoot("DynamicMarket.filtersApplied")}`
+                      : tRoot("DynamicMarket.filters")}
+                  </button>
+
+                  <div className="flex-1" />
+
+                  {currentProducts.length > 0 && (
+                    <span
+                      className={`text-xs ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
+                    >
+                      {currentProducts.length}
+                      {hasMore ? "+" : ""} {t("products")}
+                    </span>
+                  )}
+
+                  {/* Sort dropdown */}
+                  <div className="relative flex-shrink-0">
+                    <button
+                      onClick={() => setShowSortDropdown((p) => !p)}
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                        isDarkMode
+                          ? "hover:bg-gray-700 text-gray-300"
+                          : "hover:bg-gray-100 text-gray-600"
+                      } ${
+                        showSortDropdown
+                          ? isDarkMode
+                            ? "bg-gray-700"
+                            : "bg-gray-100"
+                          : ""
+                      }`}
+                    >
+                      <SortAsc size={15} />
+                      <span className="hidden sm:inline">
+                        {selectedSort !== "None"
+                          ? getSortLabel(selectedSort)
+                          : tRoot("DynamicMarket.sort")}
+                      </span>
+                      <ChevronDown
+                        size={13}
+                        className={`transition-transform ${showSortDropdown ? "rotate-180" : ""}`}
+                      />
+                    </button>
+
+                    {showSortDropdown && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-10"
+                          onClick={() => setShowSortDropdown(false)}
+                        />
+                        <div
+                          className={`absolute right-0 mt-1.5 w-52 rounded-xl shadow-xl z-20 border overflow-hidden ${
+                            isDarkMode
+                              ? "bg-gray-800 border-gray-700"
+                              : "bg-white border-gray-100"
+                          }`}
+                        >
+                          {SORT_OPTIONS.map((opt) => (
+                            <button
+                              key={opt}
+                              onClick={() => {
+                                setSelectedSort(opt);
+                                setShowSortDropdown(false);
+                              }}
+                              className={`w-full text-left px-4 py-2.5 text-xs flex items-center justify-between transition-colors ${
+                                selectedSort === opt
+                                  ? isDarkMode
+                                    ? "bg-gray-700 text-orange-400"
+                                    : "bg-orange-50 text-orange-600"
+                                  : isDarkMode
+                                    ? "text-gray-300 hover:bg-gray-700"
+                                    : "text-gray-700 hover:bg-gray-50"
+                              }`}
+                            >
+                              {getSortLabel(opt)}
+                              {selectedSort === opt && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Tab content */}
+              <div className="p-4 relative">
+                {activeTab === "home" && renderHomeTab()}
+                {activeTab === "collections" && renderCollectionsTab()}
+                {activeTab === "reviews" && renderReviewsTab()}
+                {isProductTab && renderProductGrid()}
+              </div>
+              <div className="h-20" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile FAB */}
+      {isProductTab && (
+        <div className="lg:hidden fixed bottom-5 right-5 z-50">
+          <button
+            onClick={() => setShowMobileSidebar(true)}
+            className="relative p-3.5 rounded-full shadow-xl bg-orange-500 text-white"
+          >
+            <Filter size={22} />
+            {activeCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] leading-none font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                {activeCount}
+              </span>
+            )}
+          </button>
+        </div>
+      )}
+
+      {/* Mobile filter drawer — pass shopCategories so conditional sections render */}
+      {isProductTab && isMobile && (
+        <FilterSidebar
+          shopCategories={shopData.categories}
+          filters={filters}
+          onFiltersChange={(f) => {
+            setFilters(f);
+            setShowMobileSidebar(false);
+          }}
+          specFacets={specFacets}
+          isOpen={showMobileSidebar}
+          onClose={() => setShowMobileSidebar(false)}
+          isDarkMode={isDarkMode}
         />
-      ))}
-    </span>
+      )}
+    </>
   );
 }

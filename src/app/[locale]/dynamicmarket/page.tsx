@@ -468,7 +468,8 @@ export default function DynamicMarketPage() {
       }
 
       // Create new abort controller
-      abortControllerRef.current = new AbortController();
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
 
       try {
         if (!append) {
@@ -506,7 +507,7 @@ export default function DynamicMarketPage() {
         params.set("sort", "date");
 
         const response = await fetch(`/api/dynamicmarket?${params}`, {
-          signal: abortControllerRef.current.signal,
+          signal: controller.signal,
         });
 
         if (!response.ok) {
@@ -528,7 +529,6 @@ export default function DynamicMarketPage() {
           isFirstLoadRef.current = false;
         }
 
-        // ✅ CRITICAL FIX: Set loading states AFTER products are updated
         setLoading(false);
         setLoadingMore(false);
       } catch (err) {
@@ -539,9 +539,11 @@ export default function DynamicMarketPage() {
         setError(
           err instanceof Error ? err.message : "Failed to fetch products"
         );
-        // ✅ Set loading states in catch block too
-        setLoading(false);
-        setLoadingMore(false);
+        // Only clear loading states if this request wasn't superseded
+        if (!controller.signal.aborted) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
       }
     },
     [category, subcategory, subsubcategory, filters]

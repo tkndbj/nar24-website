@@ -1,17 +1,8 @@
 // src/app/api/fetchDynamicProducts/route.ts
-//
-// ═══════════════════════════════════════════════════════════════════════════
-// DYNAMIC PRODUCTS API — PRODUCTION OPTIMIZED
-//
-// Additions vs previous version:
-//  • Parses `spec_${field}` query params → applies as Typesense facet filters
-//  • Parses `minRating` → numeric filter on averageRating
-//  • Fetches specFacets from Typesense and includes them in the response
-//    (only on page 0, so the sidebar populates on first load)
-// ═══════════════════════════════════════════════════════════════════════════
 
 import { NextRequest, NextResponse } from "next/server";
 import { getFirestoreAdmin } from "@/lib/firebase-admin";
+import { FieldPath } from "firebase-admin/firestore";
 import type { Query, QuerySnapshot } from "firebase-admin/firestore";
 import { Product, ProductUtils } from "@/app/models/Product";
 import TypeSenseServiceManager from "@/lib/typesense_service_manager";
@@ -23,7 +14,6 @@ import type { FacetCount } from "@/app/components/FilterSideBar";
 
 const CONFIG = {
   DEFAULT_LIMIT: 20,
-  MAX_ARRAY_FILTER_SIZE: 10,
   CACHE_TTL: 2 * 60 * 1000,
   STALE_TTL: 5 * 60 * 1000,
   MAX_CACHE_SIZE: 200,
@@ -31,7 +21,6 @@ const CONFIG = {
   REQUEST_TIMEOUT: 10_000,
   MAX_RETRIES: 2,
   BASE_RETRY_DELAY: 100,
-  // Facet cache
   FACET_CACHE_TTL: 5 * 60 * 1000,
   MAX_FACET_CACHE: 50,
 } as const;
@@ -40,7 +29,6 @@ const CONFIG = {
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Generic spec filter: field → selected values (from spec_${field} params) */
 type SpecFilters = Record<string, string[]>;
 
 interface ApiResponse {
@@ -49,7 +37,6 @@ interface ApiResponse {
   hasMore: boolean;
   page: number;
   total: number;
-  /** Only populated on page 0 */
   specFacets?: Record<string, FacetCount[]>;
   source?: "cache" | "stale" | "dedupe" | "fresh";
   timing?: number;
@@ -74,15 +61,12 @@ interface QueryParams {
   buyerCategory: string | null;
   buyerSubcategory: string | null;
   sortOption: string;
-  quickFilter: string | null;
   brands: string[];
   colors: string[];
   filterSubcategories: string[];
-  /** NEW: parsed from spec_${field} query params */
   specFilters: SpecFilters;
   minPrice: number | null;
   maxPrice: number | null;
-  /** NEW: minimum star rating */
   minRating: number | null;
   page: number;
 }
@@ -123,7 +107,6 @@ function generateCacheKey(p: QueryParams): string {
     bc: p.buyerCategory || "",
     bsc: p.buyerSubcategory || "",
     so: p.sortOption,
-    qf: p.quickFilter || "",
     br: p.brands.sort().join(","),
     col: p.colors.sort().join(","),
     fsc: p.filterSubcategories.sort().join(","),
@@ -191,7 +174,7 @@ function cleanupCache(): void {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Spec-facet cache (Typesense)
+// Spec-facet cache
 // ─────────────────────────────────────────────────────────────────────────────
 
 const facetCache = new Map<
@@ -216,6 +199,7 @@ async function fetchSpecFacets(
   }
 
   try {
+    // Build same category filters Flutter uses for facet fetch
     const facetFilters: string[][] = [];
     if (firestoreCategory)
       facetFilters.push([`category_en:${firestoreCategory}`]);
@@ -232,7 +216,6 @@ async function fetchSpecFacets(
         facetFilters,
       });
 
-    // Prune cache
     if (facetCache.size >= CONFIG.MAX_FACET_CACHE) {
       const oldest = Array.from(facetCache.entries()).sort(
         (a, b) => a[1].ts - b[1].ts,
@@ -291,11 +274,10 @@ async function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function extractQueryParams(sp: URLSearchParams): QueryParams {
-  // Collect all spec_* params
   const specFilters: SpecFilters = {};
   sp.forEach((value, key) => {
     if (key.startsWith("spec_")) {
-      const field = key.slice(5); // strip "spec_"
+      const field = key.slice(5);
       const vals = value.split(",").filter(Boolean);
       if (vals.length > 0) specFilters[field] = vals;
     }
@@ -309,7 +291,6 @@ function extractQueryParams(sp: URLSearchParams): QueryParams {
     buyerSubcategory: sp.get("buyerSubcategory"),
     page: Math.max(0, parseInt(sp.get("page") || "0", 10)),
     sortOption: sp.get("sort") || "date",
-    quickFilter: sp.get("filter"),
     filterSubcategories:
       sp.get("filterSubcategories")?.split(",").filter(Boolean) ?? [],
     colors: sp.get("colors")?.split(",").filter(Boolean) ?? [],
@@ -322,7 +303,7 @@ function extractQueryParams(sp: URLSearchParams): QueryParams {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Product parsing
+// Product parsing (Firestore)
 // ─────────────────────────────────────────────────────────────────────────────
 
 function parseProducts(snapshot: QuerySnapshot): Product[] {
@@ -341,10 +322,31 @@ function parseProducts(snapshot: QuerySnapshot): Product[] {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Query builders
+// Backend decision (mirrors Flutter's _decideBackend exactly)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function buildProductsQuery(
+function decideBackend(p: QueryParams): "firestore" | "typesense" {
+  if (p.sortOption !== "date") return "typesense";
+  if (
+    p.brands.length > 0 ||
+    p.colors.length > 0 ||
+    p.filterSubcategories.length > 0 ||
+    Object.keys(p.specFilters).length > 0 ||
+    p.minPrice !== null ||
+    p.maxPrice !== null ||
+    p.minRating !== null
+  )
+    return "typesense";
+  return "firestore";
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Firestore query (mirrors Flutter's _buildFirestoreQuery exactly)
+// Only category/subcategory/subsubcategory/gender — nothing else.
+// Always ordered by promotionScore DESC, documentId ASC.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function buildFirestoreQuery(
   p: QueryParams,
   firestoreCategory: string | null,
 ): Query {
@@ -354,137 +356,86 @@ function buildProductsQuery(
   if (firestoreCategory) q = q.where("category", "==", firestoreCategory);
   if (p.subcategory) q = q.where("subcategory", "==", p.subcategory);
   if (p.subsubcategory) q = q.where("subsubcategory", "==", p.subsubcategory);
-
   if (p.buyerCategory === "Women" || p.buyerCategory === "Men") {
     q = q.where("gender", "in", [p.buyerCategory, "Unisex"]);
   }
 
-  // Multi-value Firestore filters (respect 10-item limit)
-  if (p.filterSubcategories.length > 0)
-    q = q.where(
-      "subsubcategory",
-      "in",
-      p.filterSubcategories.slice(0, CONFIG.MAX_ARRAY_FILTER_SIZE),
-    );
-  if (p.brands.length > 0)
-    q = q.where(
-      "brandModel",
-      "in",
-      p.brands.slice(0, CONFIG.MAX_ARRAY_FILTER_SIZE),
-    );
-  if (p.colors.length > 0)
-    q = q.where(
-      "availableColors",
-      "array-contains-any",
-      p.colors.slice(0, CONFIG.MAX_ARRAY_FILTER_SIZE),
-    );
+  q = q
+    .orderBy("promotionScore", "desc")
+    .orderBy(FieldPath.documentId(), "asc");
 
-  // Price
-  if (p.minPrice !== null) q = q.where("price", ">=", p.minPrice);
-  if (p.maxPrice !== null) q = q.where("price", "<=", p.maxPrice);
-
-  // Rating (NEW)
-  if (p.minRating !== null) q = q.where("averageRating", ">=", p.minRating);
-
-  // Spec filters — each field applied as equality / array-contains
-  // Note: Firestore can only do one array-contains per query; spec filters
-  // work best via Typesense. Here we apply the first spec field if present,
-  // and route to Typesense when multiple spec fields are selected (see
-  // _decideBackend equivalent in the helper below).
-  const specEntries = Object.entries(p.specFilters);
-  if (specEntries.length === 1) {
-    const [field, vals] = specEntries[0];
-    if (vals.length === 1) {
-      q = q.where(field, "==", vals[0]);
-    } else if (vals.length > 1) {
-      q = q.where(field, "in", vals.slice(0, CONFIG.MAX_ARRAY_FILTER_SIZE));
-    }
+  // Offset pagination for pages beyond the first
+  if (p.page > 0) {
+    q = q.offset(p.page * CONFIG.DEFAULT_LIMIT);
   }
-  // Multiple spec fields → handled by Typesense path (specFilters passed to TS below)
-
-  // Quick filter
-  q = applyQuickFilter(q, p.quickFilter);
-
-  // Sort
-  q = applySorting(q, p.sortOption, p.quickFilter);
 
   return q.limit(CONFIG.DEFAULT_LIMIT);
 }
 
-function applyQuickFilter(q: Query, qf: string | null): Query {
-  if (!qf) return q;
-  switch (qf) {
-    case "deals":
-      return q.where("discountPercentage", ">", 0);
-    case "boosted":
-      return q.where("isBoosted", "==", true);
-    case "trending":
-      return q.where("dailyClickCount", ">=", 10);
-    case "fiveStar":
-      return q.where("averageRating", "==", 5);
-    default:
-      return q;
-  }
-}
-
-function applySorting(q: Query, sort: string, qf: string | null): Query {
-  if (qf === "bestSellers")
-    return q.orderBy("isBoosted", "desc").orderBy("purchaseCount", "desc");
-  switch (sort) {
-    case "alphabetical":
-      return q.orderBy("isBoosted", "desc").orderBy("productName", "asc");
-    case "price_asc":
-      return q.orderBy("isBoosted", "desc").orderBy("price", "asc");
-    case "price_desc":
-      return q.orderBy("isBoosted", "desc").orderBy("price", "desc");
-    default:
-      return q.orderBy("promotionScore", "desc").orderBy("createdAt", "desc");
-  }
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
-// Boosted products fetcher
+// Typesense fetch (mirrors Flutter's _fetchPageFromTypeSense exactly)
+// Parses products directly from hits — no Firestore round-trip.
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function fetchBoostedProducts(params: {
-  category: string;
-  subsubcategory: string;
-  buyerCategory: string | null;
-  brands: string[];
-  colors: string[];
-  filterSubcategories: string[];
-  minPrice: number | null;
-  maxPrice: number | null;
-}): Promise<Product[]> {
-  const db = getFirestoreAdmin();
-  let q: Query = db
-    .collection("shop_products")
-    .where("isBoosted", "==", true)
-    .where("category", "==", params.category)
-    .where("subsubcategory", "==", params.subsubcategory);
+async function fetchFromTypesense(
+  p: QueryParams,
+  firestoreCategory: string | null,
+): Promise<{ products: Product[]; hasMore: boolean }> {
+  // Build facet filter groups (mirrors Flutter's _buildTypeSenseFacetFilters)
+  const facetFilters: string[][] = [];
 
-  if (params.buyerCategory === "Women" || params.buyerCategory === "Men")
-    q = q.where("gender", "in", [params.buyerCategory, "Unisex"]);
-  if (
-    params.brands.length > 0 &&
-    params.brands.length <= CONFIG.MAX_ARRAY_FILTER_SIZE
-  )
-    q = q.where("brandModel", "in", params.brands);
-  if (
-    params.colors.length > 0 &&
-    params.colors.length <= CONFIG.MAX_ARRAY_FILTER_SIZE
-  )
-    q = q.where("availableColors", "array-contains-any", params.colors);
-  if (
-    params.filterSubcategories.length > 0 &&
-    params.filterSubcategories.length <= CONFIG.MAX_ARRAY_FILTER_SIZE
-  )
-    q = q.where("subsubcategory", "in", params.filterSubcategories);
-  if (params.minPrice !== null) q = q.where("price", ">=", params.minPrice);
-  if (params.maxPrice !== null) q = q.where("price", "<=", params.maxPrice);
+  if (firestoreCategory)
+    facetFilters.push([`category_en:${firestoreCategory}`]);
+  if (p.subcategory) facetFilters.push([`subcategory_en:${p.subcategory}`]);
+  if (p.subsubcategory)
+    facetFilters.push([`subsubcategory_en:${p.subsubcategory}`]);
 
-  q = q.orderBy("promotionScore", "desc").limit(20);
-  return parseProducts(await q.get());
+  // Gender: Women OR Unisex / Men OR Unisex (mirrors Flutter)
+  if (p.buyerCategory === "Women" || p.buyerCategory === "Men") {
+    facetFilters.push([`gender:${p.buyerCategory}`, "gender:Unisex"]);
+  }
+
+  // Dynamic filters — each is its own AND group, OR within the group
+  if (p.brands.length > 0)
+    facetFilters.push(p.brands.map((b) => `brandModel:${b}`));
+  if (p.colors.length > 0)
+    facetFilters.push(p.colors.map((c) => `availableColors:${c}`));
+  if (p.filterSubcategories.length > 0)
+    facetFilters.push(
+      p.filterSubcategories.map((s) => `subsubcategory_en:${s}`),
+    );
+
+  // Spec filters: each field is its own AND group (mirrors Flutter)
+  for (const [field, vals] of Object.entries(p.specFilters)) {
+    if (vals.length > 0) facetFilters.push(vals.map((v) => `${field}:${v}`));
+  }
+
+  // Numeric filters (mirrors Flutter's _buildTypeSenseNumericFilters)
+  const numericFilters: string[] = [];
+  if (p.minPrice !== null)
+    numericFilters.push(`price>=${Math.floor(p.minPrice)}`);
+  if (p.maxPrice !== null)
+    numericFilters.push(`price<=${Math.ceil(p.maxPrice)}`);
+  if (p.minRating !== null)
+    numericFilters.push(`averageRating>=${p.minRating}`);
+
+  const res =
+    await TypeSenseServiceManager.instance.shopService.searchIdsWithFacets({
+      indexName: "shop_products",
+      page: p.page,
+      hitsPerPage: CONFIG.DEFAULT_LIMIT,
+      facetFilters,
+      numericFilters,
+      sortOption: p.sortOption,
+    });
+
+  // Parse directly from Typesense hits — no Firestore round-trip
+  const products = res.hits.map((hit) =>
+    ProductUtils.fromJson({ ...hit, id: hit.objectID || hit.id }),
+  );
+
+  // hasMore: page-based (mirrors Flutter: res.page < res.nbPages - 1)
+  return { products, hasMore: res.page < res.nbPages - 1 };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -500,33 +451,23 @@ async function fetchDynamicProductsData(
     ? (CATEGORY_MAPPING[params.category] ?? params.category)
     : null;
 
-  const shouldFetchBoosted =
-    !params.quickFilter && firestoreCategory && params.subsubcategory;
+  const backend = decideBackend(params);
 
-  // Fetch products + boosted + (page 0 only) spec facets in parallel
-  const [products, boostedProducts, specFacets] = await Promise.all([
-    withRetry(async () => {
-      const snap = await buildProductsQuery(params, firestoreCategory).get();
-      return parseProducts(snap);
-    }),
+  const [{ products, hasMore }, specFacets] = await Promise.all([
+    backend === "typesense"
+      ? fetchFromTypesense(params, firestoreCategory)
+      : withRetry(async () => {
+          const snap = await buildFirestoreQuery(
+            params,
+            firestoreCategory,
+          ).get();
+          const products = parseProducts(snap);
+          return {
+            products,
+            hasMore: products.length >= CONFIG.DEFAULT_LIMIT,
+          };
+        }),
 
-    shouldFetchBoosted
-      ? fetchBoostedProducts({
-          category: firestoreCategory!,
-          subsubcategory: params.subsubcategory!,
-          buyerCategory: params.buyerCategory,
-          brands: params.brands,
-          colors: params.colors,
-          filterSubcategories: params.filterSubcategories,
-          minPrice: params.minPrice,
-          maxPrice: params.maxPrice,
-        }).catch((e) => {
-          console.error("[fetchDynamicProducts] boosted error:", e);
-          return [];
-        })
-      : Promise.resolve([] as Product[]),
-
-    // Spec facets only on page 0 (sidebar initial population)
     params.page === 0
       ? fetchSpecFacets(params, firestoreCategory)
       : Promise.resolve({} as Record<string, FacetCount[]>),
@@ -534,8 +475,8 @@ async function fetchDynamicProductsData(
 
   return {
     products,
-    boostedProducts,
-    hasMore: products.length >= CONFIG.DEFAULT_LIMIT,
+    boostedProducts: [], // Always empty — promotionScore ordering handles this
+    hasMore,
     page: params.page,
     total: products.length,
     specFacets: params.page === 0 ? specFacets : undefined,
@@ -578,7 +519,6 @@ export async function GET(request: NextRequest) {
       ...extra,
     });
 
-    // ── 1. Cache HIT (fresh) ─────────────────────────────────────────────
     if (cached.status === "fresh") {
       return NextResponse.json(
         { ...cached.data, source: "cache" },
@@ -586,7 +526,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // ── 2. Deduplicate in-flight request ─────────────────────────────────
     const pending = pendingRequests.get(cacheKey);
     if (pending) {
       if (cached.status === "stale" && cached.data) {
@@ -606,7 +545,6 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // ── 3. Stale-while-revalidate ─────────────────────────────────────────
     if (cached.status === "stale" && cached.data) {
       revalidateInBackground(cacheKey, params);
       return NextResponse.json(
@@ -615,7 +553,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // ── 4. Fresh fetch ────────────────────────────────────────────────────
     const fetchPromise = fetchDynamicProductsData(params);
     pendingRequests.set(cacheKey, fetchPromise);
 
@@ -675,10 +612,6 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Cache management endpoints (unchanged)
-// ─────────────────────────────────────────────────────────────────────────────
 
 export async function DELETE() {
   const prev = responseCache.size;

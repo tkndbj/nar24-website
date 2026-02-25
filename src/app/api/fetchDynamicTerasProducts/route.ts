@@ -1,19 +1,9 @@
 // src/app/api/fetchDynamicTerasProducts/route.ts
 //
-// ═══════════════════════════════════════════════════════════════════════════
-// DYNAMIC TERAS PRODUCTS API - PRODUCTION OPTIMIZED
-// ═══════════════════════════════════════════════════════════════════════════
-//
-// OPTIMIZATIONS:
-// 1. Request Deduplication - Prevents duplicate in-flight requests
-// 2. Retry with Exponential Backoff - Handles transient Firestore failures
-// 3. Stale-While-Revalidate Caching - Fast responses with background refresh
-// 4. Request Timeout - Prevents hanging requests
-// 5. Graceful Degradation - Boosted products failure doesn't break main query
-// 6. Reduced Logging - Production-appropriate logging levels
-// 7. LRU Cache with Smart Eviction - Memory-efficient caching
-//
-// ═══════════════════════════════════════════════════════════════════════════
+// Dynamic Teras Products API
+// - Initial load (no filters, default sort) → Firestore `products` collection
+// - Filtering / sorting → Typesense `products` index via mainService
+// - Spec facets fetched from Typesense on page 0
 
 import { NextRequest, NextResponse } from "next/server";
 import {
@@ -31,30 +21,33 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Product, ProductUtils } from "@/app/models/Product";
+import TypeSenseServiceManager from "@/lib/typesense_service_manager";
+import type { FacetCount } from "@/app/components/FilterSideBar";
 
-// ============= CONFIGURATION =============
+// ─────────────────────────────────────────────────────────────────────────────
+// Configuration
+// ─────────────────────────────────────────────────────────────────────────────
 
 const CONFIG = {
-  // Pagination
   DEFAULT_LIMIT: 20,
   MAX_ARRAY_FILTER_SIZE: 10,
-  BOOSTED_LIMIT: 20,
-
-  // Caching
-  CACHE_TTL: 2 * 60 * 1000, // 2 minutes - fresh
-  STALE_TTL: 5 * 60 * 1000, // 5 minutes - stale but usable
+  CACHE_TTL: 2 * 60 * 1000,
+  STALE_TTL: 5 * 60 * 1000,
   MAX_CACHE_SIZE: 200,
-
-  // Resilience
-  REQUEST_TIMEOUT: 12000, // 12 seconds
+  CACHE_CLEANUP_THRESHOLD: 0.9,
+  REQUEST_TIMEOUT: 12_000,
   MAX_RETRIES: 2,
   BASE_RETRY_DELAY: 100,
-
-  // Logging
+  FACET_CACHE_TTL: 5 * 60 * 1000,
+  MAX_FACET_CACHE: 50,
   DEBUG: process.env.NODE_ENV === "development",
 } as const;
 
-// ============= TYPES =============
+// ─────────────────────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+type SpecFilters = Record<string, string[]>;
 
 interface ApiResponse {
   products: Product[];
@@ -62,6 +55,7 @@ interface ApiResponse {
   hasMore: boolean;
   page: number;
   total: number;
+  specFacets?: Record<string, FacetCount[]>;
   source?: "cache" | "stale" | "dedupe" | "fresh";
   timing?: number;
 }
@@ -89,15 +83,19 @@ interface QueryParams {
   filterSubcategories: string[];
   colors: string[];
   brands: string[];
+  specFilters: SpecFilters;
   minPrice: number | null;
   maxPrice: number | null;
+  minRating: number | null;
   page: number;
   filterBuyerCategory: string | null;
   filterBuyerSubcategory: string | null;
   filterBuyerSubSubcategory: string | null;
 }
 
-// ============= CATEGORY MAPPINGS =============
+// ─────────────────────────────────────────────────────────────────────────────
+// Category mappings
+// ─────────────────────────────────────────────────────────────────────────────
 
 const URL_TO_FIRESTORE_CATEGORY: Record<string, string> = {
   "clothing-fashion": "Clothing & Fashion",
@@ -145,238 +143,246 @@ const DIRECT_CATEGORY_MAP: Record<string, string> = {
   "Health & Wellness": "Health & Wellness",
 };
 
-// ============= REQUEST DEDUPLICATION =============
+// ─────────────────────────────────────────────────────────────────────────────
+// Request deduplication + caching
+// ─────────────────────────────────────────────────────────────────────────────
 
 const pendingRequests = new Map<string, Promise<ApiResponse>>();
-
-// ============= RESPONSE CACHING =============
-
 const responseCache = new Map<string, CacheEntry>();
 
-function generateCacheKey(params: QueryParams): string {
+function generateCacheKey(p: QueryParams): string {
   return JSON.stringify({
-    c: params.category || "",
-    sc: params.subcategory || "",
-    ssc: params.subsubcategory || "",
-    bc: params.buyerCategory || "",
-    bsc: params.buyerSubcategory || "",
-    so: params.sortOption,
-    qf: params.quickFilter || "",
-    fsc: params.filterSubcategories.sort().join(","),
-    col: params.colors.sort().join(","),
-    br: params.brands.sort().join(","),
-    minP: params.minPrice ?? "",
-    maxP: params.maxPrice ?? "",
-    p: params.page,
-    fbc: params.filterBuyerCategory || "",
-    fbsc: params.filterBuyerSubcategory || "",
-    fbssc: params.filterBuyerSubSubcategory || "",
+    c: p.category || "",
+    sc: p.subcategory || "",
+    ssc: p.subsubcategory || "",
+    bc: p.buyerCategory || "",
+    bsc: p.buyerSubcategory || "",
+    so: p.sortOption,
+    qf: p.quickFilter || "",
+    fsc: p.filterSubcategories.sort().join(","),
+    col: p.colors.sort().join(","),
+    br: p.brands.sort().join(","),
+    sf: JSON.stringify(
+      Object.fromEntries(
+        Object.entries(p.specFilters).map(([k, v]) => [k, [...v].sort()]),
+      ),
+    ),
+    minP: p.minPrice ?? "",
+    maxP: p.maxPrice ?? "",
+    minR: p.minRating ?? "",
+    pg: p.page,
+    fbc: p.filterBuyerCategory || "",
+    fbsc: p.filterBuyerSubcategory || "",
+    fbssc: p.filterBuyerSubSubcategory || "",
   });
 }
 
-function getCachedResponse(cacheKey: string): CacheResult {
-  const entry = responseCache.get(cacheKey);
-
-  if (!entry) {
-    return { data: null, status: "miss" };
-  }
-
-  const now = Date.now();
-  const age = now - entry.timestamp;
-
-  // Update LRU stats
+function getCachedResponse(key: string): CacheResult {
+  const entry = responseCache.get(key);
+  if (!entry) return { data: null, status: "miss" };
+  const age = Date.now() - entry.timestamp;
   entry.accessCount++;
-  entry.lastAccess = now;
-
-  if (age <= CONFIG.CACHE_TTL) {
-    return { data: entry.data, status: "fresh" };
-  }
-
-  if (age <= CONFIG.STALE_TTL) {
-    return { data: entry.data, status: "stale" };
-  }
-
-  responseCache.delete(cacheKey);
+  entry.lastAccess = Date.now();
+  if (age <= CONFIG.CACHE_TTL) return { data: entry.data, status: "fresh" };
+  if (age <= CONFIG.STALE_TTL) return { data: entry.data, status: "stale" };
+  responseCache.delete(key);
   return { data: null, status: "expired" };
 }
 
-function cacheResponse(cacheKey: string, data: ApiResponse): void {
-  // LRU eviction if needed
-  if (responseCache.size >= CONFIG.MAX_CACHE_SIZE) {
+function cacheResponse(key: string, data: ApiResponse): void {
+  if (
+    responseCache.size >=
+    CONFIG.MAX_CACHE_SIZE * CONFIG.CACHE_CLEANUP_THRESHOLD
+  ) {
     cleanupCache();
   }
-
-  responseCache.set(cacheKey, {
+  const now = Date.now();
+  responseCache.set(key, {
     data,
-    timestamp: Date.now(),
+    timestamp: now,
     accessCount: 1,
-    lastAccess: Date.now(),
+    lastAccess: now,
   });
 }
 
 function cleanupCache(): void {
   const now = Date.now();
   const entries = Array.from(responseCache.entries());
-
-  // Remove expired first
-  const validEntries = entries.filter(([key, entry]) => {
-    if (now - entry.timestamp > CONFIG.STALE_TTL) {
-      responseCache.delete(key);
+  const valid = entries.filter(([k, e]) => {
+    if (now - e.timestamp > CONFIG.STALE_TTL) {
+      responseCache.delete(k);
       return false;
     }
     return true;
   });
-
-  // LRU eviction if still over limit
-  if (validEntries.length > CONFIG.MAX_CACHE_SIZE) {
-    validEntries.sort((a, b) => {
-      const scoreA = a[1].lastAccess + a[1].accessCount * 1000;
-      const scoreB = b[1].lastAccess + b[1].accessCount * 1000;
-      return scoreA - scoreB;
-    });
-
-    const toRemove = Math.floor(validEntries.length * 0.2);
-    for (let i = 0; i < toRemove; i++) {
-      responseCache.delete(validEntries[i][0]);
-    }
+  if (valid.length > CONFIG.MAX_CACHE_SIZE) {
+    valid.sort(
+      (a, b) =>
+        a[1].lastAccess +
+        a[1].accessCount * 1000 -
+        (b[1].lastAccess + b[1].accessCount * 1000),
+    );
+    valid
+      .slice(0, Math.floor(valid.length * 0.2))
+      .forEach(([k]) => responseCache.delete(k));
   }
 }
 
-// ============= RETRY LOGIC =============
+// ─────────────────────────────────────────────────────────────────────────────
+// Spec-facet cache
+// ─────────────────────────────────────────────────────────────────────────────
+
+const facetCache = new Map<
+  string,
+  { data: Record<string, FacetCount[]>; ts: number }
+>();
+
+function buildFacetCacheKey(p: QueryParams): string {
+  return [p.category, p.subcategory, p.subsubcategory, p.buyerCategory].join(
+    "|",
+  );
+}
+
+async function fetchSpecFacets(
+  p: QueryParams,
+  firestoreCategory: string | null,
+): Promise<Record<string, FacetCount[]>> {
+  const key = buildFacetCacheKey(p);
+  const cached = facetCache.get(key);
+  if (cached && Date.now() - cached.ts < CONFIG.FACET_CACHE_TTL) {
+    return cached.data;
+  }
+
+  try {
+    const facetFilters: string[][] = [];
+    if (firestoreCategory)
+      facetFilters.push([`category_en:${firestoreCategory}`]);
+    if (p.subcategory) facetFilters.push([`subcategory_en:${p.subcategory}`]);
+    if (p.subsubcategory)
+      facetFilters.push([`subsubcategory_en:${p.subsubcategory}`]);
+    if (p.buyerCategory === "Women" || p.buyerCategory === "Men") {
+      facetFilters.push([`gender:${p.buyerCategory}`, "gender:Unisex"]);
+    }
+
+    const result =
+      await TypeSenseServiceManager.instance.mainService.fetchSpecFacets({
+        indexName: "products",
+        facetFilters,
+      });
+
+    if (facetCache.size >= CONFIG.MAX_FACET_CACHE) {
+      const oldest = Array.from(facetCache.entries()).sort(
+        (a, b) => a[1].ts - b[1].ts,
+      );
+      oldest
+        .slice(0, Math.floor(CONFIG.MAX_FACET_CACHE * 0.2))
+        .forEach(([k]) => facetCache.delete(k));
+    }
+    facetCache.set(key, { data: result, ts: Date.now() });
+    return result;
+  } catch (err) {
+    console.error("[TerasProducts] fetchSpecFacets error:", err);
+    return {};
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Retry + timeout
+// ─────────────────────────────────────────────────────────────────────────────
 
 async function withRetry<T>(
   fn: () => Promise<T>,
-  options: {
-    maxRetries?: number;
-    baseDelay?: number;
-    shouldRetry?: (error: unknown) => boolean;
-  } = {}
+  maxRetries = CONFIG.MAX_RETRIES,
+  baseDelay = CONFIG.BASE_RETRY_DELAY,
 ): Promise<T> {
-  const {
-    maxRetries = CONFIG.MAX_RETRIES,
-    baseDelay = CONFIG.BASE_RETRY_DELAY,
-    shouldRetry = () => true,
-  } = options;
-
-  let lastError: Error | null = null;
-
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+  let last: Error | null = null;
+  for (let i = 0; i <= maxRetries; i++) {
     try {
       return await fn();
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-
-      if (!shouldRetry(error) || attempt === maxRetries) {
-        throw lastError;
-      }
-
-      const delay = baseDelay * Math.pow(2, attempt);
-      await new Promise((resolve) => setTimeout(resolve, delay));
+    } catch (e) {
+      last = e instanceof Error ? e : new Error(String(e));
+      if (i === maxRetries) throw last;
+      await new Promise((r) => setTimeout(r, baseDelay * 2 ** i));
     }
   }
-
-  throw lastError;
+  throw last;
 }
 
-// ============= TIMEOUT WRAPPER =============
-
-async function withTimeout<T>(
-  promise: Promise<T>,
-  timeoutMs: number,
-  errorMessage: string = "Request timeout"
-): Promise<T> {
-  let timeoutId: NodeJS.Timeout;
-
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => reject(new Error(errorMessage)), timeoutMs);
+async function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  let id: NodeJS.Timeout;
+  const timeout = new Promise<never>((_, rej) => {
+    id = setTimeout(() => rej(new Error("Request timeout")), ms);
   });
-
   try {
-    const result = await Promise.race([promise, timeoutPromise]);
-    clearTimeout(timeoutId!);
-    return result;
-  } catch (error) {
-    clearTimeout(timeoutId!);
-    throw error;
+    const r = await Promise.race([p, timeout]);
+    clearTimeout(id!);
+    return r;
+  } catch (e) {
+    clearTimeout(id!);
+    throw e;
   }
 }
 
-// ============= LOGGING HELPER =============
+// ─────────────────────────────────────────────────────────────────────────────
+// Logging
+// ─────────────────────────────────────────────────────────────────────────────
 
 function log(message: string, data?: unknown): void {
   if (CONFIG.DEBUG) {
-    if (data) {
-      console.log(`[TerasProducts] ${message}`, data);
-    } else {
-      console.log(`[TerasProducts] ${message}`);
-    }
+    if (data) console.log(`[TerasProducts] ${message}`, data);
+    else console.log(`[TerasProducts] ${message}`);
   }
 }
 
-function logError(message: string, error?: unknown): void {
-  console.error(`[TerasProducts] ${message}`, error);
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// Param extraction
+// ─────────────────────────────────────────────────────────────────────────────
 
-// ============= HELPER FUNCTIONS =============
-
-function extractQueryParams(searchParams: URLSearchParams): QueryParams {
-  const minPriceStr = searchParams.get("minPrice");
-  const maxPriceStr = searchParams.get("maxPrice");
+function extractQueryParams(sp: URLSearchParams): QueryParams {
+  const specFilters: SpecFilters = {};
+  sp.forEach((value, key) => {
+    if (key.startsWith("spec_")) {
+      const field = key.slice(5);
+      const vals = value.split(",").filter(Boolean);
+      if (vals.length > 0) specFilters[field] = vals;
+    }
+  });
 
   return {
-    category: searchParams.get("category"),
-    subcategory: searchParams.get("subcategory"),
-    subsubcategory: searchParams.get("subsubcategory"),
-    buyerCategory: searchParams.get("buyerCategory"),
-    buyerSubcategory: searchParams.get("buyerSubcategory"),
-    page: Math.max(0, parseInt(searchParams.get("page") || "0", 10)),
-    sortOption: searchParams.get("sort") || "date",
-    quickFilter: searchParams.get("filter"),
+    category: sp.get("category"),
+    subcategory: sp.get("subcategory"),
+    subsubcategory: sp.get("subsubcategory"),
+    buyerCategory: sp.get("buyerCategory"),
+    buyerSubcategory: sp.get("buyerSubcategory"),
+    page: Math.max(0, parseInt(sp.get("page") || "0", 10)),
+    sortOption: sp.get("sort") || "date",
+    quickFilter: sp.get("filter"),
     filterSubcategories:
-      searchParams.get("filterSubcategories")?.split(",").filter(Boolean) || [],
-    colors: searchParams.get("colors")?.split(",").filter(Boolean) || [],
-    brands: searchParams.get("brands")?.split(",").filter(Boolean) || [],
-    minPrice: minPriceStr ? parseFloat(minPriceStr) : null,
-    maxPrice: maxPriceStr ? parseFloat(maxPriceStr) : null,
-    filterBuyerCategory: searchParams.get("filterBuyerCategory"),
-    filterBuyerSubcategory: searchParams.get("filterBuyerSubcategory"),
-    filterBuyerSubSubcategory: searchParams.get("filterBuyerSubSubcategory"),
+      sp.get("filterSubcategories")?.split(",").filter(Boolean) ?? [],
+    colors: sp.get("colors")?.split(",").filter(Boolean) ?? [],
+    brands: sp.get("brands")?.split(",").filter(Boolean) ?? [],
+    minPrice: sp.get("minPrice") ? parseFloat(sp.get("minPrice")!) : null,
+    maxPrice: sp.get("maxPrice") ? parseFloat(sp.get("maxPrice")!) : null,
+    minRating: sp.get("minRating") ? parseFloat(sp.get("minRating")!) : null,
+    specFilters,
+    filterBuyerCategory: sp.get("filterBuyerCategory"),
+    filterBuyerSubcategory: sp.get("filterBuyerSubcategory"),
+    filterBuyerSubSubcategory: sp.get("filterBuyerSubSubcategory"),
   };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Category helpers
+// ─────────────────────────────────────────────────────────────────────────────
 
 function convertToFirestoreCategory(urlCategory: string | null): string | null {
   if (!urlCategory) return null;
   return URL_TO_FIRESTORE_CATEGORY[urlCategory] || urlCategory;
 }
 
-function parseProducts(snapshot: QuerySnapshot<DocumentData>): Product[] {
-  const products: Product[] = [];
-  const errorIds: string[] = [];
-
-  for (const doc of snapshot.docs) {
-    try {
-      const data = { id: doc.id, ...doc.data() };
-      products.push(ProductUtils.fromJson(data));
-    } catch (error) {
-      console.error(
-        `[TerasProducts] Failed to parse product ${doc.id}:`,
-        error
-      );
-      errorIds.push(doc.id);
-    }
-  }
-
-  if (errorIds.length > 0) {
-    console.warn(
-      `[TerasProducts] Failed to parse ${errorIds.length} products:`,
-      errorIds.slice(0, 5)
-    );
-  }
-
-  return products;
-}
-
-// ============= EFFECTIVE FILTERS CALCULATOR =============
+// ─────────────────────────────────────────────────────────────────────────────
+// Effective filters
+// ─────────────────────────────────────────────────────────────────────────────
 
 interface EffectiveFilters {
   category: string | null;
@@ -387,14 +393,13 @@ interface EffectiveFilters {
 
 function calculateEffectiveFilters(
   params: QueryParams,
-  firestoreCategory: string | null
+  firestoreCategory: string | null,
 ): EffectiveFilters {
   let effectiveCategory = firestoreCategory;
   let effectiveGender: string | null = null;
   let effectiveSubcategory = params.subcategory;
   let effectiveSubSubcategory = params.subsubcategory;
 
-  // Process filterBuyerCategory
   if (params.filterBuyerCategory) {
     if (
       params.filterBuyerCategory === "Women" ||
@@ -408,7 +413,6 @@ function calculateEffectiveFilters(
         BUYER_TO_PRODUCT_CATEGORY[params.filterBuyerCategory]?.[
           params.filterBuyerSubcategory
         ];
-
       if (mappedCategory && !firestoreCategory) {
         effectiveCategory = mappedCategory;
       }
@@ -423,12 +427,10 @@ function calculateEffectiveFilters(
     }
   }
 
-  // Gender from URL params
   if (params.buyerCategory === "Women" || params.buyerCategory === "Men") {
     effectiveGender = params.buyerCategory;
   }
 
-  // Subcategory mapping for Women/Men
   if (
     params.filterBuyerCategory &&
     (params.filterBuyerCategory === "Women" ||
@@ -440,7 +442,6 @@ function calculateEffectiveFilters(
     effectiveSubcategory = params.filterBuyerSubSubcategory;
   }
 
-  // SubSubcategory mapping
   if (
     !effectiveSubSubcategory &&
     params.filterBuyerSubSubcategory &&
@@ -462,72 +463,70 @@ function calculateEffectiveFilters(
   };
 }
 
-// ============= QUERY BUILDERS =============
+// ─────────────────────────────────────────────────────────────────────────────
+// Backend decision (mirrors fetchDynamicProducts pattern)
+// ─────────────────────────────────────────────────────────────────────────────
 
-function buildProductsQuery(
+function decideBackend(p: QueryParams): "firestore" | "typesense" {
+  if (p.sortOption !== "date") return "typesense";
+  if (
+    p.brands.length > 0 ||
+    p.colors.length > 0 ||
+    p.filterSubcategories.length > 0 ||
+    Object.keys(p.specFilters).length > 0 ||
+    p.minPrice !== null ||
+    p.maxPrice !== null ||
+    p.minRating !== null
+  )
+    return "typesense";
+  return "firestore";
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Firestore query (initial load only — no dynamic filters)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function parseProducts(snapshot: QuerySnapshot<DocumentData>): Product[] {
+  const out: Product[] = [];
+  const errIds: string[] = [];
+  for (const doc of snapshot.docs) {
+    try {
+      out.push(ProductUtils.fromJson({ id: doc.id, ...doc.data() }));
+    } catch {
+      errIds.push(doc.id);
+    }
+  }
+  if (errIds.length > 0)
+    console.warn(`[TerasProducts] parse errors:`, errIds.slice(0, 5));
+  return out;
+}
+
+function buildFirestoreQuery(
   params: QueryParams,
-  effectiveFilters: EffectiveFilters
+  effectiveFilters: EffectiveFilters,
 ): Query<DocumentData, DocumentData> {
   const collectionRef: CollectionReference<DocumentData, DocumentData> =
     collection(db, "products");
   const constraints: QueryConstraint[] = [];
 
-  // Category filter
   if (effectiveFilters.category) {
     constraints.push(where("category", "==", effectiveFilters.category));
   }
-
-  // Gender filter
   if (effectiveFilters.gender) {
     constraints.push(
-      where("gender", "in", [effectiveFilters.gender, "Unisex"])
+      where("gender", "in", [effectiveFilters.gender, "Unisex"]),
     );
   }
-
-  // Subcategory filter
   if (effectiveFilters.subcategory) {
     constraints.push(where("subcategory", "==", effectiveFilters.subcategory));
   }
-
-  // SubSubcategory filter
   if (effectiveFilters.subsubcategory) {
     constraints.push(
-      where("subsubcategory", "==", effectiveFilters.subsubcategory)
+      where("subsubcategory", "==", effectiveFilters.subsubcategory),
     );
   }
 
-  // Dynamic filters
-  if (
-    params.filterSubcategories.length > 0 &&
-    !effectiveFilters.subsubcategory
-  ) {
-    const subcats = params.filterSubcategories.slice(
-      0,
-      CONFIG.MAX_ARRAY_FILTER_SIZE
-    );
-    constraints.push(where("subsubcategory", "in", subcats));
-  }
-
-  if (params.brands.length > 0) {
-    const brands = params.brands.slice(0, CONFIG.MAX_ARRAY_FILTER_SIZE);
-    constraints.push(where("brandModel", "in", brands));
-  }
-
-  if (params.colors.length > 0) {
-    const colors = params.colors.slice(0, CONFIG.MAX_ARRAY_FILTER_SIZE);
-    constraints.push(where("availableColors", "array-contains-any", colors));
-  }
-
-  // Price filters
-  if (params.minPrice !== null) {
-    constraints.push(where("price", ">=", params.minPrice));
-  }
-
-  if (params.maxPrice !== null) {
-    constraints.push(where("price", "<=", params.maxPrice));
-  }
-
-  // Quick filters
+  // Quick filters (Firestore-only path)
   if (params.quickFilter) {
     switch (params.quickFilter) {
       case "deals":
@@ -545,302 +544,208 @@ function buildProductsQuery(
     }
   }
 
-  // Sorting
   if (params.quickFilter === "bestSellers") {
     constraints.push(orderBy("purchaseCount", "desc"));
   } else {
-    switch (params.sortOption) {
-      case "alphabetical":
-        constraints.push(orderBy("productName", "asc"));
-        break;
-      case "price_asc":
-        constraints.push(orderBy("price", "asc"));
-        break;
-      case "price_desc":
-        constraints.push(orderBy("price", "desc"));
-        break;
-      case "date":
-      default:
-        constraints.push(orderBy("createdAt", "desc"));
-        break;
-    }
+    constraints.push(orderBy("createdAt", "desc"));
   }
 
   constraints.push(limit(CONFIG.DEFAULT_LIMIT));
-
   return query(collectionRef, ...constraints);
 }
 
-function buildBoostedProductsQuery(
-  params: QueryParams,
-  effectiveFilters: EffectiveFilters
-): Query<DocumentData, DocumentData> {
-  const collectionRef = collection(db, "products");
-  const constraints: QueryConstraint[] = [where("isBoosted", "==", true)];
+// ─────────────────────────────────────────────────────────────────────────────
+// Typesense fetch (filtering + sorting)
+// ─────────────────────────────────────────────────────────────────────────────
 
-  if (effectiveFilters.category) {
-    constraints.push(where("category", "==", effectiveFilters.category));
+async function fetchFromTypesense(
+  p: QueryParams,
+  firestoreCategory: string | null,
+): Promise<{ products: Product[]; hasMore: boolean }> {
+  const facetFilters: string[][] = [];
+
+  if (firestoreCategory)
+    facetFilters.push([`category_en:${firestoreCategory}`]);
+  if (p.subcategory) facetFilters.push([`subcategory_en:${p.subcategory}`]);
+  if (p.subsubcategory)
+    facetFilters.push([`subsubcategory_en:${p.subsubcategory}`]);
+
+  if (p.buyerCategory === "Women" || p.buyerCategory === "Men") {
+    facetFilters.push([`gender:${p.buyerCategory}`, "gender:Unisex"]);
   }
 
-  if (effectiveFilters.gender) {
-    constraints.push(
-      where("gender", "in", [effectiveFilters.gender, "Unisex"])
+  // Dynamic filters — each is its own AND group, OR within the group
+  if (p.brands.length > 0)
+    facetFilters.push(p.brands.map((b) => `brandModel:${b}`));
+  if (p.colors.length > 0)
+    facetFilters.push(p.colors.map((c) => `availableColors:${c}`));
+  if (p.filterSubcategories.length > 0)
+    facetFilters.push(
+      p.filterSubcategories.map((s) => `subsubcategory_en:${s}`),
     );
+
+  // Spec filters: each field is its own AND group
+  for (const [field, vals] of Object.entries(p.specFilters)) {
+    if (vals.length > 0) facetFilters.push(vals.map((v) => `${field}:${v}`));
   }
 
-  if (effectiveFilters.subcategory) {
-    constraints.push(where("subcategory", "==", effectiveFilters.subcategory));
-  }
+  // Numeric filters
+  const numericFilters: string[] = [];
+  if (p.minPrice !== null)
+    numericFilters.push(`price>=${Math.floor(p.minPrice)}`);
+  if (p.maxPrice !== null)
+    numericFilters.push(`price<=${Math.ceil(p.maxPrice)}`);
+  if (p.minRating !== null)
+    numericFilters.push(`averageRating>=${p.minRating}`);
 
-  if (effectiveFilters.subsubcategory) {
-    constraints.push(
-      where("subsubcategory", "==", effectiveFilters.subsubcategory)
-    );
-  }
+  const res =
+    await TypeSenseServiceManager.instance.mainService.searchIdsWithFacets({
+      indexName: "products",
+      page: p.page,
+      hitsPerPage: CONFIG.DEFAULT_LIMIT,
+      facetFilters,
+      numericFilters,
+      sortOption: p.sortOption,
+    });
 
-  // Dynamic filters
-  if (
-    params.filterSubcategories.length > 0 &&
-    !effectiveFilters.subsubcategory
-  ) {
-    const subcats = params.filterSubcategories.slice(
-      0,
-      CONFIG.MAX_ARRAY_FILTER_SIZE
-    );
-    constraints.push(where("subsubcategory", "in", subcats));
-  }
+  // Parse directly from Typesense hits — no Firestore round-trip
+  const products = res.hits.map((hit) =>
+    ProductUtils.fromJson({ ...hit, id: hit.objectID || hit.id }),
+  );
 
-  if (
-    params.brands.length > 0 &&
-    params.brands.length <= CONFIG.MAX_ARRAY_FILTER_SIZE
-  ) {
-    constraints.push(where("brandModel", "in", params.brands));
-  }
-
-  if (
-    params.colors.length > 0 &&
-    params.colors.length <= CONFIG.MAX_ARRAY_FILTER_SIZE
-  ) {
-    constraints.push(
-      where("availableColors", "array-contains-any", params.colors)
-    );
-  }
-
-  if (params.minPrice !== null) {
-    constraints.push(where("price", ">=", params.minPrice));
-  }
-
-  if (params.maxPrice !== null) {
-    constraints.push(where("price", "<=", params.maxPrice));
-  }
-
-  constraints.push(orderBy("createdAt", "desc"));
-  constraints.push(limit(CONFIG.BOOSTED_LIMIT));
-
-  return query(collectionRef, ...constraints);
+  return { products, hasMore: res.page < res.nbPages - 1 };
 }
 
-// ============= CORE DATA FETCHING =============
+// ─────────────────────────────────────────────────────────────────────────────
+// Core data fetch
+// ─────────────────────────────────────────────────────────────────────────────
 
 async function fetchTerasProductsData(
-  params: QueryParams
+  params: QueryParams,
 ): Promise<ApiResponse> {
-  const startTime = Date.now();
+  const t0 = Date.now();
 
   const firestoreCategory = convertToFirestoreCategory(params.category);
   const effectiveFilters = calculateEffectiveFilters(params, firestoreCategory);
+  const backend = decideBackend(params);
 
-  log("Effective filters calculated", effectiveFilters);
+  log(`Backend: ${backend}`, effectiveFilters);
 
-  // Determine if we should fetch boosted products
-  const shouldFetchBoosted =
-    !params.quickFilter &&
-    (effectiveFilters.category || params.filterBuyerCategory);
+  const [{ products, hasMore }, specFacets] = await Promise.all([
+    backend === "typesense"
+      ? fetchFromTypesense(params, firestoreCategory)
+      : withRetry(async () => {
+          const q = buildFirestoreQuery(params, effectiveFilters);
+          const snapshot = await getDocs(q);
+          const products = parseProducts(snapshot);
+          return {
+            products,
+            hasMore: products.length >= CONFIG.DEFAULT_LIMIT,
+          };
+        }),
 
-  // Parallel fetching with graceful degradation
-  const [products, boostedProducts] = await Promise.all([
-    // Main products query with retry
-    withRetry(async () => {
-      const productsQuery = buildProductsQuery(params, effectiveFilters);
-      const snapshot = await getDocs(productsQuery);
-      return parseProducts(snapshot);
-    }),
-
-    // Boosted products (graceful degradation)
-    shouldFetchBoosted
-      ? (async () => {
-          try {
-            const boostedQuery = buildBoostedProductsQuery(
-              params,
-              effectiveFilters
-            );
-            const snapshot = await getDocs(boostedQuery);
-            return parseProducts(snapshot);
-          } catch (error) {
-            logError("Boosted products failed (graceful degradation)", error);
-            return [];
-          }
-        })()
-      : Promise.resolve([]),
+    params.page === 0
+      ? fetchSpecFacets(params, firestoreCategory)
+      : Promise.resolve({} as Record<string, FacetCount[]>),
   ]);
 
   return {
     products,
-    boostedProducts,
-    hasMore: products.length >= CONFIG.DEFAULT_LIMIT,
+    boostedProducts: [],
+    hasMore,
     page: params.page,
     total: products.length,
+    specFacets: params.page === 0 ? specFacets : undefined,
     source: "fresh",
-    timing: Date.now() - startTime,
+    timing: Date.now() - t0,
   };
 }
 
-// ============= BACKGROUND REVALIDATION =============
+// ─────────────────────────────────────────────────────────────────────────────
+// Background revalidation
+// ─────────────────────────────────────────────────────────────────────────────
 
 function revalidateInBackground(cacheKey: string, params: QueryParams): void {
-  if (pendingRequests.has(cacheKey)) {
-    return;
-  }
-
-  const fetchPromise = fetchTerasProductsData(params);
-  pendingRequests.set(cacheKey, fetchPromise);
-
-  fetchPromise
-    .then((result) => {
-      cacheResponse(cacheKey, result);
-      log("Background revalidation complete");
-    })
-    .catch((error) => {
-      logError("Background revalidation failed", error);
-    })
-    .finally(() => {
-      pendingRequests.delete(cacheKey);
-    });
+  if (pendingRequests.has(cacheKey)) return;
+  const p = fetchTerasProductsData(params);
+  pendingRequests.set(cacheKey, p);
+  p.then((r) => cacheResponse(cacheKey, r))
+    .catch((e) =>
+      console.error("[TerasProducts] bg revalidate error:", e),
+    )
+    .finally(() => pendingRequests.delete(cacheKey));
 }
 
-// ============= MAIN HANDLER =============
+// ─────────────────────────────────────────────────────────────────────────────
+// Main handler
+// ─────────────────────────────────────────────────────────────────────────────
 
 export async function GET(request: NextRequest) {
-  const requestStart = Date.now();
+  const t0 = Date.now();
 
   try {
     const { searchParams } = new URL(request.url);
     const params = extractQueryParams(searchParams);
     const cacheKey = generateCacheKey(params);
+    const cached = getCachedResponse(cacheKey);
 
-    log("Request params", {
-      category: params.category,
-      filterBuyerCategory: params.filterBuyerCategory,
-      page: params.page,
+    const headers = (extra: Record<string, string> = {}) => ({
+      "Cache-Control": "public, max-age=120, stale-while-revalidate=60",
+      "X-Response-Time": `${Date.now() - t0}ms`,
+      ...extra,
     });
 
-    // ========== STEP 1: Check cache ==========
-    const cacheResult = getCachedResponse(cacheKey);
-
-    if (cacheResult.status === "fresh") {
-      log("Cache HIT (fresh)");
+    if (cached.status === "fresh") {
       return NextResponse.json(
-        { ...cacheResult.data, source: "cache" },
-        {
-          headers: {
-            "Cache-Control": "public, max-age=120, stale-while-revalidate=60",
-            "X-Cache": "HIT",
-            "X-Response-Time": `${Date.now() - requestStart}ms`,
-          },
-        }
+        { ...cached.data, source: "cache" },
+        { headers: headers({ "X-Cache": "HIT" }) },
       );
     }
 
-    // ========== STEP 2: Check for in-flight request ==========
-    const pendingRequest = pendingRequests.get(cacheKey);
-
-    if (pendingRequest) {
-      log("Deduplicating request");
-
-      if (cacheResult.status === "stale" && cacheResult.data) {
+    const pending = pendingRequests.get(cacheKey);
+    if (pending) {
+      if (cached.status === "stale" && cached.data) {
         return NextResponse.json(
-          { ...cacheResult.data, source: "stale" },
-          {
-            headers: {
-              "Cache-Control": "public, max-age=0, stale-while-revalidate=120",
-              "X-Cache": "STALE",
-              "X-Response-Time": `${Date.now() - requestStart}ms`,
-            },
-          }
+          { ...cached.data, source: "stale" },
+          { headers: headers({ "X-Cache": "STALE" }) },
         );
       }
-
       try {
-        const result = await withTimeout(
-          pendingRequest,
-          CONFIG.REQUEST_TIMEOUT,
-          "Deduplicated request timeout"
-        );
+        const r = await withTimeout(pending, CONFIG.REQUEST_TIMEOUT);
         return NextResponse.json(
-          { ...result, source: "dedupe" },
-          {
-            headers: {
-              "Cache-Control": "public, max-age=120, stale-while-revalidate=60",
-              "X-Cache": "DEDUPE",
-              "X-Response-Time": `${Date.now() - requestStart}ms`,
-            },
-          }
+          { ...r, source: "dedupe" },
+          { headers: headers({ "X-Cache": "DEDUPE" }) },
         );
       } catch {
-        // Fall through to fresh fetch
+        /* fall through */
       }
     }
 
-    // ========== STEP 3: Stale-while-revalidate ==========
-    if (cacheResult.status === "stale" && cacheResult.data) {
-      log("Returning stale, revalidating in background");
+    if (cached.status === "stale" && cached.data) {
       revalidateInBackground(cacheKey, params);
-
       return NextResponse.json(
-        { ...cacheResult.data, source: "stale" },
-        {
-          headers: {
-            "Cache-Control": "public, max-age=0, stale-while-revalidate=120",
-            "X-Cache": "STALE",
-            "X-Response-Time": `${Date.now() - requestStart}ms`,
-          },
-        }
+        { ...cached.data, source: "stale" },
+        { headers: headers({ "X-Cache": "STALE" }) },
       );
     }
-
-    // ========== STEP 4: Fresh fetch ==========
-    log("Fresh fetch");
 
     const fetchPromise = fetchTerasProductsData(params);
     pendingRequests.set(cacheKey, fetchPromise);
 
     try {
-      const result = await withTimeout(
-        fetchPromise,
-        CONFIG.REQUEST_TIMEOUT,
-        "Request timeout"
-      );
-
+      const result = await withTimeout(fetchPromise, CONFIG.REQUEST_TIMEOUT);
       cacheResponse(cacheKey, result);
-
-      log(`Fetched ${result.products.length} products in ${result.timing}ms`);
-
       return NextResponse.json(
         { ...result, source: "fresh" },
         {
-          headers: {
-            "Cache-Control": "public, max-age=120, stale-while-revalidate=60",
+          headers: headers({
             "X-Cache": "MISS",
-            "X-Response-Time": `${Date.now() - requestStart}ms`,
             "X-Timing": `${result.timing}ms`,
-          },
-        }
+          }),
+        },
       );
-    } catch (error) {
-      logError("Fetch error", error);
-
-      // Handle timeout
-      if (error instanceof Error && error.message.includes("timeout")) {
+    } catch (err) {
+      if (err instanceof Error && err.message === "Request timeout") {
         return NextResponse.json(
           {
             error: "Request timeout",
@@ -850,38 +755,26 @@ export async function GET(request: NextRequest) {
             page: params.page,
             total: 0,
           },
-          { status: 504 }
+          { status: 504 },
         );
       }
-
-      // Handle Firestore index errors with helpful message
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-      const isIndexError =
-        errorMessage.includes("index") ||
-        errorMessage.includes("requires an index");
-
       return NextResponse.json(
         {
           error: "Failed to fetch products",
-          details: errorMessage,
-          hint: isIndexError
-            ? "This query requires a Firestore composite index. Check the Firebase console for index creation links."
-            : undefined,
+          details: err instanceof Error ? err.message : "Unknown error",
           products: [],
           boostedProducts: [],
           hasMore: false,
           page: params.page,
           total: 0,
         },
-        { status: 500 }
+        { status: 500 },
       );
     } finally {
       pendingRequests.delete(cacheKey);
     }
-  } catch (error) {
-    logError("Unexpected error", error);
-
+  } catch (err) {
+    console.error("[TerasProducts] Unexpected error:", err);
     return NextResponse.json(
       {
         error: "Internal server error",
@@ -891,7 +784,15 @@ export async function GET(request: NextRequest) {
         page: 0,
         total: 0,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
+}
+
+export async function DELETE() {
+  const prev = responseCache.size;
+  responseCache.clear();
+  pendingRequests.clear();
+  facetCache.clear();
+  return NextResponse.json({ message: "Cache cleared", clearedEntries: prev });
 }

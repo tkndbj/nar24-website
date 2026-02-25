@@ -184,10 +184,16 @@ export class TypeSenseService {
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   private searchUrl(collection: string): string {
+    if (typeof window !== "undefined") {
+      return `/api/typesense/${collection}`; // use path segment, no ? conflict
+    }
     return `https://${this.host}/collections/${collection}/documents/search`;
   }
-
   private get headers(): HeadersInit {
+    if (typeof window !== "undefined") {
+      // Proxy route handles auth server-side
+      return { "Content-Type": "application/json" };
+    }
     return {
       "X-TYPESENSE-API-KEY": this.searchKey,
       "Content-Type": "application/json",
@@ -564,6 +570,14 @@ export class TypeSenseService {
               .slice(colonIdx + 1)
               .trim()
               .replace(/"/g, "");
+            // Wildcards and range operators must NOT get = added
+            if (
+              value === "*" ||
+              value.startsWith(">") ||
+              value.startsWith("<")
+            ) {
+              return `${field}:${value}`;
+            }
             return `${field}:=${value}`;
           })
           .filter((p): p is string => p !== null);
@@ -614,8 +628,8 @@ export class TypeSenseService {
     }
 
     const url = `${this.searchUrl(indexName)}?${params.toString()}`;
-    console.debug(
-      `Typesense request for ${indexName}: filter_by=${params.get("filter_by")}`,
+    console.log(
+      `[Typesense] ${indexName} | filter_by: ${params.get("filter_by")} | sort_by: ${params.get("sort_by")}`,
     );
 
     try {
@@ -635,7 +649,10 @@ export class TypeSenseService {
       });
 
       if (!resp.ok) {
-        console.warn(`Typesense error ${resp.status}`);
+        const errBody = await resp.text().catch(() => "(unreadable)");
+        console.error(
+          `Typesense ${resp.status} on ${indexName}:\n  filter_by: ${params.get("filter_by")}\n  error: ${errBody}`,
+        );
         return { ids: [], hits: [], page, nbPages: page + 1 };
       }
 

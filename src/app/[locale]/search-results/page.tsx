@@ -347,7 +347,8 @@ export default function SearchResultsPage() {
       if (!query) return;
 
       abortRef.current?.abort();
-      abortRef.current = new AbortController();
+      const controller = new AbortController();
+      abortRef.current = controller;
 
       try {
         if (reset) {
@@ -382,8 +383,8 @@ export default function SearchResultsPage() {
           if (vals.length > 0) qp.set(`spec_${field}`, vals.join(","));
         }
 
-        const res = await fetch(`/api/searchProducts?${qp}`, {
-          signal: abortRef.current.signal,
+        const res = await fetch(`/api/search?${qp}`, {
+          signal: controller.signal,
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
@@ -427,9 +428,13 @@ export default function SearchResultsPage() {
         setIsNetworkError(isNet);
         setHasError(true);
       } finally {
-        setIsInitialLoading(false);
-        setIsProductsLoading(false);
-        setIsLoadingMore(false);
+        // Only clear loading states if this request wasn't superseded by a newer one.
+        // Aborted requests should not touch state — the newer request owns it.
+        if (!controller.signal.aborted) {
+          setIsInitialLoading(false);
+          setIsProductsLoading(false);
+          setIsLoadingMore(false);
+        }
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -678,22 +683,9 @@ export default function SearchResultsPage() {
 
           {/* ── Content area ── */}
           <div className="p-4 relative space-y-6">
-            {/* ── Filter-change overlay ── */}
+            {/* ── Filter-change shimmer ── */}
             {!isInitialLoading && isProductsLoading && (
-              <div
-                className={`absolute inset-0 z-10 flex items-center justify-center backdrop-blur-sm ${
-                  isDarkMode ? "bg-gray-950/80" : "bg-white/80"
-                }`}
-              >
-                <div className="text-center">
-                  <div className="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-orange-500" />
-                  <p
-                    className={`mt-3 text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
-                  >
-                    {t("DynamicMarket.updatingProducts") || "Updating…"}
-                  </p>
-                </div>
-              </div>
+              <LoadingShimmer isDarkMode={isDarkMode} />
             )}
 
             {/* ── Initial skeleton ── */}

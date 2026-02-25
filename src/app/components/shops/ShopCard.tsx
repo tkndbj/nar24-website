@@ -29,7 +29,7 @@ interface Shop {
   categories: string[];
   contactNo: string;
   ownerId: string;
-  isBoosted: boolean;
+
   createdAt: Timestamp;
 }
 
@@ -132,7 +132,7 @@ export default function ShopCard({ shop, isDarkMode }: ShopCardProps) {
       // Navigate after recording
       router.push(`/shopdetail/${shop.id}`);
     },
-    [shop.id, router, lastNavigationTime, NAVIGATION_THROTTLE]
+    [shop.id, router, lastNavigationTime, NAVIGATION_THROTTLE],
   );
 
   const renderStars = (rating: number) => {
@@ -155,7 +155,7 @@ export default function ShopCard({ shop, isDarkMode }: ShopCardProps) {
           ) : (
             <StarIcon className="w-4 h-4 text-gray-300" />
           )}
-        </div>
+        </div>,
       );
     }
     return stars;
@@ -224,20 +224,6 @@ export default function ShopCard({ shop, isDarkMode }: ShopCardProps) {
               )}
             </div>
           </div>
-          {/* Boosted Badge */}
-          {shop.isBoosted && (
-            <div className="absolute top-1 left-1">
-              <div
-                className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
-                  isDarkMode
-                    ? "bg-amber-500/20 text-amber-300"
-                    : "bg-amber-50 text-amber-700"
-                }`}
-              >
-                {t("shops.boosted")}
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Right: Content Section */}
@@ -374,21 +360,6 @@ export default function ShopCard({ shop, isDarkMode }: ShopCardProps) {
             : "bg-white border border-gray-200 hover:border-gray-300"
         } hover:shadow-lg`}
       >
-        {/* Boosted Badge */}
-        {shop.isBoosted && (
-          <div className="absolute top-3 left-3 z-20">
-            <div
-              className={`text-xs font-medium px-2.5 py-1 rounded-md ${
-                isDarkMode
-                  ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                  : "bg-amber-50 text-amber-700 border border-amber-200"
-              }`}
-            >
-              {t("shops.boosted")}
-            </div>
-          </div>
-        )}
-
         {/* Favorite Button */}
         <button
           onClick={handleFavoriteToggle}
@@ -410,7 +381,9 @@ export default function ShopCard({ shop, isDarkMode }: ShopCardProps) {
         </button>
 
         {/* Cover Image */}
-        <div className={`relative h-40 overflow-hidden ${isDarkMode ? "bg-gray-700" : "bg-gray-100"}`}>
+        <div
+          className={`relative h-40 overflow-hidden ${isDarkMode ? "bg-gray-700" : "bg-gray-100"}`}
+        >
           {shop.coverImageUrls &&
           shop.coverImageUrls.length > 0 &&
           !imageError ? (
@@ -531,7 +504,9 @@ export default function ShopCard({ shop, isDarkMode }: ShopCardProps) {
           )}
 
           {/* Stats & Address */}
-          <div className={`flex items-center justify-between pt-2 border-t ${isDarkMode ? "border-gray-700" : "border-gray-200"}`}>
+          <div
+            className={`flex items-center justify-between pt-2 border-t ${isDarkMode ? "border-gray-700" : "border-gray-200"}`}
+          >
             <div className="flex items-center gap-3">
               {shop.followerCount > 0 && (
                 <div className="flex items-center gap-1">
