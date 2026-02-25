@@ -28,6 +28,7 @@ interface UIProvidersProps {
  *
  * Optimization: BadgeProvider and SearchHistoryProvider accept user as prop
  * to avoid creating duplicate Firebase auth listeners, reducing listener count.
+ * Both defer their Firestore listener initialization via requestIdleCallback.
  */
 export const UIProviders: React.FC<UIProvidersProps> = ({
   children,

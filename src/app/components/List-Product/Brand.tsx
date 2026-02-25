@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
-import { globalBrands } from "@/constants/brands";
+
 import { BrandStepProps, BrandStepResult } from "./stepComponentTypes";
 
 export default function BrandStep({
@@ -32,10 +32,11 @@ export default function BrandStep({
   }, []);
 
   useEffect(() => {
-    // Use the single global brands list for all categories
-    // This provides access to all 3000+ brands regardless of category
-    setBrands(globalBrands);
-    setFilteredBrands(globalBrands);
+    // Dynamically load the global brands list
+    import("@/constants/brands").then((mod) => {
+      setBrands(mod.globalBrands);
+      setFilteredBrands(mod.globalBrands);
+    });
 
     // Set initial brand
     setSelectedBrand(initialBrand || null);

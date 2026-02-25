@@ -100,6 +100,14 @@ export const useCoupon = (): CouponContextType => {
   return context;
 };
 
+/**
+ * Optional version of useCoupon — returns null when outside CouponProvider.
+ * Used by components that can gracefully degrade (e.g., CelebrationProvider).
+ */
+export const useCouponOptional = (): CouponContextType | null => {
+  return useContext(CouponContext) ?? null;
+};
+
 // ============================================================================
 // PROVIDER
 // ============================================================================

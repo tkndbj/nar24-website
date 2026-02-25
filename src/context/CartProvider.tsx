@@ -477,6 +477,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     new Map()
   );
   const pendingFetchesRef = useRef<Map<string, Promise<unknown>>>(new Map());
+  const deferredCartInitRef = useRef<number | ReturnType<typeof setTimeout> | null>(null);
 
   // ========================================================================
   // HELPER FUNCTIONS
@@ -1979,9 +1980,19 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
     // ✅ User is logged in
     if (!isInitialized) {
-      // First time - initialize from Firestore
-      console.log("🔵 User ready, initializing cart...");
-      initializeCartIfNeeded();
+      // Defer initialization to avoid blocking first paint
+      console.log("🔵 User ready, scheduling deferred cart init...");
+      if (typeof requestIdleCallback !== "undefined") {
+        deferredCartInitRef.current = requestIdleCallback(
+          () => initializeCartIfNeeded(),
+          { timeout: 2000 }
+        );
+      } else {
+        deferredCartInitRef.current = setTimeout(
+          () => initializeCartIfNeeded(),
+          500
+        );
+      }
     } else if (!unsubscribeCartRef.current) {
       // ✅ CRITICAL FIX: Already initialized but listener not active
       // This happens after refresh when isInitialized is already true
@@ -2004,6 +2015,15 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      // Cancel deferred init if still pending
+      if (deferredCartInitRef.current !== null) {
+        if (typeof cancelIdleCallback !== "undefined") {
+          cancelIdleCallback(deferredCartInitRef.current as number);
+        } else {
+          clearTimeout(deferredCartInitRef.current as ReturnType<typeof setTimeout>);
+        }
+        deferredCartInitRef.current = null;
+      }
       disableLiveUpdates();
       optimisticTimeoutsRef.current.forEach((timer) => clearTimeout(timer));
       optimisticTimeoutsRef.current.clear();

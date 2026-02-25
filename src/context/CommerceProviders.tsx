@@ -12,8 +12,6 @@ import type { Functions } from "firebase/functions";
 import { ProductCacheProvider } from "./ProductCacheProvider";
 import { CartProvider } from "./CartProvider";
 import { FavoritesProvider } from "./FavoritesProvider";
-import { CouponProvider } from "./CouponProvider";
-import { DiscountSelectionProvider } from "./DiscountSelectionProvider";
 
 interface CommerceProvidersProps {
   children: ReactNode;
@@ -29,8 +27,9 @@ interface CommerceProvidersProps {
  * - ProductCacheProvider - Product data caching
  * - CartProvider - Shopping cart state and actions
  * - FavoritesProvider - Favorites/wishlist state and actions
- * - CouponProvider - Coupon management
- * - DiscountSelectionProvider - Discount selection state
+ *
+ * CouponProvider and DiscountSelectionProvider are NOT included here.
+ * They are wrapped per-page (cart, productpayment) via CouponProviders.
  *
  * Dependencies:
  * - Requires user from UserProvider
@@ -46,11 +45,7 @@ export const CommerceProviders: React.FC<CommerceProvidersProps> = ({
     <ProductCacheProvider>
       <CartProvider user={user} db={db} functions={functions}>
         <FavoritesProvider db={db}>
-          <CouponProvider user={user} db={db}>
-            <DiscountSelectionProvider>
-              {children}
-            </DiscountSelectionProvider>
-          </CouponProvider>
+          {children}
         </FavoritesProvider>
       </CartProvider>
     </ProductCacheProvider>

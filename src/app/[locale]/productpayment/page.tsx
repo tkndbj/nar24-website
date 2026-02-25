@@ -33,6 +33,7 @@ import type { Product } from "@/app/models/Product";
 // ✅ Import discount system
 import { useDiscountSelection } from "@/context/DiscountSelectionProvider";
 import { useCoupon } from "@/context/CouponProvider";
+import { CouponProviders } from "@/context/CouponProviders";
 import { UserBenefit, BenefitType } from "@/app/models/coupon";
 
 // Types
@@ -1322,6 +1323,7 @@ const isValidPhoneNumber = (phone: string): boolean => {
   const currency = cartItems[0]?.currency || "TL";
 
   return (
+    <CouponProviders user={user} db={db}>
     <div
       className={`min-h-screen ${
         isDarkMode
@@ -2253,5 +2255,6 @@ const isValidPhoneNumber = (phone: string): boolean => {
         />
       )}
     </div>
+    </CouponProviders>
   );
 }

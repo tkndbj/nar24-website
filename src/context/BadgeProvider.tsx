@@ -171,8 +171,28 @@ export function BadgeProvider({ children, user: userProp }: BadgeProviderProps) 
       setIsLoading(false);
       setError(null);
     } else {
-      // User logged in - setup Firestore listeners
-      setupFirestoreListeners(newUserId);
+      // Defer listener setup to avoid blocking initial paint
+      let deferredId: number | ReturnType<typeof setTimeout>;
+      if (typeof requestIdleCallback !== "undefined") {
+        deferredId = requestIdleCallback(
+          () => setupFirestoreListeners(newUserId),
+          { timeout: 3000 }
+        );
+      } else {
+        deferredId = setTimeout(
+          () => setupFirestoreListeners(newUserId),
+          1000
+        );
+      }
+
+      return () => {
+        if (typeof cancelIdleCallback !== "undefined") {
+          cancelIdleCallback(deferredId as number);
+        } else {
+          clearTimeout(deferredId as ReturnType<typeof setTimeout>);
+        }
+        cancelAllSubscriptions();
+      };
     }
 
     return () => {

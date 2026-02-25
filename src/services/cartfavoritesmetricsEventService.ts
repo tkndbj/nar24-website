@@ -2,24 +2,57 @@
 
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { getAuth } from "firebase/auth";
+import { sha256 } from "crypto-hash";
 
-/**
- * Service for logging cart/favorite metrics events to Cloud Functions
- *
- * Events are processed asynchronously by Cloud Functions and aggregated
- * into product/shop metrics every 1-2 minutes.
- *
- * This service is non-blocking and fails silently - metrics logging
- * never affects user operations.
- */
+// ── Config (matches Flutter MetricsEventService) ────────────────────────────
+const FLUSH_DEBOUNCE_MS = 30_000; // 30s
+const ACTION_COOLDOWN_MS = 1_000; // 1s per eventType:productId
+const MAX_RETRY_ATTEMPTS = 3;
+const MAX_BUFFER_SIZE = 100; // matches server-side max
+const PERSIST_KEY = "pending_metrics_events";
+const MAX_EVENT_AGE_MS = 24 * 60 * 60 * 1000; // 24h
+
+interface MetricsEvent {
+  type: string;
+  productId: string;
+  shopId?: string;
+}
+
+interface PersistedData {
+  events: MetricsEvent[];
+  timestamp: number;
+}
+
 class MetricsEventService {
   private static instance: MetricsEventService | null = null;
 
+  // ── Buffer ──────────────────────────────────────────────────────────────
+  private pendingEvents: MetricsEvent[] = [];
+  private flushTimer: NodeJS.Timeout | null = null;
+  private isFlushing = false;
+
+  // ── Cooldown tracking ───────────────────────────────────────────────────
+  // Key: "$eventType:$productId" to allow cart and fav on same product
+  private lastActionTime = new Map<string, number>();
+
+  // ── Retry state ─────────────────────────────────────────────────────────
+  private retryAttempts = 0;
+
   private constructor() {
-    if (MetricsEventService.instance) {
-      return MetricsEventService.instance;
+    // Load persisted events from previous session
+    this.loadPersistedEvents();
+
+    // Persist on page unload
+    if (typeof window !== "undefined") {
+      window.addEventListener("beforeunload", () => {
+        this.persistPendingEvents();
+      });
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden && this.pendingEvents.length > 0) {
+          this.persistPendingEvents();
+        }
+      });
     }
-    MetricsEventService.instance = this;
   }
 
   static getInstance(): MetricsEventService {
@@ -29,17 +62,166 @@ class MetricsEventService {
     return MetricsEventService.instance;
   }
 
-  /**
-   * Get Cloud Functions instance (europe-west3 region)
-   */
-  private getFunctionsInstance() {
-    return getFunctions(undefined, "europe-west3");
+  // ── Batch ID (matches Flutter: deterministic, 30s window) ──────────────
+  private async generateBatchId(): Promise<string> {
+    const auth = getAuth();
+    const userId = auth.currentUser?.uid ?? "anonymous";
+    const timestamp = Date.now();
+    const roundedTimestamp = Math.floor(timestamp / 30000) * 30000;
+    const input = `${userId}-cart_fav-${roundedTimestamp}`;
+    const hash = await sha256(input);
+    return `cart_fav_${hash.substring(0, 16)}`;
   }
 
-  /**
-   * Log a single cart/favorite event
-   */
-  async logEvent({
+  // ── Core enqueue (matches Flutter _enqueue) ────────────────────────────
+  private enqueue(eventType: string, productId: string, shopId?: string | null): void {
+    const auth = getAuth();
+    if (!auth.currentUser) {
+      console.warn("⚠️ MetricsEventService: user not authenticated, skipping");
+      return;
+    }
+
+    const cooldownKey = `${eventType}:${productId}`;
+    const now = Date.now();
+    const lastAction = this.lastActionTime.get(cooldownKey);
+
+    if (lastAction && now - lastAction < ACTION_COOLDOWN_MS) {
+      console.log(`⏱️ MetricsEventService: cooldown active for ${cooldownKey}`);
+      return;
+    }
+    this.lastActionTime.set(cooldownKey, now);
+
+    const event: MetricsEvent = { type: eventType, productId };
+    if (shopId) event.shopId = shopId;
+
+    this.pendingEvents.push(event);
+
+    console.log(
+      `📥 MetricsEventService: queued ${eventType} for ${productId} (buffer: ${this.pendingEvents.length})`
+    );
+
+    if (this.pendingEvents.length >= MAX_BUFFER_SIZE) {
+      console.warn("⚠️ MetricsEventService: buffer full, forcing flush");
+      if (this.flushTimer) clearTimeout(this.flushTimer);
+      void this.flush();
+      return;
+    }
+
+    this.scheduleFlush();
+  }
+
+  private scheduleFlush(): void {
+    if (this.flushTimer) clearTimeout(this.flushTimer);
+    this.flushTimer = setTimeout(() => void this.flush(), FLUSH_DEBOUNCE_MS);
+  }
+
+  // ── Flush (matches Flutter _flush) ─────────────────────────────────────
+  async flush(): Promise<void> {
+    if (this.isFlushing) return;
+    if (this.pendingEvents.length === 0) return;
+
+    this.isFlushing = true;
+
+    // Snapshot and clear before async work
+    const eventsToSend = [...this.pendingEvents];
+    this.pendingEvents = [];
+
+    try {
+      const batchId = await this.generateBatchId();
+
+      console.log(
+        `📤 MetricsEventService: flushing ${eventsToSend.length} events (batchId: ${batchId})`
+      );
+
+      const functions = getFunctions(undefined, "europe-west3");
+      const callable = httpsCallable(functions, "batchCartFavoriteEvents");
+
+      await callable({
+        batchId,
+        events: eventsToSend,
+      });
+
+      this.retryAttempts = 0;
+      this.clearPersistedEvents();
+
+      console.log(`✅ MetricsEventService: flushed ${eventsToSend.length} events`);
+    } catch (error) {
+      console.error("❌ MetricsEventService: flush failed —", error);
+
+      // Put events back at front for retry
+      this.pendingEvents = [...eventsToSend, ...this.pendingEvents];
+      this.retryAttempts++;
+
+      if (this.retryAttempts < MAX_RETRY_ATTEMPTS) {
+        const retryDelay = 10_000 * this.retryAttempts;
+        console.log(
+          `🔄 MetricsEventService: retry ${this.retryAttempts}/${MAX_RETRY_ATTEMPTS} in ${retryDelay / 1000}s`
+        );
+        if (this.flushTimer) clearTimeout(this.flushTimer);
+        this.flushTimer = setTimeout(() => void this.flush(), retryDelay);
+      } else {
+        console.warn(
+          `💾 MetricsEventService: max retries, persisting ${this.pendingEvents.length} events`
+        );
+        this.persistPendingEvents();
+        this.pendingEvents = [];
+        this.retryAttempts = 0;
+      }
+    } finally {
+      this.isFlushing = false;
+    }
+  }
+
+  // ── Persistence (localStorage, matches Flutter SQLite role) ────────────
+  private persistPendingEvents(): void {
+    if (this.pendingEvents.length === 0) return;
+    try {
+      const data: PersistedData = {
+        events: this.pendingEvents,
+        timestamp: Date.now(),
+      };
+      localStorage.setItem(PERSIST_KEY, JSON.stringify(data));
+      console.log(`💾 MetricsEventService: persisted ${this.pendingEvents.length} events`);
+    } catch (e) {
+      console.error("❌ MetricsEventService: persist failed —", e);
+    }
+  }
+
+  private loadPersistedEvents(): void {
+    try {
+      const stored = localStorage.getItem(PERSIST_KEY);
+      if (!stored) return;
+
+      const data: PersistedData = JSON.parse(stored);
+
+      // Discard events older than 24h (matches Flutter _maxEventAge)
+      if (Date.now() - data.timestamp > MAX_EVENT_AGE_MS) {
+        localStorage.removeItem(PERSIST_KEY);
+        return;
+      }
+
+      // Cap at MAX_BUFFER_SIZE (matches Flutter _loadPersistedEvents)
+      const toLoad = data.events.slice(0, MAX_BUFFER_SIZE);
+      this.pendingEvents.push(...toLoad);
+      localStorage.removeItem(PERSIST_KEY);
+
+      if (toLoad.length > 0) {
+        console.log(`📦 MetricsEventService: restored ${toLoad.length} events`);
+        this.scheduleFlush();
+      }
+    } catch (e) {
+      console.warn("⚠️ MetricsEventService: load persisted failed —", e);
+      localStorage.removeItem(PERSIST_KEY);
+    }
+  }
+
+  private clearPersistedEvents(): void {
+    localStorage.removeItem(PERSIST_KEY);
+  }
+
+  // ── Public API (same signatures as before) ─────────────────────────────
+
+  logEvent({
     eventType,
     productId,
     shopId,
@@ -47,243 +229,48 @@ class MetricsEventService {
     eventType: string;
     productId: string;
     shopId?: string | null;
-  }): Promise<void> {
-    const auth = getAuth();
-    const user = auth.currentUser;
-
-    if (!user) {
-      console.warn("⚠️ Cannot log metric event: User not authenticated");
-      return;
-    }
-
-    // Generate deterministic batch ID
-    const batchId = `cart_fav_${user.uid}_${Date.now()}`;
-
-    console.log(
-      `🔍 MetricsService.logEvent: type=${eventType}, productId=${productId}, shopId=${shopId}`
-    );
-
-    // ✅ Fire-and-forget: No await, returns immediately
-    const functions = this.getFunctionsInstance();
-    const callable = httpsCallable<
-      {
-        batchId: string;
-        events: Array<{
-          type: string;
-          productId: string;
-          shopId?: string;
-        }>;
-      },
-      unknown
-    >(functions, "batchCartFavoriteEvents");
-
-    const eventData: {
-      type: string;
-      productId: string;
-      shopId?: string;
-    } = {
-      type: eventType,
-      productId,
-    };
-
-    if (shopId) {
-      eventData.shopId = shopId;
-    }
-
-    callable({
-      batchId,
-      events: [eventData],
-    })
-      .then(() => {
-        console.log(`✅ Logged ${eventType} event for ${productId}`);
-      })
-      .catch((error) => {
-        console.warn(
-          `⚠️ Metrics event logging failed: ${error} (non-critical, ignored)`
-        );
-      });
+  }): void {
+    this.enqueue(eventType, productId, shopId);
   }
 
-  /**
-   * Log multiple cart/favorite events in a single batch
-   *
-   * More efficient than calling logEvent multiple times.
-   *
-   * Example:
-   * ```typescript
-   * await metricsEventService.logBatchEvents({
-   *   events: [
-   *     { type: 'cart_removed', productId: 'abc123', shopId: 'shop456' },
-   *     { type: 'cart_removed', productId: 'def789', shopId: 'shop456' },
-   *   ],
-   * });
-   * ```
-   */
-  async logBatchEvents({
+  logBatchEvents({
     events,
   }: {
-    events: Array<{
-      type: string;
-      productId: string;
-      shopId?: string | null;
-    }>;
-  }): Promise<void> {
-    const auth = getAuth();
-    const user = auth.currentUser;
-
-    if (!user) {
-      console.warn("⚠️ Cannot log metric events: User not authenticated");
-      return;
-    }
-
-    if (events.length === 0) {
-      console.warn("⚠️ No events to log");
-      return;
-    }
-
-    // Validate event structure
+    events: Array<{ type: string; productId: string; shopId?: string | null }>;
+  }): void {
     for (const event of events) {
       if (!event.type || !event.productId) {
-        console.warn(`⚠️ Invalid event structure:`, event);
-        return;
+        console.warn("⚠️ MetricsEventService: skipping invalid event:", event);
+        continue;
       }
+      this.enqueue(event.type, event.productId, event.shopId);
     }
-
-    const batchId = `cart_fav_${user.uid}_${Date.now()}`;
-
-    // ✅ Fire-and-forget: No await, returns immediately
-    const functions = this.getFunctionsInstance();
-    const callable = httpsCallable<
-      {
-        batchId: string;
-        events: Array<{
-          type: string;
-          productId: string;
-          shopId?: string;
-        }>;
-      },
-      unknown
-    >(functions, "batchCartFavoriteEvents");
-
-    // Filter out null shopId values
-    const cleanedEvents = events.map((event) => {
-      const cleanedEvent: {
-        type: string;
-        productId: string;
-        shopId?: string;
-      } = {
-        type: event.type,
-        productId: event.productId,
-      };
-
-      if (event.shopId) {
-        cleanedEvent.shopId = event.shopId;
-      }
-
-      return cleanedEvent;
-    });
-
-    callable({
-      batchId,
-      events: cleanedEvents,
-    })
-      .then(() => {
-        console.log(`✅ Logged ${events.length} batch events`);
-      })
-      .catch((error) => {
-        console.warn(
-          `⚠️ Batch metrics logging failed: ${error} (non-critical, ignored)`
-        );
-      });
   }
 
-  /**
-   * Log cart addition event
-   *
-   * Convenience wrapper for logEvent with eventType='cart_added'
-   */
-  async logCartAdded({
-    productId,
-    shopId,
-  }: {
-    productId: string;
-    shopId?: string | null;
-  }): Promise<void> {
-    return this.logEvent({
-      eventType: "cart_added",
-      productId,
-      shopId,
-    });
+  logCartAdded({ productId, shopId }: { productId: string; shopId?: string | null }): void {
+    this.enqueue("cart_added", productId, shopId);
   }
 
-  /**
-   * Log cart removal event
-   *
-   * Convenience wrapper for logEvent with eventType='cart_removed'
-   */
-  async logCartRemoved({
-    productId,
-    shopId,
-  }: {
-    productId: string;
-    shopId?: string | null;
-  }): Promise<void> {
-    return this.logEvent({
-      eventType: "cart_removed",
-      productId,
-      shopId,
-    });
+  logCartRemoved({ productId, shopId }: { productId: string; shopId?: string | null }): void {
+    this.enqueue("cart_removed", productId, shopId);
   }
 
-  /**
-   * Log favorite addition event
-   *
-   * Convenience wrapper for logEvent with eventType='favorite_added'
-   */
-  async logFavoriteAdded({
-    productId,
-    shopId,
-  }: {
-    productId: string;
-    shopId?: string | null;
-  }): Promise<void> {
-    return this.logEvent({
-      eventType: "favorite_added",
-      productId,
-      shopId,
-    });
+  logFavoriteAdded({ productId, shopId }: { productId: string; shopId?: string | null }): void {
+    this.enqueue("favorite_added", productId, shopId);
   }
 
-  /**
-   * Log favorite removal event
-   *
-   * Convenience wrapper for logEvent with eventType='favorite_removed'
-   */
-  async logFavoriteRemoved({
-    productId,
-    shopId,
-  }: {
-    productId: string;
-    shopId?: string | null;
-  }): Promise<void> {
-    return this.logEvent({
-      eventType: "favorite_removed",
-      productId,
-      shopId,
-    });
+  logFavoriteRemoved({ productId, shopId }: { productId: string; shopId?: string | null }): void {
+    this.enqueue("favorite_removed", productId, shopId);
   }
 
-  /**
-   * Log multiple cart removals (batch operation)
-   */
-  async logBatchCartRemovals({
+  logBatchCartRemovals({
     productIds,
     shopIds,
   }: {
     productIds: string[];
     shopIds: Record<string, string | null | undefined>;
-  }): Promise<void> {
-    return this.logBatchEvents({
+  }): void {
+    this.logBatchEvents({
       events: productIds.map((productId) => ({
         type: "cart_removed",
         productId,
@@ -292,17 +279,14 @@ class MetricsEventService {
     });
   }
 
-  /**
-   * Log multiple favorite removals (batch operation)
-   */
-  async logBatchFavoriteRemovals({
+  logBatchFavoriteRemovals({
     productIds,
     shopIds,
   }: {
     productIds: string[];
     shopIds: Record<string, string | null | undefined>;
-  }): Promise<void> {
-    return this.logBatchEvents({
+  }): void {
+    this.logBatchEvents({
       events: productIds.map((productId) => ({
         type: "favorite_removed",
         productId,

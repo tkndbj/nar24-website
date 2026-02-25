@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { ProductCard } from "@/app/components/ProductCard";
-import { globalBrands } from "@/constants/brands";
+import type { globalBrands as globalBrandsType } from "@/constants/brands";
 
 import { Product } from "@/app/models/Product";
 
@@ -173,6 +173,13 @@ export default function CollectionPage() {
   const router = useRouter();
   const t = useTranslations('Collection');
   const collectionId = params?.id as string;
+
+  // Dynamic import for globalBrands
+  const [globalBrands, setGlobalBrands] = useState<typeof globalBrandsType>([]);
+  useEffect(() => {
+    import("@/constants/brands").then((mod) => setGlobalBrands(mod.globalBrands));
+  }, []);
+
   const [shopId, setShopId] = useState<string>("");
   const [collectionName, setCollectionName] = useState<string>("");
 

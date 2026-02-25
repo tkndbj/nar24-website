@@ -21,7 +21,12 @@
     private pageImpressions: Map<string, PageImpressionData[]> = new Map();
     
     // User tracking
-    private currentUserId: string | null = null;
+  private currentUserId: string | null = null;
+  
+  // Cached demographics (avoids HTTP call every batch)
+  private cachedDemographics: { gender?: string; age?: number } | null = null;
+  private demographicsFetchedAt: number | null = null;
+  private readonly DEMOGRAPHICS_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
     
     // Configuration
     private readonly BATCH_INTERVAL = 30000; // 30 seconds
@@ -76,6 +81,8 @@
       
       // Clear in-memory data when user changes
       this.pageImpressions.clear();
+    this.cachedDemographics = null;
+    this.demographicsFetchedAt = null;
       
       this.currentUserId = userId;
       
@@ -272,11 +279,21 @@
      * Get user demographics
      */
     private async getUserDemographics(): Promise<{ gender?: string; age?: number }> {
+      // Return cache if fresh
+      if (
+        this.cachedDemographics &&
+        this.demographicsFetchedAt &&
+        Date.now() - this.demographicsFetchedAt < this.DEMOGRAPHICS_CACHE_TTL
+      ) {
+        return this.cachedDemographics;
+      }
+  
       try {
         const response = await fetch('/api/analytics/user/demographics');
         
         if (response.status === 404 || response.status === 401) {
-          console.log('ℹ️ User demographics not available (not logged in or not set)');
+          this.cachedDemographics = {};
+          this.demographicsFetchedAt = Date.now();
           return {};
         }
         
@@ -287,19 +304,17 @@
         const data = await response.json();
         
         const demographics: { gender?: string; age?: number } = {};
+        if (data.gender) demographics.gender = data.gender;
+        if (data.age) demographics.age = data.age;
         
-        if (data.gender) {
-          demographics.gender = data.gender;
-        }
-        
-        if (data.age) {
-          demographics.age = data.age;
-        }
+        this.cachedDemographics = demographics;
+        this.demographicsFetchedAt = Date.now();
         
         return demographics;
       } catch (error) {
         console.error('⚠️ Error fetching user demographics:', error);
-        return {};
+        // Return stale cache if available, otherwise empty
+        return this.cachedDemographics || {};
       }
     }
   

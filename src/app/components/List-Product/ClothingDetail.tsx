@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
-import { AllInOneCategoryData } from "@/constants/productData";
+import type { AllInOneCategoryData as AllInOneCategoryDataType } from "@/constants/productData";
 import { ClothingStepProps, GenericStepResult } from "./stepComponentTypes";
 
 export default function ClothingStep({
@@ -11,6 +11,12 @@ export default function ClothingStep({
   onCancel,
 }: ClothingStepProps) {
   const t = useTranslations("clothingStep");
+
+  // Dynamic import for AllInOneCategoryData
+  const [AllInOneCategoryData, setAllInOneCategoryData] = useState<typeof AllInOneCategoryDataType | null>(null);
+  useEffect(() => {
+    import("@/constants/productData").then((mod) => setAllInOneCategoryData(mod.AllInOneCategoryData));
+  }, []);
 
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
   const [selectedFit, setSelectedFit] = useState<string | null>(null);
@@ -173,7 +179,7 @@ export default function ClothingStep({
 
             <div className="p-3">
               <div className="grid grid-cols-3 gap-2">
-                {AllInOneCategoryData.kClothingSizes.map((size) => {
+                {(AllInOneCategoryData?.kClothingSizes ?? []).map((size) => {
                   const isSelected = selectedSizes.includes(size);
                   return (
                     <button
@@ -231,7 +237,7 @@ export default function ClothingStep({
             </div>
 
             <div className="p-3 space-y-2">
-              {AllInOneCategoryData.kClothingFits.map((fit) => {
+              {(AllInOneCategoryData?.kClothingFits ?? []).map((fit) => {
                 const isSelected = selectedFit === fit;
                 return (
                   <button
@@ -284,7 +290,7 @@ export default function ClothingStep({
             </div>
 
             <div className="p-3 space-y-2">
-              {AllInOneCategoryData.kClothingTypes.map((type) => {
+              {(AllInOneCategoryData?.kClothingTypes ?? []).map((type) => {
                 const isSelected = selectedType === type;
                 return (
                   <button

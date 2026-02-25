@@ -5,7 +5,7 @@ import {
   FunnelIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
-import { AllInOneCategoryData } from "@/constants/productData";
+import type { AllInOneCategoryData as AllInOneCategoryDataType } from "@/constants/productData";
 
 interface SearchAndFilterProps {
   onSearch: (term: string) => void;
@@ -13,9 +13,6 @@ interface SearchAndFilterProps {
   selectedCategory: string | null;
   isDarkMode: boolean;
 }
-
-// Get categories dynamically from productData - use product categories (non-buyer)
-const CATEGORIES = AllInOneCategoryData.kCategories.map((cat) => cat.key);
 
 // Helper function to get the translation key for any category
 const getCategoryTranslationKey = (category: string): string => {
@@ -85,6 +82,13 @@ export default function SearchAndFilter({
   const [isFilterExpanded, setIsFilterExpanded] = useState(false);
   const t = useTranslations("shops");
   const tRoot = useTranslations(); // For root-level category translations
+
+  // Dynamic import for AllInOneCategoryData
+  const [CategoryData, setCategoryData] = useState<typeof AllInOneCategoryDataType | null>(null);
+  useEffect(() => {
+    import("@/constants/productData").then((mod) => setCategoryData(mod.AllInOneCategoryData));
+  }, []);
+  const CATEGORIES = CategoryData?.kCategories.map((cat) => cat.key) ?? [];
 
   // Debounced search
   useEffect(() => {

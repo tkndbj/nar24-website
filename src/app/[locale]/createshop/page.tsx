@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
@@ -9,7 +9,7 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "../../../lib/firebase";
 import { useUser } from "@/context/UserProvider";
 import SecondHeader from "../../components/market_screen/SecondHeader";
-import { AllInOneCategoryData } from "../../../constants/productData";
+import type { AllInOneCategoryData as AllInOneCategoryDataType } from "../../../constants/productData";
 import { sanitizeShopApplication } from "@/lib/sanitize";
 import {
   XMarkIcon,
@@ -36,7 +36,8 @@ declare global {
   }
 }
 
-const getLocalizedCategories = (t: (key: string) => string): Category[] => {
+const getLocalizedCategories = (t: (key: string) => string, categoryData: typeof AllInOneCategoryDataType | null): Category[] => {
+  if (!categoryData) return [];
   const appLocalizations = new Proxy({} as AppLocalizations, {
     get: (_, prop: string) => {
       try {
@@ -46,9 +47,9 @@ const getLocalizedCategories = (t: (key: string) => string): Category[] => {
       }
     },
   });
-  return AllInOneCategoryData.kCategories.map((category) => ({
+  return categoryData.kCategories.map((category) => ({
     code: category.key.toLowerCase().replace(/\s+/g, "-").replace(/&/g, ""),
-    name: AllInOneCategoryData.localizeCategoryKey(
+    name: categoryData.localizeCategoryKey(
       category.key,
       appLocalizations,
     ),
@@ -59,6 +60,12 @@ export default function CreateShopPage() {
   const router = useRouter();
   const { user } = useUser();
   const t = useTranslations("createShop");
+
+  // Dynamic import for AllInOneCategoryData
+  const [AllInOneCategoryData, setAllInOneCategoryData] = useState<typeof AllInOneCategoryDataType | null>(null);
+  useEffect(() => {
+    import("../../../constants/productData").then((mod) => setAllInOneCategoryData(mod.AllInOneCategoryData));
+  }, []);
 
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -101,7 +108,7 @@ export default function CreateShopPage() {
   const taxInputRef = useRef<HTMLInputElement>(null);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
 
-  const CATEGORIES = getLocalizedCategories(t);
+  const CATEGORIES = getLocalizedCategories(t, AllInOneCategoryData);
 
   // Google Maps
   React.useEffect(() => {

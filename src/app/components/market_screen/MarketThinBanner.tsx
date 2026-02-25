@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useRef, useCallback, memo } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import type { Unsubscribe } from "firebase/firestore";
 import { getFirebaseDb } from "@/lib/firebase-lazy";
 
 /**
@@ -12,7 +11,7 @@ import { getFirebaseDb } from "@/lib/firebase-lazy";
  * Slim promotional banner carousel - matches Flutter implementation exactly.
  *
  * Features:
- * - Real-time Firestore sync from `market_thin_banners` collection
+ * - One-time Firestore fetch from `market_thin_banners` collection
  * - Auto-play with vsync-like control (4 second intervals)
  * - Infinite scroll simulation
  * - Click tracking and navigation (shop/product links)
@@ -78,20 +77,19 @@ const MarketThinBanner = memo(
     const [isTransitioning, setIsTransitioning] = useState(false);
 
     // Refs for cleanup and control
-    const unsubscribeRef = useRef<Unsubscribe | null>(null);
     const autoPlayTimerRef = useRef<NodeJS.Timeout | null>(null);
     const isMountedRef = useRef(true);
 
     // ========================================================================
-    // FIRESTORE SUBSCRIPTION
+    // FIRESTORE ONE-TIME FETCH
     // ========================================================================
 
     useEffect(() => {
       isMountedRef.current = true;
 
-      const setupSubscription = async () => {
+      const fetchBanners = async () => {
         try {
-          const [db, { collection, query, where, orderBy, onSnapshot }] =
+          const [db, { collection, query, where, orderBy, getDocs }] =
             await Promise.all([getFirebaseDb(), import("firebase/firestore")]);
 
           if (!isMountedRef.current) return;
@@ -102,48 +100,36 @@ const MarketThinBanner = memo(
             orderBy("createdAt", "desc")
           );
 
-          const unsubscribe = onSnapshot(
-            bannersQuery,
-            (snapshot) => {
-              if (!isMountedRef.current) return;
+          const snapshot = await getDocs(bannersQuery);
 
-              const items: ThinBannerItem[] = [];
+          if (!isMountedRef.current) return;
 
-              snapshot.docs.forEach((doc) => {
-                const data = doc.data();
-                const url = data.imageUrl as string | undefined;
+          const items: ThinBannerItem[] = [];
 
-                if (!url || url.trim() === "") return;
+          snapshot.docs.forEach((doc) => {
+            const data = doc.data();
+            const url = data.imageUrl as string | undefined;
 
-                items.push({
-                  id: doc.id,
-                  url: url,
-                  linkType: data.linkType as string | undefined,
-                  linkId: data.linkedShopId || data.linkedProductId,
-                });
-              });
+            if (!url || url.trim() === "") return;
 
-              setBanners(items);
-            },
-            (error) => {
-              console.error("[MarketThinBanner] Firestore error:", error);
-            }
-          );
+            items.push({
+              id: doc.id,
+              url: url,
+              linkType: data.linkType as string | undefined,
+              linkId: data.linkedShopId || data.linkedProductId,
+            });
+          });
 
-          unsubscribeRef.current = unsubscribe;
+          setBanners(items);
         } catch (error) {
-          console.error("[MarketThinBanner] Setup error:", error);
+          console.error("[MarketThinBanner] Fetch error:", error);
         }
       };
 
-      setupSubscription();
+      fetchBanners();
 
       return () => {
         isMountedRef.current = false;
-        if (unsubscribeRef.current) {
-          unsubscribeRef.current();
-          unsubscribeRef.current = null;
-        }
       };
     }, []);
 

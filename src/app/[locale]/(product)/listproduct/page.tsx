@@ -64,10 +64,16 @@ interface ProductListingFlow {
   completionRate: number;
 }
 
-import { AllInOneCategoryData } from "@/constants/productData";
+import type { AllInOneCategoryData as AllInOneCategoryDataType } from "@/constants/productData";
 
 export default function ListProductForm() {
   const t = useTranslations("listProduct");
+
+  // Dynamic import for AllInOneCategoryData
+  const [AllInOneCategoryData, setAllInOneCategoryData] = useState<typeof AllInOneCategoryDataType | null>(null);
+  useEffect(() => {
+    import("@/constants/productData").then((mod) => setAllInOneCategoryData(mod.AllInOneCategoryData));
+  }, []);
   const tGender = useTranslations("genderStep");
   const tFootwear = useTranslations("footwearSizeStep");
   const tClothing = useTranslations("clothingStep");
@@ -1585,7 +1591,7 @@ export default function ListProductForm() {
                   className={selectClass}
                 >
                   <option value="">{t("form.selectCategory")}</option>
-                  {AllInOneCategoryData.kCategories.map((cat) => (
+                  {(AllInOneCategoryData?.kCategories ?? []).map((cat) => (
                     <option key={cat.key} value={cat.key}>
                       {getLocalizedCategoryName(cat.key)}
                     </option>
@@ -1612,7 +1618,7 @@ export default function ListProductForm() {
                     className={selectClass}
                   >
                     <option value="">{t("form.selectSubcategory")}</option>
-                    {(AllInOneCategoryData.kSubcategories[category] || []).map(
+                    {(AllInOneCategoryData?.kSubcategories[category] ?? []).map(
                       (sub) => (
                         <option key={sub} value={sub}>
                           {getLocalizedSubcategoryName(sub)}
@@ -1642,7 +1648,7 @@ export default function ListProductForm() {
                   >
                     <option value="">{t("form.selectSubsubcategory")}</option>
                     {(
-                      AllInOneCategoryData.kSubSubcategories[category]?.[
+                      AllInOneCategoryData?.kSubSubcategories[category]?.[
                         subcategory
                       ] ?? []
                     ).map((ss) => (

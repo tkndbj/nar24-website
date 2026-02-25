@@ -30,7 +30,8 @@ export function useAnalytics() {
   }, []);
 
   return {
-    recordClick: analyticsBatcher.recordClick.bind(analyticsBatcher),
+    recordClick: analyticsBatcher.recordClick.bind(analyticsBatcher) as typeof analyticsBatcher.recordClick,
+    recordShopClick: analyticsBatcher.recordShopClick.bind(analyticsBatcher),
     flushAll: analyticsBatcher.flushAll.bind(analyticsBatcher),
   };
 }

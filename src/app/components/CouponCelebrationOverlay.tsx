@@ -11,7 +11,7 @@ import React, {
 } from "react";
 import { X, Sparkles } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useCoupon } from "@/context/CouponProvider";
+import { useCouponOptional } from "@/context/CouponProvider";
 import { useUser } from "@/context/UserProvider";
 import { Coupon } from "@/app/models/coupon";
 
@@ -350,7 +350,9 @@ export const CelebrationProvider: React.FC<CelebrationProviderProps> = ({
   children,
 }) => {
   const { user } = useUser();
-  const { coupons, isInitialized } = useCoupon();
+  const couponContext = useCouponOptional();
+  const coupons = couponContext?.coupons ?? [];
+  const isInitialized = couponContext?.isInitialized ?? false;
   const [, setCelebrationQueue] = useState<Coupon[]>([]);
   const [currentCoupon, setCurrentCoupon] = useState<Coupon | null>(null);
   const hasCheckedRef = useRef(false);

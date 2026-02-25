@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { Product } from '@/app/models/Product';
-import { AttributeLocalizationUtils } from '@/constants/AttributeLocalization';
+import type { AttributeLocalizationUtils as AttributeLocalizationUtilsType } from '@/constants/AttributeLocalization';
 // ==================== CUSTOM SVG ICONS ====================
 const XIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -497,7 +497,7 @@ interface ErrorProductCardProps {
     localization?: ReturnType<typeof useTranslations>;
   }
 
-  const ErrorProductCard: React.FC<ErrorProductCardProps> = ({  
+  const ErrorProductCard: React.FC<ErrorProductCardProps> = ({
     errorData,
     product,
     validatedItem,
@@ -508,11 +508,17 @@ interface ErrorProductCardProps {
     const errorMessage = localizeMessage(errorData);
     const colorImage = validatedItem?.colorImage;
     const selectedColor = validatedItem?.selectedColor;
-  
+
+    // Dynamic import for AttributeLocalizationUtils
+    const [AttrLocUtils, setAttrLocUtils] = useState<typeof AttributeLocalizationUtilsType | null>(null);
+    useEffect(() => {
+      import('@/constants/AttributeLocalization').then((mod) => setAttrLocUtils(mod.AttributeLocalizationUtils));
+    }, []);
+
     // ✅ Localize color name
-    const localizedColor = selectedColor && localization
-    ? AttributeLocalizationUtils.localizeColorName(selectedColor, localization)
-    : selectedColor; 
+    const localizedColor = selectedColor && localization && AttrLocUtils
+    ? AttrLocUtils.localizeColorName(selectedColor, localization)
+    : selectedColor;
   
     return (
       <div className="rounded-2xl border-2 border-red-300 dark:border-red-800 bg-red-50/50 dark:bg-red-900/10 overflow-hidden">
@@ -567,7 +573,7 @@ interface WarningProductCardProps {
   }
 
 const WarningProductCard: React.FC<WarningProductCardProps> = ({
-  
+
   warningData,
   product,
   validatedItem,
@@ -583,8 +589,14 @@ const WarningProductCard: React.FC<WarningProductCardProps> = ({
   const colorImage = validatedItem?.colorImage;
   const selectedColor = validatedItem?.selectedColor;
 
-  const localizedColor = selectedColor && localization
-  ? AttributeLocalizationUtils.localizeColorName(selectedColor, localization)
+  // Dynamic import for AttributeLocalizationUtils
+  const [AttrLocUtils, setAttrLocUtils] = useState<typeof AttributeLocalizationUtilsType | null>(null);
+  useEffect(() => {
+    import('@/constants/AttributeLocalization').then((mod) => setAttrLocUtils(mod.AttributeLocalizationUtils));
+  }, []);
+
+  const localizedColor = selectedColor && localization && AttrLocUtils
+  ? AttrLocUtils.localizeColorName(selectedColor, localization)
   : selectedColor;
 
   return (

@@ -34,7 +34,7 @@ import {
   FunnelIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
-import { AllInOneCategoryData } from "@/constants/productData";
+import type { AllInOneCategoryData as AllInOneCategoryDataType } from "@/constants/productData";
 
 interface Shop {
   id: string;
@@ -53,9 +53,6 @@ interface Shop {
   createdAt: Timestamp;
   isActive?: boolean;
 }
-
-// Get categories from productData
-const CATEGORIES = AllInOneCategoryData.kCategories.map((cat) => cat.key);
 
 // Helper function to get the translation key for any category
 const getCategoryTranslationKey = (category: string): string => {
@@ -110,6 +107,13 @@ const getCategoryTranslationKey = (category: string): string => {
 };
 
 export default function ShopsPage() {
+  // Dynamic import for AllInOneCategoryData
+  const [CategoryData, setCategoryData] = useState<typeof AllInOneCategoryDataType | null>(null);
+  useEffect(() => {
+    import("@/constants/productData").then((mod) => setCategoryData(mod.AllInOneCategoryData));
+  }, []);
+  const CATEGORIES = CategoryData?.kCategories.map((cat) => cat.key) ?? [];
+
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [shops, setShops] = useState<Shop[]>([]);
   const [isLoading, setIsLoading] = useState(true);

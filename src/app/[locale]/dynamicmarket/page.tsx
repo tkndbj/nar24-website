@@ -12,8 +12,8 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import SecondHeader from "../../components/market_screen/SecondHeader";
 import ProductCard from "../../components/ProductCard";
-import { AllInOneCategoryData } from "../../../constants/productData";
-import { globalBrands } from "../../../constants/brands";
+import type { AllInOneCategoryData as AllInOneCategoryDataType } from "../../../constants/productData";
+import type { globalBrands as globalBrandsType } from "../../../constants/brands";
 import { impressionBatcher } from "@/app/utils/impressionBatcher";
 import {
   AlertCircle,
@@ -106,6 +106,14 @@ export default function DynamicMarketPage() {
 
   // Memoize l10n to prevent infinite re-renders
   const l10n = useMemo(() => createAppLocalizations(t), [t]);
+
+  // Dynamic imports for large constants
+  const [AllInOneCategoryData, setAllInOneCategoryData] = useState<typeof AllInOneCategoryDataType | null>(null);
+  const [globalBrands, setGlobalBrands] = useState<typeof globalBrandsType>([]);
+  useEffect(() => {
+    import("../../../constants/productData").then((mod) => setAllInOneCategoryData(mod.AllInOneCategoryData));
+    import("../../../constants/brands").then((mod) => setGlobalBrands(mod.globalBrands));
+  }, []);
 
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
@@ -267,12 +275,12 @@ export default function DynamicMarketPage() {
       let localizedCategory = formattedCategory;
       try {
         // Check if it's a buyer category (Women, Men, etc.)
-        const buyerCategories = AllInOneCategoryData.kBuyerCategories;
+        const buyerCategories = AllInOneCategoryData?.kBuyerCategories;
         if (buyerCategories && Array.isArray(buyerCategories)) {
           const isBuyerCategory = buyerCategories.some(
             (cat) => cat.key === formattedCategory
           );
-          if (isBuyerCategory) {
+          if (isBuyerCategory && AllInOneCategoryData) {
             localizedCategory = AllInOneCategoryData.localizeBuyerCategoryKey(
               formattedCategory,
               l10n
@@ -295,12 +303,13 @@ export default function DynamicMarketPage() {
         // Localize the subcategory
         let localizedSubcategory = formattedSubcategory;
         try {
-          localizedSubcategory =
-            AllInOneCategoryData.localizeBuyerSubcategoryKey(
+          localizedSubcategory = AllInOneCategoryData
+            ? AllInOneCategoryData.localizeBuyerSubcategoryKey(
               formattedCategory,
               formattedSubcategory,
               l10n
-            );
+            )
+            : formattedSubcategory;
         } catch (error) {
           console.warn("Failed to localize subcategory:", error);
         }
@@ -326,13 +335,14 @@ export default function DynamicMarketPage() {
               .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
               .join(" ");
 
-            localizedSubSubcategory =
-              AllInOneCategoryData.localizeBuyerSubSubcategoryKey(
+            localizedSubSubcategory = AllInOneCategoryData
+              ? AllInOneCategoryData.localizeBuyerSubSubcategoryKey(
                 formattedCategory,
                 formattedSubcategory,
                 formattedSubSubcategory,
                 l10n
-              );
+              )
+              : formattedSubSubcategory;
           } catch (error) {
             console.warn("Failed to localize sub-subcategory:", error);
           }
@@ -347,24 +357,24 @@ export default function DynamicMarketPage() {
       let subcats: string[] = [];
 
       if (categoryKey === "Women" || categoryKey === "Men") {
-        const buyerSubcategories = AllInOneCategoryData.getSubcategories(
+        const buyerSubcategories = AllInOneCategoryData?.getSubcategories(
           categoryKey,
           true
-        );
+        ) ?? [];
         const allSubSubcategories: string[] = [];
 
         buyerSubcategories.forEach((buyerSub) => {
-          const subSubs = AllInOneCategoryData.getSubSubcategories(
+          const subSubs = AllInOneCategoryData?.getSubSubcategories(
             categoryKey,
             buyerSub,
             true
-          );
+          ) ?? [];
           allSubSubcategories.push(...subSubs);
         });
 
         subcats = [...new Set(allSubSubcategories)].sort();
       } else {
-        subcats = AllInOneCategoryData.getSubcategories(categoryKey, true);
+        subcats = AllInOneCategoryData?.getSubcategories(categoryKey, true) ?? [];
       }
 
       setAvailableSubcategories(subcats);
@@ -411,33 +421,33 @@ export default function DynamicMarketPage() {
       if (categoryKey === "Women" || categoryKey === "Men") {
         // Try to find the parent subcategory
         const buyerSubcategories =
-          AllInOneCategoryData.kBuyerSubcategories[categoryKey] || [];
+          AllInOneCategoryData?.kBuyerSubcategories[categoryKey] ?? [];
 
         for (const buyerSub of buyerSubcategories) {
           const subSubs =
-            AllInOneCategoryData.kBuyerSubSubcategories[categoryKey]?.[
+            AllInOneCategoryData?.kBuyerSubSubcategories[categoryKey]?.[
               buyerSub
-            ] || [];
+            ] ?? [];
           if (subSubs.includes(subcategoryKey)) {
             // Found it! Now localize it as a sub-subcategory
-            return AllInOneCategoryData.localizeBuyerSubSubcategoryKey(
+            return AllInOneCategoryData?.localizeBuyerSubSubcategoryKey(
               categoryKey,
               buyerSub,
               subcategoryKey,
               l10n
-            );
+            ) ?? subcategoryKey;
           }
         }
       }
 
       // For other categories, it's a regular subcategory
-      return AllInOneCategoryData.localizeBuyerSubcategoryKey(
+      return AllInOneCategoryData?.localizeBuyerSubcategoryKey(
         categoryKey,
         subcategoryKey,
         l10n
-      );
+      ) ?? subcategoryKey;
     },
-    [l10n]
+    [l10n, AllInOneCategoryData]
   );
 
   // Get localized color name

@@ -3,6 +3,7 @@
 import { sha256 } from "crypto-hash";
 import { circuitBreaker } from "./circuitBreaker";
 import { batchUpdateClicksCallable } from "@/lib/firebase-callable";
+import userActivityService from "@/services/userActivity";
 
 interface ClickData {
   productId: string;
@@ -22,7 +23,7 @@ class AnalyticsBatcher {
   // Click tracking
   private clickBuffer: Map<string, ClickData> = new Map();
   private clickFlushTimer: NodeJS.Timeout | null = null;
-  private readonly CLICK_FLUSH_INTERVAL = 20000; // 20 seconds (matches Flutter)
+  private readonly CLICK_FLUSH_INTERVAL = 60000; 
   private readonly CLICK_COOLDOWN = 1000; // 1 second cooldown per product
   private lastClickTime: Map<string, number> = new Map();
 
@@ -50,6 +51,9 @@ class AnalyticsBatcher {
         this.handleVisibilityChange
       );
       window.addEventListener("beforeunload", this.handleBeforeUnload);
+
+      // Restore any clicks persisted from previous session
+      this.loadPersistedClicks();
     }
   }
 
@@ -66,7 +70,20 @@ class AnalyticsBatcher {
 
   // ============= CLICK TRACKING =============
 
-  recordClick(productId: string, shopId?: string): void {
+  recordClick(
+    productId: string,
+    shopId?: string,
+    metadata?: {
+      productName?: string;
+      category?: string;
+      subcategory?: string;
+      subsubcategory?: string;
+      brand?: string;
+      gender?: string;
+      price?: number;
+      source?: string;
+    }
+  ): void {
     if (this.isDisposed) return;
 
     // Throttle rapid clicks (matches Flutter cooldown)
@@ -77,6 +94,20 @@ class AnalyticsBatcher {
     }
 
     this.lastClickTime.set(productId, now);
+
+    // ✅ Bridge to UserActivityService (matches Flutter's ClickTrackingService.trackProductClick)
+    userActivityService.trackClick({
+      productId,
+      shopId,
+      productName: metadata?.productName,
+      category: metadata?.category,
+      subcategory: metadata?.subcategory,
+      subsubcategory: metadata?.subsubcategory,
+      brand: metadata?.brand,
+      gender: metadata?.gender,
+      price: metadata?.price,
+      source: metadata?.source,
+    });
 
     // Extract clean product ID (matches Flutter logic)
     const cleanId = productId.includes("_")
@@ -270,11 +301,14 @@ class AnalyticsBatcher {
           void this.flushClicks();
         }, retryDelay);
       } else {
-        console.warn("⚠️ Max retries reached, clicks lost");
+        console.warn("⚠️ Max retries reached, persisting to localStorage");
+        this.persistToLocalStorage();
+        this.clickBuffer.clear();
         this.retryAttempts = 0;
       }
 
-      // Re-add failed clicks
+     // Re-add failed clicks only if we're going to retry (not if persisted to localStorage)
+     if (this.retryAttempts > 0) {
       clicksToFlush.forEach((data, itemId) => {
         const existing = this.clickBuffer.get(itemId);
         this.clickBuffer.set(itemId, {
@@ -284,6 +318,7 @@ class AnalyticsBatcher {
           isShopClick: data.isShopClick || false,
         });
       });
+    }
     }
   }
 
@@ -412,65 +447,67 @@ class AnalyticsBatcher {
   private handleVisibilityChange = (): void => {
     if (document.hidden) {
       console.log("📱 App backgrounding - flushing all analytics");
+      this.persistToLocalStorage(); // Persist first as safety net
       void this.flushAll();
     }
   };
 
   private handleBeforeUnload = (): void => {
-    this.flushAllWithBeacon();
+    this.persistToLocalStorage();
   };
 
   async flushAll(): Promise<void> {
     await Promise.all([this.flushClicks()]);
   }
 
-  private async flushAllWithBeacon(): Promise<void> {
-    if (this.clickBuffer.size === 0) return;
+  private static readonly PERSIST_KEY = "pending_click_buffer";
+
+  private persistToLocalStorage(): void {
+    if (this.clickBuffer.size === 0) {
+      localStorage.removeItem(AnalyticsBatcher.PERSIST_KEY);
+      return;
+    }
 
     try {
-      const productClicks: Record<string, number> = {};
-      const shopProductClicks: Record<string, number> = {};
-      const shopClicks: Record<string, number> = {};
-      const shopIds: Record<string, string> = {};
-
-      this.clickBuffer.forEach((data, id) => {
-        // ✅ NEW: Route to correct bucket based on isShopClick flag
-        if (data.isShopClick) {
-          shopClicks[id] = data.count;
-        } else if (data.shopId) {
-          shopProductClicks[id] = data.count;
-          shopIds[id] = data.shopId;
-        } else {
-          productClicks[id] = data.count;
-        }
+      const data: Record<string, ClickData> = {};
+      this.clickBuffer.forEach((value, key) => {
+        data[key] = value;
       });
+      localStorage.setItem(AnalyticsBatcher.PERSIST_KEY, JSON.stringify(data));
+      console.log(`💾 Persisted ${this.clickBuffer.size} clicks to localStorage`);
+    } catch (error) {
+      console.error("❌ Error persisting clicks:", error);
+    }
+  }
 
-      const batchId = await this.generateBatchId();
+  private loadPersistedClicks(): void {
+    try {
+      const stored = localStorage.getItem(AnalyticsBatcher.PERSIST_KEY);
+      if (!stored) return;
 
-      const payload = {
-        batchId,
-        productClicks,
-        shopProductClicks,
-        shopClicks,
-        shopIds,
-      };
+      const data: Record<string, ClickData> = JSON.parse(stored);
+      let restored = 0;
 
-      const projectId =
-        process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "emlak-mobile-app";
-      const functionUrl = `https://europe-west3-${projectId}.cloudfunctions.net/batchUpdateClicks`;
+      for (const [key, value] of Object.entries(data)) {
+        const existing = this.clickBuffer.get(key);
+        this.clickBuffer.set(key, {
+          productId: value.productId,
+          shopId: value.shopId || existing?.shopId,
+          count: (existing?.count || 0) + value.count,
+          isShopClick: value.isShopClick || false,
+        });
+        restored++;
+      }
 
-      const success = navigator.sendBeacon(
-        functionUrl,
-        JSON.stringify({ data: payload })
-      );
+      localStorage.removeItem(AnalyticsBatcher.PERSIST_KEY);
 
-      if (success) {
-        console.log("✅ Final flush via sendBeacon successful");
-      } else {
-        console.warn("⚠️ sendBeacon failed, data may be lost");
+      if (restored > 0) {
+        console.log(`📦 Restored ${restored} persisted clicks`);
+        this.scheduleClickFlush();
       }
     } catch (error) {
-      console.error("❌ Error in flushAllWithBeacon:", error);
+      console.warn("⚠️ Error loading persisted clicks:", error);
+      localStorage.removeItem(AnalyticsBatcher.PERSIST_KEY);
     }
   }
 
@@ -479,7 +516,7 @@ class AnalyticsBatcher {
 
     this.isDisposed = true;
 
-    void this.flushAllWithBeacon();
+    void this.flushAll();
 
     if (this.clickFlushTimer) clearTimeout(this.clickFlushTimer);
 

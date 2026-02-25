@@ -417,7 +417,30 @@ export const SearchHistoryProvider: React.FC<SearchHistoryProviderProps> = ({ ch
     if (effectiveUserId) {
       setIsLoadingHistory(true);
       resetPagination();
-      fetchSearchHistory(effectiveUserId);
+      // Defer listener setup to avoid blocking initial paint
+      let deferredId: number | ReturnType<typeof setTimeout>;
+      if (typeof requestIdleCallback !== "undefined") {
+        deferredId = requestIdleCallback(
+          () => fetchSearchHistory(effectiveUserId),
+          { timeout: 3000 }
+        );
+      } else {
+        deferredId = setTimeout(
+          () => fetchSearchHistory(effectiveUserId),
+          1000
+        );
+      }
+
+      return () => {
+        if (typeof cancelIdleCallback !== "undefined") {
+          cancelIdleCallback(deferredId as number);
+        } else {
+          clearTimeout(deferredId as ReturnType<typeof setTimeout>);
+        }
+        historyUnsubscribe.current?.();
+        deletingRef.clear();
+        optimisticRef.clear();
+      };
     } else {
       clearHistory();
     }

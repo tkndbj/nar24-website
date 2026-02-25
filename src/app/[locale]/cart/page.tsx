@@ -22,7 +22,7 @@ import { useCart, CartTotals, CartItemTotal } from "@/context/CartProvider";
 import { useUser } from "@/context/UserProvider";
 import { useRouter } from "@/navigation";
 import { useTranslations } from "next-intl";
-import { AttributeLocalizationUtils } from "@/constants/AttributeLocalization";
+import type { AttributeLocalizationUtils as AttributeLocalizationUtilsType } from "@/constants/AttributeLocalization";
 import { db } from "@/lib/firebase";
 import Image from "next/image";
 import { Product } from "@/app/models/Product";
@@ -32,6 +32,7 @@ import { useDiscountSelection } from "@/context/DiscountSelectionProvider";
 import { CouponSelectionSheet } from "@/app/components/CouponSelectionSheet";
 import { Coupon, UserBenefit } from "@/app/models/coupon";
 import { useCoupon } from "@/context/CouponProvider";
+import { CouponProviders } from "@/context/CouponProviders";
 import Footer from "@/app/components/Footer";
 
 // Lazy load CartValidationDialog - only shown when validation needed
@@ -91,6 +92,12 @@ export default function CartPage() {
   const router = useRouter();
   const { user, isLoading: isAuthLoading } = useUser();
   const localization = useTranslations();
+
+  // Dynamic import for AttributeLocalizationUtils
+  const [AttributeLocalizationUtils, setAttributeLocalizationUtils] = useState<typeof AttributeLocalizationUtilsType | null>(null);
+  useEffect(() => {
+    import("@/constants/AttributeLocalization").then((mod) => setAttributeLocalizationUtils(mod.AttributeLocalizationUtils));
+  }, []);
   const {
     cartItems,
     cartCount,
@@ -565,12 +572,13 @@ export default function CartPage() {
           !Array.isArray(value)
         ) {
           if (typeof value === "string" || typeof value === "number") {
-            const localizedValue =
-              AttributeLocalizationUtils.getLocalizedAttributeValue(
+            const localizedValue = AttributeLocalizationUtils
+              ? AttributeLocalizationUtils.getLocalizedAttributeValue(
                 key,
                 value,
                 localization
-              );
+              )
+              : String(value);
             if (localizedValue.trim() !== "" && !displayValues.includes(localizedValue)) {
               displayValues.push(localizedValue);
             }
@@ -1297,6 +1305,7 @@ export default function CartPage() {
   // ========================================================================
 
   return (
+    <CouponProviders user={user} db={db}>
     <div className={`min-h-screen flex flex-col transition-colors duration-200 ${isDark ? "bg-gray-950" : "bg-gray-50"}`}>
       <div className="max-w-6xl mx-auto px-0 sm:px-4 pt-4 pb-0 lg:px-8 lg:pt-8 lg:pb-8 flex-1 w-full">
         {/* Back Button */}
@@ -1661,5 +1670,6 @@ export default function CartPage() {
 
       <Footer />
     </div>
+    </CouponProviders>
   );
 }

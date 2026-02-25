@@ -21,7 +21,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { useTranslations } from "next-intl";
 import { db } from "@/lib/firebase";
 import { useUser } from "@/context/UserProvider";
-import { AttributeLocalizationUtils } from "@/constants/AttributeLocalization";
+import type { AttributeLocalizationUtils as AttributeLocalizationUtilsType } from "@/constants/AttributeLocalization";
 import { Product, ProductUtils } from "@/app/models/Product";
 
 interface SalePreferences {
@@ -209,6 +209,12 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
   localization,
 }) => {
   const { user } = useUser();
+
+  // Dynamic import for AttributeLocalizationUtils
+  const [AttributeLocalizationUtils, setAttributeLocalizationUtils] = useState<typeof AttributeLocalizationUtilsType | null>(null);
+  useEffect(() => {
+    import("@/constants/AttributeLocalization").then((mod) => setAttributeLocalizationUtils(mod.AttributeLocalizationUtils));
+  }, []);
 
   // ============================================================================
   // STATE - Matching Flutter exactly
@@ -791,7 +797,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
       return (
         <div key={attributeKey} className="mb-6">
           <h3 className="text-center text-orange-500 font-bold text-base mb-3">
-            {localization
+            {localization && AttributeLocalizationUtils
               ? AttributeLocalizationUtils.getLocalizedAttributeTitle(
                   attributeKey,
                   localization,
@@ -803,7 +809,7 @@ const ProductOptionSelector: React.FC<ProductOptionSelectorProps> = ({
               <AttributeChip
                 key={option}
                 label={
-                  localization
+                  localization && AttributeLocalizationUtils
                     ? AttributeLocalizationUtils.getLocalizedSingleValue(
                         attributeKey,
                         option,

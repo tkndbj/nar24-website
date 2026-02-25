@@ -1,6 +1,6 @@
 // src/components/productdetail/DynamicAttributesWidget.tsx
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   Package,
   Ruler,
@@ -12,7 +12,7 @@ import {
   Tag,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { AttributeLocalizationUtils } from "@/constants/AttributeLocalization";
+import type { AttributeLocalizationUtils as AttributeLocalizationUtilsType } from "@/constants/AttributeLocalization";
 import { Product } from "@/app/models/Product";
 
 interface DynamicAttributesWidgetProps {
@@ -104,6 +104,12 @@ const DynamicAttributesWidget: React.FC<DynamicAttributesWidgetProps> = ({
   isDarkMode = false,
 }) => {
   const t = useTranslations();
+
+  // Dynamic import for AttributeLocalizationUtils
+  const [AttributeLocalizationUtils, setAttributeLocalizationUtils] = useState<typeof AttributeLocalizationUtilsType | null>(null);
+  useEffect(() => {
+    import("@/constants/AttributeLocalization").then((mod) => setAttributeLocalizationUtils(mod.AttributeLocalizationUtils));
+  }, []);
 
   // Get icon for attribute key
   const getAttributeIcon = (key: string): React.ReactNode => {
@@ -215,12 +221,14 @@ const DynamicAttributesWidget: React.FC<DynamicAttributesWidgetProps> = ({
 
       try {
         // Get localized title using AttributeLocalizationUtils
-        const localizedTitle =
-          AttributeLocalizationUtils.getLocalizedAttributeTitle(key, t);
+        const localizedTitle = AttributeLocalizationUtils
+          ? AttributeLocalizationUtils.getLocalizedAttributeTitle(key, t)
+          : key.replace(/([A-Z])/g, " $1").trim();
 
         // Get localized value using AttributeLocalizationUtils
-        const localizedValue =
-          AttributeLocalizationUtils.getLocalizedAttributeValue(key, value, t);
+        const localizedValue = AttributeLocalizationUtils
+          ? AttributeLocalizationUtils.getLocalizedAttributeValue(key, value, t)
+          : (Array.isArray(value) ? value.join(", ") : String(value));
 
         // Only add if we have a meaningful value
         if (localizedValue && localizedValue.trim()) {
@@ -263,7 +271,7 @@ const DynamicAttributesWidget: React.FC<DynamicAttributesWidgetProps> = ({
     });
 
     return attributes;
-  }, [product, t]);
+  }, [product, t, AttributeLocalizationUtils]);
 
   if (isLoading || !product) {
     return (

@@ -326,6 +326,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   // Concurrency control
   const favoriteLocks = useRef<Map<string, Promise<string>>>(new Map());
   const pendingFetches = useRef<Map<string, Promise<void>>>(new Map());
+  const deferredFavInitRef = useRef<number | ReturnType<typeof setTimeout> | null>(null);
 
   // ========================================================================
   // UTILITY FUNCTIONS
@@ -686,6 +687,19 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
     ): Promise<string> => {
       if (!user) return "Please log in";
 
+      // Ensure initialization if deferred init hasn't fired yet
+      if (!isInitialLoadComplete) {
+        if (deferredFavInitRef.current !== null) {
+          if (typeof cancelIdleCallback !== "undefined") {
+            cancelIdleCallback(deferredFavInitRef.current as number);
+          } else {
+            clearTimeout(deferredFavInitRef.current as ReturnType<typeof setTimeout>);
+          }
+          deferredFavInitRef.current = null;
+        }
+        await initializeIfNeeded();
+      }
+
       // Rate limiting
       if (!addFavoriteLimiter.current.canProceed(`add_${productId}`)) {
         console.log("⏱️ Rate limit: Please wait before adding again");
@@ -904,6 +918,8 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
     [
       user,
       favoriteIds,
+      isInitialLoadComplete,
+      initializeIfNeeded,
       getProductShopId, // ✅ CORRECT
       isSystemField,
       showSuccessToast,
@@ -1591,8 +1607,24 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   useEffect(() => {
     if (user && dbProp) {
       clearUserData();
-      initializeIfNeeded();
-      subscribeToBaskets();
+      // Defer initialization to avoid blocking first paint
+      if (typeof requestIdleCallback !== "undefined") {
+        deferredFavInitRef.current = requestIdleCallback(
+          () => {
+            initializeIfNeeded();
+            subscribeToBaskets();
+          },
+          { timeout: 2500 }
+        );
+      } else {
+        deferredFavInitRef.current = setTimeout(
+          () => {
+            initializeIfNeeded();
+            subscribeToBaskets();
+          },
+          700
+        );
+      }
     } else if (!user) {
       disableLiveUpdates();
       if (basketsSubscription.current) {
@@ -1654,6 +1686,15 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      // Cancel deferred init if still pending
+      if (deferredFavInitRef.current !== null) {
+        if (typeof cancelIdleCallback !== "undefined") {
+          cancelIdleCallback(deferredFavInitRef.current as number);
+        } else {
+          clearTimeout(deferredFavInitRef.current as ReturnType<typeof setTimeout>);
+        }
+        deferredFavInitRef.current = null;
+      }
       if (removeFavoriteTimer.current) {
         clearTimeout(removeFavoriteTimer.current);
       }

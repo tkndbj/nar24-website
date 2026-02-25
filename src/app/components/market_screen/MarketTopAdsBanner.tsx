@@ -56,7 +56,6 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
   const carouselInterval = useRef<NodeJS.Timeout | null>(null);
   const touchStartX = useRef<number>(0);
   const touchEndX = useRef<number>(0);
-  const unsubscribeRef = useRef<(() => void) | null>(null);
   const lastColorRef = useRef<string>("");
 
   // Client-side mounting check
@@ -97,7 +96,7 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
     [onBackgroundColorChange, isClient]
   );
 
-  // ✅ OPTIMIZED: Firestore listener (matches Flutter exactly)
+  // ✅ OPTIMIZED: One-time Firestore fetch
   useEffect(() => {
     if (!isClient) return;
 
@@ -111,11 +110,11 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
       console.error("Failed to restore banner color:", error);
     }
 
-    let unsubscribe: (() => void) | null = null;
+    let cancelled = false;
 
     (async () => {
       try {
-        const [db, { collection, query, where, orderBy, onSnapshot }] =
+        const [db, { collection, query, where, orderBy, getDocs }] =
           await Promise.all([getFirebaseDb(), import("firebase/firestore")]);
 
         const q = query(
@@ -124,61 +123,54 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
           orderBy("createdAt", "desc")
         );
 
-        unsubscribe = onSnapshot(
-          q,
-          (snapshot) => {
-            const items: BannerItem[] = [];
+        const snapshot = await getDocs(q);
 
-            snapshot.docs.forEach((doc, index) => {
-              const data = doc.data();
-              const url = data.imageUrl as string;
+        if (cancelled) return;
 
-              if (!url) return;
+        const items: BannerItem[] = [];
 
-              const color = convertDominantColor(data.dominantColor as number);
-              const linkId = data.linkedShopId || data.linkedProductId;
+        snapshot.docs.forEach((doc, index) => {
+          const data = doc.data();
+          const url = data.imageUrl as string;
 
-              items.push({
-                id: doc.id,
-                url,
-                color,
-                linkType: data.linkType as string | undefined,
-                linkId: linkId as string | undefined,
-              });
+          if (!url) return;
 
-              if (!cachedUrls.current.has(url)) {
-                cachedUrls.current.add(url);
-                if (index > 0) {
-                  setTimeout(() => {
-                    const img = new window.Image();
-                    img.src = url;
-                  }, index * 100);
-                }
-              }
-            });
+          const color = convertDominantColor(data.dominantColor as number);
+          const linkId = data.linkedShopId || data.linkedProductId;
 
-            setBanners(items);
-            setIsLoading(false);
+          items.push({
+            id: doc.id,
+            url,
+            color,
+            linkType: data.linkType as string | undefined,
+            linkId: linkId as string | undefined,
+          });
 
-            if (items.length > 0) {
-              updateBackgroundColor(items[0].color);
+          if (!cachedUrls.current.has(url)) {
+            cachedUrls.current.add(url);
+            if (index > 0) {
+              setTimeout(() => {
+                const img = new window.Image();
+                img.src = url;
+              }, index * 100);
             }
-          },
-          (error) => {
-            console.error("Firestore error in AdsBanner:", error);
-            setIsLoading(false);
           }
-        );
+        });
 
-        unsubscribeRef.current = unsubscribe;
+        setBanners(items);
+        setIsLoading(false);
+
+        if (items.length > 0) {
+          updateBackgroundColor(items[0].color);
+        }
       } catch (error) {
-        console.error("Failed to setup AdsBanner listener:", error);
+        console.error("Failed to fetch AdsBanner data:", error);
         setIsLoading(false);
       }
     })();
 
     return () => {
-      if (unsubscribe) unsubscribe();
+      cancelled = true;
     };
   }, [isClient, updateBackgroundColor]);
 
@@ -303,9 +295,6 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (unsubscribeRef.current) {
-        unsubscribeRef.current();
-      }
       if (carouselInterval.current) {
         clearInterval(carouselInterval.current);
       }

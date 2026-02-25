@@ -23,7 +23,7 @@ import {
   Flower2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { AllInOneCategoryData } from "@/constants/productData";
+import type { AllInOneCategoryData as AllInOneCategoryDataType } from "@/constants/productData";
 import { useTranslations } from "next-intl";
 import { useTheme } from "@/hooks/useTheme";
 
@@ -119,6 +119,13 @@ type DrawerState = "main" | "subcategory" | "subsubcategory";
 
 export default function SecondHeader({ className = "" }: SecondHeaderProps) {
   const isDark = useTheme();
+  const [CategoryData, setCategoryData] = useState<typeof AllInOneCategoryDataType | null>(null);
+
+  // Lazy-load productData (202KB) — avoids blocking initial paint
+  useEffect(() => {
+    import("@/constants/productData").then((mod) => setCategoryData(mod.AllInOneCategoryData));
+  }, []);
+
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [showCategoriesMenu, setShowCategoriesMenu] = useState(false);
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
@@ -200,12 +207,13 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
 
   // Get buyer categories from AllInOneCategoryData
   const getBuyerCategories = (): BuyerCategory[] => {
-    return AllInOneCategoryData.kBuyerCategories.map((category) => ({
+    if (!CategoryData) return [];
+    return CategoryData.kBuyerCategories.map((category) => ({
       key: category.key,
-      name: AllInOneCategoryData.localizeBuyerCategoryKey(category.key, l10n),
+      name: CategoryData.localizeBuyerCategoryKey(category.key, l10n),
       icon: categoryIconMap[category.key] || Grid3x3,
       subcategories:
-        AllInOneCategoryData.kBuyerSubcategories[category.key] || [],
+        CategoryData.kBuyerSubcategories[category.key] || [],
     }));
   };
 
@@ -244,11 +252,11 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
     buyerCategory: string,
     subcategory: string
   ): string => {
-    return AllInOneCategoryData.localizeBuyerSubcategoryKey(
+    return CategoryData?.localizeBuyerSubcategoryKey(
       buyerCategory,
       subcategory,
       l10n
-    );
+    ) ?? subcategory;
   };
 
   // Helper function to get localized sub-subcategory name
@@ -257,12 +265,12 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
     subcategory: string,
     subSubcategory: string
   ): string => {
-    return AllInOneCategoryData.localizeBuyerSubSubcategoryKey(
+    return CategoryData?.localizeBuyerSubSubcategoryKey(
       buyerCategory,
       subcategory,
       subSubcategory,
       l10n
-    );
+    ) ?? subSubcategory;
   };
 
   // Helper function to chunk array into groups of 3
@@ -472,7 +480,7 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
       ) {
         // ✅ FIX: Use the same logic as Flutter for Women/Men categories
         // Map buyer subcategory to actual product category
-        const mapping = AllInOneCategoryData.getBuyerToProductMapping(
+        const mapping = CategoryData?.getBuyerToProductMapping(
           selectedMainCategory.key,
           selectedSubcategory,
           subSubcategory
@@ -821,7 +829,7 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
 
                                   {/* Sub-subcategories */}
                                   <div className="space-y-1">
-                                    {AllInOneCategoryData.kBuyerSubSubcategories[
+                                    {CategoryData?.kBuyerSubSubcategories[
                                       category.key
                                     ]?.[subcategory].map((subSubcategory) => (
                                       <button
@@ -835,7 +843,7 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
                                           ) {
                                             // ✅ FIX: Use the same logic as handleSubSubcategoryClick
                                             const productCategoryMapping =
-                                              AllInOneCategoryData.getBuyerToProductMapping(
+                                              CategoryData?.getBuyerToProductMapping(
                                                 category.key,
                                                 subcategory,
                                                 subSubcategory
@@ -1172,7 +1180,7 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
                       </span>
                     </button>
 
-                    {AllInOneCategoryData.kBuyerSubSubcategories[
+                    {CategoryData?.kBuyerSubSubcategories[
                       selectedMainCategory.key
                     ]?.[selectedSubcategory]?.map((subSubcategory) => (
                       <button

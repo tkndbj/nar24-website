@@ -38,7 +38,7 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { globalBrands } from "@/constants/brands";
+import type { globalBrands as globalBrandsType } from "@/constants/brands";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public types
@@ -286,6 +286,12 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
   const t = useTranslations();
   const isMobileDrawer = onClose !== undefined;
   const dk = isDarkMode;
+
+  // Dynamic import for globalBrands
+  const [globalBrands, setGlobalBrands] = useState<typeof globalBrandsType>([]);
+  useEffect(() => {
+    import("@/constants/brands").then((mod) => setGlobalBrands(mod.globalBrands));
+  }, []);
 
   // ── Section visibility (mirrors Flutter's conditional filter rendering) ──
   const showGender = useMemo(
