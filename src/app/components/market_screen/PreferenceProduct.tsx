@@ -13,128 +13,43 @@ import { ProductUtils } from "@/app/models/Product";
 import type { Product } from "@/app/models/Product";
 import type { PrefetchedProduct } from "@/types/MarketLayout";
 
-// GPU-accelerated shimmer loading component
-const ShimmerCard = React.memo(
-  ({
-    portraitImageHeight,
-    infoAreaHeight,
-    scaleFactor,
-    isDarkMode,
-  }: {
-    portraitImageHeight: number;
-    infoAreaHeight: number;
-    scaleFactor: number;
-    isDarkMode: boolean;
-  }) => {
-    const cardHeight = (portraitImageHeight + infoAreaHeight) * scaleFactor;
-    const imageHeight = portraitImageHeight * scaleFactor;
-    const infoHeight = infoAreaHeight * scaleFactor;
+// Shimmer skeleton — uses global CSS classes from globals.css (shimmer-effect)
+const ShimmerCard = React.memo(({ isDarkMode }: { isDarkMode: boolean }) => {
+  const shimmer = `shimmer-effect ${isDarkMode ? "shimmer-effect-dark" : "shimmer-effect-light"}`;
+  const imgBg = isDarkMode ? "bg-gray-700" : "bg-gray-100";
+  const textBg = isDarkMode ? "bg-gray-700" : "bg-gray-200";
 
-    // GPU-accelerated shimmer styles using transform instead of left
-    const shimmerStyle = {
-      position: 'absolute' as const,
-      top: 0,
-      left: 0,
-      width: '100%',
-      height: '100%',
-      background: isDarkMode
-        ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)'
-        : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)',
-      animation: 'shimmerTransform 1.2s ease-in-out infinite',
-      willChange: 'transform',
-    };
-
-    return (
-      <>
-        <style jsx global>{`
-          @keyframes shimmerTransform {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
-          }
-        `}</style>
-        <div
-          className="rounded-xl overflow-hidden shadow-sm"
-          style={{
-            height: `${cardHeight}px`,
-            backgroundColor: isDarkMode ? '#1f2937' : '#ffffff'
-          }}
-        >
-          {/* Image area with shimmer */}
-          <div
-            className="w-full relative overflow-hidden"
-            style={{
-              height: `${imageHeight}px`,
-              backgroundColor: isDarkMode ? '#374151' : '#f3f4f6'
-            }}
-          >
-            <div style={shimmerStyle} />
-          </div>
-
-          {/* Info area */}
-          <div className="p-2 space-y-2" style={{ height: `${infoHeight}px` }}>
-            {/* Title skeleton */}
-            <div
-              className="h-3 rounded w-3/4 relative overflow-hidden"
-              style={{ backgroundColor: isDarkMode ? '#374151' : '#e5e7eb' }}
-            >
-              <div style={shimmerStyle} />
-            </div>
-            <div
-              className="h-3 rounded w-1/2 relative overflow-hidden"
-              style={{ backgroundColor: isDarkMode ? '#374151' : '#e5e7eb' }}
-            >
-              <div style={shimmerStyle} />
-            </div>
-
-            {/* Price skeleton */}
-            <div
-              className="h-4 rounded w-2/5 mt-auto relative overflow-hidden"
-              style={{ backgroundColor: isDarkMode ? '#374151' : '#e5e7eb' }}
-            >
-              <div style={shimmerStyle} />
-            </div>
-          </div>
-        </div>
-      </>
-    );
-  }
-);
-ShimmerCard.displayName = "ShimmerCard";
-
-// Shimmer list
-const ShimmerList = React.memo(
-  ({
-    rowHeight,
-    portraitImageHeight,
-    infoAreaHeight,
-    scaleFactor,
-    isDarkMode,
-  }: {
-    rowHeight: number;
-    portraitImageHeight: number;
-    infoAreaHeight: number;
-    scaleFactor: number;
-    isDarkMode: boolean;
-  }) => {
-    return (
-      <div
-        className="flex gap-2 px-0 lg:px-2 overflow-hidden"
-        style={{ height: `${rowHeight - 60}px` }}
-      >
-        {[0, 1, 2, 3, 4].map((index) => (
-          <div key={index} className="flex-shrink-0" style={{ width: "190px" }}>
-            <ShimmerCard
-              portraitImageHeight={portraitImageHeight}
-              infoAreaHeight={infoAreaHeight}
-              scaleFactor={scaleFactor}
-              isDarkMode={isDarkMode}
-            />
+  return (
+    <div className={`rounded-xl overflow-hidden shadow-sm ${isDarkMode ? "bg-gray-800" : "bg-white"}`}
+      style={{ height: `${(380 + 80) * 0.88}px` }}
+    >
+      <div className={`w-full relative overflow-hidden ${imgBg}`} style={{ height: `${380 * 0.88}px` }}>
+        <div className={shimmer} />
+      </div>
+      <div className="p-2 space-y-2" style={{ height: `${80 * 0.88}px` }}>
+        {[75, 50].map((w, i) => (
+          <div key={i} className={`h-3 rounded relative overflow-hidden ${textBg}`} style={{ width: `${w}%` }}>
+            <div className={shimmer} />
           </div>
         ))}
+        <div className={`h-4 rounded relative overflow-hidden ${textBg}`} style={{ width: "40%" }}>
+          <div className={shimmer} />
+        </div>
       </div>
-    );
-  }
-);
+    </div>
+  );
+});
+ShimmerCard.displayName = "ShimmerCard";
+
+const ShimmerList = React.memo(({ isDarkMode }: { isDarkMode: boolean }) => (
+  <div className="flex gap-2 px-0 lg:px-2 overflow-hidden" style={{ height: `${380 + 80 + 40 - 60}px` }}>
+    {[0, 1, 2, 3, 4].map((i) => (
+      <div key={i} className="flex-shrink-0" style={{ width: "190px" }}>
+        <ShimmerCard isDarkMode={isDarkMode} />
+      </div>
+    ))}
+  </div>
+));
 ShimmerList.displayName = "ShimmerList";
 
 interface PreferenceProductProps {
@@ -441,10 +356,6 @@ export const PreferenceProduct = React.memo(
             {/* Content */}
             {isLoading && products.length === 0 ? (
               <ShimmerList
-                rowHeight={rowHeight}
-                portraitImageHeight={portraitImageHeight}
-                infoAreaHeight={infoAreaHeight}
-                scaleFactor={scaleFactor}
                 isDarkMode={isDarkMode}
               />
             ) : error && products.length === 0 ? (

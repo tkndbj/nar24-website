@@ -51,65 +51,29 @@ const OVERRIDE_INNER_SCALE = 1.2;
 const CARD_WIDTH = 205;
 
 // ============================================================================
-// SHIMMER — GPU-accelerated, matching PreferenceProduct
+// SHIMMER — uses global CSS classes from globals.css (shimmer-effect)
 // ============================================================================
 
 const ShimmerCard = React.memo(({ isDarkMode }: { isDarkMode: boolean }) => {
-  const cardHeight = (PORTRAIT_IMAGE_HEIGHT + INFO_AREA_HEIGHT) * SCALE_FACTOR;
-  const imageHeight = PORTRAIT_IMAGE_HEIGHT * SCALE_FACTOR;
-  const infoHeight = INFO_AREA_HEIGHT * SCALE_FACTOR;
-
-  const shimmerStyle = {
-    position: "absolute" as const,
-    top: 0,
-    left: 0,
-    width: "100%",
-    height: "100%",
-    background: isDarkMode
-      ? "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)"
-      : "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)",
-    animation: "shimmerTransform 1.2s ease-in-out infinite",
-    willChange: "transform",
-  };
+  const shimmer = `shimmer-effect ${isDarkMode ? "shimmer-effect-dark" : "shimmer-effect-light"}`;
+  const imgBg = isDarkMode ? "bg-gray-700" : "bg-gray-100";
+  const textBg = isDarkMode ? "bg-gray-700" : "bg-gray-200";
 
   return (
-    <div
-      className="rounded-xl overflow-hidden shadow-sm"
-      style={{
-        height: `${cardHeight}px`,
-        backgroundColor: isDarkMode ? "#1f2937" : "#ffffff",
-      }}
+    <div className={`rounded-xl overflow-hidden shadow-sm ${isDarkMode ? "bg-gray-800" : "bg-white"}`}
+      style={{ height: `${(PORTRAIT_IMAGE_HEIGHT + INFO_AREA_HEIGHT) * SCALE_FACTOR}px` }}
     >
-      {/* Image area */}
-      <div
-        className="w-full relative overflow-hidden"
-        style={{
-          height: `${imageHeight}px`,
-          backgroundColor: isDarkMode ? "#374151" : "#f3f4f6",
-        }}
-      >
-        <div style={shimmerStyle} />
+      <div className={`w-full relative overflow-hidden ${imgBg}`} style={{ height: `${PORTRAIT_IMAGE_HEIGHT * SCALE_FACTOR}px` }}>
+        <div className={shimmer} />
       </div>
-
-      {/* Info area */}
-      <div className="p-2 space-y-2" style={{ height: `${infoHeight}px` }}>
-        <div
-          className="h-3 rounded w-3/4 relative overflow-hidden"
-          style={{ backgroundColor: isDarkMode ? "#374151" : "#e5e7eb" }}
-        >
-          <div style={shimmerStyle} />
-        </div>
-        <div
-          className="h-3 rounded w-1/2 relative overflow-hidden"
-          style={{ backgroundColor: isDarkMode ? "#374151" : "#e5e7eb" }}
-        >
-          <div style={shimmerStyle} />
-        </div>
-        <div
-          className="h-4 rounded w-2/5 mt-auto relative overflow-hidden"
-          style={{ backgroundColor: isDarkMode ? "#374151" : "#e5e7eb" }}
-        >
-          <div style={shimmerStyle} />
+      <div className="p-2 space-y-2" style={{ height: `${INFO_AREA_HEIGHT * SCALE_FACTOR}px` }}>
+        {[75, 50].map((w, i) => (
+          <div key={i} className={`h-3 rounded relative overflow-hidden ${textBg}`} style={{ width: `${w}%` }}>
+            <div className={shimmer} />
+          </div>
+        ))}
+        <div className={`h-4 rounded relative overflow-hidden ${textBg}`} style={{ width: "40%" }}>
+          <div className={shimmer} />
         </div>
       </div>
     </div>
@@ -118,10 +82,7 @@ const ShimmerCard = React.memo(({ isDarkMode }: { isDarkMode: boolean }) => {
 ShimmerCard.displayName = "DynamicShimmerCard";
 
 const ShimmerList = React.memo(({ isDarkMode }: { isDarkMode: boolean }) => (
-  <div
-    className="flex gap-2 px-0 lg:px-2 overflow-hidden"
-    style={{ height: `${ROW_HEIGHT - 60}px` }}
-  >
+  <div className="flex gap-2 px-0 lg:px-2 overflow-hidden" style={{ height: `${ROW_HEIGHT - 60}px` }}>
     {[0, 1, 2, 3, 4].map((i) => (
       <div key={i} className="flex-shrink-0" style={{ width: `${CARD_WIDTH}px` }}>
         <ShimmerCard isDarkMode={isDarkMode} />
@@ -492,15 +453,6 @@ const DynamicListSection = React.memo(
         </div>
 
         <style jsx global>{`
-          @keyframes shimmerTransform {
-            0% {
-              transform: translateX(-100%);
-            }
-            100% {
-              transform: translateX(100%);
-            }
-          }
-
           .scrollbar-hide::-webkit-scrollbar {
             display: none;
           }
