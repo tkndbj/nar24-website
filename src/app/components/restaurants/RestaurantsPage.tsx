@@ -1,12 +1,16 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useTheme } from "@/hooks/useTheme";
 import { Restaurant } from "@/types/Restaurant";
-import { Star, MapPin, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import TypeSenseServiceManager from "@/lib/typesense_service_manager";
+import type { FacetValue } from "@/lib/typesense_restaurant_service";
+import { Star, ChevronLeft, ChevronRight, ArrowUpDown } from "lucide-react";
+import type { RestaurantSortOption } from "@/lib/typesense_restaurant_service";
+import FilterIcons from "./FilterIcons";
 
 const BANNER_IMAGES = ["/images/1.png", "/images/2.png", "/images/3.png"];
 const BANNER_INTERVAL = 5000;
@@ -105,6 +109,50 @@ function BannerCarousel() {
   );
 }
 
+// ─── Cuisine Pill Button ─────────────────────────────────────────────────────
+
+function CuisinePill({
+  label,
+  count,
+  isActive,
+  isDarkMode,
+  onClick,
+}: {
+  label: string;
+  count?: number;
+  isActive: boolean;
+  isDarkMode: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-200 ${
+        isActive
+          ? "bg-orange-500 text-white"
+          : isDarkMode
+            ? "bg-gray-800 text-gray-300 border border-gray-700 hover:border-gray-500 hover:text-white"
+            : "bg-white text-gray-700 border border-gray-200 hover:border-gray-300 hover:text-gray-900"
+      }`}
+    >
+      {label}
+      {count != null && (
+        <span
+          className={`text-xs ${
+            isActive
+              ? "text-white/80"
+              : isDarkMode
+                ? "text-gray-500"
+                : "text-gray-400"
+          }`}
+        >
+          {count}
+        </span>
+      )}
+    </button>
+  );
+}
+
 // ─── Restaurant Card ────────────────────────────────────────────────────────
 
 function RestaurantCard({
@@ -114,15 +162,13 @@ function RestaurantCard({
   restaurant: Restaurant;
   isDarkMode: boolean;
 }) {
-  const t = useTranslations("restaurants");
-
   return (
     <Link
       href={`/restaurantdetail/${restaurant.id}`}
-      className={`group flex items-center gap-4 rounded-2xl p-4 transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5 block ${
+      className={`group flex items-center gap-4 rounded-2xl p-4 block ${
         isDarkMode
-          ? "bg-gray-800/80 border border-gray-700/50 hover:border-gray-600"
-          : "bg-white border border-gray-100 hover:border-gray-200 shadow-sm"
+          ? "border border-gray-700/40"
+          : "border border-gray-200"
       }`}
     >
       {/* Profile Image */}
@@ -148,52 +194,78 @@ function RestaurantCard({
 
       {/* Content */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <h3
-            className={`font-bold text-base truncate ${
-              isDarkMode ? "text-white" : "text-gray-900"
-            }`}
-          >
-            {restaurant.name}
-          </h3>
-          {restaurant.averageRating != null && restaurant.averageRating > 0 && (
-            <span className="flex items-center gap-0.5 text-xs font-semibold flex-shrink-0">
-              <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
-              {restaurant.averageRating.toFixed(1)}
-            </span>
-          )}
-        </div>
+        <h3
+          className={`font-bold text-base truncate ${
+            isDarkMode ? "text-white" : "text-gray-900"
+          }`}
+        >
+          {restaurant.name}
+        </h3>
 
-        {restaurant.categories && restaurant.categories.length > 0 && (
+        {restaurant.cuisineTypes && restaurant.cuisineTypes.length > 0 && (
           <p
             className={`text-sm mt-0.5 truncate ${
               isDarkMode ? "text-gray-400" : "text-gray-500"
             }`}
           >
-            {restaurant.categories.join(", ")}
+            {restaurant.cuisineTypes.join(", ")}
           </p>
         )}
 
-        {/* Meta info row */}
-        <div
-          className={`flex items-center flex-wrap gap-x-4 gap-y-1 mt-2 text-xs ${
-            isDarkMode ? "text-gray-400" : "text-gray-500"
-          }`}
-        >
-          {restaurant.address && (
-            <span className="flex items-center gap-1 truncate max-w-[220px]">
-              <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
-              {restaurant.address}
+        {restaurant.foodType && restaurant.foodType.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-1.5">
+            {restaurant.foodType.map((ft) => (
+              <span
+                key={ft}
+                className={`text-[10px] px-2 py-0.5 rounded-full ${
+                  isDarkMode
+                    ? "bg-gray-700 text-gray-300"
+                    : "bg-gray-100 text-gray-600"
+                }`}
+              >
+                {ft}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Star rating */}
+        <div className="flex items-center gap-1.5 mt-2">
+          <div className="flex items-center">
+            {Array.from({ length: 5 }).map((_, i) => {
+              const rating = restaurant.averageRating ?? 0;
+              const fill = Math.min(Math.max(rating - i, 0), 1);
+              return (
+                <div key={i} className="relative w-4 h-4">
+                  <Star className="absolute inset-0 w-4 h-4 text-gray-300 dark:text-gray-600" />
+                  {fill > 0 && (
+                    <div
+                      className="absolute inset-0 overflow-hidden"
+                      style={{ width: `${fill * 100}%` }}
+                    >
+                      <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          {restaurant.averageRating != null && restaurant.averageRating > 0 && (
+            <span
+              className={`text-xs font-semibold ${
+                isDarkMode ? "text-gray-300" : "text-gray-700"
+              }`}
+            >
+              {restaurant.averageRating.toFixed(1)}
             </span>
           )}
           {restaurant.reviewCount != null && restaurant.reviewCount > 0 && (
-            <span>
-              {restaurant.reviewCount} {t("reviews")}
-            </span>
-          )}
-          {restaurant.followerCount != null && restaurant.followerCount > 0 && (
-            <span>
-              {restaurant.followerCount} {t("followers")}
+            <span
+              className={`text-xs ${
+                isDarkMode ? "text-gray-500" : "text-gray-400"
+              }`}
+            >
+              ({restaurant.reviewCount})
             </span>
           )}
         </div>
@@ -207,17 +279,65 @@ function RestaurantCard({
 export default function RestaurantsPage({ restaurants }: RestaurantsPageProps) {
   const isDarkMode = useTheme();
   const t = useTranslations("restaurants");
-  const [searchQuery, setSearchQuery] = useState("");
 
-  const filtered = restaurants.filter((r) => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      r.name.toLowerCase().includes(q) ||
-      (r.categories?.some((c) => c.toLowerCase().includes(q)) ?? false) ||
-      (r.address?.toLowerCase().includes(q) ?? false)
-    );
-  });
+  const [selectedCuisine, setSelectedCuisine] = useState<string | null>(null);
+  const [selectedFoodType, setSelectedFoodType] = useState<string | null>(null);
+  const [sortOption, setSortOption] = useState<RestaurantSortOption>("default");
+  const [cuisineFacets, setCuisineFacets] = useState<FacetValue[]>([]);
+  const [filteredRestaurants, setFilteredRestaurants] = useState<Restaurant[]>(restaurants);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const pillsRef = useRef<HTMLDivElement>(null);
+
+  // Fetch cuisine facets on mount
+  useEffect(() => {
+    const svc = TypeSenseServiceManager.instance.restaurantService;
+    svc.fetchRestaurantFacets().then((facets) => {
+      if (facets.cuisineTypes?.length) {
+        setCuisineFacets(facets.cuisineTypes);
+      }
+    });
+  }, []);
+
+  // When cuisine, foodType, or sort changes, search via Typesense
+  useEffect(() => {
+    const hasFilters = selectedCuisine !== null || selectedFoodType !== null;
+    const hasSort = sortOption !== "default";
+
+    if (!hasFilters && !hasSort) {
+      setFilteredRestaurants(restaurants);
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoading(true);
+
+    const svc = TypeSenseServiceManager.instance.restaurantService;
+    svc
+      .searchRestaurants({
+        cuisineTypes: selectedCuisine ? [selectedCuisine] : undefined,
+        foodType: selectedFoodType ? [selectedFoodType] : undefined,
+        isActive: true,
+        sort: sortOption,
+        hitsPerPage: 50,
+      })
+      .then((result) => {
+        if (!cancelled) {
+          setFilteredRestaurants(result.items);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCuisine, selectedFoodType, sortOption, restaurants]);
+
+  const handleCuisineClick = (cuisine: string | null) => {
+    setSelectedCuisine(cuisine);
+  };
 
   return (
     <main className="flex-1">
@@ -225,8 +345,8 @@ export default function RestaurantsPage({ restaurants }: RestaurantsPageProps) {
         {/* Banner */}
         <BannerCarousel />
 
-        {/* Title + Search */}
-        <div className="mt-8 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        {/* Title + Sort */}
+        <div className="mt-8 mb-4 flex items-end justify-between gap-4">
           <div>
             <h1
               className={`text-2xl sm:text-3xl font-bold ${
@@ -244,31 +364,103 @@ export default function RestaurantsPage({ restaurants }: RestaurantsPageProps) {
             </p>
           </div>
 
-          {/* Search bar */}
-          <div className="relative w-full sm:w-80">
-            <Search
-              className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${
-                isDarkMode ? "text-gray-400" : "text-gray-400"
-              }`}
-            />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={t("searchPlaceholder")}
-              className={`w-full pl-10 pr-4 py-2.5 rounded-xl text-sm outline-none transition-colors ${
-                isDarkMode
-                  ? "bg-gray-800 border border-gray-700 text-white placeholder-gray-500 focus:border-orange-500"
-                  : "bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 focus:border-orange-500"
-              }`}
-            />
-          </div>
+          {/* Sort toggle */}
+          <button
+            onClick={() => {
+              const cycle: RestaurantSortOption[] = ["default", "rating_desc", "rating_asc"];
+              const idx = cycle.indexOf(sortOption);
+              setSortOption(cycle[(idx + 1) % cycle.length]);
+            }}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-colors shrink-0 ${
+              sortOption !== "default"
+                ? "bg-orange-500 text-white"
+                : isDarkMode
+                  ? "bg-gray-800 text-gray-300 border border-gray-700 hover:border-gray-500"
+                  : "bg-white text-gray-700 border border-gray-200 hover:border-gray-300"
+            }`}
+          >
+            <ArrowUpDown className="w-4 h-4" />
+            {sortOption === "rating_desc"
+              ? t("sortRatingDesc")
+              : sortOption === "rating_asc"
+                ? t("sortRatingAsc")
+                : t("sort")}
+          </button>
         </div>
 
+        {/* Cuisine Pills */}
+        {cuisineFacets.length > 0 && (
+          <div
+            ref={pillsRef}
+            className="flex gap-2 overflow-x-auto pb-4 mb-2 scrollbar-none"
+            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+          >
+            <CuisinePill
+              label={t("all")}
+              isActive={selectedCuisine === null}
+              isDarkMode={isDarkMode}
+              onClick={() => handleCuisineClick(null)}
+            />
+            {cuisineFacets.map((facet) => (
+              <CuisinePill
+                key={facet.value}
+                label={facet.value}
+                count={facet.count}
+                isActive={selectedCuisine === facet.value}
+                isDarkMode={isDarkMode}
+                onClick={() => handleCuisineClick(facet.value)}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Food Type Icons */}
+        <FilterIcons
+          selected={selectedFoodType}
+          onSelect={setSelectedFoodType}
+          isDarkMode={isDarkMode}
+        />
+
         {/* Restaurant Grid */}
-        {filtered.length > 0 ? (
+        {isLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 pb-10">
-            {filtered.map((restaurant) => (
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div
+                key={i}
+                className={`animate-pulse rounded-2xl p-4 flex items-center gap-4 ${
+                  isDarkMode
+                    ? "bg-gray-800/80 border border-gray-700/50"
+                    : "bg-white border border-gray-100 shadow-sm"
+                }`}
+              >
+                <div
+                  className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex-shrink-0 ${
+                    isDarkMode ? "bg-gray-700" : "bg-gray-200"
+                  }`}
+                />
+                <div className="flex-1 space-y-2">
+                  <div
+                    className={`h-4 rounded w-3/4 ${
+                      isDarkMode ? "bg-gray-700" : "bg-gray-200"
+                    }`}
+                  />
+                  <div
+                    className={`h-3 rounded w-1/2 ${
+                      isDarkMode ? "bg-gray-700" : "bg-gray-200"
+                    }`}
+                  />
+                  <div
+                    className={`h-3 rounded w-2/3 ${
+                      isDarkMode ? "bg-gray-700" : "bg-gray-200"
+                    }`}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : filteredRestaurants.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 pb-10">
+            {filteredRestaurants.map((restaurant) => (
               <RestaurantCard
                 key={restaurant.id}
                 restaurant={restaurant}
@@ -277,7 +469,7 @@ export default function RestaurantsPage({ restaurants }: RestaurantsPageProps) {
             ))}
           </div>
         ) : restaurants.length === 0 ? (
-          /* Empty state - no restaurants in Firestore */
+          /* Empty state - no restaurants at all */
           <div className="flex flex-col items-center justify-center py-20">
             <span className="text-6xl mb-4">🍽️</span>
             <h2
@@ -296,7 +488,7 @@ export default function RestaurantsPage({ restaurants }: RestaurantsPageProps) {
             </p>
           </div>
         ) : (
-          /* No results for search query */
+          /* No results for the selected cuisine */
           <div className="flex flex-col items-center justify-center py-20">
             <span className="text-5xl mb-4">🔍</span>
             <h2

@@ -10,7 +10,12 @@ export interface Restaurant {
   profileImageUrl?: string;
   followerCount?: number;
   isActive?: boolean;
+  isBoosted?: boolean;
   ownerId?: string;
   latitude?: number;
   longitude?: number;
+  clickCount?: number;
+  foodType?: string[];
+  cuisineTypes?: string[];
+  workingDays?: string[];
 }

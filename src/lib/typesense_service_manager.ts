@@ -9,14 +9,25 @@
  */
 
 import { TypeSenseService } from "./typesense_service";
+import { RestaurantTypesenseService } from "./typesense_restaurant_service";
 
 export { TypeSenseService } from "./typesense_service";
+export { RestaurantTypesenseService } from "./typesense_restaurant_service";
 export type {
   TypeSensePage,
   TypeSenseDocument,
   CategorySuggestion,
   FacetCount,
 } from "./typesense_service";
+export type {
+  RestaurantSearchPage,
+  FoodSearchPage,
+  RestaurantFacets,
+  FoodFacets,
+  FacetValue,
+  RestaurantSortOption,
+  FoodSortOption,
+} from "./typesense_restaurant_service";
 
 // ── Configuration ─────────────────────────────────────────────────────────────
 // Read from environment variables so secrets never live in source code.
@@ -44,6 +55,7 @@ class TypeSenseServiceManager {
   private _shopService: TypeSenseService | null = null;
   private _ordersService: TypeSenseService | null = null;
   private _shopsService: TypeSenseService | null = null;
+  private _restaurantService: RestaurantTypesenseService | null = null;
 
   private constructor() {
     // Private — use TypeSenseServiceManager.instance
@@ -110,6 +122,17 @@ class TypeSenseServiceManager {
     return this._shopsService;
   }
 
+  /** Restaurant & food search (`restaurants` + `foods` collections) */
+  get restaurantService(): RestaurantTypesenseService {
+    if (!this._restaurantService) {
+      this._restaurantService = new RestaurantTypesenseService({
+        typesenseHost: TYPESENSE_HOST,
+        typesenseSearchKey: TYPESENSE_SEARCH_KEY,
+      });
+    }
+    return this._restaurantService;
+  }
+
   // ── Helpers ─────────────────────────────────────────────────────────────────
 
   get isInitialized(): boolean {
@@ -117,7 +140,8 @@ class TypeSenseServiceManager {
       this._mainService !== null &&
       this._shopService !== null &&
       this._ordersService !== null &&
-      this._shopsService !== null
+      this._shopsService !== null &&
+      this._restaurantService !== null
     );
   }
 
@@ -130,6 +154,7 @@ class TypeSenseServiceManager {
     this._shopService = null;
     this._ordersService = null;
     this._shopsService = null;
+    this._restaurantService = null;
   }
 
   /**
@@ -144,6 +169,7 @@ class TypeSenseServiceManager {
         this.shopService.isServiceReachable(),
         this.ordersService.isServiceReachable(),
         this.shopsService.isServiceReachable(),
+        this.restaurantService.isServiceReachable(),
       ]);
       return results.every(Boolean);
     } catch (err) {

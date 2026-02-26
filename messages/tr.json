@@ -4872,6 +4872,7 @@
     "title": "Restoranlar",
     "subtitle": "Yakınındaki en iyi restoranları keşfet",
     "searchPlaceholder": "Restoran, mutfak ara...",
+    "all": "Tümü",
     "open": "Açık",
     "closed": "Kapalı",
     "reviews": "değerlendirme",
@@ -4879,8 +4880,11 @@
     "followers": "takipçi",
     "emptyTitle": "Henüz Restoran Yok",
     "emptySubtitle": "Restoranlar eklendiğinde burada görünecektir. Yakında tekrar kontrol edin!",
+    "sort": "Sırala",
+    "sortRatingDesc": "En Yüksek Puan",
+    "sortRatingAsc": "En Düşük Puan",
     "noResults": "Sonuç Bulunamadı",
-    "noResultsSubtitle": "Farklı bir arama terimi deneyin veya tüm restoranlara göz atın."
+    "noResultsSubtitle": "Farklı bir mutfak türü deneyin veya tüm restoranlara göz atın."
   },
   "restaurantDetail": {
     "menu": "Menü",

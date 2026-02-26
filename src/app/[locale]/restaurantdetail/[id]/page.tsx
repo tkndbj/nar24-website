@@ -49,6 +49,9 @@ export default function RestaurantDetailPage() {
           ownerId: d.ownerId as string | undefined,
           latitude: d.latitude != null ? Number(d.latitude) : undefined,
           longitude: d.longitude != null ? Number(d.longitude) : undefined,
+          foodType: Array.isArray(d.foodType) ? (d.foodType as string[]) : undefined,
+          cuisineTypes: Array.isArray(d.cuisineTypes) ? (d.cuisineTypes as string[]) : undefined,
+          workingDays: Array.isArray(d.workingDays) ? (d.workingDays as string[]) : undefined,
         });
       }
 

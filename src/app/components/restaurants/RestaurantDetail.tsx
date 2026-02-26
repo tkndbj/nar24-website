@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
@@ -10,16 +10,13 @@ import { Food } from "@/types/Food";
 import { FoodCategoryData } from "@/constants/foodData";
 import {
   Star,
-  MapPin,
-  Phone,
   Clock,
   ChevronLeft,
   Search,
   UtensilsCrossed,
-  SlidersHorizontal,
-  X,
-  ChevronDown,
 } from "lucide-react";
+import TypeSenseServiceManager from "@/lib/typesense_service_manager";
+import FilterIcons from "./FilterIcons";
 
 interface RestaurantDetailProps {
   restaurant: Restaurant | null;
@@ -56,8 +53,8 @@ function RestaurantHeader({
       <div
         className={`rounded-2xl p-5 sm:p-6 ${
           isDarkMode
-            ? "bg-gray-900 border border-gray-800"
-            : "bg-white border border-gray-100 shadow-lg"
+            ? "border border-gray-700/40"
+            : "border border-gray-200"
         }`}
       >
         <div className="flex items-start gap-4">
@@ -101,7 +98,7 @@ function RestaurantHeader({
               </p>
             )}
 
-            {/* Meta row */}
+            {/* Rating + cuisine + food type */}
             <div
               className={`flex items-center flex-wrap gap-x-4 gap-y-1.5 mt-3 text-sm ${
                 isDarkMode ? "text-gray-400" : "text-gray-500"
@@ -118,20 +115,26 @@ function RestaurantHeader({
                   )}
                 </span>
               )}
-              {restaurant.address && (
-                <span className="flex items-center gap-1">
-                  <MapPin className="w-4 h-4 flex-shrink-0" />
-                  {restaurant.address}
+              {restaurant.cuisineTypes && restaurant.cuisineTypes.length > 0 && (
+                <span className="truncate">
+                  {restaurant.cuisineTypes.join(", ")}
                 </span>
               )}
-              {restaurant.contactNo && (
-                <a
-                  href={`tel:${restaurant.contactNo}`}
-                  className="flex items-center gap-1 hover:text-orange-500 transition-colors"
-                >
-                  <Phone className="w-4 h-4 flex-shrink-0" />
-                  {restaurant.contactNo}
-                </a>
+              {restaurant.foodType && restaurant.foodType.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {restaurant.foodType.map((ft) => (
+                    <span
+                      key={ft}
+                      className={`text-xs px-2 py-0.5 rounded-full ${
+                        isDarkMode
+                          ? "bg-gray-700 text-gray-300"
+                          : "bg-gray-100 text-gray-600"
+                      }`}
+                    >
+                      {ft}
+                    </span>
+                  ))}
+                </div>
               )}
             </div>
           </div>
@@ -159,10 +162,10 @@ function FoodCard({
 
   return (
     <div
-      className={`flex gap-4 rounded-2xl p-4 transition-all duration-200 hover:shadow-md ${
+      className={`flex gap-4 rounded-2xl p-4 ${
         isDarkMode
-          ? "bg-gray-800/60 border border-gray-700/50 hover:border-gray-600"
-          : "bg-white border border-gray-100 hover:border-gray-200 shadow-sm"
+          ? "border border-gray-700/40"
+          : "border border-gray-200"
       }`}
     >
       {/* Food image */}
@@ -296,281 +299,6 @@ function LoadingSkeleton({ isDarkMode }: { isDarkMode: boolean }) {
   );
 }
 
-// ─── Filter Panel ───────────────────────────────────────────────────────────
-
-interface FilterState {
-  category: string | null;
-  foodTypes: Set<string>;
-}
-
-function FilterPanel({
-  filters,
-  onFiltersChange,
-  availableCategories,
-  availableFoodTypes,
-  isDarkMode,
-}: {
-  filters: FilterState;
-  onFiltersChange: (filters: FilterState) => void;
-  availableCategories: string[];
-  availableFoodTypes: Map<string, Set<string>>;
-  isDarkMode: boolean;
-}) {
-  const t = useTranslations("restaurantDetail");
-  const tGlobal = useTranslations();
-  const [isOpen, setIsOpen] = useState(false);
-
-  const activeFilterCount =
-    (filters.category ? 1 : 0) + filters.foodTypes.size;
-
-  // Food types to show: if a category is selected, show its types; otherwise show nothing
-  const visibleFoodTypes = useMemo(() => {
-    if (!filters.category) return [];
-    const typesInCategory = availableFoodTypes.get(filters.category);
-    if (!typesInCategory) return [];
-    // Order by foodData.ts ordering
-    const orderedTypes = FoodCategoryData.kFoodTypes[filters.category] || [];
-    return orderedTypes.filter((ft) => typesInCategory.has(ft));
-  }, [filters.category, availableFoodTypes]);
-
-  const handleCategorySelect = (cat: string | null) => {
-    if (cat === filters.category) {
-      // Deselect
-      onFiltersChange({ category: null, foodTypes: new Set() });
-    } else {
-      // New category — clear food type selection
-      onFiltersChange({ category: cat, foodTypes: new Set() });
-    }
-  };
-
-  const handleFoodTypeToggle = (ft: string) => {
-    const next = new Set(filters.foodTypes);
-    if (next.has(ft)) {
-      next.delete(ft);
-    } else {
-      next.add(ft);
-    }
-    onFiltersChange({ ...filters, foodTypes: next });
-  };
-
-  const clearAll = () => {
-    onFiltersChange({ category: null, foodTypes: new Set() });
-  };
-
-  return (
-    <div className="mb-4">
-      {/* Category chips row */}
-      <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
-        {/* Filter toggle button */}
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
-            isOpen || activeFilterCount > 0
-              ? "bg-orange-500 text-white"
-              : isDarkMode
-                ? "bg-gray-800 text-gray-300 border border-gray-700 hover:border-gray-600"
-                : "bg-gray-100 text-gray-700 border border-gray-200 hover:border-gray-300"
-          }`}
-        >
-          <SlidersHorizontal className="w-3.5 h-3.5" />
-          {t("filter")}
-          {activeFilterCount > 0 && (
-            <span className="ml-0.5 w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-xs">
-              {activeFilterCount}
-            </span>
-          )}
-          <ChevronDown
-            className={`w-3.5 h-3.5 transition-transform ${isOpen ? "rotate-180" : ""}`}
-          />
-        </button>
-
-        {/* All chip */}
-        <button
-          onClick={() => {
-            clearAll();
-            setIsOpen(false);
-          }}
-          className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-            !filters.category && filters.foodTypes.size === 0
-              ? "bg-orange-500 text-white"
-              : isDarkMode
-                ? "bg-gray-800 text-gray-300 border border-gray-700 hover:border-gray-600"
-                : "bg-gray-100 text-gray-700 border border-gray-200 hover:border-gray-300"
-          }`}
-        >
-          {t("all")}
-        </button>
-
-        {/* Category quick chips */}
-        {availableCategories.map((cat) => {
-          const translationKey = FoodCategoryData.kCategoryTranslationKeys[cat];
-          const label = translationKey ? tGlobal(translationKey) : cat;
-          return (
-            <button
-              key={cat}
-              onClick={() => handleCategorySelect(cat)}
-              className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-                filters.category === cat
-                  ? "bg-orange-500 text-white"
-                  : isDarkMode
-                    ? "bg-gray-800 text-gray-300 border border-gray-700 hover:border-gray-600"
-                    : "bg-gray-100 text-gray-700 border border-gray-200 hover:border-gray-300"
-              }`}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Expanded filter panel */}
-      {isOpen && (
-        <div
-          className={`mt-3 rounded-2xl p-4 sm:p-5 ${
-            isDarkMode
-              ? "bg-gray-800/80 border border-gray-700/50"
-              : "bg-gray-50 border border-gray-200"
-          }`}
-        >
-          {/* Panel header */}
-          <div className="flex items-center justify-between mb-4">
-            <h3
-              className={`text-sm font-semibold ${
-                isDarkMode ? "text-white" : "text-gray-900"
-              }`}
-            >
-              {t("filterByCategory")}
-            </h3>
-            {activeFilterCount > 0 && (
-              <button
-                onClick={clearAll}
-                className="text-xs text-orange-500 hover:text-orange-600 font-medium transition-colors"
-              >
-                {t("clearAll")}
-              </button>
-            )}
-          </div>
-
-          {/* Category grid */}
-          <div className="flex flex-wrap gap-2 mb-2">
-            {availableCategories.map((cat) => {
-              const translationKey = FoodCategoryData.kCategoryTranslationKeys[cat];
-              const label = translationKey ? tGlobal(translationKey) : cat;
-              const count = availableFoodTypes.get(cat)?.size || 0;
-              return (
-                <button
-                  key={cat}
-                  onClick={() => handleCategorySelect(cat)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                    filters.category === cat
-                      ? "bg-orange-500 text-white"
-                      : isDarkMode
-                        ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                        : "bg-white text-gray-700 border border-gray-200 hover:border-gray-300"
-                  }`}
-                >
-                  {label}
-                  <span className="ml-1 opacity-60">({count})</span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Food type sub-filters (shown when category is selected) */}
-          {filters.category && visibleFoodTypes.length > 0 && (
-            <div className="mt-4">
-              <h4
-                className={`text-xs font-semibold uppercase tracking-wider mb-2.5 ${
-                  isDarkMode ? "text-gray-400" : "text-gray-500"
-                }`}
-              >
-                {t("filterByType")}
-              </h4>
-              <div className="flex flex-wrap gap-2">
-                {visibleFoodTypes.map((ft) => {
-                  const translationKey = FoodCategoryData.kFoodTypeTranslationKeys[ft];
-                  const label = translationKey ? tGlobal(translationKey) : ft;
-                  const isActive = filters.foodTypes.has(ft);
-                  return (
-                    <button
-                      key={ft}
-                      onClick={() => handleFoodTypeToggle(ft)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                        isActive
-                          ? "bg-orange-500 text-white"
-                          : isDarkMode
-                            ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                            : "bg-white text-gray-600 border border-gray-200 hover:border-gray-300"
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Active filter tags */}
-      {activeFilterCount > 0 && !isOpen && (
-        <div className="flex items-center gap-2 mt-2 flex-wrap">
-          {filters.category && (
-            <span
-              className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${
-                isDarkMode
-                  ? "bg-orange-500/20 text-orange-400"
-                  : "bg-orange-50 text-orange-600"
-              }`}
-            >
-              {FoodCategoryData.kCategoryTranslationKeys[filters.category]
-                ? tGlobal(FoodCategoryData.kCategoryTranslationKeys[filters.category])
-                : filters.category}
-              <button
-                onClick={() => onFiltersChange({ category: null, foodTypes: new Set() })}
-                className="ml-0.5 hover:opacity-70"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </span>
-          )}
-          {Array.from(filters.foodTypes).map((ft) => (
-            <span
-              key={ft}
-              className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${
-                isDarkMode
-                  ? "bg-blue-500/20 text-blue-400"
-                  : "bg-blue-50 text-blue-600"
-              }`}
-            >
-              {FoodCategoryData.kFoodTypeTranslationKeys[ft]
-                ? tGlobal(FoodCategoryData.kFoodTypeTranslationKeys[ft])
-                : ft}
-              <button
-                onClick={() => handleFoodTypeToggle(ft)}
-                className="ml-0.5 hover:opacity-70"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </span>
-          ))}
-          <button
-            onClick={clearAll}
-            className={`text-xs font-medium transition-colors ${
-              isDarkMode
-                ? "text-gray-400 hover:text-gray-300"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            {t("clearAll")}
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── Main Component ─────────────────────────────────────────────────────────
 
 export default function RestaurantDetail({
@@ -581,51 +309,28 @@ export default function RestaurantDetail({
   const isDarkMode = useTheme();
   const t = useTranslations("restaurantDetail");
   const [searchQuery, setSearchQuery] = useState("");
-  const [filters, setFilters] = useState<FilterState>({
-    category: null,
-    foodTypes: new Set(),
-  });
+  const [selectedIconCategory, setSelectedIconCategory] = useState<string | null>(null);
+  const [restaurantFoodCategories, setRestaurantFoodCategories] = useState<string[]>([]);
 
-  // Derive available categories and food types from actual restaurant foods
-  const { availableCategories, availableFoodTypes } = useMemo(() => {
-    const catSet = new Set<string>();
-    const typeMap = new Map<string, Set<string>>();
-
-    for (const food of foods) {
-      const cat = food.foodCategory || "";
-      if (!cat) continue;
-      catSet.add(cat);
-      if (!typeMap.has(cat)) typeMap.set(cat, new Set());
-      if (food.foodType) typeMap.get(cat)!.add(food.foodType);
-    }
-
-    // Sort categories by foodData.ts order
-    const categoryOrder = FoodCategoryData.kCategories.map((c) => c.key);
-    const sorted = Array.from(catSet).sort((a, b) => {
-      const ia = categoryOrder.indexOf(a);
-      const ib = categoryOrder.indexOf(b);
-      // Unknown categories go to end
-      return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+  // Fetch this restaurant's food categories from Typesense facets
+  useEffect(() => {
+    if (!restaurant?.id) return;
+    const svc = TypeSenseServiceManager.instance.restaurantService;
+    svc.fetchFoodFacets({ restaurantId: restaurant.id }).then((facets) => {
+      if (facets.foodCategory?.length) {
+        setRestaurantFoodCategories(facets.foodCategory.map((f) => f.value));
+      }
     });
+  }, [restaurant?.id]);
 
-    return { availableCategories: sorted, availableFoodTypes: typeMap };
-  }, [foods]);
-
-  // Filter foods based on all active filters + search
+  // Filter foods based on icon filter + search
   const filteredFoods = useMemo(() => {
     let list = foods;
 
-    // Category filter
-    if (filters.category) {
-      list = list.filter((f) => f.foodCategory === filters.category);
+    if (selectedIconCategory) {
+      list = list.filter((f) => f.foodCategory === selectedIconCategory);
     }
 
-    // Food type filter
-    if (filters.foodTypes.size > 0) {
-      list = list.filter((f) => filters.foodTypes.has(f.foodType));
-    }
-
-    // Search
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       list = list.filter(
@@ -638,7 +343,7 @@ export default function RestaurantDetail({
     }
 
     return list;
-  }, [foods, filters, searchQuery]);
+  }, [foods, selectedIconCategory, searchQuery]);
 
   if (loading) {
     return <LoadingSkeleton isDarkMode={isDarkMode} />;
@@ -665,7 +370,7 @@ export default function RestaurantDetail({
     );
   }
 
-  const hasActiveFilters = filters.category !== null || filters.foodTypes.size > 0 || searchQuery.trim() !== "";
+  const hasActiveFilters = selectedIconCategory !== null || searchQuery.trim() !== "";
 
   return (
     <main className="flex-1">
@@ -708,14 +413,13 @@ export default function RestaurantDetail({
           </div>
         </div>
 
-        {/* Filter panel */}
-        {availableCategories.length > 0 && (
-          <FilterPanel
-            filters={filters}
-            onFiltersChange={setFilters}
-            availableCategories={availableCategories}
-            availableFoodTypes={availableFoodTypes}
+        {/* Food category icons */}
+        {restaurantFoodCategories.length > 0 && (
+          <FilterIcons
+            selected={selectedIconCategory}
+            onSelect={setSelectedIconCategory}
             isDarkMode={isDarkMode}
+            categories={restaurantFoodCategories}
           />
         )}
 
@@ -768,7 +472,7 @@ export default function RestaurantDetail({
             {hasActiveFilters && (
               <button
                 onClick={() => {
-                  setFilters({ category: null, foodTypes: new Set() });
+                  setSelectedIconCategory(null);
                   setSearchQuery("");
                 }}
                 className="mt-4 px-5 py-2 bg-orange-500 text-white rounded-xl text-sm font-medium hover:bg-orange-600 transition-colors"

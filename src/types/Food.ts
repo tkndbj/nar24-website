@@ -9,4 +9,5 @@ export interface Food {
   preparationTime?: number;
   price: number;
   restaurantId: string;
+  extras?: string[];
 }

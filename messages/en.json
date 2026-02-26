@@ -4860,6 +4860,7 @@
     "title": "Restaurants",
     "subtitle": "Discover the best restaurants near you",
     "searchPlaceholder": "Search restaurants, cuisines...",
+    "all": "All",
     "open": "Open",
     "closed": "Closed",
     "reviews": "reviews",
@@ -4867,8 +4868,11 @@
     "followers": "followers",
     "emptyTitle": "No Restaurants Yet",
     "emptySubtitle": "Restaurants will appear here once they are added. Check back soon!",
+    "sort": "Sort",
+    "sortRatingDesc": "Top Rated",
+    "sortRatingAsc": "Lowest Rated",
     "noResults": "No Results Found",
-    "noResultsSubtitle": "Try a different search term or browse all restaurants."
+    "noResultsSubtitle": "Try a different cuisine or browse all restaurants."
   },
   "restaurantDetail": {
     "menu": "Menu",
