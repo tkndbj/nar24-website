@@ -37,116 +37,102 @@ function RestaurantHeader({
   isDarkMode: boolean;
 }) {
   const t = useTranslations("restaurantDetail");
-  const coverImage = restaurant.coverImageUrls?.[0];
 
   return (
-    <div className="relative">
-      {/* Cover image */}
-      <div className="relative h-52 sm:h-64 md:h-72 overflow-hidden">
-        {coverImage ? (
-          <Image
-            src={coverImage}
-            alt={restaurant.name}
-            fill
-            className="object-cover"
-            priority
-            sizes="100vw"
-          />
-        ) : (
-          <div
-            className={`w-full h-full ${
-              isDarkMode
-                ? "bg-gradient-to-br from-gray-800 to-gray-700"
-                : "bg-gradient-to-br from-orange-100 to-orange-50"
-            }`}
-          />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+      {/* Back button */}
+      <Link
+        href="/restaurants"
+        className={`inline-flex items-center gap-1 mb-4 text-sm font-medium transition-colors ${
+          isDarkMode
+            ? "text-gray-400 hover:text-white"
+            : "text-gray-500 hover:text-gray-900"
+        }`}
+      >
+        <ChevronLeft className="w-4 h-4" />
+        {t("backToRestaurants")}
+      </Link>
 
-        {/* Back button */}
-        <Link
-          href="/restaurants"
-          className="absolute top-4 left-4 w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/60 transition-colors"
-        >
-          <ChevronLeft className="w-5 h-5" />
-        </Link>
-      </div>
-
-      {/* Info overlay */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-20 relative z-10">
-        <div
-          className={`rounded-2xl p-5 sm:p-6 ${
-            isDarkMode
-              ? "bg-gray-900/95 backdrop-blur-sm border border-gray-800"
-              : "bg-white/95 backdrop-blur-sm border border-gray-100 shadow-lg"
-          }`}
-        >
-          <div className="flex items-start gap-4">
-            {/* Profile image */}
-            {restaurant.profileImageUrl && (
-              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden border-2 border-white shadow-md flex-shrink-0 dark:border-gray-700">
-                <Image
-                  src={restaurant.profileImageUrl}
-                  alt={restaurant.name}
-                  width={80}
-                  height={80}
-                  className="object-cover w-full h-full"
-                />
-              </div>
-            )}
-
-            <div className="flex-1 min-w-0">
-              <h1
-                className={`text-xl sm:text-2xl font-bold truncate ${
-                  isDarkMode ? "text-white" : "text-gray-900"
+      <div
+        className={`rounded-2xl p-5 sm:p-6 ${
+          isDarkMode
+            ? "bg-gray-900 border border-gray-800"
+            : "bg-white border border-gray-100 shadow-lg"
+        }`}
+      >
+        <div className="flex items-start gap-4">
+          {/* Profile image */}
+          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden border-2 border-white shadow-md flex-shrink-0 dark:border-gray-700">
+            {restaurant.profileImageUrl ? (
+              <Image
+                src={restaurant.profileImageUrl}
+                alt={restaurant.name}
+                width={80}
+                height={80}
+                className="object-cover w-full h-full"
+              />
+            ) : (
+              <div
+                className={`w-full h-full flex items-center justify-center ${
+                  isDarkMode ? "bg-gray-700" : "bg-gray-100"
                 }`}
               >
-                {restaurant.name}
-              </h1>
+                <span className="text-2xl">🍽️</span>
+              </div>
+            )}
+          </div>
 
-              {restaurant.categories && restaurant.categories.length > 0 && (
-                <p
-                  className={`text-sm mt-0.5 ${
-                    isDarkMode ? "text-gray-400" : "text-gray-500"
-                  }`}
-                >
-                  {restaurant.categories.join(", ")}
-                </p>
-              )}
+          <div className="flex-1 min-w-0">
+            <h1
+              className={`text-xl sm:text-2xl font-bold truncate ${
+                isDarkMode ? "text-white" : "text-gray-900"
+              }`}
+            >
+              {restaurant.name}
+            </h1>
 
-              {/* Meta row */}
-              <div
-                className={`flex items-center flex-wrap gap-x-4 gap-y-1.5 mt-3 text-sm ${
+            {restaurant.categories && restaurant.categories.length > 0 && (
+              <p
+                className={`text-sm mt-0.5 ${
                   isDarkMode ? "text-gray-400" : "text-gray-500"
                 }`}
               >
-                {restaurant.averageRating != null && (
-                  <span className="flex items-center gap-1">
-                    <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                    <span className="font-semibold">
-                      {restaurant.averageRating.toFixed(1)}
-                    </span>
-                    {restaurant.reviewCount != null && restaurant.reviewCount > 0 && (
-                      <span>({restaurant.reviewCount} {t("reviews")})</span>
-                    )}
+                {restaurant.categories.join(", ")}
+              </p>
+            )}
+
+            {/* Meta row */}
+            <div
+              className={`flex items-center flex-wrap gap-x-4 gap-y-1.5 mt-3 text-sm ${
+                isDarkMode ? "text-gray-400" : "text-gray-500"
+              }`}
+            >
+              {restaurant.averageRating != null && (
+                <span className="flex items-center gap-1">
+                  <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                  <span className="font-semibold">
+                    {restaurant.averageRating.toFixed(1)}
                   </span>
-                )}
-                {restaurant.address && (
-                  <span className="flex items-center gap-1">
-                    <MapPin className="w-4 h-4 flex-shrink-0" />
-                    {restaurant.address}
-                  </span>
-                )}
-                {restaurant.contactNo && (
-                  <a
-                    href={`tel:${restaurant.contactNo}`}
-                    className="flex items-center gap-1 hover:text-orange-500 transition-colors"
-                  >
-                    <Phone className="w-4 h-4 flex-shrink-0" />
-                    {restaurant.contactNo}
-                  </a>
-                )}
-              </div>
+                  {restaurant.reviewCount != null && restaurant.reviewCount > 0 && (
+                    <span>({restaurant.reviewCount} {t("reviews")})</span>
+                  )}
+                </span>
+              )}
+              {restaurant.address && (
+                <span className="flex items-center gap-1">
+                  <MapPin className="w-4 h-4 flex-shrink-0" />
+                  {restaurant.address}
+                </span>
+              )}
+              {restaurant.contactNo && (
+                <a
+                  href={`tel:${restaurant.contactNo}`}
+                  className="flex items-center gap-1 hover:text-orange-500 transition-colors"
+                >
+                  <Phone className="w-4 h-4 flex-shrink-0" />
+                  {restaurant.contactNo}
+                </a>
+              )}
             </div>
           </div>
         </div>
@@ -266,10 +252,10 @@ function LoadingSkeleton({ isDarkMode }: { isDarkMode: boolean }) {
 
   return (
     <div className="min-h-screen">
-      {/* Cover skeleton */}
-      <div className={`h-52 sm:h-64 md:h-72 ${skeletonBg} animate-pulse`} />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+        {/* Back link skeleton */}
+        <div className={`h-4 w-32 rounded ${skeletonBg} animate-pulse mb-4`} />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-20 relative z-10">
         {/* Header card skeleton */}
         <div
           className={`rounded-2xl p-5 sm:p-6 ${

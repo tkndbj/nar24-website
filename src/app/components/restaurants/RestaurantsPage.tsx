@@ -115,26 +115,25 @@ function RestaurantCard({
   isDarkMode: boolean;
 }) {
   const t = useTranslations("restaurants");
-  const coverImage = restaurant.coverImageUrls?.[0];
 
   return (
     <Link
       href={`/restaurantdetail/${restaurant.id}`}
-      className={`group rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 block ${
+      className={`group flex items-center gap-4 rounded-2xl p-4 transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5 block ${
         isDarkMode
           ? "bg-gray-800/80 border border-gray-700/50 hover:border-gray-600"
           : "bg-white border border-gray-100 hover:border-gray-200 shadow-sm"
       }`}
     >
-      {/* Cover Image */}
-      <div className="relative h-44 sm:h-48 overflow-hidden">
-        {coverImage ? (
+      {/* Profile Image */}
+      <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden flex-shrink-0">
+        {restaurant.profileImageUrl ? (
           <Image
-            src={coverImage}
+            src={restaurant.profileImageUrl}
             alt={restaurant.name}
             fill
             className="object-cover transition-transform duration-500 group-hover:scale-105"
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            sizes="80px"
           />
         ) : (
           <div
@@ -142,41 +141,28 @@ function RestaurantCard({
               isDarkMode ? "bg-gray-700" : "bg-gray-100"
             }`}
           >
-            <span className="text-4xl">🍽️</span>
-          </div>
-        )}
-
-        {/* Rating badge */}
-        {restaurant.averageRating != null && restaurant.averageRating > 0 && (
-          <div className="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-sm text-white text-xs font-semibold">
-            <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
-            {restaurant.averageRating.toFixed(1)}
-          </div>
-        )}
-
-        {/* Profile image overlay */}
-        {restaurant.profileImageUrl && (
-          <div className="absolute -bottom-5 left-4 w-12 h-12 rounded-xl overflow-hidden border-2 border-white shadow-lg dark:border-gray-800">
-            <Image
-              src={restaurant.profileImageUrl}
-              alt={`${restaurant.name} logo`}
-              fill
-              className="object-cover"
-              sizes="48px"
-            />
+            <span className="text-2xl">🍽️</span>
           </div>
         )}
       </div>
 
       {/* Content */}
-      <div className={`p-4 ${restaurant.profileImageUrl ? "pt-7" : "pt-4"}`}>
-        <h3
-          className={`font-bold text-base truncate ${
-            isDarkMode ? "text-white" : "text-gray-900"
-          }`}
-        >
-          {restaurant.name}
-        </h3>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <h3
+            className={`font-bold text-base truncate ${
+              isDarkMode ? "text-white" : "text-gray-900"
+            }`}
+          >
+            {restaurant.name}
+          </h3>
+          {restaurant.averageRating != null && restaurant.averageRating > 0 && (
+            <span className="flex items-center gap-0.5 text-xs font-semibold flex-shrink-0">
+              <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
+              {restaurant.averageRating.toFixed(1)}
+            </span>
+          )}
+        </div>
 
         {restaurant.categories && restaurant.categories.length > 0 && (
           <p
@@ -190,7 +176,7 @@ function RestaurantCard({
 
         {/* Meta info row */}
         <div
-          className={`flex items-center flex-wrap gap-x-4 gap-y-1.5 mt-3 text-xs ${
+          className={`flex items-center flex-wrap gap-x-4 gap-y-1 mt-2 text-xs ${
             isDarkMode ? "text-gray-400" : "text-gray-500"
           }`}
         >
