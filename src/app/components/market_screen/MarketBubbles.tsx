@@ -11,11 +11,11 @@ interface MarketBubblesProps {
   locale?: string;
 }
 
-interface BubbleData {
+interface CardData {
   label: string;
+  description: string;
   image: string;
-  borderColor: string;
-  backgroundColor: string;
+  accentColor: string;
   showComingSoon: boolean;
 }
 
@@ -24,234 +24,107 @@ export const MarketBubbles: React.FC<MarketBubblesProps> = ({}) => {
   const isDarkMode = useTheme();
   const t = useTranslations("MarketBubbles");
 
-  const bubbles: BubbleData[] = [
+  const cards: CardData[] = [
     {
       label: t("shops"),
+      description: t("shopsDesc"),
       image: "/images/shopbubble.png",
-      borderColor: "#f97316", // orange-500
-      backgroundColor: "rgba(249, 115, 22, 0.2)", // orange-500 with opacity
+      accentColor: "#f97316",
       showComingSoon: false,
     },
     {
       label: t("becomeASeller"),
+      description: t("becomeASellerDesc"),
       image: "/images/createshop.png",
-      borderColor: "#8b5cf6", // purple-500
-      backgroundColor: "rgba(139, 92, 246, 0.2)", // purple-500 with opacity
+      accentColor: "#8b5cf6",
       showComingSoon: false,
     },
     {
       label: "Vitrin",
+      description: t("showcaseDesc"),
       image: "/images/vitrinbubble.png",
-      borderColor: "#22c55e", // green-500
-      backgroundColor: "rgba(34, 197, 94, 0.2)", // green-500 with opacity
+      accentColor: "#22c55e",
       showComingSoon: false,
     },
     {
       label: t("food"),
+      description: t("foodDesc"),
       image: "/images/foodbubble.png",
-      borderColor: "#3b82f6", // blue-500
-      backgroundColor: "rgba(59, 130, 246, 0.2)", // blue-500 with opacity
+      accentColor: "#3b82f6",
       showComingSoon: false,
     },
     {
       label: t("market"),
+      description: t("marketDesc"),
       image: "/images/marketbubble.png",
-      borderColor: "#ec4899", // pink-500
-      backgroundColor: "rgba(236, 72, 153, 0.2)", // pink-500 with opacity
+      accentColor: "#ec4899",
       showComingSoon: true,
     },
   ];
 
-  const handleBubbleClick = (index: number) => {
-    if (index === 0) {
-      router.push("/shops"); // Navigate to /shops for Shops bubble
-    } else if (index === 1) {
-      router.push("/createshop"); // Navigate to /create-shop for Become a Seller bubble
-    } else if (index === 2) {
-      router.push("/dynamicteras"); // Navigate to /dynamicteras for Showcase bubble
-    } else if (index === 3) {
-      router.push("/restaurants"); // Navigate to /restaurants for Restaurants bubble
-    }
-  };
-
-  return (
-    <div className="flex w-full px-4 gap-4 lg:gap-0 lg:justify-evenly overflow-x-auto lg:overflow-x-visible scrollbar-hide pb-2 lg:pb-0">
-      {bubbles.map((bubble, index) => (
-        <div
-          key={bubble.label}
-          className={`flex flex-col items-center cursor-pointer transition-transform duration-200 hover:scale-105 flex-shrink-0 ${
-            bubble.showComingSoon ? "cursor-default opacity-75" : ""
-          }`}
-          onClick={() => !bubble.showComingSoon && handleBubbleClick(index)}
-        >
-          {/* Bubble Container */}
-          <div className="relative">
-            <div
-              className="w-18 h-18 lg:w-20 lg:h-20 rounded-full border-2 flex items-center justify-center relative overflow-hidden transition-all duration-200 hover:shadow-lg"
-              style={{
-                borderColor: bubble.borderColor,
-                backgroundColor: bubble.backgroundColor,
-              }}
-            >
-              {/* Bubble Image */}
-              <div className="relative w-11 h-11 lg:w-12 lg:h-12">
-                <Image
-                  src={bubble.image}
-                  alt={bubble.label}
-                  fill
-                  className="object-contain"
-                  sizes="48px"
-                  priority
-                  loading="eager"
-                />
-              </div>
-            </div>
-
-            {/* Coming Soon Badge */}
-            {bubble.showComingSoon && (
-              <div
-                className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 px-1.5 py-0.5 lg:px-2 lg:py-1 rounded-lg text-white text-xs font-semibold whitespace-nowrap"
-                style={{ backgroundColor: bubble.borderColor }}
-              >
-                {t("comingSoon")}
-              </div>
-            )}
-          </div>
-
-          {/* Label */}
-          <div className="mt-1.5 lg:mt-2">
-            <span
-              className={`text-xs font-semibold text-center block leading-tight ${
-                isDarkMode ? "text-white" : "text-black"
-              }`}
-            >
-              {bubble.label}
-            </span>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-};
-
-// Alternative version with icons if you don't have the image assets
-export const MarketBubblesWithIcons: React.FC<MarketBubblesProps> = ({
-  onNavItemTapped,
-}) => {
-  const router = useRouter();
-  const isDarkMode = useTheme();
-
-  const bubbles = [
-    {
-      label: "Mağazalar",
-      icon: (
-        <svg
-          className="w-10 h-10 lg:w-12 lg:h-12"
-          fill="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path d="M7 4V2C7 1.45 7.45 1 8 1H16C16.55 1 17 1.45 17 2V4H20C20.55 4 21 4.45 21 5S20.55 6 20 6H19V19C19 20.1 18.1 21 17 21H7C5.9 21 5 20.1 5 19V6H4C3.45 6 3 5.55 3 5S3.45 4 4 4H7ZM9 3V4H15V3H9ZM7 6V19H17V6H7Z" />
-        </svg>
-      ),
-      borderColor: "#f97316",
-      backgroundColor: "rgba(249, 115, 22, 0.2)",
-      showComingSoon: false,
-    },
-    {
-      label: "Vitrin",
-      icon: (
-        <svg
-          className="w-10 h-10 lg:w-12 lg:h-12"
-          fill="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path d="M12 2L2 7V10C2 16 6 20.5 12 22C18 20.5 22 16 22 10V7L12 2ZM12 4.3L18.6 7.8L12 11.3L5.4 7.8L12 4.3ZM12 20C8 18.8 4 15.4 4 10V8.5L12 12.5L20 8.5V10C20 15.4 16 18.8 12 20Z" />
-        </svg>
-      ),
-      borderColor: "#22c55e",
-      backgroundColor: "rgba(34, 197, 94, 0.2)",
-      showComingSoon: false,
-    },
-    {
-      label: "Yemek",
-      icon: (
-        <svg
-          className="w-10 h-10 lg:w-12 lg:h-12"
-          fill="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path d="M8.1 13.34L11 16.17L7.84 19.34C7.64 19.54 7.34 19.54 7.14 19.34L4.66 16.86C4.46 16.66 4.46 16.35 4.66 16.15L8.1 13.34ZM14.24 12L17.17 9.07C17.58 8.66 17.58 8.03 17.17 7.62L16.83 7.28C16.42 6.87 15.79 6.87 15.38 7.28L12.45 10.21L14.24 12ZM15.36 13.42L12.8 10.86L5.5 18.16C5.09 18.57 5.09 19.2 5.5 19.61L5.84 19.95C6.25 20.36 6.88 20.36 7.29 19.95L15.36 13.42Z" />
-        </svg>
-      ),
-      borderColor: "#3b82f6",
-      backgroundColor: "rgba(59, 130, 246, 0.2)",
-      showComingSoon: true,
-    },
-    {
-      label: "Market",
-      icon: (
-        <svg
-          className="w-10 h-10 lg:w-12 lg:h-12"
-          fill="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path d="M19 7H18V6C18 3.79 16.21 2 14 2H10C7.79 2 6 3.79 6 6V7H5C4.45 7 4 7.45 4 8S4.45 9 5 9H6V19C6 20.1 6.9 21 8 21H16C17.1 21 18 20.1 18 19V9H19C19.55 9 20 8.55 20 8S19.55 7 19 7ZM8 6C8 4.9 8.9 4 10 4H14C15.1 4 16 4.9 16 6V7H8V6ZM16 19H8V9H16V19Z" />
-        </svg>
-      ),
-      borderColor: "#ec4899",
-      backgroundColor: "rgba(236, 72, 153, 0.2)",
-      showComingSoon: true,
-    },
-  ];
-
-  const handleBubbleClick = (index: number) => {
+  const handleCardClick = (index: number) => {
     if (index === 0) {
       router.push("/shops");
     } else if (index === 1) {
-      onNavItemTapped(4);
+      router.push("/createshop");
+    } else if (index === 2) {
+      router.push("/dynamicteras");
+    } else if (index === 3) {
+      router.push("/restaurants");
     }
   };
 
   return (
-    <div className="flex w-full px-4 gap-4 lg:gap-0 lg:justify-evenly overflow-x-auto lg:overflow-x-visible scrollbar-hide pb-2 lg:pb-0">
-      {bubbles.map((bubble, index) => (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 lg:gap-4">
+      {cards.map((card, index) => (
         <div
-          key={bubble.label}
-          className={`flex flex-col items-center cursor-pointer transition-transform duration-200 hover:scale-105 flex-shrink-0 ${
-            bubble.showComingSoon ? "cursor-default opacity-75" : ""
+          key={card.label}
+          className={`group relative flex flex-row items-center gap-3 rounded-2xl border bg-transparent p-3 lg:p-4 transition-all duration-200 ${
+            isDarkMode ? "border-neutral-700" : "border-gray-200"
+          } ${
+            card.showComingSoon
+              ? "cursor-default opacity-60"
+              : "cursor-pointer hover:shadow-md hover:-translate-y-0.5"
           }`}
-          onClick={() => !bubble.showComingSoon && handleBubbleClick(index)}
+          onClick={() => !card.showComingSoon && handleCardClick(index)}
         >
-          <div className="relative">
-            <div
-              className="w-18 h-18 lg:w-20 lg:h-20 rounded-full border-2 flex items-center justify-center relative transition-all duration-200 hover:shadow-lg"
-              style={{
-                borderColor: bubble.borderColor,
-                backgroundColor: bubble.backgroundColor,
-                color: bubble.borderColor,
-              }}
-            >
-              {bubble.icon}
-            </div>
-
-            {bubble.showComingSoon && (
-              <div
-                className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 px-1.5 py-0.5 lg:px-2 lg:py-1 rounded-lg text-white text-xs font-semibold whitespace-nowrap"
-                style={{ backgroundColor: bubble.borderColor }}
-              >
-                Yakında
-              </div>
-            )}
+          {/* Icon */}
+          <div className="relative h-10 w-10 flex-shrink-0 transition-transform duration-200 group-hover:scale-110 lg:h-11 lg:w-11">
+            <Image
+              src={card.image}
+              alt={card.label}
+              fill
+              className="object-contain"
+              sizes="44px"
+              priority
+              loading="eager"
+            />
           </div>
 
-          <div className="mt-1.5 lg:mt-2">
+          {/* Text */}
+          <div className="flex min-w-0 flex-col">
             <span
-              className={`text-xs font-semibold text-center block leading-tight ${
-                isDarkMode ? "text-white" : "text-black"
+              className={`text-sm font-semibold leading-tight ${
+                isDarkMode ? "text-white" : "text-gray-900"
               }`}
             >
-              {bubble.label}
+              {card.label}
             </span>
+            <span
+              className={`mt-0.5 text-xs leading-snug line-clamp-2 ${
+                isDarkMode ? "text-neutral-400" : "text-gray-500"
+              }`}
+            >
+              {card.description}
+            </span>
+            {card.showComingSoon && (
+              <span
+                className="mt-1 inline-block w-fit rounded-full px-2 py-0.5 text-[10px] font-semibold text-white"
+                style={{ backgroundColor: card.accentColor }}
+              >
+                {t("comingSoon")}
+              </span>
+            )}
           </div>
         </div>
       ))}

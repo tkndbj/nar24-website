@@ -2362,10 +2362,15 @@
   },
   "MarketBubbles": {
     "shops": "Shops",
+    "shopsDesc": "Browse local stores",
     "becomeASeller": "Become a Seller",
+    "becomeASellerDesc": "Open your own shop",
     "showcase": "Showcase",
+    "showcaseDesc": "Discover featured products",
     "food": "Food",
+    "foodDesc": "Order from restaurants",
     "market": "Market",
+    "marketDesc": "Groceries & essentials",
     "comingSoon": "Coming Soon"
   },
   "IsbankPayment": {

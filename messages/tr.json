@@ -2437,10 +2437,15 @@
   },
   "MarketBubbles": {
     "shops": "Mağazalar",
+    "shopsDesc": "Yerel mağazalara göz atın",
     "becomeASeller": "Satıcı Ol",
+    "becomeASellerDesc": "Kendi mağazanızı açın",
     "showcase": "Vitrin",
+    "showcaseDesc": "Öne çıkan ürünleri keşfedin",
     "food": "Yemek",
+    "foodDesc": "Restoranlardan sipariş verin",
     "market": "Market",
+    "marketDesc": "Market ve temel ihtiyaçlar",
     "comingSoon": "Yakında"
   },
   "IsbankPayment": {
