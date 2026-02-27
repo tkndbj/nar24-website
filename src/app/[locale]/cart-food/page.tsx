@@ -57,7 +57,7 @@ function FoodCartPageContent() {
     items,
     itemCount,
     totals,
-    isLoading,
+
     isInitialized,
     removeItem,
     updateQuantity,
@@ -198,7 +198,10 @@ function FoodCartPageContent() {
             isDark={isDark}
             icon={<UtensilsCrossed size={24} />}
             title={t("loginRequired", "Login Required")}
-            subtitle={t("loginToViewCart", "Please log in to view your food cart")}
+            subtitle={t(
+              "loginToViewCart",
+              "Please log in to view your food cart",
+            )}
             actionLabel={t("login", "Login")}
             onAction={() => router.push("/")}
           />
@@ -230,7 +233,10 @@ function FoodCartPageContent() {
                 isDark ? "text-gray-500" : "text-gray-400"
               }`}
             >
-              {t("emptyCartDesc", "Browse restaurants and add delicious meals to your cart")}
+              {t(
+                "emptyCartDesc",
+                "Browse restaurants and add delicious meals to your cart",
+              )}
             </p>
             <button
               onClick={() => router.push("/restaurants")}
@@ -260,7 +266,8 @@ function FoodCartPageContent() {
                       : "bg-orange-50 text-orange-600"
                   }`}
                 >
-                  {itemCount} {itemCount === 1 ? t("item", "item") : t("items", "items")}
+                  {itemCount}{" "}
+                  {itemCount === 1 ? t("item", "item") : t("items", "items")}
                 </span>
               </div>
               <button
@@ -279,7 +286,9 @@ function FoodCartPageContent() {
             {currentRestaurant && (
               <div
                 className={`mx-3 sm:mx-0 mb-4 rounded-2xl border overflow-hidden ${
-                  isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"
+                  isDark
+                    ? "bg-gray-900 border-gray-800"
+                    : "bg-white border-gray-100"
                 }`}
               >
                 <div className="px-4 py-3.5 flex items-center gap-3">
@@ -299,7 +308,9 @@ function FoodCartPageContent() {
                     ) : (
                       <ChefHat
                         size={20}
-                        className={isDark ? "text-orange-400" : "text-orange-500"}
+                        className={
+                          isDark ? "text-orange-400" : "text-orange-500"
+                        }
                       />
                     )}
                   </div>
@@ -383,7 +394,9 @@ function FoodCartPageContent() {
             <div className="mt-6 mx-3 sm:mx-0">
               <div
                 className={`rounded-2xl border overflow-hidden ${
-                  isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"
+                  isDark
+                    ? "bg-gray-900 border-gray-800"
+                    : "bg-white border-gray-100"
                 }`}
               >
                 <div className="px-4 py-4 sm:px-5 sm:py-5">
@@ -402,7 +415,8 @@ function FoodCartPageContent() {
                         (s, e) => s + e.price * e.quantity,
                         0,
                       );
-                      const lineTotal = (item.price + extrasTotal) * item.quantity;
+                      const lineTotal =
+                        (item.price + extrasTotal) * item.quantity;
                       return (
                         <div
                           key={item.foodId}
@@ -465,7 +479,10 @@ function FoodCartPageContent() {
                         isDark ? "text-gray-600" : "text-gray-400"
                       }`}
                     >
-                      {t("deliveryFeeAtCheckout", "Delivery fee calculated at checkout")}
+                      {t(
+                        "deliveryFeeAtCheckout",
+                        "Delivery fee calculated at checkout",
+                      )}
                     </p>
                   </div>
 
@@ -516,7 +533,9 @@ function FoodCartPageContent() {
         >
           <div
             className={`w-full max-w-xs rounded-2xl border shadow-lg overflow-hidden ${
-              isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"
+              isDark
+                ? "bg-gray-900 border-gray-800"
+                : "bg-white border-gray-100"
             }`}
             onClick={(e) => e.stopPropagation()}
           >
@@ -538,12 +557,17 @@ function FoodCartPageContent() {
               <p
                 className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}
               >
-                {t("clearCartDesc", "This will remove all items from your food cart.")}
+                {t(
+                  "clearCartDesc",
+                  "This will remove all items from your food cart.",
+                )}
               </p>
             </div>
             <div
               className={`px-5 py-3.5 flex gap-3 border-t ${
-                isDark ? "border-gray-800 bg-gray-800/50" : "border-gray-50 bg-gray-50"
+                isDark
+                  ? "border-gray-800 bg-gray-800/50"
+                  : "border-gray-50 bg-gray-50"
               }`}
             >
               <button
@@ -880,9 +904,7 @@ function FoodCartSkeleton({ isDark }: { isDark: boolean }) {
           >
             <div className="p-4">
               <div className="flex gap-3">
-                <div
-                  className={`w-20 h-20 rounded-xl flex-shrink-0 ${bg}`}
-                />
+                <div className={`w-20 h-20 rounded-xl flex-shrink-0 ${bg}`} />
                 <div className="flex-1 space-y-2.5">
                   <div className="flex justify-between">
                     <div className="space-y-1.5 flex-1">
@@ -905,9 +927,7 @@ function FoodCartSkeleton({ isDark }: { isDark: boolean }) {
 
       {/* Order summary skeleton */}
       <div className="mt-6 mx-3 sm:mx-0">
-        <div
-          className={`rounded-2xl border overflow-hidden ${cardBg}`}
-        >
+        <div className={`rounded-2xl border overflow-hidden ${cardBg}`}>
           <div className="px-4 py-4 sm:px-5 sm:py-5 space-y-4">
             <div className={`h-4 w-28 rounded ${bg}`} />
             <div className="space-y-2">
