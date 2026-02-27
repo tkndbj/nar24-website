@@ -1,8 +1,14 @@
 "use client";
 
-import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import React, {
+  useState,
+  useCallback,
+  useMemo,
+  useEffect,
+  useRef,
+} from "react";
 import Image from "next/image";
-import Link from "next/link";
+import { Link } from "@/navigation";
 
 import { useTranslations } from "next-intl";
 import { useTheme } from "@/hooks/useTheme";
@@ -123,7 +129,7 @@ const loadGoogleMapsScript = (): Promise<void> => {
     }
 
     const existingScript = document.querySelector(
-      'script[src*="maps.googleapis.com"]'
+      'script[src*="maps.googleapis.com"]',
     );
     if (existingScript) {
       existingScript.addEventListener("load", () => resolve());
@@ -168,7 +174,9 @@ function LocationPickerModal({
   const [lastClickTime, setLastClickTime] = useState(0);
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
-  const markerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
+  const markerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(
+    null,
+  );
 
   useEffect(() => {
     if (!isOpen || !window.google || !mapRef.current) return;
@@ -176,7 +184,7 @@ function LocationPickerModal({
     const initializeMap = async () => {
       try {
         const { AdvancedMarkerElement } = (await google.maps.importLibrary(
-          "marker"
+          "marker",
         )) as google.maps.MarkerLibrary;
 
         const defaultCenter = { lat: 35.1855, lng: 33.3823 };
@@ -184,14 +192,14 @@ function LocationPickerModal({
           ? { lat: initialLocation.latitude, lng: initialLocation.longitude }
           : defaultCenter;
 
-          const map = new google.maps.Map(mapRef.current!, {
-            center: mapCenter,
-            zoom: initialLocation ? 15 : 10,
-            mapId: process.env.NEXT_PUBLIC_MAP_ID || "DEMO_MAP_ID",
-            clickableIcons: false,
-            gestureHandling: "greedy",
-            // Remove the styles property entirely — mapId handles styling via Cloud Console
-          });
+        const map = new google.maps.Map(mapRef.current!, {
+          center: mapCenter,
+          zoom: initialLocation ? 15 : 10,
+          mapId: process.env.NEXT_PUBLIC_MAP_ID || "DEMO_MAP_ID",
+          clickableIcons: false,
+          gestureHandling: "greedy",
+          // Remove the styles property entirely — mapId handles styling via Cloud Console
+        });
 
         mapInstanceRef.current = map;
 
@@ -320,7 +328,10 @@ function LocationPickerModal({
             >
               <div className="flex items-start space-x-2 sm:space-x-3">
                 <div className="p-1.5 sm:p-2 rounded-lg bg-green-500/20">
-                  <CheckCircle2 size={16} className="sm:size-5 text-green-500" />
+                  <CheckCircle2
+                    size={16}
+                    className="sm:size-5 text-green-500"
+                  />
                 </div>
                 <div>
                   <p
@@ -398,7 +409,7 @@ function CartItemRow({
 
   const extrasTotal = item.extras.reduce(
     (sum, ext) => sum + ext.price * ext.quantity,
-    0
+    0,
   );
   const lineTotal = (item.price + extrasTotal) * item.quantity;
 
@@ -581,11 +592,17 @@ function FoodCheckoutContent() {
   const t = useTranslations("foodCheckout");
   const router = useRouter();
   const { user } = useUser();
-  const { items, currentRestaurant, totals, isLoading: cartLoading } = useFoodCartState();
+  const {
+    items,
+    currentRestaurant,
+    totals,
+    isLoading: cartLoading,
+  } = useFoodCartState();
   const { clearCart } = useFoodCartActions();
 
   // Form state
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("pay_at_door");
+  const [paymentMethod, setPaymentMethod] =
+    useState<PaymentMethod>("pay_at_door");
   const [deliveryType, setDeliveryType] = useState<DeliveryType>("delivery");
   const [address, setAddress] = useState<DeliveryAddress>({
     addressLine1: "",
@@ -599,7 +616,9 @@ function FoodCheckoutContent() {
 
   // Saved addresses
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
-  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(
+    null,
+  );
 
   // Location picker
   const [showMapModal, setShowMapModal] = useState(false);
@@ -681,7 +700,7 @@ function FoodCheckoutContent() {
         });
       }
     },
-    [savedAddresses]
+    [savedAddresses],
   );
 
   // ── Phone input handler with formatting ──────────────────────────
@@ -712,7 +731,10 @@ function FoodCheckoutContent() {
       }
     } else {
       // Pickup — phone is optional but if provided, validate it
-      if (address.phoneNumber.trim() && !isValidPhoneNumber(address.phoneNumber)) {
+      if (
+        address.phoneNumber.trim() &&
+        !isValidPhoneNumber(address.phoneNumber)
+      ) {
         newErrors.phoneNumber = t("invalidPhoneNumber");
       }
     }
@@ -783,7 +805,11 @@ function FoodCheckoutContent() {
 
       if (data.success) {
         // Save address if requested
-        if (saveAddress && deliveryType === "delivery" && selectedAddressId === null) {
+        if (
+          saveAddress &&
+          deliveryType === "delivery" &&
+          selectedAddressId === null
+        ) {
           saveNewAddress(normalizedPhone);
         }
 
@@ -796,7 +822,9 @@ function FoodCheckoutContent() {
     } catch (err: unknown) {
       console.error("[FoodCheckout] Order error:", err);
       const message =
-        err instanceof Error ? err.message : "An error occurred. Please try again.";
+        err instanceof Error
+          ? err.message
+          : "An error occurred. Please try again.";
       const firebaseMsg = (err as { details?: string })?.details || message;
       setError(firebaseMsg);
     } finally {
@@ -871,7 +899,11 @@ function FoodCheckoutContent() {
 
       if (data.success && data.gatewayUrl) {
         // Save address if requested
-        if (saveAddress && deliveryType === "delivery" && selectedAddressId === null) {
+        if (
+          saveAddress &&
+          deliveryType === "delivery" &&
+          selectedAddressId === null
+        ) {
           saveNewAddress(normalizedPhone);
         }
 
@@ -923,7 +955,7 @@ function FoodCheckoutContent() {
         console.error("[FoodCheckout] Failed to save address:", err);
       }
     },
-    [user, address]
+    [user, address],
   );
 
   // ── Submit handler ───────────────────────────────────────────────
@@ -970,8 +1002,8 @@ function FoodCheckoutContent() {
                   : "bg-orange-50 text-orange-600"
               }`}
             >
-              <Clock className="w-4 h-4" />
-              ~{orderSuccess.estimatedPrepTime} {t("min")}
+              <Clock className="w-4 h-4" />~{orderSuccess.estimatedPrepTime}{" "}
+              {t("min")}
             </div>
           )}
 
@@ -1045,7 +1077,11 @@ function FoodCheckoutContent() {
       <div className="max-w-2xl mx-auto px-4 sm:px-6 pt-4">
         {/* Header */}
         <Link
-          href={currentRestaurant ? `/restaurants/${currentRestaurant.id}` : "/restaurants"}
+          href={
+            currentRestaurant
+              ? `/restaurantdetail/${currentRestaurant.id}`
+              : "/restaurants"
+          }
           className={`inline-flex items-center gap-1 mb-4 text-sm font-medium transition-colors ${
             isDarkMode
               ? "text-gray-400 hover:text-white"
@@ -1099,8 +1135,8 @@ function FoodCheckoutContent() {
                       isDarkMode ? "text-gray-500" : "text-gray-400"
                     }`}
                   >
-                    <Clock className="w-3 h-3" />
-                    ~{estimatedPrepTime} {t("min")} {t("prepTime")}
+                    <Clock className="w-3 h-3" />~{estimatedPrepTime} {t("min")}{" "}
+                    {t("prepTime")}
                   </p>
                 )}
               </div>
@@ -1111,7 +1147,11 @@ function FoodCheckoutContent() {
           <Section title={t("yourOrder")} isDarkMode={isDarkMode}>
             <div className="space-y-3">
               {items.map((item) => (
-                <CartItemRow key={item.foodId} item={item} isDarkMode={isDarkMode} />
+                <CartItemRow
+                  key={item.foodId}
+                  item={item}
+                  isDarkMode={isDarkMode}
+                />
               ))}
             </div>
           </Section>
@@ -1295,7 +1335,10 @@ function FoodCheckoutContent() {
                         type="text"
                         value={address.addressLine1}
                         onChange={(e) => {
-                          setAddress((a) => ({ ...a, addressLine1: e.target.value }));
+                          setAddress((a) => ({
+                            ...a,
+                            addressLine1: e.target.value,
+                          }));
                           setErrors((prev) => ({ ...prev, addressLine1: "" }));
                         }}
                         placeholder={t("addressPlaceholder")}
@@ -1335,7 +1378,10 @@ function FoodCheckoutContent() {
                         type="text"
                         value={address.addressLine2 || ""}
                         onChange={(e) =>
-                          setAddress((a) => ({ ...a, addressLine2: e.target.value }))
+                          setAddress((a) => ({
+                            ...a,
+                            addressLine2: e.target.value,
+                          }))
                         }
                         placeholder={t("addressLine2Placeholder")}
                         className={`w-full pl-10 pr-3 py-2.5 rounded-xl text-sm border transition-colors ${
@@ -1643,8 +1689,18 @@ function FoodCheckoutContent() {
             <div className="space-y-2">
               {(
                 [
-                  { id: "pay_at_door" as PaymentMethod, icon: Banknote, label: t("payAtDoor"), desc: t("payAtDoorDesc") },
-                  { id: "card" as PaymentMethod, icon: CreditCard, label: t("creditCard"), desc: t("creditCardDesc") },
+                  {
+                    id: "pay_at_door" as PaymentMethod,
+                    icon: Banknote,
+                    label: t("payAtDoor"),
+                    desc: t("payAtDoorDesc"),
+                  },
+                  {
+                    id: "card" as PaymentMethod,
+                    icon: CreditCard,
+                    label: t("creditCard"),
+                    desc: t("creditCardDesc"),
+                  },
                 ] as const
               ).map(({ id, icon: Icon, label, desc }) => {
                 const isSelected = paymentMethod === id;
