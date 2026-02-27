@@ -49,6 +49,7 @@ export interface SelectedExtra {
 /** A single food item in the cart */
 export interface FoodCartItem {
   foodId: string;
+  originalFoodId: string;
   name: string;
   description: string;
   price: number; // Base price of the food
@@ -274,6 +275,7 @@ function buildFoodCartItem(
 ): FoodCartItem {
   return {
     foodId,
+    originalFoodId: (data.originalFoodId as string) ?? foodId, 
     name: (data.name as string) ?? "",
     description: (data.description as string) ?? "",
     price: (data.price as number) ?? 0,
@@ -322,6 +324,7 @@ function buildFirestoreData(params: {
 }): Record<string, unknown> {
   return {
     name: params.food.name,
+    originalFoodId: params.food.id,
     description: params.food.description ?? "",
     price: params.food.price,
     imageUrl: params.food.imageUrl ?? "",
@@ -653,6 +656,7 @@ export const FoodCartProvider: React.FC<FoodCartProviderProps> = ({
         // Optimistic add
         const optimisticItem: FoodCartItem = {
           foodId: cartKey,
+          originalFoodId: food.id,
           name: food.name,
           description: food.description ?? "",
           price: food.price,
@@ -718,6 +722,7 @@ export const FoodCartProvider: React.FC<FoodCartProviderProps> = ({
           // Optimistic
           const optimisticItem: FoodCartItem = {
             foodId: cartKey,
+            originalFoodId: food.id,
             name: food.name,
             description: food.description ?? "",
             price: food.price,
