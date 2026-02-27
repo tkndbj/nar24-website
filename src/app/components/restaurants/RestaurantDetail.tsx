@@ -338,6 +338,7 @@ function FoodCard({
         foodName={food.name}
         foodPrice={food.price}
         foodCategory={food.foodCategory}
+        allowedExtras={food.extras}  
         isDarkMode={isDarkMode}
       />
     </>

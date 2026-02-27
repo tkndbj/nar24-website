@@ -10,7 +10,7 @@ interface FoodExtrasSheetProps {
   open: boolean;
   onClose: () => void;
   onConfirm: (extras: SelectedExtra[], specialNotes: string, quantity: number) => void;
-
+  allowedExtras?: string[];
   foodName: string;
   foodPrice: number;
   foodCategory: string;
@@ -35,6 +35,7 @@ export default function FoodExtrasSheet({
   initialExtras = [],
   initialNotes = "",
   initialQuantity = 1,
+  allowedExtras = [],
 }: FoodExtrasSheetProps) {
   const t = useTranslations("restaurantDetail");
   const tRoot = useTranslations();
@@ -44,8 +45,14 @@ export default function FoodExtrasSheet({
 
   // Available extras for this food category
   const availableExtras = useMemo(() => {
-    return FoodExtrasData.kExtras[foodCategory] ?? [];
-  }, [foodCategory]);
+    const categoryExtras = FoodExtrasData.kExtras[foodCategory] ?? [];
+    // If the food has a specific allowed list, filter to only those
+    if (allowedExtras && allowedExtras.length > 0) {
+      const allowedSet = new Set(allowedExtras);
+      return categoryExtras.filter((e) => allowedSet.has(e));
+    }
+    return categoryExtras;
+  }, [foodCategory, allowedExtras]);
 
   // Translate extra name
   const getExtraName = useCallback(
