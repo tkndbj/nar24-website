@@ -184,21 +184,14 @@ function LocationPickerModal({
           ? { lat: initialLocation.latitude, lng: initialLocation.longitude }
           : defaultCenter;
 
-        const map = new google.maps.Map(mapRef.current!, {
-          center: mapCenter,
-          zoom: initialLocation ? 15 : 10,
-          mapId: process.env.NEXT_PUBLIC_MAP_ID || "DEMO_MAP_ID",
-          clickableIcons: false,
-          gestureHandling: "greedy",
-          styles: isDarkMode
-            ? [
-                { elementType: "geometry", stylers: [{ color: "#1a202c" }] },
-                { elementType: "labels.text.stroke", stylers: [{ color: "#1a202c" }] },
-                { elementType: "labels.text.fill", stylers: [{ color: "#a0aec0" }] },
-                { featureType: "water", elementType: "geometry", stylers: [{ color: "#2d3748" }] },
-              ]
-            : [],
-        });
+          const map = new google.maps.Map(mapRef.current!, {
+            center: mapCenter,
+            zoom: initialLocation ? 15 : 10,
+            mapId: process.env.NEXT_PUBLIC_MAP_ID || "DEMO_MAP_ID",
+            clickableIcons: false,
+            gestureHandling: "greedy",
+            // Remove the styles property entirely — mapId handles styling via Cloud Console
+          });
 
         mapInstanceRef.current = map;
 
