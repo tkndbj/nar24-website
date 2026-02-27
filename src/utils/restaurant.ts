@@ -19,7 +19,7 @@ const DAY_NAMES = [
  * - Handles overnight hours (e.g. open: "22:00", close: "03:00").
  */
 export function isRestaurantOpen(
-  restaurant: Pick<Restaurant, "workingDays" | "workingHours">,
+  restaurant: Partial<Pick<Restaurant, "workingDays" | "workingHours">>,
 ): boolean {
   const { workingDays, workingHours } = restaurant;
 
