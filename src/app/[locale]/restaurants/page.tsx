@@ -37,6 +37,16 @@ const getRestaurants = unstable_cache(
           foodType: Array.isArray(d.foodType) ? (d.foodType as string[]) : undefined,
           cuisineTypes: Array.isArray(d.cuisineTypes) ? (d.cuisineTypes as string[]) : undefined,
           workingDays: Array.isArray(d.workingDays) ? (d.workingDays as string[]) : undefined,
+          workingHours:
+            d.workingHours != null &&
+            typeof d.workingHours === "object" &&
+            "open" in (d.workingHours as Record<string, unknown>) &&
+            "close" in (d.workingHours as Record<string, unknown>)
+              ? {
+                  open: String((d.workingHours as Record<string, unknown>).open),
+                  close: String((d.workingHours as Record<string, unknown>).close),
+                }
+              : undefined,
         });
       }
 

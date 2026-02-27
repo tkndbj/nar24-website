@@ -286,7 +286,7 @@ export class RestaurantTypesenseService {
       include_fields:
         "id,name,address,contactNo,profileImageUrl,ownerId,isActive,isBoosted," +
         "latitude,longitude,averageRating,reviewCount,clickCount,followerCount," +
-        "foodType,cuisineTypes,workingDays,createdAt",
+        "foodType,cuisineTypes,workingDays,workingHours,createdAt",
     });
 
     const filterBy = this.buildFilterBy(filterParts);
@@ -349,6 +349,19 @@ export class RestaurantTypesenseService {
           workingDays: Array.isArray(doc["workingDays"])
             ? (doc["workingDays"] as string[])
             : undefined,
+          workingHours:
+            doc["workingHours"] != null &&
+            typeof doc["workingHours"] === "object" &&
+            !Array.isArray(doc["workingHours"])
+              ? {
+                  open: String(
+                    (doc["workingHours"] as Record<string, unknown>)["open"] ?? "",
+                  ),
+                  close: String(
+                    (doc["workingHours"] as Record<string, unknown>)["close"] ?? "",
+                  ),
+                }
+              : undefined,
         });
       }
 

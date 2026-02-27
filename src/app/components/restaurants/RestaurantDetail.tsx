@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { useTheme } from "@/hooks/useTheme";
 import { Restaurant } from "@/types/Restaurant";
 import { Food } from "@/types/Food";
+import { isRestaurantOpen } from "@/utils/restaurant";
 import { FoodCategoryData } from "@/constants/foodData";
 import {
   Star,
@@ -153,10 +154,12 @@ function FoodCard({
   food,
   isDarkMode,
   restaurant,
+  isOpen,
 }: {
   food: Food;
   isDarkMode: boolean;
   restaurant: Restaurant;
+  isOpen: boolean;
 }) {
   const t = useTranslations("restaurantDetail");
   const { addItem, clearAndAddFromNewRestaurant } = useFoodCartActions();
@@ -181,8 +184,9 @@ function FoodCard({
   }), [restaurant.id, restaurant.name, restaurant.profileImageUrl]);
 
   const handleAddToCart = useCallback(() => {
+    if (!isOpen) return;
     setExtrasOpen(true);
-  }, []);
+  }, [isOpen]);
 
   const handleExtrasConfirm = useCallback(
     async (extras: SelectedExtra[], specialNotes: string, quantity: number) => {
@@ -303,16 +307,25 @@ function FoodCard({
             {/* Add to cart button */}
             <button
               onClick={handleAddToCart}
+              disabled={!isOpen}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
-                cartQuantity > 0
-                  ? "bg-orange-500 text-white hover:bg-orange-600"
-                  : isDarkMode
-                    ? "bg-orange-500/15 text-orange-400 hover:bg-orange-500/25"
-                    : "bg-orange-50 text-orange-600 hover:bg-orange-100"
+                !isOpen
+                  ? "bg-gray-200 text-gray-400 cursor-not-allowed dark:bg-gray-700 dark:text-gray-500"
+                  : cartQuantity > 0
+                    ? "bg-orange-500 text-white hover:bg-orange-600"
+                    : isDarkMode
+                      ? "bg-orange-500/15 text-orange-400 hover:bg-orange-500/25"
+                      : "bg-orange-50 text-orange-600 hover:bg-orange-100"
               }`}
             >
-              <Plus className="w-3.5 h-3.5" />
-              {cartQuantity > 0 ? cartQuantity : t("add")}
+              {!isOpen ? (
+                <span>{t("closed")}</span>
+              ) : (
+                <>
+                  <Plus className="w-3.5 h-3.5" />
+                  {cartQuantity > 0 ? cartQuantity : t("add")}
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -453,12 +466,48 @@ export default function RestaurantDetail({
     );
   }
 
+  const isOpen = isRestaurantOpen(restaurant);
   const hasActiveFilters = selectedIconCategory !== null || searchQuery.trim() !== "";
 
   return (
     <main className="flex-1">
       {/* Restaurant Header */}
       <RestaurantHeader restaurant={restaurant} isDarkMode={isDarkMode} />
+
+      {/* Closed banner */}
+      {!isOpen && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
+          <div
+            className={`flex items-center gap-3 rounded-2xl px-5 py-4 ${
+              isDarkMode
+                ? "bg-red-500/10 border border-red-500/20"
+                : "bg-red-50 border border-red-200"
+            }`}
+          >
+            <Clock
+              className={`w-5 h-5 flex-shrink-0 ${
+                isDarkMode ? "text-red-400" : "text-red-500"
+              }`}
+            />
+            <div>
+              <p
+                className={`text-sm font-semibold ${
+                  isDarkMode ? "text-red-400" : "text-red-600"
+                }`}
+              >
+                {t("closedBanner")}
+              </p>
+              <p
+                className={`text-xs mt-0.5 ${
+                  isDarkMode ? "text-red-400/70" : "text-red-500/70"
+                }`}
+              >
+                {t("closedBannerSubtitle")}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
         {/* Menu title + search */}
@@ -510,7 +559,7 @@ export default function RestaurantDetail({
         {filteredFoods.length > 0 ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pb-10">
             {filteredFoods.map((food) => (
-              <FoodCard key={food.id} food={food} isDarkMode={isDarkMode} restaurant={restaurant} />
+              <FoodCard key={food.id} food={food} isDarkMode={isDarkMode} restaurant={restaurant} isOpen={isOpen} />
             ))}
           </div>
         ) : foods.length === 0 ? (

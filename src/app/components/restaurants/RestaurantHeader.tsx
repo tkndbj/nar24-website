@@ -9,13 +9,13 @@ import React, {
 } from "react";
 import {
   Bell,
-  ShoppingBag,
+
   User,
   LogOut,
   Globe,
   LogIn,
   UtensilsCrossed,
-  ArrowLeft,
+ 
   ChevronLeft,
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
@@ -26,15 +26,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { useBadgeProvider } from "@/context/BadgeProvider";
 import dynamic from "next/dynamic";
 
-// Safe import — FoodCartProvider may or may not be in the tree
-let useFoodCartState: (() => { itemCount: number }) | null = null;
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const mod = require("@/context/FoodCartProvider");
-  useFoodCartState = mod.useFoodCartState;
-} catch {
-  // FoodCartProvider not available — that's fine
-}
+import { useFoodCartCount } from "@/hooks/useFoodCartCount";
 
 const NotificationDrawer = dynamic(
   () =>
@@ -44,18 +36,6 @@ const NotificationDrawer = dynamic(
   { ssr: false },
 );
 
-// ── Safe food cart count hook ─────────────────────────────────────────────
-// Works whether or not FoodCartProvider is in the component tree.
-// If the provider is absent, returns 0 with no error.
-function useSafeFoodCartCount(): number {
-  if (!useFoodCartState) return 0;
-  try {
-    const { itemCount } = useFoodCartState();
-    return itemCount;
-  } catch {
-    return 0;
-  }
-}
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -75,7 +55,7 @@ export default function RestaurantHeader({
 
   const { user, isLoading: userLoading } = useUser();
   const { unreadNotificationsCount } = useBadgeProvider();
-  const foodCartCount = useSafeFoodCartCount();
+  const foodCartCount = useFoodCartCount(user?.uid ?? null);
   const isDark = useTheme();
 
   const [isLoggingOut, setIsLoggingOut] = useState(false);

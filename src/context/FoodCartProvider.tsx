@@ -25,8 +25,7 @@ import {
   updateDoc,
   setDoc,
   QuerySnapshot,
-  DocumentChange,
-  QueryDocumentSnapshot,
+
 } from "firebase/firestore";
 import { User } from "firebase/auth";
 

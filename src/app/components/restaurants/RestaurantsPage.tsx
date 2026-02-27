@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useTheme } from "@/hooks/useTheme";
 import { Restaurant } from "@/types/Restaurant";
+import { isRestaurantOpen } from "@/utils/restaurant";
 import TypeSenseServiceManager from "@/lib/typesense_service_manager";
 import type { FacetValue } from "@/lib/typesense_restaurant_service";
 import { Star, ChevronLeft, ChevronRight, ArrowUpDown } from "lucide-react";
@@ -162,10 +163,13 @@ function RestaurantCard({
   restaurant: Restaurant;
   isDarkMode: boolean;
 }) {
+  const t = useTranslations("restaurants");
+  const isOpen = isRestaurantOpen(restaurant);
+
   return (
     <Link
       href={`/restaurantdetail/${restaurant.id}`}
-      className={`group flex items-center gap-4 rounded-2xl p-4 block ${
+      className={`group relative flex items-center gap-4 rounded-2xl p-4 block ${
         isDarkMode
           ? "border border-gray-700/40"
           : "border border-gray-200"
@@ -178,7 +182,9 @@ function RestaurantCard({
             src={restaurant.profileImageUrl}
             alt={restaurant.name}
             fill
-            className="object-cover transition-transform duration-500 group-hover:scale-105"
+            className={`object-cover transition-transform duration-500 group-hover:scale-105 ${
+              !isOpen ? "grayscale opacity-60" : ""
+            }`}
             sizes="80px"
           />
         ) : (
@@ -270,6 +276,13 @@ function RestaurantCard({
           )}
         </div>
       </div>
+
+      {/* Closed badge */}
+      {!isOpen && (
+        <span className="absolute bottom-2 right-2 px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-red-500/90 text-white backdrop-blur-sm">
+          {t("closed")}
+        </span>
+      )}
     </Link>
   );
 }

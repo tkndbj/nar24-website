@@ -1,3 +1,8 @@
+export interface WorkingHours {
+  open: string; // "HH:mm" format, e.g. "08:00"
+  close: string; // "HH:mm" format, e.g. "22:00"
+}
+
 export interface Restaurant {
   id: string;
   name: string;
@@ -18,4 +23,5 @@ export interface Restaurant {
   foodType?: string[];
   cuisineTypes?: string[];
   workingDays?: string[];
+  workingHours?: WorkingHours;
 }

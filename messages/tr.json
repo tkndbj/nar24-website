@@ -4946,7 +4946,10 @@
     "selected": "seçili",
     "specialNotes": "Özel Notlar",
     "optional": "Opsiyonel",
-    "notesPlaceholder": "örn. Soğansız, ekstra acılı..."
+    "notesPlaceholder": "örn. Soğansız, ekstra acılı...",
+    "closedBanner": "Bu restoran şu anda kapalı",
+    "closedBannerSubtitle": "Menüye göz atabilirsiniz, ancak şu anda sipariş verilememektedir.",
+    "closed": "Kapalı"
   },
   "foodCategoryKebabsGrills": "Kebap & Izgara",
   "foodCategoryPideLahmacun": "Pide & Lahmacun",

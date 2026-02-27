@@ -4934,7 +4934,10 @@
     "selected": "selected",
     "specialNotes": "Special Notes",
     "optional": "Optional",
-    "notesPlaceholder": "e.g. No onions, extra spicy..."
+    "notesPlaceholder": "e.g. No onions, extra spicy...",
+    "closedBanner": "This restaurant is currently closed",
+    "closedBannerSubtitle": "You can browse the menu, but ordering is not available right now.",
+    "closed": "Closed"
   },
   "foodCategoryKebabsGrills": "Kebabs & Grills",
   "foodCategoryPideLahmacun": "Pide & Lahmacun",
