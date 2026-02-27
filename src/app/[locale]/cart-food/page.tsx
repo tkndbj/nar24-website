@@ -202,9 +202,9 @@ function FoodCartPageContent() {
             actionLabel={t("login", "Login")}
             onAction={() => router.push("/")}
           />
-        ) : isLoading && !isInitialized ? (
-          /* ── Loading ────────────────────────────────────────────── */
-          <LoadingSpinner isDark={isDark} label={t("loading", "Loading your food cart...")} />
+        ) : !isInitialized ? (
+          /* ── Loading — shimmer skeleton ─────────────────────────── */
+          <FoodCartSkeleton isDark={isDark} />
         ) : items.length === 0 ? (
           /* ── Empty Cart ─────────────────────────────────────────── */
           <div className="flex flex-col items-center py-16 px-4">
@@ -836,6 +836,104 @@ function LoadingSpinner({
           {label}
         </p>
       )}
+    </div>
+  );
+}
+
+function FoodCartSkeleton({ isDark }: { isDark: boolean }) {
+  const bg = isDark ? "bg-gray-800" : "bg-gray-200";
+  const cardBg = isDark
+    ? "bg-gray-900 border-gray-800"
+    : "bg-white border-gray-100";
+
+  return (
+    <div className="animate-pulse">
+      {/* Title row */}
+      <div className="flex items-center justify-between mb-4 px-3 sm:px-0">
+        <div className="flex items-center gap-3">
+          <div className={`h-6 w-28 rounded-lg ${bg}`} />
+          <div className={`h-5 w-16 rounded-full ${bg}`} />
+        </div>
+        <div className={`h-5 w-16 rounded-lg ${bg}`} />
+      </div>
+
+      {/* Restaurant header skeleton */}
+      <div
+        className={`mx-3 sm:mx-0 mb-4 rounded-2xl border overflow-hidden ${cardBg}`}
+      >
+        <div className="px-4 py-3.5 flex items-center gap-3">
+          <div className={`w-11 h-11 rounded-xl flex-shrink-0 ${bg}`} />
+          <div className="flex-1 space-y-2">
+            <div className={`h-4 w-36 rounded ${bg}`} />
+            <div className={`h-3 w-48 rounded ${bg}`} />
+          </div>
+          <div className={`w-4 h-4 rounded ${bg}`} />
+        </div>
+      </div>
+
+      {/* Cart item skeletons */}
+      <div className="mx-3 sm:mx-0 space-y-3">
+        {[0, 1].map((i) => (
+          <div
+            key={i}
+            className={`rounded-2xl border overflow-hidden ${cardBg}`}
+          >
+            <div className="p-4">
+              <div className="flex gap-3">
+                <div
+                  className={`w-20 h-20 rounded-xl flex-shrink-0 ${bg}`}
+                />
+                <div className="flex-1 space-y-2.5">
+                  <div className="flex justify-between">
+                    <div className="space-y-1.5 flex-1">
+                      <div className={`h-4 w-3/4 rounded ${bg}`} />
+                      <div className={`h-3 w-1/3 rounded ${bg}`} />
+                    </div>
+                    <div className={`w-6 h-6 rounded-lg ${bg}`} />
+                  </div>
+                  <div className={`h-4 w-20 rounded ${bg}`} />
+                  <div className="flex items-center justify-between">
+                    <div className={`h-8 w-24 rounded-xl ${bg}`} />
+                    <div className={`h-6 w-12 rounded-lg ${bg}`} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Order summary skeleton */}
+      <div className="mt-6 mx-3 sm:mx-0">
+        <div
+          className={`rounded-2xl border overflow-hidden ${cardBg}`}
+        >
+          <div className="px-4 py-4 sm:px-5 sm:py-5 space-y-4">
+            <div className={`h-4 w-28 rounded ${bg}`} />
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <div className={`h-3 w-32 rounded ${bg}`} />
+                <div className={`h-3 w-16 rounded ${bg}`} />
+              </div>
+              <div className="flex justify-between">
+                <div className={`h-3 w-28 rounded ${bg}`} />
+                <div className={`h-3 w-14 rounded ${bg}`} />
+              </div>
+            </div>
+            <div
+              className={`border-t ${isDark ? "border-gray-800" : "border-gray-100"}`}
+            />
+            <div className="flex justify-between items-end">
+              <div className="space-y-1.5">
+                <div className={`h-3 w-10 rounded ${bg}`} />
+                <div className={`h-7 w-28 rounded ${bg}`} />
+              </div>
+              <div className={`h-3 w-40 rounded ${bg}`} />
+            </div>
+            <div className={`h-12 w-full rounded-xl ${bg}`} />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

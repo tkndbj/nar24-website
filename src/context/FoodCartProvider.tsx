@@ -501,8 +501,9 @@ export const FoodCartProvider: React.FC<FoodCartProviderProps> = ({
 
     let cancelled = false;
 
+    setIsLoading(true);
+
     const initialize = async () => {
-      setIsLoading(true);
       try {
         // 1. Load cart meta (restaurant info)
         const metaSnap = await getDoc(foodCartMetaDoc(db, user.uid));
@@ -534,7 +535,6 @@ export const FoodCartProvider: React.FC<FoodCartProviderProps> = ({
           });
 
           setItems(loaded);
-          setIsInitialized(true);
 
           // 3. Start real-time listener
           startListener();
@@ -542,16 +542,17 @@ export const FoodCartProvider: React.FC<FoodCartProviderProps> = ({
       } catch (err) {
         console.error("[FoodCart] Init error:", err);
       } finally {
-        if (!cancelled) setIsLoading(false);
+        if (!cancelled) {
+          setIsInitialized(true);
+          setIsLoading(false);
+        }
       }
     };
 
-    // Defer to avoid blocking first paint
-    const timer = setTimeout(initialize, 100);
+    initialize();
 
     return () => {
       cancelled = true;
-      clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, db, isInitialized]);
