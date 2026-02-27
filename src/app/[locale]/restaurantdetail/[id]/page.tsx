@@ -82,6 +82,7 @@ export default function RestaurantDetailPage() {
           isAvailable: d.isAvailable !== false,
           preparationTime: d.preparationTime != null ? Number(d.preparationTime) : undefined,
           price: Number(d.price) || 0,
+          extras: Array.isArray(d.extras) ? (d.extras as string[]) : [],
           restaurantId: id,
         });
       }
