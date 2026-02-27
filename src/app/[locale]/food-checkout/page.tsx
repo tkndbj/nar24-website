@@ -62,7 +62,7 @@ function CartItemRow({
   item: FoodCartItem;
   isDarkMode: boolean;
 }) {
-  const t = useTranslations("foodCheckout");
+
   const { updateQuantity, removeItem } = useFoodCartActions();
 
   const extrasTotal = item.extras.reduce(
