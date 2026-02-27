@@ -880,7 +880,7 @@ function FoodCheckoutContent() {
           orderNumber,
           paymentParams: JSON.stringify(data.paymentParams),
         });
-        router.push(`/food-payment?${params.toString()}`);
+        router.push(`/isbankfoodpayment?${params.toString()}`);
       }
     } catch (err: unknown) {
       console.error("[FoodCheckout] Payment init error:", err);
