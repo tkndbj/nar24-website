@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
@@ -14,9 +14,12 @@ import {
   ChevronLeft,
   Search,
   UtensilsCrossed,
+  Plus,
 } from "lucide-react";
 import TypeSenseServiceManager from "@/lib/typesense_service_manager";
 import FilterIcons from "./FilterIcons";
+import { useFoodCartActions, useFoodCartState, SelectedExtra, FoodCartRestaurant } from "@/context/FoodCartProvider";
+import FoodExtrasSheet from "./FoodExtrasSheet";
 
 interface RestaurantDetailProps {
   restaurant: Restaurant | null;
@@ -149,102 +152,182 @@ function RestaurantHeader({
 function FoodCard({
   food,
   isDarkMode,
+  restaurant,
 }: {
   food: Food;
   isDarkMode: boolean;
+  restaurant: Restaurant;
 }) {
   const t = useTranslations("restaurantDetail");
+  const { addItem, clearAndAddFromNewRestaurant } = useFoodCartActions();
+  const { items } = useFoodCartState();
+  const [extrasOpen, setExtrasOpen] = useState(false);
 
   // Try to get localized food type name
   const translationKey = FoodCategoryData.kFoodTypeTranslationKeys[food.foodType];
   const tFood = useTranslations();
   const displayType = translationKey ? tFood(translationKey) : food.foodType;
 
+  // Check quantity already in cart for this food
+  const cartQuantity = useMemo(() => {
+    const item = items.find((i) => i.foodId === food.id);
+    return item?.quantity ?? 0;
+  }, [items, food.id]);
+
+  const cartRestaurant: FoodCartRestaurant = useMemo(() => ({
+    id: restaurant.id,
+    name: restaurant.name,
+    profileImageUrl: restaurant.profileImageUrl,
+  }), [restaurant.id, restaurant.name, restaurant.profileImageUrl]);
+
+  const handleAddToCart = useCallback(() => {
+    setExtrasOpen(true);
+  }, []);
+
+  const handleExtrasConfirm = useCallback(
+    async (extras: SelectedExtra[], specialNotes: string, quantity: number) => {
+      const result = await addItem({
+        food: {
+          id: food.id,
+          name: food.name,
+          description: food.description,
+          price: food.price,
+          imageUrl: food.imageUrl,
+          foodCategory: food.foodCategory,
+          foodType: food.foodType,
+          preparationTime: food.preparationTime,
+        },
+        restaurant: cartRestaurant,
+        quantity,
+        extras,
+        specialNotes,
+      });
+
+      if (result === "restaurant_conflict") {
+        // Auto-replace for simplicity — could show a confirmation dialog
+        await clearAndAddFromNewRestaurant({
+          food: {
+            id: food.id,
+            name: food.name,
+            description: food.description,
+            price: food.price,
+            imageUrl: food.imageUrl,
+            foodCategory: food.foodCategory,
+            foodType: food.foodType,
+            preparationTime: food.preparationTime,
+          },
+          restaurant: cartRestaurant,
+          quantity,
+          extras,
+          specialNotes,
+        });
+      }
+    },
+    [food, cartRestaurant, addItem, clearAndAddFromNewRestaurant],
+  );
+
   return (
-    <div
-      className={`flex gap-4 rounded-2xl p-4 ${
-        isDarkMode
-          ? "border border-gray-700/40"
-          : "border border-gray-200"
-      }`}
-    >
-      {/* Food image */}
-      <div className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-xl overflow-hidden flex-shrink-0">
-        {food.imageUrl ? (
-          <Image
-            src={food.imageUrl}
-            alt={food.name}
-            fill
-            className="object-cover"
-            sizes="128px"
-          />
-        ) : (
-          <div
-            className={`w-full h-full flex items-center justify-center ${
-              isDarkMode ? "bg-gray-700" : "bg-orange-50"
-            }`}
-          >
-            <UtensilsCrossed
-              className={`w-8 h-8 ${
-                isDarkMode ? "text-gray-500" : "text-orange-300"
-              }`}
+    <>
+      <div
+        className={`flex gap-4 rounded-2xl p-4 ${
+          isDarkMode
+            ? "border border-gray-700/40"
+            : "border border-gray-200"
+        }`}
+      >
+        {/* Food image — only shown when available */}
+        {food.imageUrl && (
+          <div className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-xl overflow-hidden flex-shrink-0">
+            <Image
+              src={food.imageUrl}
+              alt={food.name}
+              fill
+              className="object-cover"
+              sizes="128px"
             />
           </div>
         )}
-      </div>
 
-      {/* Food info */}
-      <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
-        <div>
-          <h3
-            className={`font-semibold text-base truncate ${
-              isDarkMode ? "text-white" : "text-gray-900"
-            }`}
-          >
-            {food.name}
-          </h3>
-
-          <p
-            className={`text-xs mt-0.5 ${
-              isDarkMode ? "text-gray-500" : "text-gray-400"
-            }`}
-          >
-            {displayType}
-          </p>
-
-          {food.description && (
-            <p
-              className={`text-sm mt-1.5 line-clamp-2 ${
-                isDarkMode ? "text-gray-400" : "text-gray-500"
+        {/* Food info */}
+        <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
+          <div>
+            <h3
+              className={`font-semibold text-base truncate ${
+                isDarkMode ? "text-white" : "text-gray-900"
               }`}
             >
-              {food.description}
-            </p>
-          )}
-        </div>
+              {food.name}
+            </h3>
 
-        <div className="flex items-center justify-between mt-2">
-          <span
-            className={`text-lg font-bold ${
-              isDarkMode ? "text-orange-400" : "text-orange-600"
-            }`}
-          >
-            {food.price.toLocaleString()} TL
-          </span>
-
-          {food.preparationTime != null && food.preparationTime > 0 && (
-            <span
-              className={`flex items-center gap-1 text-xs ${
+            <p
+              className={`text-xs mt-0.5 ${
                 isDarkMode ? "text-gray-500" : "text-gray-400"
               }`}
             >
-              <Clock className="w-3.5 h-3.5" />
-              {food.preparationTime} {t("min")}
-            </span>
-          )}
+              {displayType}
+            </p>
+
+            {food.description && (
+              <p
+                className={`text-sm mt-1.5 line-clamp-2 ${
+                  isDarkMode ? "text-gray-400" : "text-gray-500"
+                }`}
+              >
+                {food.description}
+              </p>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between mt-2">
+            <div className="flex items-center gap-2">
+              <span
+                className={`text-lg font-bold ${
+                  isDarkMode ? "text-orange-400" : "text-orange-600"
+                }`}
+              >
+                {food.price.toLocaleString()} TL
+              </span>
+
+              {food.preparationTime != null && food.preparationTime > 0 && (
+                <span
+                  className={`flex items-center gap-1 text-xs ${
+                    isDarkMode ? "text-gray-500" : "text-gray-400"
+                  }`}
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                  {food.preparationTime} {t("min")}
+                </span>
+              )}
+            </div>
+
+            {/* Add to cart button */}
+            <button
+              onClick={handleAddToCart}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
+                cartQuantity > 0
+                  ? "bg-orange-500 text-white hover:bg-orange-600"
+                  : isDarkMode
+                    ? "bg-orange-500/15 text-orange-400 hover:bg-orange-500/25"
+                    : "bg-orange-50 text-orange-600 hover:bg-orange-100"
+              }`}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              {cartQuantity > 0 ? cartQuantity : t("add")}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+
+      <FoodExtrasSheet
+        open={extrasOpen}
+        onClose={() => setExtrasOpen(false)}
+        onConfirm={handleExtrasConfirm}
+        foodName={food.name}
+        foodPrice={food.price}
+        foodCategory={food.foodCategory}
+        isDarkMode={isDarkMode}
+      />
+    </>
   );
 }
 
@@ -427,7 +510,7 @@ export default function RestaurantDetail({
         {filteredFoods.length > 0 ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pb-10">
             {filteredFoods.map((food) => (
-              <FoodCard key={food.id} food={food} isDarkMode={isDarkMode} />
+              <FoodCard key={food.id} food={food} isDarkMode={isDarkMode} restaurant={restaurant} />
             ))}
           </div>
         ) : foods.length === 0 ? (

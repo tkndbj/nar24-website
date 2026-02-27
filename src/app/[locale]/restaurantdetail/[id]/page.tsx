@@ -8,10 +8,13 @@ import { Restaurant } from "@/types/Restaurant";
 import { Food } from "@/types/Food";
 import RestaurantDetail from "@/app/components/restaurants/RestaurantDetail";
 import Footer from "@/app/components/Footer";
+import { FoodCartProvider } from "@/context/FoodCartProvider";
+import { useUser } from "@/context/UserProvider";
 
 export default function RestaurantDetailPage() {
   const params = useParams();
   const id = params?.id as string;
+  const { user } = useUser();
 
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [foods, setFoods] = useState<Food[]>([]);
@@ -87,7 +90,9 @@ export default function RestaurantDetailPage() {
 
   return (
     <div className="min-h-screen flex flex-col overflow-x-hidden">
-      <RestaurantDetail restaurant={restaurant} foods={foods} loading={loading} />
+      <FoodCartProvider user={user} db={db}>
+        <RestaurantDetail restaurant={restaurant} foods={foods} loading={loading} />
+      </FoodCartProvider>
       <Footer />
     </div>
   );

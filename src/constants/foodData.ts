@@ -4,6 +4,36 @@
  */
 export class FoodCategoryData {
   // ------------------------------------------------------
+  // 0) Category → icon filename in /public/foods/
+  // ------------------------------------------------------
+  static readonly kCategoryIcons: Record<string, string> = {
+    "Kebabs & Grills": "kebab.png",
+    "Pide & Lahmacun": "lahmacun.png",
+    "Soups": "soup.png",
+    "Salads": "salad.png",
+    "Appetizers & Meze": "meze.png",
+    "Stews & Casseroles": "stew.png",
+    "Dolma & Sarma": "dolma.png",
+    "Steak & Roast": "steak.png",
+    "Stir Fry & Wok": "stir.png",
+    "Fried Chicken": "friedchicken.png",
+    "Rice & Pilaf": "rice.png",
+    "Noodles": "noodle.png",
+    "Sushi & Sashimi": "sushi.png",
+    "Curry": "curry.png",
+    "Pasta": "pasta.png",
+    "Wraps": "wrap.png",
+    "Doner": "doner.png",
+    "Sandwich & Toast": "sandwich.png",
+    "Seafood": "seafood.png",
+    "Breakfast": "breakfast.png",
+    "Desserts & Pastry": "desert.png",
+    "Beverages": "beverages.png",
+    "Hamburger": "hamburger.png",
+    "Pizza": "pizza.png",
+  };
+
+  // ------------------------------------------------------
   // 1) Food Categories
   // ------------------------------------------------------
   static readonly kCategories: Array<{ key: string }> = [

@@ -75,11 +75,11 @@ export const MarketBubbles: React.FC<MarketBubblesProps> = ({}) => {
   };
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 lg:gap-4">
+    <div className="flex gap-3 overflow-x-auto scrollbar-hide sm:grid sm:grid-cols-3 lg:grid-cols-5 lg:gap-4">
       {cards.map((card, index) => (
         <div
           key={card.label}
-          className={`group relative flex flex-row items-center gap-3 rounded-2xl border bg-transparent p-3 lg:p-4 transition-all duration-200 ${
+          className={`group relative flex flex-row items-center gap-3 rounded-2xl border bg-transparent p-3 lg:p-4 transition-all duration-200 flex-shrink-0 w-[160px] sm:w-auto sm:flex-shrink ${
             isDarkMode ? "border-neutral-700" : "border-gray-200"
           } ${
             card.showComingSoon

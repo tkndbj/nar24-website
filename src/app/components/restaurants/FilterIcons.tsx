@@ -6,33 +6,8 @@ import { useTranslations } from "next-intl";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { FoodCategoryData } from "@/constants/foodData";
 
-// Map each top-level category key to its icon filename in /public/foods/
-const CATEGORY_ICONS: Record<string, string> = {
-  "Kebabs & Grills": "kebab.png",
-  "Pide & Lahmacun": "lahmacun.png",
-  "Soups": "soup.png",
-  "Salads": "salad.png",
-  "Appetizers & Meze": "meze.png",
-  "Stews & Casseroles": "stew.png",
-  "Dolma & Sarma": "dolma.png",
-  "Steak & Roast": "steak.png",
-  "Stir Fry & Wok": "stir.png",
-  "Fried Chicken": "friedchicken.png",
-  "Rice & Pilaf": "rice.png",
-  "Noodles": "noodle.png",
-  "Sushi & Sashimi": "sushi.png",
-  "Curry": "curry.png",
-  "Pasta": "pasta.png",
-  "Wraps": "wrap.png",
-  "Doner": "doner.png",
-  "Sandwich & Toast": "sandwich.png",
-  "Seafood": "seafood.png",
-  "Breakfast": "breakfast.png",
-  "Desserts & Pastry": "desert.png",
-  "Beverages": "beverages.png",
-  "Hamburger": "hamburger.png",
-  "Pizza": "pizza.png",
-};
+// Reuse the shared category → icon mapping
+const CATEGORY_ICONS = FoodCategoryData.kCategoryIcons;
 
 const SCROLL_AMOUNT = 300;
 
