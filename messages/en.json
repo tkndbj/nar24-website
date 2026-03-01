@@ -5618,5 +5618,12 @@
   "foodExtraVinegar": "Vinegar",
   "foodExtraIceCreamScoop": "Ice Cream Scoop",
   "foodExtraWhippedCream": "Whipped Cream",
-  "foodExtraIce": "Ice"
+  "foodExtraIce": "Ice",
+  "NotificationDrawer": {
+    "food_order_status_update": {
+      "title": "Food Order Update",
+      "accepted": "Your order from {restaurantName} has been accepted!",
+      "rejected": "Your order from {restaurantName} has been rejected."
+    }
+  }
 }

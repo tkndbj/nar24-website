@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useUser } from "@/context/UserProvider";
 import { useRouter } from "next/navigation";
+import { useTranslations, useLocale } from "next-intl";
 import {
   collection,
   query,
@@ -58,6 +59,9 @@ interface NotificationData {
   status?: string;
   rejectionReason?: string;
   isShopProduct?: boolean;
+  restaurantName?: string;
+  orderStatus?: string;
+  orderId?: string;
 }
 
 interface NotificationDrawerProps {
@@ -73,6 +77,8 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
 }) => {
   const router = useRouter();
   const { user } = useUser();
+  const t = useTranslations("NotificationDrawer");
+  const locale = useLocale();
 
   const [notifications, setNotifications] = useState<NotificationData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -190,6 +196,9 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
             status: data.status,
             rejectionReason: data.rejectionReason,
             isShopProduct: data.isShopProduct,
+            restaurantName: data.restaurantName,
+            orderStatus: data.orderStatus,
+            orderId: data.orderId,
           };
 
           newNotifications.push(notification);
@@ -282,6 +291,8 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
       case "product_out_of_stock":
       case "product_out_of_stock_seller_panel":
         return { icon: AlertCircle, color: "text-orange-500" };
+      case "food_order_status_update":
+        return { icon: Store, color: "text-orange-500" };
       case "campaign":
         return { icon: Megaphone, color: "text-purple-500" };
       case "product_sold_shop":
@@ -321,12 +332,30 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
       case "product_out_of_stock":
       case "product_out_of_stock_seller_panel":
         return "Stok Tükendi";
+      case "food_order_status_update":
+        return t("food_order_status_update.title");
       case "campaign":
         return "Kampanya";
       case "product_question":
         return "Ürün Sorusu";
       default:
         return "Bildirim";
+    }
+  };
+
+  // Get notification message with i18n support
+  const getNotificationMessage = (notification: NotificationData): string => {
+    switch (notification.type) {
+      case "food_order_status_update":
+        return t(`food_order_status_update.${notification.orderStatus}`, {
+          restaurantName: notification.restaurantName ?? "",
+        });
+      default: {
+        if (locale === "en") {
+          return notification.messageEn || notification.message || "";
+        }
+        return notification.messageTr || notification.message || "";
+      }
     }
   };
 
@@ -531,6 +560,11 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
         break;
       case "product_sold_user":
         router.push("/my-orders?tab=1");
+        break;
+      case "food_order_status_update":
+        if (notification.orderId) {
+          router.push(`/food-orders/${notification.orderId}`);
+        }
         break;
       default:
         break;
@@ -747,8 +781,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
                       notification.type
                     );
                     const isDeleting = deletingItems.has(notification.id);
-                    const message =
-                      notification.messageTr || notification.message || "";
+                    const message = getNotificationMessage(notification);
 
                     return (
                       <div

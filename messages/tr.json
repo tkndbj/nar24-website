@@ -5630,5 +5630,12 @@
   "foodExtraVinegar": "Sirke",
   "foodExtraIceCreamScoop": "Dondurma Topları",
   "foodExtraWhippedCream": "Krem Şanti",
-  "foodExtraIce": "Buz"
+  "foodExtraIce": "Buz",
+  "NotificationDrawer": {
+    "food_order_status_update": {
+      "title": "Yemek Siparişi Güncelleme",
+      "accepted": "{restaurantName} restoranından siparişiniz kabul edildi!",
+      "rejected": "{restaurantName} restoranından siparişiniz reddedildi."
+    }
+  }
 }
