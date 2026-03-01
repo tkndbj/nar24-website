@@ -5647,6 +5647,10 @@
       "preparing": "{restaurantName} siparişinizi hazırlamaya başladı.",
       "ready": "{restaurantName} siparişiniz hazır!",
       "delivered": "{restaurantName} siparişiniz teslim edildi."
+    },
+    "food_order_delivered_review": {
+      "title": "Sipariş Teslim Edildi! 🎉",
+      "body": "{restaurantName} siparişiniz teslim edildi. Değerlendirme yapmak için tıklayın!"
     }
   }
 }

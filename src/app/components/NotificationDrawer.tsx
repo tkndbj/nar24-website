@@ -282,6 +282,8 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
       case "seller_review_shop":
       case "seller_review_user":
         return { icon: Star, color: "text-yellow-500" };
+      case "food_order_delivered_review":
+        return { icon: Star, color: "text-amber-500" };
       case "shipment":
         return { icon: Truck, color: "text-blue-500" };
       case "shop_approved":
@@ -317,6 +319,9 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
         return "Yükseltildi";
       case "boost_expired":
         return "Yükseltme Süresi Doldu";
+      case "food_order_delivered_review":
+        return t("food_order_delivered_review.title");
+
       case "shipment":
         return "Kargo";
       case "shop_approved":
@@ -346,6 +351,11 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
   // Get notification message with i18n support
   const getNotificationMessage = (notification: NotificationData): string => {
     switch (notification.type) {
+      case "food_order_delivered_review":
+        return t("food_order_delivered_review.body", {
+          restaurantName: notification.restaurantName ?? "",
+        });
+
       case "food_order_status_update":
         return t(`food_order_status_update.${notification.orderStatus}`, {
           restaurantName: notification.restaurantName ?? "",
@@ -546,6 +556,9 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
         if (notification.productId) {
           router.push(`/product/${notification.productId}`);
         }
+        break;
+      case "food_order_delivered_review":
+        router.push("/reviews");
         break;
       case "product_review":
         if (notification.productId) {

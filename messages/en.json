@@ -5635,6 +5635,10 @@
       "preparing": "{restaurantName} started preparing your food order.",
       "ready": "{restaurantName} your food order is ready!",
       "delivered": "{restaurantName} your food order is delivered."
+    },
+    "food_order_delivered_review": {
+      "title": "Order Delivered! 🎉",
+      "body": "Your order from {restaurantName} has arrived. Tap to leave a review!"
     }
   }
 }
