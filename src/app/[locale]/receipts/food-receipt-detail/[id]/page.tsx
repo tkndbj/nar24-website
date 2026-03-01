@@ -53,6 +53,7 @@ interface FoodReceipt {
     phoneNumber: string;
   } | null;
   filePath?: string;
+  downloadUrl?: string;
 }
 
 interface FoodOrderItem {
@@ -144,6 +145,7 @@ export default function FoodReceiptDetailPage() {
           buyerName: rd.buyerName || "",
           deliveryAddress: rd.deliveryAddress || null,
           filePath: rd.filePath,
+          downloadUrl: rd.downloadUrl,
         };
         setReceipt(receiptObj);
 
@@ -190,11 +192,25 @@ export default function FoodReceiptDetailPage() {
     }
   };
 
-  const downloadReceipt = () => {
-    if (receipt?.filePath) {
-      const storageUrl = `https://storage.googleapis.com/${process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}/${receipt.filePath}`;
-      window.open(storageUrl, "_blank");
-    } else {
+  const downloadReceipt = async () => {
+    try {
+      let url = receipt?.downloadUrl;
+      if (!url && receipt?.filePath) {
+        // Fallback for receipts generated before the fix
+        const { getStorage, ref, getDownloadURL } =
+          await import("firebase/storage");
+        const storage = getStorage();
+        url = await getDownloadURL(ref(storage, receipt.filePath));
+      }
+      if (url) {
+        window.open(url, "_blank");
+      } else {
+        alert(
+          l("FoodReceiptDetail.receiptPdfNotAvailable") ||
+            "PDF not available yet.",
+        );
+      }
+    } catch {
       alert(
         l("FoodReceiptDetail.receiptPdfNotAvailable") ||
           "PDF not available yet.",
@@ -460,7 +476,7 @@ export default function FoodReceiptDetailPage() {
                 className={`w-4 h-4 ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}
               />
             </button>
-            {receipt.filePath && (
+            {(receipt.downloadUrl || receipt.filePath) && (
               <button
                 onClick={downloadReceipt}
                 className={`w-9 h-9 flex items-center justify-center border rounded-xl transition-colors ${
