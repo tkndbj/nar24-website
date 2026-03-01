@@ -566,9 +566,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
         router.push("/my-orders?tab=1");
         break;
       case "food_order_status_update":
-        if (notification.orderId) {
-          router.push(`/food-orders/${notification.orderId}`);
-        }
+        router.push("/orders?tab=food");
         break;
       default:
         break;

@@ -23,7 +23,7 @@ import {
   ShoppingBag,
 } from "lucide-react";
 import { useUser } from "@/context/UserProvider";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   query,
   where,
@@ -211,7 +211,7 @@ export default function OrdersPage() {
 
   const { user, isLoading: authLoading } = useUser();
   const t = useTranslations("Orders");
-
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<OrderTab>("sold");
   const [filters, setFilters] = useState<FilterOptions>({ searchQuery: "" });
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -252,6 +252,11 @@ export default function OrdersPage() {
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const scrollThrottleRef = useRef<NodeJS.Timeout | null>(null);
   const prevFilters = useRef(filters);
+
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "food") setActiveTab("food");
+  }, [searchParams]);
 
   useEffect(() => {
     const checkDarkMode = () => {
