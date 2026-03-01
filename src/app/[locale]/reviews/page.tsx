@@ -11,6 +11,7 @@ import {
   Camera,
   ArrowLeft,
   Package,
+  UtensilsCrossed,
 } from "lucide-react";
 import { useUser } from "@/context/UserProvider";
 import { useRouter } from "next/navigation";
@@ -22,6 +23,7 @@ import {
   startAfter,
   getDocs,
   collectionGroup,
+  collection,
   Timestamp,
   QueryDocumentSnapshot,
   DocumentData,
@@ -59,6 +61,18 @@ interface PendingReview {
   timestamp: Timestamp;
 }
 
+// Food order pending review
+interface FoodPendingReview {
+  id: string; // order doc id
+  restaurantId: string;
+  restaurantName: string;
+  restaurantProfileImage?: string;
+  items: { name: string; quantity: number }[];
+  totalPrice: number;
+  currency: string;
+  createdAt: Timestamp;
+}
+
 interface Review {
   id: string;
   rating: number;
@@ -77,15 +91,30 @@ interface Review {
   userId: string;
 }
 
+// Submitted food review (stored under restaurants/{id}/reviews)
+interface FoodReview {
+  id: string;
+  orderId: string;
+  buyerId: string;
+  buyerName?: string;
+  restaurantId: string;
+  restaurantName?: string;
+  rating: number;
+  comment: string;
+  timestamp: Timestamp;
+}
+
 interface FilterOptions {
   productId?: string;
   sellerId?: string;
   startDate?: Date;
   endDate?: Date;
-  reviewType: "all" | "product" | "seller";
+  reviewType: "all" | "product" | "seller" | "food";
 }
 
 type ReviewTab = "pending" | "myReviews";
+// "food" is a separate modal category, not a tab
+type ReviewCategory = "product" | "seller" | "food";
 
 interface ImageValidationResult {
   valid: boolean;
@@ -124,11 +153,19 @@ interface SubmitReviewResult {
   message?: string;
 }
 
+interface SubmitFoodReviewData {
+  orderId: string;
+  restaurantId: string;
+  rating: number;
+  comment: string;
+}
+
 // ============================================================================
 // CONSTANTS
 // ============================================================================
 
 const PAGE_SIZE = 20;
+const FOOD_PAGE_SIZE = 20;
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = [
   "image/jpeg",
@@ -159,18 +196,34 @@ export default function ReviewsPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
-  // Pending reviews state
+  // Pending product reviews state
   const [pendingReviews, setPendingReviews] = useState<PendingReview[]>([]);
   const [pendingLoading, setPendingLoading] = useState(false);
   const [pendingHasMore, setPendingHasMore] = useState(true);
   const [pendingLastDoc, setPendingLastDoc] =
     useState<QueryDocumentSnapshot<DocumentData> | null>(null);
 
-  // My reviews state
+  // Pending food reviews state
+  const [foodPendingReviews, setFoodPendingReviews] = useState<
+    FoodPendingReview[]
+  >([]);
+  const [foodPendingLoading, setFoodPendingLoading] = useState(false);
+  const [foodPendingHasMore, setFoodPendingHasMore] = useState(true);
+  const [foodPendingLastDoc, setFoodPendingLastDoc] =
+    useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+
+  // My product reviews state
   const [myReviews, setMyReviews] = useState<Review[]>([]);
   const [myReviewsLoading, setMyReviewsLoading] = useState(false);
   const [myReviewsHasMore, setMyReviewsHasMore] = useState(true);
   const [myReviewsLastDoc, setMyReviewsLastDoc] =
+    useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+
+  // My food reviews state
+  const [myFoodReviews, setMyFoodReviews] = useState<FoodReview[]>([]);
+  const [myFoodReviewsLoading, setMyFoodReviewsLoading] = useState(false);
+  const [myFoodReviewsHasMore, setMyFoodReviewsHasMore] = useState(true);
+  const [myFoodReviewsLastDoc, setMyFoodReviewsLastDoc] =
     useState<QueryDocumentSnapshot<DocumentData> | null>(null);
 
   // Modal states
@@ -179,12 +232,15 @@ export default function ReviewsPage() {
   const [selectedReview, setSelectedReview] = useState<PendingReview | null>(
     null,
   );
+  const [selectedFoodReview, setSelectedFoodReview] =
+    useState<FoodPendingReview | null>(null);
 
   // Review form state
   const [rating, setRating] = useState(0);
   const [reviewText, setReviewText] = useState("");
   const [reviewImages, setReviewImages] = useState<File[]>([]);
-  const [reviewType, setReviewType] = useState<"product" | "seller">("product");
+  const [reviewCategory, setReviewCategory] =
+    useState<ReviewCategory>("product");
 
   // Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -192,7 +248,7 @@ export default function ReviewsPage() {
   const isLoadingMoreRef = useRef(false);
 
   // ============================================================================
-  // EFFECTS
+  // LOAD FUNCTIONS
   // ============================================================================
 
   const loadPendingReviews = useCallback(
@@ -242,6 +298,7 @@ export default function ReviewsPage() {
           const needsProductReview = data.needsProductReview ?? false;
           const needsSellerReview = data.needsSellerReview ?? false;
 
+          // Only include if at least one review is still needed
           if (needsProductReview || needsSellerReview) {
             newReviews.push({
               id: doc.id,
@@ -291,6 +348,74 @@ export default function ReviewsPage() {
     [user, filters, pendingLoading, pendingLastDoc, pendingHasMore],
   );
 
+  const loadFoodPendingReviews = useCallback(
+    async (reset = false) => {
+      if (!user) return;
+      if (foodPendingLoading) return;
+      if (!reset && !foodPendingHasMore) return;
+
+      setFoodPendingLoading(true);
+      try {
+        let q = query(
+          collection(db, "orders-food"),
+          where("buyerId", "==", user.uid),
+          where("needsReview", "==", true),
+          orderBy("createdAt", "desc"),
+          limit(FOOD_PAGE_SIZE),
+        );
+
+        if (!reset && foodPendingLastDoc) {
+          q = query(q, startAfter(foodPendingLastDoc));
+        }
+
+        const snapshot = await getDocs(q);
+        const newOrders: FoodPendingReview[] = snapshot.docs.map((doc) => {
+          const d = doc.data();
+          return {
+            id: doc.id,
+            restaurantId: d.restaurantId || "",
+            restaurantName: d.restaurantName || "",
+            restaurantProfileImage: d.restaurantProfileImage || "",
+            items: Array.isArray(d.items)
+              ? d.items.map((i: { name: string; quantity: number }) => ({
+                  name: i.name,
+                  quantity: i.quantity,
+                }))
+              : [],
+            totalPrice: d.totalPrice || 0,
+            currency: d.currency || "TL",
+            createdAt: d.createdAt,
+          };
+        });
+
+        const hasMore = newOrders.length === FOOD_PAGE_SIZE;
+        setFoodPendingHasMore(hasMore);
+
+        if (reset) {
+          setFoodPendingReviews(newOrders);
+        } else {
+          setFoodPendingReviews((prev) => {
+            const combined = [...prev, ...newOrders];
+            const uniqueMap = new Map();
+            combined.forEach((o) => uniqueMap.set(o.id, o));
+            return Array.from(uniqueMap.values());
+          });
+        }
+
+        if (newOrders.length > 0) {
+          setFoodPendingLastDoc(snapshot.docs[snapshot.docs.length - 1]);
+        } else if (reset) {
+          setFoodPendingLastDoc(null);
+        }
+      } catch (error) {
+        console.error("Error loading food pending reviews:", error);
+      } finally {
+        setFoodPendingLoading(false);
+      }
+    },
+    [user, foodPendingLoading, foodPendingLastDoc, foodPendingHasMore],
+  );
+
   const loadMyReviews = useCallback(
     async (reset = false) => {
       if (!user) return;
@@ -336,11 +461,7 @@ export default function ReviewsPage() {
 
         const snapshot = await getDocs(q);
         const newReviews = snapshot.docs.map(
-          (doc) =>
-            ({
-              id: doc.id,
-              ...doc.data(),
-            }) as Review,
+          (doc) => ({ id: doc.id, ...doc.data() }) as Review,
         );
 
         const hasMore = newReviews.length === PAGE_SIZE;
@@ -352,9 +473,7 @@ export default function ReviewsPage() {
           setMyReviews((prev) => {
             const combined = [...prev, ...newReviews];
             const uniqueMap = new Map();
-            combined.forEach((review) => {
-              uniqueMap.set(`${review.orderId}_${review.id}`, review);
-            });
+            combined.forEach((r) => uniqueMap.set(`${r.orderId}_${r.id}`, r));
             return Array.from(uniqueMap.values());
           });
         }
@@ -373,24 +492,80 @@ export default function ReviewsPage() {
     [user, filters, myReviewsLoading, myReviewsLastDoc, myReviewsHasMore],
   );
 
-  // Redirect if not authenticated
+  const loadMyFoodReviews = useCallback(
+    async (reset = false) => {
+      if (!user) return;
+      if (myFoodReviewsLoading) return;
+      if (!reset && !myFoodReviewsHasMore) return;
+
+      setMyFoodReviewsLoading(true);
+      try {
+        // Food reviews are stored under restaurants/{id}/reviews with buyerId field
+        let q = query(
+          collectionGroup(db, "reviews"),
+          where("buyerId", "==", user.uid),
+          orderBy("timestamp", "desc"),
+          limit(FOOD_PAGE_SIZE),
+        );
+
+        if (!reset && myFoodReviewsLastDoc) {
+          q = query(q, startAfter(myFoodReviewsLastDoc));
+        }
+
+        const snapshot = await getDocs(q);
+        const newReviews = snapshot.docs.map(
+          (doc) => ({ id: doc.id, ...doc.data() }) as FoodReview,
+        );
+
+        const hasMore = newReviews.length === FOOD_PAGE_SIZE;
+        setMyFoodReviewsHasMore(hasMore);
+
+        if (reset) {
+          setMyFoodReviews(newReviews);
+        } else {
+          setMyFoodReviews((prev) => {
+            const combined = [...prev, ...newReviews];
+            const uniqueMap = new Map();
+            combined.forEach((r) => uniqueMap.set(r.id, r));
+            return Array.from(uniqueMap.values());
+          });
+        }
+
+        if (newReviews.length > 0) {
+          setMyFoodReviewsLastDoc(snapshot.docs[snapshot.docs.length - 1]);
+        } else if (reset) {
+          setMyFoodReviewsLastDoc(null);
+        }
+      } catch (error) {
+        console.error("Error loading food reviews:", error);
+      } finally {
+        setMyFoodReviewsLoading(false);
+      }
+    },
+    [user, myFoodReviewsLoading, myFoodReviewsLastDoc, myFoodReviewsHasMore],
+  );
+
+  // ============================================================================
+  // EFFECTS
+  // ============================================================================
+
   useEffect(() => {
     if (!authLoading && !user) {
       router.push("/login");
     }
   }, [user, authLoading, router]);
 
-  // Load initial data when user changes
   useEffect(() => {
     if (user) {
       resetPaginationState();
       loadPendingReviews(true);
+      loadFoodPendingReviews(true);
       loadMyReviews(true);
+      loadMyFoodReviews(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  // Load data when filters change
   useEffect(() => {
     if (user) {
       const filtersChanged =
@@ -400,45 +575,62 @@ export default function ReviewsPage() {
         loadPendingReviews(true);
         loadMyReviews(true);
         prevFilters.current = filters;
+        // Food reviews don't use filters, so no reload needed
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters, user]);
 
-  // Reset filter when switching tabs
   useEffect(() => {
     if (activeTab !== "myReviews") {
       setFilters((prev) => ({ ...prev, reviewType: "all" }));
     }
   }, [activeTab]);
 
-  // Window scroll handler for infinite loading
   useEffect(() => {
     const handleScroll = () => {
       const scrollPosition = window.innerHeight + window.scrollY;
       const threshold = document.documentElement.scrollHeight - 200;
 
       if (scrollPosition >= threshold) {
-        if (
-          activeTab === "pending" &&
-          pendingHasMore &&
-          !pendingLoading &&
-          !isLoadingMoreRef.current
-        ) {
-          isLoadingMoreRef.current = true;
-          loadPendingReviews(false).finally(() => {
-            isLoadingMoreRef.current = false;
-          });
-        } else if (
-          activeTab === "myReviews" &&
-          myReviewsHasMore &&
-          !myReviewsLoading &&
-          !isLoadingMoreRef.current
-        ) {
-          isLoadingMoreRef.current = true;
-          loadMyReviews(false).finally(() => {
-            isLoadingMoreRef.current = false;
-          });
+        if (activeTab === "pending") {
+          if (pendingHasMore && !pendingLoading && !isLoadingMoreRef.current) {
+            isLoadingMoreRef.current = true;
+            loadPendingReviews(false).finally(() => {
+              isLoadingMoreRef.current = false;
+            });
+          }
+          if (
+            foodPendingHasMore &&
+            !foodPendingLoading &&
+            !isLoadingMoreRef.current
+          ) {
+            isLoadingMoreRef.current = true;
+            loadFoodPendingReviews(false).finally(() => {
+              isLoadingMoreRef.current = false;
+            });
+          }
+        } else if (activeTab === "myReviews") {
+          if (
+            myReviewsHasMore &&
+            !myReviewsLoading &&
+            !isLoadingMoreRef.current
+          ) {
+            isLoadingMoreRef.current = true;
+            loadMyReviews(false).finally(() => {
+              isLoadingMoreRef.current = false;
+            });
+          }
+          if (
+            myFoodReviewsHasMore &&
+            !myFoodReviewsLoading &&
+            !isLoadingMoreRef.current
+          ) {
+            isLoadingMoreRef.current = true;
+            loadMyFoodReviews(false).finally(() => {
+              isLoadingMoreRef.current = false;
+            });
+          }
         }
       }
     };
@@ -449,10 +641,16 @@ export default function ReviewsPage() {
     activeTab,
     pendingHasMore,
     pendingLoading,
+    foodPendingHasMore,
+    foodPendingLoading,
     myReviewsHasMore,
     myReviewsLoading,
+    myFoodReviewsHasMore,
+    myFoodReviewsLoading,
     loadPendingReviews,
+    loadFoodPendingReviews,
     loadMyReviews,
+    loadMyFoodReviews,
   ]);
 
   // ============================================================================
@@ -461,11 +659,17 @@ export default function ReviewsPage() {
 
   const resetPaginationState = () => {
     setPendingReviews([]);
+    setFoodPendingReviews([]);
     setMyReviews([]);
+    setMyFoodReviews([]);
     setPendingLastDoc(null);
+    setFoodPendingLastDoc(null);
     setMyReviewsLastDoc(null);
+    setMyFoodReviewsLastDoc(null);
     setPendingHasMore(true);
+    setFoodPendingHasMore(true);
     setMyReviewsHasMore(true);
+    setMyFoodReviewsHasMore(true);
     isLoadingMoreRef.current = false;
   };
 
@@ -474,6 +678,7 @@ export default function ReviewsPage() {
     setReviewText("");
     setReviewImages([]);
     setSelectedReview(null);
+    setSelectedFoodReview(null);
   };
 
   const getActiveFiltersCount = () => {
@@ -493,12 +698,23 @@ export default function ReviewsPage() {
           return review.productId != null;
         case "seller":
           return review.productId == null;
+        case "food":
+          return false; // food reviews are separate
         case "all":
         default:
           return true;
       }
     });
   };
+
+  const totalPendingCount = pendingReviews.length + foodPendingReviews.length;
+  const totalMyReviewsCount =
+    getFilteredMyReviews().length +
+    (filters.reviewType === "all" || filters.reviewType === "food"
+      ? myFoodReviews.length
+      : 0);
+  const currentCount =
+    activeTab === "pending" ? totalPendingCount : totalMyReviewsCount;
 
   // ============================================================================
   // IMAGE VALIDATION & PROCESSING
@@ -532,8 +748,7 @@ export default function ReviewsPage() {
         useWebWorker: true,
         fileType: "image/jpeg",
       };
-      const compressedFile = await imageCompression(file, options);
-      return compressedFile;
+      return await imageCompression(file, options);
     } catch (error) {
       console.error("Error compressing image:", error);
       return file;
@@ -545,13 +760,12 @@ export default function ReviewsPage() {
     storagePath: string,
     index: number,
   ): Promise<ImageProcessResult> => {
-    if (!user) {
+    if (!user)
       return {
         success: false,
         error: "no_user",
         message: "User not authenticated",
       };
-    }
 
     try {
       const validation = validateFile(imageFile);
@@ -564,7 +778,6 @@ export default function ReviewsPage() {
       }
 
       const compressedFile = await compressImage(imageFile);
-
       const fileName = `${user.uid}_${Date.now()}_${index}.jpg`;
       const storageRef = ref(storage, `${storagePath}/${fileName}`);
 
@@ -575,17 +788,12 @@ export default function ReviewsPage() {
         { imageUrl: string },
         ModerationResult
       >(functions, "moderateImage");
-
       const result: HttpsCallableResult<ModerationResult> =
         await moderateImageFunction({ imageUrl });
       const data = result.data;
 
       if (data.approved) {
-        return {
-          success: true,
-          url: imageUrl,
-          ref: storageRef.fullPath,
-        };
+        return { success: true, url: imageUrl, ref: storageRef.fullPath };
       } else {
         await deleteObject(storageRef);
         return {
@@ -604,16 +812,25 @@ export default function ReviewsPage() {
   };
 
   // ============================================================================
-  // DATA LOADING FUNCTIONS
+  // MODAL HANDLERS
   // ============================================================================
 
-  const refreshReviews = useCallback(() => {
-    if (user) {
-      resetPaginationState();
-      loadPendingReviews(true);
-      loadMyReviews(true);
-    }
-  }, [user, loadPendingReviews, loadMyReviews]);
+  const openProductReviewModal = (
+    review: PendingReview,
+    type: "product" | "seller",
+  ) => {
+    setSelectedReview(review);
+    setSelectedFoodReview(null);
+    setReviewCategory(type);
+    setShowReviewModal(true);
+  };
+
+  const openFoodReviewModal = (order: FoodPendingReview) => {
+    setSelectedFoodReview(order);
+    setSelectedReview(null);
+    setReviewCategory("food");
+    setShowReviewModal(true);
+  };
 
   // ============================================================================
   // IMAGE UPLOAD HANDLING
@@ -654,15 +871,6 @@ export default function ReviewsPage() {
   // REVIEW SUBMISSION
   // ============================================================================
 
-  const openReviewModal = (
-    review: PendingReview,
-    type: "product" | "seller",
-  ) => {
-    setSelectedReview(review);
-    setReviewType(type);
-    setShowReviewModal(true);
-  };
-
   const handleReviewSubmit = () => {
     if (rating === 0 || reviewText.trim() === "") {
       showErrorToast(
@@ -671,12 +879,17 @@ export default function ReviewsPage() {
       );
       return;
     }
-
     setShowReviewModal(false);
     setShowLoadingModal(true);
-    submitReviewAsync();
+
+    if (reviewCategory === "food") {
+      submitFoodReviewAsync();
+    } else {
+      submitReviewAsync();
+    }
   };
 
+  // Product/seller review submission
   const submitReviewAsync = async () => {
     if (!user || !selectedReview) {
       setShowLoadingModal(false);
@@ -688,53 +901,40 @@ export default function ReviewsPage() {
       const approvedUrls: string[] = [];
       const uploadedRefs: string[] = [];
 
-      if (reviewType === "product" && reviewImages.length > 0) {
+      if (reviewCategory === "product" && reviewImages.length > 0) {
         const storagePath = `reviews/${selectedReview.productId}`;
-
         for (let i = 0; i < reviewImages.length; i++) {
           const result = await processImage(reviewImages[i], storagePath, i);
-
           if (!result.success) {
             for (const refPath of uploadedRefs) {
               try {
                 await deleteObject(ref(storage, refPath));
-              } catch (error) {
-                console.error("Error deleting image:", error);
+              } catch {
+                console.error("Error deleting image:", refPath);
               }
             }
-
             setShowLoadingModal(false);
-
             let message = `Image ${i + 1}: `;
-            if (result.message) {
-              message += result.message;
-            } else {
-              switch (result.error) {
-                case "adult_content":
-                  message += "Contains inappropriate adult content";
-                  break;
-                case "violent_content":
-                  message += "Contains violent content";
-                  break;
-                case "file_too_large":
-                  message += "File too large (max 10MB)";
-                  break;
-                case "invalid_format":
-                  message += "Invalid format (JPG, PNG, HEIC, WEBP only)";
-                  break;
-                case "processing_error":
-                  message += "Failed to process image";
-                  break;
-                default:
-                  message += "Inappropriate content detected";
-              }
+            switch (result.error) {
+              case "adult_content":
+                message += "Contains inappropriate adult content";
+                break;
+              case "violent_content":
+                message += "Contains violent content";
+                break;
+              case "file_too_large":
+                message += "File too large (max 10MB)";
+                break;
+              case "invalid_format":
+                message += "Invalid format (JPG, PNG, HEIC, WEBP only)";
+                break;
+              default:
+                message += result.message || "Inappropriate content detected";
             }
-
             showErrorToast(message);
             resetReviewForm();
             return;
           }
-
           if (result.url && result.ref) {
             approvedUrls.push(result.url);
             uploadedRefs.push(result.ref);
@@ -748,10 +948,10 @@ export default function ReviewsPage() {
       >(functions, "submitReview");
 
       const reviewData: SubmitReviewData = {
-        isProduct: reviewType === "product",
+        isProduct: reviewCategory === "product",
         isShopProduct: selectedReview.isShopProduct,
         productId:
-          reviewType === "product" ? selectedReview.productId : undefined,
+          reviewCategory === "product" ? selectedReview.productId : undefined,
         sellerId: selectedReview.sellerId,
         shopId: selectedReview.shopId,
         transactionId: selectedReview.id,
@@ -762,15 +962,36 @@ export default function ReviewsPage() {
       };
 
       const result = await submitReviewFunction(reviewData);
-
       setShowLoadingModal(false);
 
       if (result.data.success) {
         showSuccessToast(
           t("reviewSubmittedSuccessfully") || "Review submitted successfully!",
         );
+
+        // Optimistic removal: update or remove this pending item immediately
+        setPendingReviews((prev) =>
+          prev
+            .map((r) => {
+              if (r.id !== selectedReview.id) return r;
+              const updatedNeeds = {
+                ...r,
+                needsProductReview:
+                  reviewCategory === "product" ? false : r.needsProductReview,
+                needsSellerReview:
+                  reviewCategory === "seller" ? false : r.needsSellerReview,
+              };
+              return updatedNeeds;
+            })
+            .filter((r) => r.needsProductReview || r.needsSellerReview),
+        );
+
         resetReviewForm();
-        refreshReviews();
+        // Reload my reviews to reflect new submission in tab 2
+        setMyReviews([]);
+        setMyReviewsLastDoc(null);
+        setMyReviewsHasMore(true);
+        loadMyReviews(true);
       } else {
         showErrorToast(result.data.message || "Failed to submit review");
         resetReviewForm();
@@ -778,11 +999,57 @@ export default function ReviewsPage() {
     } catch (error) {
       setShowLoadingModal(false);
       console.error("Error submitting review:", error);
+      showErrorToast(
+        error instanceof Error ? error.message : "An unexpected error occurred",
+      );
+      resetReviewForm();
+    }
+  };
 
-      const errorMessage =
-        error instanceof Error ? error.message : "An unexpected error occurred";
+  // Food review submission
+  const submitFoodReviewAsync = async () => {
+    if (!user || !selectedFoodReview) {
+      setShowLoadingModal(false);
+      showErrorToast("Missing user or food order data");
+      return;
+    }
 
-      showErrorToast(errorMessage);
+    try {
+      const submitFoodReviewFunction = httpsCallable<
+        SubmitFoodReviewData,
+        { success: boolean }
+      >(functions, "submitRestaurantReview");
+
+      await submitFoodReviewFunction({
+        orderId: selectedFoodReview.id,
+        restaurantId: selectedFoodReview.restaurantId,
+        rating,
+        comment: reviewText.trim(),
+      });
+
+      setShowLoadingModal(false);
+      showSuccessToast(
+        t("reviewSubmittedSuccessfully") || "Review submitted successfully!",
+      );
+
+      // Optimistic removal from pending list
+      setFoodPendingReviews((prev) =>
+        prev.filter((o) => o.id !== selectedFoodReview.id),
+      );
+
+      resetReviewForm();
+
+      // Reload food reviews for tab 2
+      setMyFoodReviews([]);
+      setMyFoodReviewsLastDoc(null);
+      setMyFoodReviewsHasMore(true);
+      loadMyFoodReviews(true);
+    } catch (error) {
+      setShowLoadingModal(false);
+      console.error("Error submitting food review:", error);
+      showErrorToast(
+        error instanceof Error ? error.message : "An unexpected error occurred",
+      );
       resetReviewForm();
     }
   };
@@ -794,7 +1061,6 @@ export default function ReviewsPage() {
   const showSuccessToast = (message: string) => {
     alert(message);
   };
-
   const showErrorToast = (message: string) => {
     alert(message);
   };
@@ -819,33 +1085,34 @@ export default function ReviewsPage() {
   );
 
   const activeFilterCount = getActiveFiltersCount();
-  const currentCount =
-    activeTab === "pending"
-      ? pendingReviews.length
-      : getFilteredMyReviews().length;
 
   // ============================================================================
-  // RENDER
+  // RENDER GUARDS
   // ============================================================================
 
   if (authLoading) {
     return (
-      <div className={`min-h-screen flex items-center justify-center pt-20 ${isDarkMode ? "bg-gray-950" : "bg-gray-50"}`}>
+      <div
+        className={`min-h-screen flex items-center justify-center pt-20 ${isDarkMode ? "bg-gray-950" : "bg-gray-50"}`}
+      >
         <div className="w-5 h-5 border-[3px] border-orange-200 border-t-orange-600 rounded-full animate-spin" />
       </div>
     );
   }
 
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
 
   const filteredMyReviews = getFilteredMyReviews();
+  const showFoodReviewsInTab2 =
+    filters.reviewType === "all" || filters.reviewType === "food";
 
+  // Style helpers
   const cardClass = isDarkMode
     ? "bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all"
     : "bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all";
-  const cardBorderClass = isDarkMode ? "border-b border-gray-800" : "border-b border-gray-50";
+  const cardBorderClass = isDarkMode
+    ? "border-b border-gray-800"
+    : "border-b border-gray-50";
   const headingColor = isDarkMode ? "text-white" : "text-gray-900";
   const mutedColor = isDarkMode ? "text-gray-500" : "text-gray-400";
   const bodyColor = isDarkMode ? "text-gray-300" : "text-gray-600";
@@ -854,10 +1121,18 @@ export default function ReviewsPage() {
     ? "w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 text-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all"
     : "w-full px-3 py-2 text-sm bg-gray-50/80 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500/20 focus:border-orange-300 outline-none transition-all";
 
+  // ============================================================================
+  // RENDER
+  // ============================================================================
+
   return (
-    <div className={`min-h-screen ${isDarkMode ? "bg-gray-950" : "bg-gray-50"}`}>
+    <div
+      className={`min-h-screen ${isDarkMode ? "bg-gray-950" : "bg-gray-50"}`}
+    >
       {/* Sticky Toolbar */}
-      <div className={`sticky top-14 z-30 backdrop-blur-xl border-b ${isDarkMode ? "bg-gray-950/80 border-gray-800/80" : "bg-white/80 border-gray-100/80"}`}>
+      <div
+        className={`sticky top-14 z-30 backdrop-blur-xl border-b ${isDarkMode ? "bg-gray-950/80 border-gray-800/80" : "bg-white/80 border-gray-100/80"}`}
+      >
         <div className="max-w-4xl mx-auto">
           {/* Row 1: Nav + Title + Actions */}
           <div className="flex items-center gap-3 px-3 sm:px-6 py-2">
@@ -865,19 +1140,21 @@ export default function ReviewsPage() {
               onClick={() => router.back()}
               className={`w-9 h-9 flex items-center justify-center border rounded-xl transition-colors flex-shrink-0 ${isDarkMode ? "bg-gray-800 border-gray-700 hover:bg-gray-700" : "bg-gray-50 border-gray-200 hover:bg-gray-100"}`}
             >
-              <ArrowLeft className={`w-4 h-4 ${isDarkMode ? "text-gray-300" : "text-gray-600"}`} />
+              <ArrowLeft
+                className={`w-4 h-4 ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}
+              />
             </button>
             <h1 className={`text-lg font-bold truncate ${headingColor}`}>
               {t("title") || "My Reviews"}
             </h1>
             {currentCount > 0 && (
-              <span className={`px-2 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 ${isDarkMode ? "bg-orange-950/50 text-orange-400" : "bg-orange-50 text-orange-600"}`}>
+              <span
+                className={`px-2 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 ${isDarkMode ? "bg-orange-950/50 text-orange-400" : "bg-orange-50 text-orange-600"}`}
+              >
                 {currentCount}
               </span>
             )}
             <div className="flex-1" />
-
-            {/* Filter button */}
             <button
               onClick={() => setShowFilters(!showFilters)}
               className={`relative w-9 h-9 flex items-center justify-center border rounded-xl transition-all flex-shrink-0 ${
@@ -899,26 +1176,36 @@ export default function ReviewsPage() {
 
           {/* Row 2: Tab pills */}
           <div className="px-3 sm:px-6 pb-2.5">
-            <div className={`flex gap-1 rounded-xl p-1 ${isDarkMode ? "bg-gray-800/80" : "bg-gray-100/80"}`}>
+            <div
+              className={`flex gap-1 rounded-xl p-1 ${isDarkMode ? "bg-gray-800/80" : "bg-gray-100/80"}`}
+            >
               <button
                 onClick={() => setActiveTab("pending")}
                 className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
                   activeTab === "pending"
-                    ? isDarkMode ? "bg-gray-700 text-white shadow-sm" : "bg-white text-gray-900 shadow-sm"
-                    : isDarkMode ? "text-gray-400 hover:text-gray-300" : "text-gray-500 hover:text-gray-700"
+                    ? isDarkMode
+                      ? "bg-gray-700 text-white shadow-sm"
+                      : "bg-white text-gray-900 shadow-sm"
+                    : isDarkMode
+                      ? "text-gray-400 hover:text-gray-300"
+                      : "text-gray-500 hover:text-gray-700"
                 }`}
               >
                 <ShoppingBag className="w-3.5 h-3.5" />
                 {t("toReview") || "To Review"}
-                {pendingReviews.length > 0 && (
+                {totalPendingCount > 0 && (
                   <span
                     className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
                       activeTab === "pending"
-                        ? isDarkMode ? "bg-orange-900/50 text-orange-400" : "bg-orange-100 text-orange-600"
-                        : isDarkMode ? "bg-gray-700 text-gray-400" : "bg-gray-200 text-gray-500"
+                        ? isDarkMode
+                          ? "bg-orange-900/50 text-orange-400"
+                          : "bg-orange-100 text-orange-600"
+                        : isDarkMode
+                          ? "bg-gray-700 text-gray-400"
+                          : "bg-gray-200 text-gray-500"
                     }`}
                   >
-                    {pendingReviews.length}
+                    {totalPendingCount}
                   </span>
                 )}
               </button>
@@ -926,21 +1213,29 @@ export default function ReviewsPage() {
                 onClick={() => setActiveTab("myReviews")}
                 className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
                   activeTab === "myReviews"
-                    ? isDarkMode ? "bg-gray-700 text-white shadow-sm" : "bg-white text-gray-900 shadow-sm"
-                    : isDarkMode ? "text-gray-400 hover:text-gray-300" : "text-gray-500 hover:text-gray-700"
+                    ? isDarkMode
+                      ? "bg-gray-700 text-white shadow-sm"
+                      : "bg-white text-gray-900 shadow-sm"
+                    : isDarkMode
+                      ? "text-gray-400 hover:text-gray-300"
+                      : "text-gray-500 hover:text-gray-700"
                 }`}
               >
                 <Star className="w-3.5 h-3.5" />
                 {t("myRatings") || "My Ratings"}
-                {filteredMyReviews.length > 0 && (
+                {totalMyReviewsCount > 0 && (
                   <span
                     className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
                       activeTab === "myReviews"
-                        ? isDarkMode ? "bg-green-900/50 text-green-400" : "bg-green-100 text-green-600"
-                        : isDarkMode ? "bg-gray-700 text-gray-400" : "bg-gray-200 text-gray-500"
+                        ? isDarkMode
+                          ? "bg-green-900/50 text-green-400"
+                          : "bg-green-100 text-green-600"
+                        : isDarkMode
+                          ? "bg-gray-700 text-gray-400"
+                          : "bg-gray-200 text-gray-500"
                     }`}
                   >
-                    {filteredMyReviews.length}
+                    {totalMyReviewsCount}
                   </span>
                 )}
               </button>
@@ -953,16 +1248,18 @@ export default function ReviewsPage() {
       <div className="max-w-4xl mx-auto px-3 sm:px-6 py-4">
         {/* Filter Panel */}
         {showFilters && (
-          <div className={`rounded-2xl border p-4 mb-4 ${isDarkMode ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"}`}>
+          <div
+            className={`rounded-2xl border p-4 mb-4 ${isDarkMode ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"}`}
+          >
             <div className="flex items-center justify-between mb-3">
-              <span className={`text-[11px] font-semibold uppercase tracking-wider ${mutedColor}`}>
+              <span
+                className={`text-[11px] font-semibold uppercase tracking-wider ${mutedColor}`}
+              >
                 {t("filter") || "Filters"}
               </span>
               {activeFilterCount > 0 && (
                 <button
-                  onClick={() => {
-                    setFilters({ reviewType: "all" });
-                  }}
+                  onClick={() => setFilters({ reviewType: "all" })}
                   className="text-[11px] text-orange-600 hover:text-orange-700 font-semibold"
                 >
                   {t("clearFilters") || "Clear filters"}
@@ -972,7 +1269,9 @@ export default function ReviewsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {activeTab === "myReviews" && (
                 <div>
-                  <label className={`text-[11px] font-semibold uppercase tracking-wider mb-1.5 block ${mutedColor}`}>
+                  <label
+                    className={`text-[11px] font-semibold uppercase tracking-wider mb-1.5 block ${mutedColor}`}
+                  >
                     {t("type") || "Type"}
                   </label>
                   <select
@@ -983,7 +1282,8 @@ export default function ReviewsPage() {
                         reviewType: e.target.value as
                           | "all"
                           | "product"
-                          | "seller",
+                          | "seller"
+                          | "food",
                       }))
                     }
                     className={inputClass}
@@ -991,12 +1291,14 @@ export default function ReviewsPage() {
                     <option value="all">{t("all") || "All"}</option>
                     <option value="product">{t("product") || "Product"}</option>
                     <option value="seller">{t("seller") || "Seller"}</option>
+                    <option value="food">{t("food") || "Food"}</option>
                   </select>
                 </div>
               )}
-
               <div>
-                <label className={`text-[11px] font-semibold uppercase tracking-wider mb-1.5 block ${mutedColor}`}>
+                <label
+                  className={`text-[11px] font-semibold uppercase tracking-wider mb-1.5 block ${mutedColor}`}
+                >
                   {t("startDate") || "Start Date"}
                 </label>
                 <input
@@ -1013,9 +1315,10 @@ export default function ReviewsPage() {
                   className={inputClass}
                 />
               </div>
-
               <div>
-                <label className={`text-[11px] font-semibold uppercase tracking-wider mb-1.5 block ${mutedColor}`}>
+                <label
+                  className={`text-[11px] font-semibold uppercase tracking-wider mb-1.5 block ${mutedColor}`}
+                >
                   {t("endDate") || "End Date"}
                 </label>
                 <input
@@ -1036,12 +1339,16 @@ export default function ReviewsPage() {
           </div>
         )}
 
-        {/* Pending Reviews Tab */}
+        {/* ── TAB 1: To Review ── */}
         {activeTab === "pending" ? (
           <div className="space-y-3">
-            {pendingReviews.length === 0 && !pendingLoading ? (
+            {totalPendingCount === 0 &&
+            !pendingLoading &&
+            !foodPendingLoading ? (
               <div className="text-center py-16">
-                <Star className={`w-12 h-12 mx-auto mb-3 ${isDarkMode ? "text-gray-700" : "text-gray-300"}`} />
+                <Star
+                  className={`w-12 h-12 mx-auto mb-3 ${isDarkMode ? "text-gray-700" : "text-gray-300"}`}
+                />
                 <h3 className={`text-sm font-semibold mb-1 ${headingColor}`}>
                   {t("nothingToReview") || "Nothing to Review"}
                 </h3>
@@ -1051,85 +1358,176 @@ export default function ReviewsPage() {
                 </p>
               </div>
             ) : (
-              pendingReviews.map((review) => (
-                <div
-                  key={`${review.orderId}_${review.id}`}
-                  className={cardClass}
-                >
-                  {/* Product header */}
+              <>
+                {/* Product pending reviews */}
+                {pendingReviews.map((review) => (
                   <div
-                    className={`px-4 py-3 ${cardBorderClass} flex items-center gap-3 cursor-pointer`}
-                    onClick={() =>
-                      router.push(`/productdetail/${review.productId}`)
-                    }
+                    key={`${review.orderId}_${review.id}`}
+                    className={cardClass}
                   >
-                    <div className={`w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 relative ${thumbBg}`}>
-                      {review.productImage ? (
-                        <Image
-                          src={review.productImage}
-                          alt={review.productName}
-                          fill
-                          className="object-cover"
-                          sizes="40px"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Package className={`w-4 h-4 ${isDarkMode ? "text-gray-600" : "text-gray-300"}`} />
-                        </div>
+                    <div
+                      className={`px-4 py-3 ${cardBorderClass} flex items-center gap-3 cursor-pointer`}
+                      onClick={() =>
+                        router.push(`/productdetail/${review.productId}`)
+                      }
+                    >
+                      <div
+                        className={`w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 relative ${thumbBg}`}
+                      >
+                        {review.productImage ? (
+                          <Image
+                            src={review.productImage}
+                            alt={review.productName}
+                            fill
+                            className="object-cover"
+                            sizes="40px"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Package
+                              className={`w-4 h-4 ${isDarkMode ? "text-gray-600" : "text-gray-300"}`}
+                            />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3
+                          className={`font-semibold text-sm truncate ${headingColor}`}
+                        >
+                          {review.productName}
+                        </h3>
+                        <p className="text-xs font-bold text-orange-600 mt-0.5">
+                          ₺{review.productPrice.toLocaleString()}
+                        </p>
+                      </div>
+                      <span
+                        className={`text-[11px] flex-shrink-0 ${mutedColor}`}
+                      >
+                        {review.timestamp?.toDate().toLocaleDateString("tr-TR")}
+                      </span>
+                    </div>
+                    <div className="px-4 py-3 flex items-center gap-2">
+                      {review.needsProductReview && (
+                        <button
+                          onClick={() =>
+                            openProductReviewModal(review, "product")
+                          }
+                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-orange-500 text-white rounded-xl hover:bg-orange-600 transition-colors text-xs font-medium"
+                        >
+                          <Star className="w-3.5 h-3.5" />
+                          {t("writeYourReview") || "Write Your Review"}
+                        </button>
+                      )}
+                      {review.needsSellerReview && (
+                        <button
+                          onClick={() =>
+                            openProductReviewModal(review, "seller")
+                          }
+                          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl transition-colors text-xs font-medium ${isDarkMode ? "bg-gray-800 text-gray-300 hover:bg-gray-700" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+                        >
+                          <Store className="w-3.5 h-3.5" />
+                          {review.isShopProduct
+                            ? t("shopReview") || "Shop Review"
+                            : t("sellerReview") || "Seller Review"}
+                        </button>
                       )}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`font-semibold text-sm truncate ${headingColor}`}>
-                        {review.productName}
-                      </h3>
-                      <p className="text-xs font-bold text-orange-600 mt-0.5">
-                        ₺{review.productPrice.toLocaleString()}
-                      </p>
-                    </div>
-                    <span className={`text-[11px] flex-shrink-0 ${mutedColor}`}>
-                      {review.timestamp?.toDate().toLocaleDateString("tr-TR")}
-                    </span>
                   </div>
+                ))}
 
-                  {/* Action buttons */}
-                  <div className="px-4 py-3 flex items-center gap-2">
-                    {review.needsProductReview && (
-                      <button
-                        onClick={() => openReviewModal(review, "product")}
-                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-orange-500 text-white rounded-xl hover:bg-orange-600 transition-colors text-xs font-medium"
+                {/* Food pending reviews */}
+                {foodPendingReviews.map((order) => {
+                  const itemsPreview =
+                    order.items
+                      .slice(0, 2)
+                      .map((i) =>
+                        i.quantity > 1 ? `${i.quantity}× ${i.name}` : i.name,
+                      )
+                      .join(", ") +
+                    (order.items.length > 2
+                      ? ` +${order.items.length - 2}`
+                      : "");
+
+                  return (
+                    <div key={order.id} className={cardClass}>
+                      <div
+                        className={`px-4 py-3 ${cardBorderClass} flex items-center gap-3`}
                       >
-                        <Star className="w-3.5 h-3.5" />
-                        {t("writeYourReview") || "Write Your Review"}
-                      </button>
-                    )}
-                    {review.needsSellerReview && (
-                      <button
-                        onClick={() => openReviewModal(review, "seller")}
-                        className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl transition-colors text-xs font-medium ${isDarkMode ? "bg-gray-800 text-gray-300 hover:bg-gray-700" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
-                      >
-                        <Store className="w-3.5 h-3.5" />
-                        {review.isShopProduct
-                          ? t("shopReview") || "Shop Review"
-                          : t("sellerReview") || "Seller Review"}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))
+                        <div
+                          className={`w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 relative ${thumbBg}`}
+                        >
+                          {order.restaurantProfileImage ? (
+                            <Image
+                              src={order.restaurantProfileImage}
+                              alt={order.restaurantName}
+                              fill
+                              className="object-cover"
+                              sizes="40px"
+                            />
+                          ) : (
+                            <div
+                              className={`w-full h-full flex items-center justify-center ${isDarkMode ? "bg-orange-950/30" : "bg-orange-50"}`}
+                            >
+                              <UtensilsCrossed className="w-4 h-4 text-orange-500" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3
+                            className={`font-semibold text-sm truncate ${headingColor}`}
+                          >
+                            {order.restaurantName}
+                          </h3>
+                          <p
+                            className={`text-[11px] truncate mt-0.5 ${mutedColor}`}
+                          >
+                            {itemsPreview}
+                          </p>
+                          <p className="text-xs font-bold text-orange-600 mt-0.5">
+                            {order.totalPrice.toFixed(0)} {order.currency}
+                          </p>
+                        </div>
+                        <span
+                          className={`text-[11px] flex-shrink-0 ${mutedColor}`}
+                        >
+                          {order.createdAt
+                            ?.toDate()
+                            .toLocaleDateString("tr-TR")}
+                        </span>
+                      </div>
+                      <div className="px-4 py-3">
+                        <button
+                          onClick={() => openFoodReviewModal(order)}
+                          className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-orange-500 text-white rounded-xl hover:bg-orange-600 transition-colors text-xs font-medium"
+                        >
+                          <Star className="w-3.5 h-3.5" />
+                          {t("writeRestaurantReview") ||
+                            "Write Restaurant Review"}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </>
             )}
 
-            {pendingLoading && (
+            {(pendingLoading || foodPendingLoading) && (
               <div className="flex justify-center py-8">
                 <div className="w-5 h-5 border-[3px] border-orange-200 border-t-orange-600 rounded-full animate-spin" />
               </div>
             )}
           </div>
         ) : (
-          /* My Reviews Tab */
+          /* ── TAB 2: My Reviews ── */
           <div className="space-y-3">
-            {filteredMyReviews.length === 0 && !myReviewsLoading ? (
+            {filteredMyReviews.length === 0 &&
+            myFoodReviews.length === 0 &&
+            !myReviewsLoading &&
+            !myFoodReviewsLoading ? (
               <div className="text-center py-16">
-                <Star className={`w-12 h-12 mx-auto mb-3 ${isDarkMode ? "text-gray-700" : "text-gray-300"}`} />
+                <Star
+                  className={`w-12 h-12 mx-auto mb-3 ${isDarkMode ? "text-gray-700" : "text-gray-300"}`}
+                />
                 <h3 className={`text-sm font-semibold mb-1 ${headingColor}`}>
                   {t("youHaveNoReviews") || "You Have No Reviews"}
                 </h3>
@@ -1139,110 +1537,164 @@ export default function ReviewsPage() {
                 </p>
               </div>
             ) : (
-              filteredMyReviews.map((review) => (
-                <div
-                  key={`${review.orderId}_${review.id}`}
-                  className={cardClass}
-                >
-                  {/* Product/Seller header */}
-                  {review.productId ? (
-                    <div
-                      className={`px-4 py-3 ${cardBorderClass} flex items-center gap-3 cursor-pointer`}
-                      onClick={() =>
-                        router.push(`/productdetail/${review.productId}`)
-                      }
-                    >
-                      <div className={`w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 relative ${thumbBg}`}>
-                        {review.productImage ? (
-                          <Image
-                            src={review.productImage}
-                            alt={review.productName || "Product"}
-                            fill
-                            className="object-cover"
-                            sizes="40px"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <Package className={`w-4 h-4 ${isDarkMode ? "text-gray-600" : "text-gray-300"}`} />
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className={`font-semibold text-sm truncate ${headingColor}`}>
-                          {review.productName}
-                        </h3>
-                        {review.productPrice && (
-                          <p className="text-xs font-bold text-orange-600 mt-0.5">
-                            ₺{review.productPrice.toLocaleString()}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                        {renderStars(review.rating)}
-                        <span className={`text-[11px] ${mutedColor}`}>
-                          {review.timestamp
-                            ?.toDate()
-                            .toLocaleDateString("tr-TR")}
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className={`px-4 py-3 ${cardBorderClass} flex items-center gap-3`}>
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isDarkMode ? "bg-orange-950/50" : "bg-orange-50"}`}>
-                        <Store className="w-4 h-4 text-orange-500" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className={`font-semibold text-sm ${headingColor}`}>
-                          {t("sellerReview") || "Seller Review"}
-                        </h3>
-                        <p className={`text-xs mt-0.5 ${mutedColor}`}>
-                          {review.sellerName || "Unknown Seller"}
-                        </p>
-                      </div>
-                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                        {renderStars(review.rating)}
-                        <span className={`text-[11px] ${mutedColor}`}>
-                          {review.timestamp
-                            ?.toDate()
-                            .toLocaleDateString("tr-TR")}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Review body */}
-                  <div className="px-4 py-3">
-                    {review.imageUrls && review.imageUrls.length > 0 && (
-                      <div className="flex gap-2 mb-2.5">
-                        {review.imageUrls.map((url, idx) => (
-                          <button
-                            key={idx}
-                            onClick={() => setSelectedImage(url)}
-                            className={`w-14 h-14 rounded-xl overflow-hidden hover:opacity-80 transition-opacity relative flex-shrink-0 ${thumbBg}`}
-                          >
+              <>
+                {/* Product/seller reviews */}
+                {filteredMyReviews.map((review) => (
+                  <div
+                    key={`${review.orderId}_${review.id}`}
+                    className={cardClass}
+                  >
+                    {review.productId ? (
+                      <div
+                        className={`px-4 py-3 ${cardBorderClass} flex items-center gap-3 cursor-pointer`}
+                        onClick={() =>
+                          router.push(`/productdetail/${review.productId}`)
+                        }
+                      >
+                        <div
+                          className={`w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 relative ${thumbBg}`}
+                        >
+                          {review.productImage ? (
                             <Image
-                              src={url}
-                              alt={`Review image ${idx + 1}`}
+                              src={review.productImage}
+                              alt={review.productName || "Product"}
                               fill
                               className="object-cover"
-                              sizes="56px"
+                              sizes="40px"
                             />
-                          </button>
-                        ))}
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Package
+                                className={`w-4 h-4 ${isDarkMode ? "text-gray-600" : "text-gray-300"}`}
+                              />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3
+                            className={`font-semibold text-sm truncate ${headingColor}`}
+                          >
+                            {review.productName}
+                          </h3>
+                          {review.productPrice && (
+                            <p className="text-xs font-bold text-orange-600 mt-0.5">
+                              ₺{review.productPrice.toLocaleString()}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                          {renderStars(review.rating)}
+                          <span className={`text-[11px] ${mutedColor}`}>
+                            {review.timestamp
+                              ?.toDate()
+                              .toLocaleDateString("tr-TR")}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        className={`px-4 py-3 ${cardBorderClass} flex items-center gap-3`}
+                      >
+                        <div
+                          className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isDarkMode ? "bg-orange-950/50" : "bg-orange-50"}`}
+                        >
+                          <Store className="w-4 h-4 text-orange-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3
+                            className={`font-semibold text-sm ${headingColor}`}
+                          >
+                            {t("sellerReview") || "Seller Review"}
+                          </h3>
+                          <p className={`text-xs mt-0.5 ${mutedColor}`}>
+                            {review.sellerName || "Unknown Seller"}
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                          {renderStars(review.rating)}
+                          <span className={`text-[11px] ${mutedColor}`}>
+                            {review.timestamp
+                              ?.toDate()
+                              .toLocaleDateString("tr-TR")}
+                          </span>
+                        </div>
                       </div>
                     )}
-
-                    {review.review && (
-                      <p className={`text-sm leading-relaxed ${bodyColor}`}>
-                        {review.review}
-                      </p>
-                    )}
+                    <div className="px-4 py-3">
+                      {review.imageUrls && review.imageUrls.length > 0 && (
+                        <div className="flex gap-2 mb-2.5">
+                          {review.imageUrls.map((url, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => setSelectedImage(url)}
+                              className={`w-14 h-14 rounded-xl overflow-hidden hover:opacity-80 transition-opacity relative flex-shrink-0 ${thumbBg}`}
+                            >
+                              <Image
+                                src={url}
+                                alt={`Review image ${idx + 1}`}
+                                fill
+                                className="object-cover"
+                                sizes="56px"
+                              />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {review.review && (
+                        <p className={`text-sm leading-relaxed ${bodyColor}`}>
+                          {review.review}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))
+                ))}
+
+                {/* Food reviews */}
+                {showFoodReviewsInTab2 &&
+                  myFoodReviews.map((review) => (
+                    <div key={review.id} className={cardClass}>
+                      <div
+                        className={`px-4 py-3 ${cardBorderClass} flex items-center gap-3`}
+                      >
+                        <div
+                          className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isDarkMode ? "bg-orange-950/30" : "bg-orange-50"}`}
+                        >
+                          <UtensilsCrossed className="w-4 h-4 text-orange-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3
+                            className={`font-semibold text-sm ${headingColor}`}
+                          >
+                            {review.restaurantName ||
+                              t("restaurantReview") ||
+                              "Restaurant Review"}
+                          </h3>
+                          <p className={`text-xs mt-0.5 ${mutedColor}`}>
+                            {t("foodReview") || "Food Review"}
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                          {renderStars(review.rating)}
+                          <span className={`text-[11px] ${mutedColor}`}>
+                            {review.timestamp
+                              ?.toDate()
+                              .toLocaleDateString("tr-TR")}
+                          </span>
+                        </div>
+                      </div>
+                      {review.comment && (
+                        <div className="px-4 py-3">
+                          <p className={`text-sm leading-relaxed ${bodyColor}`}>
+                            {review.comment}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+              </>
             )}
 
-            {myReviewsLoading && (
+            {(myReviewsLoading || myFoodReviewsLoading) && (
               <div className="flex justify-center py-8">
                 <div className="w-5 h-5 border-[3px] border-orange-200 border-t-orange-600 rounded-full animate-spin" />
               </div>
@@ -1251,16 +1703,22 @@ export default function ReviewsPage() {
         )}
       </div>
 
-      {/* Review Modal */}
-      {showReviewModal && selectedReview && (
+      {/* ── Review Modal ── */}
+      {showReviewModal && (selectedReview || selectedFoodReview) && (
         <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className={`rounded-2xl max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto ${isDarkMode ? "bg-gray-900" : "bg-white"}`}>
+          <div
+            className={`rounded-2xl max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto ${isDarkMode ? "bg-gray-900" : "bg-white"}`}
+          >
             {/* Header */}
-            <div className={`flex items-center justify-between p-4 border-b ${isDarkMode ? "border-gray-800" : "border-gray-100"}`}>
+            <div
+              className={`flex items-center justify-between p-4 border-b ${isDarkMode ? "border-gray-800" : "border-gray-100"}`}
+            >
               <h3 className={`text-base font-bold ${headingColor}`}>
-                {reviewType === "product"
+                {reviewCategory === "product"
                   ? t("productReview") || "Product Review"
-                  : t("sellerReview") || "Seller Review"}
+                  : reviewCategory === "seller"
+                    ? t("sellerReview") || "Seller Review"
+                    : t("restaurantReview") || "Restaurant Review"}
               </h3>
               <button
                 onClick={() => {
@@ -1275,6 +1733,32 @@ export default function ReviewsPage() {
 
             {/* Body */}
             <div className="p-4 space-y-4">
+              {/* Subject preview */}
+              {reviewCategory === "food" && selectedFoodReview && (
+                <div
+                  className={`flex items-center gap-3 p-3 rounded-xl ${isDarkMode ? "bg-gray-800" : "bg-gray-50"}`}
+                >
+                  <div
+                    className={`w-9 h-9 rounded-lg flex items-center justify-center ${isDarkMode ? "bg-orange-950/30" : "bg-orange-50"}`}
+                  >
+                    <UtensilsCrossed className="w-4 h-4 text-orange-500" />
+                  </div>
+                  <div>
+                    <p className={`text-sm font-semibold ${headingColor}`}>
+                      {selectedFoodReview.restaurantName}
+                    </p>
+                    <p className={`text-[11px] ${mutedColor}`}>
+                      {selectedFoodReview.items
+                        .slice(0, 2)
+                        .map((i) => i.name)
+                        .join(", ")}
+                      {selectedFoodReview.items.length > 2 &&
+                        ` +${selectedFoodReview.items.length - 2}`}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Star Rating */}
               <div className="flex flex-col items-center gap-2">
                 <div className="flex items-center gap-1">
@@ -1289,7 +1773,9 @@ export default function ReviewsPage() {
                         className={`w-7 h-7 ${
                           star <= rating
                             ? "fill-amber-400 text-amber-400"
-                            : isDarkMode ? "text-gray-600" : "text-gray-200"
+                            : isDarkMode
+                              ? "text-gray-600"
+                              : "text-gray-200"
                         }`}
                       />
                     </button>
@@ -1302,7 +1788,9 @@ export default function ReviewsPage() {
 
               {/* Review Text */}
               <div>
-                <label className={`text-[11px] font-semibold uppercase tracking-wider mb-1.5 block ${mutedColor}`}>
+                <label
+                  className={`text-[11px] font-semibold uppercase tracking-wider mb-1.5 block ${mutedColor}`}
+                >
                   {t("yourReview") || "Your Review"}
                 </label>
                 <textarea
@@ -1317,12 +1805,13 @@ export default function ReviewsPage() {
               </div>
 
               {/* Image Upload - product reviews only */}
-              {reviewType === "product" && (
+              {reviewCategory === "product" && (
                 <div>
-                  <label className={`text-[11px] font-semibold uppercase tracking-wider mb-1.5 block ${mutedColor}`}>
+                  <label
+                    className={`text-[11px] font-semibold uppercase tracking-wider mb-1.5 block ${mutedColor}`}
+                  >
                     {t("uploadPhotos") || "Upload Photos"}
                   </label>
-
                   {reviewImages.length > 0 && (
                     <div className="flex gap-2 mb-2.5">
                       {reviewImages.map((file, index) => (
@@ -1347,7 +1836,6 @@ export default function ReviewsPage() {
                       ))}
                     </div>
                   )}
-
                   {reviewImages.length < MAX_IMAGES && (
                     <button
                       onClick={() => fileInputRef.current?.click()}
@@ -1357,7 +1845,6 @@ export default function ReviewsPage() {
                       {t("addImage") || "Add Image"}
                     </button>
                   )}
-
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -1371,7 +1858,9 @@ export default function ReviewsPage() {
             </div>
 
             {/* Footer */}
-            <div className={`flex gap-2 p-4 border-t ${isDarkMode ? "border-gray-800" : "border-gray-100"}`}>
+            <div
+              className={`flex gap-2 p-4 border-t ${isDarkMode ? "border-gray-800" : "border-gray-100"}`}
+            >
               <button
                 onClick={() => {
                   setShowReviewModal(false);
@@ -1397,9 +1886,13 @@ export default function ReviewsPage() {
       {/* Loading Modal */}
       {showLoadingModal && (
         <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className={`rounded-2xl p-8 max-w-sm w-full shadow-2xl ${isDarkMode ? "bg-gray-900" : "bg-white"}`}>
+          <div
+            className={`rounded-2xl p-8 max-w-sm w-full shadow-2xl ${isDarkMode ? "bg-gray-900" : "bg-white"}`}
+          >
             <div className="flex flex-col items-center gap-4">
-              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${isDarkMode ? "bg-orange-950/50" : "bg-orange-50"}`}>
+              <div
+                className={`w-12 h-12 rounded-2xl flex items-center justify-center ${isDarkMode ? "bg-orange-950/50" : "bg-orange-50"}`}
+              >
                 <div className="w-5 h-5 border-[3px] border-orange-200 border-t-orange-600 rounded-full animate-spin" />
               </div>
               <div className="text-center">
