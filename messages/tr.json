@@ -5633,9 +5633,12 @@
   "foodExtraIce": "Buz",
   "NotificationDrawer": {
     "food_order_status_update": {
-      "title": "Yemek Siparişi Güncelleme",
-      "accepted": "{restaurantName} restoranından siparişiniz kabul edildi!",
-      "rejected": "{restaurantName} restoranından siparişiniz reddedildi."
+      "title": "Yemek Siparişiniz Güncellendi 🔔",
+      "accepted": "{restaurantName} siparişinizi onayladı.",
+      "rejected": "{restaurantName} siparişinizi reddetti.",
+      "preparing": "{restaurantName} siparişinizi hazırlamaya başladı.",
+      "ready": "{restaurantName} siparişiniz hazır!",
+      "delivered": "{restaurantName} siparişiniz teslim edildi."
     }
   }
 }

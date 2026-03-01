@@ -171,7 +171,8 @@ interface FilterOptions {
 
 type FoodOrderStatus =
   | "pending"
-  | "confirmed"
+  | "accepted"
+  | "rejected"
   | "preparing"
   | "ready"
   | "delivered"
@@ -671,11 +672,17 @@ export default function OrdersPage() {
           text: "text-gray-600 dark:text-gray-300",
           border: "border-gray-200 dark:border-gray-600",
         };
-      case "confirmed":
+      case "accepted":
         return {
-          bg: "bg-blue-50 dark:bg-blue-900/30",
-          text: "text-blue-600 dark:text-blue-400",
-          border: "border-blue-200 dark:border-blue-700",
+          bg: "bg-teal-50 dark:bg-teal-900/30",
+          text: "text-teal-600 dark:text-teal-400",
+          border: "border-teal-200 dark:border-teal-700",
+        };
+      case "rejected":
+        return {
+          bg: "bg-red-50 dark:bg-red-900/30",
+          text: "text-red-600 dark:text-red-400",
+          border: "border-red-200 dark:border-red-700",
         };
       case "preparing":
         return {
@@ -709,16 +716,19 @@ export default function OrdersPage() {
     const colors = getFoodStatusColors(status);
     const icons: Record<FoodOrderStatus, React.ElementType> = {
       pending: Clock,
-      confirmed: CheckCircle2,
+      accepted: CheckCircle2, // add
+      rejected: XCircle, // add
       preparing: UtensilsCrossed,
       ready: ShoppingBag,
       delivered: CheckCircle2,
       completed: CheckCircle2,
       cancelled: XCircle,
     };
+
     const labels: Record<FoodOrderStatus, string> = {
       pending: t("foodStatusPending") || "Pending",
-      confirmed: t("foodStatusConfirmed") || "Confirmed",
+      accepted: t("foodStatusAccepted") || "Accepted", // add
+      rejected: t("foodStatusRejected") || "Rejected", // add
       preparing: t("foodStatusPreparing") || "Preparing",
       ready: t("foodStatusReady") || "Ready",
       delivered: t("foodStatusDelivered") || "Delivered",

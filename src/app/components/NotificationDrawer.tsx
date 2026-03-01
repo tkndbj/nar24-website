@@ -106,28 +106,28 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
   useEffect(() => {
     // Check if it's mobile (you can adjust the breakpoint as needed)
     const isMobile = window.innerWidth < 768; // md breakpoint
-    
+
     if (isMobile && isOpen) {
       // Disable scrolling when drawer is open
-      document.body.style.overflow = 'hidden';
+      document.body.style.overflow = "hidden";
       // Prevent scrolling on iOS Safari
-      document.body.style.position = 'fixed';
-      document.body.style.width = '100%';
+      document.body.style.position = "fixed";
+      document.body.style.width = "100%";
     } else if (isMobile) {
       // Re-enable scrolling when drawer is closed (only for mobile)
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.width = '';
+      document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.width = "";
     }
-  
+
     // Cleanup function to ensure scrolling is restored
     return () => {
       // Only cleanup if it was mobile when the effect ran
       const wasMobile = window.innerWidth < 768;
       if (wasMobile) {
-        document.body.style.overflow = '';
-        document.body.style.position = '';
-        document.body.style.width = '';
+        document.body.style.overflow = "";
+        document.body.style.position = "";
+        document.body.style.width = "";
       }
     };
   }, [isOpen]);
@@ -143,13 +143,13 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
         db,
         "users",
         user.uid,
-        "notifications"
+        "notifications",
       );
       const q = query(
         notificationsRef,
         orderBy("timestamp", "desc"),
         startAfter(lastDoc),
-        limit(LIMIT)
+        limit(LIMIT),
       );
 
       const unsubscribe = onSnapshot(q, async (snapshot) => {
@@ -196,9 +196,9 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
             status: data.status,
             rejectionReason: data.rejectionReason,
             isShopProduct: data.isShopProduct,
-            restaurantName: data.restaurantName,
-            orderStatus: data.orderStatus,
-            orderId: data.orderId,
+            restaurantName: data.payload?.restaurantName ?? data.restaurantName,
+            orderStatus: data.payload?.orderStatus ?? data.orderStatus,
+            orderId: data.payload?.orderId ?? data.orderId,
           };
 
           newNotifications.push(notification);
@@ -212,7 +212,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
         setNotifications((prev) => {
           const existingIds = new Set(prev.map((n) => n.id));
           const uniqueNew = newNotifications.filter(
-            (n) => !existingIds.has(n.id)
+            (n) => !existingIds.has(n.id),
           );
           return [...prev, ...uniqueNew];
         });
@@ -255,7 +255,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
     };
 
     const scrollContainer = document.querySelector(
-      ".notification-scroll-container"
+      ".notification-scroll-container",
     );
     if (scrollContainer && isOpen) {
       scrollContainer.addEventListener("scroll", handleScroll);
@@ -388,12 +388,12 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
           db,
           "users",
           user.uid,
-          "notifications"
+          "notifications",
         );
         let q = query(
           notificationsRef,
           orderBy("timestamp", "desc"),
-          limit(LIMIT)
+          limit(LIMIT),
         );
 
         if (lastDoc && !forceRefresh) {
@@ -401,7 +401,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
             notificationsRef,
             orderBy("timestamp", "desc"),
             startAfter(lastDoc),
-            limit(LIMIT)
+            limit(LIMIT),
           );
         }
 
@@ -449,6 +449,10 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
               status: data.status,
               rejectionReason: data.rejectionReason,
               isShopProduct: data.isShopProduct,
+              restaurantName:
+                data.payload?.restaurantName ?? data.restaurantName,
+              orderStatus: data.payload?.orderStatus ?? data.orderStatus,
+              orderId: data.payload?.orderId ?? data.orderId,
             };
 
             newNotifications.push(notification);
@@ -464,7 +468,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
             setNotifications((prev) => {
               const existingIds = new Set(prev.map((n) => n.id));
               const uniqueNew = newNotifications.filter(
-                (n) => !existingIds.has(n.id)
+                (n) => !existingIds.has(n.id),
               );
               return [...prev, ...uniqueNew];
             });
@@ -487,7 +491,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
         setIsLoading(false);
       }
     },
-    [user, isLoading, lastDoc]
+    [user, isLoading, lastDoc],
   );
 
   // Mark notifications as read
@@ -513,7 +517,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
 
     try {
       await deleteDoc(
-        doc(db, "users", user.uid, "notifications", notificationId)
+        doc(db, "users", user.uid, "notifications", notificationId),
       );
       setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
     } catch (error) {
@@ -778,7 +782,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
                 <div className="space-y-3">
                   {notifications.map((notification) => {
                     const { icon: IconComponent, color } = getNotificationIcon(
-                      notification.type
+                      notification.type,
                     );
                     const isDeleting = deletingItems.has(notification.id);
                     const message = getNotificationMessage(notification);
