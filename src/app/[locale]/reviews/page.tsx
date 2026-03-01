@@ -571,11 +571,26 @@ export default function ReviewsPage() {
       const filtersChanged =
         JSON.stringify(filters) !== JSON.stringify(prevFilters.current);
       if (filtersChanged) {
-        resetPaginationState();
-        loadPendingReviews(true);
-        loadMyReviews(true);
+        setMyReviews([]);
+        setMyFoodReviews([]);
+        setMyReviewsLastDoc(null);
+        setMyFoodReviewsLastDoc(null);
+
+        if (filters.reviewType !== "food") {
+          setMyReviewsHasMore(true);
+          loadMyReviews(true);
+        } else {
+          setMyReviewsHasMore(false); // prevent scroll from triggering it
+        }
+
+        if (filters.reviewType === "all" || filters.reviewType === "food") {
+          setMyFoodReviewsHasMore(true);
+          loadMyFoodReviews(true);
+        } else {
+          setMyFoodReviewsHasMore(false); // prevent scroll from triggering it
+        }
+
         prevFilters.current = filters;
-        // Food reviews don't use filters, so no reload needed
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -691,25 +706,9 @@ export default function ReviewsPage() {
     return count;
   };
 
-  const getFilteredMyReviews = () => {
-    return myReviews.filter((review) => {
-      switch (filters.reviewType) {
-        case "product":
-          return review.productId != null;
-        case "seller":
-          return review.productId == null;
-        case "food":
-          return false; // food reviews are separate
-        case "all":
-        default:
-          return true;
-      }
-    });
-  };
-
   const totalPendingCount = pendingReviews.length + foodPendingReviews.length;
   const totalMyReviewsCount =
-    getFilteredMyReviews().length +
+    myReviews.length +
     (filters.reviewType === "all" || filters.reviewType === "food"
       ? myFoodReviews.length
       : 0);
@@ -1102,7 +1101,7 @@ export default function ReviewsPage() {
 
   if (!user) return null;
 
-  const filteredMyReviews = getFilteredMyReviews();
+  const filteredMyReviews = myReviews;
   const showFoodReviewsInTab2 =
     filters.reviewType === "all" || filters.reviewType === "food";
 
