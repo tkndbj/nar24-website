@@ -19,7 +19,12 @@ import {
 } from "lucide-react";
 import TypeSenseServiceManager from "@/lib/typesense_service_manager";
 import FilterIcons from "./FilterIcons";
-import { useFoodCartActions, useFoodCartState, SelectedExtra, FoodCartRestaurant } from "@/context/FoodCartProvider";
+import {
+  useFoodCartActions,
+  useFoodCartState,
+  SelectedExtra,
+  FoodCartRestaurant,
+} from "@/context/FoodCartProvider";
 import FoodExtrasSheet from "./FoodExtrasSheet";
 
 interface RestaurantDetailProps {
@@ -56,9 +61,7 @@ function RestaurantHeader({
 
       <div
         className={`rounded-2xl p-5 sm:p-6 ${
-          isDarkMode
-            ? "border border-gray-700/40"
-            : "border border-gray-200"
+          isDarkMode ? "border border-gray-700/40" : "border border-gray-200"
         }`}
       >
         <div className="flex items-start gap-4">
@@ -114,16 +117,20 @@ function RestaurantHeader({
                   <span className="font-semibold">
                     {restaurant.averageRating.toFixed(1)}
                   </span>
-                  {restaurant.reviewCount != null && restaurant.reviewCount > 0 && (
-                    <span>({restaurant.reviewCount} {t("reviews")})</span>
-                  )}
+                  {restaurant.reviewCount != null &&
+                    restaurant.reviewCount > 0 && (
+                      <span>
+                        ({restaurant.reviewCount} {t("reviews")})
+                      </span>
+                    )}
                 </span>
               )}
-              {restaurant.cuisineTypes && restaurant.cuisineTypes.length > 0 && (
-                <span className="truncate">
-                  {restaurant.cuisineTypes.join(", ")}
-                </span>
-              )}
+              {restaurant.cuisineTypes &&
+                restaurant.cuisineTypes.length > 0 && (
+                  <span className="truncate">
+                    {restaurant.cuisineTypes.join(", ")}
+                  </span>
+                )}
               {restaurant.foodType && restaurant.foodType.length > 0 && (
                 <div className="flex flex-wrap gap-1">
                   {restaurant.foodType.map((ft) => (
@@ -167,7 +174,8 @@ function FoodCard({
   const [extrasOpen, setExtrasOpen] = useState(false);
 
   // Try to get localized food type name
-  const translationKey = FoodCategoryData.kFoodTypeTranslationKeys[food.foodType];
+  const translationKey =
+    FoodCategoryData.kFoodTypeTranslationKeys[food.foodType];
   const tFood = useTranslations();
   const displayType = translationKey ? tFood(translationKey) : food.foodType;
 
@@ -177,11 +185,14 @@ function FoodCard({
     return item?.quantity ?? 0;
   }, [items, food.id]);
 
-  const cartRestaurant: FoodCartRestaurant = useMemo(() => ({
-    id: restaurant.id,
-    name: restaurant.name,
-    profileImageUrl: restaurant.profileImageUrl,
-  }), [restaurant.id, restaurant.name, restaurant.profileImageUrl]);
+  const cartRestaurant: FoodCartRestaurant = useMemo(
+    () => ({
+      id: restaurant.id,
+      name: restaurant.name,
+      profileImageUrl: restaurant.profileImageUrl,
+    }),
+    [restaurant.id, restaurant.name, restaurant.profileImageUrl],
+  );
 
   const handleAddToCart = useCallback(() => {
     if (!isOpen) return;
@@ -234,9 +245,7 @@ function FoodCard({
     <>
       <div
         className={`flex gap-4 rounded-2xl p-4 ${
-          isDarkMode
-            ? "border border-gray-700/40"
-            : "border border-gray-200"
+          isDarkMode ? "border border-gray-700/40" : "border border-gray-200"
         }`}
       >
         {/* Food image — only shown when available */}
@@ -338,7 +347,7 @@ function FoodCard({
         foodName={food.name}
         foodPrice={food.price}
         foodCategory={food.foodCategory}
-        allowedExtras={food.extras}  
+        allowedExtras={food.extras}
         isDarkMode={isDarkMode}
       />
     </>
@@ -359,11 +368,15 @@ function LoadingSkeleton({ isDarkMode }: { isDarkMode: boolean }) {
         {/* Header card skeleton */}
         <div
           className={`rounded-2xl p-5 sm:p-6 ${
-            isDarkMode ? "bg-gray-900 border border-gray-800" : "bg-white border border-gray-100 shadow-lg"
+            isDarkMode
+              ? "bg-gray-900 border border-gray-800"
+              : "bg-white border border-gray-100 shadow-lg"
           }`}
         >
           <div className="flex items-start gap-4">
-            <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl ${skeletonBg} animate-pulse`} />
+            <div
+              className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl ${skeletonBg} animate-pulse`}
+            />
             <div className="flex-1 space-y-3">
               <div className={`h-6 w-48 rounded ${skeletonBg} animate-pulse`} />
               <div className={`h-4 w-32 rounded ${skeletonBg} animate-pulse`} />
@@ -378,15 +391,27 @@ function LoadingSkeleton({ isDarkMode }: { isDarkMode: boolean }) {
             <div
               key={i}
               className={`flex gap-4 rounded-2xl p-4 ${
-                isDarkMode ? "bg-gray-800/60 border border-gray-700/50" : "bg-white border border-gray-100"
+                isDarkMode
+                  ? "bg-gray-800/60 border border-gray-700/50"
+                  : "bg-white border border-gray-100"
               }`}
             >
-              <div className={`w-28 h-28 sm:w-32 sm:h-32 rounded-xl ${skeletonBg} animate-pulse flex-shrink-0`} />
+              <div
+                className={`w-28 h-28 sm:w-32 sm:h-32 rounded-xl ${skeletonBg} animate-pulse flex-shrink-0`}
+              />
               <div className="flex-1 space-y-3 py-1">
-                <div className={`h-5 w-40 rounded ${skeletonBg} animate-pulse`} />
-                <div className={`h-3 w-24 rounded ${skeletonBg} animate-pulse`} />
-                <div className={`h-4 w-full rounded ${skeletonBg} animate-pulse`} />
-                <div className={`h-6 w-20 rounded ${skeletonBg} animate-pulse`} />
+                <div
+                  className={`h-5 w-40 rounded ${skeletonBg} animate-pulse`}
+                />
+                <div
+                  className={`h-3 w-24 rounded ${skeletonBg} animate-pulse`}
+                />
+                <div
+                  className={`h-4 w-full rounded ${skeletonBg} animate-pulse`}
+                />
+                <div
+                  className={`h-6 w-20 rounded ${skeletonBg} animate-pulse`}
+                />
               </div>
             </div>
           ))}
@@ -406,8 +431,12 @@ export default function RestaurantDetail({
   const isDarkMode = useTheme();
   const t = useTranslations("restaurantDetail");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedIconCategory, setSelectedIconCategory] = useState<string | null>(null);
-  const [restaurantFoodCategories, setRestaurantFoodCategories] = useState<string[]>([]);
+  const [selectedIconCategory, setSelectedIconCategory] = useState<
+    string | null
+  >(null);
+  const [restaurantFoodCategories, setRestaurantFoodCategories] = useState<
+    string[]
+  >([]);
 
   // Fetch this restaurant's food categories from Typesense facets
   useEffect(() => {
@@ -435,12 +464,27 @@ export default function RestaurantDetail({
           f.name.toLowerCase().includes(q) ||
           f.foodType.toLowerCase().includes(q) ||
           f.foodCategory.toLowerCase().includes(q) ||
-          (f.description?.toLowerCase().includes(q) ?? false)
+          (f.description?.toLowerCase().includes(q) ?? false),
       );
     }
 
     return list;
   }, [foods, selectedIconCategory, searchQuery]);
+
+  const hasActiveFilters = useMemo(
+    () => selectedIconCategory !== null || searchQuery.trim() !== "",
+    [selectedIconCategory, searchQuery],
+  );
+
+  const groupedFoods = useMemo(() => {
+    if (hasActiveFilters) return null; // flat list when filtering
+    const map = new Map<string, Food[]>();
+    FoodCategoryData.kCategories.forEach(({ key }) => {
+      const items = foods.filter((f) => f.foodCategory === key);
+      if (items.length > 0) map.set(key, items);
+    });
+    return map;
+  }, [foods, hasActiveFilters]);
 
   if (loading) {
     return <LoadingSkeleton isDarkMode={isDarkMode} />;
@@ -468,7 +512,6 @@ export default function RestaurantDetail({
   }
 
   const isOpen = isRestaurantOpen(restaurant);
-  const hasActiveFilters = selectedIconCategory !== null || searchQuery.trim() !== "";
 
   return (
     <main className="flex-1">
@@ -524,7 +567,8 @@ export default function RestaurantDetail({
                 isDarkMode ? "text-gray-500" : "text-gray-400"
               }`}
             >
-              ({filteredFoods.length}{hasActiveFilters ? `/${foods.length}` : ""} {t("items")})
+              ({filteredFoods.length}
+              {hasActiveFilters ? `/${foods.length}` : ""} {t("items")})
             </span>
           </h2>
 
@@ -558,11 +602,44 @@ export default function RestaurantDetail({
 
         {/* Food list */}
         {filteredFoods.length > 0 ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pb-10">
-            {filteredFoods.map((food) => (
-              <FoodCard key={food.id} food={food} isDarkMode={isDarkMode} restaurant={restaurant} isOpen={isOpen} />
-            ))}
-          </div>
+          groupedFoods ? (
+            // Grouped by category
+            <div className="space-y-8 pb-10">
+              {Array.from(groupedFoods.entries()).map(([category, items]) => (
+                <div key={category}>
+                  <h3
+                    className={`text-base font-bold mb-3 ${isDarkMode ? "text-white" : "text-gray-900"}`}
+                  >
+                    {category}
+                  </h3>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {items.map((food) => (
+                      <FoodCard
+                        key={food.id}
+                        food={food}
+                        isDarkMode={isDarkMode}
+                        restaurant={restaurant}
+                        isOpen={isOpen}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            // Flat list when search/filter is active
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pb-10">
+              {filteredFoods.map((food) => (
+                <FoodCard
+                  key={food.id}
+                  food={food}
+                  isDarkMode={isDarkMode}
+                  restaurant={restaurant}
+                  isOpen={isOpen}
+                />
+              ))}
+            </div>
+          )
         ) : foods.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20">
             <UtensilsCrossed

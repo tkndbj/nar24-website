@@ -1,3 +1,5 @@
+// types/food.ts
+
 export interface Food {
   id: string;
   name: string;
