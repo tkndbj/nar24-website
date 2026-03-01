@@ -502,7 +502,7 @@ export default function ReviewsPage() {
       try {
         // Food reviews are stored under restaurants/{id}/reviews with buyerId field
         let q = query(
-          collectionGroup(db, "reviews"),
+          collectionGroup(db, "food-reviews"),
           where("buyerId", "==", user.uid),
           orderBy("timestamp", "desc"),
           limit(FOOD_PAGE_SIZE),
@@ -1360,7 +1360,11 @@ export default function ReviewsPage() {
             ) : (
               <>
                 {/* Product pending reviews */}
-                {pendingReviews.map((review) => (
+                {Array.from(
+                  new Map(
+                    pendingReviews.map((r) => [`${r.orderId}_${r.id}`, r]),
+                  ).values(),
+                ).map((review) => (
                   <div
                     key={`${review.orderId}_${review.id}`}
                     className={cardClass}
@@ -1436,7 +1440,9 @@ export default function ReviewsPage() {
                 ))}
 
                 {/* Food pending reviews */}
-                {foodPendingReviews.map((order) => {
+                {Array.from(
+                  new Map(foodPendingReviews.map((r) => [r.id, r])).values(),
+                ).map((order) => {
                   const itemsPreview =
                     order.items
                       .slice(0, 2)
@@ -1539,7 +1545,11 @@ export default function ReviewsPage() {
             ) : (
               <>
                 {/* Product/seller reviews */}
-                {filteredMyReviews.map((review) => (
+                {Array.from(
+                  new Map(
+                    filteredMyReviews.map((r) => [`${r.orderId}_${r.id}`, r]),
+                  ).values(),
+                ).map((review) => (
                   <div
                     key={`product_${review.orderId}_${review.id}`}
                     className={cardClass}
@@ -1651,7 +1661,9 @@ export default function ReviewsPage() {
 
                 {/* Food reviews */}
                 {showFoodReviewsInTab2 &&
-                  myFoodReviews.map((review) => (
+                  Array.from(
+                    new Map(myFoodReviews.map((r) => [r.id, r])).values(),
+                  ).map((review) => (
                     <div key={`food_${review.id}`} className={cardClass}>
                       <div
                         className={`px-4 py-3 ${cardBorderClass} flex items-center gap-3`}
