@@ -1497,6 +1497,8 @@
     "orderNumber": "Order Number",
     "orderDate": "Order Date",
     "deliveryType": "Delivery Type",
+    "statusAccepted": "Accepted",
+    "statusRejected": "Rejected",
     "pickup": "Pickup",
     "delivery": "Delivery",
     "paymentMethod": "Payment",

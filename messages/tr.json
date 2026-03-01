@@ -1497,6 +1497,8 @@
     "orderNumber": "Sipariş No",
     "orderDate": "Sipariş Tarihi",
     "deliveryType": "Teslimat Türü",
+    "statusAccepted": "Onaylandı",
+    "statusRejected": "Reddedildi",
     "pickup": "Gel-Al",
     "delivery": "Teslimat",
     "paymentMethod": "Ödeme",

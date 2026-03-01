@@ -29,6 +29,8 @@ import { useTranslations } from "next-intl";
 
 type FoodOrderStatus =
   | "pending"
+  | "accepted"
+  | "rejected"
   | "confirmed"
   | "preparing"
   | "ready"
@@ -100,6 +102,20 @@ const STATUS_CONFIG: Record<
     darkBg: "#78350F",
     icon: Clock,
     labelKey: "statusPending",
+  },
+  accepted: {
+    color: "#0D9488",
+    bg: "#CCFBF1",
+    darkBg: "#134E4A",
+    icon: CheckCircle,
+    labelKey: "statusAccepted",
+  },
+  rejected: {
+    color: "#EF4444",
+    bg: "#FEE2E2",
+    darkBg: "#7F1D1D",
+    icon: XCircle,
+    labelKey: "statusRejected",
   },
   confirmed: {
     color: "#3B82F6",
