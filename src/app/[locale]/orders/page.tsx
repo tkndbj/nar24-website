@@ -16,6 +16,11 @@ import {
   XCircle,
   ArrowLeft,
   Star,
+  UtensilsCrossed,
+  MapPin,
+  Banknote,
+  CreditCard,
+  ShoppingBag,
 } from "lucide-react";
 import { useUser } from "@/context/UserProvider";
 import { useRouter } from "next/navigation";
@@ -27,6 +32,7 @@ import {
   startAfter,
   getDocs,
   collectionGroup,
+  collection,
   Timestamp,
   QueryDocumentSnapshot,
 } from "firebase/firestore";
@@ -163,7 +169,37 @@ interface FilterOptions {
   searchQuery: string;
 }
 
-type OrderTab = "sold" | "bought";
+type FoodOrderStatus =
+  | "pending"
+  | "confirmed"
+  | "preparing"
+  | "ready"
+  | "delivered"
+  | "completed"
+  | "cancelled";
+
+interface FoodOrder {
+  id: string;
+  restaurantId: string;
+  restaurantName: string;
+  restaurantProfileImage?: string;
+  items: {
+    foodId: string;
+    name: string;
+    quantity: number;
+    price: number;
+    extras: { name: string; price: number; quantity: number }[];
+  }[];
+  totalPrice: number;
+  currency: string;
+  paymentMethod: string;
+  isPaid: boolean;
+  deliveryType: string;
+  status: FoodOrderStatus;
+  createdAt: Timestamp;
+}
+
+type OrderTab = "sold" | "bought" | "food";
 
 const PAGE_SIZE = 20;
 const SEARCH_DEBOUNCE_DELAY = 300;
@@ -171,6 +207,7 @@ const SCROLL_THROTTLE_DELAY = 100;
 
 export default function OrdersPage() {
   const router = useRouter();
+
   const { user, isLoading: authLoading } = useUser();
   const t = useTranslations("Orders");
 
@@ -193,12 +230,23 @@ export default function OrdersPage() {
     useState<QueryDocumentSnapshot | null>(null);
   const [boughtInitialLoading, setBoughtInitialLoading] = useState(true);
 
+  // Food orders state
+  const [foodOrders, setFoodOrders] = useState<FoodOrder[]>([]);
+  const [foodLoading, setFoodLoading] = useState(false);
+  const [foodHasMore, setFoodHasMore] = useState(true);
+  const [foodLastDoc, setFoodLastDoc] = useState<QueryDocumentSnapshot | null>(
+    null,
+  );
+  const [foodInitialLoading, setFoodInitialLoading] = useState(true);
+  const [foodFetched, setFoodFetched] = useState(false);
+
   const [searchValue, setSearchValue] = useState("");
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const soldScrollRef = useRef<HTMLDivElement>(null);
   const boughtScrollRef = useRef<HTMLDivElement>(null);
+  const foodScrollRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const scrollThrottleRef = useRef<NodeJS.Timeout | null>(null);
@@ -254,6 +302,13 @@ export default function OrdersPage() {
     };
   }, [searchValue]);
 
+  // Lazy-load food orders when tab is first opened
+  useEffect(() => {
+    if (activeTab === "food" && user && !foodFetched) {
+      loadFoodOrders(true);
+    }
+  }, [activeTab, user, foodFetched]);
+
   const resetPaginationState = () => {
     setSoldOrders([]);
     setBoughtOrders([]);
@@ -286,6 +341,17 @@ export default function OrdersPage() {
       scrollThrottleRef.current = null;
     }, SCROLL_THROTTLE_DELAY);
   }, [boughtLoading, boughtHasMore]);
+
+  const handleFoodScroll = useCallback(() => {
+    if (scrollThrottleRef.current) return;
+    scrollThrottleRef.current = setTimeout(() => {
+      const container = foodScrollRef.current;
+      if (!container || foodLoading || !foodHasMore) return;
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      if (scrollHeight - scrollTop <= clientHeight + 200) loadFoodOrders(false);
+      scrollThrottleRef.current = null;
+    }, SCROLL_THROTTLE_DELAY);
+  }, [foodLoading, foodHasMore]);
 
   const loadSoldOrders = useCallback(
     async (reset = false) => {
@@ -462,6 +528,67 @@ export default function OrdersPage() {
     [user, filters, boughtLoading, boughtLastDoc, boughtHasMore],
   );
 
+  const loadFoodOrders = useCallback(
+    async (reset = false) => {
+      if (!user || foodLoading) return;
+      if (!reset && !foodHasMore) return;
+      setFoodLoading(true);
+      if (reset) setFoodInitialLoading(true);
+      try {
+        let q = query(
+          collection(db, "orders-food"),
+          where("buyerId", "==", user.uid),
+          orderBy("createdAt", "desc"),
+          limit(PAGE_SIZE),
+        );
+        if (!reset && foodLastDoc) q = query(q, startAfter(foodLastDoc));
+        const snapshot = await getDocs(q);
+        const newOrders: FoodOrder[] = snapshot.docs.map((doc) => {
+          const d = doc.data();
+          return {
+            id: doc.id,
+            restaurantId: d.restaurantId || "",
+            restaurantName: d.restaurantName || "",
+            restaurantProfileImage: d.restaurantProfileImage || "",
+            items: Array.isArray(d.items) ? d.items : [],
+            totalPrice: d.totalPrice || 0,
+            currency: d.currency || "TL",
+            paymentMethod: d.paymentMethod || "",
+            isPaid: d.isPaid || false,
+            deliveryType: d.deliveryType || "delivery",
+            status: (d.status || "pending") as FoodOrderStatus,
+            createdAt: d.createdAt,
+          };
+        });
+        // Client-side search filter
+        const filtered = filters.searchQuery
+          ? newOrders.filter(
+              (o) =>
+                o.restaurantName.toLowerCase().includes(filters.searchQuery) ||
+                o.items.some((i) =>
+                  i.name.toLowerCase().includes(filters.searchQuery),
+                ),
+            )
+          : newOrders;
+        setFoodHasMore(snapshot.docs.length === PAGE_SIZE);
+        if (reset) setFoodOrders(filtered);
+        else setFoodOrders((prev) => [...prev, ...filtered]);
+        if (snapshot.docs.length > 0)
+          setFoodLastDoc(snapshot.docs[snapshot.docs.length - 1]);
+        else if (reset) setFoodLastDoc(null);
+        setError(null);
+      } catch (error) {
+        console.error("Error loading food orders:", error);
+        setError("Failed to load food orders");
+      } finally {
+        setFoodLoading(false);
+        if (reset) setFoodInitialLoading(false);
+        setFoodFetched(true);
+      }
+    },
+    [user, filters, foodLoading, foodLastDoc, foodHasMore],
+  );
+
   const clearSearch = () => {
     setSearchValue("");
     setFilters((prev) => ({ ...prev, searchQuery: "" }));
@@ -483,6 +610,10 @@ export default function OrdersPage() {
     }
     if (activeTab === "sold") router.push(`/soldproduct?orderId=${orderId}`);
     else router.push(`/boughtproduct?orderId=${orderId}`);
+  };
+
+  const handleFoodOrderTap = (order: FoodOrder) => {
+    router.push(`/food-order-detail/${order.id}`);
   };
 
   const getCurrentOrders = () =>
@@ -528,6 +659,79 @@ export default function OrdersPage() {
       >
         <StatusIcon className="w-3 h-3" />
         {getStatusText(status)}
+      </span>
+    );
+  };
+
+  const getFoodStatusColors = (status: FoodOrderStatus) => {
+    switch (status) {
+      case "pending":
+        return {
+          bg: "bg-gray-100 dark:bg-gray-700",
+          text: "text-gray-600 dark:text-gray-300",
+          border: "border-gray-200 dark:border-gray-600",
+        };
+      case "confirmed":
+        return {
+          bg: "bg-blue-50 dark:bg-blue-900/30",
+          text: "text-blue-600 dark:text-blue-400",
+          border: "border-blue-200 dark:border-blue-700",
+        };
+      case "preparing":
+        return {
+          bg: "bg-orange-50 dark:bg-orange-900/30",
+          text: "text-orange-600 dark:text-orange-400",
+          border: "border-orange-200 dark:border-orange-700",
+        };
+      case "ready":
+        return {
+          bg: "bg-indigo-50 dark:bg-indigo-900/30",
+          text: "text-indigo-600 dark:text-indigo-400",
+          border: "border-indigo-200 dark:border-indigo-700",
+        };
+      case "delivered":
+      case "completed":
+        return {
+          bg: "bg-green-50 dark:bg-green-900/30",
+          text: "text-green-600 dark:text-green-400",
+          border: "border-green-200 dark:border-green-700",
+        };
+      case "cancelled":
+        return {
+          bg: "bg-red-50 dark:bg-red-900/30",
+          text: "text-red-600 dark:text-red-400",
+          border: "border-red-200 dark:border-red-700",
+        };
+    }
+  };
+
+  const FoodStatusBadge = ({ status }: { status: FoodOrderStatus }) => {
+    const colors = getFoodStatusColors(status);
+    const icons: Record<FoodOrderStatus, React.ElementType> = {
+      pending: Clock,
+      confirmed: CheckCircle2,
+      preparing: UtensilsCrossed,
+      ready: ShoppingBag,
+      delivered: CheckCircle2,
+      completed: CheckCircle2,
+      cancelled: XCircle,
+    };
+    const labels: Record<FoodOrderStatus, string> = {
+      pending: t("foodStatusPending") || "Pending",
+      confirmed: t("foodStatusConfirmed") || "Confirmed",
+      preparing: t("foodStatusPreparing") || "Preparing",
+      ready: t("foodStatusReady") || "Ready",
+      delivered: t("foodStatusDelivered") || "Delivered",
+      completed: t("foodStatusCompleted") || "Completed",
+      cancelled: t("foodStatusCancelled") || "Cancelled",
+    };
+    const Icon = icons[status];
+    return (
+      <span
+        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${colors.bg} ${colors.text} ${colors.border}`}
+      >
+        <Icon className="w-3 h-3" />
+        {labels[status]}
       </span>
     );
   };
@@ -585,9 +789,9 @@ export default function OrdersPage() {
             >
               {t("title") || "My Orders"}
             </h1>
-            {currentOrders.length > 0 && (
+            {(activeTab !== "food" ? currentOrders : foodOrders).length > 0 && (
               <span className="px-2 py-0.5 bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 text-xs font-semibold rounded-full flex-shrink-0">
-                {currentOrders.length}
+                {(activeTab !== "food" ? currentOrders : foodOrders).length}
               </span>
             )}
           </div>
@@ -608,7 +812,11 @@ export default function OrdersPage() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") dismissKeyboard();
                 }}
-                placeholder={t("searchProducts") || "Search products..."}
+                placeholder={
+                  activeTab === "food"
+                    ? t("searchRestaurants") || "Search restaurants or items..."
+                    : t("searchProducts") || "Search products..."
+                }
                 className={`w-full pl-9 pr-9 py-2 border rounded-xl text-sm placeholder-gray-400 focus:outline-none transition-all ${
                   isDarkMode
                     ? "bg-gray-800 border-gray-700 text-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400"
@@ -695,6 +903,37 @@ export default function OrdersPage() {
                   </span>
                 )}
               </button>
+              <button
+                onClick={() => {
+                  setActiveTab("food");
+                  dismissKeyboard();
+                }}
+                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                  activeTab === "food"
+                    ? isDarkMode
+                      ? "bg-gray-700 text-white shadow-sm"
+                      : "bg-white text-gray-900 shadow-sm"
+                    : isDarkMode
+                      ? "text-gray-400 hover:text-gray-200"
+                      : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                <UtensilsCrossed className="w-3.5 h-3.5" />
+                {t("foodOrders") || "Food"}
+                {foodOrders.length > 0 && (
+                  <span
+                    className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                      activeTab === "food"
+                        ? "bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400"
+                        : isDarkMode
+                          ? "bg-gray-700 text-gray-400"
+                          : "bg-gray-200 text-gray-500"
+                    }`}
+                  >
+                    {foodOrders.length}
+                  </span>
+                )}
+              </button>
             </div>
           </div>
         </div>
@@ -725,13 +964,165 @@ export default function OrdersPage() {
               onClick={() => {
                 setError(null);
                 if (activeTab === "sold") loadSoldOrders(true);
-                else loadBoughtOrders(true);
+                else if (activeTab === "bought") loadBoughtOrders(true);
+                else loadFoodOrders(true);
               }}
               className="inline-flex items-center px-4 py-2 bg-orange-500 text-white rounded-xl hover:bg-orange-600 transition-colors text-xs font-medium"
             >
               {t("retry") || "Retry"}
             </button>
           </div>
+        ) : activeTab === "food" ? (
+          /* ── Food Orders ─────────────────────────────────────── */
+          foodInitialLoading ? (
+            <div className="space-y-3">
+              {[...Array(6)].map((_, i) => (
+                <div
+                  key={i}
+                  className={`rounded-2xl border h-24 animate-pulse ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-100"}`}
+                />
+              ))}
+            </div>
+          ) : foodOrders.length === 0 ? (
+            <div className="text-center py-16">
+              <UtensilsCrossed
+                className={`w-12 h-12 mx-auto mb-3 ${isDarkMode ? "text-gray-600" : "text-gray-300"}`}
+              />
+              <h3
+                className={`text-sm font-semibold mb-1 ${isDarkMode ? "text-white" : "text-gray-900"}`}
+              >
+                {filters.searchQuery
+                  ? t("noResultsFound") || "No results found"
+                  : t("noFoodOrders") || "No Food Orders"}
+              </h3>
+              <p
+                className={`text-xs max-w-xs mx-auto ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+              >
+                {filters.searchQuery
+                  ? t("tryDifferentKeywords") ||
+                    "Try searching with different keywords"
+                  : t("noFoodOrdersDesc") ||
+                    "Your food orders will appear here"}
+              </p>
+            </div>
+          ) : (
+            <div
+              ref={foodScrollRef}
+              onScroll={handleFoodScroll}
+              className="space-y-3 max-h-[calc(100vh-260px)] overflow-y-auto"
+            >
+              {foodOrders.map((order) => {
+                const isPickup = order.deliveryType === "pickup";
+                const itemsPreview =
+                  order.items
+                    .slice(0, 2)
+                    .map((i) =>
+                      i.quantity > 1 ? `${i.quantity}× ${i.name}` : i.name,
+                    )
+                    .join(", ") +
+                  (order.items.length > 2 ? ` +${order.items.length - 2}` : "");
+                return (
+                  <div
+                    key={order.id}
+                    onClick={() => handleFoodOrderTap(order)}
+                    className={`rounded-2xl border overflow-hidden cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-100"}`}
+                  >
+                    <div className="px-4 py-3 flex items-center gap-3">
+                      {/* Icon */}
+                      <div
+                        className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isDarkMode ? "bg-gray-700" : "bg-orange-50"}`}
+                      >
+                        {order.restaurantProfileImage ? (
+                          <div className="w-10 h-10 rounded-xl overflow-hidden relative">
+                            <Image
+                              src={order.restaurantProfileImage}
+                              alt={order.restaurantName}
+                              fill
+                              className="object-cover"
+                              sizes="40px"
+                            />
+                          </div>
+                        ) : (
+                          <UtensilsCrossed className="w-4 h-4 text-orange-500" />
+                        )}
+                      </div>
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <h4
+                          className={`text-sm font-semibold truncate ${isDarkMode ? "text-white" : "text-gray-900"}`}
+                        >
+                          {order.restaurantName}
+                        </h4>
+                        <p
+                          className={`text-[11px] truncate mt-0.5 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                        >
+                          {itemsPreview}
+                        </p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span
+                            className={`text-xs font-bold ${isDarkMode ? "text-orange-400" : "text-orange-600"}`}
+                          >
+                            {order.totalPrice.toFixed(0)} {order.currency}
+                          </span>
+                          <span
+                            className={`flex items-center gap-0.5 text-[11px] ${isPickup ? (isDarkMode ? "text-blue-400" : "text-blue-600") : isDarkMode ? "text-green-400" : "text-green-600"}`}
+                          >
+                            {isPickup ? (
+                              <ShoppingBag className="w-2.5 h-2.5" />
+                            ) : (
+                              <MapPin className="w-2.5 h-2.5" />
+                            )}
+                            {isPickup
+                              ? t("pickup") || "Pickup"
+                              : t("delivery") || "Delivery"}
+                          </span>
+                        </div>
+                      </div>
+                      {/* Right */}
+                      <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                        <ChevronRight
+                          className={`w-4 h-4 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
+                        />
+                        <span
+                          className={`text-[11px] ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
+                        >
+                          {order.createdAt
+                            ?.toDate()
+                            .toLocaleDateString("tr-TR")}
+                        </span>
+                      </div>
+                    </div>
+                    {/* Status + payment strip */}
+                    <div
+                      className={`px-4 py-2 border-t flex items-center justify-between ${isDarkMode ? "border-gray-700 bg-gray-800/50" : "border-gray-50 bg-gray-50/50"}`}
+                    >
+                      <FoodStatusBadge status={order.status} />
+                      <span
+                        className={`inline-flex items-center gap-1 text-[11px] font-semibold ${order.isPaid ? (isDarkMode ? "text-green-400" : "text-green-600") : isDarkMode ? "text-amber-400" : "text-amber-600"}`}
+                      >
+                        {order.isPaid ? (
+                          <>
+                            <CreditCard className="w-3 h-3" />
+                            {t("paid") || "Paid"}
+                          </>
+                        ) : (
+                          <>
+                            <Banknote className="w-3 h-3" />
+                            {t("payAtDoor") || "Pay at Door"}
+                          </>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+              {foodLoading && (
+                <div className="flex justify-center py-8">
+                  <div className="w-5 h-5 border-[3px] border-orange-200 border-t-orange-600 rounded-full animate-spin" />
+                </div>
+              )}
+            </div>
+          )
         ) : currentInitialLoading ? (
           /* Loading Skeleton */
           <div className="space-y-3">
