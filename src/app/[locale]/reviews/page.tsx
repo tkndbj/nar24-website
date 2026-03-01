@@ -1541,7 +1541,7 @@ export default function ReviewsPage() {
                 {/* Product/seller reviews */}
                 {filteredMyReviews.map((review) => (
                   <div
-                    key={`${review.orderId}_${review.id}`}
+                    key={`product_${review.orderId}_${review.id}`}
                     className={cardClass}
                   >
                     {review.productId ? (
@@ -1652,7 +1652,7 @@ export default function ReviewsPage() {
                 {/* Food reviews */}
                 {showFoodReviewsInTab2 &&
                   myFoodReviews.map((review) => (
-                    <div key={review.id} className={cardClass}>
+                    <div key={`food_${review.id}`} className={cardClass}>
                       <div
                         className={`px-4 py-3 ${cardBorderClass} flex items-center gap-3`}
                       >
