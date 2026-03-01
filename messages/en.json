@@ -1533,6 +1533,8 @@
     "title": "My Orders",
     "foodOrders": "Food",
     "noFoodOrders": "No Food Orders",
+    "foodStatusAccepted": "Accepted",
+    "foodStatusRejected": "Rejected",
     "noFoodOrdersDesc": "Your food orders will appear here",
     "searchRestaurants": "Search restaurants or items...",
     "foodStatusPending": "Pending",

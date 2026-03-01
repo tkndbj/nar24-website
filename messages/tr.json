@@ -1533,6 +1533,8 @@
     "title": "Siparişlerim",
     "foodOrders": "Yemek",
     "noFoodOrders": "Yemek Siparişi Yok",
+    "foodStatusAccepted": "Onaylandı",
+    "foodStatusRejected": "Reddedildi",
     "noFoodOrdersDesc": "Yemek siparişleriniz burada görünecek",
     "searchRestaurants": "Restoran veya ürün ara...",
     "foodStatusPending": "Beklemede",
