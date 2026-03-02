@@ -26,6 +26,7 @@ import {
   FoodCartRestaurant,
 } from "@/context/FoodCartProvider";
 import FoodExtrasSheet from "./FoodExtrasSheet";
+import FoodCartSidebar from "./FoodCartSidebar";
 
 interface RestaurantDetailProps {
   restaurant: Restaurant | null;
@@ -162,15 +163,17 @@ function FoodCard({
   isDarkMode,
   restaurant,
   isOpen,
+  cartQuantity,
 }: {
   food: Food;
   isDarkMode: boolean;
   restaurant: Restaurant;
   isOpen: boolean;
+  cartQuantity: number;
 }) {
   const t = useTranslations("restaurantDetail");
   const { addItem, clearAndAddFromNewRestaurant } = useFoodCartActions();
-  const { items } = useFoodCartState();
+
   const [extrasOpen, setExtrasOpen] = useState(false);
 
   // Try to get localized food type name
@@ -178,12 +181,6 @@ function FoodCard({
     FoodCategoryData.kFoodTypeTranslationKeys[food.foodType];
   const tFood = useTranslations();
   const displayType = translationKey ? tFood(translationKey) : food.foodType;
-
-  // Check quantity already in cart for this food
-  const cartQuantity = useMemo(() => {
-    const item = items.find((i) => i.foodId === food.id);
-    return item?.quantity ?? 0;
-  }, [items, food.id]);
 
   const cartRestaurant: FoodCartRestaurant = useMemo(
     () => ({
@@ -438,6 +435,14 @@ export default function RestaurantDetail({
     string[]
   >([]);
 
+  const { items } = useFoodCartState(); // add this
+
+  const cartQuantityMap = useMemo(() => {
+    const map = new Map<string, number>();
+    items.forEach((i) => map.set(i.foodId, i.quantity));
+    return map;
+  }, [items]);
+
   // Fetch this restaurant's food categories from Typesense facets
   useEffect(() => {
     if (!restaurant?.id) return;
@@ -554,145 +559,163 @@ export default function RestaurantDetail({
       )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
-        {/* Menu title + search */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
-          <h2
-            className={`text-xl font-bold ${
-              isDarkMode ? "text-white" : "text-gray-900"
-            }`}
-          >
-            {t("menu")}
-            <span
-              className={`ml-2 text-sm font-normal ${
-                isDarkMode ? "text-gray-500" : "text-gray-400"
-              }`}
-            >
-              ({filteredFoods.length}
-              {hasActiveFilters ? `/${foods.length}` : ""} {t("items")})
-            </span>
-          </h2>
-
-          <div className="relative w-full sm:w-72">
-            <Search
-              className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400`}
-            />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={t("searchFood")}
-              className={`w-full pl-10 pr-4 py-2.5 rounded-xl text-sm outline-none transition-colors ${
-                isDarkMode
-                  ? "bg-gray-800 border border-gray-700 text-white placeholder-gray-500 focus:border-orange-500"
-                  : "bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 focus:border-orange-500"
-              }`}
-            />
-          </div>
-        </div>
-
-        {/* Food category icons */}
-        {restaurantFoodCategories.length > 0 && (
-          <FilterIcons
-            selected={selectedIconCategory}
-            onSelect={setSelectedIconCategory}
-            isDarkMode={isDarkMode}
-            categories={restaurantFoodCategories}
-          />
-        )}
-
-        {/* Food list */}
-        {filteredFoods.length > 0 ? (
-          groupedFoods ? (
-            // Grouped by category
-            <div className="space-y-8 pb-10">
-              {Array.from(groupedFoods.entries()).map(([category, items]) => (
-                <div key={category}>
-                  <h3
-                    className={`text-base font-bold mb-3 ${isDarkMode ? "text-white" : "text-gray-900"}`}
-                  >
-                    {category}
-                  </h3>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {items.map((food) => (
-                      <FoodCard
-                        key={food.id}
-                        food={food}
-                        isDarkMode={isDarkMode}
-                        restaurant={restaurant}
-                        isOpen={isOpen}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            // Flat list when search/filter is active
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pb-10">
-              {filteredFoods.map((food) => (
-                <FoodCard
-                  key={food.id}
-                  food={food}
-                  isDarkMode={isDarkMode}
-                  restaurant={restaurant}
-                  isOpen={isOpen}
-                />
-              ))}
-            </div>
-          )
-        ) : foods.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20">
-            <UtensilsCrossed
-              className={`w-16 h-16 mb-4 ${
-                isDarkMode ? "text-gray-600" : "text-gray-300"
-              }`}
-            />
-            <h3
-              className={`text-lg font-semibold mb-1 ${
-                isDarkMode ? "text-white" : "text-gray-900"
-              }`}
-            >
-              {t("noFoods")}
-            </h3>
-            <p
-              className={`text-sm ${
-                isDarkMode ? "text-gray-400" : "text-gray-500"
-              }`}
-            >
-              {t("noFoodsSubtitle")}
-            </p>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-20">
-            <span className="text-5xl mb-4">🔍</span>
-            <h3
-              className={`text-lg font-semibold mb-1 ${
-                isDarkMode ? "text-white" : "text-gray-900"
-              }`}
-            >
-              {t("noResults")}
-            </h3>
-            <p
-              className={`text-sm text-center max-w-sm ${
-                isDarkMode ? "text-gray-400" : "text-gray-500"
-              }`}
-            >
-              {t("noResultsSubtitle")}
-            </p>
-            {hasActiveFilters && (
-              <button
-                onClick={() => {
-                  setSelectedIconCategory(null);
-                  setSearchQuery("");
-                }}
-                className="mt-4 px-5 py-2 bg-orange-500 text-white rounded-xl text-sm font-medium hover:bg-orange-600 transition-colors"
+        <div className="flex gap-6">
+          {/* Main menu content */}
+          <div className="flex-1 min-w-0">
+            {/* Menu title + search */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
+              <h2
+                className={`text-xl font-bold ${
+                  isDarkMode ? "text-white" : "text-gray-900"
+                }`}
               >
-                {t("clearAll")}
-              </button>
+                {t("menu")}
+                <span
+                  className={`ml-2 text-sm font-normal ${
+                    isDarkMode ? "text-gray-500" : "text-gray-400"
+                  }`}
+                >
+                  ({filteredFoods.length}
+                  {hasActiveFilters ? `/${foods.length}` : ""} {t("items")})
+                </span>
+              </h2>
+
+              <div className="relative w-full sm:w-72">
+                <Search
+                  className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400`}
+                />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={t("searchFood")}
+                  className={`w-full pl-10 pr-4 py-2.5 rounded-xl text-sm outline-none transition-colors ${
+                    isDarkMode
+                      ? "bg-gray-800 border border-gray-700 text-white placeholder-gray-500 focus:border-orange-500"
+                      : "bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 focus:border-orange-500"
+                  }`}
+                />
+              </div>
+            </div>
+
+            {/* Food category icons */}
+            {restaurantFoodCategories.length > 0 && (
+              <FilterIcons
+                selected={selectedIconCategory}
+                onSelect={setSelectedIconCategory}
+                isDarkMode={isDarkMode}
+                categories={restaurantFoodCategories}
+              />
+            )}
+
+            {/* Food list */}
+            {filteredFoods.length > 0 ? (
+              groupedFoods ? (
+                // Grouped by category
+                <div className="space-y-8 pb-10">
+                  {Array.from(groupedFoods.entries()).map(([category, items], idx) => (
+                    <div key={category}>
+                      {idx > 0 && (
+                        <hr className={`mb-8 border-t ${isDarkMode ? "border-gray-700" : "border-gray-200"}`} />
+                      )}
+                      <h3
+                        className={`text-base font-bold mb-3 ${isDarkMode ? "text-white" : "text-gray-900"}`}
+                      >
+                        {category}
+                      </h3>
+                      <div className="grid grid-cols-1 gap-4">
+                        {items.map((food) => (
+                          <FoodCard
+                            key={food.id}
+                            food={food}
+                            isDarkMode={isDarkMode}
+                            restaurant={restaurant}
+                            isOpen={isOpen}
+                            cartQuantity={cartQuantityMap.get(food.id) ?? 0}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                // Flat list when search/filter is active
+                <div className="grid grid-cols-1 gap-4 pb-10">
+                  {filteredFoods.map((food) => (
+                    <FoodCard
+                      key={food.id}
+                      food={food}
+                      isDarkMode={isDarkMode}
+                      restaurant={restaurant}
+                      isOpen={isOpen}
+                      cartQuantity={cartQuantityMap.get(food.id) ?? 0}
+                    />
+                  ))}
+                </div>
+              )
+            ) : foods.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20">
+                <UtensilsCrossed
+                  className={`w-16 h-16 mb-4 ${
+                    isDarkMode ? "text-gray-600" : "text-gray-300"
+                  }`}
+                />
+                <h3
+                  className={`text-lg font-semibold mb-1 ${
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  }`}
+                >
+                  {t("noFoods")}
+                </h3>
+                <p
+                  className={`text-sm ${
+                    isDarkMode ? "text-gray-400" : "text-gray-500"
+                  }`}
+                >
+                  {t("noFoodsSubtitle")}
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-20">
+                <span className="text-5xl mb-4">🔍</span>
+                <h3
+                  className={`text-lg font-semibold mb-1 ${
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  }`}
+                >
+                  {t("noResults")}
+                </h3>
+                <p
+                  className={`text-sm text-center max-w-sm ${
+                    isDarkMode ? "text-gray-400" : "text-gray-500"
+                  }`}
+                >
+                  {t("noResultsSubtitle")}
+                </p>
+                {hasActiveFilters && (
+                  <button
+                    onClick={() => {
+                      setSelectedIconCategory(null);
+                      setSearchQuery("");
+                    }}
+                    className="mt-4 px-5 py-2 bg-orange-500 text-white rounded-xl text-sm font-medium hover:bg-orange-600 transition-colors"
+                  >
+                    {t("clearAll")}
+                  </button>
+                )}
+              </div>
             )}
           </div>
-        )}
+
+          {/* Cart Sidebar — desktop only (sticky right column) */}
+          <div className="hidden lg:block w-80 flex-shrink-0">
+            <FoodCartSidebar isDarkMode={isDarkMode} mode="desktop" />
+          </div>
+        </div>
       </div>
+
+      {/* Cart FAB — mobile only */}
+      <FoodCartSidebar isDarkMode={isDarkMode} mode="mobile" />
     </main>
   );
 }

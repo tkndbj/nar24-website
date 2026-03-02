@@ -10,6 +10,7 @@ import { UserProvider, useUser } from "../../context/UserProvider";
 import ConditionalHeader from "../components/ConditionalHeader";
 import { AppInitializer } from "@/app/components/AppInitializer";
 import { AnalyticsInitializer } from "@/app/components/AnalyticsInitializer";
+import ScrollToTop from "@/app/components/ScrollToTop";
 import { getFirebaseDb, getFirebaseFunctions } from "@/lib/firebase-lazy";
 import type { Firestore } from "firebase/firestore";
 import type { Functions } from "firebase/functions";
@@ -19,15 +20,14 @@ import { CommerceProviders } from "@/context/CommerceProviders";
 import { UIProviders } from "@/context/UIProviders";
 
 // Lazy load CookieConsent - only shown conditionally, not needed on initial render
-const CookieConsent = dynamic(
-  () => import("../components/CookieConsent"),
-  { ssr: false }
-);
+const CookieConsent = dynamic(() => import("../components/CookieConsent"), {
+  ssr: false,
+});
 
 // Lazy load AppDownloadModal - only shown on mobile/tablet devices
 const AppDownloadModal = dynamic(
   () => import("../components/AppDownloadModal"),
-  { ssr: false }
+  { ssr: false },
 );
 
 // Inner component that has access to user context and lazy-loaded Firebase
@@ -35,7 +35,7 @@ const AppDownloadModal = dynamic(
 function AppProviders({
   children,
   db,
-  functions
+  functions,
 }: {
   children: React.ReactNode;
   db: Firestore | null;
@@ -46,6 +46,7 @@ function AppProviders({
   return (
     <CommerceProviders user={user} db={db} functions={functions}>
       <UIProviders user={user}>
+        <ScrollToTop />
         <ConditionalHeader />
         <main className="isolate">{children}</main>
         <CookieConsent />
@@ -56,7 +57,14 @@ function AppProviders({
 }
 
 // Component to lazy load Firebase and provide it to children
-function FirebaseProvider({ children }: { children: (db: Firestore | null, functions: Functions | null) => React.ReactNode }) {
+function FirebaseProvider({
+  children,
+}: {
+  children: (
+    db: Firestore | null,
+    functions: Functions | null,
+  ) => React.ReactNode;
+}) {
   const [db, setDb] = useState<Firestore | null>(null);
   const [functions, setFunctions] = useState<Functions | null>(null);
 
