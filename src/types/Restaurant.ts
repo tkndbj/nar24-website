@@ -1,3 +1,5 @@
+// types/restaurant.ts
+
 export interface WorkingHours {
   open: string; // "HH:mm" format, e.g. "08:00"
   close: string; // "HH:mm" format, e.g. "22:00"
