@@ -727,15 +727,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, [hasScrolled]);
 
-  // ============= SCROLL TO TOP ON PRODUCT CHANGE =============
-  useEffect(() => {
-    if (productId) {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      // Reset cart operation lock when product changes
-      isCartOperationInProgress.current = false;
-    }
-  }, [productId]);
-
   // ============= EVENT HANDLERS =============
 
   const handleImageError = useCallback((index: number) => {

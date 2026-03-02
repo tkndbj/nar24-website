@@ -100,7 +100,7 @@ export default function RestaurantDetailPage() {
   }, [fetchData]);
 
   return (
-    <div className="min-h-screen flex flex-col overflow-x-hidden">
+    <div className="min-h-screen flex flex-col overflow-x-clip">
       <FoodCartProvider user={user} db={db}>
         <RestaurantDetail restaurant={restaurant} foods={foods} loading={loading} />
       </FoodCartProvider>
