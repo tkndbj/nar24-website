@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback } from "react";
 import Image from "next/image";
 import {
   ShoppingBag,
@@ -65,7 +65,9 @@ function SidebarCartItem({
   return (
     <div
       className={`rounded-xl border p-3 transition-colors ${
-        isDarkMode ? "bg-gray-800/60 border-gray-700/50" : "bg-white border-gray-100"
+        isDarkMode
+          ? "bg-gray-800/60 border-gray-700/50"
+          : "bg-white border-gray-100"
       } ${item.isOptimistic ? "opacity-70" : ""}`}
     >
       <div className="flex gap-2.5">
@@ -201,7 +203,9 @@ function SidebarCartItem({
               <span className="text-orange-500">+</span>
               {getExtraName(ext.name)}
               {ext.quantity > 1 && (
-                <span className={isDarkMode ? "text-gray-500" : "text-gray-300"}>
+                <span
+                  className={isDarkMode ? "text-gray-500" : "text-gray-300"}
+                >
                   x{ext.quantity}
                 </span>
               )}
@@ -240,7 +244,6 @@ function SidebarCartItem({
 
 function CartContent({
   isDarkMode,
-  compact,
 }: {
   isDarkMode: boolean;
   compact?: boolean;
