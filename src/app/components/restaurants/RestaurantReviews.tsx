@@ -40,6 +40,19 @@ function ReviewCard({
 }) {
   const t = useTranslations("restaurantDetail");
 
+  const maskName = (name: string) => {
+    const parts = name.trim().split(/\s+/);
+    return parts
+      .map((part, i) => {
+        if (part.length <= 1) return part;
+        if (i === 0) return part[0] + "*".repeat(part.length - 1);
+        if (i === parts.length - 1)
+          return "*".repeat(part.length - 1) + part[part.length - 1];
+        return "*".repeat(part.length);
+      })
+      .join(" ");
+  };
+
   const timeAgo = useCallback((ts: Timestamp) => {
     const now = Date.now();
     const diff = now - ts.toMillis();
@@ -80,7 +93,7 @@ function ReviewCard({
               isDarkMode ? "text-white" : "text-gray-900"
             }`}
           >
-            {review.buyerName || t("anonymousUser")}
+            {review.buyerName ? maskName(review.buyerName) : t("anonymousUser")}
           </p>
           <p
             className={`text-[11px] ${
