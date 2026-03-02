@@ -27,6 +27,7 @@ import {
 } from "@/context/FoodCartProvider";
 import FoodExtrasSheet from "./FoodExtrasSheet";
 import FoodCartSidebar from "./FoodCartSidebar";
+import RestaurantConflictDialog from "./Restaurantconflictdialog";
 
 interface RestaurantDetailProps {
   restaurant: Restaurant | null;
@@ -158,21 +159,41 @@ function RestaurantHeader({
 
 // ─── Food Card ──────────────────────────────────────────────────────────────
 
+// Pending conflict data stored by parent so the dialog is rendered once
+interface PendingConflict {
+  food: {
+    id: string;
+    name: string;
+    description?: string;
+    price: number;
+    imageUrl?: string;
+    foodCategory: string;
+    foodType: string;
+    preparationTime?: number | null;
+  };
+  restaurant: FoodCartRestaurant;
+  quantity: number;
+  extras: SelectedExtra[];
+  specialNotes: string;
+}
+
 function FoodCard({
   food,
   isDarkMode,
   restaurant,
   isOpen,
   cartQuantity,
+  onConflict,
 }: {
   food: Food;
   isDarkMode: boolean;
   restaurant: Restaurant;
   isOpen: boolean;
   cartQuantity: number;
+  onConflict: (pending: PendingConflict) => void;
 }) {
   const t = useTranslations("restaurantDetail");
-  const { addItem, clearAndAddFromNewRestaurant } = useFoodCartActions();
+  const { addItem } = useFoodCartActions();
 
   const [extrasOpen, setExtrasOpen] = useState(false);
 
@@ -198,17 +219,19 @@ function FoodCard({
 
   const handleExtrasConfirm = useCallback(
     async (extras: SelectedExtra[], specialNotes: string, quantity: number) => {
+      const foodData = {
+        id: food.id,
+        name: food.name,
+        description: food.description,
+        price: food.price,
+        imageUrl: food.imageUrl,
+        foodCategory: food.foodCategory,
+        foodType: food.foodType,
+        preparationTime: food.preparationTime,
+      };
+
       const result = await addItem({
-        food: {
-          id: food.id,
-          name: food.name,
-          description: food.description,
-          price: food.price,
-          imageUrl: food.imageUrl,
-          foodCategory: food.foodCategory,
-          foodType: food.foodType,
-          preparationTime: food.preparationTime,
-        },
+        food: foodData,
         restaurant: cartRestaurant,
         quantity,
         extras,
@@ -216,18 +239,8 @@ function FoodCard({
       });
 
       if (result === "restaurant_conflict") {
-        // Auto-replace for simplicity — could show a confirmation dialog
-        await clearAndAddFromNewRestaurant({
-          food: {
-            id: food.id,
-            name: food.name,
-            description: food.description,
-            price: food.price,
-            imageUrl: food.imageUrl,
-            foodCategory: food.foodCategory,
-            foodType: food.foodType,
-            preparationTime: food.preparationTime,
-          },
+        onConflict({
+          food: foodData,
           restaurant: cartRestaurant,
           quantity,
           extras,
@@ -235,7 +248,7 @@ function FoodCard({
         });
       }
     },
-    [food, cartRestaurant, addItem, clearAndAddFromNewRestaurant],
+    [food, cartRestaurant, addItem, onConflict],
   );
 
   return (
@@ -435,13 +448,27 @@ export default function RestaurantDetail({
     string[]
   >([]);
 
-  const { items } = useFoodCartState(); // add this
+  const { items, currentRestaurant: cartRestaurant } = useFoodCartState();
+  const { clearAndAddFromNewRestaurant } = useFoodCartActions();
 
   const cartQuantityMap = useMemo(() => {
     const map = new Map<string, number>();
     items.forEach((i) => map.set(i.foodId, i.quantity));
     return map;
   }, [items]);
+
+  // ── Restaurant conflict dialog ──
+  const [pendingConflict, setPendingConflict] = useState<PendingConflict | null>(null);
+
+  const handleConflict = useCallback((pending: PendingConflict) => {
+    setPendingConflict(pending);
+  }, []);
+
+  const handleConflictReplace = useCallback(async () => {
+    if (!pendingConflict) return;
+    await clearAndAddFromNewRestaurant(pendingConflict);
+    setPendingConflict(null);
+  }, [pendingConflict, clearAndAddFromNewRestaurant]);
 
   // Fetch this restaurant's food categories from Typesense facets
   useEffect(() => {
@@ -632,6 +659,7 @@ export default function RestaurantDetail({
                             restaurant={restaurant}
                             isOpen={isOpen}
                             cartQuantity={cartQuantityMap.get(food.id) ?? 0}
+                            onConflict={handleConflict}
                           />
                         ))}
                       </div>
@@ -649,6 +677,7 @@ export default function RestaurantDetail({
                       restaurant={restaurant}
                       isOpen={isOpen}
                       cartQuantity={cartQuantityMap.get(food.id) ?? 0}
+                      onConflict={handleConflict}
                     />
                   ))}
                 </div>
@@ -716,6 +745,24 @@ export default function RestaurantDetail({
 
       {/* Cart FAB — mobile only */}
       <FoodCartSidebar isDarkMode={isDarkMode} mode="mobile" />
+
+      {/* Restaurant conflict dialog */}
+      <RestaurantConflictDialog
+        open={!!pendingConflict}
+        currentRestaurantName={cartRestaurant?.name ?? ""}
+        newRestaurantName={pendingConflict?.restaurant.name ?? ""}
+        onReplace={handleConflictReplace}
+        onCancel={() => setPendingConflict(null)}
+        isDarkMode={isDarkMode}
+        t={(key, fallback) => {
+          try {
+            const v = t(key);
+            return v !== key ? v : fallback;
+          } catch {
+            return fallback;
+          }
+        }}
+      />
     </main>
   );
 }

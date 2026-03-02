@@ -654,7 +654,7 @@ export const FoodCartProvider: React.FC<FoodCartProviderProps> = ({
           await writeRestaurantMeta(restaurant);
         }
 
-        // Optimistic add
+        // Add to state only if the snapshot listener hasn't already added it
         const optimisticItem: FoodCartItem = {
           foodId: cartKey,
           originalFoodId: food.id,
@@ -671,10 +671,14 @@ export const FoodCartProvider: React.FC<FoodCartProviderProps> = ({
           restaurantId: restaurant.id,
           restaurantName: restaurant.name,
           addedAt: Timestamp.now(),
-          isOptimistic: true,
+          isOptimistic: false,
         };
 
-        setItems((prev) => [optimisticItem, ...prev]);
+        setItems((prev) => {
+          // If snapshot already added this item, skip
+          if (prev.some((i) => i.foodId === cartKey)) return prev;
+          return [optimisticItem, ...prev];
+        });
 
         return "added";
       } catch (err) {
@@ -720,7 +724,7 @@ export const FoodCartProvider: React.FC<FoodCartProviderProps> = ({
           await setDoc(foodCartDoc(db, user.uid, cartKey), firestoreData);
           await writeRestaurantMeta(restaurant);
 
-          // Optimistic
+          // Add to state only if the snapshot listener hasn't already added it
           const optimisticItem: FoodCartItem = {
             foodId: cartKey,
             originalFoodId: food.id,
@@ -737,10 +741,13 @@ export const FoodCartProvider: React.FC<FoodCartProviderProps> = ({
             restaurantId: restaurant.id,
             restaurantName: restaurant.name,
             addedAt: Timestamp.now(),
-            isOptimistic: true,
+            isOptimistic: false,
           };
 
-          setItems([optimisticItem]);
+          setItems((prev) => {
+            if (prev.some((i) => i.foodId === cartKey)) return prev;
+            return [optimisticItem];
+          });
 
           return "added";
         } catch (err) {
