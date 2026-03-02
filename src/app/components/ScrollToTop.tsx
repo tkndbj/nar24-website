@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 export default function ScrollToTop() {
   const pathname = usePathname();
+  const scrollPositions = useRef<Record<string, number>>({});
   const isBack = useRef(false);
 
   useEffect(() => {
@@ -15,10 +16,22 @@ export default function ScrollToTop() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
+  // Save scroll position when leaving a page
+  useEffect(() => {
+    return () => {
+      scrollPositions.current[pathname] = window.scrollY;
+    };
+  }, [pathname]);
+
+  // Scroll to top or restore position
   useEffect(() => {
     if (isBack.current) {
       isBack.current = false;
-      return; // don't scroll on back navigation
+      const saved = scrollPositions.current[pathname] ?? 0;
+      requestAnimationFrame(() => {
+        window.scrollTo(0, saved);
+      });
+      return;
     }
     window.scrollTo(0, 0);
   }, [pathname]);

@@ -321,6 +321,7 @@ export default function RestaurantsPage({ restaurants }: RestaurantsPageProps) {
 
     if (!hasFilters && !hasSort && !query) {
       setFilteredRestaurants(restaurants);
+      setIsLoading(false);
       return;
     }
 

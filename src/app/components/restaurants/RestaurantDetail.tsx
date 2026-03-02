@@ -28,6 +28,7 @@ import {
 import FoodExtrasSheet from "./FoodExtrasSheet";
 import FoodCartSidebar from "./FoodCartSidebar";
 import RestaurantConflictDialog from "./Restaurantconflictdialog";
+import RestaurantReviews from "./RestaurantReviews";
 
 interface RestaurantDetailProps {
   restaurant: Restaurant | null;
@@ -447,6 +448,7 @@ export default function RestaurantDetail({
   const [restaurantFoodCategories, setRestaurantFoodCategories] = useState<
     string[]
   >([]);
+  const [activeTab, setActiveTab] = useState<"menu" | "reviews">("menu");
 
   const { items, currentRestaurant: cartRestaurant } = useFoodCartState();
   const { clearAndAddFromNewRestaurant } = useFoodCartActions();
@@ -608,152 +610,184 @@ export default function RestaurantDetail({
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
         <div className="flex gap-6">
-          {/* Main menu content */}
+          {/* Main content */}
           <div className="flex-1 min-w-0">
-            {/* Menu title + search */}
+            {/* Tab buttons + search */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
-              <h2
-                className={`text-xl font-bold ${
-                  isDarkMode ? "text-white" : "text-gray-900"
-                }`}
-              >
-                {t("menu")}
-                <span
-                  className={`ml-2 text-sm font-normal ${
-                    isDarkMode ? "text-gray-500" : "text-gray-400"
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setActiveTab("menu")}
+                  className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
+                    activeTab === "menu"
+                      ? "bg-orange-500 text-white"
+                      : isDarkMode
+                        ? "text-gray-400 hover:text-white hover:bg-gray-800"
+                        : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
                   }`}
                 >
-                  ({filteredFoods.length}
-                  {hasActiveFilters ? `/${foods.length}` : ""} {t("items")})
-                </span>
-              </h2>
-
-              <div className="relative w-full sm:w-72">
-                <Search
-                  className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400`}
-                />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder={t("searchFood")}
-                  className={`w-full pl-10 pr-4 py-2.5 rounded-xl text-sm outline-none transition-colors ${
-                    isDarkMode
-                      ? "bg-gray-800 border border-gray-700 text-white placeholder-gray-500 focus:border-orange-500"
-                      : "bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 focus:border-orange-500"
+                  {t("menu")}
+                  <span
+                    className={`ml-1.5 text-xs font-normal ${
+                      activeTab === "menu"
+                        ? "text-white/70"
+                        : isDarkMode ? "text-gray-500" : "text-gray-400"
+                    }`}
+                  >
+                    ({foods.length})
+                  </span>
+                </button>
+                <button
+                  onClick={() => setActiveTab("reviews")}
+                  className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
+                    activeTab === "reviews"
+                      ? "bg-orange-500 text-white"
+                      : isDarkMode
+                        ? "text-gray-400 hover:text-white hover:bg-gray-800"
+                        : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
                   }`}
-                />
+                >
+                  {t("reviewsTab")}
+                </button>
               </div>
+
+              {activeTab === "menu" && (
+                <div className="relative w-full sm:w-72">
+                  <Search
+                    className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+                  />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder={t("searchFood")}
+                    className={`w-full pl-10 pr-4 py-2.5 rounded-xl text-sm outline-none transition-colors ${
+                      isDarkMode
+                        ? "bg-gray-800 border border-gray-700 text-white placeholder-gray-500 focus:border-orange-500"
+                        : "bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 focus:border-orange-500"
+                    }`}
+                  />
+                </div>
+              )}
             </div>
 
-            {/* Food category icons */}
-            {restaurantFoodCategories.length > 0 && (
-              <FilterIcons
-                selected={selectedIconCategory}
-                onSelect={setSelectedIconCategory}
-                isDarkMode={isDarkMode}
-                categories={restaurantFoodCategories}
-              />
-            )}
-
-            {/* Food list */}
-            {filteredFoods.length > 0 ? (
-              groupedFoods ? (
-                // Grouped by category
-                <div className="space-y-8 pb-10">
-                  {Array.from(groupedFoods.entries()).map(([category, items], idx) => (
-                    <div key={category}>
-                      {idx > 0 && (
-                        <hr className={`mb-8 border-t ${isDarkMode ? "border-gray-700" : "border-gray-200"}`} />
-                      )}
-                      <h3
-                        className={`text-base font-bold mb-3 ${isDarkMode ? "text-white" : "text-gray-900"}`}
-                      >
-                        {category}
-                      </h3>
-                      <div className="grid grid-cols-1 gap-4">
-                        {items.map((food) => (
-                          <FoodCard
-                            key={food.id}
-                            food={food}
-                            isDarkMode={isDarkMode}
-                            restaurant={restaurant}
-                            isOpen={isOpen}
-                            cartQuantity={cartQuantityMap.get(food.id) ?? 0}
-                            onConflict={handleConflict}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                // Flat list when search/filter is active
-                <div className="grid grid-cols-1 gap-4 pb-10">
-                  {filteredFoods.map((food) => (
-                    <FoodCard
-                      key={food.id}
-                      food={food}
-                      isDarkMode={isDarkMode}
-                      restaurant={restaurant}
-                      isOpen={isOpen}
-                      cartQuantity={cartQuantityMap.get(food.id) ?? 0}
-                      onConflict={handleConflict}
-                    />
-                  ))}
-                </div>
-              )
-            ) : foods.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20">
-                <UtensilsCrossed
-                  className={`w-16 h-16 mb-4 ${
-                    isDarkMode ? "text-gray-600" : "text-gray-300"
-                  }`}
-                />
-                <h3
-                  className={`text-lg font-semibold mb-1 ${
-                    isDarkMode ? "text-white" : "text-gray-900"
-                  }`}
-                >
-                  {t("noFoods")}
-                </h3>
-                <p
-                  className={`text-sm ${
-                    isDarkMode ? "text-gray-400" : "text-gray-500"
-                  }`}
-                >
-                  {t("noFoodsSubtitle")}
-                </p>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-20">
-                <span className="text-5xl mb-4">🔍</span>
-                <h3
-                  className={`text-lg font-semibold mb-1 ${
-                    isDarkMode ? "text-white" : "text-gray-900"
-                  }`}
-                >
-                  {t("noResults")}
-                </h3>
-                <p
-                  className={`text-sm text-center max-w-sm ${
-                    isDarkMode ? "text-gray-400" : "text-gray-500"
-                  }`}
-                >
-                  {t("noResultsSubtitle")}
-                </p>
-                {hasActiveFilters && (
-                  <button
-                    onClick={() => {
-                      setSelectedIconCategory(null);
-                      setSearchQuery("");
-                    }}
-                    className="mt-4 px-5 py-2 bg-orange-500 text-white rounded-xl text-sm font-medium hover:bg-orange-600 transition-colors"
-                  >
-                    {t("clearAll")}
-                  </button>
+            {activeTab === "menu" ? (
+              <>
+                {/* Food category icons */}
+                {restaurantFoodCategories.length > 0 && (
+                  <FilterIcons
+                    selected={selectedIconCategory}
+                    onSelect={setSelectedIconCategory}
+                    isDarkMode={isDarkMode}
+                    categories={restaurantFoodCategories}
+                  />
                 )}
-              </div>
+
+                {/* Food list */}
+                {filteredFoods.length > 0 ? (
+                  groupedFoods ? (
+                    // Grouped by category
+                    <div className="space-y-8 pb-10">
+                      {Array.from(groupedFoods.entries()).map(([category, items], idx) => (
+                        <div key={category}>
+                          {idx > 0 && (
+                            <hr className={`mb-8 border-t ${isDarkMode ? "border-gray-700" : "border-gray-200"}`} />
+                          )}
+                          <h3
+                            className={`text-base font-bold mb-3 ${isDarkMode ? "text-white" : "text-gray-900"}`}
+                          >
+                            {category}
+                          </h3>
+                          <div className="grid grid-cols-1 gap-4">
+                            {items.map((food) => (
+                              <FoodCard
+                                key={food.id}
+                                food={food}
+                                isDarkMode={isDarkMode}
+                                restaurant={restaurant}
+                                isOpen={isOpen}
+                                cartQuantity={cartQuantityMap.get(food.id) ?? 0}
+                                onConflict={handleConflict}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    // Flat list when search/filter is active
+                    <div className="grid grid-cols-1 gap-4 pb-10">
+                      {filteredFoods.map((food) => (
+                        <FoodCard
+                          key={food.id}
+                          food={food}
+                          isDarkMode={isDarkMode}
+                          restaurant={restaurant}
+                          isOpen={isOpen}
+                          cartQuantity={cartQuantityMap.get(food.id) ?? 0}
+                          onConflict={handleConflict}
+                        />
+                      ))}
+                    </div>
+                  )
+                ) : foods.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-20">
+                    <UtensilsCrossed
+                      className={`w-16 h-16 mb-4 ${
+                        isDarkMode ? "text-gray-600" : "text-gray-300"
+                      }`}
+                    />
+                    <h3
+                      className={`text-lg font-semibold mb-1 ${
+                        isDarkMode ? "text-white" : "text-gray-900"
+                      }`}
+                    >
+                      {t("noFoods")}
+                    </h3>
+                    <p
+                      className={`text-sm ${
+                        isDarkMode ? "text-gray-400" : "text-gray-500"
+                      }`}
+                    >
+                      {t("noFoodsSubtitle")}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-20">
+                    <span className="text-5xl mb-4">🔍</span>
+                    <h3
+                      className={`text-lg font-semibold mb-1 ${
+                        isDarkMode ? "text-white" : "text-gray-900"
+                      }`}
+                    >
+                      {t("noResults")}
+                    </h3>
+                    <p
+                      className={`text-sm text-center max-w-sm ${
+                        isDarkMode ? "text-gray-400" : "text-gray-500"
+                      }`}
+                    >
+                      {t("noResultsSubtitle")}
+                    </p>
+                    {hasActiveFilters && (
+                      <button
+                        onClick={() => {
+                          setSelectedIconCategory(null);
+                          setSearchQuery("");
+                        }}
+                        className="mt-4 px-5 py-2 bg-orange-500 text-white rounded-xl text-sm font-medium hover:bg-orange-600 transition-colors"
+                      >
+                        {t("clearAll")}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </>
+            ) : (
+              /* Reviews tab */
+              <RestaurantReviews
+                restaurantId={restaurant.id}
+                isDarkMode={isDarkMode}
+              />
             )}
           </div>
 

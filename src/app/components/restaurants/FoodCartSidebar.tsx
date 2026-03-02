@@ -508,7 +508,7 @@ export default function FoodCartSidebar({
       {/* ── Desktop Sidebar ──────────────────────────────────────────── */}
       {mode !== "mobile" && (
         <aside
-          className={`flex flex-col sticky top-4 max-h-[calc(100vh-2rem)] rounded-2xl border overflow-hidden ${
+          className={`flex flex-col self-start sticky top-20 max-h-[calc(100vh-6rem)] rounded-2xl border overflow-hidden ${
             isDarkMode
               ? "bg-gray-900/80 border-gray-700/50"
               : "bg-white border-gray-200"
