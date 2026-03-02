@@ -50,7 +50,7 @@ function BannerCarousel() {
   }, [next]);
 
   return (
-    <div className="relative w-full h-[220px] sm:h-[300px] md:h-[380px] lg:h-[440px] overflow-hidden rounded-2xl group">
+    <div className="relative w-full aspect-[16/7] sm:aspect-[16/6] overflow-hidden rounded-2xl group">
       {BANNER_IMAGES.map((src, i) => (
         <div
           key={src}
