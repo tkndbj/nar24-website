@@ -5080,7 +5080,8 @@
     "sortRatingDesc": "En Yüksek Puan",
     "sortRatingAsc": "En Düşük Puan",
     "noResults": "Sonuç Bulunamadı",
-    "noResultsSubtitle": "Farklı bir mutfak türü deneyin veya tüm restoranlara göz atın."
+    "noResultsSubtitle": "Farklı bir mutfak türü deneyin veya tüm restoranlara göz atın.",
+    "searchRestaurants": "Restoran ara..."
   },
   "RestaurantHeader": {
     "restaurants": "Restoranlar",
@@ -5139,7 +5140,11 @@
     "notesPlaceholder": "örn. Soğansız, ekstra acılı...",
     "closedBanner": "Bu restoran şu anda kapalı",
     "closedBannerSubtitle": "Menüye göz atabilirsiniz, ancak şu anda sipariş verilememektedir.",
-    "closed": "Kapalı"
+    "closed": "Kapalı",
+    "differentRestaurant": "Farklı Restoran",
+    "restaurantConflictMessage": "Sepetinizde {current} restoranından ürünler var. {new} restoranından ürün eklemek için mevcut sepetiniz temizlenecektir.",
+    "keepCurrent": "Mevcut Sepeti Koru",
+    "clearAndAdd": "Temizle ve Ekle"
   },
   "foodCategoryKebabsGrills": "Kebap & Izgara",
   "foodCategoryPideLahmacun": "Pide & Lahmacun",

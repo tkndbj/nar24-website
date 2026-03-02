@@ -5072,7 +5072,8 @@
     "sortRatingDesc": "Top Rated",
     "sortRatingAsc": "Lowest Rated",
     "noResults": "No Results Found",
-    "noResultsSubtitle": "Try a different cuisine or browse all restaurants."
+    "noResultsSubtitle": "Try a different cuisine or browse all restaurants.",
+    "searchRestaurants": "Search restaurants..."
   },
   "FoodCart": {
     "loginRequired": "Login Required",
@@ -5127,7 +5128,11 @@
     "notesPlaceholder": "e.g. No onions, extra spicy...",
     "closedBanner": "This restaurant is currently closed",
     "closedBannerSubtitle": "You can browse the menu, but ordering is not available right now.",
-    "closed": "Closed"
+    "closed": "Closed",
+    "differentRestaurant": "Different Restaurant",
+    "restaurantConflictMessage": "Your cart contains items from {current}. To add items from {new}, your current cart will be cleared.",
+    "keepCurrent": "Keep Current",
+    "clearAndAdd": "Clear & Add New"
   },
   "foodCategoryKebabsGrills": "Kebabs & Grills",
   "foodCategoryPideLahmacun": "Pide & Lahmacun",

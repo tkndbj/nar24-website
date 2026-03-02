@@ -481,27 +481,48 @@ export default function RestaurantDetail({
     });
   }, [restaurant?.id]);
 
-  // Filter foods based on icon filter + search
+  // Typesense search results (only populated when user types a query)
+  const [typesenseResults, setTypesenseResults] = useState<Food[] | null>(null);
+
+  useEffect(() => {
+    if (!restaurant?.id) return;
+
+    const query = searchQuery.trim();
+
+    // No text search — clear Typesense results, use prop data
+    if (!query) {
+      setTypesenseResults(null);
+      return;
+    }
+
+    let cancelled = false;
+    const svc = TypeSenseServiceManager.instance.restaurantService;
+    svc
+      .debouncedSearchFoods({
+        query,
+        restaurantId: restaurant.id,
+        foodCategory: selectedIconCategory ? [selectedIconCategory] : undefined,
+        hitsPerPage: 100,
+      })
+      .then((result) => {
+        if (!cancelled) setTypesenseResults(result.items);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchQuery, restaurant?.id, selectedIconCategory]);
+
+  // When only icon filter is active (no text), filter the prop data client-side
   const filteredFoods = useMemo(() => {
-    let list = foods;
+    if (typesenseResults) return typesenseResults;
 
     if (selectedIconCategory) {
-      list = list.filter((f) => f.foodCategory === selectedIconCategory);
+      return foods.filter((f) => f.foodCategory === selectedIconCategory);
     }
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      list = list.filter(
-        (f) =>
-          f.name.toLowerCase().includes(q) ||
-          f.foodType.toLowerCase().includes(q) ||
-          f.foodCategory.toLowerCase().includes(q) ||
-          (f.description?.toLowerCase().includes(q) ?? false),
-      );
-    }
-
-    return list;
-  }, [foods, selectedIconCategory, searchQuery]);
+    return foods;
+  }, [foods, selectedIconCategory, typesenseResults]);
 
   const hasActiveFilters = useMemo(
     () => selectedIconCategory !== null || searchQuery.trim() !== "",

@@ -9,7 +9,7 @@ import { Restaurant } from "@/types/Restaurant";
 import { isRestaurantOpen } from "@/utils/restaurant";
 import TypeSenseServiceManager from "@/lib/typesense_service_manager";
 import type { FacetValue } from "@/lib/typesense_restaurant_service";
-import { Star, ChevronLeft, ChevronRight, ArrowUpDown } from "lucide-react";
+import { Star, ChevronLeft, ChevronRight, ArrowUpDown, Search } from "lucide-react";
 import type { RestaurantSortOption } from "@/lib/typesense_restaurant_service";
 import FilterIcons from "./FilterIcons";
 
@@ -296,6 +296,7 @@ export default function RestaurantsPage({ restaurants }: RestaurantsPageProps) {
   const [selectedCuisine, setSelectedCuisine] = useState<string | null>(null);
   const [selectedFoodType, setSelectedFoodType] = useState<string | null>(null);
   const [sortOption, setSortOption] = useState<RestaurantSortOption>("default");
+  const [searchQuery, setSearchQuery] = useState("");
   const [cuisineFacets, setCuisineFacets] = useState<FacetValue[]>([]);
   const [filteredRestaurants, setFilteredRestaurants] = useState<Restaurant[]>(restaurants);
   const [isLoading, setIsLoading] = useState(false);
@@ -312,12 +313,13 @@ export default function RestaurantsPage({ restaurants }: RestaurantsPageProps) {
     });
   }, []);
 
-  // When cuisine, foodType, or sort changes, search via Typesense
+  // When cuisine, foodType, sort, or search changes, search via Typesense
   useEffect(() => {
+    const query = searchQuery.trim();
     const hasFilters = selectedCuisine !== null || selectedFoodType !== null;
     const hasSort = sortOption !== "default";
 
-    if (!hasFilters && !hasSort) {
+    if (!hasFilters && !hasSort && !query) {
       setFilteredRestaurants(restaurants);
       return;
     }
@@ -326,14 +328,18 @@ export default function RestaurantsPage({ restaurants }: RestaurantsPageProps) {
     setIsLoading(true);
 
     const svc = TypeSenseServiceManager.instance.restaurantService;
-    svc
-      .searchRestaurants({
-        cuisineTypes: selectedCuisine ? [selectedCuisine] : undefined,
-        foodType: selectedFoodType ? [selectedFoodType] : undefined,
-        isActive: true,
-        sort: sortOption,
-        hitsPerPage: 50,
-      })
+    const searchFn = query
+      ? svc.debouncedSearchRestaurants.bind(svc)
+      : svc.searchRestaurants.bind(svc);
+
+    searchFn({
+      query: query || undefined,
+      cuisineTypes: selectedCuisine ? [selectedCuisine] : undefined,
+      foodType: selectedFoodType ? [selectedFoodType] : undefined,
+      isActive: true,
+      sort: sortOption,
+      hitsPerPage: 50,
+    })
       .then((result) => {
         if (!cancelled) {
           setFilteredRestaurants(result.items);
@@ -346,7 +352,7 @@ export default function RestaurantsPage({ restaurants }: RestaurantsPageProps) {
     return () => {
       cancelled = true;
     };
-  }, [selectedCuisine, selectedFoodType, sortOption, restaurants]);
+  }, [selectedCuisine, selectedFoodType, sortOption, searchQuery, restaurants]);
 
   const handleCuisineClick = (cuisine: string | null) => {
     setSelectedCuisine(cuisine);
@@ -358,8 +364,8 @@ export default function RestaurantsPage({ restaurants }: RestaurantsPageProps) {
         {/* Banner */}
         <BannerCarousel />
 
-        {/* Title + Sort */}
-        <div className="mt-8 mb-4 flex items-end justify-between gap-4">
+        {/* Title + Search + Sort */}
+        <div className="mt-8 mb-4 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
           <div>
             <h1
               className={`text-2xl sm:text-3xl font-bold ${
@@ -377,28 +383,46 @@ export default function RestaurantsPage({ restaurants }: RestaurantsPageProps) {
             </p>
           </div>
 
-          {/* Sort toggle */}
-          <button
-            onClick={() => {
-              const cycle: RestaurantSortOption[] = ["default", "rating_desc", "rating_asc"];
-              const idx = cycle.indexOf(sortOption);
-              setSortOption(cycle[(idx + 1) % cycle.length]);
-            }}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-colors shrink-0 ${
-              sortOption !== "default"
-                ? "bg-orange-500 text-white"
-                : isDarkMode
-                  ? "bg-gray-800 text-gray-300 border border-gray-700 hover:border-gray-500"
-                  : "bg-white text-gray-700 border border-gray-200 hover:border-gray-300"
-            }`}
-          >
-            <ArrowUpDown className="w-4 h-4" />
-            {sortOption === "rating_desc"
-              ? t("sortRatingDesc")
-              : sortOption === "rating_asc"
-                ? t("sortRatingAsc")
-                : t("sort")}
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Search bar */}
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={t("searchRestaurants")}
+                className={`w-full pl-10 pr-4 py-2 rounded-xl text-sm outline-none transition-colors ${
+                  isDarkMode
+                    ? "bg-gray-800 border border-gray-700 text-white placeholder-gray-500 focus:border-orange-500"
+                    : "bg-white border border-gray-200 text-gray-900 placeholder-gray-400 focus:border-orange-500"
+                }`}
+              />
+            </div>
+
+            {/* Sort toggle */}
+            <button
+              onClick={() => {
+                const cycle: RestaurantSortOption[] = ["default", "rating_desc", "rating_asc"];
+                const idx = cycle.indexOf(sortOption);
+                setSortOption(cycle[(idx + 1) % cycle.length]);
+              }}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-colors shrink-0 ${
+                sortOption !== "default"
+                  ? "bg-orange-500 text-white"
+                  : isDarkMode
+                    ? "bg-gray-800 text-gray-300 border border-gray-700 hover:border-gray-500"
+                    : "bg-white text-gray-700 border border-gray-200 hover:border-gray-300"
+              }`}
+            >
+              <ArrowUpDown className="w-4 h-4" />
+              {sortOption === "rating_desc"
+                ? t("sortRatingDesc")
+                : sortOption === "rating_asc"
+                  ? t("sortRatingAsc")
+                  : t("sort")}
+            </button>
+          </div>
         </div>
 
         {/* Cuisine Pills */}
