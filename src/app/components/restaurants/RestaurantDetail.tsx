@@ -16,6 +16,7 @@ import {
   Search,
   UtensilsCrossed,
   Plus,
+  Check,
 } from "lucide-react";
 import TypeSenseServiceManager from "@/lib/typesense_service_manager";
 import FilterIcons from "./FilterIcons";
@@ -185,6 +186,7 @@ function FoodCard({
   isOpen,
   cartQuantity,
   onConflict,
+  onRemoveFromCart,
 }: {
   food: Food;
   isDarkMode: boolean;
@@ -192,6 +194,7 @@ function FoodCard({
   isOpen: boolean;
   cartQuantity: number;
   onConflict: (pending: PendingConflict) => void;
+  onRemoveFromCart: (foodId: string) => void;
 }) {
   const t = useTranslations("restaurantDetail");
   const { addItem } = useFoodCartActions();
@@ -324,15 +327,21 @@ function FoodCard({
               )}
             </div>
 
-            {/* Add to cart button */}
+            {/* Add to cart / In cart button */}
             <button
-              onClick={handleAddToCart}
+              onClick={
+                cartQuantity > 0
+                  ? () => onRemoveFromCart(food.id)
+                  : handleAddToCart
+              }
               disabled={!isOpen}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
                 !isOpen
                   ? "bg-gray-200 text-gray-400 cursor-not-allowed dark:bg-gray-700 dark:text-gray-500"
                   : cartQuantity > 0
-                    ? "bg-orange-500 text-white hover:bg-orange-600"
+                    ? isDarkMode
+                      ? "bg-green-500/15 text-green-400 hover:bg-green-500/25"
+                      : "bg-green-50 text-green-600 hover:bg-green-100"
                     : isDarkMode
                       ? "bg-orange-500/15 text-orange-400 hover:bg-orange-500/25"
                       : "bg-orange-50 text-orange-600 hover:bg-orange-100"
@@ -340,10 +349,15 @@ function FoodCard({
             >
               {!isOpen ? (
                 <span>{t("closed")}</span>
+              ) : cartQuantity > 0 ? (
+                <>
+                  <Check className="w-3.5 h-3.5" />
+                  {cartQuantity}
+                </>
               ) : (
                 <>
                   <Plus className="w-3.5 h-3.5" />
-                  {cartQuantity > 0 ? cartQuantity : t("add")}
+                  {t("add")}
                 </>
               )}
             </button>
@@ -451,13 +465,26 @@ export default function RestaurantDetail({
   const [activeTab, setActiveTab] = useState<"menu" | "reviews">("menu");
 
   const { items, currentRestaurant: cartRestaurant } = useFoodCartState();
-  const { clearAndAddFromNewRestaurant } = useFoodCartActions();
+  const { clearAndAddFromNewRestaurant, removeItem } = useFoodCartActions();
 
   const cartQuantityMap = useMemo(() => {
     const map = new Map<string, number>();
-    items.forEach((i) => map.set(i.foodId, i.quantity));
+    items.forEach((i) => {
+      const prev = map.get(i.originalFoodId) ?? 0;
+      map.set(i.originalFoodId, prev + i.quantity);
+    });
     return map;
   }, [items]);
+
+  const handleRemoveFromCart = useCallback(
+    async (foodId: string) => {
+      const matching = items.filter((i) => i.originalFoodId === foodId);
+      for (const item of matching) {
+        await removeItem(item.foodId);
+      }
+    },
+    [items, removeItem],
+  );
 
   // ── Restaurant conflict dialog ──
   const [pendingConflict, setPendingConflict] = useState<PendingConflict | null>(null);
@@ -707,6 +734,7 @@ export default function RestaurantDetail({
                                 isOpen={isOpen}
                                 cartQuantity={cartQuantityMap.get(food.id) ?? 0}
                                 onConflict={handleConflict}
+                                onRemoveFromCart={handleRemoveFromCart}
                               />
                             ))}
                           </div>
@@ -725,6 +753,7 @@ export default function RestaurantDetail({
                           isOpen={isOpen}
                           cartQuantity={cartQuantityMap.get(food.id) ?? 0}
                           onConflict={handleConflict}
+                          onRemoveFromCart={handleRemoveFromCart}
                         />
                       ))}
                     </div>

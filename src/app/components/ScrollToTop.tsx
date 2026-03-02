@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 
 export default function ScrollToTop() {
   const pathname = usePathname();
-  const scrollPositions = useRef<Record<string, number>>({});
   const isBack = useRef(false);
 
   useEffect(() => {
@@ -16,25 +15,43 @@ export default function ScrollToTop() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
-  // Save scroll position when leaving a page
+  // Save scroll position when leaving the page
   useEffect(() => {
+    const saveScroll = () => {
+      sessionStorage.setItem(`scroll_${pathname}`, String(window.scrollY));
+    };
+
     return () => {
-      scrollPositions.current[pathname] = window.scrollY;
+      saveScroll();
     };
   }, [pathname]);
 
-  // Scroll to top or restore position
+  // Restore or reset
   useEffect(() => {
     if (isBack.current) {
       isBack.current = false;
-      const saved = scrollPositions.current[pathname] ?? 0;
+      const saved = Number(sessionStorage.getItem(`scroll_${pathname}`) ?? 0);
 
-      // Wait for page content to render before restoring
-      setTimeout(() => {
-        window.scrollTo(0, saved);
-      }, 100);
+      if (saved > 0) {
+        // Retry until page is tall enough to scroll to saved position
+        let attempts = 0;
+        const tryScroll = () => {
+          if (
+            document.documentElement.scrollHeight >=
+              saved + window.innerHeight ||
+            attempts > 15
+          ) {
+            window.scrollTo(0, saved);
+          } else {
+            attempts++;
+            setTimeout(tryScroll, 100);
+          }
+        };
+        setTimeout(tryScroll, 50);
+      }
       return;
     }
+
     window.scrollTo(0, 0);
   }, [pathname]);
 
