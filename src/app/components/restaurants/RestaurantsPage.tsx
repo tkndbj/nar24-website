@@ -608,6 +608,7 @@ export default function RestaurantsPage({ restaurants }: RestaurantsPageProps) {
         isOpen={showLocationPicker}
         onClose={() => setShowLocationPicker(false)}
         isDarkMode={isDarkMode}
+        required={!profileData?.foodAddress}
       />
     </main>
   );

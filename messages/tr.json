@@ -5097,7 +5097,16 @@
     "fieldRequired": "Bu alan gereklidir",
     "invalidPhone": "Lütfen geçerli bir telefon numarası girin",
     "saving": "Kaydediliyor...",
-    "changeAddress": "Değiştir"
+    "changeAddress": "Değiştir",
+    "selectSubregion": "Bölge Seçin",
+    "markOnMap": "Haritada İşaretle",
+    "selectOnMap": "Haritada Seç",
+    "selectLocation": "Konum Seç",
+    "myLocation": "Konumum",
+    "clickMapToSelect": "Konum seçmek için haritaya tıklayın",
+    "cancel": "İptal",
+    "confirm": "Onayla",
+    "back": "Geri"
   },
   "RestaurantHeader": {
     "restaurants": "Restoranlar",

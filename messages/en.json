@@ -5089,7 +5089,16 @@
     "fieldRequired": "This field is required",
     "invalidPhone": "Please enter a valid phone number",
     "saving": "Saving...",
-    "changeAddress": "Change"
+    "changeAddress": "Change",
+    "selectSubregion": "Select Area",
+    "markOnMap": "Mark on Map",
+    "selectOnMap": "Select on Map",
+    "selectLocation": "Select Location",
+    "myLocation": "My Location",
+    "clickMapToSelect": "Click on the map to select a location",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "back": "Back"
   },
   "FoodCart": {
     "loginRequired": "Login Required",
