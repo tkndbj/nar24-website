@@ -9,9 +9,11 @@ import { Restaurant } from "@/types/Restaurant";
 import { isRestaurantOpen } from "@/utils/restaurant";
 import TypeSenseServiceManager from "@/lib/typesense_service_manager";
 import type { FacetValue } from "@/lib/typesense_restaurant_service";
-import { Star, ChevronLeft, ChevronRight, ArrowUpDown, Search } from "lucide-react";
+import { Star, ChevronLeft, ChevronRight, ArrowUpDown, Search, MapPin } from "lucide-react";
 import type { RestaurantSortOption } from "@/lib/typesense_restaurant_service";
 import FilterIcons from "./FilterIcons";
+import FoodLocationPicker from "./FoodLocationPicker";
+import { useUser } from "@/context/UserProvider";
 
 const BANNER_IMAGES = ["/images/1.png", "/images/2.png", "/images/3.png"];
 const BANNER_INTERVAL = 5000;
@@ -159,12 +161,18 @@ function CuisinePill({
 function RestaurantCard({
   restaurant,
   isDarkMode,
+  userMainRegion,
 }: {
   restaurant: Restaurant;
   isDarkMode: boolean;
+  userMainRegion?: string;
 }) {
   const t = useTranslations("restaurants");
   const isOpen = isRestaurantOpen(restaurant);
+  const minOrder =
+    userMainRegion && restaurant.minOrderByRegion
+      ? restaurant.minOrderByRegion[userMainRegion]
+      : undefined;
 
   return (
     <Link
@@ -274,6 +282,15 @@ function RestaurantCard({
               ({restaurant.reviewCount})
             </span>
           )}
+          {minOrder != null && (
+            <span
+              className={`text-xs font-medium ml-auto ${
+                isDarkMode ? "text-orange-400" : "text-orange-600"
+              }`}
+            >
+              {t("minOrder")}: {minOrder} TL
+            </span>
+          )}
         </div>
       </div>
 
@@ -292,6 +309,7 @@ function RestaurantCard({
 export default function RestaurantsPage({ restaurants }: RestaurantsPageProps) {
   const isDarkMode = useTheme();
   const t = useTranslations("restaurants");
+  const { user, profileData, isLoading: isUserLoading } = useUser();
 
   const [selectedCuisine, setSelectedCuisine] = useState<string | null>(null);
   const [selectedFoodType, setSelectedFoodType] = useState<string | null>(null);
@@ -300,8 +318,22 @@ export default function RestaurantsPage({ restaurants }: RestaurantsPageProps) {
   const [cuisineFacets, setCuisineFacets] = useState<FacetValue[]>([]);
   const [filteredRestaurants, setFilteredRestaurants] = useState<Restaurant[]>(restaurants);
   const [isLoading, setIsLoading] = useState(false);
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const locationPromptShown = useRef(false);
+
+  const userMainRegion = (profileData?.foodAddress as { mainRegion?: string } | undefined)?.mainRegion;
+  const userCity = (profileData?.foodAddress as { city?: string } | undefined)?.city;
 
   const pillsRef = useRef<HTMLDivElement>(null);
+
+  // Show location picker on first visit if user is logged in but hasn't set foodAddress
+  useEffect(() => {
+    if (isUserLoading || locationPromptShown.current) return;
+    if (user && profileData && !profileData.foodAddress) {
+      locationPromptShown.current = true;
+      setShowLocationPicker(true);
+    }
+  }, [user, profileData, isUserLoading]);
 
   // Fetch cuisine facets on mount
   useEffect(() => {
@@ -382,6 +414,29 @@ export default function RestaurantsPage({ restaurants }: RestaurantsPageProps) {
             >
               {t("subtitle")}
             </p>
+            {/* Delivery area indicator */}
+            {user && (
+              <button
+                onClick={() => setShowLocationPicker(true)}
+                className={`mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                  userCity
+                    ? isDarkMode
+                      ? "bg-orange-500/15 text-orange-400 hover:bg-orange-500/25"
+                      : "bg-orange-50 text-orange-600 hover:bg-orange-100"
+                    : isDarkMode
+                      ? "bg-gray-800 text-gray-400 hover:bg-gray-700 border border-gray-700"
+                      : "bg-gray-100 text-gray-500 hover:bg-gray-200 border border-gray-200"
+                }`}
+              >
+                <MapPin className="w-3 h-3" />
+                {userCity || t("selectDeliveryAddress")}
+                {userCity && (
+                  <span className={`${isDarkMode ? "text-orange-500/60" : "text-orange-400"}`}>
+                    &middot; {t("changeAddress")}
+                  </span>
+                )}
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
@@ -503,6 +558,7 @@ export default function RestaurantsPage({ restaurants }: RestaurantsPageProps) {
                 key={restaurant.id}
                 restaurant={restaurant}
                 isDarkMode={isDarkMode}
+                userMainRegion={userMainRegion}
               />
             ))}
           </div>
@@ -546,6 +602,13 @@ export default function RestaurantsPage({ restaurants }: RestaurantsPageProps) {
           </div>
         )}
       </div>
+
+      {/* Food Location Picker Modal */}
+      <FoodLocationPicker
+        isOpen={showLocationPicker}
+        onClose={() => setShowLocationPicker(false)}
+        isDarkMode={isDarkMode}
+      />
     </main>
   );
 }

@@ -46,6 +46,15 @@ interface ProfileData {
   whatsapp?: string;
   twoFactorEnabled?: boolean;
   lastTwoFactorVerification?: Timestamp;
+  foodAddress?: {
+    addressId?: string;
+    addressLine1: string;
+    addressLine2: string;
+    city: string;
+    mainRegion: string;
+    phoneNumber: string;
+    location?: { latitude: number; longitude: number };
+  };
   [key: string]: unknown;
 }
 
