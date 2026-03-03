@@ -295,7 +295,7 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
     return (
       <button
         onClick={() => router.push("/")}
-        className="flex items-center flex-shrink-0"
+        className="flex items-center flex-shrink-0 cursor-pointer"
       >
         <span
           className={`${textSize} font-extrabold tracking-tight font-[family-name:var(--font-figtree)] ${isDark ? "text-white" : "text-gray-900"}`}
