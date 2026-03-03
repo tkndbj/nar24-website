@@ -45,6 +45,7 @@ import { analyticsBatcher } from "@/app/utils/analyticsBatcher";
 import { useProductCache } from "@/context/ProductCacheProvider";
 import { userActivityService } from "@/services/userActivity";
 import { useTheme } from "@/hooks/useTheme";
+import LoginModal from "@/app/components/LoginModal";
 
 interface ProductCardProps {
   product: Product;
@@ -522,6 +523,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
   const [favoriteButtonState, setFavoriteButtonState] = useState<
     "idle" | "adding" | "added" | "removing" | "removed"
   >("idle");
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   // Note: actualIsInCart and actualIsFavorite are now defined above using selector hooks
 
@@ -700,7 +702,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
   const handleAddToCart = useCallback(
     async (selectedOptions?: { quantity?: number; [key: string]: unknown }) => {
       if (!user) {
-        router.push("/login");
+        setShowLoginModal(true);
         return;
       }
 
@@ -725,7 +727,6 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
       user,
       product,
       actualIsInCart,
-      router,
       performCartRemoval,
       performCartOperation,
     ],
@@ -734,7 +735,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
   // ✅ FAVORITE OPERATIONS (matches Flutter - NO selector, direct add)
   const handleToggleFavorite = useCallback(async () => {
     if (!user) {
-      router.push("/login");
+      setShowLoginModal(true);
       return;
     }
 
@@ -780,7 +781,6 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
     user,
     product,
     actualIsFavorite,
-    router,
     addToFavorites,
     removeMultipleFromFavorites,
     onFavoriteToggle,
@@ -1613,6 +1613,11 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
           isDarkMode={isDarkMode}
           localization={localization}
         />
+
+        <LoginModal
+          isOpen={showLoginModal}
+          onClose={() => setShowLoginModal(false)}
+        />
       </>
     );
   }
@@ -1629,6 +1634,11 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
         onConfirm={handleCartOptionSelectorConfirm}
         isDarkMode={isDarkMode}
         localization={localization}
+      />
+
+      <LoginModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
       />
     </>
   );

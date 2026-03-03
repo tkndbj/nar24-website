@@ -58,6 +58,7 @@ const ProductOptionSelector = dynamic(
 import { useCart } from "@/context/CartProvider";
 import { useUser } from "@/context/UserProvider";
 import { useFavorites } from "@/context/FavoritesProvider";
+import LoginModal from "@/app/components/LoginModal";
 import { Product, ProductUtils } from "@/app/models/Product";
 import { useProductCache } from "@/context/ProductCacheProvider";
 import { db } from "@/lib/firebase";
@@ -370,6 +371,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   const [salesPaused, setSalesPaused] = useState(false);
   const [pauseReason, setPauseReason] = useState("");
   const [showSalesPausedDialog, setShowSalesPausedDialog] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   // Refs
   const actionButtonsRef = useRef<HTMLDivElement>(null);
@@ -752,7 +754,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   const handleToggleFavorite = useCallback(async () => {
     if (!product?.id) return;
     if (!user) {
-      router.push("/login");
+      setShowLoginModal(true);
       return;
     }
 
@@ -770,7 +772,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   }, [
     product?.id,
     user,
-    router,
     isFavorite,
     addToFavorites,
     removeMultipleFromFavorites,
@@ -828,7 +829,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   const handleAddToCart = useCallback(
     async (selectedOptions?: { quantity?: number; [key: string]: unknown }) => {
       if (!user) {
-        router.push("/login");
+        setShowLoginModal(true);
         return;
       }
 
@@ -920,7 +921,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         } else {
           setCartButtonState("idle");
           if (result === "Please log in first") {
-            router.push("/login");
+            setShowLoginModal(true);
           }
         }
       } catch (error) {
@@ -936,7 +937,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
       product,
       cartProductIds,
       cartButtonState,
-      router,
       addProductToCart,
       removeFromCart,
     ],
@@ -958,7 +958,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
   const handleBuyNow = useCallback(() => {
     if (!user) {
-      router.push("/login");
+      setShowLoginModal(true);
       return;
     }
 
@@ -974,7 +974,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     } else {
       navigateToBuyNow({ quantity: 1 });
     }
-  }, [user, product, router, navigateToBuyNow, salesPaused]);
+  }, [user, product, navigateToBuyNow, salesPaused]);
 
   const handleBuyNowOptionSelectorConfirm = useCallback(
     (selectedOptions: { quantity?: number; [key: string]: unknown }) => {
@@ -2071,6 +2071,12 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           </div>
         </>
       )}
+
+      {/* Login Modal for unauthenticated users */}
+      <LoginModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+      />
 
       {/* Sales Paused Dialog */}
       {showSalesPausedDialog && (
