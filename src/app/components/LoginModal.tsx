@@ -53,7 +53,7 @@ export default function LoginModal({
   const router = useRouter();
   const t = useTranslations();
   const twoFactorService = TwoFactorService.getInstance();
-  const { isPending2FA, cancel2FA, setNameComplete } = useUser();
+  const { isPending2FA, setNameComplete } = useUser();
 
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [email, setEmail] = useState("");
