@@ -29,7 +29,7 @@ export default function FoodExtrasSheet({
   onConfirm,
   foodName,
   foodPrice,
-  foodCategory,
+  
   currency = "TL",
   isDarkMode = false,
   initialExtras = [],
@@ -43,16 +43,11 @@ export default function FoodExtrasSheet({
   const [notes, setNotes] = useState(initialNotes);
   const [quantity, setQuantity] = useState(initialQuantity);
 
-  // Available extras for this food category
+  // Available extras: use only the extras explicitly defined on the food.
+  // If the food has no extras (empty array), none are shown.
   const availableExtras = useMemo(() => {
-    const categoryExtras = FoodExtrasData.kExtras[foodCategory] ?? [];
-    // If the food has a specific allowed list, filter to only those
-    if (allowedExtras && allowedExtras.length > 0) {
-      const allowedSet = new Set(allowedExtras);
-      return categoryExtras.filter((e) => allowedSet.has(e));
-    }
-    return categoryExtras;
-  }, [foodCategory, allowedExtras]);
+    return allowedExtras ?? [];
+  }, [allowedExtras]);
 
   // Translate extra name
   const getExtraName = useCallback(
