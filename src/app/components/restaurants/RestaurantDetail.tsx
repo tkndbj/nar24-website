@@ -7,7 +7,8 @@ import { useTranslations } from "next-intl";
 import { useTheme } from "@/hooks/useTheme";
 import { Restaurant } from "@/types/Restaurant";
 import { Food } from "@/types/Food";
-import { isRestaurantOpen } from "@/utils/restaurant";
+import { isRestaurantOpen, doesRestaurantDeliver } from "@/utils/restaurant";
+import { FoodAddress } from "@/app/models/FoodAddress";
 import { FoodCategoryData } from "@/constants/foodData";
 import {
   Star,
@@ -17,6 +18,7 @@ import {
   UtensilsCrossed,
   Plus,
   Check,
+  MapPin,
 } from "lucide-react";
 import TypeSenseServiceManager from "@/lib/typesense_service_manager";
 import FilterIcons from "./FilterIcons";
@@ -186,6 +188,7 @@ function FoodCard({
   isDarkMode,
   restaurant,
   isOpen,
+  deliversToUser,
   cartQuantity,
   onConflict,
   onRemoveFromCart,
@@ -196,6 +199,7 @@ function FoodCard({
   isDarkMode: boolean;
   restaurant: Restaurant;
   isOpen: boolean;
+  deliversToUser: boolean;
   cartQuantity: number;
   onConflict: (pending: PendingConflict) => void;
   onRemoveFromCart: (foodId: string) => void;
@@ -222,14 +226,16 @@ function FoodCard({
     [restaurant.id, restaurant.name, restaurant.profileImageUrl],
   );
 
+  const canAddToCart = isOpen && deliversToUser;
+
   const handleAddToCart = useCallback(() => {
-    if (!isOpen) return;
+    if (!canAddToCart) return;
     if (!isAuthenticated) {
       onLoginRequired();
       return;
     }
     setExtrasOpen(true);
-  }, [isOpen, isAuthenticated, onLoginRequired]);
+  }, [canAddToCart, isAuthenticated, onLoginRequired]);
 
   const handleExtrasConfirm = useCallback(
     async (extras: SelectedExtra[], specialNotes: string, quantity: number) => {
@@ -344,9 +350,9 @@ function FoodCard({
                   ? () => onRemoveFromCart(food.id)
                   : handleAddToCart
               }
-              disabled={!isOpen}
+              disabled={!canAddToCart}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
-                !isOpen
+                !canAddToCart
                   ? "bg-gray-200 text-gray-400 cursor-not-allowed dark:bg-gray-700 dark:text-gray-500"
                   : cartQuantity > 0
                     ? isDarkMode
@@ -359,6 +365,8 @@ function FoodCard({
             >
               {!isOpen ? (
                 <span>{t("closed")}</span>
+              ) : !deliversToUser ? (
+                <span>{t("noDeliveryToAddress")}</span>
               ) : cartQuantity > 0 ? (
                 <>
                   <Check className="w-3.5 h-3.5" />
@@ -465,7 +473,7 @@ export default function RestaurantDetail({
 }: RestaurantDetailProps) {
   const isDarkMode = useTheme();
   const t = useTranslations("restaurantDetail");
-  const { user } = useUser();
+  const { user, profileData } = useUser();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIconCategory, setSelectedIconCategory] = useState<
@@ -478,6 +486,23 @@ export default function RestaurantDetail({
 
   const { items, currentRestaurant: cartRestaurant } = useFoodCartState();
   const { clearAndAddFromNewRestaurant, removeItem } = useFoodCartActions();
+
+  // Parse user's food address for delivery check
+  const foodAddress = useMemo(
+    () =>
+      profileData?.foodAddress
+        ? FoodAddress.fromMap(profileData.foodAddress as Record<string, unknown>)
+        : null,
+    [profileData?.foodAddress],
+  );
+
+  const deliversToUser = useMemo(
+    () =>
+      restaurant
+        ? doesRestaurantDeliver(restaurant, foodAddress?.mainRegion, foodAddress?.city)
+        : true,
+    [restaurant, foodAddress],
+  );
 
   const cartQuantityMap = useMemo(() => {
     const map = new Map<string, number>();
@@ -647,6 +672,41 @@ export default function RestaurantDetail({
         </div>
       )}
 
+      {/* No delivery banner */}
+      {!deliversToUser && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
+          <div
+            className={`flex items-center gap-3 rounded-2xl px-5 py-4 ${
+              isDarkMode
+                ? "bg-yellow-500/10 border border-yellow-500/20"
+                : "bg-yellow-50 border border-yellow-200"
+            }`}
+          >
+            <MapPin
+              className={`w-5 h-5 flex-shrink-0 ${
+                isDarkMode ? "text-yellow-400" : "text-yellow-600"
+              }`}
+            />
+            <div>
+              <p
+                className={`text-sm font-semibold ${
+                  isDarkMode ? "text-yellow-400" : "text-yellow-700"
+                }`}
+              >
+                {t("noDeliveryBanner")}
+              </p>
+              <p
+                className={`text-xs mt-0.5 ${
+                  isDarkMode ? "text-yellow-400/70" : "text-yellow-600/70"
+                }`}
+              >
+                {t("noDeliveryBannerSubtitle")}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
         <div className="flex gap-6">
           {/* Main content */}
@@ -744,6 +804,7 @@ export default function RestaurantDetail({
                                 isDarkMode={isDarkMode}
                                 restaurant={restaurant}
                                 isOpen={isOpen}
+                                deliversToUser={deliversToUser}
                                 cartQuantity={cartQuantityMap.get(food.id) ?? 0}
                                 onConflict={handleConflict}
                                 onRemoveFromCart={handleRemoveFromCart}
@@ -765,6 +826,7 @@ export default function RestaurantDetail({
                           isDarkMode={isDarkMode}
                           restaurant={restaurant}
                           isOpen={isOpen}
+                          deliversToUser={deliversToUser}
                           cartQuantity={cartQuantityMap.get(food.id) ?? 0}
                           onConflict={handleConflict}
                           onRemoveFromCart={handleRemoveFromCart}

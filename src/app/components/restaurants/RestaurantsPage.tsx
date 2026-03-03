@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useTheme } from "@/hooks/useTheme";
 import { Restaurant } from "@/types/Restaurant";
-import { isRestaurantOpen } from "@/utils/restaurant";
+import { isRestaurantOpen, doesRestaurantDeliver } from "@/utils/restaurant";
 import TypeSenseServiceManager from "@/lib/typesense_service_manager";
 import type { FacetValue } from "@/lib/typesense_restaurant_service";
 import { Star, ChevronLeft, ChevronRight, ArrowUpDown, Search, MapPin } from "lucide-react";
@@ -14,6 +14,7 @@ import type { RestaurantSortOption } from "@/lib/typesense_restaurant_service";
 import FilterIcons from "./FilterIcons";
 import FoodLocationPicker from "./FoodLocationPicker";
 import { useUser } from "@/context/UserProvider";
+import { FoodAddress } from "@/app/models/FoodAddress";
 
 const BANNER_IMAGES = ["/images/1.png", "/images/2.png", "/images/3.png"];
 const BANNER_INTERVAL = 5000;
@@ -163,11 +164,13 @@ function RestaurantCard({
   isDarkMode,
   userMainRegion,
   userSubregion,
+  deliversToUser,
 }: {
   restaurant: Restaurant;
   isDarkMode: boolean;
   userMainRegion?: string;
   userSubregion?: string;
+  deliversToUser: boolean;
 }) {
   const t = useTranslations("restaurants");
   const isOpen = isRestaurantOpen(restaurant);
@@ -297,8 +300,19 @@ function RestaurantCard({
         </div>
       </div>
 
+      {/* No delivery badge */}
+      {!deliversToUser && (
+        <span className={`absolute top-2 right-2 px-2 py-1 text-[10px] font-semibold rounded-lg backdrop-blur-sm ${
+          isDarkMode
+            ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30"
+            : "bg-yellow-50 text-yellow-700 border border-yellow-200"
+        }`}>
+          {t("noDeliveryToAddress")}
+        </span>
+      )}
+
       {/* Min order badge */}
-      {minOrder != null && (
+      {deliversToUser && minOrder != null && (
         <span className={`absolute bottom-2 right-2 px-2 py-0.5 text-[11px] font-semibold rounded-lg backdrop-blur-sm ${
           !isOpen ? "bottom-9" : "bottom-2"
         } bg-emerald-500/90 text-white`}>
@@ -333,8 +347,12 @@ export default function RestaurantsPage({ restaurants }: RestaurantsPageProps) {
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const locationPromptShown = useRef(false);
 
-  const userMainRegion = (profileData?.foodAddress as { mainRegion?: string } | undefined)?.mainRegion;
-  const userCity = (profileData?.foodAddress as { city?: string } | undefined)?.city;
+  // Parse typed FoodAddress from profile data
+  const foodAddress = profileData?.foodAddress
+    ? FoodAddress.fromMap(profileData.foodAddress as Record<string, unknown>)
+    : null;
+  const userMainRegion = foodAddress?.mainRegion;
+  const userCity = foodAddress?.city;
 
   const pillsRef = useRef<HTMLDivElement>(null);
 
@@ -431,7 +449,7 @@ export default function RestaurantsPage({ restaurants }: RestaurantsPageProps) {
               <button
                 onClick={() => setShowLocationPicker(true)}
                 className={`mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                  userCity
+                  foodAddress
                     ? isDarkMode
                       ? "bg-orange-500/15 text-orange-400 hover:bg-orange-500/25"
                       : "bg-orange-50 text-orange-600 hover:bg-orange-100"
@@ -441,8 +459,8 @@ export default function RestaurantsPage({ restaurants }: RestaurantsPageProps) {
                 }`}
               >
                 <MapPin className="w-3 h-3" />
-                {userCity || t("selectDeliveryAddress")}
-                {userCity && (
+                {foodAddress?.displayLabel || t("selectDeliveryAddress")}
+                {foodAddress && (
                   <span className={`${isDarkMode ? "text-orange-500/60" : "text-orange-400"}`}>
                     &middot; {t("changeAddress")}
                   </span>
@@ -572,6 +590,7 @@ export default function RestaurantsPage({ restaurants }: RestaurantsPageProps) {
                 isDarkMode={isDarkMode}
                 userMainRegion={userMainRegion}
                 userSubregion={userCity}
+                deliversToUser={doesRestaurantDeliver(restaurant, userMainRegion, userCity)}
               />
             ))}
           </div>

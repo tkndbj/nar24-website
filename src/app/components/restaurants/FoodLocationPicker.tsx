@@ -17,6 +17,7 @@ import { useUser } from "@/context/UserProvider";
 import { useTranslations } from "next-intl";
 import { mainRegions, getSubregions, getMainRegion } from "@/constants/regions";
 import { toast } from "react-hot-toast";
+import { FoodAddress } from "@/app/models/FoodAddress";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -326,9 +327,11 @@ export default function FoodLocationPicker({
         setSavedAddresses(addresses);
 
         // Pre-select current foodAddress if it exists
-        const currentFoodAddress = profileData?.foodAddress;
-        if (currentFoodAddress?.addressId) {
-          setSelectedAddressId(currentFoodAddress.addressId);
+        if (profileData?.foodAddress) {
+          const currentFoodAddress = FoodAddress.fromMap(profileData.foodAddress as Record<string, unknown>);
+          if (currentFoodAddress.addressId) {
+            setSelectedAddressId(currentFoodAddress.addressId);
+          }
         }
       } catch (err) {
         console.error("[FoodLocationPicker] Error loading addresses:", err);
@@ -399,18 +402,18 @@ export default function FoodLocationPicker({
         addressData
       );
 
-      // Set as foodAddress on user doc
-      await updateProfileData({
-        foodAddress: {
-          addressId: docRef.id,
-          addressLine1: formAddress.addressLine1.trim(),
-          addressLine2: formAddress.addressLine2.trim(),
-          city: formAddress.city,
-          mainRegion: resolvedMainRegion,
-          phoneNumber: normalizedPhone,
-          ...(formAddress.location ? { location: formAddress.location } : {}),
-        },
+      // Construct typed FoodAddress and write to user doc
+      const foodAddr = new FoodAddress({
+        addressId: docRef.id,
+        addressLine1: formAddress.addressLine1.trim(),
+        addressLine2: formAddress.addressLine2.trim() || undefined,
+        city: formAddress.city,
+        mainRegion: resolvedMainRegion,
+        phoneNumber: normalizedPhone,
+        location: formAddress.location ?? undefined,
       });
+
+      await updateProfileData({ foodAddress: foodAddr.toMap() });
 
       toast.success(t("addressSelectedSuccess"));
       onClose();
@@ -432,17 +435,18 @@ export default function FoodLocationPicker({
     try {
       const resolvedMainRegion = getMainRegion(selected.city) || selected.city;
 
-      await updateProfileData({
-        foodAddress: {
-          addressId: selected.id,
-          addressLine1: selected.addressLine1,
-          addressLine2: selected.addressLine2 || "",
-          city: selected.city,
-          mainRegion: resolvedMainRegion,
-          phoneNumber: selected.phoneNumber || "",
-          ...(selected.location ? { location: selected.location } : {}),
-        },
+      // Construct typed FoodAddress and write to user doc
+      const foodAddr = new FoodAddress({
+        addressId: selected.id,
+        addressLine1: selected.addressLine1,
+        addressLine2: selected.addressLine2 || undefined,
+        city: selected.city,
+        mainRegion: resolvedMainRegion,
+        phoneNumber: selected.phoneNumber || undefined,
+        location: selected.location ?? undefined,
       });
+
+      await updateProfileData({ foodAddress: foodAddr.toMap() });
 
       toast.success(t("addressSelectedSuccess"));
       onClose();

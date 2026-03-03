@@ -5106,7 +5106,8 @@
     "clickMapToSelect": "Konum seçmek için haritaya tıklayın",
     "cancel": "İptal",
     "confirm": "Onayla",
-    "back": "Geri"
+    "back": "Geri",
+    "noDeliveryToAddress": "Adresinize teslimat yapılmamaktadır"
   },
   "RestaurantHeader": {
     "restaurants": "Restoranlar",
@@ -5163,6 +5164,9 @@
     "specialNotes": "Özel Notlar",
     "optional": "Opsiyonel",
     "notesPlaceholder": "örn. Soğansız, ekstra acılı...",
+    "noDeliveryToAddress": "Adresinize teslimat yapılmamaktadır",
+    "noDeliveryBanner": "Bu restoran adresinize teslimat yapmamaktadır",
+    "noDeliveryBannerSubtitle": "Menüye göz atabilirsiniz, ancak mevcut teslimat adresinize sipariş veremezsiniz.",
     "closedBanner": "Bu restoran şu anda kapalı",
     "closedBannerSubtitle": "Menüye göz atabilirsiniz, ancak şu anda sipariş verilememektedir.",
     "closed": "Kapalı",

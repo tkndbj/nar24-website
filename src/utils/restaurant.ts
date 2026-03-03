@@ -59,3 +59,30 @@ export function isRestaurantOpen(
 
   return currentMin >= openMin && currentMin < closeMin;
 }
+
+/**
+ * Check whether a restaurant delivers to the user's address.
+ *
+ * Delivery availability is determined by the `minOrderPrices` array:
+ * if the user's subregion (city) or mainRegion appears in any entry,
+ * the restaurant delivers there.
+ *
+ * Returns `true` when:
+ *  - The restaurant has no `minOrderPrices` (delivers everywhere / no data)
+ *  - The user has no address set (can't determine — assume available)
+ *  - A matching mainRegion or subregion entry exists
+ */
+export function doesRestaurantDeliver(
+  restaurant: Pick<Restaurant, "minOrderPrices">,
+  userMainRegion?: string,
+  userCity?: string,
+): boolean {
+  if (!restaurant.minOrderPrices?.length) return true;
+  if (!userMainRegion && !userCity) return true;
+
+  return restaurant.minOrderPrices.some(
+    (p) =>
+      (userCity && p.subregion === userCity) ||
+      (userMainRegion && p.mainRegion === userMainRegion),
+  );
+}

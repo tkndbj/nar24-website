@@ -5098,7 +5098,8 @@
     "clickMapToSelect": "Click on the map to select a location",
     "cancel": "Cancel",
     "confirm": "Confirm",
-    "back": "Back"
+    "back": "Back",
+    "noDeliveryToAddress": "Does not deliver to your address"
   },
   "FoodCart": {
     "loginRequired": "Login Required",
@@ -5151,6 +5152,9 @@
     "specialNotes": "Special Notes",
     "optional": "Optional",
     "notesPlaceholder": "e.g. No onions, extra spicy...",
+    "noDeliveryToAddress": "Does not deliver to your address",
+    "noDeliveryBanner": "This restaurant does not deliver to your address",
+    "noDeliveryBannerSubtitle": "You can browse the menu, but you won't be able to place an order to your current delivery address.",
     "closedBanner": "This restaurant is currently closed",
     "closedBannerSubtitle": "You can browse the menu, but ordering is not available right now.",
     "closed": "Closed",
