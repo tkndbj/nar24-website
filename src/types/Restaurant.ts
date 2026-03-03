@@ -26,5 +26,5 @@ export interface Restaurant {
   cuisineTypes?: string[];
   workingDays?: string[];
   workingHours?: WorkingHours;
-  minOrderByRegion?: Record<string, number>;
+  minOrderPrices?: { mainRegion: string; subregion: string; minOrderPrice: number }[];
 }

@@ -162,17 +162,29 @@ function RestaurantCard({
   restaurant,
   isDarkMode,
   userMainRegion,
+  userSubregion,
 }: {
   restaurant: Restaurant;
   isDarkMode: boolean;
   userMainRegion?: string;
+  userSubregion?: string;
 }) {
   const t = useTranslations("restaurants");
   const isOpen = isRestaurantOpen(restaurant);
-  const minOrder =
-    userMainRegion && restaurant.minOrderByRegion
-      ? restaurant.minOrderByRegion[userMainRegion]
-      : undefined;
+
+  // Lookup min order: exact subregion match first, then any mainRegion match
+  const minOrder = (() => {
+    if (!restaurant.minOrderPrices?.length) return undefined;
+    if (userSubregion) {
+      const bySubregion = restaurant.minOrderPrices.find((p) => p.subregion === userSubregion);
+      if (bySubregion) return bySubregion.minOrderPrice;
+    }
+    if (userMainRegion) {
+      const byRegion = restaurant.minOrderPrices.find((p) => p.mainRegion === userMainRegion);
+      if (byRegion) return byRegion.minOrderPrice;
+    }
+    return undefined;
+  })();
 
   return (
     <Link
@@ -559,6 +571,7 @@ export default function RestaurantsPage({ restaurants }: RestaurantsPageProps) {
                 restaurant={restaurant}
                 isDarkMode={isDarkMode}
                 userMainRegion={userMainRegion}
+                userSubregion={userCity}
               />
             ))}
           </div>

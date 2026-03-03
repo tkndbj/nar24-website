@@ -47,6 +47,9 @@ const getRestaurants = unstable_cache(
                   close: String((d.workingHours as Record<string, unknown>).close),
                 }
               : undefined,
+          minOrderPrices: Array.isArray(d.minOrderPrices)
+            ? (d.minOrderPrices as { mainRegion: string; subregion: string; minOrderPrice: number }[])
+            : undefined,
         });
       }
 
