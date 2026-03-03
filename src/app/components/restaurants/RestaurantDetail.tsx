@@ -30,6 +30,8 @@ import FoodExtrasSheet from "./FoodExtrasSheet";
 import FoodCartSidebar from "./FoodCartSidebar";
 import RestaurantConflictDialog from "./Restaurantconflictdialog";
 import RestaurantReviews from "./RestaurantReviews";
+import LoginModal from "@/app/components/LoginModal";
+import { useUser } from "@/context/UserProvider";
 
 interface RestaurantDetailProps {
   restaurant: Restaurant | null;
@@ -187,6 +189,8 @@ function FoodCard({
   cartQuantity,
   onConflict,
   onRemoveFromCart,
+  onLoginRequired,
+  isAuthenticated,
 }: {
   food: Food;
   isDarkMode: boolean;
@@ -195,6 +199,8 @@ function FoodCard({
   cartQuantity: number;
   onConflict: (pending: PendingConflict) => void;
   onRemoveFromCart: (foodId: string) => void;
+  onLoginRequired: () => void;
+  isAuthenticated: boolean;
 }) {
   const t = useTranslations("restaurantDetail");
   const { addItem } = useFoodCartActions();
@@ -218,8 +224,12 @@ function FoodCard({
 
   const handleAddToCart = useCallback(() => {
     if (!isOpen) return;
+    if (!isAuthenticated) {
+      onLoginRequired();
+      return;
+    }
     setExtrasOpen(true);
-  }, [isOpen]);
+  }, [isOpen, isAuthenticated, onLoginRequired]);
 
   const handleExtrasConfirm = useCallback(
     async (extras: SelectedExtra[], specialNotes: string, quantity: number) => {
@@ -455,6 +465,8 @@ export default function RestaurantDetail({
 }: RestaurantDetailProps) {
   const isDarkMode = useTheme();
   const t = useTranslations("restaurantDetail");
+  const { user } = useUser();
+  const [showLoginModal, setShowLoginModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIconCategory, setSelectedIconCategory] = useState<
     string | null
@@ -735,6 +747,8 @@ export default function RestaurantDetail({
                                 cartQuantity={cartQuantityMap.get(food.id) ?? 0}
                                 onConflict={handleConflict}
                                 onRemoveFromCart={handleRemoveFromCart}
+                                isAuthenticated={!!user}
+                                onLoginRequired={() => setShowLoginModal(true)}
                               />
                             ))}
                           </div>
@@ -754,6 +768,8 @@ export default function RestaurantDetail({
                           cartQuantity={cartQuantityMap.get(food.id) ?? 0}
                           onConflict={handleConflict}
                           onRemoveFromCart={handleRemoveFromCart}
+                          isAuthenticated={!!user}
+                          onLoginRequired={() => setShowLoginModal(true)}
                         />
                       ))}
                     </div>
@@ -846,6 +862,12 @@ export default function RestaurantDetail({
             return fallback;
           }
         }}
+      />
+
+      {/* Login modal for unauthenticated users */}
+      <LoginModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
       />
     </main>
   );
