@@ -282,17 +282,17 @@ function RestaurantCard({
               ({restaurant.reviewCount})
             </span>
           )}
-          {minOrder != null && (
-            <span
-              className={`text-xs font-medium ml-auto ${
-                isDarkMode ? "text-orange-400" : "text-orange-600"
-              }`}
-            >
-              {t("minOrder")}: {minOrder} TL
-            </span>
-          )}
         </div>
       </div>
+
+      {/* Min order badge */}
+      {minOrder != null && (
+        <span className={`absolute bottom-2 right-2 px-2 py-0.5 text-[11px] font-semibold rounded-lg backdrop-blur-sm ${
+          !isOpen ? "bottom-9" : "bottom-2"
+        } bg-emerald-500/90 text-white`}>
+          {t("minOrder")} {minOrder} TL
+        </span>
+      )}
 
       {/* Closed badge */}
       {!isOpen && (
