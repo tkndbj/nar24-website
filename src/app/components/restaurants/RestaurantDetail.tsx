@@ -20,6 +20,7 @@ import {
   Plus,
   Check,
   MapPin,
+  Percent,
 } from "lucide-react";
 import TypeSenseServiceManager from "@/lib/typesense_service_manager";
 import FilterIcons from "./FilterIcons";
@@ -223,6 +224,13 @@ function FoodCard({
   const tFood = useTranslations();
   const displayType = translationKey ? tFood(translationKey) : food.foodType;
 
+  // Check if discount is currently active
+  const isDiscountActive = useMemo(() => {
+    if (!food.discount) return false;
+    const now = new Date();
+    return now >= food.discount.startDate && now <= food.discount.endDate;
+  }, [food.discount]);
+
   const cartRestaurant: FoodCartRestaurant = useMemo(
     () => ({
       id: restaurant.id,
@@ -298,6 +306,11 @@ function FoodCard({
               className="object-cover"
               sizes="128px"
             />
+            {isDiscountActive && food.discount && (
+              <div className="absolute top-1.5 left-1.5 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md shadow-sm">
+                -{food.discount.percentage}%
+              </div>
+            )}
           </div>
         )}
 
@@ -333,13 +346,42 @@ function FoodCard({
 
           <div className="flex items-center justify-between mt-2">
             <div className="flex items-center gap-2">
-              <span
-                className={`text-lg font-bold ${
-                  isDarkMode ? "text-orange-400" : "text-orange-600"
-                }`}
-              >
-                {food.price.toLocaleString()} TL
-              </span>
+              {isDiscountActive && food.discount ? (
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[11px] font-bold ${
+                      isDarkMode
+                        ? "bg-red-500/15 text-red-400"
+                        : "bg-red-50 text-red-600"
+                    }`}
+                  >
+                    <Percent className="w-3 h-3" />
+                    {food.discount.percentage}
+                  </span>
+                  <span
+                    className={`text-sm line-through ${
+                      isDarkMode ? "text-gray-500" : "text-gray-400"
+                    }`}
+                  >
+                    {food.discount.originalPrice.toLocaleString()} TL
+                  </span>
+                  <span
+                    className={`text-lg font-bold ${
+                      isDarkMode ? "text-orange-400" : "text-orange-600"
+                    }`}
+                  >
+                    {food.price.toLocaleString()} TL
+                  </span>
+                </div>
+              ) : (
+                <span
+                  className={`text-lg font-bold ${
+                    isDarkMode ? "text-orange-400" : "text-orange-600"
+                  }`}
+                >
+                  {food.price.toLocaleString()} TL
+                </span>
+              )}
 
               {food.preparationTime != null && food.preparationTime > 0 && (
                 <span

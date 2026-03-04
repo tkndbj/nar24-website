@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Restaurant } from "@/types/Restaurant";
-import { Food } from "@/types/Food";
+import { Food, FoodDiscount } from "@/types/Food";
 import RestaurantDetail from "@/app/components/restaurants/RestaurantDetail";
 import Footer from "@/app/components/Footer";
 import { FoodCartProvider } from "@/context/FoodCartProvider";
@@ -72,6 +72,21 @@ export default function RestaurantDetailPage() {
       for (const docSnap of foodsSnap.docs) {
         const d = docSnap.data();
         if (!d.name) continue;
+        let discount: FoodDiscount | undefined;
+        if (d.discount && typeof d.discount === "object") {
+          const disc = d.discount as Record<string, unknown>;
+          const startDate = disc.startDate instanceof Timestamp ? disc.startDate.toDate() : undefined;
+          const endDate = disc.endDate instanceof Timestamp ? disc.endDate.toDate() : undefined;
+          if (startDate && endDate && disc.percentage && disc.originalPrice) {
+            discount = {
+              percentage: Number(disc.percentage),
+              originalPrice: Number(disc.originalPrice),
+              startDate,
+              endDate,
+            };
+          }
+        }
+
         foodList.push({
           id: docSnap.id,
           name: d.name as string,
@@ -84,6 +99,7 @@ export default function RestaurantDetailPage() {
           price: Number(d.price) || 0,
           extras: Array.isArray(d.extras) ? (d.extras as string[]) : [],
           restaurantId: id,
+          discount,
         });
       }
 

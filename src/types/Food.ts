@@ -1,5 +1,12 @@
 // types/food.ts
 
+export interface FoodDiscount {
+  percentage: number;
+  originalPrice: number;
+  startDate: Date;
+  endDate: Date;
+}
+
 export interface Food {
   id: string;
   name: string;
@@ -12,4 +19,5 @@ export interface Food {
   price: number;
   restaurantId: string;
   extras?: string[];
+  discount?: FoodDiscount;
 }
