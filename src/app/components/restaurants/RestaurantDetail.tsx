@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useTheme } from "@/hooks/useTheme";
 import { Restaurant } from "@/types/Restaurant";
@@ -33,6 +34,7 @@ import FoodCartSidebar from "./FoodCartSidebar";
 import RestaurantConflictDialog from "./Restaurantconflictdialog";
 import RestaurantReviews from "./RestaurantReviews";
 import LoginModal from "@/app/components/LoginModal";
+import FoodLocationPicker from "./FoodLocationPicker";
 import { useUser } from "@/context/UserProvider";
 
 interface RestaurantDetailProps {
@@ -193,7 +195,9 @@ function FoodCard({
   onConflict,
   onRemoveFromCart,
   onLoginRequired,
+  onAddressRequired,
   isAuthenticated,
+  hasFoodAddress,
 }: {
   food: Food;
   isDarkMode: boolean;
@@ -204,7 +208,9 @@ function FoodCard({
   onConflict: (pending: PendingConflict) => void;
   onRemoveFromCart: (foodId: string) => void;
   onLoginRequired: () => void;
+  onAddressRequired: () => void;
   isAuthenticated: boolean;
+  hasFoodAddress: boolean;
 }) {
   const t = useTranslations("restaurantDetail");
   const { addItem } = useFoodCartActions();
@@ -234,8 +240,12 @@ function FoodCard({
       onLoginRequired();
       return;
     }
+    if (!hasFoodAddress) {
+      onAddressRequired();
+      return;
+    }
     setExtrasOpen(true);
-  }, [canAddToCart, isAuthenticated, onLoginRequired]);
+  }, [canAddToCart, isAuthenticated, hasFoodAddress, onLoginRequired, onAddressRequired]);
 
   const handleExtrasConfirm = useCallback(
     async (extras: SelectedExtra[], specialNotes: string, quantity: number) => {
@@ -473,8 +483,10 @@ export default function RestaurantDetail({
 }: RestaurantDetailProps) {
   const isDarkMode = useTheme();
   const t = useTranslations("restaurantDetail");
+  const router = useRouter();
   const { user, profileData } = useUser();
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIconCategory, setSelectedIconCategory] = useState<
     string | null
@@ -809,7 +821,9 @@ export default function RestaurantDetail({
                                 onConflict={handleConflict}
                                 onRemoveFromCart={handleRemoveFromCart}
                                 isAuthenticated={!!user}
+                                hasFoodAddress={!!foodAddress}
                                 onLoginRequired={() => setShowLoginModal(true)}
+                                onAddressRequired={() => setShowLocationPicker(true)}
                               />
                             ))}
                           </div>
@@ -831,7 +845,9 @@ export default function RestaurantDetail({
                           onConflict={handleConflict}
                           onRemoveFromCart={handleRemoveFromCart}
                           isAuthenticated={!!user}
+                          hasFoodAddress={!!foodAddress}
                           onLoginRequired={() => setShowLoginModal(true)}
+                          onAddressRequired={() => setShowLocationPicker(true)}
                         />
                       ))}
                     </div>
@@ -926,10 +942,23 @@ export default function RestaurantDetail({
         }}
       />
 
-      {/* Login modal for unauthenticated users */}
+      {/* Login modal for unauthenticated users — navigate back to restaurants
+          so Typesense re-fetches filtered by the user's delivery region */}
       <LoginModal
         isOpen={showLoginModal}
         onClose={() => setShowLoginModal(false)}
+        onSuccess={() => {
+          setShowLoginModal(false);
+          router.push("/restaurants");
+        }}
+      />
+
+      {/* Food address picker for users without delivery address */}
+      <FoodLocationPicker
+        isOpen={showLocationPicker}
+        onClose={() => setShowLocationPicker(false)}
+        isDarkMode={isDarkMode}
+        required
       />
     </main>
   );
