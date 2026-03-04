@@ -332,6 +332,8 @@ function RestaurantCard({
 
 // ─── Main Page ──────────────────────────────────────────────────────────────
 
+const HITS_PER_PAGE = 30;
+
 export default function RestaurantsPage({ restaurants: serverRestaurants }: RestaurantsPageProps) {
   const isDarkMode = useTheme();
   const t = useTranslations("restaurants");
@@ -344,9 +346,14 @@ export default function RestaurantsPage({ restaurants: serverRestaurants }: Rest
   const [cuisineFacets, setCuisineFacets] = useState<FacetValue[]>([]);
   const [filteredRestaurants, setFilteredRestaurants] = useState<Restaurant[]>(serverRestaurants ?? []);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const locationPromptShown = useRef(false);
   const initialLoadDone = useRef(false);
+  const currentPageRef = useRef(0);
+  const filterVersionRef = useRef(0);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   // Parse typed FoodAddress from profile data
   const foodAddress = profileData?.foodAddress
@@ -383,12 +390,17 @@ export default function RestaurantsPage({ restaurants: serverRestaurants }: Rest
     });
   }, [isUserLoading, deliveryFilterRegions]);
 
-  // Initial load + filter/search/sort changes — always use Typesense with delivery filter
+  // Initial load + filter/search/sort changes — fetch page 0, replace results
   useEffect(() => {
     if (isUserLoading) return;
 
+    // Bump filter version to invalidate any in-flight load-more requests
+    filterVersionRef.current += 1;
+    currentPageRef.current = 0;
+
     let cancelled = false;
     setIsLoading(true);
+    setHasMore(false);
 
     const svc = TypeSenseServiceManager.instance.restaurantService;
     const query = searchQuery.trim();
@@ -402,12 +414,14 @@ export default function RestaurantsPage({ restaurants: serverRestaurants }: Rest
       foodType: selectedFoodType ? [selectedFoodType] : undefined,
       isActive: true,
       sort: sortOption,
-      hitsPerPage: 100,
+      hitsPerPage: HITS_PER_PAGE,
+      page: 0,
       deliveryRegions: deliveryFilterRegions,
     })
       .then((result) => {
         if (!cancelled) {
           setFilteredRestaurants(result.items);
+          setHasMore(result.page < result.nbPages - 1);
           initialLoadDone.current = true;
         }
       })
@@ -419,6 +433,58 @@ export default function RestaurantsPage({ restaurants: serverRestaurants }: Rest
       cancelled = true;
     };
   }, [selectedCuisine, selectedFoodType, sortOption, searchQuery, isUserLoading, deliveryFilterRegions]);
+
+  // Load next page — called by IntersectionObserver
+  const loadMore = useCallback(() => {
+    if (isLoadingMore || !hasMore) return;
+
+    const version = filterVersionRef.current;
+    const nextPage = currentPageRef.current + 1;
+    setIsLoadingMore(true);
+
+    const svc = TypeSenseServiceManager.instance.restaurantService;
+    svc
+      .searchRestaurants({
+        query: searchQuery.trim() || undefined,
+        cuisineTypes: selectedCuisine ? [selectedCuisine] : undefined,
+        foodType: selectedFoodType ? [selectedFoodType] : undefined,
+        isActive: true,
+        sort: sortOption,
+        hitsPerPage: HITS_PER_PAGE,
+        page: nextPage,
+        deliveryRegions: deliveryFilterRegions,
+      })
+      .then((result) => {
+        // Discard if filters changed while this was in flight
+        if (filterVersionRef.current !== version) return;
+        currentPageRef.current = nextPage;
+        setFilteredRestaurants((prev) => [...prev, ...result.items]);
+        setHasMore(result.page < result.nbPages - 1);
+      })
+      .finally(() => {
+        if (filterVersionRef.current === version) {
+          setIsLoadingMore(false);
+        }
+      });
+  }, [isLoadingMore, hasMore, searchQuery, selectedCuisine, selectedFoodType, sortOption, deliveryFilterRegions]);
+
+  // IntersectionObserver to trigger loadMore when sentinel is visible
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          loadMore();
+        }
+      },
+      { rootMargin: "200px" },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [loadMore]);
 
   const handleCuisineClick = (cuisine: string | null) => {
     setSelectedCuisine(cuisine);
@@ -585,18 +651,51 @@ export default function RestaurantsPage({ restaurants: serverRestaurants }: Rest
             ))}
           </div>
         ) : filteredRestaurants.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 pb-10">
-            {filteredRestaurants.map((restaurant) => (
-              <RestaurantCard
-                key={restaurant.id}
-                restaurant={restaurant}
-                isDarkMode={isDarkMode}
-                userMainRegion={userMainRegion}
-                userSubregion={userCity}
-                deliversToUser={doesRestaurantDeliver(restaurant, userMainRegion, userCity)}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 pb-2">
+              {filteredRestaurants.map((restaurant) => (
+                <RestaurantCard
+                  key={restaurant.id}
+                  restaurant={restaurant}
+                  isDarkMode={isDarkMode}
+                  userMainRegion={userMainRegion}
+                  userSubregion={userCity}
+                  deliversToUser={doesRestaurantDeliver(restaurant, userMainRegion, userCity)}
+                />
+              ))}
+            </div>
+
+            {/* Sentinel for infinite scroll */}
+            <div ref={sentinelRef} className="h-px" />
+
+            {/* Loading more indicator */}
+            {isLoadingMore && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 py-4 pb-10">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className={`animate-pulse rounded-2xl p-4 flex items-center gap-4 ${
+                      isDarkMode
+                        ? "bg-gray-800/80 border border-gray-700/50"
+                        : "bg-white border border-gray-100 shadow-sm"
+                    }`}
+                  >
+                    <div
+                      className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex-shrink-0 ${
+                        isDarkMode ? "bg-gray-700" : "bg-gray-200"
+                      }`}
+                    />
+                    <div className="flex-1 space-y-2">
+                      <div className={`h-4 rounded w-3/4 ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`} />
+                      <div className={`h-3 rounded w-1/2 ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {!hasMore && !isLoadingMore && <div className="pb-10" />}
+          </>
         ) : !initialLoadDone.current ? (
           /* Empty state - no restaurants at all */
           <div className="flex flex-col items-center justify-center py-20">
