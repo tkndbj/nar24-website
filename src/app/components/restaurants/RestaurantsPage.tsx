@@ -20,7 +20,7 @@ const BANNER_IMAGES = ["/images/1.png", "/images/2.png", "/images/3.png"];
 const BANNER_INTERVAL = 5000;
 
 interface RestaurantsPageProps {
-  restaurants: Restaurant[];
+  restaurants?: Restaurant[];
 }
 
 // ─── Banner Carousel ────────────────────────────────────────────────────────
@@ -332,7 +332,7 @@ function RestaurantCard({
 
 // ─── Main Page ──────────────────────────────────────────────────────────────
 
-export default function RestaurantsPage({ restaurants }: RestaurantsPageProps) {
+export default function RestaurantsPage({ restaurants: serverRestaurants }: RestaurantsPageProps) {
   const isDarkMode = useTheme();
   const t = useTranslations("restaurants");
   const { user, profileData, isLoading: isUserLoading } = useUser();
@@ -342,10 +342,11 @@ export default function RestaurantsPage({ restaurants }: RestaurantsPageProps) {
   const [sortOption, setSortOption] = useState<RestaurantSortOption>("default");
   const [searchQuery, setSearchQuery] = useState("");
   const [cuisineFacets, setCuisineFacets] = useState<FacetValue[]>([]);
-  const [filteredRestaurants, setFilteredRestaurants] = useState<Restaurant[]>(restaurants);
-  const [isLoading, setIsLoading] = useState(false);
+  const [filteredRestaurants, setFilteredRestaurants] = useState<Restaurant[]>(serverRestaurants ?? []);
+  const [isLoading, setIsLoading] = useState(true);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const locationPromptShown = useRef(false);
+  const initialLoadDone = useRef(false);
 
   // Parse typed FoodAddress from profile data
   const foodAddress = profileData?.foodAddress
@@ -353,6 +354,14 @@ export default function RestaurantsPage({ restaurants }: RestaurantsPageProps) {
     : null;
   const userMainRegion = foodAddress?.mainRegion;
   const userCity = foodAddress?.city;
+
+  // Build delivery filter regions from user's foodAddress: [city, mainRegion]
+  const deliveryFilterRegions = React.useMemo(() => {
+    const regions: string[] = [];
+    if (userCity) regions.push(userCity);
+    if (userMainRegion) regions.push(userMainRegion);
+    return regions.length > 0 ? regions : undefined;
+  }, [userCity, userMainRegion]);
 
   const pillsRef = useRef<HTMLDivElement>(null);
 
@@ -365,32 +374,24 @@ export default function RestaurantsPage({ restaurants }: RestaurantsPageProps) {
     }
   }, [user, profileData, isUserLoading]);
 
-  // Fetch cuisine facets on mount
+  // Fetch cuisine facets (with delivery region filter)
   useEffect(() => {
+    if (isUserLoading) return;
     const svc = TypeSenseServiceManager.instance.restaurantService;
-    svc.fetchRestaurantFacets().then((facets) => {
-      if (facets.cuisineTypes?.length) {
-        setCuisineFacets(facets.cuisineTypes);
-      }
+    svc.fetchRestaurantFacets({ deliveryRegions: deliveryFilterRegions }).then((facets) => {
+      setCuisineFacets(facets.cuisineTypes ?? []);
     });
-  }, []);
+  }, [isUserLoading, deliveryFilterRegions]);
 
-  // When cuisine, foodType, sort, or search changes, search via Typesense
+  // Initial load + filter/search/sort changes — always use Typesense with delivery filter
   useEffect(() => {
-    const query = searchQuery.trim();
-    const hasFilters = selectedCuisine !== null || selectedFoodType !== null;
-    const hasSort = sortOption !== "default";
-
-    if (!hasFilters && !hasSort && !query) {
-      setFilteredRestaurants(restaurants);
-      setIsLoading(false);
-      return;
-    }
+    if (isUserLoading) return;
 
     let cancelled = false;
     setIsLoading(true);
 
     const svc = TypeSenseServiceManager.instance.restaurantService;
+    const query = searchQuery.trim();
     const searchFn = query
       ? svc.debouncedSearchRestaurants.bind(svc)
       : svc.searchRestaurants.bind(svc);
@@ -401,11 +402,13 @@ export default function RestaurantsPage({ restaurants }: RestaurantsPageProps) {
       foodType: selectedFoodType ? [selectedFoodType] : undefined,
       isActive: true,
       sort: sortOption,
-      hitsPerPage: 50,
+      hitsPerPage: 100,
+      deliveryRegions: deliveryFilterRegions,
     })
       .then((result) => {
         if (!cancelled) {
           setFilteredRestaurants(result.items);
+          initialLoadDone.current = true;
         }
       })
       .finally(() => {
@@ -415,7 +418,7 @@ export default function RestaurantsPage({ restaurants }: RestaurantsPageProps) {
     return () => {
       cancelled = true;
     };
-  }, [selectedCuisine, selectedFoodType, sortOption, searchQuery, restaurants]);
+  }, [selectedCuisine, selectedFoodType, sortOption, searchQuery, isUserLoading, deliveryFilterRegions]);
 
   const handleCuisineClick = (cuisine: string | null) => {
     setSelectedCuisine(cuisine);
@@ -594,7 +597,7 @@ export default function RestaurantsPage({ restaurants }: RestaurantsPageProps) {
               />
             ))}
           </div>
-        ) : restaurants.length === 0 ? (
+        ) : !initialLoadDone.current ? (
           /* Empty state - no restaurants at all */
           <div className="flex flex-col items-center justify-center py-20">
             <span className="text-6xl mb-4">🍽️</span>

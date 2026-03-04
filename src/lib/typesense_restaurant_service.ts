@@ -181,6 +181,33 @@ export class RestaurantTypesenseService {
     }
   }
 
+  // ── minOrderPricesJson parser ────────────────────────────────────────────
+
+  private parseMinOrderPricesJson(
+    raw: unknown,
+  ): { mainRegion: string; subregion: string; minOrderPrice: number }[] | undefined {
+    if (typeof raw !== "string" || !raw) return undefined;
+    try {
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return undefined;
+      return parsed
+        .filter(
+          (item: unknown) =>
+            item &&
+            typeof item === "object" &&
+            "mainRegion" in (item as Record<string, unknown>) &&
+            "subregion" in (item as Record<string, unknown>),
+        )
+        .map((item: Record<string, unknown>) => ({
+          mainRegion: String(item["mainRegion"] ?? ""),
+          subregion: String(item["subregion"] ?? ""),
+          minOrderPrice: Number(item["minOrderPrice"] ?? 0),
+        }));
+    } catch {
+      return undefined;
+    }
+  }
+
   // ── ID extraction ───────────────────────────────────────────────────────
 
   private extractFirestoreId(
@@ -248,6 +275,7 @@ export class RestaurantTypesenseService {
     cuisineTypes?: string[];
     foodType?: string[];
     isActive?: boolean;
+    deliveryRegions?: string[];
   }): Promise<RestaurantSearchPage> {
     const {
       query = "",
@@ -257,6 +285,7 @@ export class RestaurantTypesenseService {
       cuisineTypes,
       foodType,
       isActive,
+      deliveryRegions,
     } = opts;
 
     const filterParts: string[] = [];
@@ -277,6 +306,13 @@ export class RestaurantTypesenseService {
       else filterParts.push(`(${orParts.join(" || ")})`);
     }
 
+    if (deliveryRegions?.length) {
+      const orParts = deliveryRegions
+        .map((r) => `deliveryRegions:=${r}`)
+        .concat("deliveryRegions:=_ALL_");
+      filterParts.push(`(${orParts.join(" || ")})`);
+    }
+
     const params = new URLSearchParams({
       q: query.trim() || "*",
       query_by: "name,address",
@@ -286,7 +322,7 @@ export class RestaurantTypesenseService {
       include_fields:
         "id,name,address,contactNo,profileImageUrl,ownerId,isActive,isBoosted," +
         "latitude,longitude,averageRating,reviewCount,clickCount,followerCount," +
-        "foodType,cuisineTypes,workingDays,workingHours,createdAt",
+        "foodType,cuisineTypes,workingDays,workingHours,createdAt,minOrderPricesJson",
     });
 
     const filterBy = this.buildFilterBy(filterParts);
@@ -362,6 +398,7 @@ export class RestaurantTypesenseService {
                   ),
                 }
               : undefined,
+          minOrderPrices: this.parseMinOrderPricesJson(doc["minOrderPricesJson"]),
         });
       }
 
@@ -395,6 +432,7 @@ export class RestaurantTypesenseService {
     query?: string;
     cuisineTypes?: string[];
     foodType?: string[];
+    deliveryRegions?: string[];
   }): Promise<RestaurantFacets> {
     const filterParts: string[] = [];
     filterParts.push("isActive:=true");
@@ -409,6 +447,13 @@ export class RestaurantTypesenseService {
       const orParts = opts.foodType.map((f) => `foodType:=${f}`);
       if (orParts.length === 1) filterParts.push(orParts[0]);
       else filterParts.push(`(${orParts.join(" || ")})`);
+    }
+
+    if (opts?.deliveryRegions?.length) {
+      const orParts = opts.deliveryRegions
+        .map((r) => `deliveryRegions:=${r}`)
+        .concat("deliveryRegions:=_ALL_");
+      filterParts.push(`(${orParts.join(" || ")})`);
     }
 
     const params = new URLSearchParams({
