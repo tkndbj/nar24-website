@@ -991,7 +991,7 @@ export default function RestaurantDetail({
         onClose={() => setShowLoginModal(false)}
         onSuccess={() => {
           setShowLoginModal(false);
-          router.push("/restaurants");
+          router.replace("/restaurants");
         }}
       />
 

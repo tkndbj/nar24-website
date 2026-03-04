@@ -122,6 +122,17 @@ export default function LoginModal({
     }, 300);
   };
 
+  /** Close immediately (no animation delay) and fire onSuccess — used after
+   *  successful authentication so navigation happens without a 300ms wait. */
+  const handleSuccessClose = useCallback(() => {
+    setIsAnimating(false);
+    onClose();
+    setEmail("");
+    setPassword("");
+    setIsPasswordVisible(false);
+    onSuccess?.();
+  }, [onClose, onSuccess]);
+
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
       handleClose();
@@ -208,10 +219,10 @@ export default function LoginModal({
                 color: "#fff",
               },
             });
-            handleClose();
             if (onSuccess) {
-              onSuccess();
+              handleSuccessClose();
             } else {
+              handleClose();
               router.push("/");
             }
           }
@@ -255,7 +266,7 @@ export default function LoginModal({
         setIsLoading(false);
       }
     },
-    [email, password, t, twoFactorService, router, checkAndHandle2FA, onSuccess]
+    [email, password, t, twoFactorService, router, checkAndHandle2FA, handleSuccessClose, onSuccess]
   );
 
   const handleGoogleSignIn = useCallback(async () => {
@@ -312,10 +323,10 @@ export default function LoginModal({
               color: "#fff",
             },
           });
-          handleClose();
           if (onSuccess) {
-            onSuccess();
+            handleSuccessClose();
           } else {
+            handleClose();
             router.push("/");
           }
         }
@@ -374,7 +385,7 @@ export default function LoginModal({
     } finally {
       setIsLoading(false);
     }
-  }, [t, twoFactorService, router, checkAndHandle2FA, onSuccess]);
+  }, [t, twoFactorService, router, checkAndHandle2FA, handleSuccessClose, onSuccess]);
 
   const handleAppleSignIn = useCallback(async () => {
     twoFactorService.reset();
@@ -493,14 +504,16 @@ export default function LoginModal({
             },
           }
         );
-        handleClose();
         if (needsName) {
+          handleClose();
           router.push("/complete-name");
         } else if (needsCompletion) {
+          handleClose();
           router.push("/complete-profile");
         } else if (onSuccess) {
-          onSuccess();
+          handleSuccessClose();
         } else {
+          handleClose();
           router.push("/");
         }
       }
@@ -561,7 +574,7 @@ export default function LoginModal({
     } finally {
       setIsLoading(false);
     }
-  }, [t, twoFactorService, router, setNameComplete, onSuccess]);
+  }, [t, twoFactorService, router, setNameComplete, handleSuccessClose, onSuccess]);
 
   const isDisabled = isLoading || isPending2FA || twoFAPending;
 
