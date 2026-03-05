@@ -4,8 +4,7 @@ import React, {
   useState,
   useCallback,
   useMemo,
-  useEffect,
-  useRef,
+
 } from "react";
 import Image from "next/image";
 import { Link } from "@/navigation";
@@ -37,7 +36,7 @@ import {
   Plus,
   StickyNote,
   CheckCircle2,
-  X,
+ 
 } from "lucide-react";
 
 // ============================================================================
@@ -260,8 +259,7 @@ function FoodCheckoutContent() {
   const [deliveryType, setDeliveryType] = useState<DeliveryType>("delivery");
   const [orderNotes, setOrderNotes] = useState("");
 
-  // Validation / UI state
-  const [errors, setErrors] = useState<Record<string, string>>({});
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [orderSuccess, setOrderSuccess] = useState<{
