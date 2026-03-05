@@ -5175,7 +5175,9 @@
     "hourShort": "h",
     "dayShort": "d",
     "monthShort": "mo",
-    "yearShort": "y"
+    "yearShort": "y",
+    "changeAddress": "Change Address",
+    "understood": "OK"
   },
   "foodCategoryKebabsGrills": "Kebabs & Grills",
   "foodCategoryPideLahmacun": "Pide & Lahmacun",

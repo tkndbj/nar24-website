@@ -21,6 +21,8 @@ import {
   Check,
   MapPin,
   Percent,
+  AlertTriangle,
+  X,
 } from "lucide-react";
 import TypeSenseServiceManager from "@/lib/typesense_service_manager";
 import FilterIcons from "./FilterIcons";
@@ -197,6 +199,7 @@ function FoodCard({
   onRemoveFromCart,
   onLoginRequired,
   onAddressRequired,
+  onNoDelivery,
   isAuthenticated,
   hasFoodAddress,
 }: {
@@ -210,6 +213,7 @@ function FoodCard({
   onRemoveFromCart: (foodId: string) => void;
   onLoginRequired: () => void;
   onAddressRequired: () => void;
+  onNoDelivery: () => void;
   isAuthenticated: boolean;
   hasFoodAddress: boolean;
 }) {
@@ -240,10 +244,8 @@ function FoodCard({
     [restaurant.id, restaurant.name, restaurant.profileImageUrl],
   );
 
-  const canAddToCart = isOpen && deliversToUser;
-
   const handleAddToCart = useCallback(() => {
-    if (!canAddToCart) return;
+    if (!isOpen) return;
     if (!isAuthenticated) {
       onLoginRequired();
       return;
@@ -252,8 +254,13 @@ function FoodCard({
       onAddressRequired();
       return;
     }
+    // Click-time delivery verification — prevents stale-state race conditions
+    if (!deliversToUser) {
+      onNoDelivery();
+      return;
+    }
     setExtrasOpen(true);
-  }, [canAddToCart, isAuthenticated, hasFoodAddress, onLoginRequired, onAddressRequired]);
+  }, [isOpen, isAuthenticated, hasFoodAddress, deliversToUser, onLoginRequired, onAddressRequired, onNoDelivery]);
 
   const handleExtrasConfirm = useCallback(
     async (extras: SelectedExtra[], specialNotes: string, quantity: number) => {
@@ -402,17 +409,21 @@ function FoodCard({
                   ? () => onRemoveFromCart(food.id)
                   : handleAddToCart
               }
-              disabled={!canAddToCart}
+              disabled={!isOpen}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
-                !canAddToCart
+                !isOpen
                   ? "bg-gray-200 text-gray-400 cursor-not-allowed dark:bg-gray-700 dark:text-gray-500"
-                  : cartQuantity > 0
+                  : !deliversToUser
                     ? isDarkMode
-                      ? "bg-green-500/15 text-green-400 hover:bg-green-500/25"
-                      : "bg-green-50 text-green-600 hover:bg-green-100"
-                    : isDarkMode
-                      ? "bg-orange-500/15 text-orange-400 hover:bg-orange-500/25"
-                      : "bg-orange-50 text-orange-600 hover:bg-orange-100"
+                      ? "bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 border border-yellow-500/20"
+                      : "bg-yellow-50 text-yellow-600 hover:bg-yellow-100 border border-yellow-200"
+                    : cartQuantity > 0
+                      ? isDarkMode
+                        ? "bg-green-500/15 text-green-400 hover:bg-green-500/25"
+                        : "bg-green-50 text-green-600 hover:bg-green-100"
+                      : isDarkMode
+                        ? "bg-orange-500/15 text-orange-400 hover:bg-orange-500/25"
+                        : "bg-orange-50 text-orange-600 hover:bg-orange-100"
               }`}
             >
               {!isOpen ? (
@@ -529,6 +540,7 @@ export default function RestaurantDetail({
   const { user, profileData } = useUser();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [showNoDeliveryModal, setShowNoDeliveryModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIconCategory, setSelectedIconCategory] = useState<
     string | null
@@ -866,6 +878,7 @@ export default function RestaurantDetail({
                                 hasFoodAddress={!!foodAddress}
                                 onLoginRequired={() => setShowLoginModal(true)}
                                 onAddressRequired={() => setShowLocationPicker(true)}
+                                onNoDelivery={() => setShowNoDeliveryModal(true)}
                               />
                             ))}
                           </div>
@@ -890,6 +903,7 @@ export default function RestaurantDetail({
                           hasFoodAddress={!!foodAddress}
                           onLoginRequired={() => setShowLoginModal(true)}
                           onAddressRequired={() => setShowLocationPicker(true)}
+                          onNoDelivery={() => setShowNoDeliveryModal(true)}
                         />
                       ))}
                     </div>
@@ -1002,6 +1016,68 @@ export default function RestaurantDetail({
         isDarkMode={isDarkMode}
         required
       />
+
+      {/* No delivery warning modal */}
+      {showNoDeliveryModal && (
+        <div
+          className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
+          onClick={() => setShowNoDeliveryModal(false)}
+        >
+          <div
+            className={`w-full max-w-sm rounded-2xl border shadow-xl overflow-hidden ${
+              isDarkMode
+                ? "bg-gray-900 border-gray-800"
+                : "bg-white border-gray-100"
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 pt-6 pb-4 text-center">
+              <div
+                className={`w-12 h-12 mx-auto mb-3 rounded-full flex items-center justify-center ${
+                  isDarkMode ? "bg-yellow-500/15" : "bg-yellow-50"
+                }`}
+              >
+                <AlertTriangle className="w-6 h-6 text-yellow-500" />
+              </div>
+              <h3
+                className={`text-base font-bold mb-1 ${
+                  isDarkMode ? "text-white" : "text-gray-900"
+                }`}
+              >
+                {t("noDeliveryBanner")}
+              </h3>
+              <p
+                className={`text-sm ${
+                  isDarkMode ? "text-gray-400" : "text-gray-500"
+                }`}
+              >
+                {t("noDeliveryBannerSubtitle")}
+              </p>
+            </div>
+            <div className={`px-5 pb-5 flex gap-3`}>
+              <button
+                onClick={() => {
+                  setShowNoDeliveryModal(false);
+                  setShowLocationPicker(true);
+                }}
+                className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-semibold transition-colors border ${
+                  isDarkMode
+                    ? "border-gray-700 text-gray-300 hover:bg-gray-800"
+                    : "border-gray-200 text-gray-600 hover:bg-gray-100"
+                }`}
+              >
+                {t("changeAddress")}
+              </button>
+              <button
+                onClick={() => setShowNoDeliveryModal(false)}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold transition-colors"
+              >
+                {t("understood")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

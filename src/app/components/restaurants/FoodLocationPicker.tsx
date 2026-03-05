@@ -303,6 +303,17 @@ export default function FoodLocationPicker({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [showMainRegionDropdown, showSubregionDropdown]);
 
+  // Reset all transient state when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setShowNewForm(false);
+      setEditingAddressId(null);
+      setFormAddress({ addressLine1: "", addressLine2: "", phoneNumber: "", selectedMainRegion: "", city: "", location: null });
+      setErrors({});
+      setSelectedAddressId(null);
+    }
+  }, [isOpen]);
+
   // Load saved addresses when modal opens
   useEffect(() => {
     if (!isOpen || !user) {
@@ -345,16 +356,6 @@ export default function FoodLocationPicker({
     loadAddresses();
     return () => { cancelled = true; };
   }, [isOpen, user, profileData?.foodAddress]);
-
-  // Reset form when toggling new address
-  useEffect(() => {
-    if (!showNewForm) {
-      if (!editingAddressId) {
-        setFormAddress({ addressLine1: "", addressLine2: "", phoneNumber: "", selectedMainRegion: "", city: "", location: null });
-      }
-      setErrors({});
-    }
-  }, [showNewForm, editingAddressId]);
 
   // Compute subregions for the selected main region
   const availableSubregions = formAddress.selectedMainRegion

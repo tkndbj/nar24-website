@@ -5187,7 +5187,9 @@
     "hourShort": "sa",
     "dayShort": "g",
     "monthShort": "ay",
-    "yearShort": "y"
+    "yearShort": "y",
+    "changeAddress": "Adresi Değiştir",
+    "understood": "Tamam"
   },
   "foodCategoryKebabsGrills": "Kebap & Izgara",
   "foodCategoryPideLahmacun": "Pide & Lahmacun",

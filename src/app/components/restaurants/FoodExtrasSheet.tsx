@@ -5,12 +5,13 @@ import { X, Minus, Plus, ShoppingCart, StickyNote } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { FoodExtrasData } from "@/constants/foodExtras";
 import { SelectedExtra } from "@/context/FoodCartProvider";
+import type { FoodExtra } from "@/types/Food";
 
 interface FoodExtrasSheetProps {
   open: boolean;
   onClose: () => void;
   onConfirm: (extras: SelectedExtra[], specialNotes: string, quantity: number) => void;
-  allowedExtras?: string[];
+  allowedExtras?: FoodExtra[];
   foodName: string;
   foodPrice: number;
   foodCategory: string;
@@ -77,6 +78,15 @@ export default function FoodExtrasSheet({
     prevOpenRef.current = open;
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Build a price lookup from allowedExtras
+  const extraPriceMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const e of allowedExtras) {
+      map.set(e.name, e.price);
+    }
+    return map;
+  }, [allowedExtras]);
+
   // Toggle an extra on/off
   const toggleExtra = useCallback((extraName: string) => {
     setSelectedExtras((prev) => {
@@ -84,11 +94,11 @@ export default function FoodExtrasSheet({
       if (next.has(extraName)) {
         next.delete(extraName);
       } else {
-        next.set(extraName, { name: extraName, quantity: 1, price: 0 });
+        next.set(extraName, { name: extraName, quantity: 1, price: extraPriceMap.get(extraName) ?? 0 });
       }
       return next;
     });
-  }, []);
+  }, [extraPriceMap]);
 
   // Calculate total
   const totalPrice = useMemo(() => {
@@ -211,12 +221,12 @@ export default function FoodExtrasSheet({
               </label>
               <div className="grid grid-cols-2 gap-2 mt-2">
                 {availableExtras.map((extra) => {
-                  const isSelected = selectedExtras.has(extra);
+                  const isSelected = selectedExtras.has(extra.name);
                   return (
                     <button
-                      key={extra}
+                      key={extra.name}
                       type="button"
-                      onClick={() => toggleExtra(extra)}
+                      onClick={() => toggleExtra(extra.name)}
                       className={`px-3 py-2.5 rounded-xl text-[12px] font-medium border transition-all text-left ${
                         isSelected
                           ? isDarkMode
@@ -227,10 +237,23 @@ export default function FoodExtrasSheet({
                             : "bg-white border-gray-200 text-gray-600 hover:border-orange-200"
                       }`}
                     >
-                      <span className="mr-1.5">
-                        {isSelected ? "✓" : "+"}
-                      </span>
-                      {getExtraName(extra)}
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="truncate">
+                          <span className="mr-1">
+                            {isSelected ? "✓" : "+"}
+                          </span>
+                          {getExtraName(extra.name)}
+                        </span>
+                        {extra.price > 0 && (
+                          <span className={`text-[10px] font-semibold flex-shrink-0 ${
+                            isSelected
+                              ? "text-orange-500"
+                              : isDarkMode ? "text-gray-500" : "text-gray-400"
+                          }`}>
+                            +{extra.price.toFixed(2)}
+                          </span>
+                        )}
+                      </div>
                     </button>
                   );
                 })}

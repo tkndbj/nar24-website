@@ -602,7 +602,10 @@ export class RestaurantTypesenseService {
               : undefined,
           restaurantId: String(doc["restaurantId"] ?? ""),
           extras: Array.isArray(doc["extras"])
-            ? (doc["extras"] as string[])
+            ? (doc["extras"] as Array<Record<string, unknown>>).map((e) => ({
+                name: String(e.name ?? ""),
+                price: Number(e.price ?? 0),
+              }))
             : undefined,
         });
       }

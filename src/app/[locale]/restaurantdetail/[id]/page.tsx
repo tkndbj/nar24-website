@@ -97,7 +97,12 @@ export default function RestaurantDetailPage() {
           isAvailable: d.isAvailable !== false,
           preparationTime: d.preparationTime != null ? Number(d.preparationTime) : undefined,
           price: Number(d.price) || 0,
-          extras: Array.isArray(d.extras) ? (d.extras as string[]) : [],
+          extras: Array.isArray(d.extras)
+            ? d.extras.map((e: Record<string, unknown>) => ({
+                name: String(e.name ?? ""),
+                price: Number(e.price ?? 0),
+              }))
+            : [],
           restaurantId: id,
           discount,
         });

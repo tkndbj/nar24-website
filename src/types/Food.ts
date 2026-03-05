@@ -7,6 +7,11 @@ export interface FoodDiscount {
   endDate: Date;
 }
 
+export interface FoodExtra {
+  name: string;
+  price: number;
+}
+
 export interface Food {
   id: string;
   name: string;
@@ -18,6 +23,6 @@ export interface Food {
   preparationTime?: number;
   price: number;
   restaurantId: string;
-  extras?: string[];
+  extras?: FoodExtra[];
   discount?: FoodDiscount;
 }
