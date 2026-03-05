@@ -21,8 +21,7 @@ import {
   Check,
   MapPin,
   Percent,
-  AlertTriangle,
-  X,
+  AlertTriangle, 
 } from "lucide-react";
 import TypeSenseServiceManager from "@/lib/typesense_service_manager";
 import FilterIcons from "./FilterIcons";
