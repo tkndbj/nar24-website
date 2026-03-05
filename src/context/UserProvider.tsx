@@ -639,12 +639,12 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       return;
     }
 
-    // Then check profile completion
-    if (!isProfileComplete) {
-      console.log("🔀 Redirecting to /complete-profile - Profile incomplete");
-      window.location.href = "/complete-profile";
-      return;
-    }
+    // TODO: Re-enable profile completion redirect later
+    // if (!isProfileComplete) {
+    //   console.log("🔀 Redirecting to /complete-profile - Profile incomplete");
+    //   window.location.href = "/complete-profile";
+    //   return;
+    // }
   }, [
     user,
     isLoading,
