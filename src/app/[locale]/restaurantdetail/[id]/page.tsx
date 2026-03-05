@@ -65,6 +65,13 @@ export default function RestaurantDetailPage() {
                   close: String((d.workingHours as Record<string, unknown>).close),
                 }
               : undefined,
+          minOrderPrices: Array.isArray(d.minOrderPrices)
+            ? (d.minOrderPrices as Array<Record<string, unknown>>).map((p) => ({
+                mainRegion: String(p.mainRegion ?? ""),
+                subregion: String(p.subregion ?? ""),
+                minOrderPrice: Number(p.minOrderPrice ?? 0),
+              }))
+            : undefined,
         });
       }
 
