@@ -194,8 +194,8 @@ export default function SavedAddressesPage() {
   // Save address
   const handleSaveAddress = async () => {
     if (!user) return;
-    const { addressLine1, phoneNumber, city } = formData;
-    if (!addressLine1.trim() || !phoneNumber.trim() || !city.trim()) {
+    const { addressLine1, addressLine2, phoneNumber, city } = formData;
+    if (!addressLine1.trim() || !addressLine2.trim() || !phoneNumber.trim() || !city.trim()) {
       toast.error(l("SavedAddressesDrawer.fillAllFields") || "Please fill in all required fields");
       return;
     }
@@ -542,7 +542,7 @@ export default function SavedAddressesPage() {
               {/* Address Line 2 */}
               <div>
                 <label className={`block text-[11px] font-semibold uppercase tracking-wider mb-1.5 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
-                  {l("SavedAddressesDrawer.addressLine2") || "Address Line 2"}
+                  {l("SavedAddressesDrawer.addressLine2") || "Address Line 2"} *
                 </label>
                 <input
                   type="text"
@@ -630,7 +630,7 @@ export default function SavedAddressesPage() {
               </button>
               <button
                 onClick={handleSaveAddress}
-                disabled={!formData.addressLine1.trim() || !formData.phoneNumber.trim() || !formData.city.trim() || !isValidPhoneNumber(formData.phoneNumber)}
+                disabled={!formData.addressLine1.trim() || !formData.addressLine2.trim() || !formData.phoneNumber.trim() || !formData.city.trim() || !isValidPhoneNumber(formData.phoneNumber)}
                 className="flex-1 py-2.5 px-4 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-[13px] font-semibold disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed transition-colors"
               >
                 {l("SavedAddressesDrawer.save") || "Save"}

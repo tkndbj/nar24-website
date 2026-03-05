@@ -370,6 +370,7 @@ export default function FoodLocationPicker({
   const validateNewAddress = useCallback((): boolean => {
     const newErrors: Record<string, string> = {};
     if (!formAddress.addressLine1.trim()) newErrors.addressLine1 = t("fieldRequired");
+    if (!formAddress.addressLine2.trim()) newErrors.addressLine2 = t("fieldRequired");
     if (!formAddress.city) newErrors.city = t("fieldRequired");
     if (!formAddress.phoneNumber.trim()) {
       newErrors.phoneNumber = t("fieldRequired");
@@ -639,20 +640,26 @@ export default function FoodLocationPicker({
                       isDarkMode ? "text-gray-500" : "text-gray-400"
                     }`}
                   >
-                    {t("addressLine2")}
+                    {t("addressLine2")} *
                   </label>
                   <input
                     type="text"
                     value={formAddress.addressLine2}
-                    onChange={(e) =>
-                      setFormAddress((p) => ({ ...p, addressLine2: e.target.value }))
-                    }
+                    onChange={(e) => {
+                      setFormAddress((p) => ({ ...p, addressLine2: e.target.value }));
+                      setErrors((p) => ({ ...p, addressLine2: "" }));
+                    }}
                     className={`w-full mt-1 px-3 py-2.5 rounded-xl text-sm border transition-colors ${
-                      isDarkMode
-                        ? "bg-gray-800 border-gray-700 text-white placeholder-gray-600 focus:border-orange-500"
-                        : "bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400 focus:border-orange-500"
+                      errors.addressLine2
+                        ? "border-red-500"
+                        : isDarkMode
+                          ? "bg-gray-800 border-gray-700 text-white placeholder-gray-600 focus:border-orange-500"
+                          : "bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400 focus:border-orange-500"
                     } outline-none`}
                   />
+                  {errors.addressLine2 && (
+                    <p className="mt-1 text-xs text-red-500">{errors.addressLine2}</p>
+                  )}
                 </div>
 
                 {/* Main Region Dropdown */}
@@ -1015,8 +1022,8 @@ export default function FoodLocationPicker({
                 </button>
                 <button
                   onClick={editingAddressId ? handleUpdateAddress : handleSaveNewAddress}
-                  disabled={isSaving}
-                  className="flex-1 py-2.5 px-4 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+                  disabled={isSaving || !formAddress.addressLine1.trim() || !formAddress.addressLine2.trim() || !formAddress.phoneNumber.trim() || !formAddress.city.trim() || !isValidPhoneNumber(formAddress.phoneNumber)}
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold transition-colors flex items-center justify-center gap-2"
                 >
                   {isSaving ? (
                     <>
