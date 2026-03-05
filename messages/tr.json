@@ -5107,7 +5107,9 @@
     "cancel": "İptal",
     "confirm": "Onayla",
     "back": "Geri",
-    "noDeliveryToAddress": "Adresinize teslimat yapılmamaktadır"
+    "noDeliveryToAddress": "Adresinize teslimat yapılmamaktadır",
+    "editAddress": "Adresi Düzenle",
+    "updateAddress": "Adresi Güncelle"
   },
   "RestaurantHeader": {
     "restaurants": "Restoranlar",

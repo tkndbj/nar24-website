@@ -12,6 +12,7 @@ import {
   Home,
   Map as MapIcon,
   Crosshair,
+  Pencil,
 } from "lucide-react";
 import { useUser } from "@/context/UserProvider";
 import { useTranslations } from "next-intl";
@@ -257,6 +258,7 @@ export default function FoodLocationPicker({
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [showNewForm, setShowNewForm] = useState(false);
+  const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
 
   // New address form state
   const [formAddress, setFormAddress] = useState({
@@ -347,10 +349,12 @@ export default function FoodLocationPicker({
   // Reset form when toggling new address
   useEffect(() => {
     if (!showNewForm) {
-      setFormAddress({ addressLine1: "", addressLine2: "", phoneNumber: "", selectedMainRegion: "", city: "", location: null });
+      if (!editingAddressId) {
+        setFormAddress({ addressLine1: "", addressLine2: "", phoneNumber: "", selectedMainRegion: "", city: "", location: null });
+      }
       setErrors({});
     }
-  }, [showNewForm]);
+  }, [showNewForm, editingAddressId]);
 
   // Compute subregions for the selected main region
   const availableSubregions = formAddress.selectedMainRegion
@@ -457,6 +461,70 @@ export default function FoodLocationPicker({
     }
   }, [user, selectedAddressId, savedAddresses, updateProfileData, t, onClose]);
 
+  // Start editing an existing address
+  const handleEditAddress = useCallback((addr: SavedAddress) => {
+    const resolvedMainRegion = getMainRegion(addr.city) || "";
+    setEditingAddressId(addr.id);
+    setFormAddress({
+      addressLine1: addr.addressLine1,
+      addressLine2: addr.addressLine2 || "",
+      phoneNumber: addr.phoneNumber ? formatPhoneForDisplay(addr.phoneNumber) : "",
+      selectedMainRegion: resolvedMainRegion,
+      city: addr.city,
+      location: addr.location ?? null,
+    });
+    setShowNewForm(true);
+  }, []);
+
+  // Update an existing address in subcollection, then select it
+  const handleUpdateAddress = useCallback(async () => {
+    if (!user || !editingAddressId || !validateNewAddress()) return;
+
+    setIsSaving(true);
+    try {
+      const { doc, updateDoc, GeoPoint } = await import("firebase/firestore");
+      const { getFirebaseDb } = await import("@/lib/firebase-lazy");
+      const db = await getFirebaseDb();
+      const normalizedPhone = normalizePhone(formAddress.phoneNumber);
+      const resolvedMainRegion = formAddress.selectedMainRegion || getMainRegion(formAddress.city) || formAddress.city;
+
+      const addressData = {
+        addressLine1: formAddress.addressLine1.trim(),
+        addressLine2: formAddress.addressLine2.trim(),
+        phoneNumber: normalizedPhone,
+        city: formAddress.city,
+        ...(formAddress.location
+          ? { location: new GeoPoint(formAddress.location.latitude, formAddress.location.longitude) }
+          : {}),
+      };
+
+      await updateDoc(
+        doc(db, "users", user.uid, "addresses", editingAddressId),
+        addressData
+      );
+
+      // Update foodAddress on user profile if this was the active address
+      const foodAddr = new FoodAddress({
+        addressId: editingAddressId,
+        addressLine1: formAddress.addressLine1.trim(),
+        addressLine2: formAddress.addressLine2.trim() || undefined,
+        city: formAddress.city,
+        mainRegion: resolvedMainRegion,
+        phoneNumber: normalizedPhone,
+        location: formAddress.location ?? undefined,
+      });
+
+      await updateProfileData({ foodAddress: foodAddr.toMap() });
+
+      toast.success(t("addressSelectedSuccess"));
+      onClose();
+    } catch (err) {
+      console.error("[FoodLocationPicker] Error updating address:", err);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [user, editingAddressId, formAddress, validateNewAddress, updateProfileData, t, onClose]);
+
   if (!isOpen) return null;
 
   return (
@@ -500,7 +568,7 @@ export default function FoodLocationPicker({
                     isDarkMode ? "text-gray-500" : "text-gray-400"
                   }`}
                 >
-                  {t("selectDeliveryAddress")}
+                  {editingAddressId ? t("editAddress") : t("selectDeliveryAddress")}
                 </p>
               </div>
             </div>
@@ -813,16 +881,16 @@ export default function FoodLocationPicker({
                   savedAddresses.map((addr) => {
                     const isSelected = selectedAddressId === addr.id;
                     return (
-                      <button
+                      <div
                         key={addr.id}
-                        onClick={() => setSelectedAddressId(addr.id)}
-                        className={`w-full text-left p-3.5 rounded-xl border-2 transition-all ${
+                        className={`relative w-full text-left p-3.5 rounded-xl border-2 transition-all cursor-pointer ${
                           isSelected
                             ? "border-orange-500 bg-orange-500/5"
                             : isDarkMode
                               ? "border-gray-700 hover:border-gray-600"
                               : "border-gray-200 hover:border-gray-300"
                         }`}
+                        onClick={() => setSelectedAddressId(addr.id)}
                       >
                         <div className="flex items-start gap-3">
                           <div
@@ -885,8 +953,22 @@ export default function FoodLocationPicker({
                               </p>
                             )}
                           </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditAddress(addr);
+                            }}
+                            className={`p-1.5 rounded-lg transition-colors flex-shrink-0 ${
+                              isDarkMode
+                                ? "hover:bg-gray-700 text-gray-500 hover:text-gray-300"
+                                : "hover:bg-gray-100 text-gray-400 hover:text-gray-600"
+                            }`}
+                            title={t("editAddress")}
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
                         </div>
-                      </button>
+                      </div>
                     );
                   })
                 )}
@@ -921,7 +1003,7 @@ export default function FoodLocationPicker({
             {showNewForm ? (
               <div className="flex gap-3">
                 <button
-                  onClick={() => setShowNewForm(false)}
+                  onClick={() => { setShowNewForm(false); setEditingAddressId(null); }}
                   className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-semibold transition-colors border ${
                     isDarkMode
                       ? "border-gray-700 text-gray-300 hover:bg-gray-800"
@@ -931,7 +1013,7 @@ export default function FoodLocationPicker({
                   {t("back")}
                 </button>
                 <button
-                  onClick={handleSaveNewAddress}
+                  onClick={editingAddressId ? handleUpdateAddress : handleSaveNewAddress}
                   disabled={isSaving}
                   className="flex-1 py-2.5 px-4 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-sm font-semibold transition-colors flex items-center justify-center gap-2"
                 >
@@ -940,6 +1022,8 @@ export default function FoodLocationPicker({
                       <Loader2 className="w-4 h-4 animate-spin" />
                       {t("saving")}
                     </>
+                  ) : editingAddressId ? (
+                    t("updateAddress")
                   ) : (
                     t("useThisAddress")
                   )}

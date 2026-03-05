@@ -5099,7 +5099,9 @@
     "cancel": "Cancel",
     "confirm": "Confirm",
     "back": "Back",
-    "noDeliveryToAddress": "Does not deliver to your address"
+    "noDeliveryToAddress": "Does not deliver to your address",
+    "editAddress": "Edit Address",
+    "updateAddress": "Update Address"
   },
   "FoodCart": {
     "loginRequired": "Login Required",
