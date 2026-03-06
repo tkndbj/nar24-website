@@ -89,7 +89,7 @@ export default function IsbankPaymentPage() {
         setIsLoading(false);
         setTimeout(() => form.remove(), 1000);
       }, 1500);
-    } catch (err) {
+    } catch {
       setError(t("paymentError"));
       setIsLoading(false);
     }
