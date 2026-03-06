@@ -2161,7 +2161,8 @@
     "backToRestaurants": "Browse Restaurants",
     "cancelPaymentConfirm": "Are you sure you want to cancel this payment?",
     "secureConnectionSSL": "256-bit SSL encrypted connection",
-    "paymentProcessedByIsbank": "Payment is securely processed by İşbank."
+    "paymentProcessedByIsbank": "Payment is securely processed by İşbank.",
+    "refundIssued": "Payment was received but your order could not be created. A full refund has been issued and will appear on your card within 1–3 business days."
   },
   "foodCheckout": {
     "checkout": "Checkout",
@@ -2533,7 +2534,8 @@
     "tryAgain": "Try Again",
     "cancelPaymentConfirm": "Are you sure you want to cancel the payment?",
     "secureConnectionSSL": "Secure SSL Connection",
-    "paymentProcessedByIsbank": "Payment processed securely by İşbank"
+    "paymentProcessedByIsbank": "Payment processed securely by İşbank",
+    "refundIssued": "Payment was received but your order could not be created. A full refund has been issued and will appear on your card within 1–3 business days."
   },
   "DynamicMarket": {
     "filterAll": "All",
