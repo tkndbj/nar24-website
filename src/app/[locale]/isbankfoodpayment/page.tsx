@@ -412,7 +412,7 @@ function FoodPaymentContent() {
 }
 
 // =============================================================================
-// FULL SCREEN MESSAGE — reusable wrapper for success / failed / missing states
+// FULL SCREEN MESSAGE — reusable wrapper for success / failed / missing states.
 // =============================================================================
 
 function FullScreenMessage({
