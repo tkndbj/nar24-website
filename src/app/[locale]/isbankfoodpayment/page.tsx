@@ -4,11 +4,21 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "@/navigation";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Lock, Loader2, AlertCircle, CheckCircle2, X, UtensilsCrossed } from "lucide-react";
+import {
+  Lock,
+  Loader2,
+  AlertCircle,
+  CheckCircle2,
+  X,
+  UtensilsCrossed,
+} from "lucide-react";
 import { httpsCallable } from "firebase/functions";
 import { useUser } from "@/context/UserProvider";
 import { db, functions } from "@/lib/firebase";
-import { FoodCartProvider, useFoodCartActions } from "@/context/FoodCartProvider";
+import {
+  FoodCartProvider,
+  useFoodCartActions,
+} from "@/context/FoodCartProvider";
 
 interface PaymentStatusResponse {
   status: string;
@@ -34,15 +44,11 @@ function FoodPaymentContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [paymentStatus, setPaymentStatus] = useState<
-    "pending" | "completed" | "failed" | "timeout"
-  >("pending");
-  const [successOrderId, setSuccessOrderId] = useState("");
+  const [paymentStatus, setPaymentStatus] = useState<string>("pending");
+  const [successOrderId, setSuccessOrderId] = useState<string>("");
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pollCountRef = useRef(0);
-  const isNavigatingRef = useRef(false);
+  const statusCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const hasSubmittedRef = useRef(false);
 
   // URL params from checkout page
@@ -50,7 +56,7 @@ function FoodPaymentContent() {
   const orderNumber = searchParams.get("orderNumber");
   const paymentParamsStr = searchParams.get("paymentParams");
 
-  // ── Dark mode observer ────────────────────────────────────────────────────────
+  // ── Dark mode observer ─────────────────────────────────────────────
   useEffect(() => {
     const check = () =>
       setIsDarkMode(document.documentElement.classList.contains("dark"));
@@ -60,16 +66,18 @@ function FoodPaymentContent() {
     return () => observer.disconnect();
   }, []);
 
-  // ── Cleanup on unmount ────────────────────────────────────────────────────────
+  // ── Cleanup on unmount ─────────────────────────────────────────────
   useEffect(() => {
     return () => {
-      if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+      if (statusCheckIntervalRef.current) {
+        clearInterval(statusCheckIntervalRef.current);
+      }
     };
   }, []);
 
-  // ── Status check (single call) ────────────────────────────────────────────────
+  // ── Check payment status (single call) ─────────────────────────────
   const checkPaymentStatus = useCallback(async () => {
-    if (!orderNumber || isNavigatingRef.current) return;
+    if (!orderNumber) return;
 
     try {
       const checkStatus = httpsCallable(functions, "checkFoodPaymentStatus");
@@ -77,57 +85,77 @@ function FoodPaymentContent() {
       const data = result.data as PaymentStatusResponse;
       const status = data?.status;
 
-      switch (status) {
-        case "completed":
-          handlePaymentSuccess(data.orderId ?? "");
-          break;
+      if (status === "completed") {
+        if (statusCheckIntervalRef.current) {
+          clearInterval(statusCheckIntervalRef.current);
+          statusCheckIntervalRef.current = null;
+        }
+        setPaymentStatus("completed");
+        setSuccessOrderId(data.orderId || "");
 
-        case "payment_failed":
-        case "hash_verification_failed":
-          handlePaymentFailed(data.errorMessage ?? t("paymentFailed"));
-          break;
+        // Clear the food cart
+        try {
+          await clearCart();
+        } catch (e) {
+          console.warn("[FoodPayment] Cart clear failed (non-critical):", e);
+        }
 
-        case "payment_succeeded_order_failed":
-        case "refunded":
-          // Auto-refund has been issued by the backend
-          handlePaymentFailed(t("refundIssued"));
-          break;
-
-        // 'processing', 'awaiting_3d' — keep waiting
+        // Navigate after brief success display
+        setTimeout(() => {
+          router.push(
+            `/food-orders?success=true&orderId=${data.orderId || ""}`,
+          );
+        }, 2000);
+      } else if (
+        status === "payment_failed" ||
+        status === "hash_verification_failed" ||
+        status === "payment_succeeded_order_failed"
+      ) {
+        if (statusCheckIntervalRef.current) {
+          clearInterval(statusCheckIntervalRef.current);
+          statusCheckIntervalRef.current = null;
+        }
+        setPaymentStatus("failed");
+        setError(data.errorMessage || t("paymentFailed"));
       }
-    } catch {
-      // Transient error — keep polling
+    } catch (err) {
+      // Don't stop polling on transient errors
+      console.error("[FoodPayment] Status check error:", err);
     }
-  }, [orderNumber, t]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [orderNumber, clearCart, router, t]);
 
-  // ── Adaptive polling ──────────────────────────────────────────────────────────
-  // First 15 polls: every 2s (30s) — bank callback fires here
-  // Next 30 polls: every 5s (150s) — ~3 min total, ~45 calls max
-  const scheduleNextPoll = useCallback(() => {
-    if (!orderNumber || isNavigatingRef.current) return;
-    const delay = pollCountRef.current < 15 ? 2000 : 5000;
+  // ── Start polling ──────────────────────────────────────────────────
+  const startStatusPolling = useCallback(() => {
+    if (!orderNumber || statusCheckIntervalRef.current) return;
 
-    pollTimerRef.current = setTimeout(async () => {
-      pollCountRef.current += 1;
+    let pollCount = 0;
+    const maxPolls = 300; // 5 minutes
 
-      if (pollCountRef.current > 45) {
-        handleTimeout();
+    statusCheckIntervalRef.current = setInterval(() => {
+      pollCount++;
+
+      if (pollCount > maxPolls) {
+        if (statusCheckIntervalRef.current) {
+          clearInterval(statusCheckIntervalRef.current);
+          statusCheckIntervalRef.current = null;
+        }
+        setPaymentStatus("timeout");
+        setError(t("paymentTimeout"));
         return;
       }
 
-      await checkPaymentStatus();
+      checkPaymentStatus();
+    }, 1000);
+  }, [orderNumber, checkPaymentStatus, t]);
 
-      if (!isNavigatingRef.current) scheduleNextPoll();
-    }, delay);
-  }, [orderNumber, checkPaymentStatus]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Submit form to iframe ─────────────────────────────────────────────────────
+  // ── Submit form to iframe ──────────────────────────────────────────
   const submitPaymentForm = useCallback(() => {
     if (!gatewayUrl || !paymentParamsStr || hasSubmittedRef.current) return;
     hasSubmittedRef.current = true;
 
     try {
       const paymentParams = JSON.parse(paymentParamsStr);
+
       const form = document.createElement("form");
       form.method = "POST";
       form.action = gatewayUrl;
@@ -143,18 +171,21 @@ function FoodPaymentContent() {
       });
 
       document.body.appendChild(form);
+
+      // Small delay for iframe to be ready
       setTimeout(() => {
         form.submit();
         setIsLoading(false);
         setTimeout(() => form.remove(), 1000);
       }, 1200);
-    } catch {
+    } catch (err) {
+      console.error("[FoodPayment] Form submit error:", err);
       setError(t("paymentError"));
       setIsLoading(false);
     }
   }, [gatewayUrl, paymentParamsStr, t]);
 
-  // ── Init ──────────────────────────────────────────────────────────────────────
+  // ── Init: submit form + start polling ──────────────────────────────
   useEffect(() => {
     if (!gatewayUrl || !orderNumber || !paymentParamsStr) {
       setError(t("missingPaymentInfo"));
@@ -162,161 +193,162 @@ function FoodPaymentContent() {
       return;
     }
 
-    scheduleNextPoll();
+    startStatusPolling();
     submitPaymentForm();
-  }, [gatewayUrl, orderNumber, paymentParamsStr, scheduleNextPoll, submitPaymentForm, t]);
+  }, [
+    gatewayUrl,
+    orderNumber,
+    paymentParamsStr,
+    startStatusPolling,
+    submitPaymentForm,
+    t,
+  ]);
 
-  // ── Success ───────────────────────────────────────────────────────────────────
-  const handlePaymentSuccess = async (orderId: string) => {
-    if (isNavigatingRef.current) return;
-    isNavigatingRef.current = true;
-    if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
-
-    setPaymentStatus("completed");
-    setSuccessOrderId(orderId);
-
-    // Clear cart (non-critical)
-    try {
-      await clearCart();
-    } catch {
-      // Silent
-    }
-
-    setTimeout(() => {
-      router.push(`/food-orders?success=true&orderId=${orderId}`);
-    }, 2000);
-  };
-
-  // ── Failure ───────────────────────────────────────────────────────────────────
-  const handlePaymentFailed = (errorMessage: string) => {
-    if (isNavigatingRef.current) return;
-    isNavigatingRef.current = true;
-    if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
-
-    setError(errorMessage);
-    setPaymentStatus("failed");
-    // No auto-redirect — user reads the message and chooses what to do
-  };
-
-  // ── Timeout ───────────────────────────────────────────────────────────────────
-  const handleTimeout = () => {
-    if (isNavigatingRef.current) return;
-    isNavigatingRef.current = true;
-
-    setPaymentStatus("timeout");
-    setError(t("paymentTimeout"));
-  };
-
-  // ── Cancel ────────────────────────────────────────────────────────────────────
+  // ── Cancel handler ─────────────────────────────────────────────────
   const handleCancel = () => {
-    // Payment already resolved — X button should do nothing
-    if (isNavigatingRef.current) return;
-
-    if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+    if (statusCheckIntervalRef.current) {
+      clearInterval(statusCheckIntervalRef.current);
+      statusCheckIntervalRef.current = null;
+    }
 
     if (confirm(t("cancelPaymentConfirm"))) {
       router.back();
     } else {
-      // Resume polling — reset count for a fresh window
-      pollCountRef.current = 0;
-      scheduleNextPoll();
+      // Resume polling if user didn't confirm cancel
+      startStatusPolling();
     }
   };
 
-  // ── Shared bg ─────────────────────────────────────────────────────────────────
+  // ── Shared gradient bg ─────────────────────────────────────────────
   const bgClass = isDarkMode
     ? "bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900"
     : "bg-gradient-to-br from-orange-50 via-white to-amber-50";
 
-  // =============================================================================
-  // RENDER
-  // =============================================================================
-
-  // Missing params
+  // ════════════════════════════════════════════════════════════════════
+  // RENDER: Missing params
+  // ════════════════════════════════════════════════════════════════════
   if (!gatewayUrl || !orderNumber || !paymentParamsStr) {
     return (
-      <FullScreenMessage bgClass={bgClass}>
-        <AlertCircle size={64} className="mx-auto mb-4 text-red-500" />
-        <h2 className={`text-2xl font-bold mb-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-          {t("paymentError")}
-        </h2>
-        <p className={`mb-6 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-          {error || t("missingPaymentInfo")}
-        </p>
-        <button
-          onClick={() => router.back()}
-          className="px-6 py-3 bg-orange-500 text-white rounded-xl hover:bg-orange-600 transition-colors font-semibold"
-        >
-          {t("goBack")}
-        </button>
-      </FullScreenMessage>
-    );
-  }
-
-  // Success
-  if (paymentStatus === "completed") {
-    return (
-      <FullScreenMessage bgClass={bgClass}>
-        <div className="w-24 h-24 mx-auto mb-6 bg-green-500/15 rounded-full flex items-center justify-center">
-          <CheckCircle2 size={48} className="text-green-500" />
-        </div>
-        <h2 className={`text-2xl font-bold mb-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-          {t("paymentSuccessful")}
-        </h2>
-        <p className={`mb-4 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-          {t("orderSentToRestaurant")}
-        </p>
-        {successOrderId && (
-          <p className={`text-xs mb-4 ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>
-            {t("orderId")}: {successOrderId.substring(0, 8).toUpperCase()}
+      <div
+        className={`min-h-screen flex items-center justify-center ${bgClass}`}
+      >
+        <div className="text-center max-w-md p-8">
+          <AlertCircle size={64} className="mx-auto mb-4 text-red-500" />
+          <h2
+            className={`text-2xl font-bold mb-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}
+          >
+            {t("paymentError")}
+          </h2>
+          <p
+            className={`mb-6 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}
+          >
+            {error || t("missingPaymentInfo")}
           </p>
-        )}
-        <div className="flex items-center justify-center gap-2 text-orange-500">
-          <Loader2 size={20} className="animate-spin" />
-          <span className="text-sm font-medium">{t("redirecting")}</span>
-        </div>
-      </FullScreenMessage>
-    );
-  }
-
-  // Failed / timeout
-  if (paymentStatus === "failed" || paymentStatus === "timeout") {
-    return (
-      <FullScreenMessage bgClass={bgClass}>
-        <AlertCircle size={64} className="mx-auto mb-4 text-red-500" />
-        <h2 className={`text-2xl font-bold mb-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-          {paymentStatus === "timeout" ? t("paymentTimeout") : t("paymentFailed")}
-        </h2>
-        <p className={`mb-6 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-          {error || t("paymentProcessingError")}
-        </p>
-        <div className="flex flex-col gap-2">
           <button
             onClick={() => router.back()}
             className="px-6 py-3 bg-orange-500 text-white rounded-xl hover:bg-orange-600 transition-colors font-semibold"
           >
-            {t("tryAgain")}
-          </button>
-          <button
-            onClick={() => router.push("/restaurants")}
-            className={`px-6 py-2.5 rounded-xl text-sm transition-colors ${
-              isDarkMode ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            {t("backToRestaurants")}
+            {t("goBack")}
           </button>
         </div>
-      </FullScreenMessage>
+      </div>
     );
   }
 
-  // Active payment
+  // ════════════════════════════════════════════════════════════════════
+  // RENDER: Success
+  // ════════════════════════════════════════════════════════════════════
+  if (paymentStatus === "completed") {
+    return (
+      <div
+        className={`min-h-screen flex items-center justify-center ${bgClass}`}
+      >
+        <div className="text-center max-w-md p-8">
+          <div className="w-24 h-24 mx-auto mb-6 bg-green-500/15 rounded-full flex items-center justify-center">
+            <CheckCircle2 size={48} className="text-green-500" />
+          </div>
+          <h2
+            className={`text-2xl font-bold mb-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}
+          >
+            {t("paymentSuccessful")}
+          </h2>
+          <p
+            className={`mb-4 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}
+          >
+            {t("orderSentToRestaurant")}
+          </p>
+          {successOrderId && (
+            <p
+              className={`text-xs mb-4 ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}
+            >
+              {t("orderId")}: {successOrderId.substring(0, 8).toUpperCase()}
+            </p>
+          )}
+          <div className="flex items-center justify-center gap-2 text-orange-500">
+            <Loader2 size={20} className="animate-spin" />
+            <span className="text-sm font-medium">{t("redirecting")}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ════════════════════════════════════════════════════════════════════
+  // RENDER: Failed / Timeout
+  // ════════════════════════════════════════════════════════════════════
+  if (paymentStatus === "failed" || paymentStatus === "timeout" || error) {
+    return (
+      <div
+        className={`min-h-screen flex items-center justify-center ${bgClass}`}
+      >
+        <div className="text-center max-w-md p-8">
+          <AlertCircle size={64} className="mx-auto mb-4 text-red-500" />
+          <h2
+            className={`text-2xl font-bold mb-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}
+          >
+            {paymentStatus === "timeout"
+              ? t("paymentTimeout")
+              : t("paymentFailed")}
+          </h2>
+          <p
+            className={`mb-6 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}
+          >
+            {error || t("paymentProcessingError")}
+          </p>
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => router.back()}
+              className="px-6 py-3 bg-orange-500 text-white rounded-xl hover:bg-orange-600 transition-colors font-semibold"
+            >
+              {t("tryAgain")}
+            </button>
+            <button
+              onClick={() => router.push("/restaurants")}
+              className={`px-6 py-2.5 rounded-xl text-sm transition-colors ${
+                isDarkMode
+                  ? "text-gray-400 hover:text-white"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {t("backToRestaurants")}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ════════════════════════════════════════════════════════════════════
+  // RENDER: Payment iframe (active payment flow)
+  // ════════════════════════════════════════════════════════════════════
   return (
     <div className={`min-h-screen ${bgClass}`}>
       {/* Header */}
       <div
         className={`sticky top-0 z-10 border-b backdrop-blur-xl ${
-          isDarkMode ? "bg-gray-900/80 border-gray-700/50" : "bg-white/80 border-gray-200/50"
+          isDarkMode
+            ? "bg-gray-900/80 border-gray-700/50"
+            : "bg-white/80 border-gray-200/50"
         }`}
       >
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
@@ -335,18 +367,19 @@ function FoodPaymentContent() {
               <div className="flex items-center gap-2">
                 <Lock size={18} className="text-green-500" />
                 <h1
-                  className={`text-lg font-bold ${
-                    isDarkMode ? "text-white" : "text-gray-900"
-                  }`}
+                  className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}
                 >
                   {t("securePayment")}
                 </h1>
               </div>
             </div>
 
+            {/* Food order badge */}
             <div
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${
-                isDarkMode ? "bg-orange-500/15 text-orange-400" : "bg-orange-50 text-orange-600"
+                isDarkMode
+                  ? "bg-orange-500/15 text-orange-400"
+                  : "bg-orange-50 text-orange-600"
               }`}
             >
               <UtensilsCrossed size={14} />
@@ -379,7 +412,9 @@ function FoodPaymentContent() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         <div
           className={`rounded-2xl shadow-2xl border overflow-hidden ${
-            isDarkMode ? "bg-gray-800/80 border-gray-700/50" : "bg-white/80 border-gray-200/50"
+            isDarkMode
+              ? "bg-gray-800/80 border-gray-700/50"
+              : "bg-white/80 border-gray-200/50"
           }`}
         >
           <iframe
@@ -395,36 +430,18 @@ function FoodPaymentContent() {
         {/* Security footer */}
         <div className="mt-6 text-center">
           <div
-            className={`flex items-center justify-center gap-2 text-sm ${
-              isDarkMode ? "text-gray-400" : "text-gray-600"
-            }`}
+            className={`flex items-center justify-center gap-2 text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}
           >
             <Lock size={14} className="text-green-500" />
             <span>{t("secureConnectionSSL")}</span>
           </div>
-          <p className={`mt-1.5 text-xs ${isDarkMode ? "text-gray-600" : "text-gray-500"}`}>
+          <p
+            className={`mt-1.5 text-xs ${isDarkMode ? "text-gray-600" : "text-gray-500"}`}
+          >
             {t("paymentProcessedByIsbank")}
           </p>
         </div>
       </div>
-    </div>
-  );
-}
-
-// =============================================================================
-// FULL SCREEN MESSAGE — reusable wrapper for success / failed / missing states.
-// =============================================================================
-
-function FullScreenMessage({
-  bgClass,
-  children,
-}: {
-  bgClass: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className={`min-h-screen flex items-center justify-center ${bgClass}`}>
-      <div className="text-center max-w-md p-8">{children}</div>
     </div>
   );
 }
