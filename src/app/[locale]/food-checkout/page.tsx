@@ -678,16 +678,7 @@ function FoodCheckoutContent() {
                       </p>
                     )}
                   </div>
-                  <Link
-                    href="/food-address"
-                    className={`text-xs font-medium transition-colors flex-shrink-0 ${
-                      isDarkMode
-                        ? "text-orange-400 hover:text-orange-300"
-                        : "text-orange-500 hover:text-orange-600"
-                    }`}
-                  >
-                    {t("change")}
-                  </Link>
+                 
                 </div>
               ) : (
                 <div
