@@ -153,20 +153,20 @@ export default function SearchBar({
     return () => setIsMounted(false);
   }, []);
 
-  // ── Body scroll lock on mobile ────────────────────────────────────────────
+  // ── Body scroll lock (no layout shift) ──────────────────────────────────
   useEffect(() => {
-    if (!isSearching || !isMobile) return;
-    const scrollY = window.scrollY;
-    document.body.style.position = "fixed";
-    document.body.style.top = `-${scrollY}px`;
-    document.body.style.width = "100%";
+    if (!isSearching) return;
+    const scrollbarWidth =
+      window.innerWidth - document.documentElement.clientWidth;
+    document.body.style.overflow = "hidden";
+    if (scrollbarWidth > 0) {
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+    }
     return () => {
-      document.body.style.position = "";
-      document.body.style.top = "";
-      document.body.style.width = "";
-      window.scrollTo(0, scrollY);
+      document.body.style.overflow = "";
+      document.body.style.paddingRight = "";
     };
-  }, [isSearching, isMobile]);
+  }, [isSearching]);
 
   // ── Dropdown position ─────────────────────────────────────────────────────
   useEffect(() => {

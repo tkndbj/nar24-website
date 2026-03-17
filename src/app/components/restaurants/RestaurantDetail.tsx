@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -21,7 +22,8 @@ import {
   Check,
   MapPin,
   Percent,
-  AlertTriangle, 
+  AlertTriangle,
+  X,
 } from "lucide-react";
 import TypeSenseServiceManager from "@/lib/typesense_service_manager";
 import FilterIcons from "./FilterIcons";
@@ -167,6 +169,74 @@ function RestaurantHeader({
   );
 }
 
+// ─── Food Image Lightbox ─────────────────────────────────────────────────────
+
+function FoodImageLightbox({
+  src,
+  alt,
+  onClose,
+}: {
+  src: string;
+  alt: string;
+  onClose: () => void;
+}) {
+  // Lock body scroll without layout shift
+  useEffect(() => {
+    const scrollbarWidth =
+      window.innerWidth - document.documentElement.clientWidth;
+    document.body.style.overflow = "hidden";
+    if (scrollbarWidth > 0) {
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+    return () => {
+      document.body.style.overflow = "";
+      document.body.style.paddingRight = "";
+    };
+  }, []);
+
+  // Close on Escape
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [onClose]);
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 animate-in fade-in duration-200"
+      onClick={onClose}
+    >
+      {/* Close button */}
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors z-10"
+        aria-label="Close"
+      >
+        <X size={20} />
+      </button>
+
+      {/* Image */}
+      <div
+        className="relative max-w-[90vw] max-h-[85vh] animate-in zoom-in-95 duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <Image
+          src={src}
+          alt={alt}
+          width={800}
+          height={800}
+          className="object-contain max-h-[85vh] rounded-2xl"
+          sizes="90vw"
+          priority
+        />
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 // ─── Food Card ──────────────────────────────────────────────────────────────
 
 // Pending conflict data stored by parent so the dialog is rendered once
@@ -220,6 +290,7 @@ function FoodCard({
   const { addItem } = useFoodCartActions();
 
   const [extrasOpen, setExtrasOpen] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   // Try to get localized food type name
   const translationKey =
@@ -304,7 +375,11 @@ function FoodCard({
       >
         {/* Food image — only shown when available */}
         {food.imageUrl && (
-          <div className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-xl overflow-hidden flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => setLightboxOpen(true)}
+            className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-xl overflow-hidden flex-shrink-0 cursor-zoom-in"
+          >
             <Image
               src={food.imageUrl}
               alt={food.name}
@@ -317,7 +392,7 @@ function FoodCard({
                 -{food.discount.percentage}%
               </div>
             )}
-          </div>
+          </button>
         )}
 
         {/* Food info */}
@@ -455,6 +530,14 @@ function FoodCard({
         allowedExtras={food.extras}
         isDarkMode={isDarkMode}
       />
+
+      {lightboxOpen && food.imageUrl && (
+        <FoodImageLightbox
+          src={food.imageUrl}
+          alt={food.name}
+          onClose={() => setLightboxOpen(false)}
+        />
+      )}
     </>
   );
 }
