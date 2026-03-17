@@ -1367,8 +1367,9 @@
   "ProfilePage": {
     "refundForm": "Refund Form",
     "invalidFileType": "Please select a valid image file (JPG, PNG or GIF)",
-    "fileSizeError": "Image size must be smaller than 20MB",
+    "fileSizeError": "Image size must be smaller than 10MB",
     "imageUploadSuccess": "Profile image updated successfully!",
+    "imageModerated": "This image was not accepted. Please choose an appropriate profile photo.",
     "imageUploadError": "Could not upload image. Please try again.",
     "loginToViewProfile": "Login to view your profile",
     "login": "Login",

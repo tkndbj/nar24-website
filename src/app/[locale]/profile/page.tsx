@@ -3,8 +3,10 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useUser } from "@/context/UserProvider";
 import { updateDoc, doc } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { db, storage } from "@/lib/firebase";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import { httpsCallable } from "firebase/functions";
+import { db, storage, functions } from "@/lib/firebase";
+import { smartCompress, shouldCompress } from "@/app/utils/imageCompression";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
@@ -100,7 +102,7 @@ export default function ProfilePage() {
       return;
     }
 
-    const maxSize = 20 * 1024 * 1024;
+    const maxSize = 10 * 1024 * 1024;
     if (file.size > maxSize) {
       alert(t("ProfilePage.fileSizeError"));
       return;
@@ -108,9 +110,29 @@ export default function ProfilePage() {
 
     setIsUploadingImage(true);
     try {
+      // Compress if needed
+      let fileToUpload: File | Blob = file;
+      if (shouldCompress(file, 500)) {
+        const result = await smartCompress(file, "thumbnail");
+        fileToUpload = result.compressedFile;
+      }
+
       const storageRef = ref(storage, `profileImages/${user.uid}`);
-      const snapshot = await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(snapshot.ref);
+      await uploadBytes(storageRef, fileToUpload);
+      const downloadURL = await getDownloadURL(storageRef);
+
+      // Content moderation
+      const moderateImage = httpsCallable<
+        { imageUrl: string },
+        { approved: boolean; rejectionReason?: string }
+      >(functions, "moderateImage");
+      const modResult = await moderateImage({ imageUrl: downloadURL });
+
+      if (!modResult.data.approved) {
+        await deleteObject(storageRef);
+        alert(t("ProfilePage.imageModerated"));
+        return;
+      }
 
       await updateDoc(doc(db, "users", user.uid), {
         profileImage: downloadURL,
