@@ -25,7 +25,6 @@ import {
   QueryDocumentSnapshot,
   DocumentChange,
   getDoc,
-  getDocs,
   Timestamp,
   FieldValue,
   Firestore,
