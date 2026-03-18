@@ -1357,6 +1357,19 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         };
       }
 
+      // Early exit: if user doc says favorites is empty, skip subcollection read
+      const cachedIds = getProfileField<string[]>("favoriteItemIds");
+      if (Array.isArray(cachedIds) && cachedIds.length === 0) {
+        console.log("✅ Favorites: User doc says empty, skipping subcollection read");
+        setHasMoreData(false);
+        setIsInitialLoadComplete(true);
+        return {
+          docs: [],
+          hasMore: false,
+          error: null,
+        };
+      }
+
       setIsLoadingMore(true);
       console.log("🔵 loadNextPage: Set isLoading=true");
 

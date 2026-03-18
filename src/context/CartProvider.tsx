@@ -1041,6 +1041,19 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     const initPromise = (async () => {
       setIsLoading(true);
 
+      // Early exit: if user doc says cart is empty, skip subcollection read entirely
+      const cachedIds = getProfileField<string[]>("cartItemIds");
+      if (Array.isArray(cachedIds) && cachedIds.length === 0) {
+        console.log("✅ Cart: User doc says empty, skipping subcollection read");
+        setCartItems([]);
+        setCartProductIds(new Set());
+        setCartCount(0);
+        setHasMore(false);
+        setIsInitialized(true);
+        setIsLoading(false);
+        return;
+      }
+
       // Only clear if there are existing items to avoid clearing optimistic updates
       if (cartItems.length > 0) {
         setCartItems([]);
@@ -1071,7 +1084,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
         console.log("✅ Cart initialized with", snapshot.docs.length, "items");
 
-        // ✅ Set initialized FIRST
+        // Set initialized FIRST
         setIsInitialized(true);
       } catch (error) {
         console.error("❌ Init error:", error);
