@@ -331,22 +331,25 @@ function CartPageContent() {
   }, []);
 
   // Fetch cart data on page mount — but only if we need to
+  const hasTriggeredRefresh = useRef(false);
   useEffect(() => {
-    if (user && !isLoading) {
-      if (isInitialized && cartItems.length > 0 && cartItems[0]?.product) {
-        // Already have full item data in memory (e.g. user added items then navigated here).
-        // Skip the server refresh to avoid overwriting optimistic items.
-        // A background refresh will pick up any discrepancies.
-        console.log("✅ Cart page: using existing local cart data");
-      } else if (isInitialized) {
-        // Seeded with IDs only — need full item data from server
-        refresh();
-      } else {
-        initializeCartIfNeeded();
-      }
+    if (!user || isLoading) return;
+    if (!isInitialized) return; // Wait for seeding effect to complete
+
+    // Only trigger once per page mount
+    if (hasTriggeredRefresh.current) return;
+
+    if (cartItems.length > 0 && cartItems[0]?.product) {
+      // Already have full item data in memory (e.g. user added items then navigated here).
+      console.log("✅ Cart page: using existing local cart data");
+      hasTriggeredRefresh.current = true;
+    } else {
+      // Seeded with IDs only — need full item data from server
+      hasTriggeredRefresh.current = true;
+      refresh();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, isInitialized]);
 
   // Sync selections with cart items (matching Flutter's _syncSelections)
   useEffect(() => {
