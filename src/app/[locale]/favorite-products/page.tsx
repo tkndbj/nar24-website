@@ -46,8 +46,7 @@ export default function FavoriteProductsPage() {
     loadNextPage,
     resetPagination,
     shouldReloadFavorites,
-    enableLiveUpdates,
-    disableLiveUpdates,
+    subscribeToBaskets,
     favoriteBaskets,
   } = useFavorites();
 
@@ -120,17 +119,12 @@ export default function FavoriteProductsPage() {
   // LIFECYCLE MANAGEMENT (Smart Listeners)
   // ========================================================================
 
+  // Load baskets on mount (on-demand, not on app launch)
   useEffect(() => {
-    // Enable real-time updates when page mounts
     if (user) {
-      enableLiveUpdates();
+      subscribeToBaskets();
     }
-
-    return () => {
-      // Disable real-time updates when page unmounts
-      disableLiveUpdates();
-    };
-  }, [user, enableLiveUpdates, disableLiveUpdates]);
+  }, [user, subscribeToBaskets]);
 
   // ========================================================================
   // INITIALIZATION

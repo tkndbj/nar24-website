@@ -949,19 +949,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       // ALWAYS update IDs from full snapshot
       updateCartIds(snapshot.docs);
 
-      // Reconcile user doc array with actual subcollection state
-      const snapshotIds = snapshot.docs.map((d) => d.id).sort();
-      const cachedIds = (getProfileField<string[]>("cartItemIds") || []).sort();
-      if (JSON.stringify(snapshotIds) !== JSON.stringify(cachedIds)) {
-        console.log("🔄 Cart: Reconciling user doc array with subcollection");
-        updateLocalProfileField("cartItemIds", snapshotIds);
-        if (user && db) {
-          updateDoc(doc(db, "users", user.uid), {
-            cartItemIds: snapshotIds,
-          }).catch((err) => console.warn("Cart reconciliation write failed:", err));
-        }
-      }
-
       // Process changes if any exist
       if (snapshot.docChanges().length > 0) {
         console.log(
@@ -1097,28 +1084,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     await initPromise;
     pendingFetchesRef.current.delete("init");
 
-    // Migrate: write cartItemIds to user doc if not yet present
-    try {
-      const currentIds = Array.from(
-        new Set(cartItemsRef.current.map((item) => item.productId))
-      );
-      if (
-        user &&
-        db &&
-        getProfileField<string[]>("cartItemIds") === null
-      ) {
-        await updateDoc(doc(db, "users", user.uid), {
-          cartItemIds: currentIds,
-        });
-        updateLocalProfileField("cartItemIds", currentIds);
-        console.log("🔄 Cart: Migrated cartItemIds to user doc");
-      }
-    } catch (migrationError) {
-      console.warn("Cart migration failed (non-critical):", migrationError);
-    }
-
-    // Note: enableLiveUpdates() is now called by the cart page, not here.
-    // This keeps the listener page-scoped to avoid unbounded reads on launch.
   }, [
     user,
     isInitialized,
@@ -2037,28 +2002,12 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
       const cachedIds = getProfileField<string[]>("cartItemIds");
 
-      if (Array.isArray(cachedIds)) {
-        // Tier 1: Seed from user doc — no Firestore reads
-        console.log("🟢 Cart: Seeding from user doc array:", cachedIds.length, "items");
-        const ids = new Set(cachedIds);
-        setCartProductIds(ids);
-        setCartCount(ids.size);
-        setIsInitialized(true);
-      } else {
-        // Legacy user: fall back to subcollection read, then migrate
-        console.log("🔵 Cart: No cached IDs, falling back to subcollection init...");
-        if (typeof requestIdleCallback !== "undefined") {
-          deferredCartInitRef.current = requestIdleCallback(
-            () => initializeCartIfNeeded(),
-            { timeout: 2000 }
-          );
-        } else {
-          deferredCartInitRef.current = setTimeout(
-            () => initializeCartIfNeeded(),
-            500
-          );
-        }
-      }
+      // Seed from user doc array (0 extra Firestore reads)
+      const ids = new Set(Array.isArray(cachedIds) ? cachedIds : []);
+      console.log("🟢 Cart: Seeding from user doc array:", ids.size, "items");
+      setCartProductIds(ids);
+      setCartCount(ids.size);
+      setIsInitialized(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, isInitialized, profileData]);

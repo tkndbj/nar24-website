@@ -132,6 +132,9 @@ interface FavoritesActionsContextType {
   enableLiveUpdates: () => void;
   disableLiveUpdates: () => void;
 
+  // Baskets (on-demand)
+  subscribeToBaskets: () => void;
+
   // Utilities
   isFavorite: (productId: string) => boolean;
   isGloballyFavorited: (productId: string) => boolean;
@@ -585,11 +588,6 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
     console.log("🔴 Enabling real-time favorites listener");
 
-    // Also subscribe to baskets when listener is active (page-scoped)
-    if (!basketsSubscription.current) {
-      subscribeToBaskets();
-    }
-
     const basketId = selectedBasketIdRef.current;
     const collectionPath = basketId
       ? `users/${user.uid}/favorite_baskets/${basketId}/favorites`
@@ -621,19 +619,6 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
         setFavoriteIds(ids);
         setFavoriteCount(ids.size);
-
-        // Reconcile user doc array with actual subcollection state (default collection only)
-        if (!selectedBasketIdRef.current && user) {
-          const snapshotIds = [...ids].sort();
-          const cachedIds = (getProfileField<string[]>("favoriteItemIds") || []).sort();
-          if (JSON.stringify(snapshotIds) !== JSON.stringify(cachedIds)) {
-            console.log("🔄 Favorites: Reconciling user doc array with subcollection");
-            updateLocalProfileField("favoriteItemIds", snapshotIds);
-            updateDoc(doc(dbRef.current!, "users", user.uid), {
-              favoriteItemIds: snapshotIds,
-            }).catch((err) => console.warn("Favorites reconciliation write failed:", err));
-          }
-        }
 
       },
       (error) => console.error("❌ Listener error:", error)
@@ -748,9 +733,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
             newIds.delete(productId);
             setFavoriteIds(newIds);
             setFavoriteCount(newIds.size);
-            if (!selectedBasketIdRef.current) {
-              updateLocalProfileField("favoriteItemIds", [...newIds]);
-            }
+            updateLocalProfileField("favoriteItemIds", [...newIds]);
 
             // Remove from pagination cache
             paginatedFavoritesMap.current.delete(productId);
@@ -761,8 +744,8 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
             // STEP 2: Delete from Firestore
             await deleteDoc(existingSnap.docs[0].ref);
 
-            // Update user doc array (only for default collection)
-            if (!selectedBasketIdRef.current && user) {
+            // Update user doc array (tracks all favorites across all baskets)
+            if (user) {
               updateDoc(doc(dbRef.current!, "users", user.uid), {
                 favoriteItemIds: arrayRemove(productId),
               }).catch((err) => console.warn("favoriteItemIds arrayRemove failed:", err));
@@ -794,9 +777,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
             newIds.add(productId);
             setFavoriteIds(newIds);
             setFavoriteCount(newIds.size);
-            if (!selectedBasketIdRef.current) {
-              updateLocalProfileField("favoriteItemIds", [...newIds]);
-            }
+            updateLocalProfileField("favoriteItemIds", [...newIds]);
 
             // STEP 2: Add to Firestore
             const favoriteData: Record<string, unknown> = {
@@ -822,7 +803,8 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
             await addDoc(collection(dbRef.current!, collectionPath), favoriteData);
 
             // Update user doc array (only for default collection)
-            if (!selectedBasketIdRef.current && user) {
+            // Update user doc array (tracks all favorites across all baskets)
+            if (user) {
               updateDoc(doc(dbRef.current!, "users", user.uid), {
                 favoriteItemIds: arrayUnion(productId),
               }).catch((err) => console.warn("favoriteItemIds arrayUnion failed:", err));
@@ -973,9 +955,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         productIds.forEach((id) => newIds.delete(id));
         setFavoriteIds(newIds);
         setFavoriteCount(newIds.size);
-        if (!selectedBasketIdRef.current) {
-          updateLocalProfileField("favoriteItemIds", [...newIds]);
-        }
+        updateLocalProfileField("favoriteItemIds", [...newIds]);
 
         // Remove from pagination cache
         productIds.forEach((id) => paginatedFavoritesMap.current.delete(id));
@@ -1033,8 +1013,8 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         });
       }
 
-      // Also update user doc array (only for default collection)
-      if (!selectedBasketIdRef.current && user) {
+      // Update user doc array (tracks all favorites across all baskets)
+      if (user) {
         batch.update(doc(dbRef.current!, "users", user.uid), {
           favoriteItemIds: arrayRemove(...productIds),
         });
@@ -1218,23 +1198,8 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         // Remove from current location
         await deleteDoc(itemSnapshot.docs[0].ref);
 
-        // Update user doc array based on transfer direction
-        if (user) {
-          const isMovingFromDefault = !currentBasket;
-          const isMovingToDefault = !targetBasketId;
-
-          if (isMovingFromDefault) {
-            // Moving FROM default → remove from array
-            updateDoc(doc(dbRef.current!, "users", user.uid), {
-              favoriteItemIds: arrayRemove(productId),
-            }).catch((err) => console.warn("transferToBasket arrayRemove failed:", err));
-          } else if (isMovingToDefault) {
-            // Moving TO default → add to array
-            updateDoc(doc(dbRef.current!, "users", user.uid), {
-              favoriteItemIds: arrayUnion(productId),
-            }).catch((err) => console.warn("transferToBasket arrayUnion failed:", err));
-          }
-        }
+        // No user doc array update needed — product stays favorited,
+        // just moves between containers. favoriteItemIds tracks all favorites.
 
         // Update local cache
         paginatedFavoritesMap.current.delete(productId);
@@ -1667,28 +1632,11 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
       const cachedIds = getProfileField<string[]>("favoriteItemIds");
 
-      if (Array.isArray(cachedIds)) {
-        // Tier 1: Seed from user doc — no Firestore reads
-        console.log("🟢 Favorites: Seeding from user doc array:", cachedIds.length, "items");
-        const ids = new Set(cachedIds);
-        setFavoriteIds(ids);
-        setFavoriteCount(ids.size);
-        // Baskets are loaded on-demand when user opens favorites page
-      } else {
-        // Legacy user: fall back to subcollection read, then migrate
-        console.log("🔵 Favorites: No cached IDs, falling back to subcollection init...");
-        if (typeof requestIdleCallback !== "undefined") {
-          deferredFavInitRef.current = requestIdleCallback(
-            () => initializeIfNeeded(),
-            { timeout: 2500 }
-          );
-        } else {
-          deferredFavInitRef.current = setTimeout(
-            () => initializeIfNeeded(),
-            700
-          );
-        }
-      }
+      // Seed from user doc array (0 extra Firestore reads)
+      const ids = new Set(Array.isArray(cachedIds) ? cachedIds : []);
+      console.log("🟢 Favorites: Seeding from user doc array:", ids.size, "items");
+      setFavoriteIds(ids);
+      setFavoriteCount(ids.size);
     } else if (!user) {
       disableLiveUpdates();
       if (basketsSubscription.current) {
@@ -1833,6 +1781,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
       shouldReloadFavorites,
       enableLiveUpdates,
       disableLiveUpdates,
+      subscribeToBaskets,
       isFavorite,
       isGloballyFavorited,
       isFavoritedInBasket,
@@ -1851,6 +1800,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
       shouldReloadFavorites,
       enableLiveUpdates,
       disableLiveUpdates,
+      subscribeToBaskets,
       isFavorite,
       isGloballyFavorited,
       isFavoritedInBasket,
