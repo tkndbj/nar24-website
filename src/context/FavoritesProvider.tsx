@@ -16,7 +16,6 @@ import React, {
 import {
   collection,
   doc,
-  onSnapshot,
   writeBatch,
   serverTimestamp,
   query,
@@ -32,7 +31,6 @@ import {
   updateDoc,
   arrayUnion,
   arrayRemove,
-  Unsubscribe,
   FieldValue,
   orderBy,
   startAfter as firestoreStartAfter,
@@ -129,12 +127,8 @@ interface FavoritesActionsContextType {
   resetPagination: () => void;
   shouldReloadFavorites: (basketId: string | null) => boolean;
 
-  // Real-time listeners
-  enableLiveUpdates: () => void;
-  disableLiveUpdates: () => void;
-
-  // Baskets (on-demand)
-  subscribeToBaskets: () => void;
+  // Baskets (on-demand fetch, no listener)
+  fetchBaskets: () => Promise<void>;
 
   // Utilities
   isFavorite: (productId: string) => boolean;
@@ -303,7 +297,6 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   const [favoriteBaskets, setFavoriteBaskets] = useState<FavoriteBasket[]>([]);
 
   // Internal state
-  const [allFavoriteIds] = useState<Set<string>>(new Set());
   const lastDocument = useRef<DocumentSnapshot | null>(null);
   const paginatedFavoritesMap = useRef<Map<string, PaginatedFavorite>>(
     new Map()
@@ -321,11 +314,6 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   const basketCacheMap = useRef<Map<string, BasketCache>>(new Map());
   const BASKET_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-  // Firestore listeners
-  const favoriteSubscription = useRef<Unsubscribe | null>(null);
-  const globalFavoriteSubscription = useRef<Unsubscribe | null>(null);
-  const basketsSubscription = useRef<Unsubscribe | null>(null);
-  const authSubscription = useRef<Unsubscribe | null>(null);
 
   // Timers
   const removeFavoriteTimer = useRef<NodeJS.Timeout | null>(null);
@@ -572,71 +560,9 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   // INITIALIZATION & DATA LOADING
   // ========================================================================
 
-  // Favorite IDs are now loaded exclusively via the onSnapshot listener
-  // (enableLiveUpdates), which delivers initial data on attach — no separate
-  // getDocs fetch needed. This is the standard single-source-of-truth pattern.
-
-  // ========================================================================
-  // REAL-TIME LISTENERS
-  // ========================================================================
-
-  const enableLiveUpdates = useCallback(() => {
-    if (!user) return;
-
-    if (favoriteSubscription.current) {
-      favoriteSubscription.current();
-    }
-
-    console.log("🔴 Enabling real-time favorites listener");
-
-    const basketId = selectedBasketIdRef.current;
-    const collectionPath = basketId
-      ? `users/${user.uid}/favorite_baskets/${basketId}/favorites`
-      : `users/${user.uid}/favorites`;
-
-    favoriteSubscription.current = onSnapshot(
-      collection(dbRef.current!, collectionPath),
-      (snapshot) => {
-        if (snapshot.metadata.fromCache) {
-          console.log("⏭️ Skipping cache event");
-          return;
-        }
-
-        trackReads("Favorites:Listener", snapshot.docChanges().length || 1);
-
-        console.log(
-          "🔥 Real-time update:",
-          snapshot.docChanges().length,
-          "changes"
-        );
-
-        const ids = new Set<string>();
-        snapshot.docs.forEach((doc) => {
-          const data = doc.data();
-          if (data.productId) {
-            ids.add(data.productId as string);
-          }
-        });
-
-        setFavoriteIds(ids);
-        setFavoriteCount(ids.size);
-
-      },
-      (error) => console.error("❌ Listener error:", error)
-    );
-  }, [user, getProfileField, updateLocalProfileField]);
-
-  const disableLiveUpdates = useCallback(() => {
-    console.log("🔴 Disabling favorites listener");
-    if (favoriteSubscription.current) {
-      favoriteSubscription.current();
-      favoriteSubscription.current = null;
-    }
-    if (basketsSubscription.current) {
-      basketsSubscription.current();
-      basketsSubscription.current = null;
-    }
-  }, []);
+  // Favorite IDs are seeded from user doc `favoriteItemIds` array (Tier 1).
+  // No listener needed — local state is the source of truth for the session.
+  // Full item data is fetched on-demand via getDocsFromServer (favorites page).
 
   const initializeIfNeeded = useCallback(async () => {
     if (!user) return;
@@ -650,9 +576,9 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
     const promise = (async () => {
       try {
-        // onSnapshot delivers initial data immediately on attach,
-        // so a separate getDocs is unnecessary — single source of truth.
-        enableLiveUpdates();
+        // IDs are already seeded from user doc in the effect below.
+        // Mark as initialized so the favorites page can start loading full data.
+        setIsInitialLoadComplete(true);
       } catch (error) {
         console.error("❌ Init error:", error);
       }
@@ -661,7 +587,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
     pendingFetches.current.set("init", promise);
     await promise;
     pendingFetches.current.delete("init");
-  }, [user, enableLiveUpdates]);
+  }, [user]);
 
   // ========================================================================
   // ADD/REMOVE FAVORITES
@@ -729,28 +655,67 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
           isRemoving = existingSnap.docs.length > 0;
 
           if (isRemoving) {
-            // STEP 1: Optimistic removal
-            const newIds = new Set(favoriteIds);
-            newIds.delete(productId);
-            setFavoriteIds(newIds);
-            setFavoriteCount(newIds.size);
-            updateLocalProfileField("favoriteItemIds", [...newIds]);
+            // STEP 1: Delete from Firestore first
+            await deleteDoc(existingSnap.docs[0].ref);
 
-            // Remove from pagination cache
+            // STEP 2: Check if product exists in any other location before
+            // removing from the global favoriteItemIds array
+            let existsElsewhere = false;
+
+            if (basketId) {
+              // Removed from a basket — check default favorites
+              const defaultSnap = await getDocs(
+                query(
+                  collection(dbRef.current!, `users/${user.uid}/favorites`),
+                  where("productId", "==", productId),
+                  firestoreLimit(1)
+                )
+              );
+              if (!defaultSnap.empty) {
+                existsElsewhere = true;
+              } else {
+                // Check other baskets
+                const basketsSnap = await getDocs(
+                  collection(dbRef.current!, `users/${user.uid}/favorite_baskets`)
+                );
+                for (const bDoc of basketsSnap.docs) {
+                  if (bDoc.id === basketId) continue; // skip current basket
+                  const favSnap = await getDocs(
+                    query(
+                      collection(bDoc.ref, "favorites"),
+                      where("productId", "==", productId),
+                      firestoreLimit(1)
+                    )
+                  );
+                  if (!favSnap.empty) {
+                    existsElsewhere = true;
+                    break;
+                  }
+                }
+              }
+            }
+            // If from default collection (no basketId), always safe to remove
+
+            // STEP 3: Only remove from user doc array if not in any other location
+            if (!existsElsewhere) {
+              const newIds = new Set(favoriteIds);
+              newIds.delete(productId);
+              setFavoriteIds(newIds);
+              setFavoriteCount(newIds.size);
+              updateLocalProfileField("favoriteItemIds", [...newIds]);
+
+              if (user) {
+                updateDoc(doc(dbRef.current!, "users", user.uid), {
+                  favoriteItemIds: arrayRemove(productId),
+                }).catch((err) => console.warn("favoriteItemIds arrayRemove failed:", err));
+              }
+            }
+
+            // Remove from pagination cache (always — it's removed from current view)
             paginatedFavoritesMap.current.delete(productId);
             setPaginatedFavorites(
               Array.from(paginatedFavoritesMap.current.values())
             );
-
-            // STEP 2: Delete from Firestore
-            await deleteDoc(existingSnap.docs[0].ref);
-
-            // Update user doc array (tracks all favorites across all baskets)
-            if (user) {
-              updateDoc(doc(dbRef.current!, "users", user.uid), {
-                favoriteItemIds: arrayRemove(productId),
-              }).catch((err) => console.warn("favoriteItemIds arrayRemove failed:", err));
-            }
 
             const metadata = await getProductMetadata(productId);
             userActivityService.trackUnfavorite({
@@ -951,20 +916,13 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
           shopIds[productId] = await getProductShopId(productId);
         }
 
-        // STEP 2: Optimistic removal
-        const newIds = new Set(favoriteIds);
-        productIds.forEach((id) => newIds.delete(id));
-        setFavoriteIds(newIds);
-        setFavoriteCount(newIds.size);
-        updateLocalProfileField("favoriteItemIds", [...newIds]);
-
-        // Remove from pagination cache
+        // STEP 2: Optimistic removal from current view (pagination cache)
         productIds.forEach((id) => paginatedFavoritesMap.current.delete(id));
         setPaginatedFavorites(
           Array.from(paginatedFavoritesMap.current.values())
         );
 
-        // STEP 3: Batch delete from Firestore
+        // STEP 3: Batch delete from Firestore (also handles favoriteItemIds safely)
         const basketId = selectedBasketIdRef.current;
         const collectionPath = basketId
           ? `users/${user.uid}/favorite_baskets/${basketId}/favorites`
@@ -976,7 +934,22 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
           await removeMultipleBatch(chunk, collectionPath);
         }
 
-        // ✅ STEP 4: Log batch metrics (NEW)
+        // STEP 4: Sync local favoriteIds from what actually got removed from user doc
+        // Re-read the user doc's favoriteItemIds to get the accurate state
+        const updatedCachedIds = getProfileField<string[]>("favoriteItemIds");
+        if (Array.isArray(updatedCachedIds)) {
+          const updatedIds = new Set(updatedCachedIds);
+          // Also remove the ones we just processed (in case profile hasn't synced yet)
+          // but only if not in a basket context
+          if (!basketId) {
+            productIds.forEach((id) => updatedIds.delete(id));
+          }
+          setFavoriteIds(updatedIds);
+          setFavoriteCount(updatedIds.size);
+          updateLocalProfileField("favoriteItemIds", [...updatedIds]);
+        }
+
+        // STEP 5: Log batch metrics
         metricsEventService.logBatchFavoriteRemovals({
           productIds,
           shopIds,
@@ -986,7 +959,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
       } catch (error) {
         console.error("❌ Batch remove error:", error);
 
-        // Rollback
+        // Rollback pagination
         setFavoriteIds(previousIds);
         setFavoriteCount(previousIds.size);
 
@@ -1014,10 +987,58 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         });
       }
 
-      // Update user doc array (tracks all favorites across all baskets)
-      if (user) {
+      // Only remove from user doc array the IDs that don't exist elsewhere
+      const basketId = selectedBasketIdRef.current;
+      let idsToRemoveFromUserDoc = productIds;
+
+      if (basketId) {
+        // Removing from a basket — check which products still exist in other locations
+        const idsStillElsewhere = new Set<string>();
+
+        // Check default favorites
+        for (let i = 0; i < productIds.length; i += FIRESTORE_IN_LIMIT) {
+          const chunk = productIds.slice(i, i + FIRESTORE_IN_LIMIT);
+          const defaultSnap = await getDocs(
+            query(
+              collection(dbRef.current!, `users/${user.uid}/favorites`),
+              where("productId", "in", chunk)
+            )
+          );
+          defaultSnap.docs.forEach((d) => {
+            const pid = d.data().productId as string;
+            if (pid) idsStillElsewhere.add(pid);
+          });
+        }
+
+        // Check other baskets
+        const basketsSnap = await getDocs(
+          collection(dbRef.current!, `users/${user.uid}/favorite_baskets`)
+        );
+        for (const bDoc of basketsSnap.docs) {
+          if (bDoc.id === basketId) continue;
+          for (let i = 0; i < productIds.length; i += FIRESTORE_IN_LIMIT) {
+            const chunk = productIds.slice(i, i + FIRESTORE_IN_LIMIT);
+            const favSnap = await getDocs(
+              query(
+                collection(bDoc.ref, "favorites"),
+                where("productId", "in", chunk)
+              )
+            );
+            favSnap.docs.forEach((d) => {
+              const pid = d.data().productId as string;
+              if (pid) idsStillElsewhere.add(pid);
+            });
+          }
+        }
+
+        idsToRemoveFromUserDoc = productIds.filter(
+          (id) => !idsStillElsewhere.has(id)
+        );
+      }
+
+      if (idsToRemoveFromUserDoc.length > 0) {
         batch.update(doc(dbRef.current!, "users", user.uid), {
-          favoriteItemIds: arrayRemove(...productIds),
+          favoriteItemIds: arrayRemove(...idsToRemoveFromUserDoc),
         });
       }
 
@@ -1236,10 +1257,16 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
           return "Maximum basket limit reached";
         }
 
-        await addDoc(collection(dbRef.current!, `users/${user.uid}/favorite_baskets`), {
+        const newDoc = await addDoc(collection(dbRef.current!, `users/${user.uid}/favorite_baskets`), {
           name,
           createdAt: serverTimestamp(),
         });
+
+        // Update local state (no listener to do this)
+        setFavoriteBaskets((prev) => [
+          { id: newDoc.id, name, createdAt: Timestamp.now() },
+          ...prev,
+        ]);
 
         showSuccessToast("Basket created");
         return "Basket created";
@@ -1259,6 +1286,10 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         await deleteDoc(
           doc(dbRef.current!, `users/${user.uid}/favorite_baskets/${basketId}`)
         );
+
+        // Update local state (no listener to do this)
+        setFavoriteBaskets((prev) => prev.filter((b) => b.id !== basketId));
+        basketCacheMap.current.delete(basketId);
 
         if (selectedBasketIdRef.current === basketId) {
           setSelectedBasket(null);
@@ -1502,9 +1533,10 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
   const isGloballyFavorited = useCallback(
     (productId: string): boolean => {
-      return allFavoriteIds.has(productId);
+      // favoriteItemIds on user doc is already the global set across all baskets
+      return favoriteIds.has(productId);
     },
-    [allFavoriteIds]
+    [favoriteIds]
   );
 
   const isFavoritedInBasket = useCallback(
@@ -1590,53 +1622,46 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
     setHasMoreData(true);
   }, []);
 
-  const subscribeToBaskets = useCallback(() => {
+  const fetchBaskets = useCallback(async () => {
     if (!user) return;
 
-    if (basketsSubscription.current) {
-      basketsSubscription.current();
+    try {
+      const basketsSnap = await getDocsFromServer(
+        query(collection(dbRef.current!, `users/${user.uid}/favorite_baskets`))
+      );
+      trackReads("Favorites:Baskets", basketsSnap.docs.length || 1);
+
+      const baskets: FavoriteBasket[] = [];
+      basketsSnap.docs.forEach((d) => {
+        const data = d.data();
+        baskets.push({
+          id: d.id,
+          name: (data.name as string) || "",
+          createdAt: data.createdAt as Timestamp | FieldValue,
+        });
+      });
+
+      baskets.sort((a, b) => {
+        if (
+          a.createdAt instanceof Timestamp &&
+          b.createdAt instanceof Timestamp
+        ) {
+          return b.createdAt.toMillis() - a.createdAt.toMillis();
+        }
+        return 0;
+      });
+
+      setFavoriteBaskets(baskets);
+    } catch (error) {
+      console.error("Error fetching baskets:", error);
     }
-
-    const basketsCollection = collection(
-      dbRef.current!,
-      `users/${user.uid}/favorite_baskets`
-    );
-
-    basketsSubscription.current = onSnapshot(
-      basketsCollection,
-      (snapshot) => {
-        trackReads("Favorites:Baskets", snapshot.docs.length || 1);
-        const baskets: FavoriteBasket[] = [];
-        snapshot.docs.forEach((doc) => {
-          const data = doc.data();
-          baskets.push({
-            id: doc.id,
-            name: (data.name as string) || "",
-            createdAt: data.createdAt as Timestamp | FieldValue,
-          });
-        });
-
-        baskets.sort((a, b) => {
-          if (
-            a.createdAt instanceof Timestamp &&
-            b.createdAt instanceof Timestamp
-          ) {
-            return b.createdAt.toMillis() - a.createdAt.toMillis();
-          }
-          return 0;
-        });
-
-        setFavoriteBaskets(baskets);
-      },
-      (error) => console.error("Baskets subscription error:", error)
-    );
   }, [user]);
 
   // ========================================================================
   // EFFECTS
   // ========================================================================
 
-  // Seed favorite IDs from user doc (Tier 1) or fallback to subcollection
+  // Seed favorite IDs from user doc (Tier 1) — zero extra Firestore reads
   useEffect(() => {
     if (user && dbProp) {
       // Wait for profile data to load before checking cached IDs
@@ -1651,12 +1676,8 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
       console.log("🟢 Favorites: Seeding from user doc array:", ids.size, "items");
       setFavoriteIds(ids);
       setFavoriteCount(ids.size);
+      setIsInitialLoadComplete(true);
     } else if (!user) {
-      disableLiveUpdates();
-      if (basketsSubscription.current) {
-        basketsSubscription.current();
-        basketsSubscription.current = null;
-      }
       clearUserData();
     }
   }, [
@@ -1664,35 +1685,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
     dbProp,
     profileData,
     getProfileField,
-    initializeIfNeeded,
-    disableLiveUpdates,
     clearUserData,
-  ]);
-
-  // Re-subscribe when basket actually changes (not on mount)
-  const prevBasketIdRef = useRef<string | null | undefined>(undefined);
-  useEffect(() => {
-    if (!user || !dbProp) return;
-
-    // Track previous value — skip if this is the first run or value hasn't changed
-    if (prevBasketIdRef.current === undefined) {
-      // First run: just record the initial value, don't trigger anything
-      prevBasketIdRef.current = selectedBasketId;
-      return;
-    }
-
-    if (prevBasketIdRef.current === selectedBasketId) return;
-
-    // Basket actually changed
-    prevBasketIdRef.current = selectedBasketId;
-    disableLiveUpdates();
-    enableLiveUpdates();
-  }, [
-    user,
-    dbProp,
-    selectedBasketId,
-    enableLiveUpdates,
-    disableLiveUpdates,
   ]);
 
   // Cleanup timer
@@ -1734,18 +1727,6 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
       }
       if (removeFavoriteTimer.current) {
         clearTimeout(removeFavoriteTimer.current);
-      }
-      if (favoriteSubscription.current) {
-        favoriteSubscription.current();
-      }
-      if (globalFavoriteSubscription.current) {
-        globalFavoriteSubscription.current();
-      }
-      if (basketsSubscription.current) {
-        basketsSubscription.current();
-      }
-      if (authSubscription.current) {
-        authSubscription.current();
       }
     };
   }, []);
@@ -1793,9 +1774,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
       loadNextPage,
       resetPagination,
       shouldReloadFavorites,
-      enableLiveUpdates,
-      disableLiveUpdates,
-      subscribeToBaskets,
+      fetchBaskets,
       isFavorite,
       isGloballyFavorited,
       isFavoritedInBasket,
@@ -1812,9 +1791,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
       loadNextPage,
       resetPagination,
       shouldReloadFavorites,
-      enableLiveUpdates,
-      disableLiveUpdates,
-      subscribeToBaskets,
+      fetchBaskets,
       isFavorite,
       isGloballyFavorited,
       isFavoritedInBasket,

@@ -53,8 +53,7 @@ export interface FavoriteActions {
   transferToBasket: ReturnType<typeof useFavorites>["transferToBasket"];
   loadNextPage: ReturnType<typeof useFavorites>["loadNextPage"];
   resetPagination: ReturnType<typeof useFavorites>["resetPagination"];
-  enableLiveUpdates: ReturnType<typeof useFavorites>["enableLiveUpdates"];
-  disableLiveUpdates: ReturnType<typeof useFavorites>["disableLiveUpdates"];
+  fetchBaskets: ReturnType<typeof useFavorites>["fetchBaskets"];
 }
 
 export function useFavoriteActions(): FavoriteActions {
@@ -68,8 +67,7 @@ export function useFavoriteActions(): FavoriteActions {
     transferToBasket,
     loadNextPage,
     resetPagination,
-    enableLiveUpdates,
-    disableLiveUpdates,
+    fetchBaskets,
   } = useFavorites();
 
   // Return memoized object with stable function references
@@ -84,8 +82,7 @@ export function useFavoriteActions(): FavoriteActions {
       transferToBasket,
       loadNextPage,
       resetPagination,
-      enableLiveUpdates,
-      disableLiveUpdates,
+      fetchBaskets,
     }),
     [
       addToFavorites,
@@ -97,8 +94,7 @@ export function useFavoriteActions(): FavoriteActions {
       transferToBasket,
       loadNextPage,
       resetPagination,
-      enableLiveUpdates,
-      disableLiveUpdates,
+      fetchBaskets,
     ]
   );
 }

@@ -46,7 +46,7 @@ export default function FavoriteProductsPage() {
     loadNextPage,
     resetPagination,
     shouldReloadFavorites,
-    subscribeToBaskets,
+    fetchBaskets,
     favoriteBaskets,
   } = useFavorites();
 
@@ -122,9 +122,9 @@ export default function FavoriteProductsPage() {
   // Load baskets on mount (on-demand, not on app launch)
   useEffect(() => {
     if (user) {
-      subscribeToBaskets();
+      fetchBaskets();
     }
-  }, [user, subscribeToBaskets]);
+  }, [user, fetchBaskets]);
 
   // ========================================================================
   // INITIALIZATION
