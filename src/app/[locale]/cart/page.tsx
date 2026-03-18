@@ -329,26 +329,16 @@ function CartPageContent() {
     return () => unsubscribe();
   }, []);
 
-  // Fetch cart data on page mount — but only if we need to
-  const hasTriggeredRefresh = useRef(false);
-  useEffect(() => {
-    if (!user || isLoading) return;
-    if (!isInitialized) return; // Wait for seeding effect to complete
 
-    // Only trigger once per page mount
-    if (hasTriggeredRefresh.current) return;
-
-    if (cartItems.length > 0 && cartItems[0]?.product) {
-      // Already have full item data in memory (e.g. user added items then navigated here).
-      console.log("✅ Cart page: using existing local cart data");
-      hasTriggeredRefresh.current = true;
-    } else {
-      // Seeded with IDs only — need full item data from server
-      hasTriggeredRefresh.current = true;
-      refresh();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, isInitialized]);
+const hasTriggeredRefresh = useRef(false);
+useEffect(() => {
+  if (!user || !isInitialized) return;
+  if (hasTriggeredRefresh.current) return;
+  hasTriggeredRefresh.current = true;
+  refresh();
+  // hasTriggeredRefresh is declared inside the component, so it resets
+  // to false on every page mount — refresh() runs once per cart page visit
+}, [user, isInitialized]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sync selections with cart items (matching Flutter's _syncSelections)
   useEffect(() => {
