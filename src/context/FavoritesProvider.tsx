@@ -326,6 +326,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   const pendingFetches = useRef<Map<string, Promise<void>>>(new Map());
   const deferredFavInitRef = useRef<number | ReturnType<typeof setTimeout> | null>(null);
   const isLoadingMoreRef = useRef(false); // Ref-based guard (sync, no race conditions)
+  const paginationGenRef = useRef(0); // Generation counter: stale fetches discard results
 
   // ========================================================================
   // UTILITY FUNCTIONS
@@ -1384,6 +1385,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         return { docs: [], hasMore: false, error: null };
       }
 
+      const gen = paginationGenRef.current;
       isLoadingMoreRef.current = true;
       setIsLoadingMore(true);
 
@@ -1392,6 +1394,13 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
           lastDocument.current,
           limit
         );
+
+        // Discard if a fresh load (basket switch) started while we were fetching
+        if (gen !== paginationGenRef.current) {
+          isLoadingMoreRef.current = false;
+          setIsLoadingMore(false);
+          return { docs: [], hasMore: false, error: null };
+        }
 
         const docs = result.docs as DocumentSnapshot[];
         const hasMore = result.hasMore;
@@ -1448,6 +1457,9 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
   const loadFreshPage = useCallback(
     async (limit: number = 50) => {
+      // Invalidate any in-flight loadNextPage calls
+      paginationGenRef.current++;
+
       // Atomic reset + load: no stale closure gap
       lastDocument.current = null;
       isLoadingMoreRef.current = false;

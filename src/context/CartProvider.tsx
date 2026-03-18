@@ -1371,13 +1371,13 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       if (!user) return "Please log in first";
       if (!db) return "Loading..."; // Guard for lazy loading
 
-      try {
-        // Get shopId from local state BEFORE optimistic remove clears it
-        const localItem = cartItemsRef.current.find(
-          (item) => item.productId === productId
-        );
-        const shopId = localItem?.isShop ? localItem.sellerId : null;
+      // Capture item BEFORE optimistic remove clears it (needed for rollback + shopId)
+      const localItem = cartItemsRef.current.find(
+        (item) => item.productId === productId
+      );
+      const shopId = localItem?.isShop ? localItem.sellerId : null;
 
+      try {
         applyOptimisticRemove(productId);
 
         // Atomic batch: delete cart doc + update user doc array
@@ -1408,6 +1408,13 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       } catch (error) {
         console.error("❌ Remove error:", error);
         rollbackOptimisticRemove(productId);
+        // rollbackOptimisticRemove restores the ID but not the CartItem — restore it
+        if (localItem) {
+          setCartItems((items) => {
+            if (items.some((i) => i.productId === productId)) return items;
+            return [...items, localItem];
+          });
+        }
         return "Failed to remove from cart";
       }
     },
