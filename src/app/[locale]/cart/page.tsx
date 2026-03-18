@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { CompactBundleWidget } from "@/app/components/CompactBundle";
 import { useCart, CartTotals, CartItemTotal } from "@/context/CartProvider";
+import cartTotalsCache from "@/services/cart_totals_cache";
 import { useUser } from "@/context/UserProvider";
 import { useRouter } from "@/navigation";
 import { useTranslations } from "next-intl";
@@ -449,6 +450,11 @@ useEffect(() => {
     },
     [hasMore, isLoadingMore, handleLoadMore],
   );
+
+  // Invalidate totals cache on mount so cross-device changes are picked up
+  useEffect(() => {
+    if (user) cartTotalsCache.invalidateForUser(user.uid);
+  }, [user]);
 
   useEffect(() => {
     // Step 1: Immediate optimistic update
