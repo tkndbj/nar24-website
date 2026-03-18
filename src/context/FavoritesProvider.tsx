@@ -23,6 +23,7 @@ import {
   where,
   limit as firestoreLimit,
   getDocs,
+  getDocsFromServer,
   getDoc,
   Timestamp,
   DocumentSnapshot,
@@ -1306,7 +1307,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         q = query(q, firestoreStartAfter(startAfterDoc));
       }
 
-      const snapshot = await getDocs(q);
+      const snapshot = await getDocsFromServer(q);
       const hasMore = snapshot.docs.length > limit;
       const docs = hasMore ? snapshot.docs.slice(0, limit) : snapshot.docs;
 

@@ -34,6 +34,7 @@ import {
 
   arrayUnion,
   arrayRemove,
+  getDocsFromServer,
 } from "firebase/firestore";
 import { User } from "firebase/auth";
 import { ProductUtils, Product } from "@/app/models/Product";
@@ -1072,7 +1073,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           limit(ITEMS_PER_PAGE)
         );
 
-        const snapshot = await getDocs(cartQuery);
+        const snapshot = await getDocsFromServer(cartQuery);
         trackReads("Cart:Init", snapshot.docs.length || 1);
 
         await buildCartItemsFromDocs(snapshot.docs);
@@ -1716,7 +1717,8 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         limit(ITEMS_PER_PAGE)
       );
 
-      const snapshot = await getDocs(cartQuery);
+      const snapshot = await getDocsFromServer(cartQuery);
+      trackReads("Cart:Refresh", snapshot.docs.length || 1);
 
       await buildCartItemsFromDocs(snapshot.docs);
 
@@ -1914,7 +1916,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           cartQuery = query(cartQuery, startAfter(lastDocumentRef.current));
         }
 
-        const snapshot = await getDocs(cartQuery);
+        const snapshot = await getDocsFromServer(cartQuery);
 
         if (snapshot.docs.length === 0) {
           setHasMore(false);
