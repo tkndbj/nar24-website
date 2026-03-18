@@ -1350,7 +1350,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
 
               {/* Favorite Icon */}
               <button
-                className="w-7 h-7 bg-white bg-opacity-90 rounded-full flex items-center justify-center shadow-sm hover:bg-opacity-100 transition-all relative overflow-hidden"
+                className="w-7 h-7 bg-white bg-opacity-90 rounded-full flex items-center justify-center shadow-sm hover:bg-opacity-100 transition-all relative overflow-hidden cursor-pointer"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleToggleFavorite();
@@ -1527,7 +1527,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
               {showCartIcon && (
                 <button
                   className={`w-6 h-6 flex items-center justify-center transform -translate-y-1 transition-all hover:scale-110 relative overflow-hidden ${
-                    isAddToCartDisabled ? "opacity-50 cursor-not-allowed" : ""
+                    isAddToCartDisabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
                   }`}
                   onClick={(e) => {
                     e.stopPropagation();

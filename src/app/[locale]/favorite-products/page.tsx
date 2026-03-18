@@ -40,12 +40,10 @@ export default function FavoriteProductsPage() {
     selectedBasketId,
     hasMoreData,
     isLoadingMore,
-    isInitialLoadComplete,
     removeMultipleFromFavorites,
     transferToBasket,
     loadNextPage,
     resetPagination,
-    shouldReloadFavorites,
     fetchBaskets,
     favoriteBaskets,
   } = useFavorites();
@@ -109,166 +107,63 @@ export default function FavoriteProductsPage() {
   // Refs
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const searchDebouncer = useRef<NodeJS.Timeout | null>(null);
-  const loadingTimeoutTimer = useRef<NodeJS.Timeout | null>(null);
+
+  // Stable refs for functions used in initialization effect
+  const resetPaginationRef = useRef(resetPagination);
+  resetPaginationRef.current = resetPagination;
+  const loadNextPageRef = useRef(loadNextPage);
+  loadNextPageRef.current = loadNextPage;
+  const fetchBasketsRef = useRef(fetchBaskets);
+  fetchBasketsRef.current = fetchBaskets;
 
   // Constants
   const PAGE_SIZE = 20;
-  const MAX_LOADING_DURATION = 5000;
 
   // ========================================================================
-  // LIFECYCLE MANAGEMENT (Smart Listeners)
+  // INITIALIZATION — Fresh fetch on mount, only re-runs on user change
   // ========================================================================
 
-  // Load baskets on mount (on-demand, not on app launch)
-  useEffect(() => {
-    if (user) {
-      fetchBaskets();
-    }
-  }, [user, fetchBaskets]);
-
-  // ========================================================================
-  // INITIALIZATION
-  // ========================================================================
-
-  const loadNextPageInternal = useCallback(async () => {
-    if (isLoadingMore || !user) return;
-
-    // If no more data and list is empty, immediately hide shimmer
-    if (!hasMoreData) {
-      if (isInitialLoading) {
-        setIsInitialLoading(false);
-        if (loadingTimeoutTimer.current) {
-          clearTimeout(loadingTimeoutTimer.current);
-        }
-        console.log("✅ No more data - shimmer hidden");
-      }
-      return;
-    }
-
-    try {
-      const result = await loadNextPage(PAGE_SIZE);
-
-      if (result.error) {
-        console.error("Error loading page:", result.error);
-        setIsInitialLoading(false);
-        if (loadingTimeoutTimer.current) {
-          clearTimeout(loadingTimeoutTimer.current);
-        }
-        return;
-      }
-
-      if (!result.docs || result.docs.length === 0) {
-        setIsInitialLoading(false);
-        if (loadingTimeoutTimer.current) {
-          clearTimeout(loadingTimeoutTimer.current);
-        }
-        return;
-      }
-
-      setIsInitialLoading(false);
-      if (loadingTimeoutTimer.current) {
-        clearTimeout(loadingTimeoutTimer.current);
-      }
-    } catch (error) {
-      console.error("❌ Error loading page:", error);
-      setIsInitialLoading(false);
-      if (loadingTimeoutTimer.current) {
-        clearTimeout(loadingTimeoutTimer.current);
-      }
-    }
-  }, [isLoadingMore, user, hasMoreData, isInitialLoading, loadNextPage]);
-
-  const startLoadingTimeout = useCallback(() => {
-    if (loadingTimeoutTimer.current) {
-      clearTimeout(loadingTimeoutTimer.current);
-    }
-    loadingTimeoutTimer.current = setTimeout(() => {
-      if (isInitialLoading) {
-        console.warn("⚠️ Loading timeout reached - forcing shimmer off");
-        setIsInitialLoading(false);
-      }
-    }, MAX_LOADING_DURATION);
-  }, [isInitialLoading]);
-
-  const checkCacheAndInitialize = useCallback(() => {
-    if (!user) {
-      setIsInitialLoading(false);
-      if (loadingTimeoutTimer.current) {
-        clearTimeout(loadingTimeoutTimer.current);
-      }
-      return;
-    }
-
-    const hasCachedData = paginatedFavorites.length > 0;
-    const shouldReload = shouldReloadFavorites(selectedBasketId);
-
-    if (hasCachedData && !shouldReload) {
-      setIsInitialLoading(false);
-      if (loadingTimeoutTimer.current) {
-        clearTimeout(loadingTimeoutTimer.current);
-      }
-      console.log("✅ Using cached data -", paginatedFavorites.length, "items");
-      return;
-    }
-
-    // If cached data is empty and no more data, hide shimmer immediately
-    if (!hasCachedData && !hasMoreData && isInitialLoadComplete) {
-      setIsInitialLoading(false);
-      if (loadingTimeoutTimer.current) {
-        clearTimeout(loadingTimeoutTimer.current);
-      }
-      console.log("✅ No cached data and no more to load - shimmer hidden");
-      return;
-    }
-
-    // Only load if we haven't already loaded
-    if (!isInitialLoadComplete || shouldReload) {
-      console.log("🔄 Loading fresh data");
-      setIsInitialLoading(true);
-      startLoadingTimeout();
-
-      // Load data asynchronously
-      loadNextPageInternal();
-    }
-  }, [
-    user,
-    paginatedFavorites.length,
-    selectedBasketId,
-    hasMoreData,
-    isInitialLoadComplete,
-    shouldReloadFavorites,
-    startLoadingTimeout,
-    loadNextPageInternal,
-  ]);
-
-  // Initialize on mount
-  useEffect(() => {
-    if (user) {
-      checkCacheAndInitialize();
-    }
-  }, [user, selectedBasketId]);
-
-  // Clear selection when user logs out
   useEffect(() => {
     if (!user) {
+      setIsInitialLoading(false);
       setSelectedProductId(null);
       setShowBottomSheet(false);
+      return;
     }
+
+    let cancelled = false;
+
+    const loadFresh = async () => {
+      setIsInitialLoading(true);
+      fetchBasketsRef.current();
+      resetPaginationRef.current();
+      await loadNextPageRef.current(PAGE_SIZE);
+      if (!cancelled) {
+        setIsInitialLoading(false);
+      }
+    };
+
+    loadFresh();
+
+    return () => {
+      cancelled = true;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   // ========================================================================
-  // PAGINATION
+  // PAGINATION — scroll-based load more
   // ========================================================================
 
   const handleScroll = useCallback(() => {
-    if (!scrollContainerRef.current || !user) return;
+    if (!scrollContainerRef.current || !user || !hasMoreData || isLoadingMore) return;
 
     const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
 
     if (scrollTop + clientHeight >= scrollHeight - 300) {
-      loadNextPageInternal();
+      loadNextPageRef.current(PAGE_SIZE);
     }
-  }, [user, loadNextPageInternal]);
+  }, [user, hasMoreData, isLoadingMore]);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -342,36 +237,17 @@ export default function FavoriteProductsPage() {
   const removeSelectedFromFavorites = useCallback(async () => {
     if (!selectedProductId || !user) return;
 
+    setSelectedProductId(null);
+    setShowBottomSheet(false);
+
     try {
-      // Optimistic: Remove from UI immediately
-      setSelectedProductId(null);
-      setShowBottomSheet(false);
-
-      // Delete in background
-      const result = await removeMultipleFromFavorites([selectedProductId]);
-
-      // If removal failed, show error and reload
-      if (result !== "Products removed from favorites") {
-        console.error("Failed to remove:", result);
-        setIsInitialLoading(true);
-        resetPagination();
-        await loadNextPageInternal();
-      } else {
-        console.log("✅ Removed from favorites");
-      }
+      await removeMultipleFromFavorites([selectedProductId]);
     } catch (error) {
       console.error("Error removing favorite:", error);
-      setIsInitialLoading(true);
-      resetPagination();
-      await loadNextPageInternal();
+      resetPaginationRef.current();
+      await loadNextPageRef.current(PAGE_SIZE);
     }
-  }, [
-    selectedProductId,
-    user,
-    removeMultipleFromFavorites,
-    resetPagination,
-    loadNextPageInternal,
-  ]);
+  }, [selectedProductId, user, removeMultipleFromFavorites]);
 
   const showTransferBasketDialog = useCallback(() => {
     if (!selectedProductId || !user) return;
@@ -383,39 +259,21 @@ export default function FavoriteProductsPage() {
       if (!selectedProductId || !user) return;
 
       setIsTransferring(true);
+      setShowTransferDialog(false);
+      setSelectedProductId(null);
+      setShowBottomSheet(false);
 
       try {
-        // Close dialogs first
-        setShowTransferDialog(false);
-        setSelectedProductId(null);
-        setShowBottomSheet(false);
-
-        const result = await transferToBasket(selectedProductId, targetBasketId);
-
-        if (result !== "Transferred successfully") {
-          console.error("Failed to transfer:", result);
-          setIsInitialLoading(true);
-          resetPagination();
-          await loadNextPageInternal();
-        } else {
-          console.log("✅ Transferred successfully to", targetBasketId || "default favorites");
-        }
+        await transferToBasket(selectedProductId, targetBasketId);
       } catch (error) {
         console.error("Error transferring to basket:", error);
-        setIsInitialLoading(true);
-        resetPagination();
-        await loadNextPageInternal();
+        resetPaginationRef.current();
+        await loadNextPageRef.current(PAGE_SIZE);
       } finally {
         setIsTransferring(false);
       }
     },
-    [
-      selectedProductId,
-      user,
-      transferToBasket,
-      resetPagination,
-      loadNextPageInternal,
-    ]
+    [selectedProductId, user, transferToBasket]
   );
 
   // ========================================================================
@@ -447,44 +305,19 @@ export default function FavoriteProductsPage() {
   const handleBasketChanged = useCallback(async () => {
     if (!user) return;
 
-    // Clear selection on basket change
     setSelectedProductId(null);
     setShowBottomSheet(false);
     setShowTransferDialog(false);
 
-    // Small delay to allow provider's setSelectedBasket to restore cache
+    // Small delay to let provider's setSelectedBasket settle (cache restore or clear)
     await new Promise((resolve) => setTimeout(resolve, 10));
 
-    const shouldReload = shouldReloadFavorites(selectedBasketId);
-    const hasCachedData = paginatedFavorites.length > 0;
-
-    console.log("🔄 Basket changed, shouldReload=", shouldReload, "hasCachedData=", hasCachedData, "items=", paginatedFavorites.length);
-
-    if (hasCachedData && !shouldReload) {
-      console.log("✅ Using restored cache -", paginatedFavorites.length, "items");
-      setIsInitialLoading(false);
-      if (loadingTimeoutTimer.current) {
-        clearTimeout(loadingTimeoutTimer.current);
-      }
-    } else if (shouldReload) {
-      console.log("🔄 Loading fresh data for basket");
+    if (paginatedFavorites.length === 0 && hasMoreData) {
       setIsInitialLoading(true);
-      startLoadingTimeout();
-      await loadNextPageInternal();
-    } else {
+      await loadNextPageRef.current(PAGE_SIZE);
       setIsInitialLoading(false);
-      if (loadingTimeoutTimer.current) {
-        clearTimeout(loadingTimeoutTimer.current);
-      }
     }
-  }, [
-    user,
-    selectedBasketId,
-    shouldReloadFavorites,
-    loadNextPageInternal,
-    startLoadingTimeout,
-    paginatedFavorites.length,
-  ]);
+  }, [user, paginatedFavorites.length, hasMoreData]);
 
   // ========================================================================
   // RENDER

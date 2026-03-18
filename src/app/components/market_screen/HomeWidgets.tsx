@@ -18,10 +18,6 @@ import DynamicHorizontalList from "./DynamicHorizontalList";
 // ============================================================================
 
 const MarketBanner = lazy(() => import("./MarketBanner"));
-const AdsBanner = lazy(() =>
-  import("./MarketTopAdsBanner").then((mod) => ({ default: mod.AdsBanner })),
-);
-const ThinBanner = lazy(() => import("./MarketThinBanner"));
 const BoostedProductCarousel = lazy(() => import("./BoostedProductCarousel"));
 import ShopHorizontalList from "./ShopHorizontalList";
 
@@ -84,16 +80,6 @@ const WidgetRenderer = memo(
     let content: React.ReactNode = null;
 
     switch (widget.type) {
-      case "ads_banner":
-        content = (
-          <Suspense
-            fallback={<FullWidthLoader isDark={isDarkMode} height="h-48" />}
-          >
-            <AdsBanner initialData={prefetchedData?.ads_banner} />
-          </Suspense>
-        );
-        break;
-
       case "market_bubbles":
         content = (
           <div className={`w-full pt-6 ${bgClass}`}>
@@ -101,20 +87,6 @@ const WidgetRenderer = memo(
               <MarketBubbles onNavItemTapped={onNavigation} locale={locale} />
             </div>
           </div>
-        );
-        break;
-
-      case "thin_banner":
-        content = (
-          <Suspense
-            fallback={<ComponentLoader isDark={isDarkMode} height="h-16" />}
-          >
-            <div className={`w-full ${bgClass}`}>
-              <div className="max-w-7xl mx-auto px-4">
-                <ThinBanner initialData={prefetchedData?.thin_banner} />
-              </div>
-            </div>
-          </Suspense>
         );
         break;
 

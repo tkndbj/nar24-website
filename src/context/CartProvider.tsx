@@ -332,10 +332,8 @@ export const buildProductDataForCart = (
     reviewCount:
       typeof product.reviewCount === "number" ? product.reviewCount : 0,
 
-      sellerId: product.userId || product.shopId || "",
-      sellerName: (product.sellerName && product.sellerName !== "Unknown") 
-        ? product.sellerName 
-        : "",
+      sellerId: product.userId || product.shopId || product.ownerId || "",
+      sellerName: product.sellerName || "",
     isShop: product.shopId != null,
     ilanNo: product.ilanNo || product.id || "N/A",
     createdAt: product.createdAt || Timestamp.now(),
@@ -1203,13 +1201,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   for (const field of requiredFields) {
     const val = productData[field];
     if (val === null || val === undefined || String(val).trim() === '') {
-      console.error(`❌ Cannot add to cart: missing field "${field}"`);
+      console.error(`❌ Cannot add to cart: missing field "${field}"`, productData);
       return `Product data incomplete, cannot add to cart`;
     }
-  }
-  if (productData.sellerName === 'Unknown' || productData.sellerName === 'Seller') {
-    console.error('❌ Cannot add to cart: invalid sellerName');
-    return 'Product data incomplete, cannot add to cart';
   }
 
         // ✅ STEP 2: Apply optimistic update for instant feedback

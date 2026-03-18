@@ -323,6 +323,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   const favoriteLocks = useRef<Map<string, Promise<string>>>(new Map());
   const pendingFetches = useRef<Map<string, Promise<void>>>(new Map());
   const deferredFavInitRef = useRef<number | ReturnType<typeof setTimeout> | null>(null);
+  const isLoadingMoreRef = useRef(false); // Ref-based guard (sync, no race conditions)
 
   // ========================================================================
   // UTILITY FUNCTIONS
@@ -1373,40 +1374,23 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
   const loadNextPage = useCallback(
     async (limit: number = 50) => {
-      console.log(
-        "🔵 loadNextPage START: isLoading=",
-        isLoadingMore,
-        "hasMore=",
-        hasMoreData
-      );
-
-      if (isLoadingMore || !hasMoreData) {
-        console.log("🔵 loadNextPage SKIP: Already loading or no more data");
-        return {
-          docs: [],
-          hasMore: false,
-          error: null,
-        };
+      // Ref-based guard: synchronous, no race conditions
+      if (isLoadingMoreRef.current || !hasMoreData) {
+        return { docs: [], hasMore: false, error: null };
       }
 
       // Early exit: if user doc says favorites is empty, skip subcollection read
       const cachedIds = getProfileField<string[]>("favoriteItemIds");
       if (Array.isArray(cachedIds) && cachedIds.length === 0) {
-        console.log("✅ Favorites: User doc says empty, skipping subcollection read");
         setHasMoreData(false);
         setIsInitialLoadComplete(true);
-        return {
-          docs: [],
-          hasMore: false,
-          error: null,
-        };
+        return { docs: [], hasMore: false, error: null };
       }
 
+      isLoadingMoreRef.current = true;
       setIsLoadingMore(true);
-      console.log("🔵 loadNextPage: Set isLoading=true");
 
       try {
-        // Step 1: Fetch favorite documents
         const result = await fetchPaginatedFavorites(
           lastDocument.current,
           limit
@@ -1416,86 +1400,50 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         const hasMore = result.hasMore;
         const productIds = result.productIds;
 
-        console.log(
-          "🔵 loadNextPage RESULT: docs=",
-          docs.length,
-          "hasMore=",
-          hasMore,
-          "limit=",
-          limit
-        );
-
         if (docs.length > 0) {
           lastDocument.current = docs[docs.length - 1];
           setHasMoreData(hasMore);
 
-          // ✅ Step 2: Fetch product details (THIS WAS MISSING!)
           if (productIds) {
             const newItems = await fetchProductDetailsForIds(
               Array.from(productIds),
               docs
             );
-
-            // ✅ Step 3: Add to paginated list (THIS WAS MISSING!)
             addPaginatedItems(newItems);
-
-            console.log("✅ Added", newItems.length, "items to paginated list");
           }
-
-          console.log(
-            "🔵 loadNextPage: Set hasMoreData=",
-            hasMore,
-            "(docs not empty)"
-          );
         } else {
           setHasMoreData(false);
-          console.log("🔵 loadNextPage: Set hasMoreData=false (docs empty)");
         }
 
         setIsLoadingMore(false);
-        console.log(
-          "🔵 loadNextPage END: Set isLoading=false, hasMore=",
-          hasMoreData
-        );
+        isLoadingMoreRef.current = false;
 
-        return {
-          docs,
-          hasMore,
-          productIds,
-          error: null,
-        };
+        return { docs, hasMore, productIds, error: null };
       } catch (error) {
         console.error("❌ loadNextPage ERROR:", error);
         setIsLoadingMore(false);
+        isLoadingMoreRef.current = false;
         setHasMoreData(false);
 
-        return {
-          docs: [],
-          hasMore: false,
-          error: (error as Error).toString(),
-        };
+        return { docs: [], hasMore: false, error: (error as Error).toString() };
       }
     },
     [
-      isLoadingMore,
       hasMoreData,
       fetchPaginatedFavorites,
-      fetchProductDetailsForIds, // ✅ ADD THIS
-      addPaginatedItems, // ✅ ADD THIS
+      fetchProductDetailsForIds,
+      addPaginatedItems,
     ]
   );
 
   const resetPagination = useCallback(() => {
-    console.log("🟣 resetPagination: Resetting pagination state");
     lastDocument.current = null;
+    isLoadingMoreRef.current = false;
     setHasMoreData(true);
     setIsLoadingMore(false);
     paginatedFavoritesMap.current.clear();
     setPaginatedFavorites([]);
     setIsInitialLoadComplete(false);
-    console.log(
-      "🟣 resetPagination END: hasMore=true, isLoading=false, cleared all data"
-    );
   }, []);
 
   const shouldReloadFavorites = useCallback(
@@ -1662,22 +1610,23 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   // ========================================================================
 
   // Seed favorite IDs from user doc (Tier 1) — zero extra Firestore reads
+  const prevUserUid = useRef<string | null>(null);
   useEffect(() => {
     if (user && dbProp) {
-      // Wait for profile data to load before checking cached IDs
       if (!profileData) return;
 
-      clearUserData();
+      // Only clear everything on actual user change, not on profileData re-renders
+      if (prevUserUid.current !== user.uid) {
+        prevUserUid.current = user.uid;
+        clearUserData();
+      }
 
       const cachedIds = getProfileField<string[]>("favoriteItemIds");
-
-      // Seed from user doc array (0 extra Firestore reads)
       const ids = new Set(Array.isArray(cachedIds) ? cachedIds : []);
-      console.log("🟢 Favorites: Seeding from user doc array:", ids.size, "items");
       setFavoriteIds(ids);
       setFavoriteCount(ids.size);
-      setIsInitialLoadComplete(true);
     } else if (!user) {
+      prevUserUid.current = null;
       clearUserData();
     }
   }, [
