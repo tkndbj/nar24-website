@@ -43,7 +43,7 @@ export default function FavoriteProductsPage() {
     removeMultipleFromFavorites,
     transferToBasket,
     loadNextPage,
-    resetPagination,
+    loadFreshPage,
     fetchBaskets,
     favoriteBaskets,
   } = useFavorites();
@@ -108,11 +108,11 @@ export default function FavoriteProductsPage() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const searchDebouncer = useRef<NodeJS.Timeout | null>(null);
 
-  // Stable refs for functions used in initialization effect
-  const resetPaginationRef = useRef(resetPagination);
-  resetPaginationRef.current = resetPagination;
+  // Stable refs for functions used in effects
   const loadNextPageRef = useRef(loadNextPage);
   loadNextPageRef.current = loadNextPage;
+  const loadFreshPageRef = useRef(loadFreshPage);
+  loadFreshPageRef.current = loadFreshPage;
   const fetchBasketsRef = useRef(fetchBaskets);
   fetchBasketsRef.current = fetchBaskets;
 
@@ -136,8 +136,7 @@ export default function FavoriteProductsPage() {
     const loadFresh = async () => {
       setIsInitialLoading(true);
       fetchBasketsRef.current();
-      resetPaginationRef.current();
-      await loadNextPageRef.current(PAGE_SIZE);
+      await loadFreshPageRef.current(PAGE_SIZE);
       if (!cancelled) {
         setIsInitialLoading(false);
       }
@@ -244,8 +243,7 @@ export default function FavoriteProductsPage() {
       await removeMultipleFromFavorites([selectedProductId]);
     } catch (error) {
       console.error("Error removing favorite:", error);
-      resetPaginationRef.current();
-      await loadNextPageRef.current(PAGE_SIZE);
+      await loadFreshPageRef.current(PAGE_SIZE);
     }
   }, [selectedProductId, user, removeMultipleFromFavorites]);
 
@@ -267,8 +265,7 @@ export default function FavoriteProductsPage() {
         await transferToBasket(selectedProductId, targetBasketId);
       } catch (error) {
         console.error("Error transferring to basket:", error);
-        resetPaginationRef.current();
-        await loadNextPageRef.current(PAGE_SIZE);
+        await loadFreshPageRef.current(PAGE_SIZE);
       } finally {
         setIsTransferring(false);
       }
@@ -309,15 +306,11 @@ export default function FavoriteProductsPage() {
     setShowBottomSheet(false);
     setShowTransferDialog(false);
 
-    // Small delay to let provider's setSelectedBasket settle (cache restore or clear)
-    await new Promise((resolve) => setTimeout(resolve, 10));
-
-    if (paginatedFavorites.length === 0 && hasMoreData) {
-      setIsInitialLoading(true);
-      await loadNextPageRef.current(PAGE_SIZE);
-      setIsInitialLoading(false);
-    }
-  }, [user, paginatedFavorites.length, hasMoreData]);
+    // Always load fresh data for the newly selected basket
+    setIsInitialLoading(true);
+    await loadFreshPageRef.current(PAGE_SIZE);
+    setIsInitialLoading(false);
+  }, [user]);
 
   // ========================================================================
   // RENDER

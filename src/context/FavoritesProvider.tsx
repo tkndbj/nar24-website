@@ -124,6 +124,7 @@ interface FavoritesActionsContextType {
     productIds?: Set<string>;
     error?: string | null;
   }>;
+  loadFreshPage: (limit?: number) => Promise<void>;
   resetPagination: () => void;
   shouldReloadFavorites: (basketId: string | null) => boolean;
 
@@ -292,6 +293,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
     null
   );
   const [hasMoreData, setHasMoreData] = useState(true);
+  const hasMoreDataRef = useRef(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isInitialLoadComplete, setIsInitialLoadComplete] = useState(false);
   const [favoriteBaskets, setFavoriteBaskets] = useState<FavoriteBasket[]>([]);
@@ -1164,20 +1166,23 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         });
         setPaginatedFavorites(cached.favorites);
         lastDocument.current = cached.lastDoc;
+        hasMoreDataRef.current = cached.hasMore;
         setHasMoreData(cached.hasMore);
         setIsInitialLoadComplete(true);
       } else {
         // No cache or expired, inline reset pagination logic
         console.log("🔄 No cache for basket:", newCacheKey, "- loading fresh");
         lastDocument.current = null;
+        hasMoreDataRef.current = true;
         setHasMoreData(true);
+        isLoadingMoreRef.current = false;
         setIsLoadingMore(false);
         paginatedFavoritesMap.current.clear();
         setPaginatedFavorites([]);
         setIsInitialLoadComplete(false);
       }
     }
-  }, [hasMoreData]);
+  }, []);
 
   const transferToBasket = useCallback(
     async (
@@ -1374,16 +1379,8 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
   const loadNextPage = useCallback(
     async (limit: number = 50) => {
-      // Ref-based guard: synchronous, no race conditions
-      if (isLoadingMoreRef.current || !hasMoreData) {
-        return { docs: [], hasMore: false, error: null };
-      }
-
-      // Early exit: if user doc says favorites is empty, skip subcollection read
-      const cachedIds = getProfileField<string[]>("favoriteItemIds");
-      if (Array.isArray(cachedIds) && cachedIds.length === 0) {
-        setHasMoreData(false);
-        setIsInitialLoadComplete(true);
+      // Ref-based guards: synchronous, no stale closure issues
+      if (isLoadingMoreRef.current || !hasMoreDataRef.current) {
         return { docs: [], hasMore: false, error: null };
       }
 
@@ -1402,6 +1399,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
         if (docs.length > 0) {
           lastDocument.current = docs[docs.length - 1];
+          hasMoreDataRef.current = hasMore;
           setHasMoreData(hasMore);
 
           if (productIds) {
@@ -1412,6 +1410,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
             addPaginatedItems(newItems);
           }
         } else {
+          hasMoreDataRef.current = false;
           setHasMoreData(false);
         }
 
@@ -1423,13 +1422,13 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         console.error("❌ loadNextPage ERROR:", error);
         setIsLoadingMore(false);
         isLoadingMoreRef.current = false;
+        hasMoreDataRef.current = false;
         setHasMoreData(false);
 
         return { docs: [], hasMore: false, error: (error as Error).toString() };
       }
     },
     [
-      hasMoreData,
       fetchPaginatedFavorites,
       fetchProductDetailsForIds,
       addPaginatedItems,
@@ -1439,12 +1438,67 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   const resetPagination = useCallback(() => {
     lastDocument.current = null;
     isLoadingMoreRef.current = false;
+    hasMoreDataRef.current = true;
     setHasMoreData(true);
     setIsLoadingMore(false);
     paginatedFavoritesMap.current.clear();
     setPaginatedFavorites([]);
     setIsInitialLoadComplete(false);
   }, []);
+
+  const loadFreshPage = useCallback(
+    async (limit: number = 50) => {
+      // Atomic reset + load: no stale closure gap
+      lastDocument.current = null;
+      isLoadingMoreRef.current = false;
+      hasMoreDataRef.current = true;
+      setHasMoreData(true);
+      setIsLoadingMore(false);
+      paginatedFavoritesMap.current.clear();
+      setPaginatedFavorites([]);
+      setIsInitialLoadComplete(false);
+
+      // Now load first page
+      isLoadingMoreRef.current = true;
+      setIsLoadingMore(true);
+
+      try {
+        const result = await fetchPaginatedFavorites(null, limit);
+        const docs = result.docs as DocumentSnapshot[];
+        const hasMore = result.hasMore;
+        const productIds = result.productIds;
+
+        if (docs.length > 0) {
+          lastDocument.current = docs[docs.length - 1];
+          hasMoreDataRef.current = hasMore;
+          setHasMoreData(hasMore);
+
+          if (productIds) {
+            const newItems = await fetchProductDetailsForIds(
+              Array.from(productIds),
+              docs
+            );
+            addPaginatedItems(newItems);
+          }
+        } else {
+          hasMoreDataRef.current = false;
+          setHasMoreData(false);
+        }
+
+        setIsLoadingMore(false);
+        isLoadingMoreRef.current = false;
+        setIsInitialLoadComplete(true);
+      } catch (error) {
+        console.error("❌ loadFreshPage ERROR:", error);
+        setIsLoadingMore(false);
+        isLoadingMoreRef.current = false;
+        hasMoreDataRef.current = false;
+        setHasMoreData(false);
+        setIsInitialLoadComplete(true);
+      }
+    },
+    [fetchPaginatedFavorites, fetchProductDetailsForIds, addPaginatedItems]
+  );
 
   const shouldReloadFavorites = useCallback(
     (basketId: string | null): boolean => {
@@ -1567,6 +1621,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
     setIsInitialLoadComplete(false);
     setFavoriteBaskets([]);
     lastDocument.current = null;
+    hasMoreDataRef.current = true;
     setHasMoreData(true);
   }, []);
 
@@ -1721,6 +1776,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
       setSelectedBasket,
       transferToBasket,
       loadNextPage,
+      loadFreshPage,
       resetPagination,
       shouldReloadFavorites,
       fetchBaskets,
@@ -1738,6 +1794,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
       setSelectedBasket,
       transferToBasket,
       loadNextPage,
+      loadFreshPage,
       resetPagination,
       shouldReloadFavorites,
       fetchBaskets,
