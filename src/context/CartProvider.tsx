@@ -32,6 +32,8 @@ import {
   deleteDoc,
   updateDoc,
   setDoc,
+  arrayUnion,
+  arrayRemove,
 } from "firebase/firestore";
 import { User } from "firebase/auth";
 import { ProductUtils, Product } from "@/app/models/Product";
@@ -39,6 +41,8 @@ import { httpsCallable, Functions } from "firebase/functions";
 import cartTotalsCache from "@/services/cart_totals_cache";
 import metricsEventService from "@/services/cartfavoritesmetricsEventService";
 import { userActivityService } from "@/services/userActivity";
+import { trackReads } from "@/lib/firestore-read-tracker";
+import { useUser } from "./UserProvider";
 
 // ============================================================================
 // TYPES - Matching Flutter implementation
@@ -440,6 +444,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   db,
   functions,
 }) => {
+  // Access UserProvider for profile-based cart ID seeding
+  const { getProfileField, updateLocalProfileField, profileData } = useUser();
+
   // ========================================================================
   // STATE - Matching Flutter ValueNotifiers
   // ========================================================================
@@ -931,16 +938,31 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         return;
       }
 
+      trackReads("Cart:Listener", snapshot.docChanges().length || 1);
+
       console.log(
         `🔥 Real-time update: ${snapshot.docChanges().length} changes, ${
           snapshot.docs.length
         } total docs`
       );
 
-      // ✅ ALWAYS update IDs from full snapshot
+      // ALWAYS update IDs from full snapshot
       updateCartIds(snapshot.docs);
 
-      // ✅ Process changes if any exist
+      // Reconcile user doc array with actual subcollection state
+      const snapshotIds = snapshot.docs.map((d) => d.id).sort();
+      const cachedIds = (getProfileField<string[]>("cartItemIds") || []).sort();
+      if (JSON.stringify(snapshotIds) !== JSON.stringify(cachedIds)) {
+        console.log("🔄 Cart: Reconciling user doc array with subcollection");
+        updateLocalProfileField("cartItemIds", snapshotIds);
+        if (user && db) {
+          updateDoc(doc(db, "users", user.uid), {
+            cartItemIds: snapshotIds,
+          }).catch((err) => console.warn("Cart reconciliation write failed:", err));
+        }
+      }
+
+      // Process changes if any exist
       if (snapshot.docChanges().length > 0) {
         console.log(
           `📝 Processing ${snapshot.docChanges().length} document changes`
@@ -1051,6 +1073,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         );
 
         const snapshot = await getDocs(cartQuery);
+        trackReads("Cart:Init", snapshot.docs.length || 1);
 
         await buildCartItemsFromDocs(snapshot.docs);
 
@@ -1074,16 +1097,28 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     await initPromise;
     pendingFetchesRef.current.delete("init");
 
-    // ✅ CRITICAL FIX: Enable listener IMMEDIATELY after init completes
-    // Use setImmediate equivalent to ensure state is flushed
-    if (user && !unsubscribeCartRef.current) {
-      Promise.resolve().then(() => {
-        if (user && !unsubscribeCartRef.current) {
-          console.log("🔴 Enabling listener immediately after init");
-          enableLiveUpdates();
-        }
-      });
+    // Migrate: write cartItemIds to user doc if not yet present
+    try {
+      const currentIds = Array.from(
+        new Set(cartItemsRef.current.map((item) => item.productId))
+      );
+      if (
+        user &&
+        db &&
+        getProfileField<string[]>("cartItemIds") === null
+      ) {
+        await updateDoc(doc(db, "users", user.uid), {
+          cartItemIds: currentIds,
+        });
+        updateLocalProfileField("cartItemIds", currentIds);
+        console.log("🔄 Cart: Migrated cartItemIds to user doc");
+      }
+    } catch (migrationError) {
+      console.warn("Cart migration failed (non-critical):", migrationError);
     }
+
+    // Note: enableLiveUpdates() is now called by the cart page, not here.
+    // This keeps the listener page-scoped to avoid unbounded reads on launch.
   }, [
     user,
     isInitialized,
@@ -1254,6 +1289,8 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       newIds.add(productId);
       setCartProductIds(newIds);
       setCartCount(newIds.size);
+      // Sync to user doc local state
+      updateLocalProfileField("cartItemIds", [...newIds]);
 
       // Set timeout
       const timeout = setTimeout(() => {
@@ -1321,12 +1358,18 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         // ✅ STEP 2: Apply optimistic update for instant feedback
         applyOptimisticAdd(product.id, productData, quantity);
 
-        await setDoc(doc(db, "users", user.uid, "cart", product.id), {
-          ...productData, // ✅ Use directly, don't clean nulls
+        // Atomic batch: write cart doc + update user doc array
+        const batch = writeBatch(db);
+        batch.set(doc(db, "users", user.uid, "cart", product.id), {
+          ...productData,
           quantity,
           addedAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
+        batch.update(doc(db, "users", user.uid), {
+          cartItemIds: arrayUnion(product.id),
+        });
+        await batch.commit();
 
         userActivityService.trackAddToCart({
           productId: product.id,
@@ -1425,6 +1468,8 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       newIds.delete(productId);
       setCartProductIds(newIds);
       setCartCount(newIds.size);
+      // Sync to user doc local state
+      updateLocalProfileField("cartItemIds", [...newIds]);
 
       // Remove from items list
       setCartItems((items) =>
@@ -1482,15 +1527,20 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         // ✅ GET SHOP ID BEFORE DELETION (NEW)
         const shopId = await getProductShopId(productId);
 
-        await deleteDoc(doc(db, "users", user.uid, "cart", productId));
+        // Atomic batch: delete cart doc + update user doc array
+        const batch = writeBatch(db);
+        batch.delete(doc(db, "users", user.uid, "cart", productId));
+        batch.update(doc(db, "users", user.uid), {
+          cartItemIds: arrayRemove(productId),
+        });
+        await batch.commit();
 
         userActivityService.trackRemoveFromCart({
           productId,
           shopId: shopId || undefined,
-          
+
         });
 
-        // ✅ ADD METRICS LOGGING (NEW)
         metricsEventService.logCartRemoved({
           productId,
           shopId,
@@ -1633,10 +1683,13 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         // STEP 2: Optimistic removal
         productIds.forEach((productId) => applyOptimisticRemove(productId));
 
-        // STEP 3: Batch delete from Firestore
+        // STEP 3: Batch delete from Firestore + update user doc array
         const batch = writeBatch(db);
         productIds.forEach((productId) => {
           batch.delete(doc(db, "users", user.uid, "cart", productId));
+        });
+        batch.update(doc(db, "users", user.uid), {
+          cartItemIds: arrayRemove(...productIds),
         });
         await batch.commit();
 
@@ -1957,10 +2010,10 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     cartItemsRef.current = cartItems;
   }, [cartItems]);
 
-  // Initialize cart when user logs in or clear on logout
+  // Initialize cart IDs from user doc (Tier 1) or fallback to subcollection
   useEffect(() => {
     if (!user) {
-      // ✅ User logged out - clear everything
+      // User logged out - clear everything
       if (isInitialized) {
         console.log("🔴 User logged out, clearing cart...");
         disableLiveUpdates();
@@ -1978,29 +2031,37 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       return;
     }
 
-    // ✅ User is logged in
     if (!isInitialized) {
-      // Defer initialization to avoid blocking first paint
-      console.log("🔵 User ready, scheduling deferred cart init...");
-      if (typeof requestIdleCallback !== "undefined") {
-        deferredCartInitRef.current = requestIdleCallback(
-          () => initializeCartIfNeeded(),
-          { timeout: 2000 }
-        );
+      // Wait for profile data to load before checking cached IDs
+      if (!profileData) return;
+
+      const cachedIds = getProfileField<string[]>("cartItemIds");
+
+      if (Array.isArray(cachedIds)) {
+        // Tier 1: Seed from user doc — no Firestore reads
+        console.log("🟢 Cart: Seeding from user doc array:", cachedIds.length, "items");
+        const ids = new Set(cachedIds);
+        setCartProductIds(ids);
+        setCartCount(ids.size);
+        setIsInitialized(true);
       } else {
-        deferredCartInitRef.current = setTimeout(
-          () => initializeCartIfNeeded(),
-          500
-        );
+        // Legacy user: fall back to subcollection read, then migrate
+        console.log("🔵 Cart: No cached IDs, falling back to subcollection init...");
+        if (typeof requestIdleCallback !== "undefined") {
+          deferredCartInitRef.current = requestIdleCallback(
+            () => initializeCartIfNeeded(),
+            { timeout: 2000 }
+          );
+        } else {
+          deferredCartInitRef.current = setTimeout(
+            () => initializeCartIfNeeded(),
+            500
+          );
+        }
       }
-    } else if (!unsubscribeCartRef.current) {
-      // ✅ CRITICAL FIX: Already initialized but listener not active
-      // This happens after refresh when isInitialized is already true
-      console.log("🟡 Reattaching listener after refresh...");
-      enableLiveUpdates();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, isInitialized]);
+  }, [user, isInitialized, profileData]);
 
   // Initialize cache on mount
   useEffect(() => {

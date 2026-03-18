@@ -13,6 +13,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import type { Unsubscribe } from "firebase/firestore";
 import { getFirebaseDb } from "@/lib/firebase-lazy";
+import { trackReads } from "@/lib/firestore-read-tracker";
 import type { PrefetchedBoostedProduct } from "@/types/MarketLayout";
 
 // ============================================================================
@@ -115,6 +116,7 @@ export function useBoostedProducts(
         boostedQuery,
         (snapshot) => {
           if (!isMountedRef.current) return;
+          trackReads("BoostedProducts", snapshot.docs.length || 1);
 
           const products: BoostedProduct[] = [];
 

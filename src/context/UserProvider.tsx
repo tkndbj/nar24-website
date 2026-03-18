@@ -532,6 +532,9 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
                 const userDoc = await getDoc(
                   doc(db, "users", firebaseUser.uid)
                 );
+                // ── debug: track Firestore read ──
+                const { trackReads } = await import("@/lib/firestore-read-tracker");
+                trackReads("UserProvider", 1);
 
                 if (!isMounted || operationId !== currentAuthOperationId)
                   return;

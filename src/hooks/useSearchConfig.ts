@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
 import { getFirebaseDb } from "@/lib/firebase-lazy";
+import { trackReads } from "@/lib/firestore-read-tracker";
 
 interface SearchConfig {
   provider: "algolia" | "firestore";
@@ -39,6 +40,7 @@ async function startListener() {
     _unsubscribe = onSnapshot(
       configRef,
       (snapshot) => {
+        trackReads("SearchConfig", 1);
         if (snapshot.exists()) {
           const data = snapshot.data();
           _config = {

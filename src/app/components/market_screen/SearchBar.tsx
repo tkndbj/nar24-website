@@ -145,7 +145,17 @@ export default function SearchBar({
     deleteEntry,
     isDeletingEntry,
     saveSearchTerm,
+    fetchHistory,
   } = useSearchHistory();
+
+  // Fetch search history on demand when search bar opens
+  const historyFetchedRef = useRef(false);
+  useEffect(() => {
+    if (isSearching && !historyFetchedRef.current) {
+      historyFetchedRef.current = true;
+      fetchHistory();
+    }
+  }, [isSearching, fetchHistory]);
 
   // ── Mount guard ───────────────────────────────────────────────────────────
   useEffect(() => {

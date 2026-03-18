@@ -16,6 +16,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { getFirebaseDb } from "@/lib/firebase-lazy";
+import { trackReads } from "@/lib/firestore-read-tracker";
 import {
   MarketWidgetConfig,
   MarketLayoutState,
@@ -195,6 +196,7 @@ export function useMarketLayout(
       try {
         const webDocRef = doc(db, FIRESTORE_COLLECTION, FIRESTORE_DOC_WEB);
         const webSnap = await getDoc(webDocRef);
+        trackReads("MarketLayout:Web", 1);
 
         if (webSnap.exists()) {
           const data = webSnap.data();
@@ -229,6 +231,7 @@ export function useMarketLayout(
           FIRESTORE_DOC_SHARED
         );
         const sharedSnap = await getDoc(sharedDocRef);
+        trackReads("MarketLayout:Shared", 1);
 
         if (sharedSnap.exists()) {
           const data = sharedSnap.data();

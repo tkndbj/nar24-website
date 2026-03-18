@@ -12,6 +12,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { getFirebaseDb } from "@/lib/firebase-lazy";
 import type { PrefetchedShop } from "@/types/MarketLayout";
+import { trackReads } from "@/lib/firestore-read-tracker";
 
 // ============================================================================
 // TYPES
@@ -91,7 +92,8 @@ export function useShops(initialShops?: PrefetchedShop[] | null): UseShopsReturn
       try {
         const configRef = doc(db, CONFIG_COLLECTION, CONFIG_DOC);
         const configSnap = await getDoc(configRef);
-  
+        trackReads("Shops:Config", 1);
+
         if (configSnap.exists()) {
           const config = configSnap.data();
           const shopIds = config.shopIds as string[] | undefined;
@@ -102,7 +104,8 @@ export function useShops(initialShops?: PrefetchedShop[] | null): UseShopsReturn
               try {
                 const shopRef = doc(db, COLLECTION_NAME, id);
                 const shopSnap = await getDoc(shopRef);
-  
+                trackReads("Shops:ShopDoc", 1);
+
                 if (shopSnap.exists()) {
                   const data = shopSnap.data();
                   
@@ -161,7 +164,8 @@ export function useShops(initialShops?: PrefetchedShop[] | null): UseShopsReturn
       );
   
       const snapshot = await getDocs(shopsQuery);
-  
+      trackReads("Shops:Fallback", snapshot.docs.length || 1);
+
       snapshot.docs.forEach((doc) => {
         const data = doc.data();
         if (!data.name) return;

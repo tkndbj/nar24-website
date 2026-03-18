@@ -16,10 +16,12 @@ import {
   query,
   where,
   orderBy,
+  limit,
   Unsubscribe,
 } from "firebase/firestore";
 import type { User } from "firebase/auth";
 import { db } from "../lib/firebase";
+import { trackReads } from "@/lib/firestore-read-tracker";
 
 interface BadgeContextType {
   unreadMessagesCount: number;
@@ -81,42 +83,24 @@ export function BadgeProvider({ children, user: userProp }: BadgeProviderProps) 
     const newUnsubscribes: Unsubscribe[] = [];
 
     try {
-      // (A) Listen to user document for any additional data
-      const userDocUnsubscribe = onSnapshot(
-        doc(db, "users", userId),
-        (docSnapshot) => {
-          console.log("📄 BadgeProvider: User doc updated");
-          // You can access other user fields here if needed
-          const userData = docSnapshot.data();
-          if (userData) {
-            // Process user document data if needed
-            console.log("User data:", userData);
-          }
-        },
-        (error) => {
-          console.error(
-            "❌ BadgeProvider: Error listening to user doc:",
-            error
-          );
-          setError("Failed to sync user data");
-        }
-      );
-      newUnsubscribes.push(userDocUnsubscribe);
-
-      // (B) Listen to notifications subcollection
+      // Listen to notifications subcollection
       // Exclude notifications of type 'message' from badge count
+      // Cap at 11 docs: enough to know "10+" without reading the entire collection
+      const BADGE_CAP = 10;
       const notificationsQuery = query(
         collection(db, "users", userId, "notifications"),
         where("isRead", "==", false),
         where("type", "!=", "message"),
-        orderBy("type") // Required when using != operator
+        orderBy("type"), // Required when using != operator
+        limit(BADGE_CAP + 1)
       );
 
       const notificationsUnsubscribe = onSnapshot(
         notificationsQuery,
         (querySnapshot) => {
-          const count = querySnapshot.docs.length;
+          const count = Math.min(querySnapshot.docs.length, BADGE_CAP + 1);
           console.log("🔔 BadgeProvider: Unread notifications count:", count);
+          trackReads("Badge:Notifications", querySnapshot.docs.length);
           setUnreadNotificationsCount(count);
         },
         (error) => {

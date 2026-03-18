@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { collection, onSnapshot, query } from "firebase/firestore";
 import { getFirebaseDb } from "@/lib/firebase-lazy";
+import { trackReads } from "@/lib/firestore-read-tracker";
 
 /**
  * Lightweight Firestore listener that returns the food cart item count.
@@ -31,6 +32,7 @@ export function useFoodCartCount(uid: string | null | undefined): number {
           q,
           { includeMetadataChanges: false },
           (snapshot) => {
+            trackReads("FoodCart", snapshot.docs.length || 1);
             // Sum quantities for accurate badge count
             let total = 0;
             snapshot.docs.forEach((doc) => {

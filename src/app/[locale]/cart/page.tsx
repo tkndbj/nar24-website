@@ -132,6 +132,8 @@ function CartPageContent() {
     calculateCartTotals,
     validateForPayment,
     updateCartCacheFromValidation,
+    enableLiveUpdates,
+    disableLiveUpdates,
   } = useCart();
 
   // ✅ Coupon Service - for available coupons/benefits
@@ -329,12 +331,22 @@ function CartPageContent() {
     return () => unsubscribe();
   }, []);
 
-  // Initialize cart on mount
+  // Initialize cart data and enable real-time listener on mount
   useEffect(() => {
     if (user && !isInitialized && !isLoading) {
       initializeCartIfNeeded();
     }
   }, [user, isInitialized, isLoading, initializeCartIfNeeded]);
+
+  // Page-scoped real-time listener: active only while cart page is mounted
+  useEffect(() => {
+    if (user && isInitialized) {
+      enableLiveUpdates();
+    }
+    return () => {
+      disableLiveUpdates();
+    };
+  }, [user, isInitialized, enableLiveUpdates, disableLiveUpdates]);
 
   // Sync selections with cart items (matching Flutter's _syncSelections)
   useEffect(() => {
