@@ -11,7 +11,7 @@ import React, {
 } from "react";
 import {
   collection,
-  doc,
+ 
   onSnapshot,
   query,
   where,

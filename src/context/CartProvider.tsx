@@ -29,9 +29,9 @@ import {
   Timestamp,
   FieldValue,
   Firestore,
-  deleteDoc,
+
   updateDoc,
-  setDoc,
+
   arrayUnion,
   arrayRemove,
 } from "firebase/firestore";
