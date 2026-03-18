@@ -53,8 +53,6 @@ export interface CartActions {
   validateForPayment: ReturnType<typeof useCart>["validateForPayment"];
   updateCartCacheFromValidation: ReturnType<typeof useCart>["updateCartCacheFromValidation"];
   refresh: ReturnType<typeof useCart>["refresh"];
-  enableLiveUpdates: ReturnType<typeof useCart>["enableLiveUpdates"];
-  disableLiveUpdates: ReturnType<typeof useCart>["disableLiveUpdates"];
   initializeCartIfNeeded: ReturnType<typeof useCart>["initializeCartIfNeeded"];
   loadMoreItems: ReturnType<typeof useCart>["loadMoreItems"];
 }
@@ -70,8 +68,6 @@ export function useCartActions(): CartActions {
     validateForPayment,
     updateCartCacheFromValidation,
     refresh,
-    enableLiveUpdates,
-    disableLiveUpdates,
     initializeCartIfNeeded,
     loadMoreItems,
   } = useCart();
@@ -88,8 +84,6 @@ export function useCartActions(): CartActions {
       validateForPayment,
       updateCartCacheFromValidation,
       refresh,
-      enableLiveUpdates,
-      disableLiveUpdates,
       initializeCartIfNeeded,
       loadMoreItems,
     }),
@@ -103,8 +97,6 @@ export function useCartActions(): CartActions {
       validateForPayment,
       updateCartCacheFromValidation,
       refresh,
-      enableLiveUpdates,
-      disableLiveUpdates,
       initializeCartIfNeeded,
       loadMoreItems,
     ]

@@ -330,11 +330,16 @@ function CartPageContent() {
     return () => unsubscribe();
   }, []);
 
-  // Always fetch fresh cart data on page mount
+  // Fetch cart data on page mount — but only if we need to
   useEffect(() => {
     if (user && !isLoading) {
-      if (isInitialized) {
-        // Already seeded from user doc — refresh to get full item data from server
+      if (isInitialized && cartItems.length > 0 && cartItems[0]?.product) {
+        // Already have full item data in memory (e.g. user added items then navigated here).
+        // Skip the server refresh to avoid overwriting optimistic items.
+        // A background refresh will pick up any discrepancies.
+        console.log("✅ Cart page: using existing local cart data");
+      } else if (isInitialized) {
+        // Seeded with IDs only — need full item data from server
         refresh();
       } else {
         initializeCartIfNeeded();

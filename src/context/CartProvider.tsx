@@ -13,7 +13,6 @@ import React, {
 import {
   collection,
   doc,
-  onSnapshot,
   writeBatch,
   serverTimestamp,
   query,
@@ -21,9 +20,7 @@ import {
   limit,
   startAfter,
   DocumentSnapshot,
-  QuerySnapshot,
   QueryDocumentSnapshot,
-  DocumentChange,
   getDoc,
   Timestamp,
   FieldValue,
@@ -207,8 +204,6 @@ interface CartActionsContextType {
     validatedItems: ValidatedCartItem[]
   ) => Promise<boolean>;
   refresh: () => Promise<void>;
-  enableLiveUpdates: () => void;
-  disableLiveUpdates: () => void;
 }
 
 // Combined context type (for backward compatibility)
@@ -464,7 +459,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   // ========================================================================
 
   const lastDocumentRef = useRef<DocumentSnapshot | null>(null);
-  const unsubscribeCartRef = useRef<(() => void) | null>(null);
 
   // Keep a ref to current cart items to avoid stale closures in listeners
   const cartItemsRef = useRef<CartItem[]>([]);
@@ -485,6 +479,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   );
   const pendingFetchesRef = useRef<Map<string, Promise<unknown>>>(new Map());
   const deferredCartInitRef = useRef<number | ReturnType<typeof setTimeout> | null>(null);
+  const backgroundTotalsTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // ========================================================================
   // HELPER FUNCTIONS
@@ -836,7 +831,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   }, []);
 
   // ========================================================================
-  // REAL-TIME LISTENER - Matching Flutter implementation
+  // HELPER: Update cart IDs from doc snapshots
   // ========================================================================
 
   const updateCartIds = useCallback((docs: QueryDocumentSnapshot[]) => {
@@ -854,146 +849,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
     setCartProductIds(effectiveIds);
     setCartCount(effectiveIds.size);
-  }, []);
-
-  const processCartChanges = useCallback(
-    async (changes: DocumentChange<FirestoreCartData>[]) => {
-      if (changes.length === 0) {
-        return;
-      }
-
-      console.log(`🔄 Processing ${changes.length} cart changes`);
-
-      // ✅ FIX: Build from current state, not ref
-      setCartItems((currentItems) => {
-        const itemsMap = new Map<string, CartItem>();
-
-        // Start with current items
-        currentItems.forEach((item) => {
-          itemsMap.set(item.productId, item);
-        });
-
-        // Process changes
-        for (const change of changes) {
-          const productId = change.doc.id;
-          const cartData = change.doc.data();
-
-          if (change.type === "added" || change.type === "modified") {
-            console.log(`  ✅ ${change.type.toUpperCase()}: ${productId}`);
-            if (cartData && hasRequiredFields(cartData)) {
-              try {
-                const product = buildProductFromCartData(cartData);
-                const newItem = createCartItem(productId, cartData, product);
-                itemsMap.set(productId, newItem);
-                clearOptimisticUpdate(productId);
-                console.log(`    ✓ Item processed and optimistic flag cleared`);
-              } catch (error) {
-                console.error(`    ❌ Failed to process ${productId}:`, error);
-              }
-            } else {
-              console.warn(`    ⚠️ Item ${productId} MISSING REQUIRED FIELDS`);
-              console.warn(`    📋 Has fields:`, Object.keys(cartData || {}));
-              console.warn(`    📋 Data:`, {
-                productId: cartData?.productId,
-                productName: cartData?.productName,
-                unitPrice: cartData?.unitPrice,
-                availableStock: cartData?.availableStock,
-                sellerName: cartData?.sellerName,
-                sellerId: cartData?.sellerId,
-              });
-            }
-          } else if (change.type === "removed") {
-            console.log(`  🗑️ REMOVED: ${productId}`);
-            itemsMap.delete(productId);
-            clearOptimisticUpdate(productId);
-          }
-        }
-
-        // Convert back to array and sort
-        const uniqueItems = Array.from(itemsMap.values());
-        sortCartItems(uniqueItems);
-
-        console.log(`  📦 Final cart has ${uniqueItems.length} items`);
-        return uniqueItems;
-      });
-
-      if (user) {
-        cartTotalsCache.invalidateForUser(user.uid);
-      }
-    },
-    [
-      hasRequiredFields,
-      buildProductFromCartData,
-      createCartItem,
-      clearOptimisticUpdate,
-      sortCartItems,
-      user,
-    ]
-  );
-
-  const handleRealtimeUpdate = useCallback(
-    (snapshot: QuerySnapshot) => {
-      if (snapshot.metadata.fromCache) {
-        console.log("⏭️ Skipping cache event");
-        return;
-      }
-
-      trackReads("Cart:Listener", snapshot.docChanges().length || 1);
-
-      console.log(
-        `🔥 Real-time update: ${snapshot.docChanges().length} changes, ${
-          snapshot.docs.length
-        } total docs`
-      );
-
-      // ALWAYS update IDs from full snapshot
-      updateCartIds(snapshot.docs);
-
-      // Process changes if any exist
-      if (snapshot.docChanges().length > 0) {
-        console.log(
-          `📝 Processing ${snapshot.docChanges().length} document changes`
-        );
-        processCartChanges(snapshot.docChanges());
-      } else if (snapshot.docs.length === 0) {
-        // Only clear if cart is actually empty
-        console.log("🗑️ Cart is empty, clearing items");
-        setCartItems([]);
-      } else {
-        // No changes but docs exist - this is normal for initial listener attach
-        console.log("✅ No changes detected, keeping current state");
-      }
-    },
-    [updateCartIds, processCartChanges]
-  );
-
-  const enableLiveUpdates = useCallback(() => {
-    if (!user || !db) return; // Guard for lazy loading
-
-    // Cancel existing listener
-    if (unsubscribeCartRef.current) {
-      unsubscribeCartRef.current();
-      unsubscribeCartRef.current = null;
-    }
-
-    console.log("🔴 Enabling real-time cart listener");
-
-    const cartQuery = query(collection(db, "users", user.uid, "cart"));
-
-    unsubscribeCartRef.current = onSnapshot(
-      cartQuery,
-      { includeMetadataChanges: false },
-      handleRealtimeUpdate,
-      (error) => console.error("❌ Listener error:", error)
-    );
-  }, [user, db, handleRealtimeUpdate]);
-
-  const disableLiveUpdates = useCallback(() => {
-    console.log("🔴 Disabling cart listener");
-    if (unsubscribeCartRef.current) {
-      unsubscribeCartRef.current();
-      unsubscribeCartRef.current = null;
-    }
   }, []);
 
   // ========================================================================
@@ -1041,9 +896,11 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     const initPromise = (async () => {
       setIsLoading(true);
 
-      // Early exit: if user doc says cart is empty, skip subcollection read entirely
+      // Early exit: if user doc says cart is empty AND we have no local optimistic items,
+      // skip subcollection read entirely
       const cachedIds = getProfileField<string[]>("cartItemIds");
-      if (Array.isArray(cachedIds) && cachedIds.length === 0) {
+      const hasLocalItems = cartProductIds.size > 0 || optimisticCacheRef.current.size > 0;
+      if (Array.isArray(cachedIds) && cachedIds.length === 0 && !hasLocalItems) {
         console.log("✅ Cart: User doc says empty, skipping subcollection read");
         setCartItems([]);
         setCartProductIds(new Set());
@@ -1102,7 +959,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     isInitialized,
     db,
     buildCartItemsFromDocs,
-    enableLiveUpdates,
     cartItems.length,
   ]);
 
@@ -1212,16 +1068,23 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     [user, cartItems, functions]
   );
 
-  const backgroundRefreshTotals = useCallback(async () => {
+  const backgroundRefreshTotals = useCallback(() => {
     if (!user || cartProductIds.size === 0) return;
-  
-    try {
-      // ✅ Pass undefined = calculate ALL items (no exclusions)
-      await calculateCartTotals();
-      console.log("⚡ Background totals cached");
-    } catch (error) {
-      console.log("⚠️ Background total refresh failed:", error);
+
+    // Debounce: if user makes rapid changes, only fire once after 2s of quiet
+    if (backgroundTotalsTimerRef.current) {
+      clearTimeout(backgroundTotalsTimerRef.current);
     }
+
+    backgroundTotalsTimerRef.current = setTimeout(async () => {
+      backgroundTotalsTimerRef.current = null;
+      try {
+        await calculateCartTotals();
+        console.log("⚡ Background totals cached");
+      } catch (error) {
+        console.log("⚠️ Background total refresh failed:", error);
+      }
+    }, 2000);
   }, [user, cartProductIds, calculateCartTotals]);
 
   const applyOptimisticAdd = useCallback(
@@ -1388,7 +1251,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       user,
       db,
       isInitialized,
-      enableLiveUpdates,
       buildProductDataForCart,
       applyOptimisticAdd,
       rollbackOptimisticUpdate,
@@ -1500,10 +1362,13 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       if (!db) return "Loading..."; // Guard for lazy loading
 
       try {
-        applyOptimisticRemove(productId);
+        // Get shopId from local state BEFORE optimistic remove clears it
+        const localItem = cartItemsRef.current.find(
+          (item) => item.productId === productId
+        );
+        const shopId = localItem?.isShop ? localItem.sellerId : null;
 
-        // ✅ GET SHOP ID BEFORE DELETION (NEW)
-        const shopId = await getProductShopId(productId);
+        applyOptimisticRemove(productId);
 
         // Atomic batch: delete cart doc + update user doc array
         const batch = writeBatch(db);
@@ -1542,7 +1407,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       applyOptimisticRemove,
       rollbackOptimisticRemove,
       backgroundRefreshTotals,
-      getProductShopId, // ✅ ADD THIS DEPENDENCY
     ]
   );
 
@@ -1652,13 +1516,16 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       if (productIds.length === 0) return "No items selected";
 
       try {
-        // ✅ STEP 1: Get all shopIds BEFORE deletion (NEW)
+        // Get shopIds from local state BEFORE optimistic remove clears them
         const shopIds: Record<string, string | null> = {};
         for (const productId of productIds) {
-          shopIds[productId] = await getProductShopId(productId);
+          const localItem = cartItemsRef.current.find(
+            (item) => item.productId === productId
+          );
+          shopIds[productId] = localItem?.isShop ? localItem.sellerId : null;
         }
 
-        // STEP 2: Optimistic removal
+        // Optimistic removal
         productIds.forEach((productId) => applyOptimisticRemove(productId));
 
         // STEP 3: Batch delete from Firestore + update user doc array
@@ -1694,7 +1561,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       db,
       applyOptimisticRemove,
       backgroundRefreshTotals,
-      getProductShopId, // ✅ ADD THIS DEPENDENCY
     ]
   );
 
@@ -1719,7 +1585,30 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       const snapshot = await getDocsFromServer(cartQuery);
       trackReads("Cart:Refresh", snapshot.docs.length || 1);
 
+      // Preserve optimistic items that the server hasn't confirmed yet
+      const serverIds = new Set(snapshot.docs.map((d) => d.id));
+      const pendingOptimistic = cartItemsRef.current.filter(
+        (item) =>
+          item.isOptimistic &&
+          !serverIds.has(item.productId) &&
+          !optimisticCacheRef.current.get(item.productId)?._deleted
+      );
+
       await buildCartItemsFromDocs(snapshot.docs);
+
+      // Re-append pending optimistic items so they don't vanish
+      if (pendingOptimistic.length > 0) {
+        setCartItems((prev) => {
+          const ids = new Set(prev.map((i) => i.productId));
+          const merged = [...prev];
+          for (const opt of pendingOptimistic) {
+            if (!ids.has(opt.productId)) {
+              merged.push(opt);
+            }
+          }
+          return merged;
+        });
+      }
 
       if (snapshot.docs.length > 0) {
         lastDocumentRef.current = snapshot.docs[snapshot.docs.length - 1];
@@ -1939,24 +1828,33 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           }
         }
 
-        // Deduplication
-        const existingIds = new Set(cartItems.map((item) => item.productId));
-        const uniqueNewItems = newItems.filter(
-          (item) => !existingIds.has(item.productId)
-        );
+        // Deduplication using setState to avoid stale closure
+        if (newItems.length > 0) {
+          setCartItems((currentItems) => {
+            const existingIds = new Set(
+              currentItems.map((item) => item.productId)
+            );
+            const uniqueNewItems = newItems.filter(
+              (item) => !existingIds.has(item.productId)
+            );
 
-        if (uniqueNewItems.length > 0) {
-          const allItems = [...cartItems, ...uniqueNewItems];
-          sortCartItems(allItems);
-          setCartItems(allItems);
+            if (uniqueNewItems.length === 0) {
+              console.log(
+                `⚠️ All ${newItems.length} items already loaded`
+              );
+              return currentItems;
+            }
 
-          console.log(
-            `✅ Loaded ${uniqueNewItems.length} more items (${
-              newItems.length - uniqueNewItems.length
-            } duplicates skipped)`
-          );
-        } else {
-          console.log(`⚠️ All ${newItems.length} items already loaded`);
+            const allItems = [...currentItems, ...uniqueNewItems];
+            sortCartItems(allItems);
+
+            console.log(
+              `✅ Loaded ${uniqueNewItems.length} more items (${
+                newItems.length - uniqueNewItems.length
+              } duplicates skipped)`
+            );
+            return allItems;
+          });
         }
       } catch (error) {
         console.error("❌ Load more error:", error);
@@ -1995,7 +1893,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       // User logged out - clear everything
       if (isInitialized) {
         console.log("🔴 User logged out, clearing cart...");
-        disableLiveUpdates();
         setCartCount(0);
         setCartProductIds(new Set());
         setCartItems([]);
@@ -2048,11 +1945,14 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         }
         deferredCartInitRef.current = null;
       }
-      disableLiveUpdates();
       optimisticTimeoutsRef.current.forEach((timer) => clearTimeout(timer));
       optimisticTimeoutsRef.current.clear();
+      if (backgroundTotalsTimerRef.current) {
+        clearTimeout(backgroundTotalsTimerRef.current);
+        backgroundTotalsTimerRef.current = null;
+      }
     };
-  }, [disableLiveUpdates]);
+  }, []);
 
   // ========================================================================
   // CONTEXT VALUES - Split for granular subscriptions
@@ -2094,8 +1994,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       validateForPayment,
       updateCartCacheFromValidation,
       refresh,
-      enableLiveUpdates,
-      disableLiveUpdates,
     }),
     [
       addProductToCart,
@@ -2109,8 +2007,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       validateForPayment,
       updateCartCacheFromValidation,
       refresh,
-      enableLiveUpdates,
-      disableLiveUpdates,
     ]
   );
 
