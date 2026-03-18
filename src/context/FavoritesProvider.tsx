@@ -1707,21 +1707,22 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
     clearUserData,
   ]);
 
-  // Re-subscribe when basket changes (skip initial mount — handled by Effect 1)
-  const hasInitializedRef = useRef(false);
+  // Re-subscribe when basket actually changes (not on mount)
+  const prevBasketIdRef = useRef<string | null | undefined>(undefined);
   useEffect(() => {
-    if (!user || !dbProp) {
-      hasInitializedRef.current = false;
+    if (!user || !dbProp) return;
+
+    // Track previous value — skip if this is the first run or value hasn't changed
+    if (prevBasketIdRef.current === undefined) {
+      // First run: just record the initial value, don't trigger anything
+      prevBasketIdRef.current = selectedBasketId;
       return;
     }
 
-    // Skip the first run — Effect 1 already handles initialization
-    if (!hasInitializedRef.current) {
-      hasInitializedRef.current = true;
-      return;
-    }
+    if (prevBasketIdRef.current === selectedBasketId) return;
 
-    // Basket actually changed — re-subscribe the listener
+    // Basket actually changed
+    prevBasketIdRef.current = selectedBasketId;
     disableLiveUpdates();
     enableLiveUpdates();
   }, [

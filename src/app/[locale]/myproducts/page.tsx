@@ -28,8 +28,11 @@ import {
   query,
   where,
   orderBy,
-  onSnapshot,
+  getDocs,
+  limit,
+  startAfter,
   Timestamp,
+  QueryDocumentSnapshot,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useTranslations } from "next-intl";
@@ -56,6 +59,8 @@ interface DateRange {
   end: Date;
 }
 
+const PAGE_SIZE = 20;
+
 export default function MyProductsPage() {
   const router = useRouter();
   const { user, isLoading: authLoading } = useUser();
@@ -68,6 +73,9 @@ export default function MyProductsPage() {
     return false;
   });
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -99,9 +107,9 @@ export default function MyProductsPage() {
 
   useEffect(() => {
     if (user) {
-      const unsub = loadProducts();
-      return unsub;
+      loadProducts();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   useEffect(() => {
@@ -132,40 +140,66 @@ export default function MyProductsPage() {
     }
   }, [activeMenu]);
 
-  const loadProducts = () => {
-    if (!user) return () => {};
-    const q = query(
-      collection(db, "products"),
-      where("userId", "==", user.uid),
-      orderBy("createdAt", "desc")
-    );
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        const loaded: Product[] = snap.docs.map((doc) => {
-          const d = doc.data();
-          return {
-            id: doc.id,
-            productName: d.productName || "",
-            imageUrls: d.imageUrls || [],
-            price: d.price || 0,
-            currency: d.currency || "TRY",
-            brandModel: d.brandModel,
-            averageRating: d.averageRating,
-            clickCount: d.clickCount,
-            cartCount: d.cartCount,
-            favoritesCount: d.favoritesCount,
-            createdAt: d.createdAt,
-            isBoosted: d.isBoosted,
-            boostEndTime: d.boostEndTime,
-          };
-        });
-        setProducts(loaded);
-        setLoading(false);
-      },
-      () => setLoading(false)
-    );
-    return unsub;
+  const parseProduct = (doc: QueryDocumentSnapshot): Product => {
+    const d = doc.data();
+    return {
+      id: doc.id,
+      productName: d.productName || "",
+      imageUrls: d.imageUrls || [],
+      price: d.price || 0,
+      currency: d.currency || "TRY",
+      brandModel: d.brandModel,
+      averageRating: d.averageRating,
+      clickCount: d.clickCount,
+      cartCount: d.cartCount,
+      favoritesCount: d.favoritesCount,
+      createdAt: d.createdAt,
+      isBoosted: d.isBoosted,
+      boostEndTime: d.boostEndTime,
+    };
+  };
+
+  const loadProducts = async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const q = query(
+        collection(db, "products"),
+        where("userId", "==", user.uid),
+        orderBy("createdAt", "desc"),
+        limit(PAGE_SIZE)
+      );
+      const snap = await getDocs(q);
+      setProducts(snap.docs.map(parseProduct));
+      setLastDoc(snap.docs[snap.docs.length - 1] ?? null);
+      setHasMore(snap.docs.length === PAGE_SIZE);
+    } catch (error) {
+      console.error("Failed to load products:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadMoreProducts = async () => {
+    if (!user || !lastDoc || loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const q = query(
+        collection(db, "products"),
+        where("userId", "==", user.uid),
+        orderBy("createdAt", "desc"),
+        startAfter(lastDoc),
+        limit(PAGE_SIZE)
+      );
+      const snap = await getDocs(q);
+      setProducts((prev) => [...prev, ...snap.docs.map(parseProduct)]);
+      setLastDoc(snap.docs[snap.docs.length - 1] ?? null);
+      setHasMore(snap.docs.length === PAGE_SIZE);
+    } catch (error) {
+      console.error("Failed to load more products:", error);
+    } finally {
+      setLoadingMore(false);
+    }
   };
 
   const handleDeleteProduct = (productId: string) => {
@@ -797,11 +831,30 @@ export default function MyProductsPage() {
             )}
           </div>
         ) : (
-          <div className="space-y-2">
-            {filteredProducts.map((product) => (
-              <ProductRow key={product.id} product={product} />
-            ))}
-          </div>
+          <>
+            <div className="space-y-2">
+              {filteredProducts.map((product) => (
+                <ProductRow key={product.id} product={product} />
+              ))}
+            </div>
+            {hasMore && !searchQuery.trim() && !selectedDateRange && (
+              <div className="flex justify-center pt-4 pb-2">
+                <button
+                  onClick={loadMoreProducts}
+                  disabled={loadingMore}
+                  className={`px-6 py-2.5 text-sm font-medium rounded-lg transition-colors ${
+                    isDarkMode
+                      ? "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  } disabled:opacity-50`}
+                >
+                  {loadingMore
+                    ? (t("loading") || "Loading...")
+                    : (t("loadMore") || "Load More")}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 
