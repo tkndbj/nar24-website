@@ -362,13 +362,11 @@ export default function RestaurantsPage({ restaurants: serverRestaurants }: Rest
   const userMainRegion = foodAddress?.mainRegion;
   const userCity = foodAddress?.city;
 
-  // Build delivery filter regions from user's foodAddress: [city, mainRegion]
+  // Build delivery filter regions from user's foodAddress: only subregion (city)
+  // Matches Flutter behaviour — filter by specific subregion, not entire main region
   const deliveryFilterRegions = React.useMemo(() => {
-    const regions: string[] = [];
-    if (userCity) regions.push(userCity);
-    if (userMainRegion) regions.push(userMainRegion);
-    return regions.length > 0 ? regions : undefined;
-  }, [userCity, userMainRegion]);
+    return userCity ? [userCity] : undefined;
+  }, [userCity]);
 
   const pillsRef = useRef<HTMLDivElement>(null);
 
