@@ -15,7 +15,7 @@ const DAY_NAMES = [
  * `workingDays` (e.g. ["Monday", "Tuesday", ...]) and
  * `workingHours` ({ open: "08:00", close: "22:00" }).
  *
- * - Returns `true` when schedule data is missing (graceful default).
+ * - Returns `true` when schedule data is missing (graceful default)..
  * - Handles overnight hours (e.g. open: "22:00", close: "03:00").
  */
 export function isRestaurantOpen(
