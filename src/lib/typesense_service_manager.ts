@@ -39,11 +39,11 @@ export type {
 
 const TYPESENSE_HOST =
   process.env.NEXT_PUBLIC_TYPESENSE_HOST ??
-  "o17xr5q8psytcabup-1.a2.typesense.net";
+  "j0xs6ry9275tu4cop.a2.typesense.net";
 
 const TYPESENSE_SEARCH_KEY =
   process.env.NEXT_PUBLIC_TYPESENSE_SEARCH_KEY ??
-  "wYjR4e0aCTTy9GVCImW1U30xlBQTYK51";
+  "z8Ii7rZ3MUlpxLvbPLu3WOqmsZemMjBZ";
 
 // ── TypeSenseServiceManager ───────────────────────────────────────────────────
 
