@@ -435,6 +435,18 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  // Derived product: merges raw product state with batch seller info.
+  // This is the single source of truth for operations (cart, buy now, etc.)
+  // so that stale cached products get enriched as soon as seller data arrives.
+  const enrichedProduct = useMemo(() => {
+    if (!product) return null;
+    const seller = batchData?.seller;
+    if (seller?.sellerName && (!product.sellerName || product.sellerName === "Unknown")) {
+      return { ...product, sellerName: seller.sellerName } as Product;
+    }
+    return product;
+  }, [product, batchData]);
+
   const isOutOfStock = useMemo(() => {
     if (!product) return false;
 
@@ -795,7 +807,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
   const navigateToBuyNow = useCallback(
     (selectedOptions: { quantity?: number; [key: string]: unknown }) => {
-      if (!product) return;
+      if (!enrichedProduct) return;
 
       try {
         const selectedAttributes: Record<string, unknown> = {};
@@ -812,7 +824,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         });
 
         const productData = buildProductDataForCart(
-          product,
+          enrichedProduct,
           selectedOptions.selectedColor as string | undefined,
           undefined,
         );
@@ -839,7 +851,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         router.push(`/${locale}/productpayment`);
       }
     },
-    [product, router, locale],
+    [enrichedProduct, router, locale],
   );
 
   const handleAddToCart = useCallback(
@@ -849,7 +861,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         return;
       }
 
-      if (!product) return;
+      if (!enrichedProduct) return;
 
       // Use ref to prevent race conditions from rapid clicks
       // This is more reliable than state because refs update synchronously
@@ -861,13 +873,13 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         return;
       }
 
-      const productInCart = cartProductIds.has(product.id);
+      const productInCart = cartProductIds.has(enrichedProduct.id);
       const isAdding = !productInCart;
 
       // CRITICAL: If adding to cart and product has selectable options,
       // ALWAYS show the option selector unless options were already selected
       if (isAdding && !selectedOptions) {
-        const productHasOptions = hasSelectableOptions(product);
+        const productHasOptions = hasSelectableOptions(enrichedProduct);
         if (productHasOptions) {
           // Set the lock before showing selector to prevent race conditions
           // from rapid clicks while the modal is opening
@@ -916,7 +928,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           delete attributesToAdd.selectedColor;
 
           result = await addProductToCart(
-            product,
+            enrichedProduct,
             quantityToAdd,
             selectedColor,
             Object.keys(attributesToAdd).length > 0
@@ -924,7 +936,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               : undefined,
           );
         } else {
-          result = await removeFromCart(product.id);
+          result = await removeFromCart(enrichedProduct.id);
         }
 
         if (
@@ -950,7 +962,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     },
     [
       user,
-      product,
+      enrichedProduct,
       cartProductIds,
       cartButtonState,
       addProductToCart,
@@ -978,19 +990,19 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
       return;
     }
 
-    if (!product) return;
+    if (!enrichedProduct) return;
 
     if (salesPaused) {
       setShowSalesPausedDialog(true);
       return;
     }
 
-    if (hasSelectableOptions(product)) {
+    if (hasSelectableOptions(enrichedProduct)) {
       setShowBuyNowOptionSelector(true);
     } else {
       navigateToBuyNow({ quantity: 1 });
     }
-  }, [user, product, navigateToBuyNow, salesPaused]);
+  }, [user, enrichedProduct, navigateToBuyNow, salesPaused]);
 
   const handleBuyNowOptionSelectorConfirm = useCallback(
     (selectedOptions: { quantity?: number; [key: string]: unknown }) => {
@@ -1131,19 +1143,24 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   }, [product, cartProductIds, cartButtonState, t]);
 
   const isAddToCartDisabled = useMemo(() => {
-    if (!product) return false;
+    if (!enrichedProduct) return false;
 
     if (cartButtonState === "adding" || cartButtonState === "removing") {
       return true;
     }
 
-    const hasNoStock = product.quantity === 0;
+    // Product data not fully loaded yet (seller info arrives from batch API)
+    if (!enrichedProduct.sellerName || enrichedProduct.sellerName === "Unknown") {
+      return true;
+    }
+
+    const hasNoStock = enrichedProduct.quantity === 0;
     const hasColorOptions =
-      product.colorQuantities &&
-      Object.keys(product.colorQuantities).length > 0;
+      enrichedProduct.colorQuantities &&
+      Object.keys(enrichedProduct.colorQuantities).length > 0;
 
     return hasNoStock && !hasColorOptions;
-  }, [product, cartButtonState]);
+  }, [enrichedProduct, cartButtonState]);
 
   // ============= RENDER =============
 

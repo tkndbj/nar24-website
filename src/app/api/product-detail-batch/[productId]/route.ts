@@ -720,6 +720,12 @@ async function fetchAllProductData(
   timings.parallel = Date.now() - parallelStart;
   timings.total = Date.now() - startTime;
 
+  // Enrich product with seller info so the client gets a complete product object
+  // This prevents race conditions where cart operations use stale cached data
+  if (sellerResult) {
+    product.sellerName = sellerResult.sellerName || product.sellerName;
+  }
+
   return {
     product,
     seller: sellerResult,
