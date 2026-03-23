@@ -486,7 +486,15 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
         // Update product if we got fresh data
         if (data.product) {
-          const freshProduct = ProductUtils.fromJson(data.product);
+          // Merge seller info into product data so the Product object is complete
+          // (the batch API returns seller info separately from the product document)
+          const enrichedProductData = {
+            ...data.product,
+            ...(data.seller && {
+              sellerName: data.seller.sellerName || data.product.sellerName,
+            }),
+          };
+          const freshProduct = ProductUtils.fromJson(enrichedProductData);
           setProduct(freshProduct);
           setProductCache(id, freshProduct);
         }
@@ -594,15 +602,23 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           );
 
           if (data.product) {
-            const product = ProductUtils.fromJson(data.product);
+            // Merge seller info into product data so the Product object is complete
+            // (the batch API returns seller info separately from the product document)
+            const enrichedProductData = {
+              ...data.product,
+              ...(data.seller && {
+                sellerName: data.seller.sellerName || data.product.sellerName,
+              }),
+            };
+            const product = ProductUtils.fromJson(enrichedProductData);
             setProduct(product);
             setProductCache(id, product);
 
-            // Cache to sessionStorage
+            // Cache to sessionStorage (with enriched data so sellerName persists)
             try {
               sessionStorage.setItem(
                 `product_${id}`,
-                JSON.stringify(data.product),
+                JSON.stringify(enrichedProductData),
               );
               sessionStorage.setItem(
                 `product_${id}_timestamp`,
