@@ -810,14 +810,24 @@ function ProductPaymentPageContent() {
 
   // Handle checkout data initialization
   useEffect(() => {
-    const buyNowData = searchParams.get("buyNowData");
-
-    // CASE 1: Buy Now - Single Product Purchase
-    if (buyNowData) {
+    const isBuyNow = searchParams.get("mode") === "buyNow";
+    // CASE 1: Buy Now
+    if (isBuyNow) {
       try {
-        console.log("🛒 Buy Now Mode - Decoding buyNowData...");
-        const decodedItem = JSON.parse(decodeURIComponent(buyNowData));
-        console.log("✅ Decoded Buy Now Item:", decodedItem);
+        const raw = sessionStorage.getItem("buyNowData");
+        if (!raw) {
+          router.push("/cart");
+          return;
+        }
+
+        const decodedItem = JSON.parse(raw);
+
+        // Check not stale (5 min)
+        if (Date.now() - decodedItem.timestamp > 5 * 60 * 1000) {
+          sessionStorage.removeItem("buyNowData");
+          router.push("/cart");
+          return;
+        }
 
         const itemWithCalculatedPrices = {
           ...decodedItem,
@@ -827,18 +837,16 @@ function ProductPaymentPageContent() {
         };
 
         setCartItems([itemWithCalculatedPrices]);
-        const itemTotal = decodedItem.unitPrice * decodedItem.quantity;
-        setTotalPrice(itemTotal);
-        setIsLoadingCheckout(false);
+        setTotalPrice(decodedItem.unitPrice * decodedItem.quantity);
 
-        // ✅ Load discount data from sessionStorage for Buy Now
+        // Clear after reading so it can't be reused
+        sessionStorage.removeItem("buyNowData");
+
         loadDiscountData();
-
-        console.log("💰 Buy Now Total:", itemTotal);
+        setIsLoadingCheckout(false);
         return;
-      } catch (error) {
-        console.error("❌ Failed to parse buyNowData:", error);
-        alert("Invalid buy now data. Redirecting to cart...");
+      } catch {
+        sessionStorage.removeItem("buyNowData");
         router.push("/cart");
         return;
       }

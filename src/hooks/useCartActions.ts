@@ -130,13 +130,15 @@ export function useCartActions(
           unitPrice: product.price,
           currency: product.currency || "TL",
           quantity: selectedOptions.quantity || 1,
+          timestamp: Date.now(),
           ...(Object.keys(selectedAttributes).length > 0 && {
             selectedAttributes,
           }),
         };
 
-        const encodedData = encodeURIComponent(JSON.stringify(buyNowItem));
-        router.push(`/${locale}/productpayment?buyNowData=${encodedData}`);
+        // ✅ Store in sessionStorage, only pass a key in URL
+        sessionStorage.setItem("buyNowData", JSON.stringify(buyNowItem));
+        router.push(`/${locale}/productpayment?mode=buyNow`);
       } catch {
         router.push(`/${locale}/productpayment`);
       }
