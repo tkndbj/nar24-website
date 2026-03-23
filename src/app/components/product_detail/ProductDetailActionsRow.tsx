@@ -19,7 +19,6 @@ interface ProductDetailActionsRowProps {
   onShare?: () => void;
   onToggleFavorite?: () => void;
   isFavorite?: boolean;
-  isDarkMode?: boolean;
   localization?: ReturnType<typeof useTranslations>;
 }
 
@@ -27,7 +26,6 @@ interface RotatingCountTextProps {
   cartCount: number;
   favoriteCount: number;
   purchaseCount: number;
-  isDarkMode?: boolean;
   t: (key: string) => string;
 }
 
@@ -35,7 +33,6 @@ const RotatingCountText: React.FC<RotatingCountTextProps> = ({
   cartCount,
   favoriteCount,
   purchaseCount,
-  isDarkMode = false,
   t,
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -45,21 +42,21 @@ const RotatingCountText: React.FC<RotatingCountTextProps> = ({
   if (purchaseCount > 0) {
     messages.push({
       text: `${purchaseCount} ${t("purchased")}`,
-      color: isDarkMode ? "text-green-400" : "text-green-600",
+      color: "text-green-600 dark:text-green-400",
       icon: <Award className="w-3 h-3" />,
     });
   }
   if (favoriteCount > 0) {
     messages.push({
       text: `${favoriteCount} ${t("favorites")}`,
-      color: isDarkMode ? "text-pink-400" : "text-pink-600",
+      color: "text-pink-600 dark:text-pink-400",
       icon: <Heart className="w-3 h-3" />,
     });
   }
   if (cartCount > 0) {
     messages.push({
       text: `${cartCount} ${t("inCart")}`,
-      color: isDarkMode ? "text-orange-400" : "text-orange-600",
+      color: "text-orange-600 dark:text-orange-400",
       icon: <Truck className="w-3 h-3" />,
     });
   }
@@ -103,21 +100,17 @@ const RotatingCountText: React.FC<RotatingCountTextProps> = ({
 interface StarRatingProps {
   rating: number;
   reviewCount?: number;
-  isDarkMode?: boolean;
   t: (key: string) => string;
 }
 
-const StarRating: React.FC<StarRatingProps> = ({ 
-  rating, 
+const StarRating: React.FC<StarRatingProps> = ({
+  rating,
   reviewCount,
-  isDarkMode = false,
   t
 }) => {
   const fullStars = Math.floor(rating);
   const hasHalfStar = rating - fullStars >= 0.5;
   const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
-
-  const emptyStarColor = isDarkMode ? "text-gray-600" : "text-gray-300";
 
   return (
     <div className="flex items-center gap-3">
@@ -129,20 +122,16 @@ const StarRating: React.FC<StarRatingProps> = ({
           <StarHalf className="w-4 h-4 fill-amber-400 text-amber-400" />
         )}
         {Array.from({ length: emptyStars }).map((_, i) => (
-          <Star key={i} className={`w-4 h-4 ${emptyStarColor}`} />
+          <Star key={i} className="w-4 h-4 text-gray-300 dark:text-gray-600" />
         ))}
       </div>
-      
+
       <div className="flex items-center gap-2">
-        <span className={`text-lg font-bold ${
-          isDarkMode ? "text-white" : "text-gray-900"
-        }`}>
+        <span className="text-lg font-bold text-gray-900 dark:text-white">
           {rating.toFixed(1)}
         </span>
         {reviewCount && (
-          <span className={`text-sm ${
-            isDarkMode ? "text-gray-400" : "text-gray-500"
-          }`}>
+          <span className="text-sm text-gray-500 dark:text-gray-400">
             ({reviewCount} {t("reviews")})
           </span>
         )}
@@ -155,67 +144,45 @@ interface TrustBadgeProps {
   icon: React.ReactNode;
   title: string;
   value: string;
-  isDarkMode?: boolean;
 }
 
 const TrustBadge: React.FC<TrustBadgeProps> = ({
   icon,
   title,
   value,
-  isDarkMode = false,
 }) => (
-  <div className={`flex items-center gap-2 px-3 py-2 rounded-xl ${
-    isDarkMode 
-      ? "bg-gray-800 border border-gray-700" 
-      : "bg-gray-50 border border-gray-200"
-  }`}>
-    <div className={`${isDarkMode ? "text-orange-400" : "text-orange-600"}`}>
+  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+    <div className="text-orange-600 dark:text-orange-400">
       {icon}
     </div>
     <div className="flex flex-col">
-      <span className={`text-xs font-medium ${
-        isDarkMode ? "text-gray-400" : "text-gray-600"
-      }`}>
+      <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
         {title}
       </span>
-      <span className={`text-sm font-semibold ${
-        isDarkMode ? "text-white" : "text-gray-900"
-      }`}>
+      <span className="text-sm font-semibold text-gray-900 dark:text-white">
         {value}
       </span>
     </div>
   </div>
 );
 
-const LoadingSkeleton: React.FC<{ isDarkMode?: boolean }> = ({ 
-  isDarkMode = false 
-}) => (
-  <div className={`space-y-4 ${
-    isDarkMode ? "text-white" : "text-gray-900"
-  }`}>
+const LoadingSkeleton: React.FC = () => (
+  <div className="space-y-4 text-gray-900 dark:text-white">
     <div className="flex items-center gap-4">
       <div className="flex gap-1">
         {Array.from({ length: 5 }).map((_, i) => (
           <div
             key={i}
-            className={`w-4 h-4 rounded animate-pulse ${
-              isDarkMode ? "bg-gray-700" : "bg-gray-200"
-            }`}
+            className="w-4 h-4 rounded animate-pulse bg-gray-200 dark:bg-gray-700"
           />
         ))}
       </div>
-      <div className={`w-12 h-5 rounded animate-pulse ${
-        isDarkMode ? "bg-gray-700" : "bg-gray-200"
-      }`} />
+      <div className="w-12 h-5 rounded animate-pulse bg-gray-200 dark:bg-gray-700" />
     </div>
 
     <div className="flex gap-3">
-      <div className={`w-24 h-12 rounded-xl animate-pulse ${
-        isDarkMode ? "bg-gray-700" : "bg-gray-200"
-      }`} />
-      <div className={`w-32 h-12 rounded-xl animate-pulse ${
-        isDarkMode ? "bg-gray-700" : "bg-gray-200"
-      }`} />
+      <div className="w-24 h-12 rounded-xl animate-pulse bg-gray-200 dark:bg-gray-700" />
+      <div className="w-32 h-12 rounded-xl animate-pulse bg-gray-200 dark:bg-gray-700" />
     </div>
   </div>
 );
@@ -224,7 +191,6 @@ const ProductDetailActionsRow: React.FC<ProductDetailActionsRowProps> = ({
   product,
   isLoading = false,
   onToggleFavorite,
-  isDarkMode = false,
   localization,
 }) => {
   const { addToFavorites, isFavorite: isProductFavorite } = useFavorites();
@@ -307,7 +273,7 @@ const ProductDetailActionsRow: React.FC<ProductDetailActionsRowProps> = ({
   };
 
   if (isLoading || !product) {
-    return <LoadingSkeleton isDarkMode={isDarkMode} />;
+    return <LoadingSkeleton />;
   }
 
   return (
@@ -319,7 +285,6 @@ const ProductDetailActionsRow: React.FC<ProductDetailActionsRowProps> = ({
             <StarRating
               rating={product.averageRating}
               reviewCount={product.reviewCount || undefined}
-              isDarkMode={isDarkMode}
               t={t}
             />
 
@@ -327,7 +292,6 @@ const ProductDetailActionsRow: React.FC<ProductDetailActionsRowProps> = ({
               cartCount={product.cartCount}
               favoriteCount={product.favoritesCount}
               purchaseCount={product.purchaseCount}
-              isDarkMode={isDarkMode}
               t={t}
             />
           </div>
@@ -339,13 +303,11 @@ const ProductDetailActionsRow: React.FC<ProductDetailActionsRowProps> = ({
             icon={<Shield className="w-4 h-4" />}
             title={t("brand")}
             value={product.brandModel || t("generic")}
-            isDarkMode={isDarkMode}
           />
           <TrustBadge
             icon={<Truck className="w-4 h-4" />}
             title={t("delivery")}
             value={product.deliveryOption || t("standard")}
-            isDarkMode={isDarkMode}
           />
         </div>
       </div>

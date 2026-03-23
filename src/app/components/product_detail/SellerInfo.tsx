@@ -27,41 +27,28 @@ interface ProductDetailSellerInfoProps {
   sellerName: string;
   shopId?: string;
   isLoading?: boolean;
-  isDarkMode?: boolean;
   localization?: ReturnType<typeof useTranslations>;
   prefetchedData?: SellerInfo | null;
 }
 
-const LoadingSkeleton: React.FC<{ isDarkMode?: boolean }> = ({
-  isDarkMode = false,
-}) => (
+const LoadingSkeleton: React.FC = () => (
   <div
-    className={`rounded-2xl p-6 border animate-pulse ${
-      isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
-    }`}
+    className="rounded-2xl p-6 border animate-pulse bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
   >
     <div className="flex items-center gap-4">
       <div
-        className={`w-12 h-12 rounded-full ${
-          isDarkMode ? "bg-gray-700" : "bg-gray-200"
-        }`}
+        className="w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-700"
       />
       <div className="flex-1 space-y-2">
         <div
-          className={`w-32 h-4 rounded ${
-            isDarkMode ? "bg-gray-700" : "bg-gray-200"
-          }`}
+          className="w-32 h-4 rounded bg-gray-200 dark:bg-gray-700"
         />
         <div
-          className={`w-24 h-3 rounded ${
-            isDarkMode ? "bg-gray-700" : "bg-gray-200"
-          }`}
+          className="w-24 h-3 rounded bg-gray-200 dark:bg-gray-700"
         />
       </div>
       <div
-        className={`w-6 h-6 rounded ${
-          isDarkMode ? "bg-gray-700" : "bg-gray-200"
-        }`}
+        className="w-6 h-6 rounded bg-gray-200 dark:bg-gray-700"
       />
     </div>
   </div>
@@ -72,7 +59,6 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
   sellerName,
   shopId,
   isLoading = false,
-  isDarkMode = false,
   localization,
   prefetchedData,
 }) => {
@@ -175,7 +161,7 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
   }, [isShop, shopId, sellerId, router]);
 
   if (isLoading || loading) {
-    return <LoadingSkeleton isDarkMode={isDarkMode} />;
+    return <LoadingSkeleton />;
   }
 
   if (error && !sellerInfo) {
@@ -198,9 +184,7 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
 
   return (
     <div
-      className={`rounded-2xl p-4 md:p-6 border shadow-sm transition-all duration-200 hover:shadow-md ${
-        isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
-      }`}
+      className={`rounded-2xl p-4 md:p-6 border shadow-sm transition-all duration-200 hover:shadow-md bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700`}
     >
       <button
         onClick={handleSellerClick}
@@ -212,11 +196,7 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
         <div className="flex items-center gap-3 md:gap-4">
           {/* Seller Avatar/Icon */}
           <div
-            className={`relative p-2 md:p-3 rounded-full transition-all duration-200 ${
-              isDarkMode
-                ? "bg-gradient-to-br from-orange-900/20 to-orange-800/20 text-orange-400"
-                : "bg-gradient-to-br from-orange-100 to-orange-200 text-orange-600"
-            } ${canNavigate ? "group-hover:scale-105" : ""}`}
+            className={`relative p-2 md:p-3 rounded-full transition-all duration-200 bg-gradient-to-br from-orange-100 to-orange-200 text-orange-600 dark:from-orange-900/20 dark:to-orange-800/20 dark:text-orange-400 ${canNavigate ? "group-hover:scale-105" : ""}`}
           >
             {isShop ? (
               <Store className="w-5 h-5 md:w-6 md:h-6" />
@@ -238,17 +218,13 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
           <div className="flex-1 text-left min-w-0">
             <div className="flex items-center gap-1.5 md:gap-2 mb-0.5 md:mb-1">
               <h4
-                className={`font-bold text-base md:text-lg truncate ${
-                  isDarkMode ? "text-white" : "text-gray-900"
-                }`}
+                className="font-bold text-base md:text-lg truncate text-gray-900 dark:text-white"
               >
                 {displayName || t("unknownSeller")}
               </h4>
 
               <span
-                className={`text-xs md:text-sm whitespace-nowrap ${
-                  isDarkMode ? "text-gray-400" : "text-gray-600"
-                }`}
+                className="text-xs md:text-sm whitespace-nowrap text-gray-600 dark:text-gray-400"
               >
                 {isShop ? t("officialStore") : t("individualSeller")}
               </span>
@@ -260,9 +236,7 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
                 <div className="flex items-center gap-0.5 md:gap-1">
                   <Star className="w-3.5 h-3.5 md:w-4 md:h-4 fill-amber-400 text-amber-400" />
                   <span
-                    className={`font-semibold ${
-                      isDarkMode ? "text-white" : "text-gray-900"
-                    }`}
+                    className="font-semibold text-gray-900 dark:text-white"
                   >
                     {displayRating.toFixed(1)}
                   </span>
@@ -270,9 +244,7 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
 
                 {sellerInfo.totalReviews > 0 && (
                   <span
-                    className={`${
-                      isDarkMode ? "text-gray-400" : "text-gray-500"
-                    }`}
+                    className="text-gray-500 dark:text-gray-400"
                   >
                     ({sellerInfo.totalReviews})
                   </span>
@@ -283,9 +255,7 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
                 <div className="flex items-center gap-0.5 md:gap-1">
                   <Package className="w-3 h-3" />
                   <span
-                    className={`${
-                      isDarkMode ? "text-gray-400" : "text-gray-500"
-                    }`}
+                    className="text-gray-500 dark:text-gray-400"
                   >
                     {sellerInfo.totalProductsSold} {t("sold")}
                   </span>
@@ -297,11 +267,7 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
           {/* Arrow Icon */}
           {canNavigate && (
             <div
-              className={`transition-all duration-200 ${
-                isDarkMode
-                  ? "text-gray-400 group-hover:text-orange-400"
-                  : "text-gray-400 group-hover:text-orange-600"
-              } group-hover:translate-x-1`}
+              className="transition-all duration-200 text-gray-400 group-hover:text-orange-600 dark:group-hover:text-orange-400 group-hover:translate-x-1"
             >
               <ChevronRight className="w-4 h-4 md:w-5 md:h-5" />
             </div>
@@ -311,22 +277,14 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
         {/* Trust Indicators */}
         <div className="mt-3 md:mt-4 flex items-center gap-2 md:gap-3">
           <div
-            className={`flex items-center gap-0.5 md:gap-1 px-2 md:px-3 py-0.5 md:py-1 rounded-full text-[10px] md:text-xs font-medium ${
-              isDarkMode
-                ? "bg-green-900/20 text-green-400 border border-green-800"
-                : "bg-green-50 text-green-700 border border-green-200"
-            }`}
+            className="flex items-center gap-0.5 md:gap-1 px-2 md:px-3 py-0.5 md:py-1 rounded-full text-[10px] md:text-xs font-medium bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800"
           >
             <Verified className="w-2.5 h-2.5 md:w-3 md:h-3" />
             {t("verified2")} {isShop ? t("store") : t("seller")}
           </div>
 
           <div
-            className={`flex items-center gap-0.5 md:gap-1 px-2 md:px-3 py-0.5 md:py-1 rounded-full text-[10px] md:text-xs font-medium ${
-              isDarkMode
-                ? "bg-blue-900/20 text-blue-400 border border-blue-800"
-                : "bg-blue-50 text-blue-700 border border-blue-200"
-            }`}
+            className="flex items-center gap-0.5 md:gap-1 px-2 md:px-3 py-0.5 md:py-1 rounded-full text-[10px] md:text-xs font-medium bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800"
           >
             <MessageCircle className="w-2.5 h-2.5 md:w-3 md:h-3" />
             {t("fastResponse")}

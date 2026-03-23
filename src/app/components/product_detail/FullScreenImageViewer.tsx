@@ -10,7 +10,6 @@ interface FullScreenImageViewerProps {
   initialIndex?: number;
   isOpen: boolean;
   onClose: () => void;
-  isDarkMode?: boolean;
 }
 
 const FullScreenImageViewer: React.FC<FullScreenImageViewerProps> = ({

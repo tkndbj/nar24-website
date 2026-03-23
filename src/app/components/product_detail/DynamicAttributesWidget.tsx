@@ -18,7 +18,6 @@ import { Product } from "@/app/models/Product";
 interface DynamicAttributesWidgetProps {
   product: Product | null;
   isLoading?: boolean;
-  isDarkMode?: boolean;
   localization?: ReturnType<typeof useTranslations>;
 }
 
@@ -26,30 +25,20 @@ interface AttributeCardProps {
   title: string;
   value: string;
   icon?: React.ReactNode;
-  isDarkMode?: boolean;
 }
 
 const AttributeCard: React.FC<AttributeCardProps> = ({
   title,
   value,
   icon,
-  isDarkMode = false,
 }) => (
   <div
-    className={`group relative overflow-hidden rounded-md p-1.5 sm:p-2 border transition-all duration-200 ${
-      isDarkMode
-        ? "bg-gray-800 border-gray-700 hover:border-orange-500"
-        : "bg-white border-gray-200 hover:border-orange-300"
-    }`}
+    className="group relative overflow-hidden rounded-md p-1.5 sm:p-2 border transition-all duration-200 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-orange-300 dark:hover:border-orange-500"
   >
     <div className="flex items-start gap-1 sm:gap-1.5">
       {icon && (
         <div
-          className={`mt-0.5 p-0.5 sm:p-1 rounded transition-colors ${
-            isDarkMode
-              ? "bg-orange-900/20 text-orange-400"
-              : "bg-orange-100 text-orange-600"
-          }`}
+          className="mt-0.5 p-0.5 sm:p-1 rounded transition-colors bg-orange-100 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400"
         >
           {icon}
         </div>
@@ -57,16 +46,12 @@ const AttributeCard: React.FC<AttributeCardProps> = ({
 
       <div className="flex-1 min-w-0">
         <h4
-          className={`text-[10px] sm:text-xs font-medium mb-0.5 ${
-            isDarkMode ? "text-gray-400" : "text-gray-600"
-          }`}
+          className="text-[10px] sm:text-xs font-medium mb-0.5 text-gray-600 dark:text-gray-400"
         >
           {title}
         </h4>
         <p
-          className={`text-xs sm:text-xs font-medium break-words leading-tight ${
-            isDarkMode ? "text-white" : "text-gray-900"
-          }`}
+          className="text-xs sm:text-xs font-medium break-words leading-tight text-gray-900 dark:text-white"
         >
           {value}
         </p>
@@ -75,23 +60,17 @@ const AttributeCard: React.FC<AttributeCardProps> = ({
   </div>
 );
 
-const LoadingSkeleton: React.FC<{ isDarkMode?: boolean }> = ({
-  isDarkMode = false,
-}) => (
+const LoadingSkeleton: React.FC = () => (
   <div className="space-y-3">
     <div
-      className={`w-24 sm:w-32 h-4 sm:h-5 rounded animate-pulse ${
-        isDarkMode ? "bg-gray-700" : "bg-gray-200"
-      }`}
+      className="w-24 sm:w-32 h-4 sm:h-5 rounded animate-pulse bg-gray-200 dark:bg-gray-700"
     />
 
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
       {Array.from({ length: 6 }).map((_, i) => (
         <div
           key={i}
-          className={`h-14 sm:h-16 rounded-lg animate-pulse ${
-            isDarkMode ? "bg-gray-700" : "bg-gray-200"
-          }`}
+          className="h-14 sm:h-16 rounded-lg animate-pulse bg-gray-200 dark:bg-gray-700"
         />
       ))}
     </div>
@@ -101,7 +80,6 @@ const LoadingSkeleton: React.FC<{ isDarkMode?: boolean }> = ({
 const DynamicAttributesWidget: React.FC<DynamicAttributesWidgetProps> = ({
   product,
   isLoading = false,
-  isDarkMode = false,
 }) => {
   const t = useTranslations();
 
@@ -276,13 +254,9 @@ const DynamicAttributesWidget: React.FC<DynamicAttributesWidgetProps> = ({
   if (isLoading || !product) {
     return (
       <div
-        className={`rounded-lg p-2 sm:p-3 border ${
-          isDarkMode
-            ? "bg-gray-800 border-gray-700"
-            : "bg-white border-gray-200"
-        }`}
+        className="rounded-lg p-2 sm:p-3 border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
       >
-        <LoadingSkeleton isDarkMode={isDarkMode} />
+        <LoadingSkeleton />
       </div>
     );
   }
@@ -293,26 +267,18 @@ const DynamicAttributesWidget: React.FC<DynamicAttributesWidgetProps> = ({
 
   return (
     <div
-      className={`rounded-lg p-2 sm:p-3 border ${
-        isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
-      }`}
+      className="rounded-lg p-2 sm:p-3 border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
     >
       <div className="space-y-2">
         {/* Header */}
         <div className="flex items-center gap-1.5">
           <div
-            className={`p-0.5 sm:p-1 rounded ${
-              isDarkMode
-                ? "bg-orange-900/20 text-orange-400"
-                : "bg-orange-100 text-orange-600"
-            }`}
+            className="p-0.5 sm:p-1 rounded bg-orange-100 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400"
           >
             <Package className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
           </div>
           <h3
-            className={`text-xs sm:text-sm font-bold ${
-              isDarkMode ? "text-white" : "text-gray-900"
-            }`}
+            className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white"
           >
             {t("DynamicAttributesWidget.title") ||
               t("productDetails") ||
@@ -328,7 +294,6 @@ const DynamicAttributesWidget: React.FC<DynamicAttributesWidgetProps> = ({
               title={attr.title}
               value={attr.value}
               icon={attr.icon}
-              isDarkMode={isDarkMode}
             />
           ))}
         </div>

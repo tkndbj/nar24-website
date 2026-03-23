@@ -41,7 +41,6 @@ interface ProductQuestionsWidgetProps {
   shopId?: string;
   isShop: boolean;
   isLoading?: boolean;
-  isDarkMode?: boolean;
   localization?: ReturnType<typeof useTranslations>;
   prefetchedData?: {
     questions: Question[];
@@ -55,7 +54,6 @@ interface QuestionAnswerCardProps {
   question: Question;
   sellerImageUrl?: string;
   onReadAll: () => void;
-  isDarkMode?: boolean;
   t: (key: string) => string;
   locale?: string;
   isAuthenticated?: boolean;
@@ -64,36 +62,18 @@ interface QuestionAnswerCardProps {
 // ============= TEXT SHIMMER COMPONENT =============
 const TextShimmer: React.FC<{
   lines?: number;
-  isDarkMode?: boolean;
   className?: string;
-}> = ({ lines = 2, isDarkMode = false, className = "" }) => {
+}> = ({ lines = 2, className = "" }) => {
   return (
     <div className={`space-y-1.5 ${className}`}>
       {Array.from({ length: lines }).map((_, i) => (
         <div
           key={i}
-          className={`h-3 rounded animate-pulse ${
-            isDarkMode ? "bg-gray-600" : "bg-gray-200"
-          } ${i === lines - 1 ? "w-3/4" : "w-full"}`}
-          style={{
-            animation: "shimmer 1.5s ease-in-out infinite",
-            animationDelay: `${i * 0.1}s`,
-          }}
+          className={`h-3 rounded animate-pulse bg-gray-200 dark:bg-gray-600 ${
+            i === lines - 1 ? "w-3/4" : "w-full"
+          }`}
         />
       ))}
-      <style jsx>{`
-        @keyframes shimmer {
-          0% {
-            opacity: 0.5;
-          }
-          50% {
-            opacity: 1;
-          }
-          100% {
-            opacity: 0.5;
-          }
-        }
-      `}</style>
     </div>
   );
 };
@@ -102,7 +82,6 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
   question,
   sellerImageUrl,
   onReadAll,
-  isDarkMode = false,
   t,
   locale,
   isAuthenticated = false,
@@ -193,37 +172,25 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
 
   return (
     <div
-      className={`group min-w-80 w-80 rounded-2xl sm:rounded-2xl rounded-none p-4 sm:p-5 border transition-all duration-300 hover:shadow-lg ${
-        isDarkMode
-          ? "bg-gradient-to-br from-gray-800 to-gray-850 border-gray-700 hover:border-orange-500"
-          : "bg-gradient-to-br from-white to-gray-50 border-gray-200 hover:border-orange-300"
-      }`}
+      className="group min-w-80 w-80 rounded-2xl sm:rounded-2xl rounded-none p-4 sm:p-5 border transition-all duration-300 hover:shadow-lg bg-gradient-to-br from-white to-gray-50 border-gray-200 hover:border-orange-300 dark:from-gray-800 dark:to-gray-850 dark:border-gray-700 dark:hover:border-orange-500"
     >
       {/* Header with date and asker */}
       <div className="flex justify-between items-start mb-3 sm:mb-4">
         <div className="flex items-center gap-2">
           <div
-            className={`p-1 sm:p-1.5 rounded-lg ${
-              isDarkMode
-                ? "bg-blue-900/20 text-blue-400"
-                : "bg-blue-50 text-blue-600"
-            }`}
+            className="p-1 sm:p-1.5 rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400"
           >
             <User className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
           </div>
           <span
-            className={`text-xs sm:text-sm font-semibold ${
-              isDarkMode ? "text-white" : "text-gray-900"
-            }`}
+            className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white"
           >
             {displayName}
           </span>
         </div>
 
         <span
-          className={`text-xs ${
-            isDarkMode ? "text-gray-400" : "text-gray-500"
-          }`}
+          className="text-xs text-gray-500 dark:text-gray-400"
         >
           {formatDate(question.timestamp)}
         </span>
@@ -233,21 +200,16 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
       <div className="mb-3 sm:mb-4">
         <div className="flex items-start gap-2 mb-2">
           <HelpCircle
-            className={`w-3.5 h-3.5 sm:w-4 sm:h-4 mt-0.5 flex-shrink-0 ${
-              isDarkMode ? "text-orange-400" : "text-orange-600"
-            }`}
+            className="w-3.5 h-3.5 sm:w-4 sm:h-4 mt-0.5 flex-shrink-0 text-orange-600 dark:text-orange-400"
           />
           <div className="flex-1 min-h-[20px]">
             {isTranslating ? (
               <TextShimmer
                 lines={questionShimmerLines}
-                isDarkMode={isDarkMode}
               />
             ) : (
               <p
-                className={`text-xs sm:text-sm font-medium leading-relaxed ${
-                  isDarkMode ? "text-gray-300" : "text-gray-700"
-                }`}
+                className="text-xs sm:text-sm font-medium leading-relaxed text-gray-700 dark:text-gray-300"
               >
                 {isTranslated ? translatedQuestion : question.questionText}
               </p>
@@ -258,11 +220,7 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
 
       {/* Answer section */}
       <div
-        className={`rounded-xl p-3 sm:p-4 border ${
-          isDarkMode
-            ? "bg-gray-700/50 border-gray-600"
-            : "bg-gray-50 border-gray-100"
-        }`}
+        className="rounded-xl p-3 sm:p-4 border bg-gray-50 border-gray-100 dark:bg-gray-700/50 dark:border-gray-600"
       >
         <div className="flex gap-2 sm:gap-3">
           {/* Seller avatar */}
@@ -277,11 +235,7 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
               />
             ) : (
               <div
-                className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center ${
-                  isDarkMode
-                    ? "bg-orange-900/20 text-orange-400"
-                    : "bg-orange-100 text-orange-600"
-                }`}
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center bg-orange-100 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400"
               >
                 <User className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
@@ -292,21 +246,15 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1.5 sm:mb-2">
               <span
-                className={`text-xs font-semibold ${
-                  isDarkMode ? "text-orange-400" : "text-orange-600"
-                }`}
+                className="text-xs font-semibold text-orange-600 dark:text-orange-400"
               >
                 {t("sellerReply")}
               </span>
               <div
-                className={`w-1 h-1 rounded-full ${
-                  isDarkMode ? "bg-gray-600" : "bg-gray-300"
-                }`}
+                className="w-1 h-1 rounded-full bg-gray-300 dark:bg-gray-600"
               />
               <span
-                className={`text-xs ${
-                  isDarkMode ? "text-gray-400" : "text-gray-500"
-                }`}
+                className="text-xs text-gray-500 dark:text-gray-400"
               >
                 {t("officialResponse")}
               </span>
@@ -316,13 +264,12 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
               {isTranslating ? (
                 <TextShimmer
                   lines={answerShimmerLines}
-                  isDarkMode={isDarkMode}
                 />
               ) : (
                 <p
                   className={`text-xs sm:text-sm leading-relaxed ${
                     isLongAnswer ? "line-clamp-3" : ""
-                  } ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}
+                  } text-gray-700 dark:text-gray-300`}
                 >
                   {isTranslated ? translatedAnswer : question.answerText}
                 </p>
@@ -332,9 +279,7 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
             {/* Error message */}
             {translationError && !isTranslating && (
               <div
-                className={`flex items-center gap-1.5 mt-2 text-xs ${
-                  isDarkMode ? "text-red-400" : "text-red-500"
-                }`}
+                className="flex items-center gap-1.5 mt-2 text-xs text-red-500 dark:text-red-400"
               >
                 <AlertCircle className="w-3 h-3" />
                 <span>{translationError}</span>
@@ -344,11 +289,7 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
             {isLongAnswer && !isTranslating && (
               <button
                 onClick={onReadAll}
-                className={`mt-2 text-xs font-semibold underline transition-colors ${
-                  isDarkMode
-                    ? "text-orange-400 hover:text-orange-300"
-                    : "text-orange-600 hover:text-orange-700"
-                }`}
+                className="mt-2 text-xs font-semibold underline transition-colors text-orange-600 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300"
               >
                 {t("readFullAnswer")}
               </button>
@@ -366,12 +307,8 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
             isTranslating ? "opacity-50 cursor-not-allowed" : ""
           } ${
             isTranslated
-              ? isDarkMode
-                ? "bg-orange-900/30 text-orange-400 border border-orange-700"
-                : "bg-orange-100 text-orange-600 border border-orange-300"
-              : isDarkMode
-              ? "bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-orange-400"
-              : "bg-gray-100 text-gray-600 hover:bg-orange-50 hover:text-orange-600"
+              ? "bg-orange-100 text-orange-600 border border-orange-300 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-700"
+              : "bg-gray-100 text-gray-600 hover:bg-orange-50 hover:text-orange-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 dark:hover:text-orange-400"
           }`}
         >
           <Languages
@@ -390,33 +327,23 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
   );
 };
 
-const LoadingSkeleton: React.FC<{ isDarkMode?: boolean }> = ({
-  isDarkMode = false,
-}) => (
+const LoadingSkeleton: React.FC = () => (
   <div
-    className={`rounded-2xl sm:rounded-2xl rounded-none p-4 sm:p-6 border shadow-sm ${
-      isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
-    }`}
+    className="rounded-2xl sm:rounded-2xl rounded-none p-4 sm:p-6 border shadow-sm bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-700"
   >
     <div className="space-y-4 sm:space-y-6">
       {/* Header skeleton */}
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-2 sm:gap-3">
           <div
-            className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl animate-pulse ${
-              isDarkMode ? "bg-gray-700" : "bg-gray-200"
-            }`}
+            className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl animate-pulse bg-gray-200 dark:bg-gray-700"
           />
           <div
-            className={`w-32 h-5 sm:w-40 sm:h-6 rounded animate-pulse ${
-              isDarkMode ? "bg-gray-700" : "bg-gray-200"
-            }`}
+            className="w-32 h-5 sm:w-40 sm:h-6 rounded animate-pulse bg-gray-200 dark:bg-gray-700"
           />
         </div>
         <div
-          className={`w-20 h-7 sm:w-24 sm:h-8 rounded-xl animate-pulse ${
-            isDarkMode ? "bg-gray-700" : "bg-gray-200"
-          }`}
+          className="w-20 h-7 sm:w-24 sm:h-8 rounded-xl animate-pulse bg-gray-200 dark:bg-gray-700"
         />
       </div>
 
@@ -425,9 +352,7 @@ const LoadingSkeleton: React.FC<{ isDarkMode?: boolean }> = ({
         {Array.from({ length: 2 }).map((_, i) => (
           <div
             key={i}
-            className={`min-w-80 w-80 h-48 sm:h-56 rounded-2xl sm:rounded-2xl rounded-none animate-pulse ${
-              isDarkMode ? "bg-gray-700" : "bg-gray-200"
-            }`}
+            className="min-w-80 w-80 h-48 sm:h-56 rounded-2xl sm:rounded-2xl rounded-none animate-pulse bg-gray-200 dark:bg-gray-700"
           />
         ))}
       </div>
@@ -441,7 +366,6 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
   shopId,
   isShop,
   isLoading = false,
-  isDarkMode = false,
   localization,
   prefetchedData,
   locale,
@@ -591,7 +515,7 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
   }, [handleViewAllQuestions]);
 
   if (isLoading || loading) {
-    return <LoadingSkeleton isDarkMode={isDarkMode} />;
+    return <LoadingSkeleton />;
   }
 
   if (totalQuestions === 0) {
@@ -604,35 +528,25 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
 
   return (
     <div
-      className={`sm:rounded-2xl rounded-none p-4 sm:p-6 border shadow-sm -mx-4 sm:mx-0 ${
-        isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
-      }`}
+      className="sm:rounded-2xl rounded-none p-4 sm:p-6 border shadow-sm -mx-4 sm:mx-0 bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-700"
     >
       <div className="space-y-4 sm:space-y-6">
         {/* Header */}
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2 sm:gap-3">
             <div
-              className={`p-1.5 sm:p-2 rounded-xl ${
-                isDarkMode
-                  ? "bg-orange-900/20 text-orange-400"
-                  : "bg-orange-100 text-orange-600"
-              }`}
+              className="p-1.5 sm:p-2 rounded-xl bg-orange-100 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400"
             >
               <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
               <h3
-                className={`text-lg sm:text-xl font-bold ${
-                  isDarkMode ? "text-white" : "text-gray-900"
-                }`}
+                className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white"
               >
                 {t("title")}
               </h3>
               <p
-                className={`text-xs sm:text-sm ${
-                  isDarkMode ? "text-gray-400" : "text-gray-600"
-                }`}
+                className="text-xs sm:text-sm text-gray-600 dark:text-gray-400"
               >
                 {totalQuestions} {t("answeredQuestions")}
               </p>
@@ -641,11 +555,7 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
 
           <button
             onClick={handleViewAllQuestions}
-            className={`flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl font-semibold text-xs sm:text-sm transition-all duration-200 hover:scale-105 ${
-              isDarkMode
-                ? "bg-orange-900/20 text-orange-400 hover:bg-orange-900/30 border border-orange-700"
-                : "bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200"
-            }`}
+            className="flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl font-semibold text-xs sm:text-sm transition-all duration-200 hover:scale-105 bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200 dark:bg-orange-900/20 dark:text-orange-400 dark:hover:bg-orange-900/30 dark:border-orange-700"
           >
             {t("viewAll")} ({totalQuestions})
             <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -658,11 +568,7 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
           {canScrollLeft && (
             <button
               onClick={scrollLeft}
-              className={`absolute left-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 sm:w-10 sm:h-10 shadow-xl rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-110 ${
-                isDarkMode
-                  ? "bg-gray-700 text-gray-300 hover:text-orange-400 border border-gray-600"
-                  : "bg-white text-gray-600 hover:text-orange-600 border border-gray-200"
-              }`}
+              className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 sm:w-10 sm:h-10 shadow-xl rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-110 bg-white text-gray-600 hover:text-orange-600 border border-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:text-orange-400 dark:border-gray-600"
             >
               <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
@@ -672,11 +578,7 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
           {canScrollRight && (
             <button
               onClick={scrollRight}
-              className={`absolute right-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 sm:w-10 sm:h-10 shadow-xl rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-110 ${
-                isDarkMode
-                  ? "bg-gray-700 text-gray-300 hover:text-orange-400 border border-gray-600"
-                  : "bg-white text-gray-600 hover:text-orange-600 border border-gray-200"
-              }`}
+              className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 sm:w-10 sm:h-10 shadow-xl rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-110 bg-white text-gray-600 hover:text-orange-600 border border-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:text-orange-400 dark:border-gray-600"
             >
               <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
@@ -697,7 +599,6 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
                 question={question}
                 sellerImageUrl={sellerImageUrl}
                 onReadAll={handleReadAll}
-                isDarkMode={isDarkMode}
                 t={t}
                 locale={locale}
                 isAuthenticated={!!firebaseUser}

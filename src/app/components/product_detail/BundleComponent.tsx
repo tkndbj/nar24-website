@@ -40,7 +40,6 @@ interface BundleDisplayData {
 interface BundleComponentProps {
   productId: string;
   shopId?: string;
-  isDarkMode?: boolean;
   localization?: ReturnType<typeof useTranslations>;
   prefetchedData?: BundleDisplayData[] | null;
 }
@@ -48,14 +47,12 @@ interface BundleComponentProps {
 interface BundleProductCardProps {
   bundleData: BundleDisplayData;
   onClick: () => void;
-  isDarkMode: boolean;
   t: (key: string) => string;
 }
 
 const BundleProductCard: React.FC<BundleProductCardProps> = ({
   bundleData,
   onClick,
-  isDarkMode,
   t,
 }) => {
   const {
@@ -72,11 +69,7 @@ const BundleProductCard: React.FC<BundleProductCardProps> = ({
   return (
     <div
       onClick={onClick}
-      className={`group relative overflow-hidden rounded-2xl sm:rounded-xl border cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-xl ${
-        isDarkMode
-          ? "bg-gradient-to-br from-gray-700 to-gray-800 border-gray-600 hover:border-orange-500"
-          : "bg-gradient-to-br from-white to-gray-50 border-gray-200 hover:border-orange-300"
-      }`}
+      className="group relative overflow-hidden rounded-2xl sm:rounded-xl border cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-xl bg-gradient-to-br from-white to-gray-50 border-gray-200 hover:border-orange-300 dark:from-gray-700 dark:to-gray-800 dark:border-gray-600 dark:hover:border-orange-500"
     >
       <div className="flex p-3 sm:p-4">
         {/* Product Image */}
@@ -92,14 +85,10 @@ const BundleProductCard: React.FC<BundleProductCardProps> = ({
               />
             ) : (
               <div
-                className={`w-full h-full flex items-center justify-center ${
-                  isDarkMode ? "bg-gray-600" : "bg-gray-200"
-                }`}
+                className="w-full h-full flex items-center justify-center bg-gray-200 dark:bg-gray-600"
               >
                 <Package
-                  className={`w-6 h-6 sm:w-8 sm:h-8 ${
-                    isDarkMode ? "text-gray-500" : "text-gray-400"
-                  }`}
+                  className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400 dark:text-gray-500"
                 />
               </div>
             )}
@@ -123,18 +112,14 @@ const BundleProductCard: React.FC<BundleProductCardProps> = ({
         <div className="flex-1 ml-3 sm:ml-4 flex flex-col justify-center">
           {/* Product Name */}
           <h4
-            className={`text-sm sm:text-sm font-semibold mb-1.5 sm:mb-2 line-clamp-2 leading-tight group-hover:text-orange-500 transition-colors ${
-              isDarkMode ? "text-white" : "text-gray-900"
-            }`}
+            className="text-sm sm:text-sm font-semibold mb-1.5 sm:mb-2 line-clamp-2 leading-tight group-hover:text-orange-500 transition-colors text-gray-900 dark:text-white"
           >
             {product.productName}
           </h4>
 
           {/* Bundle Price Label */}
           <p
-            className={`text-xs mb-1 ${
-              isDarkMode ? "text-gray-400" : "text-gray-500"
-            }`}
+            className="text-xs mb-1 text-gray-500 dark:text-gray-400"
           >
             {t("bundlePrice")}
           </p>
@@ -146,9 +131,7 @@ const BundleProductCard: React.FC<BundleProductCardProps> = ({
                 {totalBundlePrice.toFixed(2)} {currency}
               </span>
               <span
-                className={`text-xs sm:text-sm line-through ${
-                  isDarkMode ? "text-gray-400" : "text-gray-500"
-                }`}
+                className="text-xs sm:text-sm line-through text-gray-500 dark:text-gray-400"
               >
                 {totalOriginalPrice.toFixed(2)}
               </span>
@@ -163,9 +146,7 @@ const BundleProductCard: React.FC<BundleProductCardProps> = ({
 
       {/* Hover overlay effect */}
       <div
-        className={`absolute inset-0 bg-gradient-to-r from-orange-500/0 to-orange-500/0 group-hover:from-orange-500/5 group-hover:to-orange-500/10 transition-all duration-300 ${
-          isDarkMode ? "opacity-50" : ""
-        }`}
+        className="absolute inset-0 bg-gradient-to-r from-orange-500/0 to-orange-500/0 group-hover:from-orange-500/5 group-hover:to-orange-500/10 transition-all duration-300 dark:opacity-50"
       />
     </div>
   );
@@ -174,7 +155,6 @@ const BundleProductCard: React.FC<BundleProductCardProps> = ({
 const BundleComponent: React.FC<BundleComponentProps> = ({
   productId,
   shopId,
-  isDarkMode = false,
   localization,
   prefetchedData,
 }) => {
@@ -327,11 +307,7 @@ const BundleComponent: React.FC<BundleComponentProps> = ({
   if (isLoading) {
     return (
       <div
-        className={`rounded-2xl sm:rounded-xl p-4 sm:p-6 border shadow-sm ${
-          isDarkMode
-            ? "bg-gray-800 border-gray-700"
-            : "bg-white border-gray-200"
-        }`}
+        className="rounded-2xl sm:rounded-xl p-4 sm:p-6 border shadow-sm bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-700"
       >
         <div className="flex items-center justify-center h-32">
           <div className="w-8 h-8 border-2 border-orange-600 border-t-transparent rounded-full animate-spin" />
@@ -346,9 +322,7 @@ const BundleComponent: React.FC<BundleComponentProps> = ({
 
   return (
     <div
-      className={`rounded-none sm:rounded-2xl p-4 sm:p-6 border shadow-sm -mx-4 sm:mx-0 ${
-        isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
-      }`}
+      className="rounded-none sm:rounded-2xl p-4 sm:p-6 border shadow-sm -mx-4 sm:mx-0 bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-700"
     >
       <div className="space-y-4 sm:space-y-6">
         {/* Header */}
@@ -358,16 +332,12 @@ const BundleComponent: React.FC<BundleComponentProps> = ({
           </div>
           <div className="flex-1">
             <h3
-              className={`text-lg sm:text-xl font-bold ${
-                isDarkMode ? "text-white" : "text-gray-900"
-              }`}
+              className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white"
             >
               {t("title")}
             </h3>
             <p
-              className={`text-xs sm:text-sm ${
-                isDarkMode ? "text-gray-400" : "text-gray-600"
-              }`}
+              className="text-xs sm:text-sm text-gray-600 dark:text-gray-400"
             >
               {t("subtitle")}
             </p>
@@ -381,7 +351,6 @@ const BundleComponent: React.FC<BundleComponentProps> = ({
               key={`${bundleData.bundleId}-${bundleData.product.id}`}
               bundleData={bundleData}
               onClick={() => navigateToProduct(bundleData.product)}
-              isDarkMode={isDarkMode}
               t={t}
             />
           ))}

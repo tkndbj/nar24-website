@@ -10,7 +10,6 @@ interface AskSellerBubbleProps {
   alignment?: "bottomRight" | "bottomLeft" | "topRight" | "topLeft";
   size?: number;
   color?: string;
-  isDarkMode?: boolean;
   localization?: ReturnType<typeof useTranslations>;
 }
 

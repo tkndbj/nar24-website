@@ -12,15 +12,13 @@ interface ProductDetailRelatedProductsProps {
   category?: string;
   subcategory?: string;
   isLoading?: boolean;
-  isDarkMode?: boolean;
   localization?: ReturnType<typeof useTranslations>;
   prefetchedProducts?: Product[] | null;
 }
 
 const LoadingSkeleton: React.FC<{
   cardCount: number;
-  isDarkMode?: boolean;
-}> = ({ cardCount, isDarkMode = false }) => {
+}> = ({ cardCount }) => {
   const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
 
   return (
@@ -28,32 +26,22 @@ const LoadingSkeleton: React.FC<{
       {Array.from({ length: cardCount }).map((_, i) => (
         <div
           key={i}
-          className={`flex-shrink-0 w-48 sm:w-60 rounded-xl sm:rounded-2xl animate-pulse ${
-            isDarkMode ? "bg-gray-700" : "bg-gray-200"
-          }`}
+          className="flex-shrink-0 w-48 sm:w-60 rounded-xl sm:rounded-2xl animate-pulse bg-gray-200 dark:bg-gray-700"
           style={{ height: isMobile ? "420px" : "380px" }}
         >
           <div className="p-3 sm:p-4 space-y-2 sm:space-y-3 h-full flex flex-col">
             <div
-              className={`flex-1 rounded-lg sm:rounded-xl ${
-                isDarkMode ? "bg-gray-600" : "bg-gray-300"
-              }`}
+              className="flex-1 rounded-lg sm:rounded-xl bg-gray-300 dark:bg-gray-600"
             />
             <div className="space-y-1.5 sm:space-y-2">
               <div
-                className={`h-2.5 sm:h-3 rounded w-full ${
-                  isDarkMode ? "bg-gray-600" : "bg-gray-300"
-                }`}
+                className="h-2.5 sm:h-3 rounded w-full bg-gray-300 dark:bg-gray-600"
               />
               <div
-                className={`h-2.5 sm:h-3 rounded w-3/4 ${
-                  isDarkMode ? "bg-gray-600" : "bg-gray-300"
-                }`}
+                className="h-2.5 sm:h-3 rounded w-3/4 bg-gray-300 dark:bg-gray-600"
               />
               <div
-                className={`h-3 sm:h-4 rounded w-1/2 ${
-                  isDarkMode ? "bg-gray-600" : "bg-gray-300"
-                }`}
+                className="h-3 sm:h-4 rounded w-1/2 bg-gray-300 dark:bg-gray-600"
               />
             </div>
           </div>
@@ -68,7 +56,6 @@ const ProductDetailRelatedProducts: React.FC<
 > = ({
   productId,
   relatedProductIds: preloadedIds,
-  isDarkMode = false,
   localization,
   prefetchedProducts,
 }) => {
@@ -320,26 +307,18 @@ const ProductDetailRelatedProducts: React.FC<
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2 sm:gap-3">
             <div
-              className={`p-1.5 sm:p-2 rounded-lg sm:rounded-xl ${
-                isDarkMode
-                  ? "bg-orange-900/20 text-orange-400"
-                  : "bg-orange-100 text-orange-600"
-              }`}
+              className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-orange-100 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400"
             >
               <Shuffle className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
               <h3
-                className={`text-lg sm:text-xl font-bold ${
-                  isDarkMode ? "text-white" : "text-gray-900"
-                }`}
+                className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white"
               >
                 {t("title")}
               </h3>
               <p
-                className={`text-xs sm:text-sm ${
-                  isDarkMode ? "text-gray-400" : "text-gray-600"
-                }`}
+                className="text-xs sm:text-sm text-gray-600 dark:text-gray-400"
               >
                 {t("subtitle")}
               </p>
@@ -348,11 +327,7 @@ const ProductDetailRelatedProducts: React.FC<
 
           {relatedProducts.length > 4 && (
             <div
-              className={`flex items-center gap-1 px-2 sm:px-3 py-1 rounded-full text-xs font-medium ${
-                isDarkMode
-                  ? "bg-gray-700 text-gray-300"
-                  : "bg-gray-100 text-gray-600"
-              }`}
+              className="flex items-center gap-1 px-2 sm:px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
             >
               <Shuffle className="w-3 h-3" />
               {relatedProducts.length} {t("items")}
@@ -365,22 +340,14 @@ const ProductDetailRelatedProducts: React.FC<
           {/* Left Smokey Fade Effect */}
           {!isMobile && canScrollLeft && (
             <div
-              className={`absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r ${
-                isDarkMode
-                  ? "from-gray-900 via-gray-900/80 to-transparent"
-                  : "from-gray-50 via-gray-50/80 to-transparent"
-              } pointer-events-none z-10`}
+              className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-gray-50 via-gray-50/80 to-transparent dark:from-gray-900 dark:via-gray-900/80 pointer-events-none z-10"
             />
           )}
 
           {/* Right Smokey Fade Effect */}
           {!isMobile && canScrollRight && (
             <div
-              className={`absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l ${
-                isDarkMode
-                  ? "from-gray-900 via-gray-900/80 to-transparent"
-                  : "from-gray-50 via-gray-50/80 to-transparent"
-              } pointer-events-none z-10`}
+              className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-gray-50 via-gray-50/80 to-transparent dark:from-gray-900 dark:via-gray-900/80 pointer-events-none z-10"
             />
           )}
 
@@ -388,11 +355,7 @@ const ProductDetailRelatedProducts: React.FC<
           {!isMobile && canScrollLeft && (
             <button
               onClick={scrollLeft}
-              className={`absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 shadow-xl rounded-full flex items-center justify-center transition-all hover:scale-110 ${
-                isDarkMode
-                  ? "bg-gray-700 text-gray-300 hover:text-orange-400 border border-gray-600"
-                  : "bg-white text-gray-600 hover:text-orange-600 border border-gray-200"
-              }`}
+              className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 shadow-xl rounded-full flex items-center justify-center transition-all hover:scale-110 bg-white text-gray-600 hover:text-orange-600 border border-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:text-orange-400 dark:border-gray-600"
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
@@ -402,11 +365,7 @@ const ProductDetailRelatedProducts: React.FC<
           {!isMobile && canScrollRight && (
             <button
               onClick={scrollRight}
-              className={`absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 shadow-xl rounded-full flex items-center justify-center transition-all hover:scale-110 ${
-                isDarkMode
-                  ? "bg-gray-700 text-gray-300 hover:text-orange-400 border border-gray-600"
-                  : "bg-white text-gray-600 hover:text-orange-600 border border-gray-200"
-              }`}
+              className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 shadow-xl rounded-full flex items-center justify-center transition-all hover:scale-110 bg-white text-gray-600 hover:text-orange-600 border border-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:text-orange-400 dark:border-gray-600"
             >
               <ChevronRight className="w-5 h-5" />
             </button>
@@ -414,7 +373,7 @@ const ProductDetailRelatedProducts: React.FC<
 
           <div className="overflow-hidden">
             {loading ? (
-              <LoadingSkeleton cardCount={cardCount} isDarkMode={isDarkMode} />
+              <LoadingSkeleton cardCount={cardCount} />
             ) : relatedProducts.length > 0 ? (
               <div
                 ref={scrollContainerRef}
@@ -462,14 +421,10 @@ const ProductDetailRelatedProducts: React.FC<
             ) : error ? (
               <div className="flex items-center justify-center py-8">
                 <div
-                  className={`text-center space-y-2 sm:space-y-3 ${
-                    isDarkMode ? "text-gray-400" : "text-gray-500"
-                  }`}
+                  className="text-center space-y-2 sm:space-y-3 text-gray-500 dark:text-gray-400"
                 >
                   <Shuffle
-                    className={`w-10 h-10 sm:w-12 sm:h-12 mx-auto ${
-                      isDarkMode ? "text-gray-600" : "text-gray-400"
-                    }`}
+                    className="w-10 h-10 sm:w-12 sm:h-12 mx-auto text-gray-400 dark:text-gray-600"
                   />
                   <div>
                     <p className="font-medium text-sm sm:text-base">
@@ -482,11 +437,7 @@ const ProductDetailRelatedProducts: React.FC<
                       setLoadingInitiated(false);
                       fetchRelatedProducts();
                     }}
-                    className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors ${
-                      isDarkMode
-                        ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    }`}
+                    className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                   >
                     {t("tryAgain")}
                   </button>

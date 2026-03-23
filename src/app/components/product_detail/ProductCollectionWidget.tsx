@@ -25,7 +25,6 @@ interface ProductCollectionWidgetProps {
   productId: string;
   shopId?: string;
   isLoading?: boolean;
-  isDarkMode?: boolean;
   localization?: ReturnType<typeof useTranslations>;
   prefetchedData?: CollectionData | null;
 }
@@ -33,30 +32,22 @@ interface ProductCollectionWidgetProps {
 interface CollectionProductCardProps {
   product: Product;
   onProductClick: (productId: string) => void;
-  isDarkMode?: boolean;
 }
 
 const CollectionProductCard: React.FC<CollectionProductCardProps> = ({
   product,
   onProductClick,
-  isDarkMode = false,
 }) => {
   const [imageError, setImageError] = useState(false);
 
   return (
     <div
-      className={`group flex min-w-72 w-72 h-28 border rounded-2xl md:rounded-2xl rounded-lg overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-lg ${
-        isDarkMode
-          ? "bg-gradient-to-br from-gray-800 to-gray-850 border-gray-700 hover:border-orange-500"
-          : "bg-gradient-to-br from-white to-gray-50 border-gray-200 hover:border-orange-300"
-      }`}
+      className="group flex min-w-72 w-72 h-28 border rounded-2xl md:rounded-2xl rounded-lg overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-lg bg-gradient-to-br from-white to-gray-50 border-gray-200 hover:border-orange-300 dark:from-gray-800 dark:to-gray-850 dark:border-gray-700 dark:hover:border-orange-500"
       onClick={() => onProductClick(product.id)}
     >
       {/* Product image */}
       <div
-        className={`w-28 h-28 flex-shrink-0 relative ${
-          isDarkMode ? "bg-gray-800" : "bg-gray-100"
-        }`}
+        className="w-28 h-28 flex-shrink-0 relative bg-gray-100 dark:bg-gray-800"
       >
         {product.imageUrls.length > 0 && !imageError ? (
           <Image
@@ -68,14 +59,10 @@ const CollectionProductCard: React.FC<CollectionProductCardProps> = ({
           />
         ) : (
           <div
-            className={`w-full h-full flex items-center justify-center ${
-              isDarkMode ? "bg-gray-800" : "bg-gray-100"
-            }`}
+            className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800"
           >
             <Package
-              className={`w-8 h-8 md:w-8 md:h-8 w-6 h-6 ${
-                isDarkMode ? "text-gray-600" : "text-gray-400"
-              }`}
+              className="w-8 h-8 md:w-8 md:h-8 w-6 h-6 text-gray-400 dark:text-gray-600"
             />
           </div>
         )}
@@ -87,18 +74,12 @@ const CollectionProductCard: React.FC<CollectionProductCardProps> = ({
       {/* Product details */}
       <div className="flex-1 p-4 md:p-4 p-3 flex flex-col justify-center min-w-0">
         <h4
-          className={`text-sm md:text-sm text-xs font-semibold line-clamp-2 mb-2 md:mb-2 mb-1 leading-tight transition-colors ${
-            isDarkMode
-              ? "text-white group-hover:text-orange-400"
-              : "text-gray-900 group-hover:text-orange-600"
-          }`}
+          className="text-sm md:text-sm text-xs font-semibold line-clamp-2 mb-2 md:mb-2 mb-1 leading-tight transition-colors text-gray-900 group-hover:text-orange-600 dark:text-white dark:group-hover:text-orange-400"
         >
           {product.productName}
         </h4>
         <p
-          className={`text-base md:text-base text-sm font-bold ${
-            isDarkMode ? "text-orange-400" : "text-orange-600"
-          }`}
+          className="text-base md:text-base text-sm font-bold text-orange-600 dark:text-orange-400"
         >
           {product.price} {product.currency}
         </p>
@@ -107,33 +88,23 @@ const CollectionProductCard: React.FC<CollectionProductCardProps> = ({
   );
 };
 
-const LoadingSkeleton: React.FC<{ isDarkMode?: boolean }> = ({
-  isDarkMode = false,
-}) => (
+const LoadingSkeleton: React.FC = () => (
   <div
-    className={`rounded-2xl md:rounded-2xl rounded-none -mx-3 px-3 py-4 sm:mx-0 sm:p-6 border-0 sm:border shadow-none sm:shadow-sm ${
-      isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
-    }`}
+    className="rounded-2xl md:rounded-2xl rounded-none -mx-3 px-3 py-4 sm:mx-0 sm:p-6 border-0 sm:border shadow-none sm:shadow-sm bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-700"
   >
     <div className="space-y-6 md:space-y-6 space-y-4">
       {/* Header skeleton */}
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-3 md:gap-3 gap-2">
           <div
-            className={`w-10 h-10 md:w-10 md:h-10 w-8 h-8 rounded-xl animate-pulse ${
-              isDarkMode ? "bg-gray-700" : "bg-gray-200"
-            }`}
+            className="w-10 h-10 md:w-10 md:h-10 w-8 h-8 rounded-xl animate-pulse bg-gray-200 dark:bg-gray-700"
           />
           <div
-            className={`w-40 md:w-40 w-32 h-6 md:h-6 h-5 rounded animate-pulse ${
-              isDarkMode ? "bg-gray-700" : "bg-gray-200"
-            }`}
+            className="w-40 md:w-40 w-32 h-6 md:h-6 h-5 rounded animate-pulse bg-gray-200 dark:bg-gray-700"
           />
         </div>
         <div
-          className={`w-16 md:w-16 w-12 h-4 rounded animate-pulse ${
-            isDarkMode ? "bg-gray-700" : "bg-gray-200"
-          }`}
+          className="w-16 md:w-16 w-12 h-4 rounded animate-pulse bg-gray-200 dark:bg-gray-700"
         />
       </div>
 
@@ -142,9 +113,7 @@ const LoadingSkeleton: React.FC<{ isDarkMode?: boolean }> = ({
         {Array.from({ length: 3 }).map((_, i) => (
           <div
             key={i}
-            className={`min-w-72 w-72 h-28 rounded-2xl md:rounded-2xl rounded-lg animate-pulse ${
-              isDarkMode ? "bg-gray-700" : "bg-gray-200"
-            }`}
+            className="min-w-72 w-72 h-28 rounded-2xl md:rounded-2xl rounded-lg animate-pulse bg-gray-200 dark:bg-gray-700"
           />
         ))}
       </div>
@@ -156,7 +125,6 @@ const ProductCollectionWidget: React.FC<ProductCollectionWidgetProps> = ({
   productId,
   shopId,
   isLoading = false,
-  isDarkMode = false,
   localization,
   prefetchedData,
 }) => {
@@ -299,7 +267,7 @@ const ProductCollectionWidget: React.FC<ProductCollectionWidgetProps> = ({
   }, [collectionData, shopId, router]);
 
   if (isLoading || loading) {
-    return <LoadingSkeleton isDarkMode={isDarkMode} />;
+    return <LoadingSkeleton />;
   }
 
   if (error || !collectionData || collectionData.products.length === 0) {
@@ -308,35 +276,25 @@ const ProductCollectionWidget: React.FC<ProductCollectionWidgetProps> = ({
 
   return (
     <div
-      className={`rounded-2xl md:rounded-2xl rounded-none -mx-3 px-3 py-4 sm:mx-0 sm:p-6 border md:border border-0 shadow-sm md:shadow-sm shadow-none ${
-        isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
-      }`}
+      className="rounded-2xl md:rounded-2xl rounded-none -mx-3 px-3 py-4 sm:mx-0 sm:p-6 border md:border border-0 shadow-sm md:shadow-sm shadow-none bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-700"
     >
       <div className="space-y-6 md:space-y-6 space-y-4">
         {/* Header */}
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-3 md:gap-3 gap-2">
             <div
-              className={`p-2 md:p-2 p-1.5 rounded-xl ${
-                isDarkMode
-                  ? "bg-orange-900/20 text-orange-400"
-                  : "bg-orange-100 text-orange-600"
-              }`}
+              className="p-2 md:p-2 p-1.5 rounded-xl bg-orange-100 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400"
             >
               <Package className="w-5 h-5 md:w-5 md:h-5 w-4 h-4" />
             </div>
             <div>
               <h3
-                className={`text-xl md:text-xl text-lg font-bold ${
-                  isDarkMode ? "text-white" : "text-gray-900"
-                }`}
+                className="text-xl md:text-xl text-lg font-bold text-gray-900 dark:text-white"
               >
                 {t("title")}
               </h3>
               <p
-                className={`text-sm md:text-sm text-xs ${
-                  isDarkMode ? "text-gray-400" : "text-gray-600"
-                }`}
+                className="text-sm md:text-sm text-xs text-gray-600 dark:text-gray-400"
               >
                 {collectionData.name}
               </p>
@@ -345,11 +303,7 @@ const ProductCollectionWidget: React.FC<ProductCollectionWidgetProps> = ({
 
           <button
             onClick={handleViewAll}
-            className={`flex items-center gap-2 md:gap-2 gap-1.5 px-4 md:px-4 px-3 py-2 md:py-2 py-1.5 rounded-xl font-semibold text-sm md:text-sm text-xs transition-all duration-200 hover:scale-105 ${
-              isDarkMode
-                ? "bg-orange-900/20 text-orange-400 hover:bg-orange-900/30 border border-orange-700"
-                : "bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200"
-            }`}
+            className="flex items-center gap-2 md:gap-2 gap-1.5 px-4 md:px-4 px-3 py-2 md:py-2 py-1.5 rounded-xl font-semibold text-sm md:text-sm text-xs transition-all duration-200 hover:scale-105 bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200 dark:bg-orange-900/20 dark:text-orange-400 dark:hover:bg-orange-900/30 dark:border-orange-700"
           >
             {t("viewAll")}
             <ChevronRight className="w-4 h-4 md:w-4 md:h-4 w-3 h-3" />
@@ -362,11 +316,7 @@ const ProductCollectionWidget: React.FC<ProductCollectionWidgetProps> = ({
           {canScrollLeft && (
             <button
               onClick={scrollLeft}
-              className={`absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 md:w-10 md:h-10 w-8 h-8 shadow-xl rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-110 ${
-                isDarkMode
-                  ? "bg-gray-700 text-gray-300 hover:text-orange-400 border border-gray-600"
-                  : "bg-white text-gray-600 hover:text-orange-600 border border-gray-200"
-              }`}
+              className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 md:w-10 md:h-10 w-8 h-8 shadow-xl rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-110 bg-white text-gray-600 hover:text-orange-600 border border-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:text-orange-400 dark:border-gray-600"
             >
               <ChevronLeft className="w-5 h-5 md:w-5 md:h-5 w-4 h-4" />
             </button>
@@ -376,11 +326,7 @@ const ProductCollectionWidget: React.FC<ProductCollectionWidgetProps> = ({
           {canScrollRight && (
             <button
               onClick={scrollRight}
-              className={`absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 md:w-10 md:h-10 w-8 h-8 shadow-xl rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-110 ${
-                isDarkMode
-                  ? "bg-gray-700 text-gray-300 hover:text-orange-400 border border-gray-600"
-                  : "bg-white text-gray-600 hover:text-orange-600 border border-gray-200"
-              }`}
+              className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 md:w-10 md:h-10 w-8 h-8 shadow-xl rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-110 bg-white text-gray-600 hover:text-orange-600 border border-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:text-orange-400 dark:border-gray-600"
             >
               <ChevronRight className="w-5 h-5 md:w-5 md:h-5 w-4 h-4" />
             </button>
@@ -400,7 +346,6 @@ const ProductCollectionWidget: React.FC<ProductCollectionWidgetProps> = ({
                 key={product.id}
                 product={product}
                 onProductClick={handleProductClick}
-                isDarkMode={isDarkMode}
               />
             ))}
           </div>

@@ -403,10 +403,12 @@ export default function FavoriteProductsPage() {
                       key={i}
                       className={`rounded-xl border animate-pulse overflow-hidden ${isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"}`}
                     >
-                      <div className={`aspect-square ${isDark ? "bg-gray-800" : "bg-gray-100"}`} />
+                      <div className={`aspect-[4/5] ${isDark ? "bg-gray-800" : "bg-gray-100"}`} />
                       <div className="p-3 space-y-2">
+                        <div className={`h-2.5 rounded w-1/3 ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
                         <div className={`h-3 rounded w-3/4 ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
                         <div className={`h-3 rounded w-1/2 ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
+                        <div className={`h-3.5 rounded w-2/5 mt-1 ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
                       </div>
                     </div>
                   ))}
