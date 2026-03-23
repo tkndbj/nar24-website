@@ -27,9 +27,11 @@ export default function IsbankPaymentPage() {
   const statusCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Get params from URL
-  const gatewayUrl = searchParams.get("gatewayUrl");
   const orderNumber = searchParams.get("orderNumber");
-  const paymentParamsStr = searchParams.get("paymentParams");
+  const [paymentData, setPaymentData] = useState<{
+    gatewayUrl: string;
+    paymentParams: Record<string, string | number>;
+  } | null>(null);
 
   useEffect(() => {
     const checkDarkMode = () => {
@@ -42,16 +44,35 @@ export default function IsbankPaymentPage() {
   }, []);
 
   useEffect(() => {
-    if (!gatewayUrl || !orderNumber || !paymentParamsStr) {
+    try {
+      const raw = sessionStorage.getItem("isbankPaymentData");
+      if (!raw) {
+        setError(t("missingPaymentInfo"));
+        setIsLoading(false);
+        return;
+      }
+      const data = JSON.parse(raw);
+      if (Date.now() - data.timestamp > 15 * 60 * 1000) {
+        sessionStorage.removeItem("isbankPaymentData");
+        setError(t("missingPaymentInfo"));
+        setIsLoading(false);
+        return;
+      }
+      sessionStorage.removeItem("isbankPaymentData");
+      setPaymentData({
+        gatewayUrl: data.gatewayUrl,
+        paymentParams: data.paymentParams,
+      });
+    } catch {
       setError(t("missingPaymentInfo"));
       setIsLoading(false);
-      return;
     }
+  }, [t]);
 
-    // Start status polling
+  useEffect(() => {
+    if (!paymentData || !orderNumber) return; // ✅ silently wait, don't show error
+
     startStatusPolling();
-
-    // Submit payment form programmatically
     submitPaymentForm();
 
     return () => {
@@ -59,16 +80,17 @@ export default function IsbankPaymentPage() {
         clearInterval(statusCheckIntervalRef.current);
       }
     };
-  }, [gatewayUrl, orderNumber, paymentParamsStr]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paymentData, orderNumber]);
 
   const submitPaymentForm = () => {
     try {
-      const paymentParams = JSON.parse(paymentParamsStr!);
+      const paymentParams = paymentData!.paymentParams;
 
       // Create form dynamically
       const form = document.createElement("form");
       form.method = "POST";
-      form.action = gatewayUrl!;
+      form.action = paymentData!.gatewayUrl;
       form.target = "payment-iframe";
       form.style.display = "none";
 
@@ -187,7 +209,7 @@ export default function IsbankPaymentPage() {
     }
   };
 
-  if (!gatewayUrl || !orderNumber || !paymentParamsStr) {
+  if (!paymentData || !orderNumber) {
     return (
       <div
         className={`min-h-screen flex items-center justify-center ${

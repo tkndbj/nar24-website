@@ -1235,16 +1235,19 @@ function ProductPaymentPageContent() {
       // ✅ Clear discount session data (will clear local storage after successful payment)
       sessionStorage.removeItem("checkoutDiscounts");
 
-      const searchParamsString =
-        `?gatewayUrl=${encodeURIComponent(initData.gatewayUrl)}` +
-        `&orderNumber=${encodeURIComponent(orderNumber)}` +
-        `&paymentParams=${encodeURIComponent(
-          JSON.stringify(initData.paymentParams),
-        )}`;
+      sessionStorage.setItem(
+        "isbankPaymentData",
+        JSON.stringify({
+          gatewayUrl: initData.gatewayUrl,
+          paymentParams: initData.paymentParams,
+          orderNumber,
+          timestamp: Date.now(),
+        }),
+      );
 
-      const targetPath = `/isbankpayment${searchParamsString}`;
-      console.log("Navigating to:", targetPath);
-      router.replace(targetPath);
+      router.replace(
+        `/isbankpayment?orderNumber=${encodeURIComponent(orderNumber)}`,
+      );
     } catch (error: unknown) {
       console.error("Payment error:", error);
 
