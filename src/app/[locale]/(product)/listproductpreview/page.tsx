@@ -40,27 +40,6 @@ interface UploadResult {
   colorImageUrls: Record<string, string[]>;
 }
 
-interface ProductData {
-  title: string;
-  description: string;
-  price: string;
-  quantity: string;
-  condition: string;
-  deliveryOption: string;
-  category: string;
-  subcategory: string;
-  subsubcategory: string;
-  brand: string;
-  attributes: { [key: string]: string | string[] | number | boolean };
-  phone: string;
-  region: string;
-  address: string;
-  ibanOwnerName: string;
-  ibanOwnerSurname: string;
-  iban: string;
-  shopId: string | null;
-}
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ListProductPreview() {
@@ -766,7 +745,7 @@ export default function ListProductPreview() {
               <SectionCard title={t("sections.productSpecs")} icon="⚙️">
                 {Object.entries(productData.attributes).map(([key, value]) => {
                   if (!value) return null;
-                  let displayValue =
+                  const displayValue =
                     Array.isArray(value)
                       ? value.join(", ")
                       : key === "gender"
