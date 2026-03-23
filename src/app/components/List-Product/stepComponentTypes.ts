@@ -34,7 +34,7 @@ export interface ClothingStepProps extends BaseStepProps {
   initialAttributes?: {
     clothingSizes?: string[];
     clothingFit?: string;
-    clothingType?: string;
+    clothingTypes?: string[];
     [key: string]: unknown;
   };
 }
@@ -47,11 +47,11 @@ export interface ComputerComponentsStepProps extends BaseStepProps {
   };
 }
 
-// Consoles step props - includes brand and variant attributes
+// Consoles step props - includes brand and productType attributes
 export interface ConsolesStepProps extends BaseStepProps {
   initialAttributes?: {
     consoleBrand?: string;
-    consoleVariant?: string;
+    productType?: string;
     [key: string]: unknown;
   };
 }
@@ -80,10 +80,10 @@ export interface JeweleryMaterialStepProps extends BaseStepProps {
   };
 }
 
-// Jewelery type step props - includes type attribute
+// Jewelery type step props - includes productType attribute
 export interface JeweleryTypeStepProps extends BaseStepProps {
   initialAttributes?: {
-    jewelryType?: string;
+    productType?: string;
     [key: string]: unknown;
   };
 }
@@ -96,10 +96,11 @@ export interface KitchenAppliancesStepProps extends BaseStepProps {
   };
 }
 
-// Pant detail step props - includes sizes attributes
+// Pant detail step props - includes sizes and fabric type attributes
 export interface PantDetailStepProps extends BaseStepProps {
   initialAttributes?: {
     pantSizes?: string[];
+    pantFabricTypes?: string[];
     [key: string]: unknown;
   };
 }

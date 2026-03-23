@@ -96,8 +96,8 @@ export default function ConsolesStep({
       if (typeof initialAttributes.consoleBrand === "string") {
         setSelectedBrand(initialAttributes.consoleBrand);
       }
-      if (typeof initialAttributes.consoleVariant === "string") {
-        setSelectedVariant(initialAttributes.consoleVariant);
+      if (typeof initialAttributes.productType === "string") {
+        setSelectedVariant(initialAttributes.productType);
       }
     }
   }, [initialAttributes]);
@@ -124,7 +124,7 @@ export default function ConsolesStep({
     // Return the console selection as dynamic attributes following the interface
     const result: GenericStepResult = {
       consoleBrand: selectedBrand,
-      consoleVariant: selectedVariant,
+      productType: selectedVariant,
     };
 
     // Include any existing attributes that were passed in
@@ -132,7 +132,7 @@ export default function ConsolesStep({
       Object.keys(initialAttributes).forEach((key) => {
         if (
           key !== "consoleBrand" &&
-          key !== "consoleVariant" &&
+          key !== "productType" &&
           initialAttributes[key] !== undefined
         ) {
           const value = initialAttributes[key];

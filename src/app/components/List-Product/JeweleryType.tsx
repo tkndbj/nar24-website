@@ -40,9 +40,9 @@ export default function JeweleryTypeStep({
     // Load from dynamic attributes if provided
     if (
       initialAttributes &&
-      typeof initialAttributes.jewelryType === "string"
+      typeof initialAttributes.productType === "string"
     ) {
-      setSelectedType(initialAttributes.jewelryType);
+      setSelectedType(initialAttributes.productType);
     }
   }, [initialAttributes]);
 
@@ -58,13 +58,13 @@ export default function JeweleryTypeStep({
 
     // Return the jewelry type as dynamic attributes following the interface
     const result: GenericStepResult = {
-      jewelryType: selectedType,
+      productType: selectedType,
     };
 
     // Include any existing attributes that were passed in
     if (initialAttributes) {
       Object.keys(initialAttributes).forEach((key) => {
-        if (key !== "jewelryType" && initialAttributes[key] !== undefined) {
+        if (key !== "productType" && initialAttributes[key] !== undefined) {
           const value = initialAttributes[key];
           if (
             typeof value === "string" ||

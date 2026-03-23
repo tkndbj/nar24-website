@@ -77,7 +77,17 @@ export default function PantDetailStep({
     "M",
   ];
 
+  // Fabric type keys matching Flutter's pant fabric types
+  const fabricTypeKeys = [
+    "Denim", "Cotton", "Chino", "Corduroy", "Linen", "Wool",
+    "Polyester", "Leather", "Velvet", "Fleece", "Nylon", "Spandex",
+    "Tweed", "Silk", "Viscose", "Modal", "Lyocell", "OrganicCotton",
+    "RecycledCotton", "Canvas", "Jersey", "Gabardine", "Satin",
+    "Rayon", "Elastane", "Bamboo", "Lycra", "Cashmere", "Chiffon",
+  ];
+
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
+  const [selectedFabricTypes, setSelectedFabricTypes] = useState<string[]>([]);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   useEffect(() => {
@@ -95,29 +105,38 @@ export default function PantDetailStep({
 
   useEffect(() => {
     // Load from dynamic attributes if provided
-    if (initialAttributes && Array.isArray(initialAttributes.pantSizes)) {
-      const pantSizes = initialAttributes.pantSizes.filter(
-        (size): size is string => typeof size === "string"
-      );
-      setSelectedSizes(pantSizes);
+    if (initialAttributes) {
+      if (Array.isArray(initialAttributes.pantSizes)) {
+        const pantSizes = initialAttributes.pantSizes.filter(
+          (size): size is string => typeof size === "string"
+        );
+        setSelectedSizes(pantSizes);
+      }
+      if (Array.isArray(initialAttributes.pantFabricTypes)) {
+        const fabrics = initialAttributes.pantFabricTypes.filter(
+          (f): f is string => typeof f === "string"
+        );
+        setSelectedFabricTypes(fabrics);
+      }
     }
   }, [initialAttributes]);
 
-  const handleSavePantSizes = () => {
+  const handleSavePantDetails = () => {
     if (selectedSizes.length === 0) {
       alert(t("pleaseSelectPantSizes"));
       return;
     }
 
-    // Return the pant sizes as dynamic attributes following the interface
+    // Return pant sizes and fabric types as dynamic attributes (matches Flutter)
     const result: GenericStepResult = {
       pantSizes: [...selectedSizes],
+      ...(selectedFabricTypes.length > 0 && { pantFabricTypes: [...selectedFabricTypes] }),
     };
 
     // Include any existing attributes that were passed in
     if (initialAttributes) {
       Object.keys(initialAttributes).forEach((key) => {
-        if (key !== "pantSizes" && initialAttributes[key] !== undefined) {
+        if (key !== "pantSizes" && key !== "pantFabricTypes" && initialAttributes[key] !== undefined) {
           const value = initialAttributes[key];
           if (
             typeof value === "string" ||
@@ -132,6 +151,16 @@ export default function PantDetailStep({
     }
 
     onSave(result);
+  };
+
+  const handleFabricTypeToggle = (fabric: string) => {
+    setSelectedFabricTypes((prev) => {
+      if (prev.includes(fabric)) {
+        return prev.filter((f) => f !== fabric);
+      } else {
+        return [...prev, fabric];
+      }
+    });
   };
 
   const handleSizeToggle = (size: string) => {
@@ -275,6 +304,65 @@ export default function PantDetailStep({
             </div>
           </div>
 
+          {/* Fabric Types Section */}
+          <div className={`backdrop-blur-xl rounded-lg shadow-lg border overflow-hidden ${isDarkMode ? "bg-gray-800/90 border-gray-700" : "bg-white/70 border-gray-200/50"}`}>
+            <div className={`p-4 border-b ${isDarkMode ? "border-gray-700 bg-gray-700/50" : `border-opacity-50 bg-gradient-to-r ${categoryInfo.bgColor}`}`}>
+              <h3 className={`text-base font-bold flex items-center gap-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                <div className={`w-7 h-7 bg-gradient-to-r ${categoryInfo.color} rounded-lg flex items-center justify-center`}>
+                  <span className="text-white text-sm">🧵</span>
+                </div>
+                {t("fabricType")}
+              </h3>
+              <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                {selectedFabricTypes.length} fabric{selectedFabricTypes.length !== 1 ? 's' : ''} selected (optional)
+              </p>
+            </div>
+
+            <div className="p-3">
+              <div className="grid grid-cols-3 gap-2 max-h-60 overflow-y-auto">
+                {fabricTypeKeys.map((fabric) => {
+                  const isSelected = selectedFabricTypes.includes(fabric);
+                  return (
+                    <button
+                      key={fabric}
+                      onClick={() => handleFabricTypeToggle(fabric)}
+                      className={`relative group p-2.5 rounded-lg border-2 transition-all duration-300 text-xs ${
+                        isSelected
+                          ? `border-opacity-100 ${isDarkMode ? "bg-purple-900/20 border-purple-400" : `bg-gradient-to-r ${categoryInfo.bgColor} border-purple-400`} shadow-lg`
+                          : isDarkMode ? "border-gray-600 bg-gray-700 hover:border-gray-500" : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-md"
+                      }`}
+                    >
+                      <span
+                        className={`font-medium transition-colors duration-300 text-center ${
+                          isSelected
+                            ? isDarkMode ? "text-purple-400" : "text-purple-700"
+                            : isDarkMode ? "text-gray-200 group-hover:text-gray-100" : "text-gray-600 group-hover:text-gray-800"
+                        }`}
+                      >
+                        {t(`fabricTypes.${fabric}`, { fallback: fabric.replace(/([A-Z])/g, ' $1').trim() })}
+                      </span>
+                      {isSelected && (
+                        <div className={`absolute -top-1.5 -right-1.5 w-5 h-5 bg-gradient-to-r ${categoryInfo.color} rounded-full flex items-center justify-center shadow-lg`}>
+                          <svg
+                            className="w-2.5 h-2.5 text-white"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
           {/* Size Guide Info */}
           <div className={`mb-6 p-4 bg-gradient-to-r ${categoryInfo.bgColor} rounded-2xl border border-opacity-30`}>
             <div className="flex items-center gap-3">
@@ -307,7 +395,7 @@ export default function PantDetailStep({
           {/* Enhanced Save Button */}
           <div className="pt-4">
             <button
-              onClick={handleSavePantSizes}
+              onClick={handleSavePantDetails}
               disabled={selectedSizes.length === 0}
               className={`w-full group relative overflow-hidden bg-gradient-to-r ${categoryInfo.color} hover:opacity-90 text-white font-bold py-5 px-6 rounded-3xl transition-all duration-300 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 shadow-2xl hover:shadow-3xl`}
             >

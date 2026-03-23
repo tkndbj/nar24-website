@@ -20,7 +20,7 @@ export default function ClothingStep({
 
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
   const [selectedFit, setSelectedFit] = useState<string | null>(null);
-  const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   useEffect(() => {
@@ -38,7 +38,7 @@ export default function ClothingStep({
     if (initialAttributes) {
       const sizes = initialAttributes.clothingSizes;
       const fit = initialAttributes.clothingFit;
-      const type = initialAttributes.clothingType;
+      const types = initialAttributes.clothingTypes;
 
       if (Array.isArray(sizes)) {
         setSelectedSizes(
@@ -50,23 +50,26 @@ export default function ClothingStep({
         setSelectedFit(fit);
       }
 
-      if (typeof type === "string") {
-        setSelectedType(type);
+      if (Array.isArray(types)) {
+        setSelectedTypes(
+          types.filter((t): t is string => typeof t === "string")
+        );
       }
     }
   }, [initialAttributes]);
 
   const handleSaveClothingDetails = () => {
-    if (selectedSizes.length === 0 || !selectedFit || !selectedType) {
+    if (selectedSizes.length === 0 || !selectedFit || selectedTypes.length === 0) {
       alert(t("pleaseSelectAllClothingDetails"));
       return;
     }
 
     // Return the clothing details as dynamic attributes following the interface
+    // Uses clothingTypes (plural array) to match Flutter's flat product model
     const result: GenericStepResult = {
       clothingSizes: selectedSizes,
       clothingFit: selectedFit,
-      clothingType: selectedType,
+      clothingTypes: selectedTypes,
     };
 
     // Include any existing attributes that were passed in
@@ -98,6 +101,16 @@ export default function ClothingStep({
         return prev.filter((s) => s !== size);
       } else {
         return [...prev, size];
+      }
+    });
+  };
+
+  const handleTypeToggle = (type: string) => {
+    setSelectedTypes((prev) => {
+      if (prev.includes(type)) {
+        return prev.filter((t) => t !== type);
+      } else {
+        return [...prev, type];
       }
     });
   };
@@ -289,42 +302,48 @@ export default function ClothingStep({
               </p>
             </div>
 
-            <div className="p-3 space-y-2">
-              {(AllInOneCategoryData?.kClothingTypes ?? []).map((type) => {
-                const isSelected = selectedType === type;
-                return (
-                  <button
-                    key={type}
-                    onClick={() => setSelectedType(type)}
-                    className={`w-full group flex items-center justify-between p-3 rounded-lg border-2 transition-all text-sm ${
-                      isSelected
-                        ? "border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20"
-                        : isDarkMode ? "border-gray-600 bg-gray-700 hover:border-emerald-400" : "border-gray-200 bg-white hover:border-emerald-300"
-                    }`}
-                  >
-                    <span
-                      className={`font-medium ${
+            <div className="p-3">
+              <div className="grid grid-cols-2 gap-2">
+                {(AllInOneCategoryData?.kClothingTypes ?? []).map((type) => {
+                  const isSelected = selectedTypes.includes(type);
+                  return (
+                    <button
+                      key={type}
+                      onClick={() => handleTypeToggle(type)}
+                      className={`relative group p-3 rounded-lg border-2 transition-all text-sm ${
                         isSelected
-                          ? "text-emerald-700 dark:text-emerald-400"
-                          : isDarkMode ? "text-gray-200" : "text-gray-700"
+                          ? "border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20"
+                          : isDarkMode ? "border-gray-600 bg-gray-700 hover:border-emerald-400" : "border-gray-200 bg-white hover:border-emerald-300"
                       }`}
                     >
-                      {getTypeDisplay(type)}
-                    </span>
-                    <div
-                      className={`w-5 h-5 rounded-full border-2 transition-all ${
-                        isSelected
-                          ? "bg-gradient-to-r from-emerald-500 to-teal-500 border-emerald-500"
-                          : isDarkMode ? "border-gray-600" : "border-gray-300"
-                      } flex items-center justify-center`}
-                    >
+                      <span
+                        className={`font-medium ${
+                          isSelected
+                            ? "text-emerald-700 dark:text-emerald-400"
+                            : isDarkMode ? "text-gray-200" : "text-gray-700"
+                        }`}
+                      >
+                        {getTypeDisplay(type)}
+                      </span>
                       {isSelected && (
-                        <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                        <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full flex items-center justify-center">
+                          <svg
+                            className="w-2.5 h-2.5 text-white"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                        </div>
                       )}
-                    </div>
-                  </button>
-                );
-              })}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
@@ -332,7 +351,7 @@ export default function ClothingStep({
           <div className="pt-2">
             <button
               onClick={handleSaveClothingDetails}
-              disabled={selectedSizes.length === 0 || !selectedFit || !selectedType}
+              disabled={selectedSizes.length === 0 || !selectedFit || selectedTypes.length === 0}
               className="w-full bg-gradient-to-r from-rose-500 via-purple-500 to-indigo-500 hover:from-rose-600 hover:via-purple-600 hover:to-indigo-600 text-white font-bold py-3 px-6 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
             >
               <span className="flex items-center justify-center gap-2">
@@ -358,7 +377,7 @@ export default function ClothingStep({
           <div className="flex justify-center space-x-2 pt-2">
             <div className={`w-2 h-2 rounded-full transition-all ${selectedSizes.length > 0 ? 'bg-rose-400' : isDarkMode ? 'bg-gray-600' : 'bg-gray-300'}`}></div>
             <div className={`w-2 h-2 rounded-full transition-all ${selectedFit ? 'bg-purple-400' : isDarkMode ? 'bg-gray-600' : 'bg-gray-300'}`}></div>
-            <div className={`w-2 h-2 rounded-full transition-all ${selectedType ? 'bg-emerald-400' : isDarkMode ? 'bg-gray-600' : 'bg-gray-300'}`}></div>
+            <div className={`w-2 h-2 rounded-full transition-all ${selectedTypes.length > 0 ? 'bg-emerald-400' : isDarkMode ? 'bg-gray-600' : 'bg-gray-300'}`}></div>
           </div>
         </div>
       </div>

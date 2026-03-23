@@ -475,12 +475,14 @@ export default function ListProductForm() {
       case "clothingFit":
         return tClothing(`fits.${value}`, { fallback: String(value) });
       case "clothingType":
+      case "clothingTypes":
         return tClothing(`types.${value}`, { fallback: String(value) });
       case "computerComponent":
         return tComputer(`components.${value}`, { fallback: String(value) });
       case "consoleBrand":
         return tConsoles(`brands.${value}`, { fallback: String(value) });
       case "consoleVariant":
+      case "productType":
         return tConsoles(`variants.${value}`, { fallback: String(value) });
       case "jewelryMaterial":
         return tJewelryMaterial(`materials.${value}`, {
@@ -488,6 +490,8 @@ export default function ListProductForm() {
         });
       case "jewelryType":
         return tJewelryType(`types.${value}`, { fallback: String(value) });
+      case "pantFabricTypes":
+        return tPant(`fabricTypes.${value}`, { fallback: String(value).replace(/([A-Z])/g, ' $1').trim() });
       case "kitchenAppliance":
         return tKitchen(`appliances.${value}`, { fallback: String(value) });
       case "pantSizes":
@@ -520,17 +524,21 @@ export default function ListProductForm() {
       case "clothingFit":
         return tClothing("clothingFit");
       case "clothingType":
+      case "clothingTypes":
         return tClothing("clothingType");
       case "computerComponent":
         return tComputer("title");
       case "consoleBrand":
         return tConsoles("selectConsoleBrand");
       case "consoleVariant":
+      case "productType":
         return tConsoles("selectConsoleVariant");
       case "jewelryMaterial":
         return tJewelryMaterial("title");
       case "jewelryType":
         return tJewelryType("title");
+      case "pantFabricTypes":
+        return tPant("fabricType");
       case "kitchenAppliance":
         return tKitchen("title");
       case "pantSizes":
