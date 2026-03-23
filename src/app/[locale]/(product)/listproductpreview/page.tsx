@@ -20,9 +20,8 @@ import UploadProgressOverlay from "../../../components/List-Product/UploadProgre
 import {
   UploadPhase,
   UploadState,
-  makeUploadState,
-  formatBytes,
-  getFraction,
+  makeUploadState
+ 
 } from "../../../components/List-Product/uploadState";
 import { smartCompress, shouldCompress } from "../../../utils/imageCompression";
 

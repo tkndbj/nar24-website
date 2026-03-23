@@ -3,7 +3,7 @@
 // Mirrors Flutter's upload_progress_overlay.dart exactly.
 // Covers the entire screen and absorbs all pointer events while uploading.
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { UploadPhase, UploadState, getFraction, formatBytes } from "./uploadState";
 
 interface Props {
