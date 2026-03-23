@@ -400,10 +400,6 @@ export default function ListProductPreview() {
     const consoleBrand = getString("consoleBrand");
     const curtainMaxWidth = getNumber("curtainMaxWidth");
     const curtainMaxHeight = getNumber("curtainMaxHeight");
-    const computerComponent = getString("computerComponent");
-    const kitchenAppliance = getString("kitchenAppliance");
-    const whiteGood = getString("whiteGood");
-    const fantasyWearType = getString("fantasyWearType");
 
     // Build searchIndex array (matching Flutter's cloud function behaviour)
     const searchTerms = [
@@ -484,11 +480,6 @@ export default function ListProductPreview() {
       ...(consoleBrand && { consoleBrand }),
       ...(curtainMaxWidth != null && { curtainMaxWidth }),
       ...(curtainMaxHeight != null && { curtainMaxHeight }),
-      ...(computerComponent && { computerComponent }),
-      ...(kitchenAppliance && { kitchenAppliance }),
-      ...(whiteGood && { whiteGood }),
-      ...(fantasyWearType && { fantasyWearType }),
-
       // Flatten any remaining dynamic attributes to top-level
       // (matches Flutter's flat document structure)
       ...cleanedAttributes,

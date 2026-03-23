@@ -69,9 +69,9 @@ export default function KitchenAppliancesStep({
     // Load from dynamic attributes if provided
     if (
       initialAttributes &&
-      typeof initialAttributes.kitchenAppliance === "string"
+      typeof initialAttributes.productType === "string"
     ) {
-      setSelectedAppliance(initialAttributes.kitchenAppliance);
+      setSelectedAppliance(initialAttributes.productType);
     }
   }, [initialAttributes]);
 
@@ -87,14 +87,14 @@ export default function KitchenAppliancesStep({
 
     // Return the kitchen appliance as dynamic attributes following the interface
     const result: GenericStepResult = {
-      kitchenAppliance: selectedAppliance,
+      productType: selectedAppliance,
     };
 
     // Include any existing attributes that were passed in
     if (initialAttributes) {
       Object.keys(initialAttributes).forEach((key) => {
         if (
-          key !== "kitchenAppliance" &&
+          key !== "productType" &&
           initialAttributes[key] !== undefined
         ) {
           const value = initialAttributes[key];

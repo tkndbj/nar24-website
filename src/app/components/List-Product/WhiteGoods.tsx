@@ -26,8 +26,8 @@ export default function WhiteGoodsStep({
 
   useEffect(() => {
     // Load from dynamic attributes if provided
-    if (initialAttributes && typeof initialAttributes.whiteGood === "string") {
-      setSelectedWhiteGood(initialAttributes.whiteGood);
+    if (initialAttributes && typeof initialAttributes.productType === "string") {
+      setSelectedWhiteGood(initialAttributes.productType);
     }
   }, [initialAttributes]);
 
@@ -43,13 +43,13 @@ export default function WhiteGoodsStep({
 
     // Return the white good as dynamic attributes following the interface
     const result: GenericStepResult = {
-      whiteGood: selectedWhiteGood,
+      productType: selectedWhiteGood,
     };
 
     // Include any existing attributes that were passed in
     if (initialAttributes) {
       Object.keys(initialAttributes).forEach((key) => {
-        if (key !== "whiteGood" && initialAttributes[key] !== undefined) {
+        if (key !== "productType" && initialAttributes[key] !== undefined) {
           const value = initialAttributes[key];
           if (
             typeof value === "string" ||

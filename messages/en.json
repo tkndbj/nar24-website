@@ -1754,6 +1754,8 @@
     "edit": "Edit",
     "cancel": "Cancel",
     "delete": "Delete",
+    "deletingProduct": "Deleting Product",
+    "deletingProductDesc": "This will take a moment...",
     "created": "Created",
     "last7Days": "Last 7 Days",
     "last30Days": "Last 30 Days",

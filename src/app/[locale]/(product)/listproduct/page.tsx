@@ -482,8 +482,10 @@ export default function ListProductForm() {
       case "consoleBrand":
         return tConsoles(`brands.${value}`, { fallback: String(value) });
       case "consoleVariant":
-      case "productType":
         return tConsoles(`variants.${value}`, { fallback: String(value) });
+      case "productType":
+        // productType is used by multiple categories - try each translation namespace
+        return String(value);
       case "jewelryMaterial":
         return tJewelryMaterial(`materials.${value}`, {
           fallback: String(value),
@@ -531,8 +533,9 @@ export default function ListProductForm() {
       case "consoleBrand":
         return tConsoles("selectConsoleBrand");
       case "consoleVariant":
-      case "productType":
         return tConsoles("selectConsoleVariant");
+      case "productType":
+        return tRoot("productPreview.attributes.productType", { fallback: "Product Type" });
       case "jewelryMaterial":
         return tJewelryMaterial("title");
       case "jewelryType":

@@ -24,7 +24,7 @@ export default function FantasyWearStep({
   const t = useTranslations("fantasyWearStep");
 
   // Raw fantasy wear type keys
-  const fantasyWearTypes = [
+  const productTypes = [
     "Lingerie",
     "Babydoll",
     "Chemise",
@@ -47,9 +47,9 @@ export default function FantasyWearStep({
     // Load from dynamic attributes if provided
     if (
       initialAttributes &&
-      typeof initialAttributes.fantasyWearType === "string"
+      typeof initialAttributes.productType === "string"
     ) {
-      setSelectedType(initialAttributes.fantasyWearType);
+      setSelectedType(initialAttributes.productType);
     }
   }, [initialAttributes]);
 
@@ -65,14 +65,14 @@ export default function FantasyWearStep({
 
     // Return the fantasy wear type as dynamic attributes following the interface
     const result: GenericStepResult = {
-      fantasyWearType: selectedType,
+      productType: selectedType,
     };
 
     // Include any existing attributes that were passed in
     if (initialAttributes) {
       Object.keys(initialAttributes).forEach((key) => {
         if (
-          key !== "fantasyWearType" &&
+          key !== "productType" &&
           initialAttributes[key] !== undefined
         ) {
           const value = initialAttributes[key];
@@ -268,7 +268,7 @@ export default function FantasyWearStep({
           {/* Fantasy Wear Types Grid */}
           <div className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-xl border border-white/20 overflow-hidden mb-8">
             <div className="p-6 space-y-3">
-              {fantasyWearTypes.map((type) => {
+              {productTypes.map((type) => {
                 const isSelected = selectedType === type;
                 const colors = getColorScheme(type, isSelected);
                 return (

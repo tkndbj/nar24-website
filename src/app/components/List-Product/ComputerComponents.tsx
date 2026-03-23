@@ -50,9 +50,9 @@ export default function ComputerComponentsStep({
     // Load from dynamic attributes if provided
     if (
       initialAttributes &&
-      typeof initialAttributes.computerComponent === "string"
+      typeof initialAttributes.productType === "string"
     ) {
-      setSelectedComponent(initialAttributes.computerComponent);
+      setSelectedComponent(initialAttributes.productType);
     }
   }, [initialAttributes]);
 
@@ -68,14 +68,14 @@ export default function ComputerComponentsStep({
 
     // Return the computer component as dynamic attributes following the interface
     const result: GenericStepResult = {
-      computerComponent: selectedComponent,
+      productType: selectedComponent,
     };
 
     // Include any existing attributes that were passed in
     if (initialAttributes) {
       Object.keys(initialAttributes).forEach((key) => {
         if (
-          key !== "computerComponent" &&
+          key !== "productType" &&
           initialAttributes[key] !== undefined
         ) {
           const value = initialAttributes[key];

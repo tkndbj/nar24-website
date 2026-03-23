@@ -1746,6 +1746,8 @@
     "filterByDate": "Tarihe Göre Filtrele",
     "cancel": "İptal",
     "archivedProducts": "Arşivlenmiş Ürünler",
+    "deletingProduct": "Ürün Siliniyor",
+    "deletingProductDesc": "Bu biraz zaman alacak...",
     "clear": "Temizle",
     "boost": "Öne Çıkar",
     "edit": "Düzenle",

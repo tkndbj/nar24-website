@@ -39,10 +39,10 @@ export interface ClothingStepProps extends BaseStepProps {
   };
 }
 
-// Computer components step props - includes additional attributes
+// Computer components step props - uses productType (flat, matches Flutter)
 export interface ComputerComponentsStepProps extends BaseStepProps {
   initialAttributes?: {
-    computerComponent?: string;
+    productType?: string;
     [key: string]: unknown;
   };
 }
@@ -88,10 +88,10 @@ export interface JeweleryTypeStepProps extends BaseStepProps {
   };
 }
 
-// Kitchen appliances step props - includes appliance attribute
+// Kitchen appliances step props - uses productType (flat, matches Flutter)
 export interface KitchenAppliancesStepProps extends BaseStepProps {
   initialAttributes?: {
-    kitchenAppliance?: string;
+    productType?: string;
     [key: string]: unknown;
   };
 }
@@ -105,10 +105,10 @@ export interface PantDetailStepProps extends BaseStepProps {
   };
 }
 
-// White goods step props - includes white good attribute
+// White goods step props - uses productType (flat, matches Flutter)
 export interface WhiteGoodsStepProps extends BaseStepProps {
   initialAttributes?: {
-    whiteGood?: string;
+    productType?: string;
     [key: string]: unknown;
   };
 }
