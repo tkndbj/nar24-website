@@ -878,11 +878,7 @@ export default function MyProductsPage() {
                 }`}
               >
                 {t("confirmDelete") || "Delete Product?"}
-              </h3>
-              <p className="text-sm text-gray-500 mb-5">
-                {t("confirmDeleteMessage") ||
-                  "This action cannot be undone."}
-              </p>
+              </h3>              
               <div className="flex gap-2 w-full">
                 <button
                   onClick={() => {
