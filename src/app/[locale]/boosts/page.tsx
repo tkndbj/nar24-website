@@ -289,7 +289,9 @@ export default function BoostPage() {
       const q = query(
         collection(db, "products"),
         where("userId", "==", user.uid),
-        where("isBoosted", "==", false),
+        // ✅ Removed: where("isBoosted", "==", false)
+        // Flutter does NOT filter this server-side — it fetches all user
+        // products and filters client-side to catch null/undefined cases too.
         orderBy("createdAt", "desc"),
       );
       const snapshot = await getDocs(q);
@@ -297,6 +299,9 @@ export default function BoostPage() {
       snapshot.docs.forEach((doc) => {
         const data = doc.data();
         if (productId && doc.id === productId) return;
+        // ✅ Mirrors Flutter: data['isBoosted'] != true
+        // Includes products where isBoosted is false, null, or field doesn't exist
+        if (data.isBoosted === true) return;
         products.push({
           id: doc.id,
           productName: data.productName || "",
