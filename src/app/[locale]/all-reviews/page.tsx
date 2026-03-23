@@ -65,6 +65,7 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
 
   // Extract query parameters - use URL as source of truth for server-side filtering
   const productId = searchParams.get("productId") || "";
+  const isShop = searchParams.get("isShop");
   const sortBy = (searchParams.get("sortBy") as "recent" | "helpful" | "rating") || "recent";
   const filterRatingParam = searchParams.get("rating");
   const filterRating = filterRatingParam ? parseInt(filterRatingParam, 10) : null;
@@ -210,6 +211,10 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
           sortBy,
         });
 
+        if (isShop !== null) {
+          params.append("isShop", isShop);
+        }
+
         if (filterRating) {
           params.append("rating", filterRating.toString());
         }
@@ -254,7 +259,7 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
     return () => {
       abortController.abort();
     };
-  }, [productId, sortBy, filterRating]);
+  }, [productId, isShop, sortBy, filterRating]);
 
   // Load more reviews (for infinite scroll)
   const loadMoreReviews = useCallback(async () => {
@@ -267,6 +272,10 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
         limit: PAGE_SIZE.toString(),
         sortBy,
       });
+
+      if (isShop !== null) {
+        params.append("isShop", isShop);
+      }
 
       if (filterRating) {
         params.append("rating", filterRating.toString());
@@ -298,7 +307,7 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
     } finally {
       setIsLoadingMore(false);
     }
-  }, [productId, sortBy, filterRating, lastDocId, hasMore, isLoadingMore]);
+  }, [productId, isShop, sortBy, filterRating, lastDocId, hasMore, isLoadingMore]);
 
   // Infinite scroll observer
   useEffect(() => {

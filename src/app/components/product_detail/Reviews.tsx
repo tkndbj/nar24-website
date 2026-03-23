@@ -34,6 +34,7 @@ interface Review {
 
 interface ProductDetailReviewsTabProps {
   productId: string;
+  isShop?: boolean;
   isLoading?: boolean;
   localization?: ReturnType<typeof useTranslations>;
   prefetchedData?: { reviews: Review[]; totalCount: number } | null;
@@ -419,6 +420,7 @@ const LoadingSkeleton: React.FC = () => (
 
 const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
   productId,
+  isShop,
   isLoading = false,
   localization,
   prefetchedData,
@@ -524,7 +526,7 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
 
       try {
         setLoading(true);
-        const response = await fetch(`/api/reviews/${productId}`);
+        const response = await fetch(`/api/reviews/${productId}${isShop !== undefined ? `?isShop=${isShop}` : ""}`);
         if (!response.ok) {
           throw new Error(t("failedToFetchReviews"));
         }
@@ -578,7 +580,7 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
   );
 
   const handleSeeAllReviews = useCallback(() => {
-    router.push(`/all-reviews?productId=${productId}`);
+    router.push(`/all-reviews?productId=${productId}${isShop !== undefined ? `&isShop=${isShop}` : ""}`);
   }, [productId, router]);
 
   if (isLoading || loading) {

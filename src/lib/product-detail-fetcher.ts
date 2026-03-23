@@ -138,31 +138,14 @@ async function fetchSellerInfo(
   const sellerData = sellerDoc.data();
   if (!sellerData) return null;
 
-  const reviewsSnapshot = await db
-    .collection("users")
-    .doc(sellerId)
-    .collection("reviews")
-    .get();
-
-  let sellerAverageRating = 0;
-  let totalReviews = 0;
-
-  if (!reviewsSnapshot.empty) {
-    let totalRating = 0;
-    reviewsSnapshot.docs.forEach((doc) => {
-      const reviewData = doc.data();
-      if (reviewData.rating) {
-        totalRating += reviewData.rating;
-        totalReviews++;
-      }
-    });
-    sellerAverageRating = totalReviews > 0 ? totalRating / totalReviews : 0;
-  }
+  // Use denormalized averageRating/totalReviews from user and shop docs
+  const sellerAverageRating = safeDouble(sellerData.averageRating);
+  const totalReviews = safeInt(sellerData.totalReviews);
 
   let shopAverageRating = 0;
   if (shopDoc && shopDoc.exists) {
     const shopData = shopDoc.data();
-    shopAverageRating = shopData?.averageRating || 0;
+    shopAverageRating = safeDouble(shopData?.averageRating);
   }
 
   return {
@@ -267,20 +250,42 @@ async function fetchRelatedProducts(
   subcategory: string
 ): Promise<RelatedProduct[]> {
   if (relatedIds.length > 0) {
-    const products: RelatedProduct[] = [];
     const limitedIds = relatedIds.slice(0, 10);
 
-    const docs = await Promise.all(
-      limitedIds.map(async (id) => {
-        const shopDoc = await db.collection("shop_products").doc(id).get();
-        if (shopDoc.exists) return shopDoc;
-
-        const prodDoc = await db.collection("products").doc(id).get();
-        return prodDoc.exists ? prodDoc : null;
-      })
+    // Batch read: try shop_products first, then fill gaps from products
+    const shopRefs = limitedIds.map((id) =>
+      db.collection("shop_products").doc(id)
     );
+    const shopDocs = await db.getAll(...shopRefs);
 
-    for (const doc of docs) {
+    // Collect IDs that weren't found in shop_products
+    const missingIds: string[] = [];
+    const foundMap = new Map<string, FirebaseFirestore.DocumentSnapshot>();
+    shopDocs.forEach((doc, i) => {
+      if (doc.exists) {
+        foundMap.set(limitedIds[i], doc);
+      } else {
+        missingIds.push(limitedIds[i]);
+      }
+    });
+
+    // Batch read the missing ones from products collection
+    if (missingIds.length > 0) {
+      const prodRefs = missingIds.map((id) =>
+        db.collection("products").doc(id)
+      );
+      const prodDocs = await db.getAll(...prodRefs);
+      prodDocs.forEach((doc, i) => {
+        if (doc.exists) {
+          foundMap.set(missingIds[i], doc);
+        }
+      });
+    }
+
+    // Map results preserving original order
+    const products: RelatedProduct[] = [];
+    for (const id of limitedIds) {
+      const doc = foundMap.get(id);
       if (doc && doc.exists) {
         const data = doc.data();
         if (data) {
@@ -396,6 +401,7 @@ async function fetchBundles(
     .where("shopId", "==", shopId)
     .where("mainProductId", "==", productId)
     .where("isActive", "==", true)
+    .limit(10)
     .get();
 
   return bundlesSnapshot.docs.map((doc) => {

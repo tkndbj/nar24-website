@@ -2,7 +2,6 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getFirestoreAdmin } from "@/lib/firebase-admin";
-import { sanitizeText, sanitizeQuestionInput } from "@/lib/sanitize";
 
 export async function GET(
   request: NextRequest,
@@ -45,16 +44,18 @@ export async function GET(
     // Determine collection based on isShop flag
     const questionCollection = isShop ? "shop_products" : "products";
 
-    // Fetch questions from the product's subcollection
-    const questionsSnapshot = await db
+    // Fetch questions and count in parallel
+    const questionsRef = db
       .collection(questionCollection)
       .doc(rawId)
       .collection("product_questions")
       .where("productId", "==", rawId)
-      .where("answered", "==", true)
-      .orderBy("timestamp", "desc")
-      .limit(limit)
-      .get();
+      .where("answered", "==", true);
+
+    const [questionsSnapshot, countSnapshot] = await Promise.all([
+      questionsRef.orderBy("timestamp", "desc").limit(limit).get(),
+      questionsRef.count().get(),
+    ]);
 
     const questions = questionsSnapshot.docs.map((doc) => {
       const data = doc.data();
@@ -71,16 +72,7 @@ export async function GET(
       };
     });
 
-    // Get total count of answered questions
-    const totalSnapshot = await db
-      .collection(questionCollection)
-      .doc(rawId)
-      .collection("product_questions")
-      .where("productId", "==", rawId)
-      .where("answered", "==", true)
-      .get();
-
-    const totalCount = totalSnapshot.size;
+    const totalCount = countSnapshot.data().count;
 
     return NextResponse.json({
       questions,
@@ -105,115 +97,5 @@ export async function GET(
       { error: "Internal server error" },
       { status: 500 }
     );
-  }
-}
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ productId: string }> }
-) {
-  try {
-    const db = getFirestoreAdmin();
-    const body = await request.json();
-    const { productId } = await params;
-
-    // Sanitize and validate all input using the sanitization library
-    let sanitizedInput;
-    try {
-      sanitizedInput = sanitizeQuestionInput({
-        sellerId: body.sellerId,
-        isShop: body.isShop,
-        questionText: body.questionText,
-        askerNameVisible: body.askerNameVisible,
-      });
-    } catch (validationError) {
-      return NextResponse.json(
-        { error: validationError instanceof Error ? validationError.message : "Invalid input" },
-        { status: 400 }
-      );
-    }
-
-    // Validate productId
-    if (!productId) {
-      return NextResponse.json(
-        { error: "Product ID is required" },
-        { status: 400 }
-      );
-    }
-
-    // For now, using mock user data - you'll integrate with your auth system later
-    const mockUserId = "current-user-id";
-    const mockUserName = "Test User";
-
-    // Normalize productId (sanitize first)
-    let rawId = sanitizeText(productId.trim());
-    const p1 = "products_";
-    const p2 = "shop_products_";
-    if (rawId.startsWith(p1)) {
-      rawId = rawId.substring(p1.length);
-    } else if (rawId.startsWith(p2)) {
-      rawId = rawId.substring(p2.length);
-    }
-
-    if (!rawId) {
-      return NextResponse.json(
-        { error: "Invalid product ID" },
-        { status: 400 }
-      );
-    }
-
-    // Determine collection using sanitized input
-    const productCollection = sanitizedInput.isShop ? "shop_products" : "products";
-
-    // Get product data
-    const productDoc = await db.collection(productCollection).doc(rawId).get();
-    if (!productDoc.exists) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 });
-    }
-    const productData = productDoc.data()!;
-
-    // Get seller data using sanitized sellerId
-    const sellerCollection = sanitizedInput.isShop ? "shops" : "users";
-    const sellerDoc = await db.collection(sellerCollection).doc(sanitizedInput.sellerId).get();
-    if (!sellerDoc.exists) {
-      return NextResponse.json({ error: "Seller not found" }, { status: 404 });
-    }
-    const sellerData = sellerDoc.data()!;
-
-    // Create question document with sanitized data
-    const questionRef = db
-      .collection(productCollection)
-      .doc(rawId)
-      .collection("product_questions")
-      .doc();
-
-    const questionPayload = {
-      questionId: questionRef.id,
-      productId: rawId,
-      askerId: mockUserId,
-      askerName: mockUserName,
-      askerNameVisible: sanitizedInput.askerNameVisible,
-      questionText: sanitizedInput.questionText,
-      timestamp: new Date(),
-      answered: false,
-      productName: productData.productName || "",
-      productImage: (productData.imageUrls && productData.imageUrls[0]) || "",
-      productPrice: productData.price || 0,
-      productRating: productData.averageRating || 0,
-      sellerId: sanitizedInput.sellerId,
-      sellerName: sanitizedInput.isShop ? (sellerData.name || "") : (sellerData.displayName || ""),
-      sellerImage: sanitizedInput.isShop ? (sellerData.profileImageUrl || "") : (sellerData.profileImage || ""),
-    };
-
-    // Save question
-    await questionRef.set(questionPayload);
-
-    return NextResponse.json({
-      success: true,
-      questionId: questionRef.id,
-    });
-
-  } catch (error) {
-    console.error("Error submitting question:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

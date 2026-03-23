@@ -406,6 +406,7 @@ export default function ProductDetailClient({
                 <ProductDetailReviewsTab
                   key={`reviews-${product.id}`}
                   productId={product.id}
+                  isShop={!!product.shopId}
                   localization={localization}
                   locale={locale}
                   prefetchedData={

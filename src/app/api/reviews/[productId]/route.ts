@@ -2,16 +2,11 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getFirestoreAdmin } from "@/lib/firebase-admin";
-import { Timestamp } from "firebase-admin/firestore";
-import {
-  sanitizeText,
-  sanitizeReviewInput,
-} from "@/lib/sanitize";
 
 interface ReviewData {
   rating: number;
   review: string;
-  timestamp: Timestamp | Date;
+  timestamp: { toDate(): Date } | Date;
   imageUrls?: string[];
   imageUrl?: string;
   likes?: string[];
@@ -21,7 +16,7 @@ interface ReviewData {
   helpful?: number;
   verified?: boolean;
   sellerResponse?: string;
-  sellerResponseDate?: Timestamp | Date;
+  sellerResponseDate?: { toDate(): Date } | Date;
   productId?: string;
 }
 
@@ -67,14 +62,16 @@ export async function GET(
       );
     }
 
-    // Determine which collection has the product
-    const [, shopProductDoc] = await Promise.all([
-      db.collection("products").doc(rawId).get(),
-      db.collection("shop_products").doc(rawId).get(),
-    ]);
-
-    const isShopProduct = shopProductDoc.exists;
-    const baseCollection = isShopProduct ? "shop_products" : "products";
+    // Determine collection — prefer isShop param to avoid 2 wasted reads
+    const isShopParam = searchParams.get("isShop");
+    let baseCollection: string;
+    if (isShopParam !== null) {
+      baseCollection = isShopParam === "true" ? "shop_products" : "products";
+    } else {
+      // Fallback: probe both collections (backwards compat)
+      const shopProductDoc = await db.collection("shop_products").doc(rawId).get();
+      baseCollection = shopProductDoc.exists ? "shop_products" : "products";
+    }
 
     // Build the query
     let query: FirebaseFirestore.Query = db
@@ -82,20 +79,29 @@ export async function GET(
       .doc(rawId)
       .collection("reviews");
 
-    // Apply sorting first (needed for proper Firestore query structure)
-    if (sortBy === "rating") {
+    // Apply rating filter first — Firestore requires range filter field
+    // to be the first orderBy when combined with other orderBy fields
+    if (filterRating !== null) {
+      query = query
+        .where("rating", ">=", filterRating)
+        .where("rating", "<", filterRating + 1);
+    }
+
+    // Apply sorting (rating must come first if filtering by rating)
+    if (filterRating !== null) {
+      // Range filter on rating requires rating as first orderBy
+      query = query.orderBy("rating", "desc").orderBy("timestamp", "desc");
+    } else if (sortBy === "rating") {
       query = query.orderBy("rating", "desc").orderBy("timestamp", "desc");
     } else if (sortBy === "helpful") {
       query = query.orderBy("helpful", "desc").orderBy("timestamp", "desc");
     } else {
-      // Default to recent (timestamp desc)
       query = query.orderBy("timestamp", "desc");
     }
 
     // Handle pagination with lastDocId
     if (lastDocId) {
       try {
-        // Fetch the last document to use as cursor
         const lastDocSnapshot = await db
           .collection(baseCollection)
           .doc(rawId)
@@ -108,20 +114,30 @@ export async function GET(
         }
       } catch (error) {
         console.warn("Failed to fetch last document for pagination:", error);
-        // Continue without pagination if there's an error
       }
     }
 
-    // When filtering by rating, fetch more to account for filtered out items
-    // This ensures we have enough results after filtering
-    const fetchLimit = filterRating !== null ? limit * 5 : limit;
-    query = query.limit(fetchLimit);
+    query = query.limit(limit);
 
-    // Execute the query
-    const reviewsSnapshot = await query.get();
+    // Execute the paginated query and count in parallel
+    const reviewsRef = db
+      .collection(baseCollection)
+      .doc(rawId)
+      .collection("reviews");
 
-    // Map and filter the reviews
-    let reviews = reviewsSnapshot.docs.map((doc) => {
+    let countQuery: FirebaseFirestore.Query = reviewsRef;
+    if (filterRating !== null) {
+      countQuery = countQuery
+        .where("rating", ">=", filterRating)
+        .where("rating", "<", filterRating + 1);
+    }
+
+    const [reviewsSnapshot, countSnapshot] = await Promise.all([
+      query.get(),
+      countQuery.count().get(),
+    ]);
+
+    const reviews = reviewsSnapshot.docs.map((doc) => {
       const data = doc.data() as ReviewData;
 
       // Handle timestamp conversion
@@ -169,39 +185,12 @@ export async function GET(
       };
     });
 
-    // Apply rating filter server-side (handles both integer and decimal ratings)
-    // A "4 star" filter shows reviews with rating >= 4 and < 5
-    if (filterRating !== null) {
-      reviews = reviews.filter(review => {
-        const rating = review.rating;
-        return rating >= filterRating && rating < filterRating + 1;
-      });
-    }
-
-    // Apply limit after filtering
-    const paginatedReviews = reviews.slice(0, limit);
-
-    // Get total count for the current filter
-    const allReviewsSnapshot = await db
-      .collection(baseCollection)
-      .doc(rawId)
-      .collection("reviews")
-      .get();
-
-    let totalCount = allReviewsSnapshot.size;
-
-    // If filtering, count only matching reviews
-    if (filterRating !== null) {
-      totalCount = allReviewsSnapshot.docs.filter(doc => {
-        const rating = doc.data().rating || 0;
-        return rating >= filterRating && rating < filterRating + 1;
-      }).length;
-    }
+    const totalCount = countSnapshot.data().count;
 
     return NextResponse.json({
-      reviews: paginatedReviews,
+      reviews,
       totalCount,
-      hasMore: reviews.length > limit,
+      hasMore: totalCount > (lastDocId ? reviews.length : 0) + reviews.length,
     });
 
   } catch (error) {
@@ -224,137 +213,3 @@ export async function GET(
     );
   }
 }
-
-// Optional: POST endpoint for creating reviews
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ productId: string }> }
-) {
-  try {
-    const db = getFirestoreAdmin();
-    const { productId } = await params;
-    const body = await request.json();
-
-    // Sanitize and validate all input using the sanitization library
-    let sanitizedInput;
-    try {
-      sanitizedInput = sanitizeReviewInput({
-        userId: body.userId,
-        userName: body.userName,
-        userImage: body.userImage,
-        rating: body.rating,
-        review: body.review,
-        imageUrls: body.imageUrls,
-        verified: body.verified,
-      });
-    } catch (validationError) {
-      return NextResponse.json(
-        { error: validationError instanceof Error ? validationError.message : "Invalid input" },
-        { status: 400 }
-      );
-    }
-
-    // Validate productId
-    if (!productId) {
-      return NextResponse.json(
-        { error: "Product ID is required" },
-        { status: 400 }
-      );
-    }
-
-    // Normalize productId (sanitize first)
-    let rawId = sanitizeText(productId.trim());
-    const p1 = "products_";
-    const p2 = "shop_products_";
-    if (rawId.startsWith(p1)) {
-      rawId = rawId.substring(p1.length);
-    } else if (rawId.startsWith(p2)) {
-      rawId = rawId.substring(p2.length);
-    }
-
-    if (!rawId) {
-      return NextResponse.json(
-        { error: "Invalid product ID" },
-        { status: 400 }
-      );
-    }
-
-    // Determine which collection to use
-    const [productDoc, shopProductDoc] = await Promise.all([
-      db.collection("products").doc(rawId).get(),
-      db.collection("shop_products").doc(rawId).get(),
-    ]);
-
-    const isShopProduct = shopProductDoc.exists;
-    const baseCollection = isShopProduct ? "shop_products" : "products";
-
-    if (!productDoc.exists && !shopProductDoc.exists) {
-      return NextResponse.json(
-        { error: "Product not found" },
-        { status: 404 }
-      );
-    }
-
-    // Create review document with sanitized data
-    const reviewRef = db
-      .collection(baseCollection)
-      .doc(rawId)
-      .collection("reviews")
-      .doc();
-
-    const reviewData = {
-      productId: rawId,
-      userId: sanitizedInput.userId,
-      userName: sanitizedInput.userName,
-      userImage: sanitizedInput.userImage,
-      rating: sanitizedInput.rating,
-      review: sanitizedInput.review,
-      imageUrls: sanitizedInput.imageUrls,
-      timestamp: new Date(),
-      likes: [],
-      helpful: 0,
-      verified: sanitizedInput.verified,
-    };
-
-    await reviewRef.set(reviewData);
-
-    // Update product's average rating and review count
-    const reviewsSnapshot = await db
-      .collection(baseCollection)
-      .doc(rawId)
-      .collection("reviews")
-      .get();
-
-    let totalRating = 0;
-    let reviewCount = 0;
-
-    reviewsSnapshot.forEach((doc) => {
-      const data = doc.data();
-      if (data.rating) {
-        totalRating += data.rating;
-        reviewCount++;
-      }
-    });
-
-    const averageRating = reviewCount > 0 ? totalRating / reviewCount : 0;
-
-    // Update product document with new average rating and total reviews
-    await db.collection(baseCollection).doc(rawId).update({
-      averageRating: Math.round(averageRating * 10) / 10,
-      totalReviews: reviewCount,
-    });
-
-    return NextResponse.json({
-      success: true,
-      reviewId: reviewRef.id,
-      averageRating,
-      totalReviews: reviewCount,
-    });
-
-  } catch (error) {
-    console.error("Error creating review:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
-  }}
