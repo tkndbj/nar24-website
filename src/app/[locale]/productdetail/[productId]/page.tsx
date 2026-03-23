@@ -435,18 +435,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Derived product: merges raw product state with batch seller info.
-  // This is the single source of truth for operations (cart, buy now, etc.)
-  // so that stale cached products get enriched as soon as seller data arrives.
-  const enrichedProduct = useMemo(() => {
-    if (!product) return null;
-    const seller = batchData?.seller;
-    if (seller?.sellerName && (!product.sellerName || product.sellerName === "Unknown")) {
-      return { ...product, sellerName: seller.sellerName } as Product;
-    }
-    return product;
-  }, [product, batchData]);
-
   const isOutOfStock = useMemo(() => {
     if (!product) return false;
 
@@ -498,15 +486,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
         // Update product if we got fresh data
         if (data.product) {
-          // Merge seller info into product data so the Product object is complete
-          // (the batch API returns seller info separately from the product document)
-          const enrichedProductData = {
-            ...data.product,
-            ...(data.seller && {
-              sellerName: data.seller.sellerName || data.product.sellerName,
-            }),
-          };
-          const freshProduct = ProductUtils.fromJson(enrichedProductData);
+          const freshProduct = ProductUtils.fromJson(data.product);
           setProduct(freshProduct);
           setProductCache(id, freshProduct);
         }
@@ -614,23 +594,15 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           );
 
           if (data.product) {
-            // Merge seller info into product data so the Product object is complete
-            // (the batch API returns seller info separately from the product document)
-            const enrichedProductData = {
-              ...data.product,
-              ...(data.seller && {
-                sellerName: data.seller.sellerName || data.product.sellerName,
-              }),
-            };
-            const product = ProductUtils.fromJson(enrichedProductData);
+            const product = ProductUtils.fromJson(data.product);
             setProduct(product);
             setProductCache(id, product);
 
-            // Cache to sessionStorage (with enriched data so sellerName persists)
+            // Cache to sessionStorage
             try {
               sessionStorage.setItem(
                 `product_${id}`,
-                JSON.stringify(enrichedProductData),
+                JSON.stringify(data.product),
               );
               sessionStorage.setItem(
                 `product_${id}_timestamp`,
@@ -807,7 +779,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
 
   const navigateToBuyNow = useCallback(
     (selectedOptions: { quantity?: number; [key: string]: unknown }) => {
-      if (!enrichedProduct) return;
+      if (!product) return;
 
       try {
         const selectedAttributes: Record<string, unknown> = {};
@@ -824,7 +796,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         });
 
         const productData = buildProductDataForCart(
-          enrichedProduct,
+          product,
           selectedOptions.selectedColor as string | undefined,
           undefined,
         );
@@ -851,7 +823,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         router.push(`/${locale}/productpayment`);
       }
     },
-    [enrichedProduct, router, locale],
+    [product, router, locale],
   );
 
   const handleAddToCart = useCallback(
@@ -861,7 +833,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         return;
       }
 
-      if (!enrichedProduct) return;
+      if (!product) return;
 
       // Use ref to prevent race conditions from rapid clicks
       // This is more reliable than state because refs update synchronously
@@ -873,13 +845,13 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
         return;
       }
 
-      const productInCart = cartProductIds.has(enrichedProduct.id);
+      const productInCart = cartProductIds.has(product.id);
       const isAdding = !productInCart;
 
       // CRITICAL: If adding to cart and product has selectable options,
       // ALWAYS show the option selector unless options were already selected
       if (isAdding && !selectedOptions) {
-        const productHasOptions = hasSelectableOptions(enrichedProduct);
+        const productHasOptions = hasSelectableOptions(product);
         if (productHasOptions) {
           // Set the lock before showing selector to prevent race conditions
           // from rapid clicks while the modal is opening
@@ -928,7 +900,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
           delete attributesToAdd.selectedColor;
 
           result = await addProductToCart(
-            enrichedProduct,
+            product,
             quantityToAdd,
             selectedColor,
             Object.keys(attributesToAdd).length > 0
@@ -936,7 +908,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
               : undefined,
           );
         } else {
-          result = await removeFromCart(enrichedProduct.id);
+          result = await removeFromCart(product.id);
         }
 
         if (
@@ -962,7 +934,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
     },
     [
       user,
-      enrichedProduct,
+      product,
       cartProductIds,
       cartButtonState,
       addProductToCart,
@@ -990,19 +962,19 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
       return;
     }
 
-    if (!enrichedProduct) return;
+    if (!product) return;
 
     if (salesPaused) {
       setShowSalesPausedDialog(true);
       return;
     }
 
-    if (hasSelectableOptions(enrichedProduct)) {
+    if (hasSelectableOptions(product)) {
       setShowBuyNowOptionSelector(true);
     } else {
       navigateToBuyNow({ quantity: 1 });
     }
-  }, [user, enrichedProduct, navigateToBuyNow, salesPaused]);
+  }, [user, product, navigateToBuyNow, salesPaused]);
 
   const handleBuyNowOptionSelectorConfirm = useCallback(
     (selectedOptions: { quantity?: number; [key: string]: unknown }) => {
@@ -1143,24 +1115,24 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ params }) => {
   }, [product, cartProductIds, cartButtonState, t]);
 
   const isAddToCartDisabled = useMemo(() => {
-    if (!enrichedProduct) return false;
+    if (!product) return false;
 
     if (cartButtonState === "adding" || cartButtonState === "removing") {
       return true;
     }
 
     // Product data not fully loaded yet (seller info arrives from batch API)
-    if (!enrichedProduct.sellerName || enrichedProduct.sellerName === "Unknown") {
+    if (!product.sellerName || product.sellerName === "Unknown") {
       return true;
     }
 
-    const hasNoStock = enrichedProduct.quantity === 0;
+    const hasNoStock = product.quantity === 0;
     const hasColorOptions =
-      enrichedProduct.colorQuantities &&
-      Object.keys(enrichedProduct.colorQuantities).length > 0;
+      product.colorQuantities &&
+      Object.keys(product.colorQuantities).length > 0;
 
     return hasNoStock && !hasColorOptions;
-  }, [enrichedProduct, cartButtonState]);
+  }, [product, cartButtonState]);
 
   // ============= RENDER =============
 
