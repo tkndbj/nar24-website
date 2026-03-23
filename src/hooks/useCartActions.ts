@@ -76,15 +76,17 @@ function hasSelectableOptions(product: Product | null): boolean {
 export function useCartActions(
   product: Product | null,
   locale: string,
-  salesPaused: boolean
+  salesPaused: boolean,
 ): CartActionsResult {
   const router = useRouter();
   const { addProductToCart, removeFromCart, cartProductIds } = useCart();
   const { user } = useUser();
 
-  const [cartButtonState, setCartButtonState] = useState<CartButtonState>("idle");
+  const [cartButtonState, setCartButtonState] =
+    useState<CartButtonState>("idle");
   const [showCartOptionSelector, setShowCartOptionSelector] = useState(false);
-  const [showBuyNowOptionSelector, setShowBuyNowOptionSelector] = useState(false);
+  const [showBuyNowOptionSelector, setShowBuyNowOptionSelector] =
+    useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const isCartOperationInProgress = useRef(false);
 
@@ -112,7 +114,12 @@ export function useCartActions(
       try {
         const selectedAttributes: Record<string, unknown> = {};
         Object.entries(selectedOptions).forEach(([key, value]) => {
-          if (key !== "quantity" && value !== undefined && value !== null && value !== "") {
+          if (
+            key !== "quantity" &&
+            value !== undefined &&
+            value !== null &&
+            value !== ""
+          ) {
             selectedAttributes[key] = value;
           }
         });
@@ -120,7 +127,7 @@ export function useCartActions(
         const productData = buildProductDataForCart(
           product,
           selectedOptions.selectedColor as string | undefined,
-          undefined
+          undefined,
         );
 
         const buyNowItem = {
@@ -138,7 +145,7 @@ export function useCartActions(
         router.push(`/${locale}/productpayment`);
       }
     },
-    [product, router, locale]
+    [product, router, locale],
   );
 
   const handleAddToCart = useCallback(
@@ -187,14 +194,18 @@ export function useCartActions(
             });
           }
 
-          const selectedColor = attributesToAdd.selectedColor as string | undefined;
+          const selectedColor = attributesToAdd.selectedColor as
+            | string
+            | undefined;
           delete attributesToAdd.selectedColor;
 
           result = await addProductToCart(
             product,
             quantityToAdd,
             selectedColor,
-            Object.keys(attributesToAdd).length > 0 ? attributesToAdd : undefined
+            Object.keys(attributesToAdd).length > 0
+              ? attributesToAdd
+              : undefined,
           );
         } else {
           result = await removeFromCart(product.id);
@@ -219,7 +230,14 @@ export function useCartActions(
         isCartOperationInProgress.current = false;
       }
     },
-    [user, product, cartProductIds, isProcessing, addProductToCart, removeFromCart]
+    [
+      user,
+      product,
+      cartProductIds,
+      isProcessing,
+      addProductToCart,
+      removeFromCart,
+    ],
   );
 
   const handleBuyNow = useCallback(() => {
@@ -242,7 +260,7 @@ export function useCartActions(
       setShowCartOptionSelector(false);
       await handleAddToCart(selectedOptions);
     },
-    [handleAddToCart]
+    [handleAddToCart],
   );
 
   const handleCartOptionSelectorClose = useCallback(() => {
@@ -255,7 +273,7 @@ export function useCartActions(
       setShowBuyNowOptionSelector(false);
       navigateToBuyNow(selectedOptions);
     },
-    [navigateToBuyNow]
+    [navigateToBuyNow],
   );
 
   const handleBuyNowOptionSelectorClose = useCallback(() => {

@@ -25,9 +25,7 @@ import {
   Timestamp,
   FieldValue,
   Firestore,
-
   updateDoc,
-
   arrayUnion,
   arrayRemove,
   getDocsFromServer,
@@ -177,13 +175,13 @@ interface CartActionsContextType {
     product: Product,
     quantity?: number,
     selectedColor?: string,
-    attributes?: CartAttributes
+    attributes?: CartAttributes,
   ) => Promise<string>;
   addToCartById: (
     productId: string,
     quantity?: number,
     selectedColor?: string,
-    attributes?: CartAttributes
+    attributes?: CartAttributes,
   ) => Promise<string>;
   removeFromCart: (productId: string) => Promise<string>;
   updateQuantity: (productId: string, newQuantity: number) => Promise<string>;
@@ -193,7 +191,7 @@ interface CartActionsContextType {
   calculateCartTotals: (excludedProductIds?: string[]) => Promise<CartTotals>;
   validateForPayment: (
     selectedProductIds: string[],
-    reserveStock?: boolean
+    reserveStock?: boolean,
   ) => Promise<{
     isValid: boolean;
     errors: Record<string, ValidationMessage>;
@@ -201,17 +199,22 @@ interface CartActionsContextType {
     validatedItems: ValidatedCartItem[];
   }>;
   updateCartCacheFromValidation: (
-    validatedItems: ValidatedCartItem[]
+    validatedItems: ValidatedCartItem[],
   ) => Promise<boolean>;
   refresh: () => Promise<void>;
 }
 
 // Combined context type (for backward compatibility)
-interface CartContextType extends CartStateContextType, CartActionsContextType {}
+interface CartContextType
+  extends CartStateContextType, CartActionsContextType {}
 
 // Create separate contexts
-const CartStateContext = createContext<CartStateContextType | undefined>(undefined);
-const CartActionsContext = createContext<CartActionsContextType | undefined>(undefined);
+const CartStateContext = createContext<CartStateContextType | undefined>(
+  undefined,
+);
+const CartActionsContext = createContext<CartActionsContextType | undefined>(
+  undefined,
+);
 
 // Combined context for backward compatibility
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -300,7 +303,7 @@ interface CartProviderProps {
 export const buildProductDataForCart = (
   product: Product,
   selectedColor?: string,
-  attributes?: CartAttributes
+  attributes?: CartAttributes,
 ): Record<string, unknown> => {
   let extractedBundlePrice: number | undefined;
   if (product.bundleData && product.bundleData.length > 0) {
@@ -320,7 +323,7 @@ export const buildProductDataForCart = (
     category: product.category || "Uncategorized",
     subcategory: product.subcategory || "",
     subsubcategory: product.subsubcategory || "",
-    gender: product.gender || "", 
+    gender: product.gender || "",
     allImages: Array.isArray(product.imageUrls) ? product.imageUrls : [],
     productImage:
       Array.isArray(product.imageUrls) && product.imageUrls.length > 0
@@ -332,8 +335,8 @@ export const buildProductDataForCart = (
     reviewCount:
       typeof product.reviewCount === "number" ? product.reviewCount : 0,
 
-      sellerId: product.userId || product.shopId || product.ownerId || "",
-      sellerName: product.sellerName || "",
+    sellerId: product.userId || product.shopId || product.ownerId || "",
+    sellerName: product.sellerName || "",
     isShop: product.shopId != null,
     ilanNo: product.ilanNo || product.id || "N/A",
     createdAt: product.createdAt || Timestamp.now(),
@@ -469,16 +472,18 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
   // Optimistic updates tracking
   const optimisticCacheRef = useRef<Map<string, OptimisticCacheEntry>>(
-    new Map()
+    new Map(),
   );
   const optimisticTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
   // Concurrency control
   const quantityUpdateLocksRef = useRef<Map<string, Promise<string>>>(
-    new Map()
+    new Map(),
   );
   const pendingFetchesRef = useRef<Map<string, Promise<unknown>>>(new Map());
-  const deferredCartInitRef = useRef<number | ReturnType<typeof setTimeout> | null>(null);
+  const deferredCartInitRef = useRef<
+    number | ReturnType<typeof setTimeout> | null
+  >(null);
   const backgroundTotalsTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // ========================================================================
@@ -492,7 +497,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       try {
         // Try shop_products collection first
         const shopProductDoc = await getDoc(
-          doc(db, "shop_products", productId)
+          doc(db, "shop_products", productId),
         );
 
         if (shopProductDoc.exists()) {
@@ -514,7 +519,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         return null;
       }
     },
-    [db]
+    [db],
   );
 
   const clearOptimisticUpdate = useCallback((productId: string) => {
@@ -560,7 +565,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
       return true;
     },
-    []
+    [],
   );
 
   const buildProductFromCartData = useCallback(
@@ -700,7 +705,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         },
       });
     },
-    []
+    [],
   );
 
   const extractSalePreferences = useCallback(
@@ -726,7 +731,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
       return Object.keys(salePrefs).length === 0 ? null : salePrefs;
     },
-    []
+    [],
   );
 
   const resolveColorImage = useCallback(
@@ -738,14 +743,14 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       const images = product.colorImages[selectedColor];
       return images?.[0];
     },
-    []
+    [],
   );
 
   const createCartItem = useCallback(
     (
       productId: string,
       cartData: FirestoreCartData,
-      product: Product
+      product: Product,
     ): CartItem => {
       const salePreferences = extractSalePreferences(cartData);
 
@@ -785,7 +790,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
         selectedColorImage: resolveColorImage(
           product,
-          cartData.selectedColor as string | undefined
+          cartData.selectedColor as string | undefined,
         ),
         sellerName: (cartData.sellerName as string) ?? "Unknown",
         sellerId: (cartData.sellerId as string) ?? "unknown",
@@ -804,7 +809,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
       return item;
     },
-    [extractSalePreferences, resolveColorImage]
+    [extractSalePreferences, resolveColorImage],
   );
 
   const sortCartItems = useCallback((items: CartItem[]) => {
@@ -881,7 +886,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       createCartItem,
       sortCartItems,
       updateCartIds,
-    ]
+    ],
   );
 
   const initializeCartIfNeeded = useCallback(async () => {
@@ -899,9 +904,16 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       // Early exit: if user doc says cart is empty AND we have no local optimistic items,
       // skip subcollection read entirely
       const cachedIds = getProfileField<string[]>("cartItemIds");
-      const hasLocalItems = cartProductIds.size > 0 || optimisticCacheRef.current.size > 0;
-      if (Array.isArray(cachedIds) && cachedIds.length === 0 && !hasLocalItems) {
-        console.log("✅ Cart: User doc says empty, skipping subcollection read");
+      const hasLocalItems =
+        cartProductIds.size > 0 || optimisticCacheRef.current.size > 0;
+      if (
+        Array.isArray(cachedIds) &&
+        cachedIds.length === 0 &&
+        !hasLocalItems
+      ) {
+        console.log(
+          "✅ Cart: User doc says empty, skipping subcollection read",
+        );
         setCartItems([]);
         setCartProductIds(new Set());
         setCartCount(0);
@@ -926,7 +938,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         const cartQuery = query(
           collection(db, "users", user.uid, "cart"),
           orderBy("addedAt", "desc"),
-          limit(ITEMS_PER_PAGE)
+          limit(ITEMS_PER_PAGE),
         );
 
         const snapshot = await getDocsFromServer(cartQuery);
@@ -953,25 +965,18 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     pendingFetchesRef.current.set("init", initPromise);
     await initPromise;
     pendingFetchesRef.current.delete("init");
-
-  }, [
-    user,
-    isInitialized,
-    db,
-    buildCartItemsFromDocs,
-    cartItems.length,
-  ]);
+  }, [user, isInitialized, db, buildCartItemsFromDocs, cartItems.length]);
 
   const calculateCartTotals = useCallback(
     async (excludedProductIds?: string[]): Promise<CartTotals> => {
       if (!user || !functions) {
         return { total: 0, items: [], currency: "TL" };
       }
-  
+
       // ✅ Build cache key from excluded IDs (empty = all items)
       const excludedSorted = [...(excludedProductIds ?? [])].sort();
       const cacheKey = `all_minus_${excludedSorted.join(",")}`;
-  
+
       // ✅ Check local cache first
       const cached = cartTotalsCache.get(user.uid, [cacheKey]);
       if (cached) {
@@ -993,18 +998,16 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       if (pendingFetchesRef.current.has(`totals_${cacheKey}`)) {
         console.log("⏳ Waiting for existing totals calculation...");
         const result = await pendingFetchesRef.current.get(
-          `totals_${cacheKey}`
+          `totals_${cacheKey}`,
         );
         return result as CartTotals;
       }
 
       const totalsPromise = (async () => {
         try {
-         
-
           const calculateCartTotalsFunction = httpsCallable(
             functions,
-            "calculateCartTotals"
+            "calculateCartTotals",
           );
 
           const result = await calculateCartTotalsFunction({
@@ -1049,7 +1052,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           });
 
           console.log(
-            `✅ Total calculated: ${totals.total} ${totals.currency}`
+            `✅ Total calculated: ${totals.total} ${totals.currency}`,
           );
           return totals;
         } catch (error) {
@@ -1065,7 +1068,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
       return result;
     },
-    [user, cartItems, functions]
+    [user, cartItems, functions],
   );
 
   const backgroundRefreshTotals = useCallback(() => {
@@ -1091,7 +1094,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     (
       productId: string,
       productData: Record<string, unknown>,
-      quantity: number
+      quantity: number,
     ) => {
       clearOptimisticUpdate(productId);
 
@@ -1099,7 +1102,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       setCartItems((currentItems) => {
         // Remove any existing item with this ID
         const existingItems = currentItems.filter(
-          (item) => item.productId !== productId
+          (item) => item.productId !== productId,
         );
 
         // Mark as optimistic
@@ -1147,8 +1150,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       cartProductIds,
       clearOptimisticUpdate,
       buildProductFromCartData,
+      updateLocalProfileField,
       createCartItem,
-    ]
+    ],
   );
 
   const rollbackOptimisticUpdate = useCallback(
@@ -1168,7 +1172,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
       console.log("🔄 Rolled back optimistic update:", productId);
     },
-    [cartProductIds]
+    [cartProductIds],
   );
 
   const addProductToCart = useCallback(
@@ -1176,7 +1180,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       product: Product,
       quantity: number = 1,
       selectedColor?: string,
-      attributes?: CartAttributes
+      attributes?: CartAttributes,
     ): Promise<string> => {
       if (!user) return "Please log in first";
       if (!db) return "Loading..."; // Guard for lazy loading
@@ -1193,18 +1197,28 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         const productData = buildProductDataForCart(
           product,
           selectedColor,
-          attributes
+          attributes,
         );
 
-          // ✅ Validate before writing
-  const requiredFields = ['productId', 'productName', 'unitPrice', 'availableStock', 'sellerId', 'sellerName'];
-  for (const field of requiredFields) {
-    const val = productData[field];
-    if (val === null || val === undefined || String(val).trim() === '') {
-      console.error(`❌ Cannot add to cart: missing field "${field}"`, productData);
-      return `Product data incomplete, cannot add to cart`;
-    }
-  }
+        // ✅ Validate before writing
+        const requiredFields = [
+          "productId",
+          "productName",
+          "unitPrice",
+          "availableStock",
+          "sellerId",
+          "sellerName",
+        ];
+        for (const field of requiredFields) {
+          const val = productData[field];
+          if (val === null || val === undefined || String(val).trim() === "") {
+            console.error(
+              `❌ Cannot add to cart: missing field "${field}"`,
+              productData,
+            );
+            return `Product data incomplete, cannot add to cart`;
+          }
+        }
 
         // ✅ STEP 2: Apply optimistic update for instant feedback
         applyOptimisticAdd(product.id, productData, quantity);
@@ -1266,7 +1280,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       rollbackOptimisticUpdate,
       backgroundRefreshTotals,
       getProductShopId,
-    ]
+    ],
   );
 
   const addToCartById = useCallback(
@@ -1274,7 +1288,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       productId: string,
       quantity: number = 1,
       selectedColor?: string,
-      attributes?: CartAttributes
+      attributes?: CartAttributes,
     ): Promise<string> => {
       if (!user) return "Please log in first";
       if (!db) return "Loading..."; // Guard for lazy loading
@@ -1302,7 +1316,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         return "Failed to add to cart";
       }
     },
-    [user, db, addProductToCart]
+    [user, db, addProductToCart],
   );
 
   // ========================================================================
@@ -1323,7 +1337,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
       // Remove from items list
       setCartItems((items) =>
-        items.filter((item) => item.productId !== productId)
+        items.filter((item) => item.productId !== productId),
       );
 
       // Set timeout
@@ -1334,7 +1348,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
       optimisticTimeoutsRef.current.set(productId, timeout);
     },
-    [cartProductIds]
+    [cartProductIds],
   );
 
   const rollbackOptimisticRemove = useCallback(
@@ -1350,7 +1364,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       if (user && db) {
         try {
           const docSnap = await getDoc(
-            doc(db, "users", user.uid, "cart", productId)
+            doc(db, "users", user.uid, "cart", productId),
           );
           if (docSnap.exists()) {
             const newIds = new Set(cartProductIds);
@@ -1363,7 +1377,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         }
       }
     },
-    [user, db, cartProductIds]
+    [user, db, cartProductIds],
   );
 
   const removeFromCart = useCallback(
@@ -1373,7 +1387,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
       // Capture item BEFORE optimistic remove clears it (needed for rollback + shopId)
       const localItem = cartItemsRef.current.find(
-        (item) => item.productId === productId
+        (item) => item.productId === productId,
       );
       const shopId = localItem?.isShop ? localItem.sellerId : null;
 
@@ -1391,7 +1405,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         userActivityService.trackRemoveFromCart({
           productId,
           shopId: shopId || undefined,
-
         });
 
         metricsEventService.logCartRemoved({
@@ -1424,7 +1437,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       applyOptimisticRemove,
       rollbackOptimisticRemove,
       backgroundRefreshTotals,
-    ]
+    ],
   );
 
   // ========================================================================
@@ -1460,7 +1473,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         return newItems;
       });
     },
-    []
+    [],
   );
 
   const updateQuantity = useCallback(
@@ -1519,7 +1532,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       removeFromCart,
       applyOptimisticQuantityChange,
       backgroundRefreshTotals,
-    ]
+    ],
   );
 
   // ========================================================================
@@ -1537,7 +1550,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         const shopIds: Record<string, string | null> = {};
         for (const productId of productIds) {
           const localItem = cartItemsRef.current.find(
-            (item) => item.productId === productId
+            (item) => item.productId === productId,
           );
           shopIds[productId] = localItem?.isShop ? localItem.sellerId : null;
         }
@@ -1573,12 +1586,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         return "Failed to remove products";
       }
     },
-    [
-      user,
-      db,
-      applyOptimisticRemove,
-      backgroundRefreshTotals,
-    ]
+    [user, db, applyOptimisticRemove, backgroundRefreshTotals],
   );
 
   // ========================================================================
@@ -1596,7 +1604,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       const cartQuery = query(
         collection(db, "users", user.uid, "cart"),
         orderBy("addedAt", "desc"),
-        limit(ITEMS_PER_PAGE)
+        limit(ITEMS_PER_PAGE),
       );
 
       const snapshot = await getDocsFromServer(cartQuery);
@@ -1608,7 +1616,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         (item) =>
           item.isOptimistic &&
           !serverIds.has(item.productId) &&
-          !optimisticCacheRef.current.get(item.productId)?._deleted
+          !optimisticCacheRef.current.get(item.productId)?._deleted,
       );
 
       await buildCartItemsFromDocs(snapshot.docs);
@@ -1669,7 +1677,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       }
       return item;
     });
-  }; 
+  };
 
   // ========================================================================
   // VALIDATION
@@ -1678,7 +1686,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   const validateForPayment = useCallback(
     async (
       selectedProductIds: string[],
-      reserveStock: boolean = false
+      reserveStock: boolean = false,
     ): Promise<{
       isValid: boolean;
       errors: Record<string, ValidationMessage>;
@@ -1716,7 +1724,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
         const validateCartCheckoutFunction = httpsCallable(
           functions,
-          "validateCartCheckout"
+          "validateCartCheckout",
         );
 
         const result = await validateCartCheckoutFunction({
@@ -1743,7 +1751,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         };
       }
     },
-    [cartItems, functions]
+    [cartItems, functions],
   );
 
   const updateCartCacheFromValidation = useCallback(
@@ -1752,7 +1760,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
       try {
         console.log(
-          `🔄 Updating cart cache for ${validatedItems.length} items...`
+          `🔄 Updating cart cache for ${validatedItems.length} items...`,
         );
 
         const updates = validatedItems.map((item) => ({
@@ -1775,7 +1783,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
         const updateCartCacheFunction = httpsCallable(
           functions,
-          "updateCartCache"
+          "updateCartCache",
         );
 
         const result = await updateCartCacheFunction({
@@ -1792,7 +1800,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         return false;
       }
     },
-    [user, functions]
+    [user, functions],
   );
 
   // ========================================================================
@@ -1814,7 +1822,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         let cartQuery = query(
           collection(db, "users", user.uid, "cart"),
           orderBy("addedAt", "desc"),
-          limit(ITEMS_PER_PAGE)
+          limit(ITEMS_PER_PAGE),
         );
 
         if (lastDocumentRef.current) {
@@ -1849,16 +1857,14 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         if (newItems.length > 0) {
           setCartItems((currentItems) => {
             const existingIds = new Set(
-              currentItems.map((item) => item.productId)
+              currentItems.map((item) => item.productId),
             );
             const uniqueNewItems = newItems.filter(
-              (item) => !existingIds.has(item.productId)
+              (item) => !existingIds.has(item.productId),
             );
 
             if (uniqueNewItems.length === 0) {
-              console.log(
-                `⚠️ All ${newItems.length} items already loaded`
-              );
+              console.log(`⚠️ All ${newItems.length} items already loaded`);
               return currentItems;
             }
 
@@ -1868,7 +1874,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
             console.log(
               `✅ Loaded ${uniqueNewItems.length} more items (${
                 newItems.length - uniqueNewItems.length
-              } duplicates skipped)`
+              } duplicates skipped)`,
             );
             return allItems;
           });
@@ -1958,7 +1964,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         if (typeof cancelIdleCallback !== "undefined") {
           cancelIdleCallback(deferredCartInitRef.current as number);
         } else {
-          clearTimeout(deferredCartInitRef.current as ReturnType<typeof setTimeout>);
+          clearTimeout(
+            deferredCartInitRef.current as ReturnType<typeof setTimeout>,
+          );
         }
         deferredCartInitRef.current = null;
       }
@@ -1994,7 +2002,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       isLoadingMore,
       hasMore,
       isInitialized,
-    ]
+    ],
   );
 
   // Actions context - stable references, no re-renders
@@ -2024,7 +2032,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       validateForPayment,
       updateCartCacheFromValidation,
       refresh,
-    ]
+    ],
   );
 
   // Combined context for backward compatibility
@@ -2033,7 +2041,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       ...stateValue,
       ...actionsValue,
     }),
-    [stateValue, actionsValue]
+    [stateValue, actionsValue],
   );
 
   return (

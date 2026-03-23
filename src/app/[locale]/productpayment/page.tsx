@@ -134,7 +134,7 @@ const loadGoogleMapsScript = (): Promise<void> => {
     }
 
     const existingScript = document.querySelector(
-      'script[src*="maps.googleapis.com"]'
+      'script[src*="maps.googleapis.com"]',
     );
     if (existingScript) {
       existingScript.addEventListener("load", () => resolve());
@@ -177,7 +177,7 @@ const LocationPickerModal: React.FC<{
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const markerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(
-    null
+    null,
   );
 
   useEffect(() => {
@@ -186,7 +186,7 @@ const LocationPickerModal: React.FC<{
     const initializeMap = async () => {
       try {
         const { AdvancedMarkerElement } = (await google.maps.importLibrary(
-          "marker"
+          "marker",
         )) as google.maps.MarkerLibrary;
 
         const defaultCenter = { lat: 35.1855, lng: 33.3823 };
@@ -443,12 +443,12 @@ const DeliveryOption: React.FC<{
             ? "border-gray-700 bg-gray-800/50 opacity-50 cursor-not-allowed"
             : "border-gray-200 bg-gray-100/50 opacity-50 cursor-not-allowed"
           : selected
-          ? isDarkMode
-            ? "border-blue-500 bg-blue-500/10 shadow-lg"
-            : "border-blue-500 bg-blue-50 shadow-lg"
-          : isDarkMode
-          ? "border-gray-700 hover:border-gray-600 hover:bg-gray-700/50"
-          : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+            ? isDarkMode
+              ? "border-blue-500 bg-blue-500/10 shadow-lg"
+              : "border-blue-500 bg-blue-50 shadow-lg"
+            : isDarkMode
+              ? "border-gray-700 hover:border-gray-600 hover:bg-gray-700/50"
+              : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
       }`}
     >
       <div className="flex items-center justify-between">
@@ -458,8 +458,8 @@ const DeliveryOption: React.FC<{
               selected
                 ? "bg-blue-500/20"
                 : isDarkMode
-                ? "bg-gray-700"
-                : "bg-gray-100"
+                  ? "bg-gray-700"
+                  : "bg-gray-100"
             }`}
           >
             {icon}
@@ -490,8 +490,8 @@ const DeliveryOption: React.FC<{
               price === 0
                 ? "text-green-500"
                 : isDarkMode
-                ? "text-white"
-                : "text-gray-900"
+                  ? "text-white"
+                  : "text-gray-900"
             }`}
           >
             {price === 0 ? "Ücretsiz" : `${price.toFixed(2)} TL`}
@@ -544,9 +544,12 @@ function ProductPaymentPageContent() {
     code: string | null;
   } | null>(null);
   const [useFreeShipping, setUseFreeShipping] = useState(false);
-  const [selectedBenefitId, setSelectedBenefitId] = useState<string | null>(null);
+  const [selectedBenefitId, setSelectedBenefitId] = useState<string | null>(
+    null,
+  );
   const [couponDiscount, setCouponDiscount] = useState(0);
-  const [freeShippingBenefit, setFreeShippingBenefit] = useState<UserBenefit | null>(null);
+  const [freeShippingBenefit, setFreeShippingBenefit] =
+    useState<UserBenefit | null>(null);
 
   // Delivery settings from Firestore
   const [deliverySettings, setDeliverySettings] = useState<{
@@ -570,7 +573,7 @@ function ProductPaymentPageContent() {
 
   const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(
-    null
+    null,
   );
 
   const [showCityDropdown, setShowCityDropdown] = useState(false);
@@ -580,38 +583,40 @@ function ProductPaymentPageContent() {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // ============================================================================
-// Phone number formatting utilities (matching Flutter implementation)
-// Format: (5XX) XXX XX XX for Turkish phone numbers
-// ============================================================================
+  // Phone number formatting utilities (matching Flutter implementation)
+  // Format: (5XX) XXX XX XX for Turkish phone numbers
+  // ============================================================================
 
-const formatPhoneNumber = (value: string): string => {
-  const digitsOnly = value.replace(/\D/g, '');
-  const limited = digitsOnly.slice(0, 10);
-  
-  let formatted = '';
-  for (let i = 0; i < limited.length; i++) {
-    if (i === 0) formatted += '(';
-    formatted += limited[i];
-    if (i === 2) formatted += ') ';
-    if (i === 5) formatted += ' ';
-    if (i === 7) formatted += ' ';
-  }
-  
-  return formatted;
-};
+  const formatPhoneNumber = (value: string): string => {
+    const digitsOnly = value.replace(/\D/g, "");
+    const limited = digitsOnly.slice(0, 10);
 
-const formatPhoneForDisplay = (phone: string): string => {
-  if (!phone) return '';
-  const digitsOnly = phone.replace(/\D/g, '');
-  const digits = digitsOnly.startsWith('0') ? digitsOnly.slice(1) : digitsOnly;
-  if (digits.length !== 10) return phone;
-  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)} ${digits.slice(6, 8)} ${digits.slice(8, 10)}`;
-};
+    let formatted = "";
+    for (let i = 0; i < limited.length; i++) {
+      if (i === 0) formatted += "(";
+      formatted += limited[i];
+      if (i === 2) formatted += ") ";
+      if (i === 5) formatted += " ";
+      if (i === 7) formatted += " ";
+    }
 
-const isValidPhoneNumber = (phone: string): boolean => {
-  const digitsOnly = phone.replace(/\D/g, '');
-  return digitsOnly.length === 10 && digitsOnly.startsWith('5');
-};
+    return formatted;
+  };
+
+  const formatPhoneForDisplay = (phone: string): string => {
+    if (!phone) return "";
+    const digitsOnly = phone.replace(/\D/g, "");
+    const digits = digitsOnly.startsWith("0")
+      ? digitsOnly.slice(1)
+      : digitsOnly;
+    if (digits.length !== 10) return phone;
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)} ${digits.slice(6, 8)} ${digits.slice(8, 10)}`;
+  };
+
+  const isValidPhoneNumber = (phone: string): boolean => {
+    const digitsOnly = phone.replace(/\D/g, "");
+    return digitsOnly.length === 10 && digitsOnly.startsWith("5");
+  };
 
   // ========================================================================
   // DISCOUNT CALCULATIONS (matching Flutter's ProductPaymentProvider)
@@ -624,7 +629,7 @@ const isValidPhoneNumber = (phone: string): boolean => {
       // Cap discount at cart total (can't go negative)
       return coupon.amount > cartTotal ? cartTotal : coupon.amount;
     },
-    []
+    [],
   );
 
   // ✅ Find free shipping benefit (matching Flutter's _findFreeShippingBenefit)
@@ -635,7 +640,7 @@ const isValidPhoneNumber = (phone: string): boolean => {
       // Use specific benefit ID if provided
       if (benefitId) {
         const specificBenefit = benefits.find(
-          (b) => b.id === benefitId && b.isValid
+          (b) => b.id === benefitId && b.isValid,
         );
         if (specificBenefit) return specificBenefit;
       }
@@ -643,11 +648,11 @@ const isValidPhoneNumber = (phone: string): boolean => {
       // Fallback to first available
       return (
         benefits.find(
-          (b) => b.isValid && b.type === BenefitType.FreeShipping
+          (b) => b.isValid && b.type === BenefitType.FreeShipping,
         ) || null
       );
     },
-    [useFreeShipping]
+    [useFreeShipping],
   );
 
   // ✅ Get delivery price (matching Flutter's getDeliveryPrice)
@@ -726,7 +731,7 @@ const isValidPhoneNumber = (phone: string): boolean => {
     const detectDarkMode = () => {
       const htmlElement = document.documentElement;
       const darkModeMediaQuery = window.matchMedia(
-        "(prefers-color-scheme: dark)"
+        "(prefers-color-scheme: dark)",
       );
 
       const isDark =
@@ -775,7 +780,7 @@ const isValidPhoneNumber = (phone: string): boolean => {
     if (useFreeShipping && activeFreeShippingBenefits.length > 0) {
       const benefit = findFreeShippingBenefit(
         selectedBenefitId,
-        activeFreeShippingBenefits
+        activeFreeShippingBenefits,
       );
       setFreeShippingBenefit(benefit);
     }
@@ -879,7 +884,7 @@ const isValidPhoneNumber = (phone: string): boolean => {
         }
 
         const selectedCartItems = firebaseCartItems.filter((item) =>
-          selectedIds.includes(item.productId)
+          selectedIds.includes(item.productId),
         );
 
         if (selectedCartItems.length === 0) {
@@ -916,8 +921,7 @@ const isValidPhoneNumber = (phone: string): boolean => {
             quantity: item.quantity,
             productName: item.product?.productName,
             currency: item.product?.currency || "TL",
-            calculatedUnitPrice:
-              pricing?.unitPrice || item.product?.price || 0,
+            calculatedUnitPrice: pricing?.unitPrice || item.product?.price || 0,
             calculatedTotal:
               pricing?.total || (item.product?.price || 0) * item.quantity,
             isBundleItem: pricing?.isBundleItem || false,
@@ -934,7 +938,7 @@ const isValidPhoneNumber = (phone: string): boolean => {
 
         console.log(
           "✅ Items with server-calculated pricing:",
-          itemsWithPricing
+          itemsWithPricing,
         );
 
         setCartItems(itemsWithPricing);
@@ -1001,7 +1005,10 @@ const isValidPhoneNumber = (phone: string): boolean => {
       if (discountData.useFreeShipping) {
         setUseFreeShipping(true);
         setSelectedBenefitId(discountData.benefitId);
-        console.log("✅ Free shipping enabled, benefit:", discountData.benefitId);
+        console.log(
+          "✅ Free shipping enabled, benefit:",
+          discountData.benefitId,
+        );
       }
     } catch (error) {
       console.error("❌ Failed to parse discount data:", error);
@@ -1036,9 +1043,9 @@ const isValidPhoneNumber = (phone: string): boolean => {
 
   const handleInputChange = (
     field: keyof FormData,
-    value: string | boolean | { latitude: number; longitude: number } | null
+    value: string | boolean | { latitude: number; longitude: number } | null,
   ) => {
-    if (field === 'phoneNumber' && typeof value === 'string') {
+    if (field === "phoneNumber" && typeof value === "string") {
       // Apply phone number formatting (matching Flutter's _PhoneNumberFormatter)
       const formattedPhone = formatPhoneNumber(value);
       setFormData((prev) => ({ ...prev, [field]: formattedPhone }));
@@ -1052,7 +1059,7 @@ const isValidPhoneNumber = (phone: string): boolean => {
 
   const handleAddressSelect = (addressId: string | null) => {
     setSelectedAddressId(addressId);
-  
+
     if (addressId) {
       const address = savedAddresses.find((a) => a.id === addressId);
       if (address) {
@@ -1066,7 +1073,6 @@ const isValidPhoneNumber = (phone: string): boolean => {
           location: address.location || null,
         }));
       }
-    
     } else {
       setFormData((prev) => ({
         ...prev,
@@ -1090,14 +1096,16 @@ const isValidPhoneNumber = (phone: string): boolean => {
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
-  
+
     if (!formData.addressLine1.trim()) {
       newErrors.addressLine1 = t("fieldRequired");
     }
     if (!formData.phoneNumber.trim()) {
       newErrors.phoneNumber = t("fieldRequired");
     } else if (!isValidPhoneNumber(formData.phoneNumber)) {
-      newErrors.phoneNumber = t("invalidPhoneNumber") || "Please enter a valid phone number starting with 5";
+      newErrors.phoneNumber =
+        t("invalidPhoneNumber") ||
+        "Please enter a valid phone number starting with 5";
     }
     if (!formData.city.trim()) {
       newErrors.city = t("fieldRequired");
@@ -1183,7 +1191,9 @@ const isValidPhoneNumber = (phone: string): boolean => {
         saveAddress: formData.saveAddress,
         // ✅ Add discount data (matching Flutter)
         couponId: appliedCoupon?.id ?? null,
-        freeShippingBenefitId: useFreeShipping ? freeShippingBenefit?.id ?? selectedBenefitId : null,
+        freeShippingBenefitId: useFreeShipping
+          ? (freeShippingBenefit?.id ?? selectedBenefitId)
+          : null,
         clientDeliveryPrice: getDeliveryPrice(), // Original delivery price before free shipping
       };
 
@@ -1202,7 +1212,7 @@ const isValidPhoneNumber = (phone: string): boolean => {
         orderNumber,
         customerName,
         customerEmail,
-        customerPhone: formData.phoneNumber,
+        customerPhone: normalizedPhone,
         cartData,
       });
 
@@ -1221,7 +1231,7 @@ const isValidPhoneNumber = (phone: string): boolean => {
         `?gatewayUrl=${encodeURIComponent(initData.gatewayUrl)}` +
         `&orderNumber=${encodeURIComponent(orderNumber)}` +
         `&paymentParams=${encodeURIComponent(
-          JSON.stringify(initData.paymentParams)
+          JSON.stringify(initData.paymentParams),
         )}`;
 
       const targetPath = `/isbankpayment${searchParamsString}`;
@@ -1248,8 +1258,8 @@ const isValidPhoneNumber = (phone: string): boolean => {
           const displayError = errorMessage.includes("already been used")
             ? t("couponAlreadyUsed") || "This coupon has already been used"
             : errorMessage.includes("expired")
-            ? t("couponExpired") || "This coupon has expired"
-            : t("couponNotFound") || "Coupon not found";
+              ? t("couponExpired") || "This coupon has expired"
+              : t("couponNotFound") || "Coupon not found";
 
           alert(displayError);
           setIsProcessing(false);
@@ -1437,9 +1447,9 @@ const isValidPhoneNumber = (phone: string): boolean => {
                     useFreeShipping && freeShippingBenefit
                       ? 0
                       : totalPrice >=
-                        (deliverySettings?.normal.freeThreshold ?? 2000)
-                      ? 0
-                      : deliverySettings?.normal.price ?? 150
+                          (deliverySettings?.normal.freeThreshold ?? 2000)
+                        ? 0
+                        : (deliverySettings?.normal.price ?? 150)
                   }
                   selected={selectedDeliveryOption === "normal"}
                   onSelect={() => handleDeliveryOptionChange("normal")}
@@ -1456,7 +1466,7 @@ const isValidPhoneNumber = (phone: string): boolean => {
                     totalPrice >=
                     (deliverySettings?.express.freeThreshold ?? 10000)
                       ? 0
-                      : deliverySettings?.express.price ?? 350
+                      : (deliverySettings?.express.price ?? 350)
                   }
                   selected={selectedDeliveryOption === "express"}
                   onSelect={() => handleDeliveryOptionChange("express")}
@@ -1548,8 +1558,8 @@ const isValidPhoneNumber = (phone: string): boolean => {
                                   ? "border-blue-500 bg-blue-500/10 shadow-lg"
                                   : "border-blue-500 bg-blue-50 shadow-lg"
                                 : isDarkMode
-                                ? "border-gray-700 hover:border-gray-600 hover:bg-gray-700/50"
-                                : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                                  ? "border-gray-700 hover:border-gray-600 hover:bg-gray-700/50"
+                                  : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
                             }`}
                           >
                             <input
@@ -1595,8 +1605,8 @@ const isValidPhoneNumber = (phone: string): boolean => {
                                 ? "border-blue-500 bg-blue-500/10 shadow-lg"
                                 : "border-blue-500 bg-blue-50 shadow-lg"
                               : isDarkMode
-                              ? "border-gray-700 hover:border-gray-600 hover:bg-gray-700/50"
-                              : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                                ? "border-gray-700 hover:border-gray-600 hover:bg-gray-700/50"
+                                : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
                           }`}
                         >
                           <input
@@ -1647,8 +1657,8 @@ const isValidPhoneNumber = (phone: string): boolean => {
                               errors.addressLine1
                                 ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
                                 : isDarkMode
-                                ? "border-gray-600 bg-gray-700/50 text-white focus:border-blue-500 focus:ring-blue-500/20"
-                                : "border-gray-300 bg-white text-gray-900 focus:border-blue-500 focus:ring-blue-500/20"
+                                  ? "border-gray-600 bg-gray-700/50 text-white focus:border-blue-500 focus:ring-blue-500/20"
+                                  : "border-gray-300 bg-white text-gray-900 focus:border-blue-500 focus:ring-blue-500/20"
                             } focus:outline-none focus:ring-4`}
                             placeholder={t("enterStreetAddress")}
                           />
@@ -1719,14 +1729,16 @@ const isValidPhoneNumber = (phone: string): boolean => {
                               errors.phoneNumber
                                 ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
                                 : isDarkMode
-                                ? "border-gray-600 bg-gray-700/50 text-white focus:border-blue-500 focus:ring-blue-500/20"
-                                : "border-gray-300 bg-white text-gray-900 focus:border-blue-500 focus:ring-blue-500/20"
+                                  ? "border-gray-600 bg-gray-700/50 text-white focus:border-blue-500 focus:ring-blue-500/20"
+                                  : "border-gray-300 bg-white text-gray-900 focus:border-blue-500 focus:ring-blue-500/20"
                             } focus:outline-none focus:ring-4`}
                             placeholder="(5__) ___ __ __"
                           />
                         </div>
                         {/* Format hint - outside the relative group */}
-                        <p className={`mt-1 text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                        <p
+                          className={`mt-1 text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                        >
                           {t("phoneFormatHint") || "Format: (5XX) XXX XX XX"}
                         </p>
                         {errors.phoneNumber && (
@@ -1752,8 +1764,8 @@ const isValidPhoneNumber = (phone: string): boolean => {
                             errors.city
                               ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
                               : isDarkMode
-                              ? "border-gray-600 bg-gray-700/50 text-white focus:border-blue-500 focus:ring-blue-500/20"
-                              : "border-gray-300 bg-white text-gray-900 focus:border-blue-500 focus:ring-blue-500/20"
+                                ? "border-gray-600 bg-gray-700/50 text-white focus:border-blue-500 focus:ring-blue-500/20"
+                                : "border-gray-300 bg-white text-gray-900 focus:border-blue-500 focus:ring-blue-500/20"
                           } focus:outline-none focus:ring-4`}
                         >
                           <span
@@ -1763,8 +1775,8 @@ const isValidPhoneNumber = (phone: string): boolean => {
                                   ? "text-white"
                                   : "text-gray-900"
                                 : isDarkMode
-                                ? "text-gray-500"
-                                : "text-gray-500"
+                                  ? "text-gray-500"
+                                  : "text-gray-500"
                             }
                           >
                             {formData.city || t("selectYourCity")}
@@ -1835,8 +1847,8 @@ const isValidPhoneNumber = (phone: string): boolean => {
                           errors.location
                             ? "border-red-500"
                             : isDarkMode
-                            ? "border-gray-600 bg-gray-700/50 hover:bg-gray-600/50"
-                            : "border-gray-300 bg-white hover:bg-gray-50"
+                              ? "border-gray-600 bg-gray-700/50 hover:bg-gray-600/50"
+                              : "border-gray-300 bg-white hover:bg-gray-50"
                         } ${
                           !mapsLoaded ? "opacity-50 cursor-not-allowed" : ""
                         }`}
@@ -1847,8 +1859,8 @@ const isValidPhoneNumber = (phone: string): boolean => {
                               formData.location
                                 ? "bg-green-500/20"
                                 : isDarkMode
-                                ? "bg-blue-500/20"
-                                : "bg-blue-50"
+                                  ? "bg-blue-500/20"
+                                  : "bg-blue-50"
                             } group-hover:scale-105`}
                           >
                             {formData.location ? (
@@ -1872,8 +1884,8 @@ const isValidPhoneNumber = (phone: string): boolean => {
                               {formData.location
                                 ? t("locationPinned")
                                 : !mapsLoaded
-                                ? t("loadingMaps")
-                                : t("pinYourExactLocation")}
+                                  ? t("loadingMaps")
+                                  : t("pinYourExactLocation")}
                             </p>
                             {formData.location ? (
                               <p
@@ -1999,8 +2011,8 @@ const isValidPhoneNumber = (phone: string): boolean => {
                         {(typeof item.calculatedUnitPrice === "number"
                           ? item.calculatedUnitPrice
                           : typeof item.price === "number"
-                          ? item.price
-                          : 0
+                            ? item.price
+                            : 0
                         ).toFixed(2)}{" "}
                         {item.currency || "TL"}
                       </p>
@@ -2077,8 +2089,8 @@ const isValidPhoneNumber = (phone: string): boolean => {
                         useFreeShipping && freeShippingBenefit
                           ? "text-green-500"
                           : isDarkMode
-                          ? "text-gray-400"
-                          : "text-gray-500"
+                            ? "text-gray-400"
+                            : "text-gray-500"
                       }
                     />
                     <span
@@ -2086,8 +2098,8 @@ const isValidPhoneNumber = (phone: string): boolean => {
                         useFreeShipping && freeShippingBenefit
                           ? "text-green-600 font-medium"
                           : isDarkMode
-                          ? "text-gray-400"
-                          : "text-gray-600"
+                            ? "text-gray-400"
+                            : "text-gray-600"
                       }`}
                     >
                       {t("shipping") || "Shipping"}
@@ -2098,8 +2110,8 @@ const isValidPhoneNumber = (phone: string): boolean => {
                       getEffectiveDeliveryPrice() === 0
                         ? "text-green-500 font-semibold"
                         : isDarkMode
-                        ? "text-white"
-                        : "text-gray-900"
+                          ? "text-white"
+                          : "text-gray-900"
                     }`}
                   >
                     {getEffectiveDeliveryPrice() === 0
