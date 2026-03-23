@@ -212,7 +212,7 @@ export default function OrdersPage() {
   const { user, isLoading: authLoading } = useUser();
   const t = useTranslations("Orders");
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState<OrderTab>("sold");
+  const [activeTab, setActiveTab] = useState<OrderTab>("bought");
   const [filters, setFilters] = useState<FilterOptions>({ searchQuery: "" });
   const [isDarkMode, setIsDarkMode] = useState(false);
 
@@ -788,7 +788,7 @@ export default function OrdersPage() {
           {/* Row 1: Nav + Title */}
           <div className="flex items-center gap-3 px-3 sm:px-6 pt-3 pb-2">
             <button
-              onClick={() => router.back()}
+              onClick={() => router.push("/profile")}
               className={`w-9 h-9 flex items-center justify-center border rounded-xl transition-colors flex-shrink-0 ${
                 isDarkMode
                   ? "bg-gray-800 border-gray-700 hover:bg-gray-700"
@@ -858,37 +858,6 @@ export default function OrdersPage() {
             >
               <button
                 onClick={() => {
-                  setActiveTab("sold");
-                  dismissKeyboard();
-                }}
-                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
-                  activeTab === "sold"
-                    ? isDarkMode
-                      ? "bg-gray-700 text-white shadow-sm"
-                      : "bg-white text-gray-900 shadow-sm"
-                    : isDarkMode
-                      ? "text-gray-400 hover:text-gray-200"
-                      : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                <Package className="w-3.5 h-3.5" />
-                {t("soldProducts") || "Sold"}
-                {soldOrders.length > 0 && (
-                  <span
-                    className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                      activeTab === "sold"
-                        ? "bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400"
-                        : isDarkMode
-                          ? "bg-gray-700 text-gray-400"
-                          : "bg-gray-200 text-gray-500"
-                    }`}
-                  >
-                    {soldOrders.length}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={() => {
                   setActiveTab("bought");
                   dismissKeyboard();
                 }}
@@ -915,6 +884,37 @@ export default function OrdersPage() {
                     }`}
                   >
                     {boughtOrders.length}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab("sold");
+                  dismissKeyboard();
+                }}
+                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                  activeTab === "sold"
+                    ? isDarkMode
+                      ? "bg-gray-700 text-white shadow-sm"
+                      : "bg-white text-gray-900 shadow-sm"
+                    : isDarkMode
+                      ? "text-gray-400 hover:text-gray-200"
+                      : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                <Package className="w-3.5 h-3.5" />
+                {t("soldProducts") || "Sold"}
+                {soldOrders.length > 0 && (
+                  <span
+                    className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                      activeTab === "sold"
+                        ? "bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400"
+                        : isDarkMode
+                          ? "bg-gray-700 text-gray-400"
+                          : "bg-gray-200 text-gray-500"
+                    }`}
+                  >
+                    {soldOrders.length}
                   </span>
                 )}
               </button>

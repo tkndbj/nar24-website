@@ -1236,7 +1236,7 @@ function ProductPaymentPageContent() {
 
       const targetPath = `/isbankpayment${searchParamsString}`;
       console.log("Navigating to:", targetPath);
-      router.push(targetPath);
+      router.replace(targetPath);
     } catch (error: unknown) {
       console.error("Payment error:", error);
 

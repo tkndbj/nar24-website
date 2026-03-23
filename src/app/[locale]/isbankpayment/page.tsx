@@ -159,7 +159,7 @@ export default function IsbankPaymentPage() {
 
     // Show success message
     setTimeout(() => {
-      router.push(`/orders?success=true&orderId=${orderId}`);
+      router.replace(`/orders?success=true&orderId=${orderId}`);
     }, 1500);
   };
 

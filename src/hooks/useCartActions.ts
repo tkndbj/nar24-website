@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useCart, buildProductDataForCart } from "@/context/CartProvider";
+import { useCart } from "@/context/CartProvider";
 import { useUser } from "@/context/UserProvider";
 import { Product } from "@/app/models/Product";
 
@@ -124,19 +124,15 @@ export function useCartActions(
           }
         });
 
-        const productData = buildProductDataForCart(
-          product,
-          selectedOptions.selectedColor as string | undefined,
-          undefined,
-        );
-
         const buyNowItem = {
-          ...productData,
+          productId: product.id,
+          productName: product.productName,
+          unitPrice: product.price,
+          currency: product.currency || "TL",
           quantity: selectedOptions.quantity || 1,
-          selectedAttributes:
-            Object.keys(selectedAttributes).length > 0
-              ? selectedAttributes
-              : undefined,
+          ...(Object.keys(selectedAttributes).length > 0 && {
+            selectedAttributes,
+          }),
         };
 
         const encodedData = encodeURIComponent(JSON.stringify(buyNowItem));
