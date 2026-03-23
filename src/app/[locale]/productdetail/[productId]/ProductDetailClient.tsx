@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useLocale } from "next-intl";
 import {
   ArrowLeft,
   Share2,

@@ -3,7 +3,6 @@
 
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getTranslations } from "next-intl/server";
 import {
   fetchAllProductData,
   fetchProductOnly,
@@ -59,8 +58,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function ProductDetailPage({ params }: Props) {
   const { productId, locale } = await params;
   const normalizedId = normalizeProductId(productId);
-  const t = await getTranslations({ locale });
-
   const data = await fetchAllProductData(normalizedId);
 
   if (!data) {
