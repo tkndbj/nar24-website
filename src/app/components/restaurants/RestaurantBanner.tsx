@@ -2,14 +2,10 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { useLocale } from "next-intl";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  onSnapshot,
-} from "firebase/firestore";
+import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -18,6 +14,7 @@ interface BannerItem {
   id: string;
   imageUrl: string;
   title: string;
+  linkedRestaurantId?: string;
 }
 
 const BANNER_INTERVAL = 5000;
@@ -27,7 +24,7 @@ const BANNER_INTERVAL = 5000;
 function BannerSkeleton() {
   return (
     <div className="relative w-full aspect-[16/7] sm:aspect-[16/6] overflow-hidden rounded-2xl bg-gray-200 animate-pulse">
-      <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-shimmer" />
+      <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200" />
     </div>
   );
 }
@@ -60,42 +57,43 @@ function BannerFallback() {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function RestaurantBanner() {
+  const router = useRouter();
+  const locale = useLocale();
   const [banners, setBanners] = useState<BannerItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [current, setCurrent] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
 
-  // ── Firestore real-time subscription ────────────────────────────────────────
+  // ── One-time Firestore fetch ──────────────────────────────────────────────
   useEffect(() => {
-    const q = query(
-      collection(db, "restaurant_banners"),
-      where("isActive", "==", true),
-      orderBy("order", "asc"),
-    );
-
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        const items: BannerItem[] = snap.docs
-          .map((d) => ({
-            id: d.id,
-            imageUrl: (d.data().imageUrl as string) ?? "",
-            title: (d.data().title as string) ?? "",
-          }))
-          .filter((b) => b.imageUrl);
-
-        setBanners(items);
-        setLoading(false);
-
-        // Clamp current index if banners were removed
-        setCurrent((prev) =>
-          prev >= items.length ? Math.max(0, items.length - 1) : prev,
+    const fetchBanners = async () => {
+      try {
+        const q = query(
+          collection(db, "restaurant_banners"),
+          where("isActive", "==", true),
+          orderBy("order", "asc"),
         );
-      },
-      () => setLoading(false),
-    );
+        const snap = await getDocs(q);
+        const items: BannerItem[] = snap.docs
+          .map((d) => {
+            const data = d.data();
+            return {
+              id: d.id,
+              imageUrl: (data.imageUrl as string) ?? "",
+              title: (data.title as string) ?? "",
+              linkedRestaurantId: (data.linkedRestaurantId as string) || undefined,
+            };
+          })
+          .filter((b) => b.imageUrl);
+        setBanners(items);
+      } catch {
+        // leave banners empty → renders fallback
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    return () => unsub();
+    fetchBanners();
   }, []);
 
   // ── Navigation ───────────────────────────────────────────────────────────────
@@ -133,13 +131,18 @@ export default function RestaurantBanner() {
       {banners.map((banner, i) => (
         <div
           key={banner.id}
-          className="absolute inset-0"
+          className={`absolute inset-0${banner.linkedRestaurantId ? " cursor-pointer" : ""}`}
           style={{
             opacity: i === current ? 1 : 0,
             transform: i === current ? "scale(1)" : "scale(1.05)",
             transition:
               "opacity 600ms ease-in-out, transform 600ms ease-in-out",
             pointerEvents: i === current ? "auto" : "none",
+          }}
+          onClick={() => {
+            if (banner.linkedRestaurantId) {
+              router.push(`/${locale}/restaurantdetail/${banner.linkedRestaurantId}`);
+            }
           }}
         >
           <Image

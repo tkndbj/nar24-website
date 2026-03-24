@@ -124,12 +124,13 @@ export const FavoriteBasketWidget: React.FC<FavoriteBasketWidgetProps> = ({
       try {
         await deleteFavoriteBasket(basketId);
         setShowDeleteConfirm(null);
+        onBasketChanged?.();
       } catch (error) {
         console.error("Error deleting basket:", error);
         alert("Error deleting basket");
       }
     },
-    [deleteFavoriteBasket]
+    [deleteFavoriteBasket, onBasketChanged]
   );
 
   if (!user) return null;
