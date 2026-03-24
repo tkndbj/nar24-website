@@ -9,108 +9,16 @@ import { Restaurant } from "@/types/Restaurant";
 import { isRestaurantOpen, doesRestaurantDeliver } from "@/utils/restaurant";
 import TypeSenseServiceManager from "@/lib/typesense_service_manager";
 import type { FacetValue } from "@/lib/typesense_restaurant_service";
-import { Star, ChevronLeft, ChevronRight, ArrowUpDown, Search, MapPin } from "lucide-react";
+import { Star, ArrowUpDown, Search, MapPin } from "lucide-react";
 import type { RestaurantSortOption } from "@/lib/typesense_restaurant_service";
 import FilterIcons from "./FilterIcons";
 import FoodLocationPicker from "./FoodLocationPicker";
+import RestaurantBanner from "./RestaurantBanner";
 import { useUser } from "@/context/UserProvider";
 import { FoodAddress } from "@/app/models/FoodAddress";
 
-const BANNER_IMAGES = ["/images/1.png", "/images/2.png", "/images/3.png"];
-const BANNER_INTERVAL = 5000;
-
 interface RestaurantsPageProps {
   restaurants?: Restaurant[];
-}
-
-// ─── Banner Carousel ────────────────────────────────────────────────────────
-
-function BannerCarousel() {
-  const [current, setCurrent] = useState(0);
-  const [isTransitioning, setIsTransitioning] = useState(false);
-
-  const goTo = useCallback(
-    (index: number) => {
-      if (isTransitioning) return;
-      setIsTransitioning(true);
-      setCurrent(index);
-      setTimeout(() => setIsTransitioning(false), 600);
-    },
-    [isTransitioning]
-  );
-
-  const next = useCallback(() => {
-    goTo((current + 1) % BANNER_IMAGES.length);
-  }, [current, goTo]);
-
-  const prev = useCallback(() => {
-    goTo((current - 1 + BANNER_IMAGES.length) % BANNER_IMAGES.length);
-  }, [current, goTo]);
-
-  useEffect(() => {
-    const timer = setInterval(next, BANNER_INTERVAL);
-    return () => clearInterval(timer);
-  }, [next]);
-
-  return (
-    <div className="relative w-full aspect-[16/7] sm:aspect-[16/6] overflow-hidden rounded-2xl group">
-      {BANNER_IMAGES.map((src, i) => (
-        <div
-          key={src}
-          className="absolute inset-0 transition-all duration-600 ease-in-out"
-          style={{
-            opacity: i === current ? 1 : 0,
-            transform: i === current ? "scale(1)" : "scale(1.05)",
-            transitionDuration: "600ms",
-          }}
-        >
-          <Image
-            src={src}
-            alt={`Banner ${i + 1}`}
-            fill
-            className="object-cover"
-            priority={i === 0}
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 90vw, 1400px"
-          />
-        </div>
-      ))}
-
-      {/* Gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
-
-      {/* Navigation arrows */}
-      <button
-        onClick={prev}
-        aria-label="Previous banner"
-        className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/30"
-      >
-        <ChevronLeft className="w-5 h-5" />
-      </button>
-      <button
-        onClick={next}
-        aria-label="Next banner"
-        className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/30"
-      >
-        <ChevronRight className="w-5 h-5" />
-      </button>
-
-      {/* Dots */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-        {BANNER_IMAGES.map((_, i) => (
-          <button
-            key={i}
-            onClick={() => goTo(i)}
-            aria-label={`Go to banner ${i + 1}`}
-            className={`h-2 rounded-full transition-all duration-300 ${
-              i === current
-                ? "w-8 bg-white"
-                : "w-2 bg-white/50 hover:bg-white/70"
-            }`}
-          />
-        ))}
-      </div>
-    </div>
-  );
 }
 
 // ─── Cuisine Pill Button ─────────────────────────────────────────────────────
@@ -492,7 +400,7 @@ export default function RestaurantsPage({ restaurants: serverRestaurants }: Rest
     <main className="flex-1">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Banner */}
-        <BannerCarousel />
+        <RestaurantBanner />
 
         {/* Title + Search + Sort */}
         <div className="mt-8 mb-4 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">

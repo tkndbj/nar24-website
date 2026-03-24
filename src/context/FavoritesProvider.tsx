@@ -1290,13 +1290,110 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
       if (!user) return "Please log in";
 
       try {
-        await deleteDoc(
-          doc(dbRef.current!, `users/${user.uid}/favorite_baskets/${basketId}`)
-        );
+        const db = dbRef.current!;
+        const basketFavCollPath = `users/${user.uid}/favorite_baskets/${basketId}/favorites`;
 
-        // Update local state (no listener to do this)
+        // STEP 1: Get all favorites in the basket's subcollection
+        const basketFavSnap = await getDocs(
+          collection(db, basketFavCollPath)
+        );
+        const basketProductIds = basketFavSnap.docs
+          .map((d) => d.data().productId as string)
+          .filter(Boolean);
+
+        // STEP 2: Determine which product IDs are exclusive to this basket
+        let idsToRemoveFromUserDoc: string[] = [];
+        if (basketProductIds.length > 0) {
+          const idsStillElsewhere = new Set<string>();
+
+          // Check default favorites
+          for (let i = 0; i < basketProductIds.length; i += FIRESTORE_IN_LIMIT) {
+            const chunk = basketProductIds.slice(i, i + FIRESTORE_IN_LIMIT);
+            const defaultSnap = await getDocs(
+              query(
+                collection(db, `users/${user.uid}/favorites`),
+                where("productId", "in", chunk)
+              )
+            );
+            defaultSnap.docs.forEach((d) => {
+              const pid = d.data().productId as string;
+              if (pid) idsStillElsewhere.add(pid);
+            });
+          }
+
+          // Check other baskets
+          const basketsSnap = await getDocs(
+            collection(db, `users/${user.uid}/favorite_baskets`)
+          );
+          for (const bDoc of basketsSnap.docs) {
+            if (bDoc.id === basketId) continue;
+            for (let i = 0; i < basketProductIds.length; i += FIRESTORE_IN_LIMIT) {
+              const chunk = basketProductIds.slice(i, i + FIRESTORE_IN_LIMIT);
+              const favSnap = await getDocs(
+                query(
+                  collection(bDoc.ref, "favorites"),
+                  where("productId", "in", chunk)
+                )
+              );
+              favSnap.docs.forEach((d) => {
+                const pid = d.data().productId as string;
+                if (pid) idsStillElsewhere.add(pid);
+              });
+            }
+          }
+
+          idsToRemoveFromUserDoc = basketProductIds.filter(
+            (id) => !idsStillElsewhere.has(id)
+          );
+        }
+
+        // STEP 3: Atomic batch — delete subcollection docs, update user doc, delete basket
+        // Firestore batch limit is 500; chunk if needed
+        const allDeletes = basketFavSnap.docs;
+        const BATCH_LIMIT = 499; // leave room for the basket doc delete + user doc update
+        for (let i = 0; i < allDeletes.length; i += BATCH_LIMIT) {
+          const chunk = allDeletes.slice(i, i + BATCH_LIMIT);
+          const isLastChunk = i + BATCH_LIMIT >= allDeletes.length;
+
+          const batch = writeBatch(db);
+          chunk.forEach((d) => batch.delete(d.ref));
+
+          if (isLastChunk) {
+            // Delete the basket document itself
+            batch.delete(
+              doc(db, `users/${user.uid}/favorite_baskets/${basketId}`)
+            );
+            // Remove exclusive IDs from favoriteItemIds
+            if (idsToRemoveFromUserDoc.length > 0) {
+              batch.update(doc(db, "users", user.uid), {
+                favoriteItemIds: arrayRemove(...idsToRemoveFromUserDoc),
+              });
+            }
+          }
+
+          await batch.commit();
+        }
+
+        // If basket had no favorites, still need to delete the basket doc
+        if (allDeletes.length === 0) {
+          await deleteDoc(
+            doc(db, `users/${user.uid}/favorite_baskets/${basketId}`)
+          );
+        }
+
+        // STEP 4: Sync local state
         setFavoriteBaskets((prev) => prev.filter((b) => b.id !== basketId));
         basketCacheMap.current.delete(basketId);
+
+        if (idsToRemoveFromUserDoc.length > 0) {
+          setFavoriteIds((prev) => {
+            const next = new Set(prev);
+            idsToRemoveFromUserDoc.forEach((id) => next.delete(id));
+            setFavoriteCount(next.size);
+            updateLocalProfileField("favoriteItemIds", [...next]);
+            return next;
+          });
+        }
 
         if (selectedBasketIdRef.current === basketId) {
           setSelectedBasket(null);
@@ -1309,7 +1406,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         return "Error deleting basket";
       }
     },
-    [user, showSuccessToast, setSelectedBasket]
+    [user, showSuccessToast, setSelectedBasket, updateLocalProfileField]
   );
 
   // ========================================================================
