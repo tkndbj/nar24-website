@@ -158,7 +158,7 @@ export default function RestaurantBanner() {
       ))}
 
       {/* Gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
 
       {/* Navigation arrows — only shown when more than one banner */}
       {banners.length > 1 && (
