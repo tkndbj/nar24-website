@@ -201,7 +201,7 @@ export const PreferenceProduct = React.memo(
     }, [fetchProductDetails]);
 
     /**
-     * Force refresh
+     * Force refresh.
      */
     const refresh = useCallback(async () => {
       // ✅ Clear local cache FIRST
