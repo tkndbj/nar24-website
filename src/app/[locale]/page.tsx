@@ -10,7 +10,6 @@ import {
   WidgetType,
   PrefetchedWidgetData,
   PrefetchedBannerItem,
-  PrefetchedBoostedProduct,
   PrefetchedShop,
   PrefetchedDynamicListConfig,
   PrefetchedProduct,
@@ -200,43 +199,6 @@ const prefetchMarketBanners = unstable_cache(
   },
   ["prefetch-market-banners"],
   { revalidate: 120 },
-);
-
-const prefetchBoostedProducts = unstable_cache(
-  async (): Promise<PrefetchedBoostedProduct[]> => {
-    const db = getFirestoreAdmin();
-    const snapshot = await db
-      .collection("products")
-      .where("isBoosted", "==", true)
-      .where("isActive", "==", true)
-      .orderBy("boostStartedAt", "desc")
-      .limit(10)
-      .get();
-    const items: PrefetchedBoostedProduct[] = [];
-    for (const doc of snapshot.docs) {
-      const d = doc.data();
-      if (!d.name || !d.price) continue;
-      items.push({
-        id: doc.id,
-        name: d.name as string,
-        price: Number(d.price) || 0,
-        originalPrice: d.originalPrice ? Number(d.originalPrice) : undefined,
-        currency: (d.currency as string) || "TRY",
-        imageUrl: (d.imageUrl || d.images?.[0] || "") as string,
-        shopId: (d.shopId || "") as string,
-        shopName: d.shopName as string | undefined,
-        isBoosted: true as const,
-        boostExpiresAt: toEpoch(d.boostExpiresAt),
-        category: d.category as string | undefined,
-        subcategory: d.subcategory as string | undefined,
-        rating: d.rating ? Number(d.rating) : undefined,
-        reviewCount: d.reviewCount ? Number(d.reviewCount) : undefined,
-      });
-    }
-    return items;
-  },
-  ["prefetch-boosted-products"],
-  { revalidate: 60 },
 );
 
 /** Convert a Firestore Admin document to PrefetchedProduct (fields ProductCard needs) */
@@ -540,13 +502,7 @@ async function prefetchAllWidgetData(
         .catch(() => { data.market_banner = null; }),
     );
   }
-  if (visibleTypes.has("boosted_product_carousel")) {
-    fetches.push(
-      prefetchBoostedProducts()
-        .then((r) => { data.boosted_product_carousel = r; })
-        .catch(() => { data.boosted_product_carousel = null; }),
-    );
-  }
+
   if (visibleTypes.has("preference_product")) {
     fetches.push(
       prefetchPreferenceProducts()

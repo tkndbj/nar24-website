@@ -10,7 +10,6 @@ export type WidgetType =
   | "market_bubbles"
   | "thin_banner"
   | "preference_product"
-  | "boosted_product_carousel"
   | "dynamic_product_list"
   | "market_banner"
   | "shop_horizontal_list";
@@ -70,13 +69,6 @@ export const DEFAULT_WIDGETS: MarketWidgetConfig[] = [
     order: 3,
   },
   {
-    id: "boosted_product_carousel",
-    name: "Boosted Products",
-    type: "boosted_product_carousel",
-    isVisible: true,
-    order: 4,
-  },
-  {
     id: "dynamic_product_list",
     name: "Dynamic Product Lists",
     type: "dynamic_product_list",
@@ -105,7 +97,6 @@ export const VALID_WIDGET_TYPES: readonly WidgetType[] = [
   "market_bubbles",
   "thin_banner",
   "preference_product",
-  "boosted_product_carousel",
   "dynamic_product_list",
   "market_banner",
   "shop_horizontal_list",
@@ -209,7 +200,6 @@ export interface PrefetchedWidgetData {
   ads_banner?: PrefetchedBannerItem[] | null;
   thin_banner?: PrefetchedBannerItem[] | null;
   market_banner?: PrefetchedBannerItem[] | null;
-  boosted_product_carousel?: PrefetchedBoostedProduct[] | null;
   preference_product?: PrefetchedProduct[] | null;
   dynamic_product_list?: PrefetchedDynamicListConfig[] | null;
   shop_horizontal_list?: PrefetchedShop[] | null;
