@@ -113,19 +113,6 @@ const getMarketLayout = unstable_cache(
 // WIDGET DATA PREFETCHING
 // ============================================================================
 
-/** Convert Firestore Admin Timestamp to epoch milliseconds */
-function toEpoch(value: unknown): number | undefined {
-  if (!value) return undefined;
-  if (typeof value === "number") return value;
-  if (typeof (value as { toMillis?: () => number }).toMillis === "function") {
-    return (value as { toMillis: () => number }).toMillis();
-  }
-  if (typeof (value as { toDate?: () => Date }).toDate === "function") {
-    return (value as { toDate: () => Date }).toDate().getTime();
-  }
-  if (value instanceof Date) return value.getTime();
-  return undefined;
-}
 
 /** Helper to extract banner fields from Firestore doc */
 function parseBannerDoc(
