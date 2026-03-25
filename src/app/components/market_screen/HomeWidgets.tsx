@@ -18,7 +18,6 @@ import DynamicHorizontalList from "./DynamicHorizontalList";
 // ============================================================================
 
 const MarketBanner = lazy(() => import("./MarketBanner"));
-const BoostedProductCarousel = lazy(() => import("./BoostedProductCarousel"));
 import ShopHorizontalList from "./ShopHorizontalList";
 
 // ============================================================================
@@ -100,17 +99,6 @@ const WidgetRenderer = memo(
         );
         break;
 
-      case "boosted_product_carousel":
-        content = (
-          <Suspense
-            fallback={<ComponentLoader isDark={isDarkMode} height="h-64" />}
-          >
-            <div className={`w-full ${bgClass}`}>
-              <BoostedProductCarousel initialData={prefetchedData?.boosted_product_carousel} />
-            </div>
-          </Suspense>
-        );
-        break;
 
       case "dynamic_product_list":
         content = (
