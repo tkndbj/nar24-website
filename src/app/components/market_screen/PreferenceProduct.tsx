@@ -72,7 +72,7 @@ function hydrateProducts(prefetched: PrefetchedProduct[]): Product[] {
 
 let cachedProducts: Product[] | null = null;
 let productsCacheExpiry: Date | null = null;
-const PRODUCTS_CACHE_DURATION = 60 * 60 * 1000;
+const PRODUCTS_CACHE_DURATION = 6 * 60 * 60 * 1000;
 
 export const PreferenceProduct = React.memo(
   ({ keyPrefix = "", initialProducts }: PreferenceProductProps) => {
@@ -108,25 +108,6 @@ export const PreferenceProduct = React.memo(
     const rowHeight = portraitImageHeight + infoAreaHeight + 40;
     const scaleFactor = 0.88;
     const overrideInnerScale = 1.2;
-
-    /**
-     * Get random sample from array
-     */
-    const getRandomSample = useCallback(
-      (items: string[], sampleSize: number): string[] => {
-        if (items.length <= sampleSize) {
-          return [...items];
-        }
-
-        const indices = new Set<number>();
-        while (indices.size < sampleSize) {
-          indices.add(Math.floor(Math.random() * items.length));
-        }
-
-        return Array.from(indices).map((i) => items[i]);
-      },
-      []
-    );
 
     /**
      * Fetch product details from Firestore
@@ -200,14 +181,14 @@ export const PreferenceProduct = React.memo(
           return;
         }
 
-        const randomProductIds = getRandomSample(productIds, 30);
-        const fetchedProducts = await fetchProductDetails(randomProductIds);
+        const topProductIds = productIds.slice(0, 30);
+        const fetchedProducts = await fetchProductDetails(topProductIds);
 
         // ✅ CACHE THE PRODUCTS
         cachedProducts = fetchedProducts;
         productsCacheExpiry = new Date(Date.now() + PRODUCTS_CACHE_DURATION);
         console.log(
-          `📦 Cached ${fetchedProducts.length} preference products for 1 hour`
+          `📦 Cached ${fetchedProducts.length} preference products for 6 hour`
         );
 
         setProducts(fetchedProducts);
@@ -217,7 +198,7 @@ export const PreferenceProduct = React.memo(
         setError(e instanceof Error ? e.message : "Unknown error");
         setIsLoading(false);
       }
-    }, [getRandomSample, fetchProductDetails]);
+    }, [fetchProductDetails]);
 
     /**
      * Force refresh
@@ -241,14 +222,19 @@ export const PreferenceProduct = React.memo(
       }
     }, [hydratedFromServer]);
 
-    /**
-     * Initial load — skipped when server data is available
-     */
-    useEffect(() => {
-      // If we already have products (from server or cache), skip client fetch
-      if (products.length > 0 && !isLoading) return;
-      loadRecommendations();
-    }, [loadRecommendations]);
+    
+    const hasInitialized = useRef(false);
+
+// AFTER
+useEffect(() => {
+  if (hasInitialized.current) return;
+  if (products.length > 0 && !isLoading) {
+    hasInitialized.current = true;
+    return;
+  }
+  hasInitialized.current = true;
+  loadRecommendations();
+}, []); // empty deps — run once on mount only
 
     /**
      * Check scroll position
