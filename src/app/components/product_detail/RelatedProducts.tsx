@@ -207,48 +207,30 @@ const ProductDetailRelatedProducts: React.FC<
   }, [relatedProducts, checkScrollPosition]);
 
   const fetchRelatedProducts = useCallback(async () => {
-    // ✅ Skip if we already have prefetched products
-    if (prefetchedProducts && prefetchedProducts.length > 0) {
-      return;
-    }
-
+    if (prefetchedProducts && prefetchedProducts.length > 0) return;
     if (loadingInitiated) return;
-
-    // Need either preloaded IDs or productId to fetch
-    if (!preloadedIds?.length && (!productId || productId.trim() === "")) {
-      return;
-    }
-
+    if (!preloadedIds?.length) return; // No IDs = nothing to show, no fallback
+  
     setLoadingInitiated(true);
     setLoading(true);
-
+  
     try {
       setError(null);
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-      let url: string;
-
-      // ✅ If we have pre-loaded IDs, use batch endpoint (faster)
-      if (preloadedIds && preloadedIds.length > 0) {
-        url = `/api/products/batch?ids=${preloadedIds.slice(0, 10).join(",")}`;
-      } else {
-        // Fallback to original endpoint
-        url = `/api/relatedproducts/${productId}`;
-      }
-
+  
+      const url = `/api/products/batch?ids=${preloadedIds.slice(0, 15).join(",")}`;
+  
       const response = await fetch(url, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
         signal: controller.signal,
       });
-
+  
       clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
+  
+      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  
       const data = await response.json();
       setRelatedProducts(data.products || []);
     } catch (err) {
@@ -258,7 +240,7 @@ const ProductDetailRelatedProducts: React.FC<
     } finally {
       setLoading(false);
     }
-  }, [productId, preloadedIds, loadingInitiated, t, prefetchedProducts]);
+  }, [preloadedIds, loadingInitiated, t, prefetchedProducts]);
 
   // ✅ LAZY LOADING: Setup intersection observer
   // Matches Flutter's WidgetsBinding.instance.addPostFrameCallback approach

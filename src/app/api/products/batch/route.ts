@@ -58,116 +58,77 @@ function documentToProduct(
 export async function GET(request: NextRequest) {
   try {
     const idsParam = request.nextUrl.searchParams.get("ids");
-    
-    if (!idsParam) {
-      return NextResponse.json({ products: [], count: 0 });
-    }
+    if (!idsParam) return NextResponse.json({ products: [], count: 0 });
 
     const ids = idsParam
       .split(",")
       .map((id) => id.trim())
       .filter((id) => id.length > 0)
-      .slice(0, 10); // Limit to 10
+      .slice(0, 15); // ← was 10, now 15
 
-    if (ids.length === 0) {
-      return NextResponse.json({ products: [], count: 0 });
-    }
+    if (ids.length === 0) return NextResponse.json({ products: [], count: 0 });
 
-    // ✅ Check cache first
     const cachedProducts: Product[] = [];
     const uncachedIds: string[] = [];
 
     for (const id of ids) {
       const cached = getCachedProduct(id);
-      if (cached) {
-        cachedProducts.push(cached);
-      } else {
-        uncachedIds.push(id);
-      }
+      if (cached) cachedProducts.push(cached);
+      else uncachedIds.push(id);
     }
 
-    // If all cached, return immediately
     if (uncachedIds.length === 0) {
-      return NextResponse.json({
-        products: cachedProducts,
-        count: cachedProducts.length,
-        source: "cache",
-      });
+      return NextResponse.json({ products: cachedProducts, count: cachedProducts.length, source: "cache" });
     }
 
     const db = getFirestoreAdmin();
-    const fetchedProducts: Product[] = [];
 
-    // ✅ OPTIMIZED: Fetch both collections in parallel for each ID
     const results = await Promise.all(
-      uncachedIds.map(async (id) => {
+      uncachedIds.map(async (rawId) => {
         try {
-          // Query both collections simultaneously
-          const [shopDoc, prodDoc] = await Promise.all([
-            db.collection("shop_products").doc(id).get(),
-            db.collection("products").doc(id).get(),
-          ]);
+          // Resolve collection and clean ID from prefix
+          let collection: string;
+          let id: string;
 
-          // Prefer shop_products (matching Flutter logic)
-          const doc = shopDoc.exists ? shopDoc : prodDoc.exists ? prodDoc : null;
-          
-          if (doc && doc.exists) {
+          if (rawId.startsWith('p:')) {
+            collection = 'products';
+            id = rawId.substring(2);
+          } else if (rawId.startsWith('sp:')) {
+            collection = 'shop_products';
+            id = rawId.substring(3);
+          } else {
+            collection = 'shop_products'; // unprefixed = backward compat
+            id = rawId;
+          }
+
+          const doc = await db.collection(collection).doc(id).get();
+          if (doc.exists) {
             const product = documentToProduct(doc);
             if (product) {
-              cacheProduct(id, product); // Cache for future requests
+              cacheProduct(rawId, product);
               return product;
             }
           }
           return null;
         } catch (error) {
-          console.error(`Error fetching product ${id}:`, error);
+          console.error(`Error fetching product ${rawId}:`, error);
           return null;
         }
       })
     );
 
-    // Filter out nulls
-    for (const product of results) {
-      if (product) {
-        fetchedProducts.push(product);
-      }
-    }
-
-    // Combine cached + fetched, maintain order
+    const fetchedProducts = results.filter((p): p is Product => p !== null);
     const allProducts = [...cachedProducts, ...fetchedProducts];
-    
-    // Sort by original ID order
+
     const idOrder = new Map(ids.map((id, index) => [id, index]));
-    allProducts.sort((a, b) => {
-      const orderA = idOrder.get(a.id) ?? 999;
-      const orderB = idOrder.get(b.id) ?? 999;
-      return orderA - orderB;
-    });
+    allProducts.sort((a, b) => (idOrder.get(a.id) ?? 999) - (idOrder.get(b.id) ?? 999));
 
     return NextResponse.json(
-      {
-        products: allProducts,
-        count: allProducts.length,
-        source: cachedProducts.length === allProducts.length ? "cache" : "mixed",
-      },
-      {
-        headers: {
-          "Cache-Control": "public, max-age=120, stale-while-revalidate=300",
-        },
-      }
+      { products: allProducts, count: allProducts.length },
+      { headers: { "Cache-Control": "public, max-age=120, stale-while-revalidate=300" } }
     );
   } catch (error) {
     console.error("Error in batch fetch:", error);
-
-    return NextResponse.json(
-      {
-        error: "Internal server error",
-        products: [],
-        count: 0,
-        details:
-          process.env.NODE_ENV === "development" ? String(error) : undefined,
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error", products: [], count: 0 }, { status: 500 });
   }
 }
