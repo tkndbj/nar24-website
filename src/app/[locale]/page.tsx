@@ -3,6 +3,7 @@ import { getFirestoreAdmin } from "@/lib/firebase-admin";
 import SecondHeader from "../components/market_screen/SecondHeader";
 import Footer from "../components/Footer";
 import HomeWidgets from "../components/market_screen/HomeWidgets";
+import { AdsBanner } from "../components/market_screen/MarketTopAdsBanner";
 import {
   MarketWidgetConfig,
   DEFAULT_WIDGETS,
@@ -521,12 +522,18 @@ async function prefetchAllWidgetData(
 // ============================================================================
 
 export default async function Home() {
-  const widgets = await getMarketLayout();
+  const [widgets, adsBannerData] = await Promise.all([
+    getMarketLayout(),
+    prefetchAdsBanners(),
+  ]);
   const prefetchedData = await prefetchAllWidgetData(widgets);
 
   return (
     <div className="min-h-screen flex flex-col overflow-x-hidden">
       <SecondHeader />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 w-full">
+        <AdsBanner initialData={adsBannerData} />
+      </div>
       <HomeWidgets widgets={widgets} prefetchedData={prefetchedData} />
       <Footer />
     </div>

@@ -164,15 +164,6 @@ export default function SearchBar({
     return () => setIsMounted(false);
   }, []);
 
-  // ── Body scroll lock ─────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!isSearching) return;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [isSearching]);
-
   // ── Dropdown position ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!isSearching || !searchContainerRef.current) {
@@ -180,18 +171,16 @@ export default function SearchBar({
       return;
     }
     const update = () => {
-      requestAnimationFrame(() => {
-        if (!searchContainerRef.current) return;
-        const rect = searchContainerRef.current.getBoundingClientRect();
-        if (rect.width === 0 && rect.height === 0) {
-          setDropdownPosition(null);
-          return;
-        }
-        setDropdownPosition({
-          top: rect.bottom + 6,
-          left: rect.left,
-          width: Math.max(rect.width, 380),
-        });
+      if (!searchContainerRef.current) return;
+      const rect = searchContainerRef.current.getBoundingClientRect();
+      if (rect.width === 0 && rect.height === 0) {
+        setDropdownPosition(null);
+        return;
+      }
+      setDropdownPosition({
+        top: rect.bottom + 6,
+        left: rect.left,
+        width: Math.max(rect.width, 380),
       });
     };
     update();

@@ -578,13 +578,12 @@ function ProductPaymentPageContent() {
   );
 
   const [showRegionDropdown, setShowRegionDropdown] = useState(false);
-  const [showCityDropdown, setShowCityDropdown] = useState(false);
   const [selectedMainRegion, setSelectedMainRegion] = useState("");
   const [showMapModal, setShowMapModal] = useState(false);
   const [mapsLoaded, setMapsLoaded] = useState(false);
 
   const regionButtonRef = useRef<HTMLButtonElement>(null);
-  const cityButtonRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const subregions = useMemo(() => {
     if (!selectedMainRegion) return [];
@@ -593,20 +592,21 @@ function ProductPaymentPageContent() {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Close region/city dropdowns when clicking outside
+  // Close region dropdown when clicking outside
   useEffect(() => {
+    if (!showRegionDropdown) return;
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node;
-      if (showRegionDropdown && regionButtonRef.current && !regionButtonRef.current.contains(target)) {
+      if (
+        regionButtonRef.current && !regionButtonRef.current.contains(target) &&
+        dropdownRef.current && !dropdownRef.current.contains(target)
+      ) {
         setShowRegionDropdown(false);
-      }
-      if (showCityDropdown && cityButtonRef.current && !cityButtonRef.current.contains(target)) {
-        setShowCityDropdown(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showRegionDropdown, showCityDropdown]);
+  }, [showRegionDropdown]);
 
   // ============================================================================
   // Phone number formatting utilities (matching Flutter implementation)
@@ -1788,84 +1788,7 @@ function ProductPaymentPageContent() {
                         )}
                       </div>
 
-                      {/* Region Dropdown */}
-                      <div>
-                        <label
-                          className={`block text-xs font-semibold mb-1.5 sm:mb-2 ${
-                            isDarkMode ? "text-gray-300" : "text-gray-700"
-                          }`}
-                        >
-                          {t("region") || "Region"} *
-                        </label>
-                        <button
-                          ref={regionButtonRef}
-                          type="button"
-                          onClick={() => { setShowRegionDropdown(!showRegionDropdown); setShowCityDropdown(false); }}
-                          className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg border text-left flex items-center justify-between transition-all duration-200 text-sm sm:text-base ${
-                            isDarkMode
-                              ? "border-gray-600 bg-gray-700/50 text-white focus:border-blue-500 focus:ring-blue-500/20"
-                              : "border-gray-300 bg-white text-gray-900 focus:border-blue-500 focus:ring-blue-500/20"
-                          } focus:outline-none focus:ring-4`}
-                        >
-                          <span
-                            className={
-                              selectedMainRegion
-                                ? isDarkMode ? "text-white" : "text-gray-900"
-                                : isDarkMode ? "text-gray-500" : "text-gray-500"
-                            }
-                          >
-                            {selectedMainRegion || t("selectRegion") || "Select Region"}
-                          </span>
-                          <ChevronDown
-                            size={14}
-                            className="sm:size-4 transition-transform duration-200"
-                          />
-                        </button>
-
-                        {showRegionDropdown && regionButtonRef.current && createPortal(
-                          <div
-                            style={{
-                              position: "fixed",
-                              top: regionButtonRef.current.getBoundingClientRect().bottom + 4,
-                              left: regionButtonRef.current.getBoundingClientRect().left,
-                              width: regionButtonRef.current.getBoundingClientRect().width,
-                              zIndex: 9999,
-                            }}
-                          >
-                            <div
-                              className={`border rounded-xl shadow-xl max-h-48 overflow-y-auto backdrop-blur-sm ${
-                                isDarkMode
-                                  ? "bg-gray-800/95 border-gray-600"
-                                  : "bg-white/95 border-gray-300"
-                              }`}
-                            >
-                              {mainRegions.map((region) => (
-                                <button
-                                  key={region}
-                                  type="button"
-                                  onClick={() => {
-                                    setSelectedMainRegion(region);
-                                    handleInputChange("city", "");
-                                    setShowRegionDropdown(false);
-                                  }}
-                                  className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 text-left transition-colors text-sm sm:text-base ${
-                                    selectedMainRegion === region
-                                      ? "bg-orange-500 text-white"
-                                      : isDarkMode
-                                        ? "text-white hover:bg-gray-700"
-                                        : "text-gray-900 hover:bg-gray-100"
-                                  }`}
-                                >
-                                  {region}
-                                </button>
-                              ))}
-                            </div>
-                          </div>,
-                          document.body
-                        )}
-                      </div>
-
-                      {/* City/Subregion Dropdown */}
+                      {/* Region / City Dropdown */}
                       <div>
                         <label
                           className={`block text-xs font-semibold mb-1.5 sm:mb-2 ${
@@ -1875,12 +1798,11 @@ function ProductPaymentPageContent() {
                           {t("city")} *
                         </label>
                         <button
-                          ref={cityButtonRef}
+                          ref={regionButtonRef}
                           type="button"
                           onClick={() => {
-                            if (!selectedMainRegion) return;
-                            setShowCityDropdown(!showCityDropdown);
-                            setShowRegionDropdown(false);
+                            setShowRegionDropdown(!showRegionDropdown);
+                            if (!showRegionDropdown) setSelectedMainRegion("");
                           }}
                           className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg border text-left flex items-center justify-between transition-all duration-200 text-sm sm:text-base ${
                             errors.city
@@ -1888,7 +1810,7 @@ function ProductPaymentPageContent() {
                               : isDarkMode
                                 ? "border-gray-600 bg-gray-700/50 text-white focus:border-blue-500 focus:ring-blue-500/20"
                                 : "border-gray-300 bg-white text-gray-900 focus:border-blue-500 focus:ring-blue-500/20"
-                          } focus:outline-none focus:ring-4 ${!selectedMainRegion ? "opacity-60 cursor-not-allowed" : ""}`}
+                          } focus:outline-none focus:ring-4`}
                         >
                           <span
                             className={
@@ -1901,46 +1823,80 @@ function ProductPaymentPageContent() {
                           </span>
                           <ChevronDown
                             size={14}
-                            className="sm:size-4 transition-transform duration-200"
+                            className={`sm:size-4 transition-transform duration-200 ${showRegionDropdown ? "rotate-180" : ""}`}
                           />
                         </button>
 
-                        {showCityDropdown && cityButtonRef.current && createPortal(
+                        {showRegionDropdown && regionButtonRef.current && createPortal(
                           <div
+                            ref={dropdownRef}
                             style={{
                               position: "fixed",
-                              top: cityButtonRef.current.getBoundingClientRect().bottom + 4,
-                              left: cityButtonRef.current.getBoundingClientRect().left,
-                              width: cityButtonRef.current.getBoundingClientRect().width,
+                              top: regionButtonRef.current.getBoundingClientRect().bottom + 4,
+                              left: regionButtonRef.current.getBoundingClientRect().left,
+                              width: regionButtonRef.current.getBoundingClientRect().width,
                               zIndex: 9999,
                             }}
                           >
                             <div
-                              className={`border rounded-xl shadow-xl max-h-48 overflow-y-auto backdrop-blur-sm ${
+                              className={`border rounded-xl shadow-xl max-h-60 overflow-y-auto backdrop-blur-sm ${
                                 isDarkMode
                                   ? "bg-gray-800/95 border-gray-600"
                                   : "bg-white/95 border-gray-300"
                               }`}
                             >
-                              {subregions.map((city) => (
-                                <button
-                                  key={city}
-                                  type="button"
-                                  onClick={() => {
-                                    handleInputChange("city", city);
-                                    setShowCityDropdown(false);
-                                  }}
-                                  className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 text-left transition-colors text-sm sm:text-base ${
-                                    formData.city === city
-                                      ? "bg-orange-500 text-white"
-                                      : isDarkMode
+                              {!selectedMainRegion ? (
+                                mainRegions.map((region) => (
+                                  <button
+                                    key={region}
+                                    type="button"
+                                    onClick={() => setSelectedMainRegion(region)}
+                                    className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 text-left transition-colors text-sm sm:text-base flex items-center justify-between ${
+                                      isDarkMode
                                         ? "text-white hover:bg-gray-700"
                                         : "text-gray-900 hover:bg-gray-100"
-                                  }`}
-                                >
-                                  {city}
-                                </button>
-                              ))}
+                                    }`}
+                                  >
+                                    <span className="font-medium">{region}</span>
+                                    <ChevronDown size={14} className={`sm:size-4 -rotate-90 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`} />
+                                  </button>
+                                ))
+                              ) : (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedMainRegion("")}
+                                    className={`w-full px-3 sm:px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider border-b flex items-center gap-1.5 ${
+                                      isDarkMode
+                                        ? "text-orange-400 border-gray-600 bg-gray-800/80"
+                                        : "text-orange-600 border-gray-200 bg-gray-50"
+                                    }`}
+                                  >
+                                    <ChevronDown size={12} className={`rotate-90 ${isDarkMode ? "text-orange-400" : "text-orange-600"}`} />
+                                    {selectedMainRegion}
+                                  </button>
+                                  {subregions.map((sub) => (
+                                    <button
+                                      key={sub}
+                                      type="button"
+                                      onClick={() => {
+                                        handleInputChange("city", sub);
+                                        setShowRegionDropdown(false);
+                                        setSelectedMainRegion("");
+                                      }}
+                                      className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 text-left transition-colors text-sm sm:text-base ${
+                                        formData.city === sub
+                                          ? "bg-orange-500 text-white"
+                                          : isDarkMode
+                                            ? "text-white hover:bg-gray-700"
+                                            : "text-gray-900 hover:bg-gray-100"
+                                      }`}
+                                    >
+                                      {sub}
+                                    </button>
+                                  ))}
+                                </>
+                              )}
                             </div>
                           </div>,
                           document.body

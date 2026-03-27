@@ -326,19 +326,15 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
   // Loading skeleton with CSS-based responsive height (prevents CLS)
   if (isLoading || banners.length === 0) {
     return (
-      <div
-        className="w-full bg-gray-200 flex items-center justify-center animate-pulse h-[150px] min-[600px]:h-[300px] lg:h-[350px]"
-      >
-        <div
-          className="bg-gray-300 rounded-full w-8 h-8 min-[600px]:w-10 min-[600px]:h-10"
-        />
+      <div className="relative w-full aspect-[16/7] sm:aspect-[16/6] overflow-hidden rounded-2xl bg-gray-200 animate-pulse">
+        <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200" />
       </div>
     );
   }
 
   return (
     <div
-      className="relative w-full overflow-hidden h-[150px] min-[600px]:h-[300px] lg:h-[350px]"
+      className="relative w-full aspect-[16/7] sm:aspect-[16/6] overflow-hidden rounded-2xl group"
     >
       {/* Banner Container */}
       <div
@@ -403,6 +399,9 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
           );
         })}
       </div>
+
+      {/* Gradient overlay */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
 
       {/* Navigation Dots - using transform for GPU-accelerated animations */}
       {banners.length > 1 && (
