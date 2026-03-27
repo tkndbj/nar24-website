@@ -326,8 +326,8 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
   // Loading skeleton with CSS-based responsive height (prevents CLS)
   if (isLoading || banners.length === 0) {
     return (
-      <div className="relative w-full aspect-[16/7] sm:aspect-[16/6] overflow-hidden rounded-2xl bg-gray-200 animate-pulse">
-        <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200" />
+      <div className="relative w-full aspect-[16/7] sm:aspect-[16/6] overflow-hidden rounded-2xl animate-pulse">
+        <div className="absolute inset-0 bg-gradient-to-r from-gray-200/40 via-gray-100/40 to-gray-200/40" />
       </div>
     );
   }
@@ -374,7 +374,7 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
                 />
               ) : hasError ? (
                 // Error placeholder
-                <div className="absolute inset-0 bg-gray-200 flex items-center justify-center">
+                <div className="absolute inset-0 bg-transparent flex items-center justify-center">
                   <svg
                     className="text-gray-400 w-6 h-6 min-[600px]:w-8 min-[600px]:h-8"
                     fill="none"
@@ -393,7 +393,7 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
 
               {/* Loading placeholder */}
               {!isActive && !hasError && (
-                <div className="absolute inset-0 bg-gray-200" />
+                <div className="absolute inset-0 bg-transparent" />
               )}
             </div>
           );
