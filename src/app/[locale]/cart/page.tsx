@@ -1048,12 +1048,12 @@ useEffect(() => {
           {item.showSellerHeader && (
             <div
               className={`flex items-center space-x-1.5 px-2 py-1.5 mb-1 rounded-lg ${
-                isDark ? "bg-gray-800/60" : "bg-orange-50/80"
+                isDark ? "bg-gray-800/60" : "bg-orange-500"
               }`}
             >
-              <ShoppingBag size={11} className="text-orange-500" />
+              <ShoppingBag size={11} className={isDark ? "text-orange-500" : "text-white"} />
               <span
-                className={`text-[11px] font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}
+                className={`text-[11px] font-medium ${isDark ? "text-gray-300" : "text-white"}`}
               >
                 {item.sellerName}
               </span>

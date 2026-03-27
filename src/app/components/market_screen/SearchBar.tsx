@@ -110,7 +110,7 @@ export default function SearchBar({
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const savedScrollY = useRef(0);
+
   const router = useRouter();
   const { useFirestore: isFirestoreMode } = useSearchConfig();
 
@@ -164,31 +164,12 @@ export default function SearchBar({
     return () => setIsMounted(false);
   }, []);
 
-  // ── Body scroll lock (no layout shift) ──────────────────────────────────
+  // ── Body scroll lock ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!isSearching) return;
-    // Use the scroll position captured synchronously in the focus handler,
-    // because by the time this effect runs the browser may have already
-    // auto-scrolled the focused input into view (resetting scrollY to 0).
-    const scrollY = savedScrollY.current;
-    const scrollbarWidth =
-      window.innerWidth - document.documentElement.clientWidth;
-    document.body.style.position = "fixed";
-    document.body.style.top = `-${scrollY}px`;
-    document.body.style.left = "0";
-    document.body.style.right = "0";
     document.body.style.overflow = "hidden";
-    if (scrollbarWidth > 0) {
-      document.body.style.paddingRight = `${scrollbarWidth}px`;
-    }
     return () => {
-      document.body.style.position = "";
-      document.body.style.top = "";
-      document.body.style.left = "";
-      document.body.style.right = "";
       document.body.style.overflow = "";
-      document.body.style.paddingRight = "";
-      window.scrollTo(0, scrollY);
     };
   }, [isSearching]);
 
@@ -508,12 +489,7 @@ export default function SearchBar({
           value={searchTerm}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
-          onFocus={() => {
-            if (!isSearching) {
-              savedScrollY.current = window.scrollY;
-              onSearchStateChange(true);
-            }
-          }}
+          onFocus={() => !isSearching && onSearchStateChange(true)}
           readOnly={!isSearching}
           disabled={isSubmitting}
           placeholder={t("header.searchPlaceholder")}

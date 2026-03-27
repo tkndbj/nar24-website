@@ -394,7 +394,7 @@ export default function FavoriteProductsPage() {
             </div>
 
             {/* Content Area */}
-            <div ref={scrollContainerRef}>
+            <div ref={scrollContainerRef} className="w-full">
               {shouldShowShimmer ? (
                 /* Shimmer Grid */
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 lg:gap-4">
@@ -403,12 +403,17 @@ export default function FavoriteProductsPage() {
                       key={i}
                       className={`rounded-xl border animate-pulse overflow-hidden ${isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"}`}
                     >
-                      <div className={`aspect-[4/5] ${isDark ? "bg-gray-800" : "bg-gray-100"}`} />
-                      <div className="p-3 space-y-2">
+                      <div className={`aspect-[4/5] w-full ${isDark ? "bg-gray-800" : "bg-gray-100"}`} />
+                      <div className="p-3 space-y-2.5">
                         <div className={`h-2.5 rounded w-1/3 ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
-                        <div className={`h-3 rounded w-3/4 ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
-                        <div className={`h-3 rounded w-1/2 ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
-                        <div className={`h-3.5 rounded w-2/5 mt-1 ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
+                        <div className="space-y-1.5">
+                          <div className={`h-3 rounded w-full ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
+                          <div className={`h-3 rounded w-3/4 ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
+                        </div>
+                        <div className="flex items-center justify-between pt-1">
+                          <div className={`h-4 rounded w-2/5 ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
+                          <div className={`h-3 rounded w-1/6 ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
+                        </div>
                       </div>
                     </div>
                   ))}
