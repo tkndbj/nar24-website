@@ -542,8 +542,8 @@ export default function SavedAddressesPage() {
       {/* Add/Edit Modal */}
       {/* ================================================================ */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <div className={`w-full max-w-sm rounded-2xl border shadow-xl max-h-[85vh] overflow-y-auto ${isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"}`}>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/40 backdrop-blur-sm">
+          <div className={`w-full max-w-sm rounded-t-2xl sm:rounded-2xl border shadow-xl max-h-[92vh] sm:max-h-[85vh] overflow-y-auto ${isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"}`}>
             <div className={`sticky top-0 z-10 flex items-center justify-between px-5 py-4 border-b ${isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"}`}>
               <h3 className={`text-base font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
                 {editingAddress ? l("SavedAddressesDrawer.editAddress") || "Edit Address" : l("SavedAddressesDrawer.newAddress") || "New Address"}
