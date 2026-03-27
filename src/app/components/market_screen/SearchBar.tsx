@@ -110,6 +110,7 @@ export default function SearchBar({
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const savedScrollY = useRef(0);
   const router = useRouter();
   const { useFirestore: isFirestoreMode } = useSearchConfig();
 
@@ -166,7 +167,10 @@ export default function SearchBar({
   // ── Body scroll lock (no layout shift) ──────────────────────────────────
   useEffect(() => {
     if (!isSearching) return;
-    const scrollY = window.scrollY;
+    // Use the scroll position captured synchronously in the focus handler,
+    // because by the time this effect runs the browser may have already
+    // auto-scrolled the focused input into view (resetting scrollY to 0).
+    const scrollY = savedScrollY.current;
     const scrollbarWidth =
       window.innerWidth - document.documentElement.clientWidth;
     document.body.style.position = "fixed";
@@ -237,7 +241,7 @@ export default function SearchBar({
   // ── Focus management ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!isSearching) return;
-    const t = setTimeout(() => searchInputRef.current?.focus(), 100);
+    const t = setTimeout(() => searchInputRef.current?.focus({ preventScroll: true }), 100);
     setHistoryPage(0);
     return () => clearTimeout(t);
   }, [isSearching]);
@@ -504,7 +508,12 @@ export default function SearchBar({
           value={searchTerm}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
-          onFocus={() => !isSearching && onSearchStateChange(true)}
+          onFocus={() => {
+            if (!isSearching) {
+              savedScrollY.current = window.scrollY;
+              onSearchStateChange(true);
+            }
+          }}
           readOnly={!isSearching}
           disabled={isSubmitting}
           placeholder={t("header.searchPlaceholder")}
