@@ -489,8 +489,12 @@ export default function SearchBar({
           value={searchTerm}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
-          onFocus={() => !isSearching && onSearchStateChange(true)}
-          readOnly={!isSearching}
+          onPointerDown={(e) => {
+            if (!isSearching) {
+              e.preventDefault();
+              onSearchStateChange(true);
+            }
+          }}
           disabled={isSubmitting}
           placeholder={t("header.searchPlaceholder")}
           className={`

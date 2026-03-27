@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
 import {
   ArrowLeftIcon,
   MapPinIcon,
@@ -29,7 +30,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useTranslations } from "next-intl";
-import regionsList from "@/constants/regions";
+import { mainRegions, regionHierarchy, getMainRegion } from "@/constants/regions";
 import { toast } from "react-hot-toast";
 
 // ============================================================================
@@ -124,8 +125,33 @@ export default function SavedAddressesPage() {
     city: "",
     location: null as { latitude: number; longitude: number } | null,
   });
+  const [showRegionDropdown, setShowRegionDropdown] = useState(false);
   const [showCityDropdown, setShowCityDropdown] = useState(false);
+  const [selectedMainRegion, setSelectedMainRegion] = useState("");
   const [showMapModal, setShowMapModal] = useState(false);
+
+  const regionButtonRef = useRef<HTMLButtonElement>(null);
+  const cityButtonRef = useRef<HTMLButtonElement>(null);
+
+  const subregions = useMemo(() => {
+    if (!selectedMainRegion) return [];
+    return regionHierarchy[selectedMainRegion] || [];
+  }, [selectedMainRegion]);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (showRegionDropdown && regionButtonRef.current && !regionButtonRef.current.contains(target)) {
+        setShowRegionDropdown(false);
+      }
+      if (showCityDropdown && cityButtonRef.current && !cityButtonRef.current.contains(target)) {
+        setShowCityDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showRegionDropdown, showCityDropdown]);
 
   const l = (key: string) => {
     try { return t(key); } catch { return key.split(".").pop() || key; }
@@ -292,6 +318,8 @@ export default function SavedAddressesPage() {
 
   // Edit address
   const editAddress = (address: Address) => {
+    const mainRegion = getMainRegion(address.city) || "";
+    setSelectedMainRegion(mainRegion);
     setFormData({
       addressLine1: address.addressLine1,
       addressLine2: address.addressLine2,
@@ -308,6 +336,8 @@ export default function SavedAddressesPage() {
     setFormData({ addressLine1: "", addressLine2: "", phoneNumber: "", city: "", location: null });
     setShowAddModal(false);
     setEditingAddress(null);
+    setSelectedMainRegion("");
+    setShowRegionDropdown(false);
     setShowCityDropdown(false);
   };
 
@@ -570,32 +600,104 @@ export default function SavedAddressesPage() {
                 </p>
               </div>
 
-              {/* City Dropdown */}
-              <div className="relative">
+              {/* Region Dropdown */}
+              <div>
+                <label className={`block text-[11px] font-semibold uppercase tracking-wider mb-1.5 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                  {l("SavedAddressesDrawer.region") || "Region"} *
+                </label>
+                <button
+                  ref={regionButtonRef}
+                  onClick={() => { setShowRegionDropdown(!showRegionDropdown); setShowCityDropdown(false); }}
+                  className={`w-full px-3 py-2.5 rounded-xl border text-[13px] text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 transition-colors ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-900"}`}
+                >
+                  <span className={selectedMainRegion ? "" : (isDark ? "text-gray-600" : "text-gray-400")}>
+                    {selectedMainRegion || l("SavedAddressesDrawer.selectRegion") || "Select Region"}
+                  </span>
+                  <ChevronDownIcon className={`w-4 h-4 ${isDark ? "text-gray-600" : "text-gray-400"}`} />
+                </button>
+                {showRegionDropdown && regionButtonRef.current && createPortal(
+                  <div
+                    style={{
+                      position: "fixed",
+                      top: regionButtonRef.current.getBoundingClientRect().bottom + 4,
+                      left: regionButtonRef.current.getBoundingClientRect().left,
+                      width: regionButtonRef.current.getBoundingClientRect().width,
+                      zIndex: 9999,
+                    }}
+                  >
+                    <div className={`border rounded-xl shadow-lg max-h-48 overflow-y-auto ${isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}>
+                      {mainRegions.map((region) => (
+                        <button
+                          key={region}
+                          onClick={() => {
+                            setSelectedMainRegion(region);
+                            handleInputChange("city", "");
+                            setShowRegionDropdown(false);
+                          }}
+                          className={`w-full px-3 py-2 text-left text-sm transition-colors ${
+                            selectedMainRegion === region
+                              ? "bg-orange-500 text-white"
+                              : isDark ? "text-gray-200 hover:bg-gray-700" : "text-gray-900 hover:bg-gray-50"
+                          }`}
+                        >
+                          {region}
+                        </button>
+                      ))}
+                    </div>
+                  </div>,
+                  document.body
+                )}
+              </div>
+
+              {/* City/Subregion Dropdown */}
+              <div>
                 <label className={`block text-[11px] font-semibold uppercase tracking-wider mb-1.5 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
                   {l("SavedAddressesDrawer.city") || "City"} *
                 </label>
                 <button
-                  onClick={() => setShowCityDropdown(!showCityDropdown)}
-                  className={`w-full px-3 py-2.5 rounded-xl border text-[13px] text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 transition-colors ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-900"}`}
+                  ref={cityButtonRef}
+                  onClick={() => {
+                    if (!selectedMainRegion) {
+                      toast.error(l("SavedAddressesDrawer.selectRegionFirst") || "Please select a region first");
+                      return;
+                    }
+                    setShowCityDropdown(!showCityDropdown);
+                    setShowRegionDropdown(false);
+                  }}
+                  className={`w-full px-3 py-2.5 rounded-xl border text-[13px] text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 transition-colors ${isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-900"} ${!selectedMainRegion ? "opacity-60 cursor-not-allowed" : ""}`}
                 >
                   <span className={formData.city ? "" : (isDark ? "text-gray-600" : "text-gray-400")}>
                     {formData.city || l("SavedAddressesDrawer.selectCity") || "Select City"}
                   </span>
                   <ChevronDownIcon className={`w-4 h-4 ${isDark ? "text-gray-600" : "text-gray-400"}`} />
                 </button>
-                {showCityDropdown && (
-                  <div className={`absolute top-full left-0 right-0 mt-1 border rounded-xl shadow-lg z-20 max-h-40 overflow-y-auto ${isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}>
-                    {regionsList.map((city) => (
-                      <button
-                        key={city}
-                        onClick={() => { handleInputChange("city", city); setShowCityDropdown(false); }}
-                        className={`w-full px-3 py-2 text-left text-sm transition-colors ${isDark ? "text-gray-200 hover:bg-gray-700" : "text-gray-900 hover:bg-gray-50"}`}
-                      >
-                        {city}
-                      </button>
-                    ))}
-                  </div>
+                {showCityDropdown && cityButtonRef.current && createPortal(
+                  <div
+                    style={{
+                      position: "fixed",
+                      top: cityButtonRef.current.getBoundingClientRect().bottom + 4,
+                      left: cityButtonRef.current.getBoundingClientRect().left,
+                      width: cityButtonRef.current.getBoundingClientRect().width,
+                      zIndex: 9999,
+                    }}
+                  >
+                    <div className={`border rounded-xl shadow-lg max-h-48 overflow-y-auto ${isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}>
+                      {subregions.map((city) => (
+                        <button
+                          key={city}
+                          onClick={() => { handleInputChange("city", city); setShowCityDropdown(false); }}
+                          className={`w-full px-3 py-2 text-left text-sm transition-colors ${
+                            formData.city === city
+                              ? "bg-orange-500 text-white"
+                              : isDark ? "text-gray-200 hover:bg-gray-700" : "text-gray-900 hover:bg-gray-50"
+                          }`}
+                        >
+                          {city}
+                        </button>
+                      ))}
+                    </div>
+                  </div>,
+                  document.body
                 )}
               </div>
 

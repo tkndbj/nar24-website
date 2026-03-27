@@ -26,6 +26,13 @@ export const MarketBubbles: React.FC<MarketBubblesProps> = ({}) => {
 
   const cards: CardData[] = [
     {
+      label: t("food"),
+      description: t("foodDesc"),
+      image: "/images/foodbubble.png",
+      accentColor: "#3b82f6",
+      showComingSoon: false,
+    },
+    {
       label: t("shops"),
       description: t("shopsDesc"),
       image: "/images/shopbubble.png",
@@ -47,13 +54,6 @@ export const MarketBubbles: React.FC<MarketBubblesProps> = ({}) => {
       showComingSoon: false,
     },
     {
-      label: t("food"),
-      description: t("foodDesc"),
-      image: "/images/foodbubble.png",
-      accentColor: "#3b82f6",
-      showComingSoon: false,
-    },
-    {
       label: t("market"),
       description: t("marketDesc"),
       image: "/images/marketbubble.png",
@@ -64,13 +64,13 @@ export const MarketBubbles: React.FC<MarketBubblesProps> = ({}) => {
 
   const handleCardClick = (index: number) => {
     if (index === 0) {
-      router.push("/shops");
-    } else if (index === 1) {
-      router.push("/createshop");
-    } else if (index === 2) {
-      router.push("/dynamicteras");
-    } else if (index === 3) {
       router.push("/restaurants");
+    } else if (index === 1) {
+      router.push("/shops");
+    } else if (index === 2) {
+      router.push("/createshop");
+    } else if (index === 3) {
+      router.push("/dynamicteras");
     }
   };
 
@@ -79,8 +79,8 @@ export const MarketBubbles: React.FC<MarketBubblesProps> = ({}) => {
       {cards.map((card, index) => (
         <div
           key={card.label}
-          className={`group relative flex flex-row items-center gap-3 rounded-2xl border bg-transparent p-3 lg:p-4 transition-all duration-200 flex-shrink-0 w-[160px] sm:w-auto sm:flex-shrink ${
-            isDarkMode ? "border-neutral-700" : "border-gray-200"
+          className={`group relative flex flex-row items-center gap-3 rounded-2xl border border-orange-300 bg-transparent p-3 lg:p-4 transition-all duration-200 flex-shrink-0 w-[160px] sm:w-auto sm:flex-shrink ${
+            isDarkMode ? "border-orange-400/50" : "border-orange-300"
           } ${
             card.showComingSoon
               ? "cursor-default opacity-60"
