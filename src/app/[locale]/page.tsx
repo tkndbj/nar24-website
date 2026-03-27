@@ -531,8 +531,10 @@ export default async function Home() {
   return (
     <div className="min-h-screen flex flex-col overflow-x-hidden">
       <SecondHeader />
-      <div className="w-full my-2 lg:mx-0 lg:px-6">
-        <AdsBanner initialData={adsBannerData} />
+      <div className="w-full bg-gray-50 dark:bg-gray-900">
+        <div className="lg:max-w-[1400px] lg:mx-auto px-4 sm:px-6 lg:px-6 pt-4">
+          <AdsBanner initialData={adsBannerData} />
+        </div>
       </div>
       <HomeWidgets widgets={widgets} prefetchedData={prefetchedData} />
       <Footer />
