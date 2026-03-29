@@ -185,7 +185,9 @@ export class RestaurantTypesenseService {
 
   private parseMinOrderPricesJson(
     raw: unknown,
-  ): { mainRegion: string; subregion: string; minOrderPrice: number }[] | undefined {
+  ):
+    | { mainRegion: string; subregion: string; minOrderPrice: number }[]
+    | undefined {
     if (typeof raw !== "string" || !raw) return undefined;
     try {
       const parsed = JSON.parse(raw);
@@ -210,10 +212,7 @@ export class RestaurantTypesenseService {
 
   // ── ID extraction ───────────────────────────────────────────────────────
 
-  private extractFirestoreId(
-    typesenseId: string,
-    collection: string,
-  ): string {
+  private extractFirestoreId(typesenseId: string, collection: string): string {
     const prefix = `${collection}_`;
     return typesenseId.startsWith(prefix)
       ? typesenseId.slice(prefix.length)
@@ -322,7 +321,7 @@ export class RestaurantTypesenseService {
       include_fields:
         "id,name,address,contactNo,profileImageUrl,ownerId,isActive,isBoosted," +
         "latitude,longitude,averageRating,reviewCount,clickCount,followerCount," +
-        "foodType,cuisineTypes,workingDays,workingHours,createdAt,minOrderPricesJson",
+        "foodType,cuisineTypes,workingDays,createdAt,minOrderPricesJson,workingHoursJson",
     });
 
     const filterBy = this.buildFilterBy(filterParts);
@@ -352,8 +351,7 @@ export class RestaurantTypesenseService {
             doc["profileImageUrl"] != null
               ? String(doc["profileImageUrl"])
               : undefined,
-          ownerId:
-            doc["ownerId"] != null ? String(doc["ownerId"]) : undefined,
+          ownerId: doc["ownerId"] != null ? String(doc["ownerId"]) : undefined,
           isActive: doc["isActive"] === true,
           isBoosted: doc["isBoosted"] === true,
           latitude:
@@ -365,13 +363,9 @@ export class RestaurantTypesenseService {
               ? Number(doc["averageRating"])
               : undefined,
           reviewCount:
-            doc["reviewCount"] != null
-              ? Number(doc["reviewCount"])
-              : undefined,
+            doc["reviewCount"] != null ? Number(doc["reviewCount"]) : undefined,
           clickCount:
-            doc["clickCount"] != null
-              ? Number(doc["clickCount"])
-              : undefined,
+            doc["clickCount"] != null ? Number(doc["clickCount"]) : undefined,
           followerCount:
             doc["followerCount"] != null
               ? Number(doc["followerCount"])
@@ -385,20 +379,10 @@ export class RestaurantTypesenseService {
           workingDays: Array.isArray(doc["workingDays"])
             ? (doc["workingDays"] as string[])
             : undefined,
-          workingHours:
-            doc["workingHours"] != null &&
-            typeof doc["workingHours"] === "object" &&
-            !Array.isArray(doc["workingHours"])
-              ? {
-                  open: String(
-                    (doc["workingHours"] as Record<string, unknown>)["open"] ?? "",
-                  ),
-                  close: String(
-                    (doc["workingHours"] as Record<string, unknown>)["close"] ?? "",
-                  ),
-                }
-              : undefined,
-          minOrderPrices: this.parseMinOrderPricesJson(doc["minOrderPricesJson"]),
+          workingHours: this.parseWorkingHoursJson(doc["workingHoursJson"]),
+          minOrderPrices: this.parseMinOrderPricesJson(
+            doc["minOrderPricesJson"],
+          ),
         });
       }
 
@@ -409,6 +393,28 @@ export class RestaurantTypesenseService {
     } catch (err) {
       console.warn("Typesense searchRestaurants error:", err);
       return { items: [], ids: [], page, nbPages: 1, total: 0 };
+    }
+  }
+
+  private parseWorkingHoursJson(
+    raw: unknown,
+  ): { open: string; close: string } | undefined {
+    if (typeof raw !== "string" || !raw) return undefined;
+    try {
+      const parsed = JSON.parse(raw);
+      if (
+        parsed &&
+        typeof parsed === "object" &&
+        typeof parsed["open"] === "string" &&
+        typeof parsed["close"] === "string" &&
+        parsed["open"] &&
+        parsed["close"]
+      ) {
+        return { open: parsed["open"], close: parsed["close"] };
+      }
+      return undefined;
+    } catch {
+      return undefined;
     }
   }
 
@@ -476,8 +482,7 @@ export class RestaurantTypesenseService {
         const counts: FacetValue[] = (facet.counts ?? [])
           .map((c) => ({
             value: String(c.value ?? ""),
-            count:
-              typeof c.count === "number" ? c.count : Number(c.count ?? 0),
+            count: typeof c.count === "number" ? c.count : Number(c.count ?? 0),
           }))
           .filter((c) => c.value && c.count > 0);
 
@@ -587,9 +592,7 @@ export class RestaurantTypesenseService {
           id: firestoreId,
           name: String(doc["name"] ?? ""),
           description:
-            doc["description"] != null
-              ? String(doc["description"])
-              : undefined,
+            doc["description"] != null ? String(doc["description"]) : undefined,
           price: Number(doc["price"] ?? 0),
           foodCategory: String(doc["foodCategory"] ?? ""),
           foodType: String(doc["foodType"] ?? ""),
@@ -681,8 +684,7 @@ export class RestaurantTypesenseService {
         const counts: FacetValue[] = (facet.counts ?? [])
           .map((c) => ({
             value: String(c.value ?? ""),
-            count:
-              typeof c.count === "number" ? c.count : Number(c.count ?? 0),
+            count: typeof c.count === "number" ? c.count : Number(c.count ?? 0),
           }))
           .filter((c) => c.value && c.count > 0);
 
