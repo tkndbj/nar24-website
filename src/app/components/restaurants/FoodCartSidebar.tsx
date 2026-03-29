@@ -297,7 +297,7 @@ function CartContent({
     ? FoodAddress.fromMap(profileData.foodAddress as Record<string, unknown>)
     : null;
   const minOrderPrice = restaurant
-    ? getMinOrderPrice(restaurant, foodAddress?.city, foodAddress?.mainRegion)
+    ? getMinOrderPrice(restaurant, foodAddress?.city)
     : undefined;
 
   const handleCheckout = useCallback(() => {
