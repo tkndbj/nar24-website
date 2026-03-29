@@ -72,7 +72,8 @@ function FoodCartPageContent() {
 
   // ── Min order price from restaurant ──────────────────────────────────
   const [restaurantMinOrderPrices, setRestaurantMinOrderPrices] = useState<
-    { mainRegion: string; subregion: string; minOrderPrice: number }[] | undefined
+    | { mainRegion: string; subregion: string; minOrderPrice: number }[]
+    | undefined
   >(undefined);
   const [showMinOrderAlert, setShowMinOrderAlert] = useState(false);
 
@@ -101,7 +102,9 @@ function FoodCartPageContent() {
       })
       .catch(() => setRestaurantMinOrderPrices(undefined));
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [currentRestaurant?.id]);
 
   const foodAddress = profileData?.foodAddress
@@ -111,7 +114,6 @@ function FoodCartPageContent() {
     ? getMinOrderPrice(
         { minOrderPrices: restaurantMinOrderPrices },
         foodAddress?.city,
-        foodAddress?.mainRegion,
       )
     : undefined;
 
