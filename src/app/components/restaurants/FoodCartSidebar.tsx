@@ -23,11 +23,12 @@ import { useRouter } from "@/navigation";
 import { useTranslations } from "next-intl";
 import FoodExtrasSheet from "./FoodExtrasSheet";
 import MinOrderAlertDialog from "./MinOrderAlertDialog";
+import RestaurantClosedAlertDialog from "./RestaurantClosedAlertDialog";
 import { FoodExtrasData } from "@/constants/foodExtras";
 import { FoodCategoryData } from "@/constants/foodData";
 import { useUser } from "@/context/UserProvider";
 import { FoodAddress } from "@/app/models/FoodAddress";
-import { getMinOrderPrice } from "@/utils/restaurant";
+import { getMinOrderPrice, isRestaurantOpen } from "@/utils/restaurant";
 import type { Restaurant } from "@/types/Restaurant";
 
 // ─── Compact Cart Item ──────────────────────────────────────────────────────
@@ -253,7 +254,7 @@ function CartContent({
 }: {
   isDarkMode: boolean;
   compact?: boolean;
-  restaurant?: Pick<Restaurant, "minOrderPrices"> | null;
+  restaurant?: Pick<Restaurant, "minOrderPrices" | "workingDays" | "workingHours"> | null;
 }) {
   const router = useRouter();
   const localization = useTranslations();
@@ -264,6 +265,7 @@ function CartContent({
 
   const [editingItem, setEditingItem] = useState<FoodCartItem | null>(null);
   const [showMinOrderAlert, setShowMinOrderAlert] = useState(false);
+  const [showClosedAlert, setShowClosedAlert] = useState(false);
 
   const t = useCallback(
     (key: string, fallback?: string) => {
@@ -303,6 +305,12 @@ function CartContent({
   const handleCheckout = useCallback(() => {
     if (items.length === 0) return;
 
+    // Check if restaurant is currently open
+    if (restaurant && !isRestaurantOpen(restaurant)) {
+      setShowClosedAlert(true);
+      return;
+    }
+
     // Check minimum order requirement
     if (minOrderPrice != null && totals.subtotal < minOrderPrice) {
       setShowMinOrderAlert(true);
@@ -329,7 +337,7 @@ function CartContent({
       );
     }
     router.push("/food-checkout");
-  }, [items, currentRestaurant, totals, router, minOrderPrice]);
+  }, [items, currentRestaurant, totals, router, minOrderPrice, restaurant]);
 
   // Empty state
   if (items.length === 0) {
@@ -524,6 +532,14 @@ function CartContent({
           t={t}
         />
       )}
+
+      {/* Restaurant Closed Alert */}
+      <RestaurantClosedAlertDialog
+        open={showClosedAlert}
+        onClose={() => setShowClosedAlert(false)}
+        isDarkMode={isDarkMode}
+        t={t}
+      />
     </>
   );
 }
@@ -537,7 +553,7 @@ export default function FoodCartSidebar({
 }: {
   isDarkMode: boolean;
   mode?: "desktop" | "mobile";
-  restaurant?: Pick<Restaurant, "minOrderPrices"> | null;
+  restaurant?: Pick<Restaurant, "minOrderPrices" | "workingDays" | "workingHours"> | null;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { itemCount } = useFoodCartState();

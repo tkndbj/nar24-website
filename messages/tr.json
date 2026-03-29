@@ -5182,7 +5182,10 @@
     "edit": "Düzenle",
     "minOrderTitle": "Minimum Sipariş Tutarına Ulaşılmadı",
     "minOrderMessage": "Bu restoran minimum {minOrder} {currency} sipariş gerektirmektedir. Mevcut toplam tutarınız {currentTotal} {currency}. Devam etmek için {remaining} {currency} daha eklemeniz gerekmektedir.",
-    "minOrderOk": "Daha Fazla Ürün Ekle"
+    "minOrderOk": "Daha Fazla Ürün Ekle",
+    "restaurantClosedTitle": "Restoran Kapalı",
+    "restaurantClosedMessage": "Bu restoran şu anda kapalıdır. Sepetinizdeki ürünleri saklayabilir ve restoran tekrar açıldığında siparişinizi verebilirsiniz.",
+    "restaurantClosedOk": "Anladım"
   },
   "restaurantDetail": {
     "menu": "Menü",

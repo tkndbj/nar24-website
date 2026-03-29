@@ -32,7 +32,9 @@ import { db } from "@/lib/firebase";
 import { FoodCartProvider } from "@/context/FoodCartProvider";
 import { doc, getDoc } from "firebase/firestore";
 import { FoodAddress } from "@/app/models/FoodAddress";
-import { getMinOrderPrice } from "@/utils/restaurant";
+import { getMinOrderPrice, isRestaurantOpen } from "@/utils/restaurant";
+import RestaurantClosedAlertDialog from "@/app/components/restaurants/RestaurantClosedAlertDialog";
+import type { WorkingHours } from "@/types/Restaurant";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // WRAPPER — provides FoodCartProvider
@@ -70,16 +72,22 @@ function FoodCartPageContent() {
     clearCart,
   } = useFoodCart();
 
-  // ── Min order price from restaurant ──────────────────────────────────
+  // ── Restaurant data for checkout validation ───────��──────────────────
   const [restaurantMinOrderPrices, setRestaurantMinOrderPrices] = useState<
     | { mainRegion: string; subregion: string; minOrderPrice: number }[]
     | undefined
   >(undefined);
+  const [restaurantSchedule, setRestaurantSchedule] = useState<{
+    workingDays?: string[];
+    workingHours?: WorkingHours;
+  }>({});
   const [showMinOrderAlert, setShowMinOrderAlert] = useState(false);
+  const [showClosedAlert, setShowClosedAlert] = useState(false);
 
   useEffect(() => {
     if (!currentRestaurant?.id || !db) {
       setRestaurantMinOrderPrices(undefined);
+      setRestaurantSchedule({});
       return;
     }
 
@@ -99,8 +107,21 @@ function FoodCartPageContent() {
         } else {
           setRestaurantMinOrderPrices(undefined);
         }
+
+        // Extract working schedule
+        const wh = d.workingHours as Record<string, unknown> | undefined;
+        setRestaurantSchedule({
+          workingDays: Array.isArray(d.workingDays) ? (d.workingDays as string[]) : undefined,
+          workingHours:
+            wh && typeof wh === "object" && "open" in wh && "close" in wh
+              ? { open: String(wh.open), close: String(wh.close) }
+              : undefined,
+        });
       })
-      .catch(() => setRestaurantMinOrderPrices(undefined));
+      .catch(() => {
+        setRestaurantMinOrderPrices(undefined);
+        setRestaurantSchedule({});
+      });
 
     return () => {
       cancelled = true;
@@ -191,6 +212,12 @@ function FoodCartPageContent() {
   const handleCheckout = useCallback(() => {
     if (items.length === 0) return;
 
+    // Check if restaurant is currently open
+    if (!isRestaurantOpen(restaurantSchedule)) {
+      setShowClosedAlert(true);
+      return;
+    }
+
     // Check minimum order requirement
     if (minOrderPrice != null && totals.subtotal < minOrderPrice) {
       setShowMinOrderAlert(true);
@@ -219,7 +246,7 @@ function FoodCartPageContent() {
     }
 
     router.push("/food-checkout");
-  }, [items, currentRestaurant, totals, router, minOrderPrice]);
+  }, [items, currentRestaurant, totals, router, minOrderPrice, restaurantSchedule]);
 
   // ════════════════════════════════════════════════════════════════════════
   // RENDER
@@ -594,6 +621,14 @@ function FoodCartPageContent() {
           t={t}
         />
       )}
+
+      {/* Restaurant Closed Alert */}
+      <RestaurantClosedAlertDialog
+        open={showClosedAlert}
+        onClose={() => setShowClosedAlert(false)}
+        isDarkMode={isDark}
+        t={t}
+      />
 
       {/* Clear Cart Confirmation */}
       {showClearConfirm && (
