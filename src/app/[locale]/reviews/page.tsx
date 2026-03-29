@@ -101,6 +101,7 @@ interface FoodReview {
   restaurantName?: string;
   rating: number;
   comment: string;
+  imageUrls?: string[];
   timestamp: Timestamp;
 }
 
@@ -158,12 +159,14 @@ interface SubmitFoodReviewData {
   restaurantId: string;
   rating: number;
   comment: string;
+  imageUrls: string[]; // ← just add this line
 }
 
 // ============================================================================
 // CONSTANTS
 // ============================================================================
 
+const FOOD_MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 const PAGE_SIZE = 20;
 const FOOD_PAGE_SIZE = 20;
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
@@ -719,8 +722,11 @@ export default function ReviewsPage() {
   // IMAGE VALIDATION & PROCESSING
   // ============================================================================
 
-  const validateFile = (file: File): ImageValidationResult => {
-    if (file.size > MAX_FILE_SIZE_BYTES) {
+  const validateFile = (
+    file: File,
+    maxSizeBytes = MAX_FILE_SIZE_BYTES, // ← ADD PARAM
+  ): ImageValidationResult => {
+    if (file.size > maxSizeBytes) {
       return {
         valid: false,
         error: "file_too_large",
@@ -849,9 +855,15 @@ export default function ReviewsPage() {
     const remainingSlots = MAX_IMAGES - currentCount;
     const filesToAdd = files.slice(0, remainingSlots);
 
+    // ← Use 5MB limit for food reviews
+    const maxSize =
+      reviewCategory === "food"
+        ? FOOD_MAX_FILE_SIZE_BYTES
+        : MAX_FILE_SIZE_BYTES;
+
     const validFiles: File[] = [];
     for (const file of filesToAdd) {
-      const validation = validateFile(file);
+      const validation = validateFile(file, maxSize); // ← PASS maxSize
       if (validation.valid) {
         validFiles.push(file);
       } else {
@@ -1014,16 +1026,61 @@ export default function ReviewsPage() {
     }
 
     try {
-      const submitFoodReviewFunction = httpsCallable<
-        SubmitFoodReviewData,
-        { success: boolean }
-      >(functions, "submitRestaurantReview");
+      // Upload and moderate images
+      const approvedUrls: string[] = [];
+      const uploadedRefs: string[] = [];
+
+      if (reviewImages.length > 0) {
+        const storagePath = `restaurant_reviews/${selectedFoodReview.restaurantId}`;
+        for (let i = 0; i < reviewImages.length; i++) {
+          const result = await processImage(reviewImages[i], storagePath, i);
+          if (!result.success) {
+            // Clean up previously uploaded images
+            for (const refPath of uploadedRefs) {
+              try {
+                await deleteObject(ref(storage, refPath));
+              } catch {
+                console.error("Error deleting image:", refPath);
+              }
+            }
+            setShowLoadingModal(false);
+            let message = `Image ${i + 1}: `;
+            switch (result.error) {
+              case "adult_content":
+                message += "Contains inappropriate adult content";
+                break;
+              case "violent_content":
+                message += "Contains violent content";
+                break;
+              case "file_too_large":
+                message += "File too large (max 5MB)";
+                break;
+              case "invalid_format":
+                message += "Invalid format (JPG, PNG, HEIC, WEBP only)";
+                break;
+              default:
+                message += result.message || "Inappropriate content detected";
+            }
+            showErrorToast(message);
+            resetReviewForm();
+            return;
+          }
+          if (result.url && result.ref) {
+            approvedUrls.push(result.url);
+            uploadedRefs.push(result.ref);
+          }
+        }
+      }
+
+      const submitFoodReviewFunction = httpsCallable<SubmitFoodReviewData,
+        { success: boolean }>(functions, "submitRestaurantReview");
 
       await submitFoodReviewFunction({
         orderId: selectedFoodReview.id,
         restaurantId: selectedFoodReview.restaurantId,
         rating,
         comment: reviewText.trim(),
+        imageUrls: approvedUrls, // ← ADD
       });
 
       setShowLoadingModal(false);
@@ -1031,14 +1088,12 @@ export default function ReviewsPage() {
         t("reviewSubmittedSuccessfully") || "Review submitted successfully!",
       );
 
-      // Optimistic removal from pending list
       setFoodPendingReviews((prev) =>
         prev.filter((o) => o.id !== selectedFoodReview.id),
       );
 
       resetReviewForm();
 
-      // Reload food reviews for tab 2
       setMyFoodReviews([]);
       setMyFoodReviewsLastDoc(null);
       setMyFoodReviewsHasMore(true);
@@ -1693,6 +1748,25 @@ export default function ReviewsPage() {
                           </span>
                         </div>
                       </div>
+                      {review.imageUrls && review.imageUrls.length > 0 && (
+                        <div className="px-4 pt-3 flex gap-2">
+                          {review.imageUrls.map((url, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => setSelectedImage(url)}
+                              className={`w-14 h-14 rounded-xl overflow-hidden hover:opacity-80 transition-opacity relative flex-shrink-0 ${thumbBg}`}
+                            >
+                              <Image
+                                src={url}
+                                alt={`Review image ${idx + 1}`}
+                                fill
+                                className="object-cover"
+                                sizes="56px"
+                              />
+                            </button>
+                          ))}
+                        </div>
+                      )}
                       {review.comment && (
                         <div className="px-4 py-3">
                           <p className={`text-sm leading-relaxed ${bodyColor}`}>
@@ -1816,7 +1890,7 @@ export default function ReviewsPage() {
               </div>
 
               {/* Image Upload - product reviews only */}
-              {reviewCategory === "product" && (
+              {(reviewCategory === "product" || reviewCategory === "food") && (
                 <div>
                   <label
                     className={`text-[11px] font-semibold uppercase tracking-wider mb-1.5 block ${mutedColor}`}

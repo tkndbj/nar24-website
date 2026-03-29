@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Star, MessageSquare, ChevronDown, User } from "lucide-react";
+import { Star, MessageSquare, ChevronDown, User, X } from "lucide-react";
+import Image from "next/image";
 import { useTranslations } from "next-intl";
 import {
   collection,
@@ -26,6 +27,7 @@ interface FoodReview {
   restaurantName?: string;
   rating: number;
   comment: string;
+  imageUrls?: string[];
   timestamp: Timestamp;
 }
 
@@ -39,6 +41,7 @@ function ReviewCard({
   isDarkMode: boolean;
 }) {
   const t = useTranslations("restaurantDetail");
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   const maskName = (name: string) => {
     const parts = name.trim().split(/\s+/);
@@ -53,86 +56,147 @@ function ReviewCard({
       .join(" ");
   };
 
-  const timeAgo = useCallback((ts: Timestamp) => {
-    const now = Date.now();
-    const diff = now - ts.toMillis();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return t("justNow");
-    if (mins < 60) return `${mins}${t("minuteShort")}`;
-    const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours}${t("hourShort")}`;
-    const days = Math.floor(hours / 24);
-    if (days < 30) return `${days}${t("dayShort")}`;
-    const months = Math.floor(days / 30);
-    if (months < 12) return `${months}${t("monthShort")}`;
-    const years = Math.floor(months / 12);
-    return `${years}${t("yearShort")}`;
-  }, [t]);
+  const timeAgo = useCallback(
+    (ts: Timestamp) => {
+      const now = Date.now();
+      const diff = now - ts.toMillis();
+      const mins = Math.floor(diff / 60000);
+      if (mins < 1) return t("justNow");
+      if (mins < 60) return `${mins}${t("minuteShort")}`;
+      const hours = Math.floor(mins / 60);
+      if (hours < 24) return `${hours}${t("hourShort")}`;
+      const days = Math.floor(hours / 24);
+      if (days < 30) return `${days}${t("dayShort")}`;
+      const months = Math.floor(days / 30);
+      if (months < 12) return `${months}${t("monthShort")}`;
+      const years = Math.floor(months / 12);
+      return `${years}${t("yearShort")}`;
+    },
+    [t],
+  );
 
   return (
-    <div
-      className={`rounded-xl border p-4 ${
-        isDarkMode ? "border-gray-700/50 bg-gray-800/40" : "border-gray-200 bg-white"
-      }`}
-    >
-      {/* Header: avatar + name + time */}
-      <div className="flex items-center gap-3 mb-2.5">
+    <>
+      <div
+        className={`rounded-xl border p-4 ${
+          isDarkMode
+            ? "border-gray-700/50 bg-gray-800/40"
+            : "border-gray-200 bg-white"
+        }`}
+      >
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-2.5">
+          <div
+            className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
+              isDarkMode ? "bg-gray-700" : "bg-gray-100"
+            }`}
+          >
+            <User
+              size={16}
+              className={isDarkMode ? "text-gray-400" : "text-gray-500"}
+            />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p
+              className={`text-sm font-semibold truncate ${
+                isDarkMode ? "text-white" : "text-gray-900"
+              }`}
+            >
+              {review.buyerName
+                ? maskName(review.buyerName)
+                : t("anonymousUser")}
+            </p>
+            <p
+              className={`text-[11px] ${
+                isDarkMode ? "text-gray-500" : "text-gray-400"
+              }`}
+            >
+              {review.timestamp ? timeAgo(review.timestamp) : ""}
+            </p>
+          </div>
+        </div>
+
+        {/* Stars */}
+        <div className="flex items-center gap-0.5 mb-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Star
+              key={i}
+              size={14}
+              className={
+                i < review.rating
+                  ? "fill-yellow-400 text-yellow-400"
+                  : isDarkMode
+                    ? "text-gray-600"
+                    : "text-gray-300"
+              }
+            />
+          ))}
+        </div>
+
+        {/* Comment */}
+        {review.comment && (
+          <p
+            className={`text-sm leading-relaxed ${
+              isDarkMode ? "text-gray-300" : "text-gray-600"
+            }`}
+          >
+            {review.comment}
+          </p>
+        )}
+
+        {/* Image thumbnails */}
+        {review.imageUrls && review.imageUrls.length > 0 && (
+          <div className="flex gap-2 mt-3">
+            {review.imageUrls.map((url, idx) => (
+              <button
+                key={idx}
+                onClick={() => setLightboxUrl(url)}
+                className={`w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 relative hover:opacity-80 transition-opacity ${
+                  isDarkMode ? "bg-gray-700" : "bg-gray-100"
+                }`}
+              >
+                <Image
+                  src={url}
+                  alt={`Review photo ${idx + 1}`}
+                  fill
+                  className="object-cover"
+                  sizes="64px"
+                />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Lightbox */}
+      {lightboxUrl && (
         <div
-          className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
-            isDarkMode ? "bg-gray-700" : "bg-gray-100"
-          }`}
+          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+          onClick={() => setLightboxUrl(null)}
         >
-          <User
-            size={16}
-            className={isDarkMode ? "text-gray-400" : "text-gray-500"}
-          />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p
-            className={`text-sm font-semibold truncate ${
-              isDarkMode ? "text-white" : "text-gray-900"
-            }`}
+          <button
+            onClick={() => setLightboxUrl(null)}
+            className="absolute top-4 right-4 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
           >
-            {review.buyerName ? maskName(review.buyerName) : t("anonymousUser")}
-          </p>
-          <p
-            className={`text-[11px] ${
-              isDarkMode ? "text-gray-500" : "text-gray-400"
-            }`}
+            <X size={20} />
+          </button>
+          <div
+            className="relative max-w-[90vw] max-h-[85vh]"
+            onClick={(e) => e.stopPropagation()}
           >
-            {review.timestamp ? timeAgo(review.timestamp) : ""}
-          </p>
+            <Image
+              src={lightboxUrl}
+              alt="Review photo"
+              width={800}
+              height={800}
+              className="object-contain max-h-[85vh] rounded-2xl"
+              sizes="90vw"
+              priority
+            />
+          </div>
         </div>
-      </div>
-
-      {/* Stars */}
-      <div className="flex items-center gap-0.5 mb-2">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <Star
-            key={i}
-            size={14}
-            className={
-              i < review.rating
-                ? "fill-yellow-400 text-yellow-400"
-                : isDarkMode
-                  ? "text-gray-600"
-                  : "text-gray-300"
-            }
-          />
-        ))}
-      </div>
-
-      {/* Comment */}
-      {review.comment && (
-        <p
-          className={`text-sm leading-relaxed ${
-            isDarkMode ? "text-gray-300" : "text-gray-600"
-          }`}
-        >
-          {review.comment}
-        </p>
       )}
-    </div>
+    </>
   );
 }
 
@@ -203,7 +267,12 @@ export default function RestaurantReviews({
 
         const q =
           !reset && lastDocRef.current
-            ? query(col, orderBy("timestamp", "desc"), startAfter(lastDocRef.current), limit(PAGE_SIZE))
+            ? query(
+                col,
+                orderBy("timestamp", "desc"),
+                startAfter(lastDocRef.current),
+                limit(PAGE_SIZE),
+              )
             : query(col, orderBy("timestamp", "desc"), limit(PAGE_SIZE));
 
         const snapshot = await getDocs(q);
@@ -219,6 +288,7 @@ export default function RestaurantReviews({
             restaurantName: d.restaurantName as string | undefined,
             rating: (d.rating as number) ?? 0,
             comment: (d.comment as string) ?? "",
+            imageUrls: Array.isArray(d.imageUrls) ? d.imageUrls : [],
             timestamp: d.timestamp as Timestamp,
           };
         });
@@ -284,11 +354,7 @@ export default function RestaurantReviews({
     <div className="pb-10">
       <div className="space-y-3">
         {reviews.map((review) => (
-          <ReviewCard
-            key={review.id}
-            review={review}
-            isDarkMode={isDarkMode}
-          />
+          <ReviewCard key={review.id} review={review} isDarkMode={isDarkMode} />
         ))}
       </div>
 
@@ -309,9 +375,7 @@ export default function RestaurantReviews({
             ) : (
               <ChevronDown size={16} />
             )}
-            {isLoadingMore
-              ? t("loadingMore")
-              : t("loadMore")}
+            {isLoadingMore ? t("loadingMore") : t("loadMore")}
           </button>
         </div>
       )}
