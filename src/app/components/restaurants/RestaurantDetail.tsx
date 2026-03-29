@@ -330,7 +330,15 @@ function FoodCard({
       return;
     }
     setExtrasOpen(true);
-  }, [isOpen, isAuthenticated, hasFoodAddress, deliversToUser, onLoginRequired, onAddressRequired, onNoDelivery]);
+  }, [
+    isOpen,
+    isAuthenticated,
+    hasFoodAddress,
+    deliversToUser,
+    onLoginRequired,
+    onAddressRequired,
+    onNoDelivery,
+  ]);
 
   const handleExtrasConfirm = useCallback(
     async (extras: SelectedExtra[], specialNotes: string, quantity: number) => {
@@ -639,16 +647,16 @@ export default function RestaurantDetail({
   const foodAddress = useMemo(
     () =>
       profileData?.foodAddress
-        ? FoodAddress.fromMap(profileData.foodAddress as Record<string, unknown>)
+        ? FoodAddress.fromMap(
+            profileData.foodAddress as Record<string, unknown>,
+          )
         : null,
     [profileData?.foodAddress],
   );
 
   const deliversToUser = useMemo(
     () =>
-      restaurant
-        ? doesRestaurantDeliver(restaurant, foodAddress?.mainRegion, foodAddress?.city)
-        : true,
+      restaurant ? doesRestaurantDeliver(restaurant, foodAddress?.city) : true,
     [restaurant, foodAddress],
   );
 
@@ -672,7 +680,8 @@ export default function RestaurantDetail({
   );
 
   // ── Restaurant conflict dialog ──
-  const [pendingConflict, setPendingConflict] = useState<PendingConflict | null>(null);
+  const [pendingConflict, setPendingConflict] =
+    useState<PendingConflict | null>(null);
 
   const handleConflict = useCallback((pending: PendingConflict) => {
     setPendingConflict(pending);
@@ -877,7 +886,9 @@ export default function RestaurantDetail({
                     className={`ml-1.5 text-xs font-normal ${
                       activeTab === "menu"
                         ? "text-white/70"
-                        : isDarkMode ? "text-gray-500" : "text-gray-400"
+                        : isDarkMode
+                          ? "text-gray-500"
+                          : "text-gray-400"
                     }`}
                   >
                     ({foods.length})
@@ -899,9 +910,7 @@ export default function RestaurantDetail({
 
               {activeTab === "menu" && (
                 <div className="relative w-full sm:w-72">
-                  <Search
-                    className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
-                  />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
                     type="text"
                     value={searchQuery}
@@ -934,38 +943,50 @@ export default function RestaurantDetail({
                   groupedFoods ? (
                     // Grouped by category
                     <div className="space-y-8 pb-10">
-                      {Array.from(groupedFoods.entries()).map(([category, items], idx) => (
-                        <div key={category}>
-                          {idx > 0 && (
-                            <hr className={`mb-8 border-t ${isDarkMode ? "border-gray-700" : "border-gray-200"}`} />
-                          )}
-                          <h3
-                            className={`text-base font-bold mb-3 ${isDarkMode ? "text-white" : "text-gray-900"}`}
-                          >
-                            {category}
-                          </h3>
-                          <div className="grid grid-cols-1 gap-4">
-                            {items.map((food) => (
-                              <FoodCard
-                                key={food.id}
-                                food={food}
-                                isDarkMode={isDarkMode}
-                                restaurant={restaurant}
-                                isOpen={isOpen}
-                                deliversToUser={deliversToUser}
-                                cartQuantity={cartQuantityMap.get(food.id) ?? 0}
-                                onConflict={handleConflict}
-                                onRemoveFromCart={handleRemoveFromCart}
-                                isAuthenticated={!!user}
-                                hasFoodAddress={!!foodAddress}
-                                onLoginRequired={() => setShowLoginModal(true)}
-                                onAddressRequired={() => setShowLocationPicker(true)}
-                                onNoDelivery={() => setShowNoDeliveryModal(true)}
+                      {Array.from(groupedFoods.entries()).map(
+                        ([category, items], idx) => (
+                          <div key={category}>
+                            {idx > 0 && (
+                              <hr
+                                className={`mb-8 border-t ${isDarkMode ? "border-gray-700" : "border-gray-200"}`}
                               />
-                            ))}
+                            )}
+                            <h3
+                              className={`text-base font-bold mb-3 ${isDarkMode ? "text-white" : "text-gray-900"}`}
+                            >
+                              {category}
+                            </h3>
+                            <div className="grid grid-cols-1 gap-4">
+                              {items.map((food) => (
+                                <FoodCard
+                                  key={food.id}
+                                  food={food}
+                                  isDarkMode={isDarkMode}
+                                  restaurant={restaurant}
+                                  isOpen={isOpen}
+                                  deliversToUser={deliversToUser}
+                                  cartQuantity={
+                                    cartQuantityMap.get(food.id) ?? 0
+                                  }
+                                  onConflict={handleConflict}
+                                  onRemoveFromCart={handleRemoveFromCart}
+                                  isAuthenticated={!!user}
+                                  hasFoodAddress={!!foodAddress}
+                                  onLoginRequired={() =>
+                                    setShowLoginModal(true)
+                                  }
+                                  onAddressRequired={() =>
+                                    setShowLocationPicker(true)
+                                  }
+                                  onNoDelivery={() =>
+                                    setShowNoDeliveryModal(true)
+                                  }
+                                />
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ),
+                      )}
                     </div>
                   ) : (
                     // Flat list when search/filter is active
@@ -1054,13 +1075,21 @@ export default function RestaurantDetail({
 
           {/* Cart Sidebar — desktop only (sticky right column) */}
           <div className="hidden lg:block w-80 flex-shrink-0">
-            <FoodCartSidebar isDarkMode={isDarkMode} mode="desktop" restaurant={restaurant} />
+            <FoodCartSidebar
+              isDarkMode={isDarkMode}
+              mode="desktop"
+              restaurant={restaurant}
+            />
           </div>
         </div>
       </div>
 
       {/* Cart FAB — mobile only */}
-      <FoodCartSidebar isDarkMode={isDarkMode} mode="mobile" restaurant={restaurant} />
+      <FoodCartSidebar
+        isDarkMode={isDarkMode}
+        mode="mobile"
+        restaurant={restaurant}
+      />
 
       {/* Restaurant conflict dialog */}
       <RestaurantConflictDialog
