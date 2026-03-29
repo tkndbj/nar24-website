@@ -1,15 +1,5 @@
 import type { Restaurant } from "@/types/Restaurant";
 
-const DAY_NAMES = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-] as const;
-
 /**
  * Determine whether a restaurant is currently open based on its
  * `workingDays` (e.g. ["Monday", "Tuesday", ...]) and
@@ -23,41 +13,48 @@ export function isRestaurantOpen(
 ): boolean {
   const { workingDays, workingHours } = restaurant;
 
-  // No schedule data → assume open
   if (!workingDays?.length || !workingHours?.open || !workingHours?.close) {
     return true;
   }
 
-  const now = new Date();
-  const todayName = DAY_NAMES[now.getDay()];
+  // Always evaluate in Cyprus time regardless of user's device timezone
+  const nowInCyprus = new Date(
+    new Date().toLocaleString("en-US", { timeZone: "Asia/Nicosia" }),
+  );
 
-  // Parse "HH:mm" → total minutes since midnight
+  const DAY_NAMES = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ] as const;
+
+  const todayName = DAY_NAMES[nowInCyprus.getDay()];
+
   const toMinutes = (time: string): number => {
     const [h, m] = time.split(":").map(Number);
     return h * 60 + (m || 0);
   };
 
-  const currentMin = now.getHours() * 60 + now.getMinutes();
+  const currentMin = nowInCyprus.getHours() * 60 + nowInCyprus.getMinutes();
   const openMin = toMinutes(workingHours.open);
   const closeMin = toMinutes(workingHours.close);
+  const days = new Set(workingDays);
 
-  // Overnight span (e.g. 22:00 → 03:00)
-  if (closeMin <= openMin) {
-    // If it's after midnight but before close, the shift started yesterday
+  if (closeMin > openMin) {
+    return (
+      days.has(todayName) && currentMin >= openMin && currentMin < closeMin
+    );
+  } else {
     if (currentMin < closeMin) {
-      const yesterdayIdx = (now.getDay() + 6) % 7;
-      return workingDays.includes(DAY_NAMES[yesterdayIdx]);
+      const yesterdayIdx = (nowInCyprus.getDay() + 6) % 7;
+      return days.has(DAY_NAMES[yesterdayIdx]);
     }
-    // Normal part of the shift (after open, before midnight)
-    return workingDays.includes(todayName) && currentMin >= openMin;
+    return days.has(todayName) && currentMin >= openMin;
   }
-
-  // Normal span (e.g. 08:00 → 22:00)
-  if (!workingDays.includes(todayName)) {
-    return false;
-  }
-
-  return currentMin >= openMin && currentMin < closeMin;
 }
 
 /**
@@ -94,23 +91,10 @@ export function doesRestaurantDeliver(
 export function getMinOrderPrice(
   restaurant: Pick<Restaurant, "minOrderPrices">,
   userCity?: string,
-  userMainRegion?: string,
 ): number | undefined {
   if (!restaurant.minOrderPrices?.length) return undefined;
+  if (!userCity) return undefined;
 
-  if (userCity) {
-    const bySubregion = restaurant.minOrderPrices.find(
-      (p) => p.subregion === userCity,
-    );
-    if (bySubregion) return bySubregion.minOrderPrice;
-  }
-
-  if (userMainRegion) {
-    const byRegion = restaurant.minOrderPrices.find(
-      (p) => p.mainRegion === userMainRegion,
-    );
-    if (byRegion) return byRegion.minOrderPrice;
-  }
-
-  return undefined;
+  return restaurant.minOrderPrices.find((p) => p.subregion === userCity)
+    ?.minOrderPrice;
 }
