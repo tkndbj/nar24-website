@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
@@ -285,6 +285,20 @@ export default function RestaurantsPage({
   const deliveryFilterRegions = React.useMemo(() => {
     return userCity ? [userCity] : undefined;
   }, [userCity]);
+
+  // Sort restaurants: open first, closed last (preserves Typesense order within each group)
+  const sortedRestaurants = useMemo(() => {
+    const open: Restaurant[] = [];
+    const closed: Restaurant[] = [];
+    for (const r of filteredRestaurants) {
+      if (isRestaurantOpen(r)) {
+        open.push(r);
+      } else {
+        closed.push(r);
+      }
+    }
+    return open.concat(closed);
+  }, [filteredRestaurants]);
 
   const pillsRef = useRef<HTMLDivElement>(null);
 
@@ -589,10 +603,10 @@ export default function RestaurantsPage({
               </div>
             ))}
           </div>
-        ) : filteredRestaurants.length > 0 ? (
+        ) : sortedRestaurants.length > 0 ? (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 pb-2">
-              {filteredRestaurants.map((restaurant) => (
+              {sortedRestaurants.map((restaurant) => (
                 <RestaurantCard
                   key={restaurant.id}
                   restaurant={restaurant}

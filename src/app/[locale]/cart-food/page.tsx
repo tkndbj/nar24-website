@@ -35,6 +35,7 @@ import { FoodAddress } from "@/app/models/FoodAddress";
 import { getMinOrderPrice, isRestaurantOpen } from "@/utils/restaurant";
 import RestaurantClosedAlertDialog from "@/app/components/restaurants/RestaurantClosedAlertDialog";
 import type { WorkingHours } from "@/types/Restaurant";
+import type { FoodExtra } from "@/types/Food";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // WRAPPER — provides FoodCartProvider
@@ -185,6 +186,31 @@ function FoodCartPageContent() {
 
   // ── Editing extras state ─────────────────────────────────────────────
   const [editingItem, setEditingItem] = useState<FoodCartItem | null>(null);
+  const [editingAllowedExtras, setEditingAllowedExtras] = useState<FoodExtra[] | undefined>(undefined);
+
+  // Fetch allowed extras when editing a cart item
+  useEffect(() => {
+    if (!editingItem) {
+      setEditingAllowedExtras(undefined);
+      return;
+    }
+    let cancelled = false;
+    getDoc(doc(db, "foods", editingItem.originalFoodId))
+      .then((snap) => {
+        if (cancelled || !snap.exists()) return;
+        const d = snap.data();
+        if (Array.isArray(d.extras)) {
+          setEditingAllowedExtras(
+            d.extras.map((e: Record<string, unknown>) => ({
+              name: String(e.name ?? ""),
+              price: Number(e.price ?? 0),
+            })),
+          );
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [editingItem?.originalFoodId]);
 
   // ── Clear cart confirmation ──────────────────────────────────────────
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -602,6 +628,7 @@ function FoodCartPageContent() {
           foodName={editingItem.name}
           foodPrice={editingItem.price}
           foodCategory={editingItem.foodCategory}
+          allowedExtras={editingAllowedExtras}
           isDarkMode={isDark}
           initialExtras={editingItem.extras}
           initialNotes={editingItem.specialNotes}

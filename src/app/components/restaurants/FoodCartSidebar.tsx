@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import Image from "next/image";
 import {
   ShoppingBag,
@@ -30,6 +30,9 @@ import { useUser } from "@/context/UserProvider";
 import { FoodAddress } from "@/app/models/FoodAddress";
 import { getMinOrderPrice, isRestaurantOpen } from "@/utils/restaurant";
 import type { Restaurant } from "@/types/Restaurant";
+import type { FoodExtra } from "@/types/Food";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 // ─── Compact Cart Item ──────────────────────────────────────────────────────
 
@@ -264,8 +267,33 @@ function CartContent({
   const { profileData } = useUser();
 
   const [editingItem, setEditingItem] = useState<FoodCartItem | null>(null);
+  const [editingAllowedExtras, setEditingAllowedExtras] = useState<FoodExtra[] | undefined>(undefined);
   const [showMinOrderAlert, setShowMinOrderAlert] = useState(false);
   const [showClosedAlert, setShowClosedAlert] = useState(false);
+
+  // Fetch allowed extras when editing a cart item
+  useEffect(() => {
+    if (!editingItem) {
+      setEditingAllowedExtras(undefined);
+      return;
+    }
+    let cancelled = false;
+    getDoc(doc(db, "foods", editingItem.originalFoodId))
+      .then((snap) => {
+        if (cancelled || !snap.exists()) return;
+        const d = snap.data();
+        if (Array.isArray(d.extras)) {
+          setEditingAllowedExtras(
+            d.extras.map((e: Record<string, unknown>) => ({
+              name: String(e.name ?? ""),
+              price: Number(e.price ?? 0),
+            })),
+          );
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [editingItem?.originalFoodId]);
 
   const t = useCallback(
     (key: string, fallback?: string) => {
@@ -513,6 +541,7 @@ function CartContent({
           foodName={editingItem.name}
           foodPrice={editingItem.price}
           foodCategory={editingItem.foodCategory}
+          allowedExtras={editingAllowedExtras}
           isDarkMode={isDarkMode}
           initialExtras={editingItem.extras}
           initialNotes={editingItem.specialNotes}
