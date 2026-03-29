@@ -1054,13 +1054,13 @@ export default function RestaurantDetail({
 
           {/* Cart Sidebar — desktop only (sticky right column) */}
           <div className="hidden lg:block w-80 flex-shrink-0">
-            <FoodCartSidebar isDarkMode={isDarkMode} mode="desktop" />
+            <FoodCartSidebar isDarkMode={isDarkMode} mode="desktop" restaurant={restaurant} />
           </div>
         </div>
       </div>
 
       {/* Cart FAB — mobile only */}
-      <FoodCartSidebar isDarkMode={isDarkMode} mode="mobile" />
+      <FoodCartSidebar isDarkMode={isDarkMode} mode="mobile" restaurant={restaurant} />
 
       {/* Restaurant conflict dialog */}
       <RestaurantConflictDialog

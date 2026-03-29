@@ -87,11 +87,15 @@ function RestaurantCard({
   const minOrder = (() => {
     if (!restaurant.minOrderPrices?.length) return undefined;
     if (userSubregion) {
-      const bySubregion = restaurant.minOrderPrices.find((p) => p.subregion === userSubregion);
+      const bySubregion = restaurant.minOrderPrices.find(
+        (p) => p.subregion === userSubregion,
+      );
       if (bySubregion) return bySubregion.minOrderPrice;
     }
     if (userMainRegion) {
-      const byRegion = restaurant.minOrderPrices.find((p) => p.mainRegion === userMainRegion);
+      const byRegion = restaurant.minOrderPrices.find(
+        (p) => p.mainRegion === userMainRegion,
+      );
       if (byRegion) return byRegion.minOrderPrice;
     }
     return undefined;
@@ -101,9 +105,7 @@ function RestaurantCard({
     <Link
       href={`/restaurantdetail/${restaurant.id}`}
       className={`group relative flex items-center gap-4 rounded-2xl p-4 block ${
-        isDarkMode
-          ? "border border-gray-700/40"
-          : "border border-gray-200"
+        isDarkMode ? "border border-gray-700/40" : "border border-gray-200"
       }`}
     >
       {/* Profile Image */}
@@ -210,20 +212,24 @@ function RestaurantCard({
 
       {/* No delivery badge */}
       {!deliversToUser && (
-        <span className={`absolute top-2 right-2 px-2 py-1 text-[10px] font-semibold rounded-lg backdrop-blur-sm ${
-          isDarkMode
-            ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30"
-            : "bg-yellow-50 text-yellow-700 border border-yellow-200"
-        }`}>
+        <span
+          className={`absolute top-2 right-2 px-2 py-1 text-[10px] font-semibold rounded-lg backdrop-blur-sm ${
+            isDarkMode
+              ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30"
+              : "bg-yellow-50 text-yellow-700 border border-yellow-200"
+          }`}
+        >
           {t("noDeliveryToAddress")}
         </span>
       )}
 
       {/* Min order badge */}
       {deliversToUser && minOrder != null && (
-        <span className={`absolute bottom-2 right-2 px-2 py-0.5 text-[11px] font-semibold rounded-lg backdrop-blur-sm ${
-          !isOpen ? "bottom-9" : "bottom-2"
-        } bg-emerald-500/90 text-white`}>
+        <span
+          className={`absolute bottom-2 right-2 px-2 py-0.5 text-[11px] font-semibold rounded-lg backdrop-blur-sm ${
+            !isOpen ? "bottom-9" : "bottom-2"
+          } bg-emerald-500/90 text-white`}
+        >
           {t("minOrder")} {minOrder} TL
         </span>
       )}
@@ -242,7 +248,9 @@ function RestaurantCard({
 
 const HITS_PER_PAGE = 30;
 
-export default function RestaurantsPage({ restaurants: serverRestaurants }: RestaurantsPageProps) {
+export default function RestaurantsPage({
+  restaurants: serverRestaurants,
+}: RestaurantsPageProps) {
   const isDarkMode = useTheme();
   const t = useTranslations("restaurants");
   const { user, profileData, isLoading: isUserLoading } = useUser();
@@ -252,7 +260,9 @@ export default function RestaurantsPage({ restaurants: serverRestaurants }: Rest
   const [sortOption, setSortOption] = useState<RestaurantSortOption>("default");
   const [searchQuery, setSearchQuery] = useState("");
   const [cuisineFacets, setCuisineFacets] = useState<FacetValue[]>([]);
-  const [filteredRestaurants, setFilteredRestaurants] = useState<Restaurant[]>(serverRestaurants ?? []);
+  const [filteredRestaurants, setFilteredRestaurants] = useState<Restaurant[]>(
+    serverRestaurants ?? [],
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
@@ -291,9 +301,11 @@ export default function RestaurantsPage({ restaurants: serverRestaurants }: Rest
   useEffect(() => {
     if (isUserLoading) return;
     const svc = TypeSenseServiceManager.instance.restaurantService;
-    svc.fetchRestaurantFacets({ deliveryRegions: deliveryFilterRegions }).then((facets) => {
-      setCuisineFacets(facets.cuisineTypes ?? []);
-    });
+    svc
+      .fetchRestaurantFacets({ deliveryRegions: deliveryFilterRegions })
+      .then((facets) => {
+        setCuisineFacets(facets.cuisineTypes ?? []);
+      });
   }, [isUserLoading, deliveryFilterRegions]);
 
   // Initial load + filter/search/sort changes — fetch page 0, replace results
@@ -338,7 +350,14 @@ export default function RestaurantsPage({ restaurants: serverRestaurants }: Rest
     return () => {
       cancelled = true;
     };
-  }, [selectedCuisine, selectedFoodType, sortOption, searchQuery, isUserLoading, deliveryFilterRegions]);
+  }, [
+    selectedCuisine,
+    selectedFoodType,
+    sortOption,
+    searchQuery,
+    isUserLoading,
+    deliveryFilterRegions,
+  ]);
 
   // Load next page — called by IntersectionObserver
   const loadMore = useCallback(() => {
@@ -372,7 +391,15 @@ export default function RestaurantsPage({ restaurants: serverRestaurants }: Rest
           setIsLoadingMore(false);
         }
       });
-  }, [isLoadingMore, hasMore, searchQuery, selectedCuisine, selectedFoodType, sortOption, deliveryFilterRegions]);
+  }, [
+    isLoadingMore,
+    hasMore,
+    searchQuery,
+    selectedCuisine,
+    selectedFoodType,
+    sortOption,
+    deliveryFilterRegions,
+  ]);
 
   // IntersectionObserver to trigger loadMore when sentinel is visible
   useEffect(() => {
@@ -436,7 +463,9 @@ export default function RestaurantsPage({ restaurants: serverRestaurants }: Rest
                 <MapPin className="w-3 h-3" />
                 {foodAddress?.displayLabel || t("selectDeliveryAddress")}
                 {foodAddress && (
-                  <span className={`${isDarkMode ? "text-orange-500/60" : "text-orange-400"}`}>
+                  <span
+                    className={`${isDarkMode ? "text-orange-500/60" : "text-orange-400"}`}
+                  >
                     &middot; {t("changeAddress")}
                   </span>
                 )}
@@ -464,7 +493,11 @@ export default function RestaurantsPage({ restaurants: serverRestaurants }: Rest
             {/* Sort toggle */}
             <button
               onClick={() => {
-                const cycle: RestaurantSortOption[] = ["default", "rating_desc", "rating_asc"];
+                const cycle: RestaurantSortOption[] = [
+                  "default",
+                  "rating_desc",
+                  "rating_asc",
+                ];
                 const idx = cycle.indexOf(sortOption);
                 setSortOption(cycle[(idx + 1) % cycle.length]);
               }}
@@ -566,7 +599,7 @@ export default function RestaurantsPage({ restaurants: serverRestaurants }: Rest
                   isDarkMode={isDarkMode}
                   userMainRegion={userMainRegion}
                   userSubregion={userCity}
-                  deliversToUser={doesRestaurantDeliver(restaurant, userMainRegion, userCity)}
+                  deliversToUser={doesRestaurantDeliver(restaurant, userCity)}
                 />
               ))}
             </div>
@@ -592,8 +625,12 @@ export default function RestaurantsPage({ restaurants: serverRestaurants }: Rest
                       }`}
                     />
                     <div className="flex-1 space-y-2">
-                      <div className={`h-4 rounded w-3/4 ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`} />
-                      <div className={`h-3 rounded w-1/2 ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`} />
+                      <div
+                        className={`h-4 rounded w-3/4 ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`}
+                      />
+                      <div
+                        className={`h-3 rounded w-1/2 ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`}
+                      />
                     </div>
                   </div>
                 ))}

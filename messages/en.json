@@ -5167,7 +5167,10 @@
     "clearCartDesc": "This will remove all items from your food cart.",
     "cancel": "Cancel",
     "clearCart": "Clear Cart",
-    "edit": "Edit"
+    "edit": "Edit",
+    "minOrderTitle": "Minimum Order Not Met",
+    "minOrderMessage": "This restaurant requires a minimum order of {minOrder} {currency}. Your current total is {currentTotal} {currency}. Please add {remaining} {currency} more to proceed.",
+    "minOrderOk": "Add More Items"
   },
   "restaurantDetail": {
     "menu": "Menu",

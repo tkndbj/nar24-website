@@ -5179,7 +5179,10 @@
     "clearCartDesc": "Bu işlem yemek sepetinizdeki tüm ürünleri kaldıracak.",
     "cancel": "İptal",
     "clearCart": "Sepeti Temizle",
-    "edit": "Düzenle"
+    "edit": "Düzenle",
+    "minOrderTitle": "Minimum Sipariş Tutarına Ulaşılmadı",
+    "minOrderMessage": "Bu restoran minimum {minOrder} {currency} sipariş gerektirmektedir. Mevcut toplam tutarınız {currentTotal} {currency}. Devam etmek için {remaining} {currency} daha eklemeniz gerekmektedir.",
+    "minOrderOk": "Daha Fazla Ürün Ekle"
   },
   "restaurantDetail": {
     "menu": "Menü",

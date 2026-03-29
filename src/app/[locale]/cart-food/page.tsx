@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import Image from "next/image";
 import {
   ArrowLeft,
@@ -24,11 +24,15 @@ import { useUser } from "@/context/UserProvider";
 import { useRouter } from "@/navigation";
 import { useTranslations } from "next-intl";
 import FoodExtrasSheet from "@/app/components/restaurants/FoodExtrasSheet";
+import MinOrderAlertDialog from "@/app/components/restaurants/MinOrderAlertDialog";
 import { FoodExtrasData } from "@/constants/foodExtras";
 import { FoodCategoryData } from "@/constants/foodData";
 import Footer from "@/app/components/Footer";
 import { db } from "@/lib/firebase";
 import { FoodCartProvider } from "@/context/FoodCartProvider";
+import { doc, getDoc } from "firebase/firestore";
+import { FoodAddress } from "@/app/models/FoodAddress";
+import { getMinOrderPrice } from "@/utils/restaurant";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // WRAPPER — provides FoodCartProvider
@@ -49,7 +53,7 @@ export default function FoodCartPage() {
 
 function FoodCartPageContent() {
   const router = useRouter();
-  const { user, isLoading: isAuthLoading } = useUser();
+  const { user, isLoading: isAuthLoading, profileData } = useUser();
   const localization = useTranslations();
 
   const {
@@ -65,6 +69,51 @@ function FoodCartPageContent() {
     updateNotes,
     clearCart,
   } = useFoodCart();
+
+  // ── Min order price from restaurant ──────────────────────────────────
+  const [restaurantMinOrderPrices, setRestaurantMinOrderPrices] = useState<
+    { mainRegion: string; subregion: string; minOrderPrice: number }[] | undefined
+  >(undefined);
+  const [showMinOrderAlert, setShowMinOrderAlert] = useState(false);
+
+  useEffect(() => {
+    if (!currentRestaurant?.id || !db) {
+      setRestaurantMinOrderPrices(undefined);
+      return;
+    }
+
+    let cancelled = false;
+    getDoc(doc(db, "restaurants", currentRestaurant.id))
+      .then((snap) => {
+        if (cancelled || !snap.exists()) return;
+        const d = snap.data();
+        if (Array.isArray(d.minOrderPrices)) {
+          setRestaurantMinOrderPrices(
+            (d.minOrderPrices as Array<Record<string, unknown>>).map((p) => ({
+              mainRegion: String(p.mainRegion ?? ""),
+              subregion: String(p.subregion ?? ""),
+              minOrderPrice: Number(p.minOrderPrice ?? 0),
+            })),
+          );
+        } else {
+          setRestaurantMinOrderPrices(undefined);
+        }
+      })
+      .catch(() => setRestaurantMinOrderPrices(undefined));
+
+    return () => { cancelled = true; };
+  }, [currentRestaurant?.id]);
+
+  const foodAddress = profileData?.foodAddress
+    ? FoodAddress.fromMap(profileData.foodAddress as Record<string, unknown>)
+    : null;
+  const minOrderPrice = restaurantMinOrderPrices
+    ? getMinOrderPrice(
+        { minOrderPrices: restaurantMinOrderPrices },
+        foodAddress?.city,
+        foodAddress?.mainRegion,
+      )
+    : undefined;
 
   // ── Theme ────────────────────────────────────────────────────────────
   const [isDark, setIsDark] = useState(false);
@@ -140,6 +189,12 @@ function FoodCartPageContent() {
   const handleCheckout = useCallback(() => {
     if (items.length === 0) return;
 
+    // Check minimum order requirement
+    if (minOrderPrice != null && totals.subtotal < minOrderPrice) {
+      setShowMinOrderAlert(true);
+      return;
+    }
+
     // Store food checkout data in sessionStorage
     if (typeof window !== "undefined") {
       sessionStorage.setItem(
@@ -162,7 +217,7 @@ function FoodCartPageContent() {
     }
 
     router.push("/food-checkout");
-  }, [items, currentRestaurant, totals, router]);
+  }, [items, currentRestaurant, totals, router, minOrderPrice]);
 
   // ════════════════════════════════════════════════════════════════════════
   // RENDER
@@ -522,6 +577,19 @@ function FoodCartPageContent() {
           initialExtras={editingItem.extras}
           initialNotes={editingItem.specialNotes}
           initialQuantity={editingItem.quantity}
+        />
+      )}
+
+      {/* Min Order Alert */}
+      {minOrderPrice != null && (
+        <MinOrderAlertDialog
+          open={showMinOrderAlert}
+          minOrderPrice={minOrderPrice}
+          currentTotal={totals.subtotal}
+          currency={totals.currency}
+          onClose={() => setShowMinOrderAlert(false)}
+          isDarkMode={isDark}
+          t={t}
         />
       )}
 

@@ -74,15 +74,43 @@ export function isRestaurantOpen(
  */
 export function doesRestaurantDeliver(
   restaurant: Pick<Restaurant, "minOrderPrices">,
-  userMainRegion?: string,
   userCity?: string,
 ): boolean {
   if (!restaurant.minOrderPrices?.length) return true;
-  if (!userMainRegion && !userCity) return true;
+  if (!userCity) return true; // can't determine → assume deliverable
 
-  return restaurant.minOrderPrices.some(
-    (p) =>
-      (userCity && p.subregion === userCity) ||
-      (userMainRegion && p.mainRegion === userMainRegion),
-  );
+  return restaurant.minOrderPrices.some((p) => p.subregion === userCity);
+}
+
+/**
+ * Get the minimum order price for a restaurant given the user's location.
+ *
+ * Lookup priority:
+ *  1. Exact subregion (city) match
+ *  2. mainRegion match
+ *
+ * Returns `undefined` when no min order applies (no data, no address, or no match).
+ */
+export function getMinOrderPrice(
+  restaurant: Pick<Restaurant, "minOrderPrices">,
+  userCity?: string,
+  userMainRegion?: string,
+): number | undefined {
+  if (!restaurant.minOrderPrices?.length) return undefined;
+
+  if (userCity) {
+    const bySubregion = restaurant.minOrderPrices.find(
+      (p) => p.subregion === userCity,
+    );
+    if (bySubregion) return bySubregion.minOrderPrice;
+  }
+
+  if (userMainRegion) {
+    const byRegion = restaurant.minOrderPrices.find(
+      (p) => p.mainRegion === userMainRegion,
+    );
+    if (byRegion) return byRegion.minOrderPrice;
+  }
+
+  return undefined;
 }

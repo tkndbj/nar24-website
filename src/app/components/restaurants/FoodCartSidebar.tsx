@@ -22,8 +22,13 @@ import {
 import { useRouter } from "@/navigation";
 import { useTranslations } from "next-intl";
 import FoodExtrasSheet from "./FoodExtrasSheet";
+import MinOrderAlertDialog from "./MinOrderAlertDialog";
 import { FoodExtrasData } from "@/constants/foodExtras";
 import { FoodCategoryData } from "@/constants/foodData";
+import { useUser } from "@/context/UserProvider";
+import { FoodAddress } from "@/app/models/FoodAddress";
+import { getMinOrderPrice } from "@/utils/restaurant";
+import type { Restaurant } from "@/types/Restaurant";
 
 // ─── Compact Cart Item ──────────────────────────────────────────────────────
 
@@ -244,17 +249,21 @@ function SidebarCartItem({
 
 function CartContent({
   isDarkMode,
+  restaurant,
 }: {
   isDarkMode: boolean;
   compact?: boolean;
+  restaurant?: Pick<Restaurant, "minOrderPrices"> | null;
 }) {
   const router = useRouter();
   const localization = useTranslations();
   const { items, totals, itemCount, currentRestaurant } = useFoodCartState();
   const { removeItem, updateQuantity, updateExtras, updateNotes, clearCart } =
     useFoodCartActions();
+  const { profileData } = useUser();
 
   const [editingItem, setEditingItem] = useState<FoodCartItem | null>(null);
+  const [showMinOrderAlert, setShowMinOrderAlert] = useState(false);
 
   const t = useCallback(
     (key: string, fallback?: string) => {
@@ -283,8 +292,23 @@ function CartContent({
     [editingItem, updateExtras, updateNotes, updateQuantity],
   );
 
+  // Derive min order price from restaurant + user address
+  const foodAddress = profileData?.foodAddress
+    ? FoodAddress.fromMap(profileData.foodAddress as Record<string, unknown>)
+    : null;
+  const minOrderPrice = restaurant
+    ? getMinOrderPrice(restaurant, foodAddress?.city, foodAddress?.mainRegion)
+    : undefined;
+
   const handleCheckout = useCallback(() => {
     if (items.length === 0) return;
+
+    // Check minimum order requirement
+    if (minOrderPrice != null && totals.subtotal < minOrderPrice) {
+      setShowMinOrderAlert(true);
+      return;
+    }
+
     if (typeof window !== "undefined") {
       sessionStorage.setItem(
         "foodCheckoutData",
@@ -305,7 +329,7 @@ function CartContent({
       );
     }
     router.push("/food-checkout");
-  }, [items, currentRestaurant, totals, router]);
+  }, [items, currentRestaurant, totals, router, minOrderPrice]);
 
   // Empty state
   if (items.length === 0) {
@@ -487,6 +511,19 @@ function CartContent({
           initialQuantity={editingItem.quantity}
         />
       )}
+
+      {/* Min Order Alert */}
+      {minOrderPrice != null && (
+        <MinOrderAlertDialog
+          open={showMinOrderAlert}
+          minOrderPrice={minOrderPrice}
+          currentTotal={totals.subtotal}
+          currency={totals.currency}
+          onClose={() => setShowMinOrderAlert(false)}
+          isDarkMode={isDarkMode}
+          t={t}
+        />
+      )}
     </>
   );
 }
@@ -496,9 +533,11 @@ function CartContent({
 export default function FoodCartSidebar({
   isDarkMode,
   mode,
+  restaurant,
 }: {
   isDarkMode: boolean;
   mode?: "desktop" | "mobile";
+  restaurant?: Pick<Restaurant, "minOrderPrices"> | null;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { itemCount } = useFoodCartState();
@@ -514,7 +553,7 @@ export default function FoodCartSidebar({
               : "bg-white border-gray-200"
           }`}
         >
-          <CartContent isDarkMode={isDarkMode} />
+          <CartContent isDarkMode={isDarkMode} restaurant={restaurant} />
         </aside>
       )}
 
@@ -569,7 +608,7 @@ export default function FoodCartSidebar({
               </button>
             </div>
 
-            <CartContent isDarkMode={isDarkMode} />
+            <CartContent isDarkMode={isDarkMode} restaurant={restaurant} />
           </div>
         </div>
       )}
