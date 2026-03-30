@@ -1008,9 +1008,15 @@ export const CartProvider: React.FC<CartProviderProps> = ({
             functions,
             "calculateCartTotals",
           );
-
+          
+          // Convert excluded IDs to selected IDs for direct lookup
+          const allIds = Array.from(cartProductIds);
+          const selectedIds = excludedProductIds == null || excludedProductIds.length === 0
+            ? allIds
+            : allIds.filter((id) => !excludedProductIds.includes(id));
+          
           const result = await calculateCartTotalsFunction({
-            excludedProductIds: excludedProductIds ?? [],
+            selectedProductIds: selectedIds,
           });
 
           // Deep conversion of nested structures
