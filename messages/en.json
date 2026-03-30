@@ -1552,6 +1552,7 @@
     "foodStatusConfirmed": "Confirmed",
     "foodStatusPreparing": "Preparing",
     "foodStatusReady": "Ready",
+    "foodStatusOutForDelivery": "Out for Delivery",
     "foodStatusDelivered": "Delivered",
     "foodStatusCompleted": "Completed",
     "foodStatusCancelled": "Cancelled",

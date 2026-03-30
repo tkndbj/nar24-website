@@ -1552,6 +1552,7 @@
     "foodStatusConfirmed": "Onaylandı",
     "foodStatusPreparing": "Hazırlanıyor",
     "foodStatusReady": "Hazır",
+    "foodStatusOutForDelivery": "Yolda",
     "foodStatusDelivered": "Teslim Edildi",
     "foodStatusCompleted": "Tamamlandı",
     "foodStatusCancelled": "İptal Edildi",

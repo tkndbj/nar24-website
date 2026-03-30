@@ -175,6 +175,7 @@ type FoodOrderStatus =
   | "rejected"
   | "preparing"
   | "ready"
+  | "out_for_delivery"
   | "delivered"
   | "completed"
   | "cancelled";
@@ -701,6 +702,12 @@ export default function OrdersPage() {
           text: "text-indigo-600 dark:text-indigo-400",
           border: "border-indigo-200 dark:border-indigo-700",
         };
+      case "out_for_delivery":
+        return {
+          bg: "bg-blue-50 dark:bg-blue-900/30",
+          text: "text-blue-600 dark:text-blue-400",
+          border: "border-blue-200 dark:border-blue-700",
+        };
       case "delivered":
       case "completed":
         return {
@@ -714,6 +721,12 @@ export default function OrdersPage() {
           text: "text-red-600 dark:text-red-400",
           border: "border-red-200 dark:border-red-700",
         };
+      default:
+        return {
+          bg: "bg-gray-100 dark:bg-gray-700",
+          text: "text-gray-600 dark:text-gray-300",
+          border: "border-gray-200 dark:border-gray-600",
+        };
     }
   };
 
@@ -725,6 +738,7 @@ export default function OrdersPage() {
       rejected: XCircle, // add
       preparing: UtensilsCrossed,
       ready: ShoppingBag,
+      out_for_delivery: Bike,
       delivered: CheckCircle2,
       completed: CheckCircle2,
       cancelled: XCircle,
@@ -736,17 +750,18 @@ export default function OrdersPage() {
       rejected: t("foodStatusRejected") || "Rejected", // add
       preparing: t("foodStatusPreparing") || "Preparing",
       ready: t("foodStatusReady") || "Ready",
+      out_for_delivery: t("foodStatusOutForDelivery") || "Out for Delivery",
       delivered: t("foodStatusDelivered") || "Delivered",
       completed: t("foodStatusCompleted") || "Completed",
       cancelled: t("foodStatusCancelled") || "Cancelled",
     };
-    const Icon = icons[status];
+    const Icon = icons[status] || Clock;
     return (
       <span
         className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${colors.bg} ${colors.text} ${colors.border}`}
       >
         <Icon className="w-3 h-3" />
-        {labels[status]}
+        {labels[status] || status}
       </span>
     );
   };
