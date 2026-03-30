@@ -929,12 +929,18 @@ function ProductPaymentPageContent() {
           return;
         }
 
-        console.log("📦 Cart items from Firebase:", selectedCartItems);
 
-        // Calculate fresh totals
-        console.log("💰 Calculating fresh totals from server...");
-        const freshTotals = await calculateCartTotals(selectedIds);
-        console.log("💰 Server totals:", freshTotals);
+        const allCartItemIds = firebaseCartItems.map((item) => item.productId);
+
+        // Calculate excluded IDs (items NOT selected)
+        const excludedIds = allCartItemIds.filter(
+          (id) => !selectedIds.includes(id),
+        );
+        
+        // Pass excluded IDs (matching cart page behavior)
+        const freshTotals = await calculateCartTotals(
+          excludedIds.length > 0 ? excludedIds : undefined,
+        );
 
         const pricingMap = new Map<
           string,
