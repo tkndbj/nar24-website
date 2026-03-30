@@ -26,6 +26,7 @@ import {
   StickyNote,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { FoodExtrasData } from "@/constants/foodExtras";
 
 // ============================================================================
 // INTERFACES
@@ -715,7 +716,9 @@ export default function FoodReceiptDetailPage() {
                                     : "bg-gray-200 text-gray-600"
                                 }`}
                               >
-                                {ext.name}
+                                {FoodExtrasData.kExtrasTranslationKeys[ext.name]
+                                  ? t(FoodExtrasData.kExtrasTranslationKeys[ext.name])
+                                  : ext.name}
                                 {ext.quantity > 1 ? ` ×${ext.quantity}` : ""}
                                 {ext.price > 0 ? ` +${ext.price}` : ""}
                               </span>

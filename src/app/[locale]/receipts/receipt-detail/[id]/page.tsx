@@ -36,6 +36,7 @@ import {
   Check,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { AttributeLocalizationUtils } from "@/constants/AttributeLocalization";
 
 // ============================================================================
 // INTERFACES
@@ -319,42 +320,7 @@ export default function ReceiptDetailPage() {
 
   const formatAttributes = (attrs?: Record<string, unknown>): string => {
     if (!attrs) return "";
-    const systemFields = [
-      "productId",
-      "orderId",
-      "buyerId",
-      "sellerId",
-      "timestamp",
-      "addedAt",
-      "updatedAt",
-      "selectedColorImage",
-      "productImage",
-      "price",
-      "finalPrice",
-      "shopId",
-      "sellerName",
-      "buyerName",
-      "productName",
-      "currency",
-      "quantity",
-      "unitPrice",
-      "clothingFit",
-      "clothingType",
-      "clothingTypes",
-      "pantFabricTypes",
-      "pantFabricType",
-      "isBundleItem",
-      "gender",
-      "calculatedTotal",
-      "calculatedUnitPrice",
-      "ourComission",
-      "sellerContactNo",
-      "showSellerHeader",
-    ];
-    return Object.entries(attrs)
-      .filter(([k, v]) => v != null && v !== "" && !systemFields.includes(k))
-      .map(([k, v]) => `${k}: ${v}`)
-      .join(", ");
+    return AttributeLocalizationUtils.formatAttributesDisplay(attrs, t).replace(/\n/g, ", ");
   };
 
   const groupItemsBySeller = (items: OrderItem[]) =>
