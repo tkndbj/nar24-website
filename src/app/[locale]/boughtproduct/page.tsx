@@ -34,6 +34,7 @@ import {
 import { db } from "@/lib/firebase";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
+import { AttributeLocalizationUtils } from "@/constants/AttributeLocalization";
 
 // ============================================================================
 // TYPES
@@ -240,6 +241,7 @@ export default function BoughtProductsPage() {
   const orderId = searchParams.get("orderId");
   const { user, isLoading: authLoading } = useUser();
   const t = useTranslations("BoughtProducts");
+  const tRoot = useTranslations();
 
   // State
   const [orderData, setOrderData] = useState<OrderData | null>(null);
@@ -540,12 +542,9 @@ export default function BoughtProductsPage() {
       const colorConfig = ATTRIBUTE_COLORS[colorIndex % ATTRIBUTE_COLORS.length];
       colorIndex++;
 
-      // Format key and value
-      const formattedKey = key
-        .replace(/([A-Z])/g, " $1")
-        .replace(/^./, (str) => str.toUpperCase())
-        .trim();
-      const formattedValue = String(value);
+      // Format key and value using localization
+      const formattedKey = AttributeLocalizationUtils.getLocalizedAttributeTitle(key, tRoot);
+      const formattedValue = AttributeLocalizationUtils.getLocalizedAttributeValue(key, value, tRoot);
 
       chips.push(
         <span

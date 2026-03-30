@@ -22,6 +22,7 @@ import { useRouter, useParams } from "next/navigation";
 import { doc, getDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useTranslations } from "next-intl";
+import { FoodExtrasData } from "@/constants/foodExtras";
 
 // ============================================================================
 // TYPES
@@ -170,6 +171,7 @@ export default function FoodOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { user, isLoading: authLoading } = useUser();
   const t = useTranslations("FoodOrderDetail");
+  const tRoot = useTranslations();
 
   const [order, setOrder] = useState<FoodOrder | null>(null);
   const [loading, setLoading] = useState(true);
@@ -612,7 +614,9 @@ export default function FoodOrderDetailPage() {
                               border: "1px solid #F9731630",
                             }}
                           >
-                            {ext.name}
+                            {FoodExtrasData.kExtrasTranslationKeys[ext.name]
+                              ? tRoot(FoodExtrasData.kExtrasTranslationKeys[ext.name])
+                              : ext.name}
                             {ext.quantity > 1 && ` ×${ext.quantity}`}
                             {ext.price > 0 && (
                               <span className="ml-1 opacity-75">
