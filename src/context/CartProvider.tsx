@@ -314,6 +314,7 @@ export const buildProductDataForCart = (
 
   const data: Record<string, unknown> = {
     productId: product.id || "",
+    productSource: product.shopId != null ? "shop_products" : "products",
     productName: product.productName || "Product",
     description: product.description || "",
     unitPrice: typeof product.price === "number" ? product.price : 0,
@@ -814,24 +815,22 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
   const sortCartItems = useCallback((items: CartItem[]) => {
     items.sort((a, b) => {
-      // Group by seller
-      const sellerA = a.sellerId ?? "";
-      const sellerB = b.sellerId ?? "";
-      if (sellerA !== sellerB) return sellerA.localeCompare(sellerB);
-
-      // Then by added date
+      // Use shopId for shop items, sellerId for individual sellers
+      const groupA = (a.cartData?.shopId as string) ?? a.sellerId ?? "";
+      const groupB = (b.cartData?.shopId as string) ?? b.sellerId ?? "";
+      if (groupA !== groupB) return groupA.localeCompare(groupB);
+  
       const dateA = a.cartData.addedAt as Timestamp;
       const dateB = b.cartData.addedAt as Timestamp;
       if (!dateA || !dateB) return 0;
       return dateB.toMillis() - dateA.toMillis();
     });
-
-    // Add seller headers
-    let lastSeller: string | null = null;
+  
+    let lastGroupKey: string | null = null;
     items.forEach((item) => {
-      const sellerId = item.sellerId ?? "";
-      item.showSellerHeader = sellerId !== lastSeller;
-      lastSeller = sellerId;
+      const groupKey = (item.cartData?.shopId as string) ?? item.sellerId ?? "";
+      item.showSellerHeader = groupKey !== lastGroupKey;
+      lastGroupKey = groupKey;
     });
   }, []);
 
@@ -1712,6 +1711,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
               productId: item.productId,
               quantity: item.quantity ?? 1,
               selectedColor: cartData.selectedColor,
+              productSource: (cartData as Record<string, unknown>).productSource as string ?? "shop_products",
               cachedPrice: cartData.cachedPrice,
               cachedBundlePrice: cartData.cachedBundlePrice,
               cachedDiscountPercentage: cartData.cachedDiscountPercentage,
