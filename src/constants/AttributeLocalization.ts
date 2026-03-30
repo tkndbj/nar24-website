@@ -6,7 +6,27 @@ import { useTranslations } from 'next-intl';
 type TranslationFunction = ReturnType<typeof useTranslations>;
 
 export class AttributeLocalizationUtils {
-  
+
+  /** Fields that should never be displayed in attribute summaries */
+  private static readonly SYSTEM_FIELDS = new Set([
+    "productId", "orderId", "buyerId", "sellerId", "timestamp",
+    "addedAt", "updatedAt", "selectedColorImage", "selectedColorImages",
+    "productImage", "price", "finalPrice", "calculatedUnitPrice",
+    "calculatedTotal", "unitPrice", "totalPrice", "currency",
+    "isBundleItem", "bundleInfo", "salePreferences", "isBundle",
+    "bundleId", "mainProductPrice", "bundlePrice", "sellerName",
+    "isShop", "shopId", "productName", "brandModel", "brand",
+    "category", "subcategory", "subsubcategory", "condition",
+    "averageRating", "productAverageRating", "reviewCount",
+    "productReviewCount", "gender", "clothingType", "clothingFit",
+    "shipmentStatus", "deliveryOption", "needsProductReview",
+    "needsSellerReview", "needsAnyReview", "quantity",
+    "availableStock", "maxQuantityAllowed", "ourComission",
+    "sellerContactNo", "showSellerHeader", "clothingTypes",
+    "pantFabricTypes", "pantFabricType", "gatheringStatus",
+    "deliveryStatus", "deliveredInPartial", "buyerName",
+  ]);
+
   /**
    * Formats all attributes with localized titles and values
    */
@@ -16,7 +36,10 @@ export class AttributeLocalizationUtils {
     const displayParts: string[] = [];
 
     Object.entries(attributes).forEach(([key, value]) => {
-      if (value == null) return;
+      if (value == null || value === '' || this.SYSTEM_FIELDS.has(key)) return;
+      if (Array.isArray(value) && value.length === 0) return;
+      // Skip values that look like URLs
+      if (typeof value === 'string' && (value.startsWith('http://') || value.startsWith('https://'))) return;
 
       const displayValue = this.getLocalizedAttributeValue(key, value, t);
       if (displayValue.trim() !== '') {
@@ -33,6 +56,10 @@ export class AttributeLocalizationUtils {
    */
   static getLocalizedAttributeTitle(attributeKey: string, t: TranslationFunction): string {
     switch (attributeKey) {
+      // Color
+      case 'selectedColor':
+        return t('color') || 'Color';
+
       // Gender
       case 'gender':
         return t('gender') || 'Gender';
@@ -117,6 +144,9 @@ export class AttributeLocalizationUtils {
     const stringValue = value?.toString() || '';
     
     switch (attributeKey) {
+      case 'selectedColor':
+        return this.localizeColorName(stringValue, t);
+
       case 'gender':
         return this.localizeGender(stringValue, t);
       
