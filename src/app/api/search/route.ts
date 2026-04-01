@@ -478,6 +478,11 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 export async function GET(request: NextRequest) {
   const t0 = Date.now();
   try {
+    // Rate limit: 60 requests/min per IP
+    const { applyRateLimit } = await import("@/lib/auth-middleware");
+    const limited = await applyRateLimit(request, 60, 60000);
+    if (limited) return limited;
+
     const params = extractParams(new URL(request.url).searchParams);
 
     if (!params.query) {
@@ -575,8 +580,14 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Cache management
-export async function DELETE() {
+// Cache management (admin-only)
+export async function DELETE(request: NextRequest) {
+  const { verifyAuth, verifyAdmin } = await import("@/lib/auth-middleware");
+  const auth = await verifyAuth(request);
+  if (auth.error) return auth.error;
+  const adminCheck = await verifyAdmin(auth.isAdmin ?? false);
+  if (adminCheck.error) return adminCheck.error;
+
   const n = cache.size;
   cache.clear();
   pending.clear();

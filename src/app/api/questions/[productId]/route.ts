@@ -8,6 +8,11 @@ export async function GET(
   { params }: { params: Promise<{ productId: string }> }
 ) {
   try {
+    // Rate limit: 60 requests/min per IP
+    const { applyRateLimit } = await import("@/lib/auth-middleware");
+    const limited = await applyRateLimit(request, 60, 60000);
+    if (limited) return limited;
+
     // Initialize Firestore
     const db = getFirestoreAdmin();
 
@@ -15,7 +20,7 @@ export async function GET(
     const { productId } = await params;
     const { searchParams } = new URL(request.url);
     const isShop = searchParams.get("isShop") === "true";
-    const limit = parseInt(searchParams.get("limit") || "5");
+    const limit = Math.min(parseInt(searchParams.get("limit") || "5", 10), 30);
 
     if (!productId || productId.trim() === "") {
       return NextResponse.json(

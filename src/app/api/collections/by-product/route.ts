@@ -5,6 +5,14 @@ import { getFirestoreAdmin } from "@/lib/firebase-admin";
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit by IP to prevent abuse (public read endpoint)
+    const { checkRateLimit } = await import("@/lib/auth-middleware");
+    const clientIp = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+      || request.headers.get("x-real-ip")
+      || "unknown";
+    const rateLimitResult = await checkRateLimit(clientIp, 30, 60000); // 30 req/min per IP
+    if (rateLimitResult.error) return rateLimitResult.error;
+
     const db = getFirestoreAdmin();
     const body = await request.json();
     const { productId, shopId } = body;

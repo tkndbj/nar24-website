@@ -84,9 +84,12 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ productId: string }> }
 ) {
-  console.log("API Route called - Environment:", process.env.NODE_ENV);
-  
   try {
+    // Rate limit: 60 requests/min per IP
+    const { applyRateLimit } = await import("@/lib/auth-middleware");
+    const limited = await applyRateLimit(request, 60, 60000);
+    if (limited) return limited;
+
     // Await the params Promise
     const { productId } = await params;
     console.log("Product ID received:", productId);

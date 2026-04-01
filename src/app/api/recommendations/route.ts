@@ -253,12 +253,18 @@ const RESPONSE_HEADERS = {
 
 export async function GET(request: NextRequest) {
   try {
+    // Rate limit: 30 requests/min per IP (expensive queries)
+    const { applyRateLimit } = await import("@/lib/auth-middleware");
+    const limited = await applyRateLimit(request, 30, 60000);
+    if (limited) return limited;
+
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get("userId");
     const category = searchParams.get("category");
-    const maxProducts = parseInt(searchParams.get("maxProducts") || "20");
-    const pageSize = parseInt(
-      searchParams.get("pageSize") || maxProducts.toString()
+    const maxProducts = Math.min(parseInt(searchParams.get("maxProducts") || "20", 10), 50);
+    const pageSize = Math.min(
+      parseInt(searchParams.get("pageSize") || maxProducts.toString(), 10),
+      50
     );
     const pageToken = searchParams.get("pageToken");
 
@@ -357,11 +363,16 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Optional: Add POST method for more complex recommendation requests
+// POST method for complex recommendation requests (authenticated)
 export async function POST(request: NextRequest) {
   try {
+    const { verifyAuth } = await import("@/lib/auth-middleware");
+    const auth = await verifyAuth(request);
+    if (auth.error) return auth.error;
+
     const body = await request.json();
-    const { userId, category, filters, maxProducts = 20 } = body;
+    const { category, filters, maxProducts = 20 } = body;
+    const userId = auth.userId;
 
     let products: Product[];
 

@@ -8,6 +8,11 @@ initializeFirebaseAdmin();
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit: 30 requests/min per IP
+    const { applyRateLimit } = await import("@/lib/auth-middleware");
+    const limited = await applyRateLimit(request, 30, 60000);
+    if (limited) return limited;
+
     // ── Auth check ────────────────────────────────────────────────────────
     const { getAuth } = await import('firebase-admin/auth');
     const authHeader = request.headers.get('authorization');
@@ -89,10 +94,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error processing impressions:', error);
     return NextResponse.json(
-      { 
-        error: 'Failed to process impressions',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
+      { error: 'Failed to process impressions' },
       { status: 500 }
     );
   }

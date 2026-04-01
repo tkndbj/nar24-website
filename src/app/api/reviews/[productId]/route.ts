@@ -25,15 +25,20 @@ export async function GET(
   { params }: { params: Promise<{ productId: string }> }
 ) {
   try {
+    // Rate limit: 60 requests/min per IP
+    const { applyRateLimit } = await import("@/lib/auth-middleware");
+    const limited = await applyRateLimit(request, 60, 60000);
+    if (limited) return limited;
+
     // Initialize Firestore
     const db = getFirestoreAdmin();
 
     // Await the params Promise
     const { productId } = await params;
     const { searchParams } = new URL(request.url);
-    
-    // Parse query parameters
-    const limit = parseInt(searchParams.get("limit") || "20");
+
+    // Parse query parameters (capped at 50)
+    const limit = Math.min(parseInt(searchParams.get("limit") || "20", 10), 50);
     const sortBy = searchParams.get("sortBy") || "recent"; // recent, helpful, rating
     const filterRating = searchParams.get("rating") ? parseInt(searchParams.get("rating")!) : null;
     const lastDocId = searchParams.get("lastDocId");
@@ -208,7 +213,7 @@ export async function GET(
     }
 
     return NextResponse.json(
-      { error: "Internal server error", details: error instanceof Error ? error.message : "Unknown error" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

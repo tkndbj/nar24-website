@@ -176,3 +176,32 @@ setInterval(() => {
     }
   }
 }, 5 * 60 * 1000);
+
+/**
+ * Extract client IP from request headers (works behind proxies/CDNs)
+ */
+export function getClientIp(request: NextRequest): string {
+  return (
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    request.headers.get('x-real-ip') ||
+    'unknown'
+  );
+}
+
+/**
+ * Apply IP-based rate limiting to a request.
+ * Returns a 429 response if limit exceeded, otherwise undefined.
+ *
+ * Usage:
+ *   const limited = await applyRateLimit(request, 60, 60000);
+ *   if (limited) return limited;
+ */
+export async function applyRateLimit(
+  request: NextRequest,
+  maxRequests: number = 60,
+  windowMs: number = 60000
+): Promise<NextResponse | null> {
+  const ip = getClientIp(request);
+  const result = await checkRateLimit(ip, maxRequests, windowMs);
+  return result.error ?? null;
+}

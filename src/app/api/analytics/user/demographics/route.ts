@@ -7,6 +7,11 @@ initializeFirebaseAdmin();
 
 export async function GET(request: NextRequest) {
   try {
+    // Rate limit: 30 requests/min per IP
+    const { applyRateLimit } = await import("@/lib/auth-middleware");
+    const limited = await applyRateLimit(request, 30, 60000);
+    if (limited) return limited;
+
     // Get Firebase ID token from cookie or header
     const authHeader = request.headers.get('authorization');
     const cookieToken = request.cookies.get('__session')?.value;

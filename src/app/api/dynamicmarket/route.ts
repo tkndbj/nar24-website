@@ -563,6 +563,11 @@ export async function GET(request: NextRequest) {
   const requestStart = Date.now();
 
   try {
+    // Rate limit: 60 requests/min per IP
+    const { applyRateLimit } = await import("@/lib/auth-middleware");
+    const limited = await applyRateLimit(request, 60, 60000);
+    if (limited) return limited;
+
     const { searchParams } = new URL(request.url);
     const filters = parseQueryParams(searchParams);
 
@@ -715,13 +720,13 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      const errorMessage =
-        error instanceof Error ? error.message : "Internal server error";
-      const statusCode = errorMessage.includes("permission") ? 403 : 500;
+      const isPermissionError =
+        error instanceof Error && error.message.includes("permission");
+      const statusCode = isPermissionError ? 403 : 500;
 
       return NextResponse.json(
         {
-          error: errorMessage,
+          error: isPermissionError ? "Permission denied" : "Internal server error",
           products: [],
           hasMore: false,
           page: 0,

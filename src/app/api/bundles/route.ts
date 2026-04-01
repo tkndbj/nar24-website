@@ -5,6 +5,11 @@ import { getFirestoreAdmin } from "@/lib/firebase-admin";
 
 export async function GET(request: NextRequest) {
   try {
+    // Rate limit: 60 requests/min per IP
+    const { applyRateLimit } = await import("@/lib/auth-middleware");
+    const limited = await applyRateLimit(request, 60, 60000);
+    if (limited) return limited;
+
     const shopId = request.nextUrl.searchParams.get("shopId");
     const isActive = request.nextUrl.searchParams.get("isActive");
 

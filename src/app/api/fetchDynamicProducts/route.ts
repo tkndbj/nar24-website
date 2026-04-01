@@ -508,6 +508,11 @@ export async function GET(request: NextRequest) {
   const t0 = Date.now();
 
   try {
+    // Rate limit: 60 requests/min per IP
+    const { applyRateLimit } = await import("@/lib/auth-middleware");
+    const limited = await applyRateLimit(request, 60, 60000);
+    if (limited) return limited;
+
     const { searchParams } = new URL(request.url);
     const params = extractQueryParams(searchParams);
     const cacheKey = generateCacheKey(params);
@@ -613,7 +618,13 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function DELETE() {
+export async function DELETE(request: NextRequest) {
+  const { verifyAuth, verifyAdmin } = await import("@/lib/auth-middleware");
+  const auth = await verifyAuth(request);
+  if (auth.error) return auth.error;
+  const adminCheck = await verifyAdmin(auth.isAdmin ?? false);
+  if (adminCheck.error) return adminCheck.error;
+
   const prev = responseCache.size;
   responseCache.clear();
   pendingRequests.clear();
@@ -621,7 +632,13 @@ export async function DELETE() {
   return NextResponse.json({ message: "Cache cleared", clearedEntries: prev });
 }
 
-export async function HEAD() {
+export async function HEAD(request: NextRequest) {
+  const { verifyAuth, verifyAdmin } = await import("@/lib/auth-middleware");
+  const auth = await verifyAuth(request);
+  if (auth.error) return auth.error;
+  const adminCheck = await verifyAdmin(auth.isAdmin ?? false);
+  if (adminCheck.error) return adminCheck.error;
+
   const now = Date.now();
   return NextResponse.json({
     cacheSize: responseCache.size,
