@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { sanitizeText } from "@/lib/sanitize";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Star, Store, User, ShoppingBag } from "lucide-react";
 import { useUser } from "@/context/UserProvider";
@@ -322,7 +323,7 @@ const AskToSellerPage: React.FC<PageProps> = ({ params, searchParams }) => {
         askerId: user.uid,
         askerName: askerName,
         askerNameVisible: allowNameVisible,
-        questionText: questionText.trim(),
+        questionText: sanitizeText(questionText.trim()),
         timestamp: serverTimestamp(),
         answered: false,
 
@@ -352,7 +353,7 @@ const AskToSellerPage: React.FC<PageProps> = ({ params, searchParams }) => {
       createQuestionNotifications({
         productId: productId,
         productName: productInfo.productName,
-        questionText: questionText.trim(),
+        questionText: sanitizeText(questionText.trim()),
         askerName: allowNameVisible ? askerName : "Anonymous",
         isShop: isShop,
         sellerId: sellerId,

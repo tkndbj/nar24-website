@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { sanitizeText } from "@/lib/sanitize";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/context/UserProvider";
 import {
@@ -192,7 +193,7 @@ export default function RefundFormPage() {
         displayName: profileData?.displayName || "",
         email: profileData?.email || user.email || "",
         receiptNo: receiptNo.trim(),
-        description: description.trim(),
+        description: sanitizeText(description.trim()),
         status: "pending",
         createdAt: Timestamp.now(),
         // ← ADD THESE

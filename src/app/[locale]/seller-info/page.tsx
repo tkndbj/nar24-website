@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { sanitizeUsername, sanitizeAddress } from "@/lib/sanitize";
 import dynamic from "next/dynamic";
 import {
   X,
@@ -262,12 +263,12 @@ export default function SellerInfoPage() {
     setIsSaving(true);
     try {
       const sellerData: SellerInfo = {
-        ibanOwnerName: formData.ibanOwnerName.trim(),
-        ibanOwnerSurname: formData.ibanOwnerSurname.trim(),
+        ibanOwnerName: sanitizeUsername(formData.ibanOwnerName.trim()),
+        ibanOwnerSurname: sanitizeUsername(formData.ibanOwnerSurname.trim()),
         phone: normalizePhoneForStorage(formData.phone),
         latitude: formData.latitude!,
         longitude: formData.longitude!,
-        address: formData.address.trim(),
+        address: sanitizeAddress(formData.address.trim()) || formData.address.trim(),
         iban: normalizeIbanForStorage(formData.iban),
       };
       if (shopId) {

@@ -13,6 +13,7 @@ import { updateProfile } from "firebase/auth";
 import { toast } from "react-hot-toast";
 import { getFirebaseDb, getFirebaseAuth } from "@/lib/firebase-lazy";
 import { UserIcon, ArrowRightIcon } from "@heroicons/react/24/outline";
+import { sanitizeUsername } from "@/lib/sanitize";
 
 export default function CompleteNamePage() {
   const router = useRouter();
@@ -142,7 +143,7 @@ export default function CompleteNamePage() {
     setNameSaveInProgress(true);
 
     try {
-      const displayName = `${firstName.trim()} ${lastName.trim()}`;
+      const displayName = `${sanitizeUsername(firstName.trim())} ${sanitizeUsername(lastName.trim())}`;
 
       // Step 2: Update Firestore FIRST (matching Flutter order)
       const db = await getFirebaseDb();
