@@ -23,7 +23,7 @@ export function initializeFirebaseAdmin(): App {
   try {
     // Option 1: Use complete service account JSON (recommended)
     const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-    
+
     // Option 2: Use individual environment variables (fallback)
     const projectId = process.env.FIREBASE_PROJECT_ID;
     const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
@@ -36,22 +36,28 @@ export function initializeFirebaseAdmin(): App {
       try {
         serviceAccount = JSON.parse(serviceAccountJson);
       } catch (parseError) {
-        console.error("Failed to parse service account JSON");
+        console.error("Failed to parse service account JSON", parseError);
         throw new Error("Invalid service account JSON format");
       }
     } else if (projectId && clientEmail && privateKey) {
       // Use individual environment variables
       // Clean up the private key
-      let cleanPrivateKey = privateKey.replace(/\\n/g, '\n');
+      let cleanPrivateKey = privateKey.replace(/\\n/g, "\n");
 
       // Ensure proper formatting
-      if (!cleanPrivateKey.includes('\n')) {
-        cleanPrivateKey = cleanPrivateKey.replace(/-----BEGIN PRIVATE KEY-----/, '-----BEGIN PRIVATE KEY-----\n');
-        cleanPrivateKey = cleanPrivateKey.replace(/-----END PRIVATE KEY-----/, '\n-----END PRIVATE KEY-----');
+      if (!cleanPrivateKey.includes("\n")) {
+        cleanPrivateKey = cleanPrivateKey.replace(
+          /-----BEGIN PRIVATE KEY-----/,
+          "-----BEGIN PRIVATE KEY-----\n",
+        );
+        cleanPrivateKey = cleanPrivateKey.replace(
+          /-----END PRIVATE KEY-----/,
+          "\n-----END PRIVATE KEY-----",
+        );
       }
 
-      if (!cleanPrivateKey.endsWith('\n')) {
-        cleanPrivateKey += '\n';
+      if (!cleanPrivateKey.endsWith("\n")) {
+        cleanPrivateKey += "\n";
       }
 
       serviceAccount = {
@@ -63,11 +69,14 @@ export function initializeFirebaseAdmin(): App {
         client_id: "",
         auth_uri: "https://accounts.google.com/o/oauth2/auth",
         token_uri: "https://oauth2.googleapis.com/token",
-        auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
-        client_x509_cert_url: `https://www.googleapis.com/robot/v1/metadata/x509/${encodeURIComponent(clientEmail)}`
+        auth_provider_x509_cert_url:
+          "https://www.googleapis.com/oauth2/v1/certs",
+        client_x509_cert_url: `https://www.googleapis.com/robot/v1/metadata/x509/${encodeURIComponent(clientEmail)}`,
       };
     } else {
-      throw new Error("Neither complete service account JSON nor individual credentials are available");
+      throw new Error(
+        "Neither complete service account JSON nor individual credentials are available",
+      );
     }
 
     app = initializeApp({
@@ -78,15 +87,15 @@ export function initializeFirebaseAdmin(): App {
     return app;
   } catch (error) {
     console.error("❌ Firebase Admin initialization failed:", error);
-    
+
     if (error instanceof Error) {
       console.error("Error details:", {
         name: error.name,
         message: error.message,
-        stack: error.stack?.substring(0, 500)
+        stack: error.stack?.substring(0, 500),
       });
     }
-    
+
     throw error;
   }
 }
