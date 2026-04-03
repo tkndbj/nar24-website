@@ -159,7 +159,13 @@ function shouldUseTypesense(
   if (filters.minPrice !== undefined || filters.maxPrice !== undefined)
     return true;
   if (filters.minRating !== undefined) return true;
-  if (filters.gender) return true; // ADD THIS LINE
+  if (filters.gender) return true;
+  if (filters.brands.length > 0) return true;
+  if (filters.colors.length > 0) return true;
+  if ((filters.types ?? []).length > 0) return true;
+  if ((filters.fits ?? []).length > 0) return true;
+  if ((filters.sizes ?? []).length > 0) return true;
+  if (filters.subcategories.length > 0) return true;
   return false;
 }
 
@@ -322,6 +328,8 @@ export default function ShopDetailPage() {
   // Firestore cursor — mirrors Flutter's _lastProductDocument
   const lastFirestoreDocRef =
     useRef<QueryDocumentSnapshot<DocumentData> | null>(null);
+  // Typesense page counter — explicitly tracked for reliable pagination
+  const typesensePageRef = useRef(0);
   const PRODUCTS_LIMIT = 20;
 
   // ── Filter + facet state ───────────────────────────────────────────────────
@@ -769,7 +777,8 @@ export default function ShopDetailPage() {
       } else {
         setIsProductsLoading(true);
         setProductError(null);
-        if (!loadMore) lastFirestoreDocRef.current = null;
+        lastFirestoreDocRef.current = null;
+        typesensePageRef.current = 0;
       }
 
       try {
@@ -780,10 +789,11 @@ export default function ShopDetailPage() {
           filters,
         );
         if (useTs) {
-          const page = loadMore
-            ? Math.floor(allProducts.length / PRODUCTS_LIMIT)
-            : 0;
+          const page = loadMore ? typesensePageRef.current + 1 : 0;
           await fetchProductsTypesense(page, !loadMore, token);
+          if (token === fetchTokenRef.current) {
+            typesensePageRef.current = page;
+          }
         } else {
           await fetchProductsFirestore(loadMore, token);
         }
@@ -800,7 +810,7 @@ export default function ShopDetailPage() {
       selectedSort,
       filters.specFilters,
       debouncedSearch,
-      allProducts.length,
+      filters,
       fetchProductsTypesense,
       fetchProductsFirestore,
     ],
@@ -825,6 +835,7 @@ export default function ShopDetailPage() {
     setBestSellers([]);
     setIsInitialProductLoad(true);
     lastFirestoreDocRef.current = null;
+    typesensePageRef.current = 0;
     setFilters(EMPTY_FILTER_STATE);
     setSelectedSort("None");
     setSearchQuery("");
