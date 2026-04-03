@@ -785,7 +785,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
 
         {/* ═══ 3. SPEC FACETS (Typesense-driven, one section per field) ════ */}
         {Object.entries(specFacets).map(([field, facetValues]) => {
-          if (!facetValues.length) return null;
+          if (!facetValues.length || field === "brandModel") return null;
           const sectionKey = `spec_${field}`;
           const selected = filters.specFilters[field] ?? [];
           const title = localizeField(field);
@@ -861,18 +861,32 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
               />
             </div>
             <div className="max-h-44 overflow-y-auto">
-              {(globalBrands as string[])
-                .filter((b) =>
-                  b.toLowerCase().includes(brandSearch.toLowerCase()),
-                )
-                .map((brand) => (
-                  <CheckRow
-                    key={brand}
-                    label={brand}
-                    checked={filters.brands.includes(brand)}
-                    onChange={() => toggleList("brands", brand)}
-                  />
-                ))}
+              {(specFacets["brandModel"] && specFacets["brandModel"].length > 0
+                ? specFacets["brandModel"]
+                    .filter((f) =>
+                      f.value.toLowerCase().includes(brandSearch.toLowerCase()),
+                    )
+                    .map((f) => (
+                      <CheckRow
+                        key={f.value}
+                        label={`${f.value} (${f.count})`}
+                        checked={filters.brands.includes(f.value)}
+                        onChange={() => toggleList("brands", f.value)}
+                      />
+                    ))
+                : (globalBrands as string[])
+                    .filter((b) =>
+                      b.toLowerCase().includes(brandSearch.toLowerCase()),
+                    )
+                    .map((brand) => (
+                      <CheckRow
+                        key={brand}
+                        label={brand}
+                        checked={filters.brands.includes(brand)}
+                        onChange={() => toggleList("brands", brand)}
+                      />
+                    ))
+              )}
             </div>
           </div>
         )}

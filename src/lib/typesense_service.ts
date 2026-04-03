@@ -839,7 +839,7 @@ export class TypeSenseService {
   // ── Facet queries ─────────────────────────────────────────────────────────
 
   private static readonly SPEC_FACET_FIELDS =
-    "productType,consoleBrand,clothingFit,clothingTypes,clothingSizes," +
+    "brandModel,productType,consoleBrand,clothingFit,clothingTypes,clothingSizes," +
     "jewelryType,jewelryMaterials,pantSizes,pantFabricTypes,footwearSizes";
 
   async fetchSpecFacets(opts: {
