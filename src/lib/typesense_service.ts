@@ -603,13 +603,13 @@ export class TypeSenseService {
       }
     }
 
+    // Minimal field set for list/card views — covers ProductCard + filter/sort needs.
+    // Callers needing more fields (e.g. detail pages) can pass includeFields.
     const defaultFields =
       "id,productName,price,originalPrice,discountPercentage,brandModel," +
       "category,subcategory,subsubcategory,gender,availableColors,colorImagesJson,colorQuantitiesJson," +
-      "shopId,ownerId,userId,promotionScore,createdAt,imageUrls," +
-      "sellerName,condition,currency,quantity,averageRating,reviewCount," +
-      "isBoosted,isFeatured,purchaseCount,bestSellerRank,deliveryOption,paused," +
-      "bundleIds,videoUrl,campaignName,discountThreshold,bulkDiscountPercentage";
+      "shopId,imageUrls,currency,quantity,averageRating,reviewCount," +
+      "isBoosted,purchaseCount,deliveryOption,campaignName";
 
     const params = new URLSearchParams({
       q: query.trim() || "*",

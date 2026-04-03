@@ -7,10 +7,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { unstable_cache, revalidateTag } from "next/cache";
 import TypeSenseServiceManager from "@/lib/typesense_service_manager";
-import { getFirestoreAdmin } from "@/lib/firebase-admin";
 import { ProductUtils } from "@/app/models/Product";
 import type { FacetCount } from "@/app/components/FilterSideBar";
-import { Timestamp } from "firebase-admin/firestore";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Config
@@ -155,13 +153,10 @@ function buildNumericFilters(p: SearchParams): string[] {
 // Shop search via Typesense + Firestore batch enrichment
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface RawTypesenseShop {
-  id: string;
-  name?: string;
-  profileImageUrl?: string;
-  isActive?: boolean;
-  categories?: string[];
-}
+const SHOP_INCLUDE_FIELDS =
+  "id,name,profileImageUrl,coverImageUrls,address,averageRating," +
+  "reviewCount,followerCount,clickCount,categories,contactNo," +
+  "ownerId,isBoosted,isActive,createdAt";
 
 async function fetchShopsFromTypesense(query: string): Promise<ShopResult[]> {
   try {
@@ -172,61 +167,51 @@ async function fetchShopsFromTypesense(query: string): Promise<ShopResult[]> {
       page: 0,
       hitsPerPage: 10,
       facetFilters: [["isActive:true"]],
-      numericFilters: [],
       sortOption: "relevance",
+      queryBy: "name,searchableText",
+      includeFields: SHOP_INCLUDE_FIELDS,
     });
 
     if (!res.hits.length) return [];
 
-    const hitsWithIds = res.hits.map((hit) => {
-      const raw = hit as RawTypesenseShop;
-      const firestoreId = raw.id.startsWith("shops_")
-        ? raw.id.slice(6)
-        : raw.id;
-      return { firestoreId, raw };
-    });
+    return res.hits
+      .map((hit) => {
+        try {
+          const d = hit as unknown as Record<string, unknown>;
+          const rawId = String(d.id ?? "");
+          const id = rawId.startsWith("shops_") ? rawId.slice(6) : rawId;
+          const rawCreatedAt = d.createdAt as number | undefined;
 
-    // Batch read all shops in a single Firestore round-trip (fixes N+1)
-    const db = getFirestoreAdmin();
-    const refs = hitsWithIds.map(({ firestoreId }) =>
-      db.collection("shops").doc(firestoreId),
-    );
-    const docs = await db.getAll(...refs);
-
-    const enriched = docs.map((snap, i) => {
-      const { firestoreId, raw } = hitsWithIds[i];
-      try {
-        const d = snap.exists ? snap.data()! : {};
-        const ts: Timestamp | null =
-          d.createdAt instanceof Timestamp ? d.createdAt : null;
-
-        return {
-          id: firestoreId,
-          name: raw.name ?? d.name ?? "",
-          profileImageUrl: raw.profileImageUrl ?? d.profileImageUrl ?? "",
-          coverImageUrls: (d.coverImageUrls as string[]) ?? [],
-          address: (d.address as string) ?? "",
-          averageRating: (d.averageRating as number) ?? 0,
-          reviewCount: (d.reviewCount as number) ?? 0,
-          followerCount: (d.followerCount as number) ?? 0,
-          clickCount: (d.clickCount as number) ?? 0,
-          categories: raw.categories ?? (d.categories as string[]) ?? [],
-          contactNo: (d.contactNo as string) ?? "",
-          ownerId: (d.ownerId as string) ?? "",
-          isBoosted: (d.isBoosted as boolean) ?? false,
-          isActive: raw.isActive ?? (d.isActive as boolean) ?? true,
-          createdAt: ts
-            ? { seconds: ts.seconds, nanoseconds: ts.nanoseconds }
-            : { seconds: 0, nanoseconds: 0 },
-        } satisfies ShopResult;
-      } catch {
-        return null;
-      }
-    });
-
-    return enriched.filter(
-      (s): s is ShopResult => s !== null && s.isActive !== false,
-    );
+          return {
+            id,
+            name: String(d.name ?? ""),
+            profileImageUrl: String(d.profileImageUrl ?? ""),
+            coverImageUrls: (d.coverImageUrls as string[]) ?? [],
+            address: String(d.address ?? ""),
+            averageRating: Number(d.averageRating ?? 0),
+            reviewCount: Number(d.reviewCount ?? 0),
+            followerCount: Number(d.followerCount ?? 0),
+            clickCount: Number(d.clickCount ?? 0),
+            categories: (d.categories as string[]) ?? [],
+            contactNo: String(d.contactNo ?? ""),
+            ownerId: String(d.ownerId ?? ""),
+            isBoosted: Boolean(d.isBoosted ?? false),
+            isActive: Boolean(d.isActive ?? true),
+            createdAt: rawCreatedAt
+              ? {
+                  seconds:
+                    rawCreatedAt > 1e12
+                      ? Math.floor(rawCreatedAt / 1000)
+                      : rawCreatedAt,
+                  nanoseconds: 0,
+                }
+              : { seconds: 0, nanoseconds: 0 },
+          } satisfies ShopResult;
+        } catch {
+          return null;
+        }
+      })
+      .filter((s): s is ShopResult => s !== null);
   } catch (err) {
     console.error("[searchProducts] shop search error:", err);
     return [];
