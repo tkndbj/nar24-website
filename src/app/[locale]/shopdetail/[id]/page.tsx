@@ -512,19 +512,53 @@ export default function ShopDetailPage() {
 
   // ── Spec facets ────────────────────────────────────────────────────────────
 
-  const fetchSpecFacets = useCallback(async () => {
+  const fetchSpecFacets = useCallback(async (signal?: AbortSignal) => {
     if (!shopId) return;
     try {
+      const facetFilters: string[][] = [];
+      if (filters.gender) facetFilters.push([`gender:${filters.gender}`]);
+      if (filters.subcategories.length > 0)
+        facetFilters.push([`subcategory:${filters.subcategories[0]}`]);
+      if (filters.brands.length > 0)
+        facetFilters.push(filters.brands.map((b) => `brandModel:${b}`));
+      if (filters.colors.length > 0)
+        facetFilters.push(filters.colors.map((c) => `colorImages.${c}:*`));
+      if ((filters.types ?? []).length > 0)
+        facetFilters.push(
+          (filters.types ?? []).map((t) => `attributes.clothingType:${t}`),
+        );
+      if ((filters.fits ?? []).length > 0)
+        facetFilters.push(
+          (filters.fits ?? []).map((f) => `attributes.clothingFit:${f}`),
+        );
+      for (const [field, vals] of Object.entries(filters.specFilters)) {
+        if (vals.length > 0)
+          facetFilters.push(vals.map((v) => `${field}:${v}`));
+      }
+
+      const numericParts: string[] = [`shopId:=${shopId}`];
+      if (filters.minPrice !== undefined)
+        numericParts.push(`price:>=${filters.minPrice}`);
+      if (filters.maxPrice !== undefined)
+        numericParts.push(`price:<=${filters.maxPrice}`);
+      if (filters.minRating !== undefined)
+        numericParts.push(`averageRating:>=${filters.minRating}`);
+
       const facets =
         await TypeSenseServiceManager.instance.shopService.fetchSpecFacets({
           indexName: "shop_products",
-          additionalFilterBy: `shopId:=${shopId}`,
+          query: debouncedSearch || "*",
+          facetFilters: facetFilters.length > 0 ? facetFilters : undefined,
+          additionalFilterBy: numericParts.join(" && "),
         });
-      setSpecFacets(facets);
+
+      if (!signal?.aborted) setSpecFacets(facets);
     } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
       console.error("Error fetching spec facets:", err);
     }
-  }, [shopId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shopId, filterKey, debouncedSearch]);
 
   // ── Product fetchers ───────────────────────────────────────────────────────
 
@@ -738,6 +772,12 @@ export default function ShopDetailPage() {
           debouncedSearch,
           filters,
         );
+
+        // Re-fetch facets on reset to narrow counts by active filters
+        const facetPromise = !loadMore
+          ? fetchSpecFacets(controller.signal)
+          : Promise.resolve();
+
         if (useTs) {
           const page = loadMore ? typesensePageRef.current + 1 : 0;
           await fetchProductsTypesense(page, !loadMore, controller.signal);
@@ -745,6 +785,8 @@ export default function ShopDetailPage() {
         } else {
           await fetchProductsFirestore(loadMore, controller.signal);
         }
+
+        await facetPromise;
       } catch (err) {
         // Silently ignore aborted requests — a newer request owns the state
         if (err instanceof DOMException && err.name === "AbortError") return;
@@ -773,6 +815,7 @@ export default function ShopDetailPage() {
       filters,
       fetchProductsTypesense,
       fetchProductsFirestore,
+      fetchSpecFacets,
     ],
   );
 
@@ -802,10 +845,10 @@ export default function ShopDetailPage() {
     setDebouncedSearch("");
 
     // Parallel fetch — mirrors Flutter's Future.wait
+    // fetchSpecFacets is called inside fetchProducts on reset
     fetchProducts(false);
     fetchCollections();
     fetchReviews();
-    fetchSpecFacets();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shopData?.id]);
 

@@ -279,39 +279,59 @@ async function fetchFromTypesense(
 // Spec-facet fetch
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function fetchSpecFacetsData(
-  category: string | null,
-  subcategory: string | null,
-  subsubcategory: string | null,
-  buyerCategory: string | null,
+function buildFacetFiltersForParams(
+  p: QueryParams,
+  firestoreCategory: string | null,
+): string[][] {
+  const facetFilters: string[][] = [];
+  if (firestoreCategory)
+    facetFilters.push([`category_en:${firestoreCategory}`]);
+  if (p.subcategory) facetFilters.push([`subcategory_en:${p.subcategory}`]);
+  if (p.subsubcategory)
+    facetFilters.push([`subsubcategory_en:${p.subsubcategory}`]);
+  if (p.buyerCategory === "Women" || p.buyerCategory === "Men") {
+    facetFilters.push([`gender:${p.buyerCategory}`, "gender:Unisex"]);
+  }
+  if (p.brands.length > 0)
+    facetFilters.push(p.brands.map((b) => `brandModel:${b}`));
+  if (p.colors.length > 0)
+    facetFilters.push(p.colors.map((c) => `availableColors:${c}`));
+  if (p.filterSubcategories.length > 0)
+    facetFilters.push(
+      p.filterSubcategories.map((s) => `subsubcategory_en:${s}`),
+    );
+  for (const [field, vals] of Object.entries(p.specFilters)) {
+    if (vals.length > 0) facetFilters.push(vals.map((v) => `${field}:${v}`));
+  }
+  return facetFilters;
+}
+
+async function fetchSpecFacetsForParams(
+  p: QueryParams,
   firestoreCategory: string | null,
 ): Promise<Record<string, FacetCount[]>> {
   try {
-    const facetFilters: string[][] = [];
-    if (firestoreCategory)
-      facetFilters.push([`category_en:${firestoreCategory}`]);
-    if (subcategory) facetFilters.push([`subcategory_en:${subcategory}`]);
-    if (subsubcategory)
-      facetFilters.push([`subsubcategory_en:${subsubcategory}`]);
-    if (buyerCategory === "Women" || buyerCategory === "Men") {
-      facetFilters.push([`gender:${buyerCategory}`, "gender:Unisex"]);
-    }
+    const facetFilters = buildFacetFiltersForParams(p, firestoreCategory);
+
+    const numericFilters: string[] = [];
+    if (p.minPrice !== null)
+      numericFilters.push(`price>=${Math.floor(p.minPrice)}`);
+    if (p.maxPrice !== null)
+      numericFilters.push(`price<=${Math.ceil(p.maxPrice)}`);
+    if (p.minRating !== null)
+      numericFilters.push(`averageRating>=${p.minRating}`);
 
     return await TypeSenseServiceManager.instance.shopService.fetchSpecFacets({
       indexName: "shop_products",
       facetFilters,
+      additionalFilterBy:
+        numericFilters.length > 0 ? numericFilters.join(" && ") : undefined,
     });
   } catch (err) {
     console.error("[fetchDynamicProducts] fetchSpecFacets error:", err);
     return {};
   }
 }
-
-const cachedFetchSpecFacets = unstable_cache(
-  fetchSpecFacetsData,
-  ["dynamic-products-facets"],
-  { revalidate: CONFIG.FACET_CACHE_REVALIDATE_SECONDS, tags: ["dynamic-products"] },
-);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Core data fetch
@@ -344,13 +364,7 @@ async function fetchDynamicProductsData(
         }),
 
     params.page === 0
-      ? cachedFetchSpecFacets(
-          params.category,
-          params.subcategory,
-          params.subsubcategory,
-          params.buyerCategory,
-          firestoreCategory,
-        )
+      ? fetchSpecFacetsForParams(params, firestoreCategory)
       : Promise.resolve({} as Record<string, FacetCount[]>),
   ]);
 
