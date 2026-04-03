@@ -1,6 +1,11 @@
 // src/app/api/fetchDynamicProducts/route.ts
+//
+// Dynamic Products API with unstable_cache for server-side caching.
+// - Initial load (no filters, default sort) → Firestore
+// - Filtering / sorting → Typesense
 
 import { NextRequest, NextResponse } from "next/server";
+import { unstable_cache, revalidateTag } from "next/cache";
 import { getFirestoreAdmin } from "@/lib/firebase-admin";
 import { FieldPath } from "firebase-admin/firestore";
 import type { Query, QuerySnapshot } from "firebase-admin/firestore";
@@ -14,15 +19,11 @@ import type { FacetCount } from "@/app/components/FilterSideBar";
 
 const CONFIG = {
   DEFAULT_LIMIT: 20,
-  CACHE_TTL: 2 * 60 * 1000,
-  STALE_TTL: 5 * 60 * 1000,
-  MAX_CACHE_SIZE: 200,
-  CACHE_CLEANUP_THRESHOLD: 0.9,
+  CACHE_REVALIDATE_SECONDS: 120, // 2 minutes
+  FACET_CACHE_REVALIDATE_SECONDS: 300, // 5 minutes
   REQUEST_TIMEOUT: 10_000,
   MAX_RETRIES: 2,
   BASE_RETRY_DELAY: 100,
-  FACET_CACHE_TTL: 5 * 60 * 1000,
-  MAX_FACET_CACHE: 50,
 } as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -38,20 +39,7 @@ interface ApiResponse {
   page: number;
   total: number;
   specFacets?: Record<string, FacetCount[]>;
-  source?: "cache" | "stale" | "dedupe" | "fresh";
   timing?: number;
-}
-
-interface CacheEntry {
-  data: ApiResponse;
-  timestamp: number;
-  accessCount: number;
-  lastAccess: number;
-}
-
-interface CacheResult {
-  data: ApiResponse | null;
-  status: "fresh" | "stale" | "expired" | "miss";
 }
 
 interface QueryParams {
@@ -91,146 +79,6 @@ const CATEGORY_MAPPING: Record<string, string> = {
   automotive: "Automotive",
   "health-wellness": "Health & Wellness",
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Request deduplication + main cache
-// ─────────────────────────────────────────────────────────────────────────────
-
-const pendingRequests = new Map<string, Promise<ApiResponse>>();
-const responseCache = new Map<string, CacheEntry>();
-
-function generateCacheKey(p: QueryParams): string {
-  return JSON.stringify({
-    c: p.category || "",
-    sc: p.subcategory || "",
-    ssc: p.subsubcategory || "",
-    bc: p.buyerCategory || "",
-    bsc: p.buyerSubcategory || "",
-    so: p.sortOption,
-    br: p.brands.sort().join(","),
-    col: p.colors.sort().join(","),
-    fsc: p.filterSubcategories.sort().join(","),
-    sf: JSON.stringify(
-      Object.fromEntries(
-        Object.entries(p.specFilters).map(([k, v]) => [k, [...v].sort()]),
-      ),
-    ),
-    minP: p.minPrice ?? "",
-    maxP: p.maxPrice ?? "",
-    minR: p.minRating ?? "",
-    pg: p.page,
-  });
-}
-
-function getCachedResponse(key: string): CacheResult {
-  const entry = responseCache.get(key);
-  if (!entry) return { data: null, status: "miss" };
-  const age = Date.now() - entry.timestamp;
-  entry.accessCount++;
-  entry.lastAccess = Date.now();
-  if (age <= CONFIG.CACHE_TTL) return { data: entry.data, status: "fresh" };
-  if (age <= CONFIG.STALE_TTL) return { data: entry.data, status: "stale" };
-  responseCache.delete(key);
-  return { data: null, status: "expired" };
-}
-
-function cacheResponse(key: string, data: ApiResponse): void {
-  const now = Date.now();
-  if (
-    responseCache.size >=
-    CONFIG.MAX_CACHE_SIZE * CONFIG.CACHE_CLEANUP_THRESHOLD
-  ) {
-    cleanupCache();
-  }
-  responseCache.set(key, {
-    data,
-    timestamp: now,
-    accessCount: 1,
-    lastAccess: now,
-  });
-}
-
-function cleanupCache(): void {
-  const now = Date.now();
-  const entries = Array.from(responseCache.entries());
-  const valid = entries.filter(([k, e]) => {
-    if (now - e.timestamp > CONFIG.STALE_TTL) {
-      responseCache.delete(k);
-      return false;
-    }
-    return true;
-  });
-  if (valid.length > CONFIG.MAX_CACHE_SIZE) {
-    valid.sort(
-      (a, b) =>
-        a[1].lastAccess +
-        a[1].accessCount * 1000 -
-        (b[1].lastAccess + b[1].accessCount * 1000),
-    );
-    valid
-      .slice(0, Math.floor(valid.length * 0.2))
-      .forEach(([k]) => responseCache.delete(k));
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Spec-facet cache
-// ─────────────────────────────────────────────────────────────────────────────
-
-const facetCache = new Map<
-  string,
-  { data: Record<string, FacetCount[]>; ts: number }
->();
-
-function buildFacetCacheKey(p: QueryParams): string {
-  return [p.category, p.subcategory, p.subsubcategory, p.buyerCategory].join(
-    "|",
-  );
-}
-
-async function fetchSpecFacets(
-  p: QueryParams,
-  firestoreCategory: string | null,
-): Promise<Record<string, FacetCount[]>> {
-  const key = buildFacetCacheKey(p);
-  const cached = facetCache.get(key);
-  if (cached && Date.now() - cached.ts < CONFIG.FACET_CACHE_TTL) {
-    return cached.data;
-  }
-
-  try {
-    // Build same category filters Flutter uses for facet fetch
-    const facetFilters: string[][] = [];
-    if (firestoreCategory)
-      facetFilters.push([`category_en:${firestoreCategory}`]);
-    if (p.subcategory) facetFilters.push([`subcategory_en:${p.subcategory}`]);
-    if (p.subsubcategory)
-      facetFilters.push([`subsubcategory_en:${p.subsubcategory}`]);
-    if (p.buyerCategory === "Women" || p.buyerCategory === "Men") {
-      facetFilters.push([`gender:${p.buyerCategory}`, "gender:Unisex"]);
-    }
-
-    const result =
-      await TypeSenseServiceManager.instance.shopService.fetchSpecFacets({
-        indexName: "shop_products",
-        facetFilters,
-      });
-
-    if (facetCache.size >= CONFIG.MAX_FACET_CACHE) {
-      const oldest = Array.from(facetCache.entries()).sort(
-        (a, b) => a[1].ts - b[1].ts,
-      );
-      oldest
-        .slice(0, Math.floor(CONFIG.MAX_FACET_CACHE * 0.2))
-        .forEach(([k]) => facetCache.delete(k));
-    }
-    facetCache.set(key, { data: result, ts: Date.now() });
-    return result;
-  } catch (err) {
-    console.error("[fetchDynamicProducts] fetchSpecFacets error:", err);
-    return {};
-  }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Retry + timeout
@@ -342,8 +190,6 @@ function decideBackend(p: QueryParams): "firestore" | "typesense" {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Firestore query (mirrors Flutter's _buildFirestoreQuery exactly)
-// Only category/subcategory/subsubcategory/gender — nothing else.
-// Always ordered by promotionScore DESC, documentId ASC.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function buildFirestoreQuery(
@@ -364,7 +210,6 @@ function buildFirestoreQuery(
     .orderBy("promotionScore", "desc")
     .orderBy(FieldPath.documentId(), "asc");
 
-  // Offset pagination for pages beyond the first
   if (p.page > 0) {
     q = q.offset(p.page * CONFIG.DEFAULT_LIMIT);
   }
@@ -374,14 +219,12 @@ function buildFirestoreQuery(
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Typesense fetch (mirrors Flutter's _fetchPageFromTypeSense exactly)
-// Parses products directly from hits — no Firestore round-trip.
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function fetchFromTypesense(
   p: QueryParams,
   firestoreCategory: string | null,
 ): Promise<{ products: Product[]; hasMore: boolean }> {
-  // Build facet filter groups (mirrors Flutter's _buildTypeSenseFacetFilters)
   const facetFilters: string[][] = [];
 
   if (firestoreCategory)
@@ -390,12 +233,10 @@ async function fetchFromTypesense(
   if (p.subsubcategory)
     facetFilters.push([`subsubcategory_en:${p.subsubcategory}`]);
 
-  // Gender: Women OR Unisex / Men OR Unisex (mirrors Flutter)
   if (p.buyerCategory === "Women" || p.buyerCategory === "Men") {
     facetFilters.push([`gender:${p.buyerCategory}`, "gender:Unisex"]);
   }
 
-  // Dynamic filters — each is its own AND group, OR within the group
   if (p.brands.length > 0)
     facetFilters.push(p.brands.map((b) => `brandModel:${b}`));
   if (p.colors.length > 0)
@@ -405,12 +246,10 @@ async function fetchFromTypesense(
       p.filterSubcategories.map((s) => `subsubcategory_en:${s}`),
     );
 
-  // Spec filters: each field is its own AND group (mirrors Flutter)
   for (const [field, vals] of Object.entries(p.specFilters)) {
     if (vals.length > 0) facetFilters.push(vals.map((v) => `${field}:${v}`));
   }
 
-  // Numeric filters (mirrors Flutter's _buildTypeSenseNumericFilters)
   const numericFilters: string[] = [];
   if (p.minPrice !== null)
     numericFilters.push(`price>=${Math.floor(p.minPrice)}`);
@@ -429,14 +268,50 @@ async function fetchFromTypesense(
       sortOption: p.sortOption,
     });
 
-  // Parse directly from Typesense hits — no Firestore round-trip
   const products = res.hits.map((hit) =>
     ProductUtils.fromJson({ ...hit, id: hit.objectID || hit.id }),
   );
 
-  // hasMore: page-based (mirrors Flutter: res.page < res.nbPages - 1)
   return { products, hasMore: res.page < res.nbPages - 1 };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Spec-facet fetch
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function fetchSpecFacetsData(
+  category: string | null,
+  subcategory: string | null,
+  subsubcategory: string | null,
+  buyerCategory: string | null,
+  firestoreCategory: string | null,
+): Promise<Record<string, FacetCount[]>> {
+  try {
+    const facetFilters: string[][] = [];
+    if (firestoreCategory)
+      facetFilters.push([`category_en:${firestoreCategory}`]);
+    if (subcategory) facetFilters.push([`subcategory_en:${subcategory}`]);
+    if (subsubcategory)
+      facetFilters.push([`subsubcategory_en:${subsubcategory}`]);
+    if (buyerCategory === "Women" || buyerCategory === "Men") {
+      facetFilters.push([`gender:${buyerCategory}`, "gender:Unisex"]);
+    }
+
+    return await TypeSenseServiceManager.instance.shopService.fetchSpecFacets({
+      indexName: "shop_products",
+      facetFilters,
+    });
+  } catch (err) {
+    console.error("[fetchDynamicProducts] fetchSpecFacets error:", err);
+    return {};
+  }
+}
+
+const cachedFetchSpecFacets = unstable_cache(
+  fetchSpecFacetsData,
+  ["dynamic-products-facets"],
+  { revalidate: CONFIG.FACET_CACHE_REVALIDATE_SECONDS, tags: ["dynamic-products"] },
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Core data fetch
@@ -469,36 +344,36 @@ async function fetchDynamicProductsData(
         }),
 
     params.page === 0
-      ? fetchSpecFacets(params, firestoreCategory)
+      ? cachedFetchSpecFacets(
+          params.category,
+          params.subcategory,
+          params.subsubcategory,
+          params.buyerCategory,
+          firestoreCategory,
+        )
       : Promise.resolve({} as Record<string, FacetCount[]>),
   ]);
 
   return {
     products,
-    boostedProducts: [], // Always empty — promotionScore ordering handles this
+    boostedProducts: [],
     hasMore,
     page: params.page,
     total: products.length,
     specFacets: params.page === 0 ? specFacets : undefined,
-    source: "fresh",
     timing: Date.now() - t0,
   };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Background revalidation
+// Server-side cache
 // ─────────────────────────────────────────────────────────────────────────────
 
-function revalidateInBackground(cacheKey: string, params: QueryParams): void {
-  if (pendingRequests.has(cacheKey)) return;
-  const p = fetchDynamicProductsData(params);
-  pendingRequests.set(cacheKey, p);
-  p.then((r) => cacheResponse(cacheKey, r))
-    .catch((e) =>
-      console.error("[fetchDynamicProducts] bg revalidate error:", e),
-    )
-    .finally(() => pendingRequests.delete(cacheKey));
-}
+const cachedFetchDynamicProducts = unstable_cache(
+  fetchDynamicProductsData,
+  ["dynamic-products"],
+  { revalidate: CONFIG.CACHE_REVALIDATE_SECONDS, tags: ["dynamic-products"] },
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main handler
@@ -515,8 +390,6 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const params = extractQueryParams(searchParams);
-    const cacheKey = generateCacheKey(params);
-    const cached = getCachedResponse(cacheKey);
 
     const headers = (extra: Record<string, string> = {}) => ({
       "Cache-Control": "public, max-age=120, stale-while-revalidate=60",
@@ -524,55 +397,14 @@ export async function GET(request: NextRequest) {
       ...extra,
     });
 
-    if (cached.status === "fresh") {
-      return NextResponse.json(
-        { ...cached.data, source: "cache" },
-        { headers: headers({ "X-Cache": "HIT" }) },
-      );
-    }
-
-    const pending = pendingRequests.get(cacheKey);
-    if (pending) {
-      if (cached.status === "stale" && cached.data) {
-        return NextResponse.json(
-          { ...cached.data, source: "stale" },
-          { headers: headers({ "X-Cache": "STALE" }) },
-        );
-      }
-      try {
-        const r = await withTimeout(pending, CONFIG.REQUEST_TIMEOUT);
-        return NextResponse.json(
-          { ...r, source: "dedupe" },
-          { headers: headers({ "X-Cache": "DEDUPE" }) },
-        );
-      } catch {
-        /* fall through */
-      }
-    }
-
-    if (cached.status === "stale" && cached.data) {
-      revalidateInBackground(cacheKey, params);
-      return NextResponse.json(
-        { ...cached.data, source: "stale" },
-        { headers: headers({ "X-Cache": "STALE" }) },
-      );
-    }
-
-    const fetchPromise = fetchDynamicProductsData(params);
-    pendingRequests.set(cacheKey, fetchPromise);
-
     try {
-      const result = await withTimeout(fetchPromise, CONFIG.REQUEST_TIMEOUT);
-      cacheResponse(cacheKey, result);
-      return NextResponse.json(
-        { ...result, source: "fresh" },
-        {
-          headers: headers({
-            "X-Cache": "MISS",
-            "X-Timing": `${result.timing}ms`,
-          }),
-        },
+      const result = await withTimeout(
+        cachedFetchDynamicProducts(params),
+        CONFIG.REQUEST_TIMEOUT,
       );
+      return NextResponse.json(result, {
+        headers: headers({ "X-Timing": `${result.timing}ms` }),
+      });
     } catch (err) {
       if (err instanceof Error && err.message === "Request timeout") {
         return NextResponse.json(
@@ -599,8 +431,6 @@ export async function GET(request: NextRequest) {
         },
         { status: 500 },
       );
-    } finally {
-      pendingRequests.delete(cacheKey);
     }
   } catch (err) {
     console.error("[fetchDynamicProducts] Unexpected error:", err);
@@ -625,11 +455,8 @@ export async function DELETE(request: NextRequest) {
   const adminCheck = await verifyAdmin(auth.isAdmin ?? false);
   if (adminCheck.error) return adminCheck.error;
 
-  const prev = responseCache.size;
-  responseCache.clear();
-  pendingRequests.clear();
-  facetCache.clear();
-  return NextResponse.json({ message: "Cache cleared", clearedEntries: prev });
+  revalidateTag("dynamic-products");
+  return NextResponse.json({ message: "Cache invalidated" });
 }
 
 export async function HEAD(request: NextRequest) {
@@ -639,19 +466,9 @@ export async function HEAD(request: NextRequest) {
   const adminCheck = await verifyAdmin(auth.isAdmin ?? false);
   if (adminCheck.error) return adminCheck.error;
 
-  const now = Date.now();
   return NextResponse.json({
-    cacheSize: responseCache.size,
-    facetCacheSize: facetCache.size,
-    maxCacheSize: CONFIG.MAX_CACHE_SIZE,
-    pendingRequests: pendingRequests.size,
-    entries: Array.from(responseCache.entries())
-      .slice(0, 20)
-      .map(([key, e]) => ({
-        key: key.substring(0, 50),
-        ageSeconds: Math.floor((now - e.timestamp) / 1000),
-        accessCount: e.accessCount,
-        isFresh: now - e.timestamp <= CONFIG.CACHE_TTL,
-      })),
+    cacheType: "unstable_cache",
+    revalidateSeconds: CONFIG.CACHE_REVALIDATE_SECONDS,
+    facetRevalidateSeconds: CONFIG.FACET_CACHE_REVALIDATE_SECONDS,
   });
 }

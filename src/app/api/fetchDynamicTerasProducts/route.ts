@@ -1,11 +1,12 @@
 // src/app/api/fetchDynamicTerasProducts/route.ts
 //
-// Dynamic Teras Products API
+// Dynamic Teras Products API with unstable_cache for server-side caching.
 // - Initial load (no filters, default sort) → Firestore `products` collection
 // - Filtering / sorting → Typesense `products` index via mainService
 // - Spec facets fetched from Typesense on page 0
 
 import { NextRequest, NextResponse } from "next/server";
+import { unstable_cache, revalidateTag } from "next/cache";
 import {
   collection,
   query,
@@ -31,15 +32,11 @@ import type { FacetCount } from "@/app/components/FilterSideBar";
 const CONFIG = {
   DEFAULT_LIMIT: 20,
   MAX_ARRAY_FILTER_SIZE: 10,
-  CACHE_TTL: 2 * 60 * 1000,
-  STALE_TTL: 5 * 60 * 1000,
-  MAX_CACHE_SIZE: 200,
-  CACHE_CLEANUP_THRESHOLD: 0.9,
+  CACHE_REVALIDATE_SECONDS: 120, // 2 minutes
+  FACET_CACHE_REVALIDATE_SECONDS: 300, // 5 minutes
   REQUEST_TIMEOUT: 12_000,
   MAX_RETRIES: 2,
   BASE_RETRY_DELAY: 100,
-  FACET_CACHE_TTL: 5 * 60 * 1000,
-  MAX_FACET_CACHE: 50,
   DEBUG: process.env.NODE_ENV === "development",
 } as const;
 
@@ -56,20 +53,7 @@ interface ApiResponse {
   page: number;
   total: number;
   specFacets?: Record<string, FacetCount[]>;
-  source?: "cache" | "stale" | "dedupe" | "fresh";
   timing?: number;
-}
-
-interface CacheEntry {
-  data: ApiResponse;
-  timestamp: number;
-  accessCount: number;
-  lastAccess: number;
-}
-
-interface CacheResult {
-  data: ApiResponse | null;
-  status: "fresh" | "stale" | "expired" | "miss";
 }
 
 interface QueryParams {
@@ -142,149 +126,6 @@ const DIRECT_CATEGORY_MAP: Record<string, string> = {
   Automotive: "Automotive",
   "Health & Wellness": "Health & Wellness",
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Request deduplication + caching
-// ─────────────────────────────────────────────────────────────────────────────
-
-const pendingRequests = new Map<string, Promise<ApiResponse>>();
-const responseCache = new Map<string, CacheEntry>();
-
-function generateCacheKey(p: QueryParams): string {
-  return JSON.stringify({
-    c: p.category || "",
-    sc: p.subcategory || "",
-    ssc: p.subsubcategory || "",
-    bc: p.buyerCategory || "",
-    bsc: p.buyerSubcategory || "",
-    so: p.sortOption,
-    qf: p.quickFilter || "",
-    fsc: p.filterSubcategories.sort().join(","),
-    col: p.colors.sort().join(","),
-    br: p.brands.sort().join(","),
-    sf: JSON.stringify(
-      Object.fromEntries(
-        Object.entries(p.specFilters).map(([k, v]) => [k, [...v].sort()]),
-      ),
-    ),
-    minP: p.minPrice ?? "",
-    maxP: p.maxPrice ?? "",
-    minR: p.minRating ?? "",
-    pg: p.page,
-    fbc: p.filterBuyerCategory || "",
-    fbsc: p.filterBuyerSubcategory || "",
-    fbssc: p.filterBuyerSubSubcategory || "",
-  });
-}
-
-function getCachedResponse(key: string): CacheResult {
-  const entry = responseCache.get(key);
-  if (!entry) return { data: null, status: "miss" };
-  const age = Date.now() - entry.timestamp;
-  entry.accessCount++;
-  entry.lastAccess = Date.now();
-  if (age <= CONFIG.CACHE_TTL) return { data: entry.data, status: "fresh" };
-  if (age <= CONFIG.STALE_TTL) return { data: entry.data, status: "stale" };
-  responseCache.delete(key);
-  return { data: null, status: "expired" };
-}
-
-function cacheResponse(key: string, data: ApiResponse): void {
-  if (
-    responseCache.size >=
-    CONFIG.MAX_CACHE_SIZE * CONFIG.CACHE_CLEANUP_THRESHOLD
-  ) {
-    cleanupCache();
-  }
-  const now = Date.now();
-  responseCache.set(key, {
-    data,
-    timestamp: now,
-    accessCount: 1,
-    lastAccess: now,
-  });
-}
-
-function cleanupCache(): void {
-  const now = Date.now();
-  const entries = Array.from(responseCache.entries());
-  const valid = entries.filter(([k, e]) => {
-    if (now - e.timestamp > CONFIG.STALE_TTL) {
-      responseCache.delete(k);
-      return false;
-    }
-    return true;
-  });
-  if (valid.length > CONFIG.MAX_CACHE_SIZE) {
-    valid.sort(
-      (a, b) =>
-        a[1].lastAccess +
-        a[1].accessCount * 1000 -
-        (b[1].lastAccess + b[1].accessCount * 1000),
-    );
-    valid
-      .slice(0, Math.floor(valid.length * 0.2))
-      .forEach(([k]) => responseCache.delete(k));
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Spec-facet cache
-// ─────────────────────────────────────────────────────────────────────────────
-
-const facetCache = new Map<
-  string,
-  { data: Record<string, FacetCount[]>; ts: number }
->();
-
-function buildFacetCacheKey(p: QueryParams): string {
-  return [p.category, p.subcategory, p.subsubcategory, p.buyerCategory].join(
-    "|",
-  );
-}
-
-async function fetchSpecFacets(
-  p: QueryParams,
-  firestoreCategory: string | null,
-): Promise<Record<string, FacetCount[]>> {
-  const key = buildFacetCacheKey(p);
-  const cached = facetCache.get(key);
-  if (cached && Date.now() - cached.ts < CONFIG.FACET_CACHE_TTL) {
-    return cached.data;
-  }
-
-  try {
-    const facetFilters: string[][] = [];
-    if (firestoreCategory)
-      facetFilters.push([`category_en:${firestoreCategory}`]);
-    if (p.subcategory) facetFilters.push([`subcategory_en:${p.subcategory}`]);
-    if (p.subsubcategory)
-      facetFilters.push([`subsubcategory_en:${p.subsubcategory}`]);
-    if (p.buyerCategory === "Women" || p.buyerCategory === "Men") {
-      facetFilters.push([`gender:${p.buyerCategory}`, "gender:Unisex"]);
-    }
-
-    const result =
-      await TypeSenseServiceManager.instance.mainService.fetchSpecFacets({
-        indexName: "products",
-        facetFilters,
-      });
-
-    if (facetCache.size >= CONFIG.MAX_FACET_CACHE) {
-      const oldest = Array.from(facetCache.entries()).sort(
-        (a, b) => a[1].ts - b[1].ts,
-      );
-      oldest
-        .slice(0, Math.floor(CONFIG.MAX_FACET_CACHE * 0.2))
-        .forEach(([k]) => facetCache.delete(k));
-    }
-    facetCache.set(key, { data: result, ts: Date.now() });
-    return result;
-  } catch (err) {
-    console.error("[TerasProducts] fetchSpecFacets error:", err);
-    return {};
-  }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Retry + timeout
@@ -464,7 +305,7 @@ function calculateEffectiveFilters(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Backend decision (mirrors fetchDynamicProducts pattern)
+// Backend decision
 // ─────────────────────────────────────────────────────────────────────────────
 
 function decideBackend(p: QueryParams): "firestore" | "typesense" {
@@ -526,7 +367,6 @@ function buildFirestoreQuery(
     );
   }
 
-  // Quick filters (Firestore-only path)
   if (params.quickFilter) {
     switch (params.quickFilter) {
       case "deals":
@@ -574,7 +414,6 @@ async function fetchFromTypesense(
     facetFilters.push([`gender:${p.buyerCategory}`, "gender:Unisex"]);
   }
 
-  // Dynamic filters — each is its own AND group, OR within the group
   if (p.brands.length > 0)
     facetFilters.push(p.brands.map((b) => `brandModel:${b}`));
   if (p.colors.length > 0)
@@ -584,12 +423,10 @@ async function fetchFromTypesense(
       p.filterSubcategories.map((s) => `subsubcategory_en:${s}`),
     );
 
-  // Spec filters: each field is its own AND group
   for (const [field, vals] of Object.entries(p.specFilters)) {
     if (vals.length > 0) facetFilters.push(vals.map((v) => `${field}:${v}`));
   }
 
-  // Numeric filters
   const numericFilters: string[] = [];
   if (p.minPrice !== null)
     numericFilters.push(`price>=${Math.floor(p.minPrice)}`);
@@ -608,13 +445,50 @@ async function fetchFromTypesense(
       sortOption: p.sortOption,
     });
 
-  // Parse directly from Typesense hits — no Firestore round-trip
   const products = res.hits.map((hit) =>
     ProductUtils.fromJson({ ...hit, id: hit.objectID || hit.id }),
   );
 
   return { products, hasMore: res.page < res.nbPages - 1 };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Spec-facet fetch
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function fetchSpecFacetsData(
+  category: string | null,
+  subcategory: string | null,
+  subsubcategory: string | null,
+  buyerCategory: string | null,
+  firestoreCategory: string | null,
+): Promise<Record<string, FacetCount[]>> {
+  try {
+    const facetFilters: string[][] = [];
+    if (firestoreCategory)
+      facetFilters.push([`category_en:${firestoreCategory}`]);
+    if (subcategory) facetFilters.push([`subcategory_en:${subcategory}`]);
+    if (subsubcategory)
+      facetFilters.push([`subsubcategory_en:${subsubcategory}`]);
+    if (buyerCategory === "Women" || buyerCategory === "Men") {
+      facetFilters.push([`gender:${buyerCategory}`, "gender:Unisex"]);
+    }
+
+    return await TypeSenseServiceManager.instance.mainService.fetchSpecFacets({
+      indexName: "products",
+      facetFilters,
+    });
+  } catch (err) {
+    console.error("[TerasProducts] fetchSpecFacets error:", err);
+    return {};
+  }
+}
+
+const cachedFetchSpecFacets = unstable_cache(
+  fetchSpecFacetsData,
+  ["teras-products-facets"],
+  { revalidate: CONFIG.FACET_CACHE_REVALIDATE_SECONDS, tags: ["teras-products"] },
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Core data fetch
@@ -645,7 +519,13 @@ async function fetchTerasProductsData(
         }),
 
     params.page === 0
-      ? fetchSpecFacets(params, firestoreCategory)
+      ? cachedFetchSpecFacets(
+          params.category,
+          params.subcategory,
+          params.subsubcategory,
+          params.buyerCategory,
+          firestoreCategory,
+        )
       : Promise.resolve({} as Record<string, FacetCount[]>),
   ]);
 
@@ -656,25 +536,19 @@ async function fetchTerasProductsData(
     page: params.page,
     total: products.length,
     specFacets: params.page === 0 ? specFacets : undefined,
-    source: "fresh",
     timing: Date.now() - t0,
   };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Background revalidation
+// Server-side cache
 // ─────────────────────────────────────────────────────────────────────────────
 
-function revalidateInBackground(cacheKey: string, params: QueryParams): void {
-  if (pendingRequests.has(cacheKey)) return;
-  const p = fetchTerasProductsData(params);
-  pendingRequests.set(cacheKey, p);
-  p.then((r) => cacheResponse(cacheKey, r))
-    .catch((e) =>
-      console.error("[TerasProducts] bg revalidate error:", e),
-    )
-    .finally(() => pendingRequests.delete(cacheKey));
-}
+const cachedFetchTerasProducts = unstable_cache(
+  fetchTerasProductsData,
+  ["teras-products"],
+  { revalidate: CONFIG.CACHE_REVALIDATE_SECONDS, tags: ["teras-products"] },
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main handler
@@ -691,8 +565,6 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const params = extractQueryParams(searchParams);
-    const cacheKey = generateCacheKey(params);
-    const cached = getCachedResponse(cacheKey);
 
     const headers = (extra: Record<string, string> = {}) => ({
       "Cache-Control": "public, max-age=120, stale-while-revalidate=60",
@@ -700,55 +572,14 @@ export async function GET(request: NextRequest) {
       ...extra,
     });
 
-    if (cached.status === "fresh") {
-      return NextResponse.json(
-        { ...cached.data, source: "cache" },
-        { headers: headers({ "X-Cache": "HIT" }) },
-      );
-    }
-
-    const pending = pendingRequests.get(cacheKey);
-    if (pending) {
-      if (cached.status === "stale" && cached.data) {
-        return NextResponse.json(
-          { ...cached.data, source: "stale" },
-          { headers: headers({ "X-Cache": "STALE" }) },
-        );
-      }
-      try {
-        const r = await withTimeout(pending, CONFIG.REQUEST_TIMEOUT);
-        return NextResponse.json(
-          { ...r, source: "dedupe" },
-          { headers: headers({ "X-Cache": "DEDUPE" }) },
-        );
-      } catch {
-        /* fall through */
-      }
-    }
-
-    if (cached.status === "stale" && cached.data) {
-      revalidateInBackground(cacheKey, params);
-      return NextResponse.json(
-        { ...cached.data, source: "stale" },
-        { headers: headers({ "X-Cache": "STALE" }) },
-      );
-    }
-
-    const fetchPromise = fetchTerasProductsData(params);
-    pendingRequests.set(cacheKey, fetchPromise);
-
     try {
-      const result = await withTimeout(fetchPromise, CONFIG.REQUEST_TIMEOUT);
-      cacheResponse(cacheKey, result);
-      return NextResponse.json(
-        { ...result, source: "fresh" },
-        {
-          headers: headers({
-            "X-Cache": "MISS",
-            "X-Timing": `${result.timing}ms`,
-          }),
-        },
+      const result = await withTimeout(
+        cachedFetchTerasProducts(params),
+        CONFIG.REQUEST_TIMEOUT,
       );
+      return NextResponse.json(result, {
+        headers: headers({ "X-Timing": `${result.timing}ms` }),
+      });
     } catch (err) {
       if (err instanceof Error && err.message === "Request timeout") {
         return NextResponse.json(
@@ -775,8 +606,6 @@ export async function GET(request: NextRequest) {
         },
         { status: 500 },
       );
-    } finally {
-      pendingRequests.delete(cacheKey);
     }
   } catch (err) {
     console.error("[TerasProducts] Unexpected error:", err);
@@ -801,9 +630,6 @@ export async function DELETE(request: NextRequest) {
   const adminCheck = await verifyAdmin(auth.isAdmin ?? false);
   if (adminCheck.error) return adminCheck.error;
 
-  const prev = responseCache.size;
-  responseCache.clear();
-  pendingRequests.clear();
-  facetCache.clear();
-  return NextResponse.json({ message: "Cache cleared", clearedEntries: prev });
+  revalidateTag("teras-products");
+  return NextResponse.json({ message: "Cache invalidated" });
 }

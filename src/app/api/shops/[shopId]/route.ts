@@ -1,39 +1,23 @@
 // src/app/api/shops/[shopId]/route.ts
 //
-// ═══════════════════════════════════════════════════════════════════════════
-// SHOP DETAIL API - PRODUCTION OPTIMIZED
-// ═══════════════════════════════════════════════════════════════════════════
-//
-// OPTIMIZATIONS:
-// 1. Request Deduplication - Prevents duplicate in-flight requests
-// 2. Retry with Exponential Backoff - Handles transient Firestore failures
-// 3. Stale-While-Revalidate Caching - Fast responses with background refresh
-// 4. Request Timeout - Prevents hanging requests
-// 5. Rate Limiting Integration - Preserved from original
-// 6. Structured Error Handling - Consistent error responses
-//
-// ═══════════════════════════════════════════════════════════════════════════
+// SHOP DETAIL API
+// Uses Next.js unstable_cache for server-side caching that persists across
+// Vercel serverless invocations, replacing in-memory Maps.
 
 import { NextRequest, NextResponse } from "next/server";
+import { unstable_cache } from "next/cache";
 import { getFirestoreAdmin } from "@/lib/firebase-admin";
 import { checkRateLimit } from "@/lib/auth-middleware";
 
 // ============= CONFIGURATION =============
 
 const CONFIG = {
-  // Caching
-  CACHE_TTL: 2 * 60 * 1000, // 2 minutes - fresh
-  STALE_TTL: 5 * 60 * 1000, // 5 minutes - stale but usable
-  MAX_CACHE_SIZE: 100,
-
-  // Resilience
-  REQUEST_TIMEOUT: 8000, // 8 seconds
+  CACHE_REVALIDATE_SECONDS: 120, // 2 minutes
+  REQUEST_TIMEOUT: 8000,
   MAX_RETRIES: 2,
   BASE_RETRY_DELAY: 100,
-
-  // Rate Limiting
   RATE_LIMIT_MAX: 100,
-  RATE_LIMIT_WINDOW: 60000, // 1 minute
+  RATE_LIMIT_WINDOW: 60000,
 } as const;
 
 // ============= TYPES =============
@@ -59,57 +43,7 @@ interface ShopResponse {
   categories: string[];
   totalProducts: number;
   totalSales: number;
-  source?: "cache" | "stale" | "dedupe" | "fresh";
   timing?: number;
-}
-
-interface CacheEntry {
-  data: ShopResponse;
-  timestamp: number;
-}
-
-interface CacheResult {
-  data: ShopResponse | null;
-  status: "fresh" | "stale" | "expired" | "miss";
-}
-
-// ============= REQUEST DEDUPLICATION =============
-
-const pendingRequests = new Map<string, Promise<ShopResponse>>();
-
-// ============= RESPONSE CACHING =============
-
-const responseCache = new Map<string, CacheEntry>();
-
-function getCachedResponse(shopId: string): CacheResult {
-  const entry = responseCache.get(shopId);
-
-  if (!entry) {
-    return { data: null, status: "miss" };
-  }
-
-  const age = Date.now() - entry.timestamp;
-
-  if (age <= CONFIG.CACHE_TTL) {
-    return { data: entry.data, status: "fresh" };
-  }
-
-  if (age <= CONFIG.STALE_TTL) {
-    return { data: entry.data, status: "stale" };
-  }
-
-  responseCache.delete(shopId);
-  return { data: null, status: "expired" };
-}
-
-function cacheResponse(shopId: string, data: ShopResponse): void {
-  // LRU eviction if needed
-  if (responseCache.size >= CONFIG.MAX_CACHE_SIZE) {
-    const firstKey = responseCache.keys().next().value;
-    if (firstKey) responseCache.delete(firstKey);
-  }
-
-  responseCache.set(shopId, { data, timestamp: Date.now() });
 }
 
 // ============= RETRY LOGIC =============
@@ -148,35 +82,11 @@ async function withRetry<T>(
   throw lastError;
 }
 
-// ============= TIMEOUT WRAPPER =============
-
-async function withTimeout<T>(
-  promise: Promise<T>,
-  timeoutMs: number,
-  errorMessage: string = "Request timeout",
-): Promise<T> {
-  let timeoutId: NodeJS.Timeout;
-
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => reject(new Error(errorMessage)), timeoutMs);
-  });
-
-  try {
-    const result = await Promise.race([promise, timeoutPromise]);
-    clearTimeout(timeoutId!);
-    return result;
-  } catch (error) {
-    clearTimeout(timeoutId!);
-    throw error;
-  }
-}
-
 // ============= TIMESTAMP PARSER =============
 
 function parseTimestamp(value: unknown): string | null {
   if (!value) return null;
 
-  // Handle Firestore Timestamp with toDate()
   if (
     value &&
     typeof value === "object" &&
@@ -186,7 +96,6 @@ function parseTimestamp(value: unknown): string | null {
     return (value as { toDate: () => Date }).toDate().toISOString();
   }
 
-  // Handle _seconds format
   if (
     value &&
     typeof value === "object" &&
@@ -198,13 +107,11 @@ function parseTimestamp(value: unknown): string | null {
     ).toISOString();
   }
 
-  // Handle number (milliseconds or seconds)
   if (typeof value === "number") {
     const ms = value > 10000000000 ? value : value * 1000;
     return new Date(ms).toISOString();
   }
 
-  // Handle string
   if (typeof value === "string") {
     const date = new Date(value);
     return isNaN(date.getTime()) ? null : date.toISOString();
@@ -266,7 +173,6 @@ async function fetchShopData(shopId: string): Promise<ShopResponse> {
     {
       maxRetries: CONFIG.MAX_RETRIES,
       shouldRetry: (error) => {
-        // Don't retry on permission errors
         if (error instanceof Error && error.message.includes("permission")) {
           return false;
         }
@@ -285,37 +191,18 @@ async function fetchShopData(shopId: string): Promise<ShopResponse> {
   }
 
   const response = transformShopData(shopId, shopData);
-  response.source = "fresh";
   response.timing = Date.now() - startTime;
 
   return response;
 }
 
-// ============= BACKGROUND REVALIDATION =============
+// ============= SERVER-SIDE CACHE =============
 
-function revalidateInBackground(shopId: string): void {
-  if (pendingRequests.has(shopId)) {
-    return;
-  }
-
-  const fetchPromise = fetchShopData(shopId);
-  pendingRequests.set(shopId, fetchPromise);
-
-  fetchPromise
-    .then((result) => {
-      cacheResponse(shopId, result);
-      console.log(`[shops] Background revalidation complete for ${shopId}`);
-    })
-    .catch((error) => {
-      console.error(
-        `[shops] Background revalidation failed for ${shopId}:`,
-        error,
-      );
-    })
-    .finally(() => {
-      pendingRequests.delete(shopId);
-    });
-}
+const getCachedShopData = unstable_cache(
+  fetchShopData,
+  ["shop-detail"],
+  { revalidate: CONFIG.CACHE_REVALIDATE_SECONDS, tags: ["shops"] },
+);
 
 // ============= MAIN HANDLER =============
 
@@ -328,7 +215,6 @@ export async function GET(
   try {
     const { shopId } = await context.params;
 
-    // Validate shopId
     if (!shopId || shopId.trim() === "") {
       return NextResponse.json(
         { error: "Shop ID is required" },
@@ -352,145 +238,31 @@ export async function GET(
       return rateLimitResult.error;
     }
 
-    // ========== STEP 1: Check cache ==========
-    const cacheResult = getCachedResponse(normalizedShopId);
+    const result = await getCachedShopData(normalizedShopId);
 
-    if (cacheResult.status === "fresh") {
-      console.log(`[shops] Cache HIT (fresh) for ${normalizedShopId}`);
-      return NextResponse.json(
-        { ...cacheResult.data, source: "cache" },
-        {
-          headers: {
-            "Cache-Control": "public, max-age=120, stale-while-revalidate=60",
-            "X-Cache": "HIT",
-            "X-Response-Time": `${Date.now() - requestStart}ms`,
-          },
-        },
-      );
-    }
-
-    // ========== STEP 2: Check for in-flight request ==========
-    const pendingRequest = pendingRequests.get(normalizedShopId);
-
-    if (pendingRequest) {
-      console.log(`[shops] Deduplicating request for ${normalizedShopId}`);
-
-      // Return stale data if available
-      if (cacheResult.status === "stale" && cacheResult.data) {
-        return NextResponse.json(
-          { ...cacheResult.data, source: "stale" },
-          {
-            headers: {
-              "Cache-Control": "public, max-age=0, stale-while-revalidate=120",
-              "X-Cache": "STALE",
-              "X-Response-Time": `${Date.now() - requestStart}ms`,
-            },
-          },
-        );
-      }
-
-      // Wait for pending request
-      try {
-        const result = await withTimeout(
-          pendingRequest,
-          CONFIG.REQUEST_TIMEOUT,
-          "Deduplicated request timeout",
-        );
-        return NextResponse.json(
-          { ...result, source: "dedupe" },
-          {
-            headers: {
-              "Cache-Control": "public, max-age=120, stale-while-revalidate=60",
-              "X-Cache": "DEDUPE",
-              "X-Response-Time": `${Date.now() - requestStart}ms`,
-            },
-          },
-        );
-      } catch {
-        // Fall through to fresh fetch
-      }
-    }
-
-    // ========== STEP 3: Stale-while-revalidate ==========
-    if (cacheResult.status === "stale" && cacheResult.data) {
-      console.log(
-        `[shops] Returning stale, revalidating in background for ${normalizedShopId}`,
-      );
-      revalidateInBackground(normalizedShopId);
-
-      return NextResponse.json(
-        { ...cacheResult.data, source: "stale" },
-        {
-          headers: {
-            "Cache-Control": "public, max-age=0, stale-while-revalidate=120",
-            "X-Cache": "STALE",
-            "X-Response-Time": `${Date.now() - requestStart}ms`,
-          },
-        },
-      );
-    }
-
-    // ========== STEP 4: Fresh fetch ==========
-    console.log(`[shops] Fresh fetch for ${normalizedShopId}`);
-
-    const fetchPromise = fetchShopData(normalizedShopId);
-    pendingRequests.set(normalizedShopId, fetchPromise);
-
-    try {
-      const result = await withTimeout(
-        fetchPromise,
-        CONFIG.REQUEST_TIMEOUT,
-        "Request timeout",
-      );
-
-      cacheResponse(normalizedShopId, result);
-
-      console.log(
-        `[shops] Fetched shop ${normalizedShopId} in ${result.timing}ms`,
-      );
-
-      return NextResponse.json(
-        { ...result, source: "fresh" },
-        {
-          headers: {
-            "Cache-Control": "public, max-age=120, stale-while-revalidate=60",
-            "X-Cache": "MISS",
-            "X-Response-Time": `${Date.now() - requestStart}ms`,
-            "X-Timing": `${result.timing}ms`,
-          },
-        },
-      );
-    } catch (error) {
-      console.error(`[shops] Fetch error for ${normalizedShopId}:`, error);
-
-      // Handle "not found"
-      if (error instanceof Error && error.message === "Shop not found") {
-        return NextResponse.json({ error: "Shop not found" }, { status: 404 });
-      }
-
-      // Handle timeout
-      if (error instanceof Error && error.message.includes("timeout")) {
-        return NextResponse.json(
-          { error: "Request timeout", message: "Please try again" },
-          { status: 504 },
-        );
-      }
-
-      // Handle permission errors
-      if (error instanceof Error && error.message.includes("permission")) {
-        return NextResponse.json({ error: "Access denied" }, { status: 403 });
-      }
-
-      // Generic error
-      return NextResponse.json(
-        { error: "Internal server error" },
-        { status: 500 },
-      );
-    } finally {
-      pendingRequests.delete(normalizedShopId);
-    }
+    return NextResponse.json(result, {
+      headers: {
+        "Cache-Control": "public, max-age=120, stale-while-revalidate=60",
+        "X-Response-Time": `${Date.now() - requestStart}ms`,
+      },
+    });
   } catch (error) {
-    console.error("[shops] Unexpected error:", error);
+    console.error("[shops] Fetch error:", error);
+
+    if (error instanceof Error && error.message === "Shop not found") {
+      return NextResponse.json({ error: "Shop not found" }, { status: 404 });
+    }
+
+    if (error instanceof Error && error.message.includes("timeout")) {
+      return NextResponse.json(
+        { error: "Request timeout", message: "Please try again" },
+        { status: 504 },
+      );
+    }
+
+    if (error instanceof Error && error.message.includes("permission")) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 });
+    }
 
     return NextResponse.json(
       { error: "Internal server error" },

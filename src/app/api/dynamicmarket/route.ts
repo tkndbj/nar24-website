@@ -1,20 +1,10 @@
-// src/app/api/category-products/route.ts
+// src/app/api/dynamicmarket/route.ts
 //
-// ═══════════════════════════════════════════════════════════════════════════
-// CATEGORY PRODUCTS API - PRODUCTION OPTIMIZED
-// ═══════════════════════════════════════════════════════════════════════════
-//
-// OPTIMIZATIONS:
-// 1. Request Deduplication - Prevents duplicate in-flight requests
-// 2. Retry with Exponential Backoff - Handles transient Firestore failures
-// 3. Stale-While-Revalidate Caching - Fast responses with background refresh
-// 4. Request Timeout - Prevents hanging requests
-// 5. Query Fingerprinting - Cache key based on all query params
-// 6. Efficient Pagination - Cursor-based option for large datasets
-//
-// ═══════════════════════════════════════════════════════════════════════════
+// CATEGORY PRODUCTS API
+// Uses unstable_cache for server-side caching.
 
 import { NextRequest, NextResponse } from "next/server";
+import { unstable_cache } from "next/cache";
 import { getFirestoreAdmin } from "@/lib/firebase-admin";
 import { QueryDocumentSnapshot } from "firebase-admin/firestore";
 import { Product, ProductUtils } from "@/app/models/Product";
@@ -22,13 +12,11 @@ import { Product, ProductUtils } from "@/app/models/Product";
 // ============= CONFIGURATION =============
 
 const CONFIG = {
-  CACHE_TTL: 60 * 1000, // 1 minute - fresh
-  STALE_TTL: 3 * 60 * 1000, // 3 minutes - stale but usable
-  MAX_CACHE_SIZE: 100,
+  CACHE_REVALIDATE_SECONDS: 60, // 1 minute
   MAX_FETCH_LIMIT: 200,
   DEFAULT_PAGE_SIZE: 20,
   MAX_PAGE_SIZE: 100,
-  REQUEST_TIMEOUT: 10000, // 10 seconds
+  REQUEST_TIMEOUT: 10000,
   MAX_RETRIES: 2,
   BASE_RETRY_DELAY: 100,
 } as const;
@@ -40,13 +28,7 @@ interface CategoryProductsResponse {
   hasMore: boolean;
   page: number;
   total: number;
-  source?: "cache" | "stale" | "dedupe" | "fresh";
   timing?: number;
-}
-
-interface CacheEntry {
-  data: CategoryProductsResponse;
-  timestamp: number;
 }
 
 interface QueryFilters {
@@ -60,64 +42,6 @@ interface QueryFilters {
   maxPrice?: number;
   page: number;
   limit: number;
-}
-
-// ============= REQUEST DEDUPLICATION =============
-
-const pendingRequests = new Map<string, Promise<CategoryProductsResponse>>();
-
-// ============= RESPONSE CACHING =============
-
-const responseCache = new Map<string, CacheEntry>();
-
-interface CacheResult {
-  data: CategoryProductsResponse | null;
-  status: "fresh" | "stale" | "expired" | "miss";
-}
-
-function generateCacheKey(filters: QueryFilters): string {
-  return JSON.stringify({
-    c: filters.category,
-    sc: filters.subcategory || "",
-    ssc: filters.subsubcategory || "",
-    fsc: filters.filterSubcategories.sort().join(","),
-    col: filters.colors.sort().join(","),
-    br: filters.brands.sort().join(","),
-    minP: filters.minPrice ?? "",
-    maxP: filters.maxPrice ?? "",
-    p: filters.page,
-    l: filters.limit,
-  });
-}
-
-function getCachedResponse(cacheKey: string): CacheResult {
-  const cached = responseCache.get(cacheKey);
-
-  if (!cached) {
-    return { data: null, status: "miss" };
-  }
-
-  const age = Date.now() - cached.timestamp;
-
-  if (age <= CONFIG.CACHE_TTL) {
-    return { data: cached.data, status: "fresh" };
-  }
-
-  if (age <= CONFIG.STALE_TTL) {
-    return { data: cached.data, status: "stale" };
-  }
-
-  responseCache.delete(cacheKey);
-  return { data: null, status: "expired" };
-}
-
-function cacheResponse(cacheKey: string, data: CategoryProductsResponse): void {
-  if (responseCache.size >= CONFIG.MAX_CACHE_SIZE) {
-    const firstKey = responseCache.keys().next().value;
-    if (firstKey) responseCache.delete(firstKey);
-  }
-
-  responseCache.set(cacheKey, { data, timestamp: Date.now() });
 }
 
 // ============= RETRY LOGIC =============
@@ -276,13 +200,11 @@ function applyClientSideFilters(
     return products;
   }
 
-  // Pre-normalize filter values for performance
   const normalizedFilterSubs = filters.filterSubcategories.map(normalizeString);
   const normalizedFilterColors = filters.colors.map(normalizeString);
   const normalizedFilterBrands = filters.brands.map(normalizeString);
 
   return products.filter((product) => {
-    // Subcategory filter
     if (normalizedFilterSubs.length > 0) {
       if (!product.subcategory) return false;
 
@@ -297,7 +219,6 @@ function applyClientSideFilters(
       if (!matchesSubcategory) return false;
     }
 
-    // Color filter
     if (normalizedFilterColors.length > 0) {
       if (!product.availableColors || product.availableColors.length === 0) {
         return false;
@@ -317,7 +238,6 @@ function applyClientSideFilters(
       if (!hasMatchingColor) return false;
     }
 
-    // Brand filter
     if (normalizedFilterBrands.length > 0) {
       if (!product.brandModel) return false;
 
@@ -332,7 +252,6 @@ function applyClientSideFilters(
       if (!matchesBrand) return false;
     }
 
-    // Price range filter (backup - should be handled at DB level)
     if (filters.minPrice !== undefined && product.price < filters.minPrice) {
       return false;
     }
@@ -362,14 +281,6 @@ async function fetchCategoryProducts(
     ? formatCategoryName(filters.subsubcategory)
     : undefined;
 
-  // ─────────────────────────────────────────────────────────────────────
-  // Gender-based query (Women / Men)
-  // Matches Flutter: .where('gender', whereIn: [buyerCategory, 'Unisex'])
-  //   .where('quantity', isGreaterThan: 0)
-  //   .orderBy('quantity')
-  //   .orderBy('isBoosted', descending: true)
-  //   .orderBy('promotionScore', descending: true)
-  // ─────────────────────────────────────────────────────────────────────
   if (filters.category === "women" || filters.category === "men") {
     const genderValue = formattedCategory;
 
@@ -406,9 +317,6 @@ async function fetchCategoryProducts(
     } catch (error) {
       console.error(`[category-products] Gender query failed:`, error);
 
-      // Fallback: simpler query matching Flutter's fallback
-      // Flutter fallback: .where('gender', whereIn: [...])
-      //   .orderBy('createdAt', descending: true).limit(20)
       try {
         const fallbackQuery: FirebaseFirestore.Query = db
           .collection("shop_products")
@@ -430,14 +338,6 @@ async function fetchCategoryProducts(
       }
     }
   } else {
-    // ─────────────────────────────────────────────────────────────────
-    // Standard category query
-    // Matches Flutter: .where('category', isEqualTo: buyerCategory)
-    //   .where('quantity', isGreaterThan: 0)
-    //   .orderBy('quantity')
-    //   .orderBy('isBoosted', descending: true)
-    //   .orderBy('promotionScore', descending: true)
-    // ─────────────────────────────────────────────────────────────────
     try {
       let query: FirebaseFirestore.Query = db
         .collection("shop_products")
@@ -471,9 +371,6 @@ async function fetchCategoryProducts(
     } catch (error) {
       console.error(`[category-products] Category query failed:`, error);
 
-      // Fallback: simpler query matching Flutter's fallback
-      // Flutter fallback: .where('category', isEqualTo: buyerCategory)
-      //   .orderBy('createdAt', descending: true).limit(20)
       try {
         const fallbackQuery: FirebaseFirestore.Query = db
           .collection("shop_products")
@@ -496,7 +393,6 @@ async function fetchCategoryProducts(
     }
   }
 
-  // Apply client-side filters
   allProducts = applyClientSideFilters(allProducts, {
     filterSubcategories: filters.filterSubcategories,
     colors: filters.colors,
@@ -505,7 +401,6 @@ async function fetchCategoryProducts(
     maxPrice: filters.maxPrice,
   });
 
-  // Sort: boosted first, then by promotionScore (matches Flutter orderBy)
   allProducts.sort((a, b) => {
     if (a.isBoosted !== b.isBoosted) {
       return a.isBoosted ? -1 : 1;
@@ -513,7 +408,6 @@ async function fetchCategoryProducts(
     return (b.promotionScore ?? 0) - (a.promotionScore ?? 0);
   });
 
-  // Paginate
   const startIndex = filters.page * filters.limit;
   const paginatedProducts = allProducts.slice(
     startIndex,
@@ -526,36 +420,17 @@ async function fetchCategoryProducts(
     hasMore,
     page: filters.page,
     total: allProducts.length,
-    source: "fresh",
     timing: Date.now() - startTime,
   };
 }
 
-// ============= BACKGROUND REVALIDATION =============
+// ============= SERVER-SIDE CACHE =============
 
-function revalidateInBackground(cacheKey: string, filters: QueryFilters): void {
-  if (pendingRequests.has(cacheKey)) {
-    return;
-  }
-
-  const fetchPromise = fetchCategoryProducts(filters);
-  pendingRequests.set(cacheKey, fetchPromise);
-
-  fetchPromise
-    .then((result) => {
-      cacheResponse(cacheKey, result);
-      console.log(`[category-products] Background revalidation complete`);
-    })
-    .catch((error) => {
-      console.error(
-        `[category-products] Background revalidation failed:`,
-        error,
-      );
-    })
-    .finally(() => {
-      pendingRequests.delete(cacheKey);
-    });
-}
+const cachedFetchCategoryProducts = unstable_cache(
+  fetchCategoryProducts,
+  ["category-products"],
+  { revalidate: CONFIG.CACHE_REVALIDATE_SECONDS, tags: ["category-products"] },
+);
 
 // ============= MAIN HANDLER =============
 
@@ -571,7 +446,6 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const filters = parseQueryParams(searchParams);
 
-    // Validate
     const validationError = validateFilters(filters);
     if (validationError) {
       return NextResponse.json(
@@ -586,124 +460,27 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const cacheKey = generateCacheKey(filters);
-
-    // ========== STEP 1: Check cache ==========
-    const cacheResult = getCachedResponse(cacheKey);
-
-    if (cacheResult.status === "fresh") {
-      console.log(`[category-products] Cache HIT (fresh)`);
-      return NextResponse.json(
-        { ...cacheResult.data, source: "cache" },
-        {
-          headers: {
-            "Cache-Control": `public, s-maxage=60, stale-while-revalidate=120`,
-            "X-Cache": "HIT",
-            "X-Response-Time": `${Date.now() - requestStart}ms`,
-          },
-        },
-      );
-    }
-
-    // ========== STEP 2: Check for in-flight request ==========
-    const pendingRequest = pendingRequests.get(cacheKey);
-
-    if (pendingRequest) {
-      console.log(`[category-products] Deduplicating request`);
-
-      if (cacheResult.status === "stale" && cacheResult.data) {
-        return NextResponse.json(
-          { ...cacheResult.data, source: "stale" },
-          {
-            headers: {
-              "Cache-Control": `public, s-maxage=0, stale-while-revalidate=120`,
-              "X-Cache": "STALE",
-              "X-Response-Time": `${Date.now() - requestStart}ms`,
-            },
-          },
-        );
-      }
-
-      try {
-        const result = await withTimeout(
-          pendingRequest,
-          CONFIG.REQUEST_TIMEOUT,
-          "Deduplicated request timeout",
-        );
-        return NextResponse.json(
-          { ...result, source: "dedupe" },
-          {
-            headers: {
-              "Cache-Control": `public, s-maxage=60, stale-while-revalidate=120`,
-              "X-Cache": "DEDUPE",
-              "X-Response-Time": `${Date.now() - requestStart}ms`,
-            },
-          },
-        );
-      } catch {
-        // Fall through to fresh fetch
-      }
-    }
-
-    // ========== STEP 3: Stale-while-revalidate ==========
-    if (cacheResult.status === "stale" && cacheResult.data) {
-      console.log(
-        `[category-products] Returning stale, revalidating in background`,
-      );
-      revalidateInBackground(cacheKey, filters);
-
-      return NextResponse.json(
-        { ...cacheResult.data, source: "stale" },
-        {
-          headers: {
-            "Cache-Control": `public, s-maxage=0, stale-while-revalidate=120`,
-            "X-Cache": "STALE",
-            "X-Response-Time": `${Date.now() - requestStart}ms`,
-          },
-        },
-      );
-    }
-
-    // ========== STEP 4: Fresh fetch ==========
-    console.log(`[category-products] Fresh fetch for ${filters.category}`);
-
-    const fetchPromise = withRetry(() => fetchCategoryProducts(filters), {
-      maxRetries: CONFIG.MAX_RETRIES,
-      shouldRetry: (error) => {
-        // Don't retry on validation errors
-        if (error instanceof Error && error.message.includes("permission")) {
-          return false;
-        }
-        return true;
-      },
-    });
-
-    pendingRequests.set(cacheKey, fetchPromise);
-
     try {
       const result = await withTimeout(
-        fetchPromise,
+        withRetry(() => cachedFetchCategoryProducts(filters), {
+          maxRetries: CONFIG.MAX_RETRIES,
+          shouldRetry: (error) => {
+            if (error instanceof Error && error.message.includes("permission")) {
+              return false;
+            }
+            return true;
+          },
+        }),
         CONFIG.REQUEST_TIMEOUT,
         "Request timeout",
       );
 
-      cacheResponse(cacheKey, result);
-
-      console.log(
-        `[category-products] Fetched ${result.products.length}/${result.total} products in ${result.timing}ms`,
-      );
-
-      return NextResponse.json(
-        { ...result, source: "fresh" },
-        {
-          headers: {
-            "Cache-Control": `public, s-maxage=60, stale-while-revalidate=120`,
-            "X-Cache": "MISS",
-            "X-Response-Time": `${Date.now() - requestStart}ms`,
-            "X-Timing": `${result.timing}ms`,
-          },
+      return NextResponse.json(result, {
+        headers: {
+          "Cache-Control": `public, s-maxage=60, stale-while-revalidate=120`,
+          "X-Response-Time": `${Date.now() - requestStart}ms`,
         },
-      );
+      });
     } catch (error) {
       console.error(`[category-products] Fetch error:`, error);
 
@@ -734,8 +511,6 @@ export async function GET(request: NextRequest) {
         },
         { status: statusCode },
       );
-    } finally {
-      pendingRequests.delete(cacheKey);
     }
   } catch (error) {
     console.error(`[category-products] Unexpected error:`, error);

@@ -1,23 +1,11 @@
-// src/app/api/searchProducts/route.ts
+// src/app/api/search/route.ts
 //
-// ═══════════════════════════════════════════════════════════════════════════
-// SEARCH PRODUCTS API  (100 % Typesense — no Algolia dependency)
+// SEARCH PRODUCTS API (100% Typesense — no Algolia dependency)
 //
-// Products (mirrors Flutter's SearchResultsScreen._fetchResults):
-//   Unfiltered (no filters, sort = relevance):
-//     Search "products" + "shop_products" in parallel, merge & deduplicate.
-//   Filtered / sorted:
-//     Search "shop_products" only with facetFilters + numericFilters.
-//   Spec facets returned on page 0.
-//
-// Shops (mirrors Flutter's searchShops):
-//   Search Typesense "shops" index.
-//   Only on page 0 — shops don't paginate.
-//   Firestore enrichment done server-side for fields not in Typesense index
-//   (coverImageUrls, address, averageRating, etc.).
-// ═══════════════════════════════════════════════════════════════════════════
+// Uses unstable_cache for server-side caching + batch Firestore reads for shops.
 
 import { NextRequest, NextResponse } from "next/server";
+import { unstable_cache, revalidateTag } from "next/cache";
 import TypeSenseServiceManager from "@/lib/typesense_service_manager";
 import { getFirestoreAdmin } from "@/lib/firebase-admin";
 import { ProductUtils } from "@/app/models/Product";
@@ -31,9 +19,7 @@ import { Timestamp } from "firebase-admin/firestore";
 const CONFIG = {
   DEFAULT_HITS: 20,
   MAX_HITS: 50,
-  CACHE_TTL: 60 * 1000, // 1 min  — search results go stale faster
-  STALE_TTL: 3 * 60 * 1000,
-  MAX_CACHE: 300,
+  CACHE_REVALIDATE_SECONDS: 60, // 1 minute
   TIMEOUT_MS: 8_000,
 } as const;
 
@@ -47,7 +33,7 @@ interface SearchParams {
   query: string;
   page: number;
   hitsPerPage: number;
-  sortOption: string; // "date" | "alphabetical" | "price_asc" | "price_desc"
+  sortOption: string;
   brands: string[];
   colors: string[];
   specFilters: SpecFilters;
@@ -56,7 +42,6 @@ interface SearchParams {
   minRating: number | null;
 }
 
-/** Minimal shop shape returned to the client — matches ShopCard props */
 interface ShopResult {
   id: string;
   name: string;
@@ -77,74 +62,12 @@ interface ShopResult {
 
 interface SearchResponse {
   products: ReturnType<typeof ProductUtils.fromJson>[];
-  /** Only present on page 0 */
   shops?: ShopResult[];
   hasMore: boolean;
   page: number;
   total: number;
   specFacets?: Record<string, FacetCount[]>;
-  source?: string;
   timing?: number;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Cache
-// ─────────────────────────────────────────────────────────────────────────────
-
-interface CacheEntry {
-  data: SearchResponse;
-  ts: number;
-  hits: number;
-  accessed: number;
-}
-const cache = new Map<string, CacheEntry>();
-const pending = new Map<string, Promise<SearchResponse>>();
-
-function cacheKey(p: SearchParams): string {
-  return JSON.stringify({
-    q: p.query,
-    pg: p.page,
-    hpp: p.hitsPerPage,
-    so: p.sortOption,
-    br: [...p.brands].sort().join(","),
-    col: [...p.colors].sort().join(","),
-    sf: JSON.stringify(
-      Object.fromEntries(
-        Object.entries(p.specFilters).map(([k, v]) => [k, [...v].sort()]),
-      ),
-    ),
-    minP: p.minPrice ?? "",
-    maxP: p.maxPrice ?? "",
-    minR: p.minRating ?? "",
-  });
-}
-
-function getCache(
-  key: string,
-): { data: SearchResponse; stale: boolean } | null {
-  const e = cache.get(key);
-  if (!e) return null;
-  const age = Date.now() - e.ts;
-  if (age > CONFIG.STALE_TTL) {
-    cache.delete(key);
-    return null;
-  }
-  e.hits++;
-  e.accessed = Date.now();
-  return { data: e.data, stale: age > CONFIG.CACHE_TTL };
-}
-
-function setCache(key: string, data: SearchResponse): void {
-  if (cache.size >= CONFIG.MAX_CACHE) {
-    // evict LRU 20 %
-    const sorted = [...cache.entries()].sort(
-      (a, b) => a[1].accessed - b[1].accessed,
-    );
-    sorted
-      .slice(0, Math.floor(CONFIG.MAX_CACHE * 0.2))
-      .forEach(([k]) => cache.delete(k));
-  }
-  cache.set(key, { data, ts: Date.now(), hits: 1, accessed: Date.now() });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -183,7 +106,7 @@ function extractParams(sp: URLSearchParams): SearchParams {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Filter-state helpers (mirrors Flutter's hasDynamicFilters + sortOption check)
+// Filter-state helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
 function hasFilters(p: SearchParams): boolean {
@@ -229,10 +152,7 @@ function buildNumericFilters(p: SearchParams): string[] {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Shop search via Typesense + Firestore enrichment (server-side)
-// Typesense "shops" index fields: id, name, profileImageUrl, isActive,
-//   categories, searchableText
-// Fields not in Typesense → enriched from Firestore shops collection
+// Shop search via Typesense + Firestore batch enrichment
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface RawTypesenseShop {
@@ -258,7 +178,6 @@ async function fetchShopsFromTypesense(query: string): Promise<ShopResult[]> {
 
     if (!res.hits.length) return [];
 
-    // Strip "shops_" prefix (backfill used "shops_<firestoreId>" format)
     const hitsWithIds = res.hits.map((hit) => {
       const raw = hit as RawTypesenseShop;
       const firestoreId = raw.id.startsWith("shops_")
@@ -267,40 +186,43 @@ async function fetchShopsFromTypesense(query: string): Promise<ShopResult[]> {
       return { firestoreId, raw };
     });
 
-    // Enrich from Firestore (coverImageUrls, address, ratings, etc. not in TS)
+    // Batch read all shops in a single Firestore round-trip (fixes N+1)
     const db = getFirestoreAdmin();
-    const enriched = await Promise.all(
-      hitsWithIds.map(async ({ firestoreId, raw }) => {
-        try {
-          const snap = await db.collection("shops").doc(firestoreId).get();
-          const d = snap.exists ? snap.data()! : {};
-          const ts: Timestamp | null =
-            d.createdAt instanceof Timestamp ? d.createdAt : null;
-
-          return {
-            id: firestoreId,
-            name: raw.name ?? d.name ?? "",
-            profileImageUrl: raw.profileImageUrl ?? d.profileImageUrl ?? "",
-            coverImageUrls: (d.coverImageUrls as string[]) ?? [],
-            address: (d.address as string) ?? "",
-            averageRating: (d.averageRating as number) ?? 0,
-            reviewCount: (d.reviewCount as number) ?? 0,
-            followerCount: (d.followerCount as number) ?? 0,
-            clickCount: (d.clickCount as number) ?? 0,
-            categories: raw.categories ?? (d.categories as string[]) ?? [],
-            contactNo: (d.contactNo as string) ?? "",
-            ownerId: (d.ownerId as string) ?? "",
-            isBoosted: (d.isBoosted as boolean) ?? false,
-            isActive: raw.isActive ?? (d.isActive as boolean) ?? true,
-            createdAt: ts
-              ? { seconds: ts.seconds, nanoseconds: ts.nanoseconds }
-              : { seconds: 0, nanoseconds: 0 },
-          } satisfies ShopResult;
-        } catch {
-          return null;
-        }
-      }),
+    const refs = hitsWithIds.map(({ firestoreId }) =>
+      db.collection("shops").doc(firestoreId),
     );
+    const docs = await db.getAll(...refs);
+
+    const enriched = docs.map((snap, i) => {
+      const { firestoreId, raw } = hitsWithIds[i];
+      try {
+        const d = snap.exists ? snap.data()! : {};
+        const ts: Timestamp | null =
+          d.createdAt instanceof Timestamp ? d.createdAt : null;
+
+        return {
+          id: firestoreId,
+          name: raw.name ?? d.name ?? "",
+          profileImageUrl: raw.profileImageUrl ?? d.profileImageUrl ?? "",
+          coverImageUrls: (d.coverImageUrls as string[]) ?? [],
+          address: (d.address as string) ?? "",
+          averageRating: (d.averageRating as number) ?? 0,
+          reviewCount: (d.reviewCount as number) ?? 0,
+          followerCount: (d.followerCount as number) ?? 0,
+          clickCount: (d.clickCount as number) ?? 0,
+          categories: raw.categories ?? (d.categories as string[]) ?? [],
+          contactNo: (d.contactNo as string) ?? "",
+          ownerId: (d.ownerId as string) ?? "",
+          isBoosted: (d.isBoosted as boolean) ?? false,
+          isActive: raw.isActive ?? (d.isActive as boolean) ?? true,
+          createdAt: ts
+            ? { seconds: ts.seconds, nanoseconds: ts.nanoseconds }
+            : { seconds: 0, nanoseconds: 0 },
+        } satisfies ShopResult;
+      } catch {
+        return null;
+      }
+    });
 
     return enriched.filter(
       (s): s is ShopResult => s !== null && s.isActive !== false,
@@ -340,7 +262,6 @@ async function fetchSearchData(p: SearchParams): Promise<SearchResponse> {
       ProductUtils.fromTypeSense(hit as unknown as Record<string, unknown>),
     );
 
-    // Spec facets on page 0
     let specFacets: Record<string, FacetCount[]> | undefined;
     if (p.page === 0) {
       specFacets = await svc
@@ -352,7 +273,6 @@ async function fetchSearchData(p: SearchParams): Promise<SearchResponse> {
         .catch(() => ({}));
     }
 
-    // Shops on page 0
     const shops =
       p.page === 0
         ? await fetchShopsFromTypesense(p.query).catch(() => [])
@@ -365,13 +285,11 @@ async function fetchSearchData(p: SearchParams): Promise<SearchResponse> {
       page: p.page,
       total: res.hits.length,
       specFacets: p.page === 0 ? specFacets : undefined,
-      source: "filtered",
       timing: Date.now() - t0,
     };
   }
 
   // ── Unfiltered path — search BOTH indexes, merge & deduplicate ────────────
-  // Mirrors Flutter: _marketProvider.searchOnly() searches products + shop_products
   const [prodRes, shopRes] = await Promise.allSettled([
     svc.searchIdsWithFacets({
       indexName: "products",
@@ -408,7 +326,6 @@ async function fetchSearchData(p: SearchParams): Promise<SearchResponse> {
     }
   }
 
-  // Boosted products first (mirrors Flutter's prioritizeBoosted)
   merged.sort((a, b) => (b.isBoosted ? 1 : 0) - (a.isBoosted ? 1 : 0));
 
   const nbPages = Math.max(
@@ -416,7 +333,6 @@ async function fetchSearchData(p: SearchParams): Promise<SearchResponse> {
     shopRes.status === "fulfilled" ? shopRes.value.nbPages : 0,
   );
 
-  // Spec facets + shops on page 0 (run in parallel)
   let specFacets: Record<string, FacetCount[]> | undefined;
   let shops: ShopResult[] | undefined;
   if (p.page === 0) {
@@ -439,25 +355,19 @@ async function fetchSearchData(p: SearchParams): Promise<SearchResponse> {
     page: p.page,
     total: merged.length,
     specFacets: p.page === 0 ? specFacets : undefined,
-    source: "unfiltered",
     timing: Date.now() - t0,
   };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Background revalidation
+// Server-side cache
 // ─────────────────────────────────────────────────────────────────────────────
 
-function revalidate(key: string, params: SearchParams): void {
-  if (pending.has(key)) return;
-  const p = fetchSearchData(params);
-  pending.set(key, p);
-  p.then((r) => setCache(key, r))
-    .catch(() => {
-      /* swallow */
-    })
-    .finally(() => pending.delete(key));
-}
+const cachedSearchData = unstable_cache(
+  fetchSearchData,
+  ["search-results"],
+  { revalidate: CONFIG.CACHE_REVALIDATE_SECONDS, tags: ["search"] },
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Timeout wrapper
@@ -494,62 +404,20 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const key = cacheKey(params);
-    const cached = getCache(key);
-
     const headers = (extra: Record<string, string> = {}) => ({
       "Cache-Control": "public, max-age=60, stale-while-revalidate=120",
       "X-Response-Time": `${Date.now() - t0}ms`,
       ...extra,
     });
 
-    // ── Fresh cache hit ──
-    if (cached && !cached.stale) {
-      return NextResponse.json(
-        { ...cached.data, source: "cache" },
-        { headers: headers({ "X-Cache": "HIT" }) },
-      );
-    }
-
-    // ── Stale-while-revalidate ──
-    if (cached?.stale) {
-      revalidate(key, params);
-      return NextResponse.json(
-        { ...cached.data, source: "stale" },
-        { headers: headers({ "X-Cache": "STALE" }) },
-      );
-    }
-
-    // ── Deduplicate in-flight ──
-    const inFlight = pending.get(key);
-    if (inFlight) {
-      try {
-        const r = await withTimeout(inFlight, CONFIG.TIMEOUT_MS);
-        return NextResponse.json(
-          { ...r, source: "dedupe" },
-          { headers: headers({ "X-Cache": "DEDUPE" }) },
-        );
-      } catch {
-        /* fall through to fresh fetch */
-      }
-    }
-
-    // ── Fresh fetch ──
-    const fetchPromise = fetchSearchData(params);
-    pending.set(key, fetchPromise);
-
     try {
-      const result = await withTimeout(fetchPromise, CONFIG.TIMEOUT_MS);
-      setCache(key, result);
-      return NextResponse.json(
-        { ...result, source: "fresh" },
-        {
-          headers: headers({
-            "X-Cache": "MISS",
-            "X-Timing": `${result.timing}ms`,
-          }),
-        },
+      const result = await withTimeout(
+        cachedSearchData(params),
+        CONFIG.TIMEOUT_MS,
       );
+      return NextResponse.json(result, {
+        headers: headers({ "X-Timing": `${result.timing}ms` }),
+      });
     } catch (err) {
       const isTimeout = err instanceof Error && err.message === "timeout";
       return NextResponse.json(
@@ -562,8 +430,6 @@ export async function GET(request: NextRequest) {
         },
         { status: isTimeout ? 504 : 500 },
       );
-    } finally {
-      pending.delete(key);
     }
   } catch (err) {
     console.error("[searchProducts] unexpected error:", err);
@@ -588,8 +454,6 @@ export async function DELETE(request: NextRequest) {
   const adminCheck = await verifyAdmin(auth.isAdmin ?? false);
   if (adminCheck.error) return adminCheck.error;
 
-  const n = cache.size;
-  cache.clear();
-  pending.clear();
-  return NextResponse.json({ cleared: n });
+  revalidateTag("search");
+  return NextResponse.json({ cleared: true });
 }

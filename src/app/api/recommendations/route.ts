@@ -1,18 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { unstable_cache } from "next/cache";
 import { getFirestoreAdmin } from "@/lib/firebase-admin";
 import { Product, ProductUtils } from "@/app/models/Product";
-
-// Cache interface
-interface CacheEntry {
-  products: Product[];
-  timestamp: number;
-  userId?: string;
-  category?: string;
-}
-
-// In-memory cache (in production, use Redis or similar)
-const cache = new Map<string, CacheEntry>();
-const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
 function documentToProduct(
   doc: FirebaseFirestore.DocumentSnapshot
@@ -42,13 +31,12 @@ class ProductDatabase {
     try {
       const db = getFirestoreAdmin();
 
-      // Query shop_products by ranking score, filtering out of stock items
       const snapshot = await db
         .collection("shop_products")
         .where("quantity", ">", 0)
         .orderBy("quantity")
         .orderBy("rankingScore", "desc")
-        .limit(limit * 2) // Fetch extra in case some fail validation
+        .limit(limit * 2)
         .get();
 
       const products: Product[] = [];
@@ -61,7 +49,6 @@ class ProductDatabase {
         }
       }
 
-      // If we don't have enough products, try a simpler query
       if (products.length < limit) {
         const additionalSnapshot = await db
           .collection("shop_products")
@@ -98,7 +85,6 @@ class ProductDatabase {
     try {
       const db = getFirestoreAdmin();
 
-      // Fetch activity score and products in parallel
       const productsQuery = (() => {
         let ref: FirebaseFirestore.Query = db
           .collection("shop_products")
@@ -130,7 +116,6 @@ class ProductDatabase {
         }
       }
 
-      // If we don't have enough products or user has low activity, blend with fallback
       if (products.length < limit || activityScore < 20) {
         const fallbackProducts = await this.getFallbackShopProducts(limit);
 
@@ -138,7 +123,6 @@ class ProductDatabase {
           return fallbackProducts.slice(0, limit);
         }
 
-        // Blend recommendations with fallback
         const blended: Product[] = [];
         const seen = new Set<string>();
         let ri = 0,
@@ -170,7 +154,6 @@ class ProductDatabase {
       return products.slice(0, limit);
     } catch (error) {
       console.error("Error fetching user recommendations:", error);
-      // Fallback to top-ranked products
       return await this.getFallbackShopProducts(limit);
     }
   }
@@ -209,7 +192,7 @@ class ProductDatabase {
       const userDoc = await db.collection("users").doc(userId).get();
 
       if (!userDoc.exists) {
-        return 0; // New user
+        return 0;
       }
 
       const userData = userDoc.data();
@@ -237,15 +220,23 @@ class ProductDatabase {
   }
 }
 
-function generateCacheKey(userId?: string, category?: string): string {
-  const userPart = userId || "anonymous";
-  const categoryPart = category || "all";
-  return `recommendations:${userPart}:${categoryPart}`;
-}
+// ============= SERVER-SIDE CACHE =============
 
-function isCacheValid(entry: CacheEntry): boolean {
-  return Date.now() - entry.timestamp < CACHE_TTL;
-}
+// Anonymous recommendations (shared across all anonymous users)
+const getCachedTopProducts = unstable_cache(
+  async (pageSize: number) =>
+    ProductDatabase.getTopRankedShopProducts(pageSize),
+  ["recommendations-anonymous"],
+  { revalidate: 300, tags: ["recommendations"] },
+);
+
+// User-specific recommendations (cached per userId + category)
+const getCachedUserRecommendations = unstable_cache(
+  async (userId: string, category: string | undefined, pageSize: number) =>
+    ProductDatabase.getRecommendationsForUser(userId, category, pageSize),
+  ["recommendations-user"],
+  { revalidate: 300, tags: ["recommendations"] },
+);
 
 const RESPONSE_HEADERS = {
   "Cache-Control": "public, max-age=300, stale-while-revalidate=600",
@@ -266,60 +257,24 @@ export async function GET(request: NextRequest) {
       parseInt(searchParams.get("pageSize") || maxProducts.toString(), 10),
       50
     );
-    const pageToken = searchParams.get("pageToken");
-
-    // Generate cache key
-    const cacheKey = generateCacheKey(
-      userId || undefined,
-      category || undefined
-    );
-
-    // Check cache for initial fetch (no pageToken)
-    if (!pageToken) {
-      const cachedEntry = cache.get(cacheKey);
-      if (cachedEntry && isCacheValid(cachedEntry)) {
-        return NextResponse.json(
-          {
-            products: cachedEntry.products.slice(0, pageSize),
-            cached: true,
-            timestamp: cachedEntry.timestamp,
-          },
-          { headers: RESPONSE_HEADERS }
-        );
-      }
-    }
 
     let products: Product[] = [];
 
     if (!userId) {
-      // Unauthenticated user - fetch top-ranked shop products
-      products = await ProductDatabase.getTopRankedShopProducts(pageSize);
+      products = await getCachedTopProducts(pageSize);
     } else {
-      // Authenticated user - get personalized recommendations
       try {
-        products = await ProductDatabase.getRecommendationsForUser(
+        products = await getCachedUserRecommendations(
           userId,
           category || undefined,
-          pageSize
+          pageSize,
         );
       } catch (error) {
         console.error("Error fetching personalized recommendations:", error);
-        // Fallback to top-ranked products
-        products = await ProductDatabase.getTopRankedShopProducts(pageSize);
+        products = await getCachedTopProducts(pageSize);
       }
     }
 
-    // Cache the results for initial fetch
-    if (!pageToken) {
-      cache.set(cacheKey, {
-        products: products,
-        timestamp: Date.now(),
-        userId: userId || undefined,
-        category: category || undefined,
-      });
-    }
-
-    // Simulate pagination token (in real implementation, this would be more sophisticated)
     const nextPageToken =
       products.length >= pageSize
         ? Buffer.from(`${Date.now()}-${Math.random()}`).toString("base64")
@@ -327,9 +282,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
       {
-        products: products,
+        products,
         nextPageToken,
-        cached: false,
         total: products.length,
       },
       { headers: RESPONSE_HEADERS }
@@ -337,7 +291,6 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("Error in recommendations API:", error);
 
-    // Return fallback response
     try {
       const fallbackProducts = await ProductDatabase.getTopRankedShopProducts(
         20
@@ -386,10 +339,8 @@ export async function POST(request: NextRequest) {
       products = await ProductDatabase.getTopRankedShopProducts(maxProducts);
     }
 
-    // Apply any additional filters from the request body
     if (filters) {
       // Implement filtering logic based on the filters object
-      // e.g., price range, brand, condition, etc.
     }
 
     return NextResponse.json(
