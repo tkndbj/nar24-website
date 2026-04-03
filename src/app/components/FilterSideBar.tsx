@@ -38,7 +38,6 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import type { globalBrands as globalBrandsType } from "@/constants/brands";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public types
@@ -287,11 +286,6 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
   const isMobileDrawer = onClose !== undefined;
   const dk = isDarkMode;
 
-  // Dynamic import for globalBrands
-  const [globalBrands, setGlobalBrands] = useState<typeof globalBrandsType>([]);
-  useEffect(() => {
-    import("@/constants/brands").then((mod) => setGlobalBrands(mod.globalBrands));
-  }, []);
 
   // ── Section visibility (mirrors Flutter's conditional filter rendering) ──
   const showGender = useMemo(
@@ -861,32 +855,18 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
               />
             </div>
             <div className="max-h-44 overflow-y-auto">
-              {(specFacets["brandModel"] && specFacets["brandModel"].length > 0
-                ? specFacets["brandModel"]
-                    .filter((f) =>
-                      f.value.toLowerCase().includes(brandSearch.toLowerCase()),
-                    )
-                    .map((f) => (
-                      <CheckRow
-                        key={f.value}
-                        label={`${f.value} (${f.count})`}
-                        checked={filters.brands.includes(f.value)}
-                        onChange={() => toggleList("brands", f.value)}
-                      />
-                    ))
-                : (globalBrands as string[])
-                    .filter((b) =>
-                      b.toLowerCase().includes(brandSearch.toLowerCase()),
-                    )
-                    .map((brand) => (
-                      <CheckRow
-                        key={brand}
-                        label={brand}
-                        checked={filters.brands.includes(brand)}
-                        onChange={() => toggleList("brands", brand)}
-                      />
-                    ))
-              )}
+              {(specFacets["brandModel"] ?? [])
+                .filter((f) =>
+                  f.value.toLowerCase().includes(brandSearch.toLowerCase()),
+                )
+                .map((f) => (
+                  <CheckRow
+                    key={f.value}
+                    label={`${f.value} (${f.count})`}
+                    checked={filters.brands.includes(f.value)}
+                    onChange={() => toggleList("brands", f.value)}
+                  />
+                ))}
             </div>
           </div>
         )}

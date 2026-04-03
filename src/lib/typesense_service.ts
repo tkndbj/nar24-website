@@ -538,6 +538,7 @@ export class TypeSenseService {
     additionalFilterBy?: string;
     queryBy?: string;
     includeFields?: string;
+    signal?: AbortSignal;
   }): Promise<TypeSensePage> {
     const {
       indexName,
@@ -550,6 +551,7 @@ export class TypeSenseService {
       additionalFilterBy,
       queryBy,
       includeFields,
+      signal,
     } = opts;
 
     const filterParts: string[] = [];
@@ -633,9 +635,15 @@ export class TypeSenseService {
     );
 
     try {
+      // Bail early if already cancelled before making the request
+      if (signal?.aborted) throw signal.reason ?? new DOMException("Aborted", "AbortError");
+
       const resp = await withRetry(async () => {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 5_000);
+        // If the caller's signal aborts, propagate to the internal controller
+        const onAbort = () => controller.abort();
+        signal?.addEventListener("abort", onAbort, { once: true });
         try {
           const r = await fetch(url, {
             headers: this.headers,
@@ -645,6 +653,7 @@ export class TypeSenseService {
           return r;
         } finally {
           clearTimeout(timeout);
+          signal?.removeEventListener("abort", onAbort);
         }
       });
 
@@ -679,6 +688,8 @@ export class TypeSenseService {
 
       return { ids, hits, page, nbPages };
     } catch (err) {
+      // Re-throw AbortError so callers can distinguish cancellation from failures
+      if (err instanceof DOMException && err.name === "AbortError") throw err;
       console.warn("Typesense exception in searchIdsWithFacets:", err);
       return { ids: [], hits: [], page, nbPages: page + 1 };
     }

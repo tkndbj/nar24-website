@@ -349,8 +349,8 @@ export default function ShopDetailPage() {
   const [showSortDropdown, setShowSortDropdown] = useState(false);
 
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  // Race token — mirrors Flutter's _searchRaceToken (prevents stale result races)
-  const fetchTokenRef = useRef(0);
+  // AbortController — cancels in-flight requests when filters/sort/search change
+  const abortRef = useRef<AbortController | null>(null);
 
   const isProductTab = ["allProducts", "deals", "bestSellers"].includes(
     activeTab,
@@ -540,115 +540,83 @@ export default function ShopDetailPage() {
    *  - Colors use `availableColors:${c}` (Typesense array field, correctly indexed)
    */
   const fetchProductsTypesense = useCallback(
-    async (page: number, reset: boolean, token: number): Promise<void> => {
+    async (page: number, reset: boolean, signal: AbortSignal): Promise<void> => {
       if (!shopId) return;
 
-      try {
-        const facetFilters: string[][] = [];
-        const numericFilters: string[] = [];
+      const facetFilters: string[][] = [];
+      const numericFilters: string[] = [];
 
-        // Gender — mirrors Flutter: facetFilters.add(['gender:$_selectedGender'])
-        if (filters.gender) {
-          facetFilters.push([`gender:${filters.gender}`]);
+      if (filters.gender) {
+        facetFilters.push([`gender:${filters.gender}`]);
+      }
+      if (filters.subcategories.length > 0) {
+        facetFilters.push([`subcategory:${filters.subcategories[0]}`]);
+      }
+      if (filters.brands.length > 0) {
+        facetFilters.push(filters.brands.map((b) => `brandModel:${b}`));
+      }
+      if (filters.colors.length > 0) {
+        facetFilters.push(filters.colors.map((c) => `colorImages.${c}:*`));
+      }
+      if ((filters.types ?? []).length > 0) {
+        facetFilters.push(
+          (filters.types ?? []).map((t) => `attributes.clothingType:${t}`),
+        );
+      }
+      if ((filters.fits ?? []).length > 0) {
+        facetFilters.push(
+          (filters.fits ?? []).map((f) => `attributes.clothingFit:${f}`),
+        );
+      }
+      if (filters.minPrice !== undefined)
+        numericFilters.push(`price >= ${filters.minPrice}`);
+      if (filters.maxPrice !== undefined)
+        numericFilters.push(`price <= ${filters.maxPrice}`);
+      if (filters.minRating !== undefined)
+        numericFilters.push(`averageRating:>=${filters.minRating}`);
+
+      for (const [field, vals] of Object.entries(filters.specFilters)) {
+        if (vals.length > 0) {
+          facetFilters.push(vals.map((v) => `${field}:${v}`));
         }
+      }
 
-        // Subcategories
-        if (filters.subcategories.length > 0) {
-          facetFilters.push([`subcategory:${filters.subcategories[0]}`]);
-        }
-
-        // Brands — mirrors Flutter: facetFilters.add(_selectedBrands.map((b) => 'brandModel:$b'))
-        if (filters.brands.length > 0) {
-          facetFilters.push(filters.brands.map((b) => `brandModel:${b}`));
-        }
-
-        // Colors — mirrors Flutter: facetFilters.add(_selectedColors.map((c) => 'availableColors:$c'))
-        // Note: Flutter sends 'colorImages.$c:*' but availableColors is the properly indexed
-        // array field in the TypeSense schema. We use availableColors for correct OR-group filtering.
-        if (filters.colors.length > 0) {
-          facetFilters.push(filters.colors.map((c) => `colorImages.${c}:*`));
-        }
-
-        // Clothing types — mirrors Flutter: facetFilters.add(_selectedTypes.map((t) => 'attributes.clothingType:$t'))
-        if ((filters.types ?? []).length > 0) {
-          facetFilters.push(
-            (filters.types ?? []).map((t) => `attributes.clothingType:${t}`),
-          );
-        }
-
-        // Clothing fits — mirrors Flutter: facetFilters.add(_selectedFits.map((f) => 'attributes.clothingFit:$f'))
-        if ((filters.fits ?? []).length > 0) {
-          facetFilters.push(
-            (filters.fits ?? []).map((f) => `attributes.clothingFit:${f}`),
-          );
-        }
-
-        // Rating
-        if (filters.minPrice !== undefined)
-          numericFilters.push(`price >= ${filters.minPrice}`);
-        if (filters.maxPrice !== undefined)
-          numericFilters.push(`price <= ${filters.maxPrice}`);
-
-        // Rating
-        if (filters.minRating !== undefined)
-          numericFilters.push(`averageRating:>=${filters.minRating}`);
-
-        // Dynamic spec facet filters (clothingTypes, consoleBrand, etc.)
-        for (const [field, vals] of Object.entries(filters.specFilters)) {
-          if (vals.length > 0) {
-            facetFilters.push(vals.map((v) => `${field}:${v}`));
-          }
-        }
-
-        const result =
-          await TypeSenseServiceManager.instance.shopService.searchIdsWithFacets(
-            {
-              indexName: "shop_products",
-              query: debouncedSearch || "",
-              page,
-              hitsPerPage: PRODUCTS_LIMIT,
-              facetFilters: facetFilters.length > 0 ? facetFilters : undefined,
-              numericFilters:
-                numericFilters.length > 0 ? numericFilters : undefined,
-              sortOption: toSortCode(selectedSort),
-              additionalFilterBy: `shopId:=${shopId}`,
-            },
-          );
-
-        // Race-token check — mirrors Flutter's _searchRaceToken
-        if (token !== fetchTokenRef.current) return;
-
-        const fetched = result.hits.map((hit) =>
-          ProductUtils.fromTypeSense(hit as unknown as Record<string, unknown>),
+      const result =
+        await TypeSenseServiceManager.instance.shopService.searchIdsWithFacets(
+          {
+            indexName: "shop_products",
+            query: debouncedSearch || "",
+            page,
+            hitsPerPage: PRODUCTS_LIMIT,
+            facetFilters: facetFilters.length > 0 ? facetFilters : undefined,
+            numericFilters:
+              numericFilters.length > 0 ? numericFilters : undefined,
+            sortOption: toSortCode(selectedSort),
+            additionalFilterBy: `shopId:=${shopId}`,
+            signal,
+          },
         );
 
-        if (reset) {
-          const derived = deriveProductArrays(fetched);
-          setAllProducts(derived.all);
+      const fetched = result.hits.map((hit) =>
+        ProductUtils.fromTypeSense(hit as unknown as Record<string, unknown>),
+      );
+
+      if (reset) {
+        const derived = deriveProductArrays(fetched);
+        setAllProducts(derived.all);
+        setDealProducts(derived.deals);
+        setBestSellers(derived.bestSellers);
+      } else {
+        setAllProducts((prev) => {
+          const combined = [...prev, ...fetched];
+          const derived = deriveProductArrays(combined);
           setDealProducts(derived.deals);
           setBestSellers(derived.bestSellers);
-        } else {
-          setAllProducts((prev) => {
-            const combined = [...prev, ...fetched];
-            const derived = deriveProductArrays(combined);
-            setDealProducts(derived.deals);
-            setBestSellers(derived.bestSellers);
-            return derived.all;
-          });
-        }
-
-        setHasMore(fetched.length >= PRODUCTS_LIMIT);
-      } catch (err) {
-        if (token !== fetchTokenRef.current) return;
-        console.error("Typesense product fetch error:", err);
-        setProductError("Failed to load products");
-        if (reset) {
-          setAllProducts([]);
-          setDealProducts([]);
-          setBestSellers([]);
-        }
-        setHasMore(false);
+          return derived.all;
+        });
       }
+
+      setHasMore(fetched.length >= PRODUCTS_LIMIT);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [shopId, debouncedSearch, selectedSort, filterKey, filters],
@@ -664,96 +632,76 @@ export default function ShopDetailPage() {
    *    (mirrors Flutter's _applyAllFilters after Firestore fetch)
    */
   const fetchProductsFirestore = useCallback(
-    async (loadMore: boolean, token: number): Promise<void> => {
+    async (loadMore: boolean, signal: AbortSignal): Promise<void> => {
       if (!shopId) return;
 
-      try {
-        // Build additively — mirrors Flutter's Firestore path exactly
-        let baseQuery = query(
-          collection(db, "shop_products"),
-          where("shopId", "==", shopId),
+      // Build additively — mirrors Flutter's Firestore path exactly
+      let baseQuery = query(
+        collection(db, "shop_products"),
+        where("shopId", "==", shopId),
+      );
+
+      if (filters.gender) {
+        baseQuery = query(baseQuery, where("gender", "==", filters.gender));
+      }
+      if (filters.subcategories.length > 0) {
+        baseQuery = query(
+          baseQuery,
+          where("subcategory", "==", filters.subcategories[0]),
         );
+      }
+      if (filters.minPrice !== undefined) {
+        baseQuery = query(baseQuery, where("price", ">=", filters.minPrice));
+      }
+      if (filters.maxPrice !== undefined) {
+        baseQuery = query(baseQuery, where("price", "<=", filters.maxPrice));
+      }
 
-        // Gender — server-side equality (mirrors Flutter: if (_selectedGender != null) query.where('gender'))
-        if (filters.gender) {
-          baseQuery = query(baseQuery, where("gender", "==", filters.gender));
-        }
+      baseQuery = query(baseQuery, orderBy("createdAt", "desc"));
 
-        // Subcategory — server-side equality (mirrors Flutter: if (_selectedSubcategory != null) query.where('subcategory'))
-        if (filters.subcategories.length > 0) {
-          baseQuery = query(
-            baseQuery,
-            where("subcategory", "==", filters.subcategories[0]),
-          );
-        }
+      const finalQuery =
+        loadMore && lastFirestoreDocRef.current
+          ? query(
+              baseQuery,
+              startAfter(lastFirestoreDocRef.current),
+              limit(PRODUCTS_LIMIT),
+            )
+          : query(baseQuery, limit(PRODUCTS_LIMIT));
 
-        // Price range — server-side (mirrors Flutter: where('price', isGreaterThanOrEqualTo: _minPrice))
-        if (filters.minPrice !== undefined) {
-          baseQuery = query(baseQuery, where("price", ">=", filters.minPrice));
-        }
-        if (filters.maxPrice !== undefined) {
-          baseQuery = query(baseQuery, where("price", "<=", filters.maxPrice));
-        }
+      const snapshot = await getDocs(finalQuery);
 
-        // Always date sort on Firestore path (all other sorts routed to Typesense)
-        baseQuery = query(baseQuery, orderBy("createdAt", "desc"));
+      // Discard results if this request was superseded
+      if (signal.aborted) return;
 
-        const finalQuery =
-          loadMore && lastFirestoreDocRef.current
-            ? query(
-                baseQuery,
-                startAfter(lastFirestoreDocRef.current),
-                limit(PRODUCTS_LIMIT),
-              )
-            : query(baseQuery, limit(PRODUCTS_LIMIT));
+      const fetched = snapshot.docs.map((d) =>
+        ProductUtils.fromDocument(d.data() as Record<string, unknown>, d.id, {
+          id: d.id,
+          path: d.ref.path,
+          parent: { id: d.ref.parent.id },
+        }),
+      );
 
-        const snapshot = await getDocs(finalQuery);
+      if (snapshot.docs.length > 0) {
+        lastFirestoreDocRef.current = snapshot.docs[snapshot.docs.length - 1];
+      }
 
-        if (token !== fetchTokenRef.current) return;
+      setHasMore(snapshot.docs.length === PRODUCTS_LIMIT);
 
-        const fetched = snapshot.docs.map((d) =>
-          ProductUtils.fromDocument(d.data() as Record<string, unknown>, d.id, {
-            id: d.id,
-            path: d.ref.path,
-            parent: { id: d.ref.parent.id },
-          }),
-        );
+      const filtered = applyClientFilters(fetched, filters, debouncedSearch);
 
-        if (snapshot.docs.length > 0) {
-          lastFirestoreDocRef.current = snapshot.docs[snapshot.docs.length - 1];
-        }
-
-        // hasMore — mirrors Flutter: fetched.length >= _productsLimit
-        setHasMore(snapshot.docs.length === PRODUCTS_LIMIT);
-
-        // Client-side filtering — mirrors Flutter's _applyAllFilters()
-        // Applies brands, types, fits, sizes, colors after Firestore fetch
-        const filtered = applyClientFilters(fetched, filters, debouncedSearch);
-
-        if (loadMore) {
-          setAllProducts((prev) => {
-            const combined = [...prev, ...filtered];
-            const derived = deriveProductArrays(combined);
-            setDealProducts(derived.deals);
-            setBestSellers(derived.bestSellers);
-            return derived.all;
-          });
-        } else {
-          const derived = deriveProductArrays(filtered);
-          setAllProducts(derived.all);
+      if (loadMore) {
+        setAllProducts((prev) => {
+          const combined = [...prev, ...filtered];
+          const derived = deriveProductArrays(combined);
           setDealProducts(derived.deals);
           setBestSellers(derived.bestSellers);
-        }
-      } catch (err) {
-        if (token !== fetchTokenRef.current) return;
-        console.error("Firestore product fetch error:", err);
-        setProductError("Failed to load products");
-        if (!loadMore) {
-          setAllProducts([]);
-          setDealProducts([]);
-          setBestSellers([]);
-        }
-        setHasMore(false);
+          return derived.all;
+        });
+      } else {
+        const derived = deriveProductArrays(filtered);
+        setAllProducts(derived.all);
+        setDealProducts(derived.deals);
+        setBestSellers(derived.bestSellers);
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -769,8 +717,10 @@ export default function ShopDetailPage() {
     async (loadMore = false): Promise<void> => {
       if (!shopId) return;
 
-      // Increment token — invalidates any in-flight requests
-      const token = ++fetchTokenRef.current;
+      // Cancel any in-flight request before starting a new one
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
 
       if (loadMore) {
         setIsLoadingMore(true);
@@ -790,15 +740,25 @@ export default function ShopDetailPage() {
         );
         if (useTs) {
           const page = loadMore ? typesensePageRef.current + 1 : 0;
-          await fetchProductsTypesense(page, !loadMore, token);
-          if (token === fetchTokenRef.current) {
-            typesensePageRef.current = page;
-          }
+          await fetchProductsTypesense(page, !loadMore, controller.signal);
+          typesensePageRef.current = page;
         } else {
-          await fetchProductsFirestore(loadMore, token);
+          await fetchProductsFirestore(loadMore, controller.signal);
         }
+      } catch (err) {
+        // Silently ignore aborted requests — a newer request owns the state
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        console.error("Product fetch error:", err);
+        setProductError("Failed to load products");
+        if (!loadMore) {
+          setAllProducts([]);
+          setDealProducts([]);
+          setBestSellers([]);
+        }
+        setHasMore(false);
       } finally {
-        if (token === fetchTokenRef.current) {
+        // Only clear loading states if this request wasn't superseded
+        if (!controller.signal.aborted) {
           setIsInitialProductLoad(false);
           setIsProductsLoading(false);
           setIsLoadingMore(false);
