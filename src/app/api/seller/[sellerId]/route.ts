@@ -46,27 +46,8 @@ export async function GET(
       );
     }
 
-    // Get seller reviews to calculate average rating
-    const reviewsSnapshot = await db
-      .collection("users")
-      .doc(sellerId)
-      .collection("reviews")
-      .get();
-
-    let sellerAverageRating = 0;
-    let totalReviews = 0;
-
-    if (!reviewsSnapshot.empty) {
-      let totalRating = 0;
-      reviewsSnapshot.docs.forEach((doc) => {
-        const reviewData = doc.data();
-        if (reviewData.rating) {
-          totalRating += reviewData.rating;
-          totalReviews++;
-        }
-      });
-      sellerAverageRating = totalReviews > 0 ? totalRating / totalReviews : 0;
-    }
+    const sellerAverageRating: number = sellerData.averageRating || 0;
+    const totalReviews: number = sellerData.reviewCount || 0;
 
     // Get shop information if shopId is provided
     let shopAverageRating = 0;

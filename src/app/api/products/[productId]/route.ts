@@ -80,22 +80,32 @@ function parseTimestamp(value: unknown): number | null {
 
 // ============= CORE DATA FETCHING =============
 
-async function fetchProductData(rawId: string): Promise<Record<string, unknown> | null> {
+// canonicalId formats:
+//   "p:<id>"  → products collection (single read)
+//   "sp:<id>" → shop_products collection (single read)
+//   "<id>"    → unknown, fall back to parallel dual read
+async function fetchProductData(canonicalId: string): Promise<Record<string, unknown> | null> {
   const db = getFirestoreAdmin();
 
-  const [productDoc, shopProductDoc] = await Promise.all([
-    db.collection("products").doc(rawId).get(),
-    db.collection("shop_products").doc(rawId).get(),
-  ]);
-
-  let doc = null;
+  let doc: FirebaseFirestore.DocumentSnapshot | null = null;
   let collection = "";
-  if (productDoc.exists) {
-    doc = productDoc;
-    collection = "products";
-  } else if (shopProductDoc.exists) {
-    doc = shopProductDoc;
-    collection = "shop_products";
+
+  if (canonicalId.startsWith("p:")) {
+    const id = canonicalId.substring(2);
+    const snap = await db.collection("products").doc(id).get();
+    if (snap.exists) { doc = snap; collection = "products"; }
+  } else if (canonicalId.startsWith("sp:")) {
+    const id = canonicalId.substring(3);
+    const snap = await db.collection("shop_products").doc(id).get();
+    if (snap.exists) { doc = snap; collection = "shop_products"; }
+  } else {
+    // No collection hint — probe both in parallel (legacy fallback)
+    const [productDoc, shopProductDoc] = await Promise.all([
+      db.collection("products").doc(canonicalId).get(),
+      db.collection("shop_products").doc(canonicalId).get(),
+    ]);
+    if (productDoc.exists) { doc = productDoc; collection = "products"; }
+    else if (shopProductDoc.exists) { doc = shopProductDoc; collection = "shop_products"; }
   }
 
   if (!doc || !doc.exists) return null;
@@ -208,24 +218,29 @@ export async function GET(
       );
     }
 
-    // Normalize productId (remove prefixes like Flutter does)
-    let rawId = productId.trim();
-    const p1 = "products_";
-    const p2 = "shop_products_";
-    if (rawId.startsWith(p1)) {
-      rawId = rawId.substring(p1.length);
-    } else if (rawId.startsWith(p2)) {
-      rawId = rawId.substring(p2.length);
+    // Normalize incoming ID to canonical form used by fetchProductData and the cache:
+    //   "products_<id>"      → "p:<id>"
+    //   "shop_products_<id>" → "sp:<id>"
+    //   "p:<id>" / "sp:<id>" → already canonical (batch-route format)
+    //   "<id>"               → bare ID, dual-read fallback
+    const trimmed = productId.trim();
+    let canonicalId: string;
+    if (trimmed.startsWith("shop_products_")) {
+      canonicalId = `sp:${trimmed.substring("shop_products_".length)}`;
+    } else if (trimmed.startsWith("products_")) {
+      canonicalId = `p:${trimmed.substring("products_".length)}`;
+    } else {
+      canonicalId = trimmed; // handles "p:", "sp:", and bare IDs
     }
 
-    if (rawId === "") {
+    if (canonicalId === "" || canonicalId === "p:" || canonicalId === "sp:") {
       return NextResponse.json(
         { error: "Invalid product ID format" },
         { status: 400 }
       );
     }
 
-    const product = await getCachedProduct(rawId);
+    const product = await getCachedProduct(canonicalId);
 
     if (!product) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
