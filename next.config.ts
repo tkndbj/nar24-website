@@ -159,7 +159,7 @@ export default withSentryConfig(withNextIntl(nextConfig), {
   //   SENTRY_PROJECT     — your project slug
   // Once set, change disable to false for readable stack traces in Sentry.
   sourcemaps: {
-    disable: true,
+    disable: false,
   },
 
   // Remove Sentry's internal debug logger from the client bundle.
