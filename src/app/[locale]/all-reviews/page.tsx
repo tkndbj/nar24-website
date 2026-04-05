@@ -23,6 +23,7 @@ import {
 import Image from "next/image";
 import { format } from "date-fns";
 import { useUser } from "@/context/UserProvider";
+import { maskName } from "@/utils/maskName";
 import translationService, {
   RateLimitException,
   TranslationException,
@@ -494,7 +495,7 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
                   <p className={`font-semibold text-sm md:text-base ${colors.text}`}>
-                    {review.userName || t("anonymous")}
+                    {review.userName ? maskName(review.userName) : t("anonymous")}
                   </p>
                   {review.verified && (
                     <span className="px-1.5 py-0.5 md:px-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-[10px] md:text-xs rounded-full flex items-center gap-0.5 md:gap-1">

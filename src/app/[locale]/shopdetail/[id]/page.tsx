@@ -62,6 +62,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { HeartIcon as HeartSolidIcon } from "@heroicons/react/24/solid";
 import { Filter, SortAsc, ChevronDown } from "lucide-react";
+import { maskName } from "@/utils/maskName";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -1148,7 +1149,7 @@ export default function ShopDetailPage() {
               <span
                 className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}
               >
-                {review.userName || t("anonymous")}
+                {review.userName ? maskName(review.userName) : t("anonymous")}
               </span>
               <span
                 className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}

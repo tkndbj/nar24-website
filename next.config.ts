@@ -1,4 +1,5 @@
 import createNextIntlPlugin from "next-intl/plugin";
+import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
 const withNextIntl = createNextIntlPlugin();
@@ -144,4 +145,26 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withNextIntl(nextConfig);
+export default withSentryConfig(withNextIntl(nextConfig), {
+  // Suppress noisy build output
+  silent: true,
+
+  // Route Sentry events through /monitoring on your own domain.
+  // Bypasses ad blockers and avoids any CSP changes.
+  tunnelRoute: "/monitoring",
+
+  // Source map upload disabled until you configure these env vars:
+  //   SENTRY_AUTH_TOKEN  — from sentry.io → Settings → Auth Tokens
+  //   SENTRY_ORG         — your org slug
+  //   SENTRY_PROJECT     — your project slug
+  // Once set, change disable to false for readable stack traces in Sentry.
+  sourcemaps: {
+    disable: true,
+  },
+
+  // Remove Sentry's internal debug logger from the client bundle.
+  disableLogger: true,
+
+  // Don't auto-create Vercel cron monitors.
+  automaticVercelMonitors: false,
+});

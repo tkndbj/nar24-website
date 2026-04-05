@@ -20,6 +20,7 @@ import translationService, {
   TranslationException,
 } from "@/services/translation_service";
 import { useUser } from "@/context/UserProvider";
+import { maskName } from "@/utils/maskName";
 
 interface Question {
   id: string;
@@ -333,7 +334,7 @@ const AllQuestionsPage: React.FC<AllQuestionsPageProps> = ({}) => {
   // Question card component
   const QuestionCard = ({ question }: { question: Question }) => {
     const displayAskerName = question.askerNameVisible
-      ? question.askerName
+      ? maskName(question.askerName)
       : t("anonymous");
 
     const answererName =

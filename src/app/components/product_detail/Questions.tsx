@@ -18,6 +18,7 @@ import translationService, {
   TranslationException,
 } from "@/services/translation_service";
 import { useUser } from "@/context/UserProvider";
+import { maskName } from "@/utils/maskName";
 
 interface Question {
   id: string;
@@ -99,7 +100,7 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
   };
 
   const displayName = question.askerNameVisible
-    ? question.askerName
+    ? maskName(question.askerName)
     : t("anonymous");
   const isLongAnswer = question.answerText.length > 120;
 
