@@ -150,21 +150,6 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
     );
   }, [user, cartCount]);
 
-  if (userLoading) {
-    return (
-      <header
-        className={`sticky top-0 z-[100] ${isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"} border-b ${className}`}
-      >
-        <div className="safe-area-top">
-          <div className="h-12 px-4 flex items-center justify-center">
-            <div
-              className={`animate-pulse h-5 w-14 rounded ${isDark ? "bg-gray-800" : "bg-gray-100"}`}
-            />
-          </div>
-        </div>
-      </header>
-    );
-  }
 
   const LanguageDropdown = () => (
     <div
@@ -264,7 +249,11 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
         >
           <User size={iconSize} />
         </button>
-        {user ? (
+        {userLoading ? (
+          <div className={`p-2 rounded-xl ${isDark ? "text-gray-700" : "text-gray-200"}`}>
+            <LogIn size={iconSize - 1} />
+          </div>
+        ) : user ? (
           <button
             onClick={handleLogout}
             disabled={isLoggingOut}
