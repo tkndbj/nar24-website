@@ -125,6 +125,16 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   // ✅ NEW: Debounce timer for background fetches (matching Flutter)
   const backgroundFetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Stable ref for callbacks used inside the auth effect,
+  // so the auth listener subscribes once and never re-subscribes.
+  const authEffectDepsRef = useRef<{
+    check2FARequirement: (user: User) => Promise<boolean>;
+    updateUserDataFromDoc: (data: Record<string, unknown>, user: User | null) => void;
+    syncLanguageToFirestore: (uid: string, firestoreLanguage?: string) => Promise<void>;
+    clearCachedState: () => void;
+    nameSaveInProgress: boolean;
+  }>(null!);
+
   const twoFactorService = useMemo(() => TwoFactorService.getInstance(), []);
 
   // ✅ NEW: Computed property - is user signed in with Apple
@@ -479,6 +489,15 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     }, 500);
   }, [user, internalFirebaseUser, nameSaveInProgress, updateUserDataFromDoc]);
 
+  // Keep ref in sync with latest callbacks/state (avoids stale closures in auth listener)
+  authEffectDepsRef.current = {
+    check2FARequirement,
+    updateUserDataFromDoc,
+    syncLanguageToFirestore,
+    clearCachedState,
+    nameSaveInProgress,
+  };
+
   // Initialize auth state listener with lazy Firebase loading
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -506,13 +525,14 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         // Set up auth state listener
         unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
           const operationId = ++currentAuthOperationId;
+          const deps = authEffectDepsRef.current;
 
           if (firebaseUser) {
             setInternalFirebaseUser(firebaseUser);
             analyticsBatcher.setCurrentUserId(firebaseUser.uid);
 
             try {
-              const needs2FA = await check2FARequirement(firebaseUser);
+              const needs2FA = await deps.check2FARequirement(firebaseUser);
 
               if (!isMounted || operationId !== currentAuthOperationId) return;
 
@@ -527,8 +547,8 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
               // Fetch profile data (respects nameSaveInProgress)
               const { doc, getDoc } = firestoreModule;
 
-              // ✅ NEW: Skip fetch if name save in progress
-              if (!nameSaveInProgress) {
+              // Skip fetch if name save in progress
+              if (!deps.nameSaveInProgress) {
                 const userDoc = await getDoc(
                   doc(db, "users", firebaseUser.uid)
                 );
@@ -541,8 +561,8 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
                 if (userDoc.exists()) {
                   const data = userDoc.data();
-                  updateUserDataFromDoc(data, firebaseUser);
-                  syncLanguageToFirestore(firebaseUser.uid, data.languageCode as string | undefined);
+                  deps.updateUserDataFromDoc(data, firebaseUser);
+                  deps.syncLanguageToFirestore(firebaseUser.uid, data.languageCode as string | undefined);
                 }
               }
             } catch (error) {
@@ -557,10 +577,10 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
             setIsAdmin(false);
             setPending2FA(false);
 
-            // ✅ NEW: Reset Apple-specific state on logout
+            // Reset Apple-specific state on logout
             setNameCompleteState(null);
             setNameSaveInProgressState(false);
-            clearCachedState();
+            deps.clearCachedState();
 
             analyticsBatcher.setCurrentUserId(null);
 
@@ -589,17 +609,13 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       if (unsubscribe) {
         unsubscribe();
       }
-      // ✅ NEW: Cancel pending background fetch on cleanup
+      // Cancel pending background fetch on cleanup
       if (backgroundFetchTimeoutRef.current) {
         clearTimeout(backgroundFetchTimeoutRef.current);
       }
     };
-  }, [
-    check2FARequirement,
-    nameSaveInProgress,
-    updateUserDataFromDoc,
-    clearCachedState,
-  ]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ✅ Redirect logic for name completion and profile completion
   useEffect(() => {
