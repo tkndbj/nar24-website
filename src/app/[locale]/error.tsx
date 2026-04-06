@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import * as Sentry from '@sentry/nextjs';
 
 export default function LocaleError({
   error,
@@ -14,6 +15,7 @@ export default function LocaleError({
 
   useEffect(() => {
     console.error('Locale Route Error:', error);
+    Sentry.captureException(error);
   }, [error]);
 
   return (

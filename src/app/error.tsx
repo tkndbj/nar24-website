@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import * as Sentry from '@sentry/nextjs';
 
 export default function Error({
   error,
@@ -13,11 +14,8 @@ export default function Error({
   const router = useRouter();
 
   useEffect(() => {
-    // Log error to console for debugging
     console.error('Application Error:', error);
-
-    // TODO: Send to error tracking service (e.g., Sentry)
-    // Example: Sentry.captureException(error);
+    Sentry.captureException(error);
   }, [error]);
 
   return (
