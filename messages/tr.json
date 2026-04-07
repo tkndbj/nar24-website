@@ -2,6 +2,14 @@
   "common": {
     "cancel": "İptal"
   },
+  "limits": {
+    "cartLimitTitle": "Sepet Dolu",
+    "cartLimitDescription": "Sepetinizde en fazla {max} ürün bulunabilir. Yeni ürün eklemek için lütfen bazı ürünleri kaldırın.",
+    "favoritesLimitTitle": "Favori Sınırına Ulaşıldı",
+    "favoritesLimitDescription": "En fazla {max} favori ürün kaydedebilirsiniz. Yeni favori eklemek için lütfen bazılarını kaldırın.",
+    "understood": "Tamam",
+    "close": "Kapat"
+  },
   "translate": "Çevir",
   "buyerCategoryWomen": "Kadın",
   "buyerCategoryMen": "Erkek",

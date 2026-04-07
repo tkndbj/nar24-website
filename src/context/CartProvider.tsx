@@ -38,6 +38,9 @@ import metricsEventService from "@/services/cartfavoritesmetricsEventService";
 import { userActivityService } from "@/services/userActivity";
 import { trackReads } from "@/lib/firestore-read-tracker";
 import { useUser } from "./UserProvider";
+import LimitReachedModal from "@/app/components/LimitReachedModal";
+
+const MAX_CART_ITEMS = 300;
 
 // ============================================================================
 // TYPES - Matching Flutter implementation
@@ -457,6 +460,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const [showCartLimitModal, setShowCartLimitModal] = useState(false);
 
   // ========================================================================
   // REFS - Internal state management
@@ -1196,6 +1200,12 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       // Rate limiting
       if (!addToCartLimiterRef.current.canProceed(`add_${product.id}`)) {
         return "Please wait before adding again";
+      }
+
+      // Cart item limit check (only for new items)
+      if (!cartProductIds.has(product.id) && cartProductIds.size >= MAX_CART_ITEMS) {
+        setShowCartLimitModal(true);
+        return "Cart limit reached";
       }
 
       try {
@@ -2055,6 +2065,13 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       <CartActionsContext.Provider value={actionsValue}>
         <CartContext.Provider value={combinedValue}>
           {children}
+          {showCartLimitModal && (
+            <LimitReachedModal
+              onClose={() => setShowCartLimitModal(false)}
+              type="cart"
+              maxItems={MAX_CART_ITEMS}
+            />
+          )}
         </CartContext.Provider>
       </CartActionsContext.Provider>
     </CartStateContext.Provider>

@@ -76,13 +76,11 @@ async function fetchPersonalized(userId: string): Promise<string[]> {
     import("firebase/firestore"),
   ]);
 
-  const snap = await getDoc(
-    doc(db, "user_profiles", userId, "personalized_feed", "current"),
-  );
+  const snap = await getDoc(doc(db, "user_profiles", userId));
 
-  if (!snap.exists()) return fetchTrending();
-
-  const data = snap.data();
+  if (!snap.exists() || !snap.data().feed) return fetchTrending();
+  
+  const data = snap.data().feed;
 
   // Stale feed (>3 days) → fall back to trending
   if (data.lastComputed) {

@@ -2,6 +2,14 @@
   "common": {
     "cancel": "Cancel"
   },
+  "limits": {
+    "cartLimitTitle": "Cart is Full",
+    "cartLimitDescription": "You can have up to {max} items in your cart. Please remove some items before adding new ones.",
+    "favoritesLimitTitle": "Favorites Limit Reached",
+    "favoritesLimitDescription": "You can save up to {max} favorite items. Please remove some favorites before adding new ones.",
+    "understood": "OK",
+    "close": "Close"
+  },
   "translate": "Translate",
   "buyerCategoryWomen": "Women",
   "buyerCategoryMen": "Men",

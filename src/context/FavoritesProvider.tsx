@@ -41,6 +41,9 @@ import { trackReads } from "@/lib/firestore-read-tracker";
 
 import metricsEventService from "@/services/cartfavoritesmetricsEventService";
 import { userActivityService } from "@/services/userActivity";
+import LimitReachedModal from "@/app/components/LimitReachedModal";
+
+const MAX_FAVORITE_ITEMS = 500;
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -297,6 +300,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isInitialLoadComplete, setIsInitialLoadComplete] = useState(false);
   const [favoriteBaskets, setFavoriteBaskets] = useState<FavoriteBasket[]>([]);
+  const [showFavoritesLimitModal, setShowFavoritesLimitModal] = useState(false);
 
   // Internal state
   const lastDocument = useRef<DocumentSnapshot | null>(null);
@@ -742,6 +746,12 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
             showDebouncedRemoveToast();
             return "Removed from favorites";
           } else {
+            // Favorites item limit check
+            if (favoriteIds.size >= MAX_FAVORITE_ITEMS) {
+              setShowFavoritesLimitModal(true);
+              return "Favorites limit reached";
+            }
+
             // STEP 1: Optimistic add
             const newIds = new Set(favoriteIds);
             newIds.add(productId);
@@ -1928,6 +1938,13 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
       <FavoritesActionsContext.Provider value={actionsValue}>
         <FavoritesContext.Provider value={combinedValue}>
           {children}
+          {showFavoritesLimitModal && (
+            <LimitReachedModal
+              onClose={() => setShowFavoritesLimitModal(false)}
+              type="favorites"
+              maxItems={MAX_FAVORITE_ITEMS}
+            />
+          )}
         </FavoritesContext.Provider>
       </FavoritesActionsContext.Provider>
     </FavoritesStateContext.Provider>
