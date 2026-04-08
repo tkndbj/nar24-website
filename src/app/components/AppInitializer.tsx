@@ -16,11 +16,9 @@ export function AppInitializer({ children }: { children: ReactNode }) {
         : (cb: () => void) => setTimeout(cb, 1);
 
     const id = schedule(async () => {
-      const [{ memoryManager }, { userActivityService }] = await Promise.all([
-        import("@/app/utils/memoryManager"),
+      const [{ userActivityService }] = await Promise.all([
         import("@/services/userActivity"),
       ]);
-      memoryManager.setupMemoryManagement();
       userActivityService.initialize();
     });
 
@@ -29,7 +27,6 @@ export function AppInitializer({ children }: { children: ReactNode }) {
         cancelIdleCallback(id as number);
       }
       // Lazy cleanup — only dispose if modules were loaded
-      import("@/app/utils/memoryManager").then((m) => m.memoryManager.dispose());
       import("@/services/userActivity").then((m) =>
         m.userActivityService.dispose()
       );
