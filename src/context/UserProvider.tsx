@@ -25,7 +25,6 @@ import { impressionBatcher } from "@/app/utils/impressionBatcher";
 import { clearPreferenceProductsCache } from "@/app/components/market_screen/PreferenceProduct";
 import { analyticsBatcher } from "@/app/utils/analyticsBatcher";
 
-
 interface ProfileData {
   displayName?: string;
   email?: string;
@@ -63,7 +62,7 @@ interface UserContextType {
   getProfileField: <T>(key: string) => T | null;
   updateUserDataImmediately: (
     user: User,
-    options?: { profileComplete?: boolean }
+    options?: { profileComplete?: boolean },
   ) => Promise<void>;
   setProfileComplete: (complete: boolean) => void;
   isPending2FA: boolean;
@@ -104,13 +103,14 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [profileComplete, setProfileCompleteState] = useState<boolean | null>(
-    null
+    null,
   );
   const [pending2FA, setPending2FA] = useState(false);
   const [internalFirebaseUser, setInternalFirebaseUser] = useState<User | null>(
-    null
+    null,
   );
-  const pathname = typeof window !== "undefined" ? window.location.pathname : "";
+  const pathname =
+    typeof window !== "undefined" ? window.location.pathname : "";
   // ✅ NEW: Apple Sign-In specific state (matching Flutter's UserProvider)
   const [nameComplete, setNameCompleteState] = useState<boolean | null>(null);
   const [nameSaveInProgress, setNameSaveInProgressState] = useState(false);
@@ -119,7 +119,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const authRef = useRef<import("firebase/auth").Auth | null>(null);
   const dbRef = useRef<import("firebase/firestore").Firestore | null>(null);
   const firestoreModuleRef = useRef<typeof import("firebase/firestore") | null>(
-    null
+    null,
   );
 
   // ✅ NEW: Debounce timer for background fetches (matching Flutter)
@@ -129,8 +129,14 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   // so the auth listener subscribes once and never re-subscribes.
   const authEffectDepsRef = useRef<{
     check2FARequirement: (user: User) => Promise<boolean>;
-    updateUserDataFromDoc: (data: Record<string, unknown>, user: User | null) => void;
-    syncLanguageToFirestore: (uid: string, firestoreLanguage?: string) => Promise<void>;
+    updateUserDataFromDoc: (
+      data: Record<string, unknown>,
+      user: User | null,
+    ) => void;
+    syncLanguageToFirestore: (
+      uid: string,
+      firestoreLanguage?: string,
+    ) => Promise<void>;
     clearCachedState: () => void;
     nameSaveInProgress: boolean;
   }>(null!);
@@ -227,37 +233,39 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const getCurrentLocale = useCallback((): string => {
     const segments = pathname.split("/").filter(Boolean);
     const firstSegment = segments[0];
-    
+
     const supportedLocales = ["en", "tr"];
     if (firstSegment && supportedLocales.includes(firstSegment)) {
       return firstSegment;
     }
-    
+
     return "tr"; // Default locale
   }, [pathname]);
 
-  const syncLanguageToFirestore = useCallback(async (
-    uid: string, 
-    firestoreLanguage?: string
-  ) => {
-    if (typeof window === "undefined") return;
-    if (!dbRef.current || !firestoreModuleRef.current) return;
-    
-    try {
-      const localLanguage = getCurrentLocale();
-      
-      if (localLanguage !== firestoreLanguage) {
-        const { doc, updateDoc } = firestoreModuleRef.current;
-        await updateDoc(doc(dbRef.current, "users", uid), {
-          languageCode: localLanguage,
-        });
-        
-        console.log(`🌍 Language synced: ${firestoreLanguage} → ${localLanguage}`);
+  const syncLanguageToFirestore = useCallback(
+    async (uid: string, firestoreLanguage?: string) => {
+      if (typeof window === "undefined") return;
+      if (!dbRef.current || !firestoreModuleRef.current) return;
+
+      try {
+        const localLanguage = getCurrentLocale();
+
+        if (localLanguage !== firestoreLanguage) {
+          const { doc, updateDoc } = firestoreModuleRef.current;
+          await updateDoc(doc(dbRef.current, "users", uid), {
+            languageCode: localLanguage,
+          });
+
+          console.log(
+            `🌍 Language synced: ${firestoreLanguage} → ${localLanguage}`,
+          );
+        }
+      } catch (error) {
+        console.error("⚠️ Language sync failed:", error);
       }
-    } catch (error) {
-      console.error("⚠️ Language sync failed:", error);
-    }
-  }, [getCurrentLocale]);
+    },
+    [getCurrentLocale],
+  );
 
   // ✅ NEW: Cache profile complete state to localStorage
   const cacheProfileComplete = useCallback((value: boolean) => {
@@ -288,7 +296,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         cacheNameComplete(complete);
       }
     },
-    [nameComplete, cacheNameComplete]
+    [nameComplete, cacheNameComplete],
   );
 
   // ✅ NEW: Set name save in progress (exposed to components)
@@ -299,7 +307,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         // This triggers re-render which causes router redirect to re-evaluate
       }
     },
-    [nameSaveInProgress]
+    [nameSaveInProgress],
   );
 
   // ✅ NEW: Update local profile field immediately (for optimistic UI updates)
@@ -309,7 +317,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         ({
           ...(prev || {}),
           [key]: value,
-        } as ProfileData)
+        }) as ProfileData,
     );
   }, []);
 
@@ -370,7 +378,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       internalFirebaseUser,
       cacheProfileComplete,
       cacheNameComplete,
-    ]
+    ],
   );
 
   // Check if user needs 2FA verification
@@ -381,7 +389,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       try {
         const isEmailPasswordUser =
           firebaseUser.providerData?.some?.(
-            (info) => info.providerId === "password"
+            (info) => info.providerId === "password",
           ) ?? false;
 
         if (isEmailPasswordUser && !firebaseUser.emailVerified) {
@@ -417,7 +425,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         return false;
       }
     },
-    [twoFactorService]
+    [twoFactorService],
   );
 
   // Fetch user data
@@ -434,7 +442,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     try {
       const { doc, getDoc } = firestoreModuleRef.current;
       const userDoc = await getDoc(
-        doc(dbRef.current, "users", currentUser.uid)
+        doc(dbRef.current, "users", currentUser.uid),
       );
 
       if (userDoc.exists()) {
@@ -470,7 +478,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       try {
         const { doc, getDoc } = firestoreModuleRef.current!;
         const userDoc = await getDoc(
-          doc(dbRef.current!, "users", currentUser.uid)
+          doc(dbRef.current!, "users", currentUser.uid),
         );
 
         // Check again after async operation
@@ -531,6 +539,18 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
             setInternalFirebaseUser(firebaseUser);
             analyticsBatcher.setCurrentUserId(firebaseUser.uid);
 
+            // Set GA4 user ID for analytics filtering
+            import("firebase/analytics")
+              .then(({ getAnalytics, setUserId }) => {
+                try {
+                  const analytics = getAnalytics();
+                  setUserId(analytics, firebaseUser.uid);
+                } catch (e) {
+                  console.warn("GA4 setUserId failed:", e);
+                }
+              })
+              .catch(() => {});
+
             try {
               const needs2FA = await deps.check2FARequirement(firebaseUser);
 
@@ -550,10 +570,11 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
               // Skip fetch if name save in progress
               if (!deps.nameSaveInProgress) {
                 const userDoc = await getDoc(
-                  doc(db, "users", firebaseUser.uid)
+                  doc(db, "users", firebaseUser.uid),
                 );
                 // ── debug: track Firestore read ──
-                const { trackReads } = await import("@/lib/firestore-read-tracker");
+                const { trackReads } =
+                  await import("@/lib/firestore-read-tracker");
                 trackReads("UserProvider", 1);
 
                 if (!isMounted || operationId !== currentAuthOperationId)
@@ -562,7 +583,10 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
                 if (userDoc.exists()) {
                   const data = userDoc.data();
                   deps.updateUserDataFromDoc(data, firebaseUser);
-                  deps.syncLanguageToFirestore(firebaseUser.uid, data.languageCode as string | undefined);
+                  deps.syncLanguageToFirestore(
+                    firebaseUser.uid,
+                    data.languageCode as string | undefined,
+                  );
                 }
               }
             } catch (error) {
@@ -583,6 +607,18 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
             deps.clearCachedState();
 
             analyticsBatcher.setCurrentUserId(null);
+
+            // Clear GA4 user ID
+            import("firebase/analytics")
+              .then(({ getAnalytics, setUserId }) => {
+                try {
+                  const analytics = getAnalytics();
+                  setUserId(analytics, null as unknown as string);
+                } catch {
+                  /* ignore */
+                }
+              })
+              .catch(() => {});
 
             cacheManager.clearAll();
             clearPreferenceProductsCache();
@@ -614,7 +650,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         clearTimeout(backgroundFetchTimeoutRef.current);
       }
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ✅ Redirect logic for name completion and profile completion
@@ -637,14 +673,14 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     // Auth pages - don't redirect (user is logging in/registering)
     const authPages = ["/login", "/registration", "/email-verification"];
     const isOnAuthPage = authPages.some(
-      (path) => currentPath === path || currentPath.endsWith(path)
+      (path) => currentPath === path || currentPath.endsWith(path),
     );
     if (isOnAuthPage) return;
 
     // Completion pages - don't redirect (user is already completing something)
     const completionPages = ["/complete-name", "/complete-profile"];
     const isOnCompletionPage = completionPages.some((path) =>
-      currentPath.includes(path)
+      currentPath.includes(path),
     );
     if (isOnCompletionPage) return;
 
@@ -708,10 +744,10 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
           async () => {
             await updateDoc(
               doc(dbRef.current!, "users", currentUser.uid),
-              updates
+              updates,
             );
           },
-          300
+          300,
         )();
 
         const updatedProfileData = { ...(profileData || {}), ...updates };
@@ -730,7 +766,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         throw error;
       }
     },
-    [user, internalFirebaseUser, profileData, cacheProfileComplete]
+    [user, internalFirebaseUser, profileData, cacheProfileComplete],
   );
 
   // Get ID token
@@ -752,7 +788,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     <T,>(key: string): T | null => {
       return (profileData?.[key] as T) || null;
     },
-    [profileData]
+    [profileData],
   );
 
   // Update user data immediately
@@ -778,7 +814,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       // ✅ NEW: Trigger background fetch for profile data
       backgroundFetchUserData();
     },
-    [check2FARequirement, cacheProfileComplete, backgroundFetchUserData]
+    [check2FARequirement, cacheProfileComplete, backgroundFetchUserData],
   );
 
   // Set profile complete
@@ -787,7 +823,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       setProfileCompleteState(complete);
       cacheProfileComplete(complete);
     },
-    [cacheProfileComplete]
+    [cacheProfileComplete],
   );
 
   // Complete 2FA
@@ -868,7 +904,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       setNameComplete,
       setNameSaveInProgress,
       updateLocalProfileField,
-    ]
+    ],
   );
 
   return (
