@@ -47,6 +47,7 @@ import {
 } from "@/context/SearchProvider";
 import { useSearchHistory } from "@/context/SearchHistoryProvider";
 import { useSearchConfig } from "@/hooks/useSearchConfig";
+import { userActivityService } from "@/services/userActivity";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -101,7 +102,7 @@ export default function SearchBar({
   onSearchStateChange,
   searchTerm,
   onSearchTermChange,
- 
+
   t,
   languageCode = "en",
 }: SearchBarProps) {
@@ -211,7 +212,10 @@ export default function SearchBar({
   // ── Focus management ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!isSearching) return;
-    const t = setTimeout(() => searchInputRef.current?.focus({ preventScroll: true }), 100);
+    const t = setTimeout(
+      () => searchInputRef.current?.focus({ preventScroll: true }),
+      100,
+    );
     setHistoryPage(0);
     return () => clearTimeout(t);
   }, [isSearching]);
@@ -241,6 +245,7 @@ export default function SearchBar({
       if (!q || isSubmitting) return;
       setIsSubmitting(true);
       try {
+        userActivityService.trackSearch({ query: q });
         saveSearchTerm(q).catch(console.error);
         onSearchStateChange(false);
         if (term && term !== searchTerm) onSearchTermChange(term);
