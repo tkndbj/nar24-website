@@ -1,6 +1,11 @@
 // services/cartfavoritesmetricsEventService.ts
 
-import { doc, writeBatch, increment, serverTimestamp } from "firebase/firestore";
+import {
+  doc,
+  writeBatch,
+  increment,
+  serverTimestamp,
+} from "firebase/firestore";
 import { getAnalytics, logEvent } from "firebase/analytics";
 import { getAuth } from "firebase/auth";
 import { db } from "@/lib/firebase";
@@ -9,7 +14,11 @@ let analytics: ReturnType<typeof getAnalytics> | null = null;
 
 function getAnalyticsInstance() {
   if (!analytics && typeof window !== "undefined") {
-    try { analytics = getAnalytics(); } catch (e) { void e; }
+    try {
+      analytics = getAnalytics();
+    } catch (e) {
+      void e;
+    }
   }
   return analytics;
 }
@@ -46,7 +55,7 @@ class MetricsEventService {
 
     if (this.lastActionTime.size > this.MAX_COOLDOWN_ENTRIES) {
       const sorted = [...this.lastActionTime.entries()].sort(
-        (a, b) => a[1] - b[1]
+        (a, b) => a[1] - b[1],
       );
       sorted
         .slice(0, this.lastActionTime.size - this.MAX_COOLDOWN_ENTRIES)
@@ -61,7 +70,7 @@ class MetricsEventService {
   private logAnalytics(
     eventType: string,
     productId: string,
-    shopId?: string | null
+    shopId?: string | null,
   ): void {
     const a = getAnalyticsInstance();
     if (a) {
@@ -77,7 +86,7 @@ class MetricsEventService {
   private async incrementMetric(
     productId: string,
     shopId?: string | null,
-    options?: { cart?: number; favorite?: number }
+    options?: { cart?: number; favorite?: number },
   ): Promise<void> {
     if (!this.auth.currentUser) return;
 
@@ -88,7 +97,10 @@ class MetricsEventService {
     try {
       const batch = writeBatch(db);
 
-      const updateData: Record<string, any> = {
+      const updateData: Record<
+        string,
+        ReturnType<typeof increment> | ReturnType<typeof serverTimestamp>
+      > = {
         metricsUpdatedAt: serverTimestamp(),
       };
       if (cart !== 0) updateData.cartCount = increment(cart);
@@ -97,7 +109,10 @@ class MetricsEventService {
       batch.update(doc(db, collection, productId), updateData);
 
       if (shopId) {
-        const shopUpdate: Record<string, any> = {
+        const shopUpdate: Record<
+          string,
+          ReturnType<typeof increment> | ReturnType<typeof serverTimestamp>
+        > = {
           "metrics.lastUpdated": serverTimestamp(),
         };
         if (cart > 0) shopUpdate["metrics.totalCartAdditions"] = increment(1);
@@ -244,7 +259,7 @@ class MetricsEventService {
       batch.commit().catch((e) => {
         console.warn(
           "⚠️ MetricsEventService: batch favorite removal failed —",
-          e
+          e,
         );
       });
     }
