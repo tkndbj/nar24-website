@@ -88,7 +88,7 @@ class MetricsEventService {
     try {
       const batch = writeBatch(db);
 
-      const updateData: Record<string, unknown> = {
+      const updateData: Record<string, any> = {
         metricsUpdatedAt: serverTimestamp(),
       };
       if (cart !== 0) updateData.cartCount = increment(cart);
@@ -97,7 +97,7 @@ class MetricsEventService {
       batch.update(doc(db, collection, productId), updateData);
 
       if (shopId) {
-        const shopUpdate: Record<string, unknown> = {
+        const shopUpdate: Record<string, any> = {
           "metrics.lastUpdated": serverTimestamp(),
         };
         if (cart > 0) shopUpdate["metrics.totalCartAdditions"] = increment(1);
