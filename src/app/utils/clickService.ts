@@ -1,11 +1,11 @@
-import { doc, writeBatch, getFirestore, increment, serverTimestamp } from "firebase/firestore";
+import { doc, writeBatch, increment, serverTimestamp } from "firebase/firestore";
 import { getAnalytics, logEvent } from "firebase/analytics";
 import { db } from "@/lib/firebase";
 let analytics: ReturnType<typeof getAnalytics> | null = null;
 
 function getAnalyticsInstance() {
     if (!analytics && typeof window !== "undefined") {
-      try { analytics = getAnalytics(); } catch (_) {}
+      try { analytics = getAnalytics(); } catch (e) { void e; }
     }
     return analytics;
   }
@@ -32,7 +32,6 @@ export async function writeProductClick(
       gender?: string;
     }
   ) {
-    // GA4
     const a = getAnalyticsInstance();
     if (a) {
       logEvent(a, "product_click", {
@@ -47,12 +46,11 @@ export async function writeProductClick(
         gender: metadata?.gender ?? "",
       });
     }
-  
-    // Distributed shard + dirty marker
+
     const shardIndex = hashCode(productId) % 10;
     try {
       const batch = writeBatch(db);
-  
+
       batch.set(
         doc(db, collection, productId, "click_shards", `shard_${shardIndex}`),
         { count: increment(1) },
@@ -63,9 +61,9 @@ export async function writeProductClick(
         { collection, updatedAt: serverTimestamp() },
         { merge: true }
       );
-  
+
       await batch.commit();
-    } catch (_) {}
+    } catch (e) { void e; }
   }
 
 export async function writeShopClick(shopId: string) {
@@ -88,5 +86,5 @@ export async function writeShopClick(shopId: string) {
       { merge: true }
     );
     await batch.commit();
-  } catch (_) {}
+  } catch (e) { void e; }
 }
