@@ -415,6 +415,20 @@ async function fetchBundles(
   });
 }
 
+async function fetchSalesConfig(
+  db: FirebaseFirestore.Firestore
+): Promise<{ salesPaused: boolean; pauseReason: string }> {
+  const doc = await db.collection("settings").doc("salesConfig").get();
+  if (doc.exists) {
+    const data = doc.data();
+    return {
+      salesPaused: data?.salesPaused || false,
+      pauseReason: data?.pauseReason || "",
+    };
+  }
+  return { salesPaused: false, pauseReason: "" };
+}
+
 // ============= MAIN ORCHESTRATOR =============
 
 export async function fetchAllProductData(
@@ -442,6 +456,7 @@ export async function fetchAllProductData(
     relatedResult,
     collectionResult,
     bundlesResult,
+    salesConfigResult,
   ] = await Promise.all([
     fetchSellerInfo(db, sellerId, shopId).catch(() => null),
     fetchReviews(db, productId, productCollection, 3).catch(() => ({
@@ -457,6 +472,7 @@ export async function fetchAllProductData(
     ),
     fetchCollection(db, productId, shopId).catch(() => null),
     fetchBundles(db, productId, shopId).catch(() => [] as BundleInfo[]),
+    fetchSalesConfig(db).catch(() => ({ salesPaused: false, pauseReason: "" })),
   ]);
 
   return {
@@ -469,14 +485,7 @@ export async function fetchAllProductData(
     relatedProducts: relatedResult,
     collection: collectionResult,
     bundles: bundlesResult,
+    salesConfig: salesConfigResult,
   };
 }
 
-// Re-export for convenience in server component metadata
-export async function fetchProductOnly(
-  productId: string
-): Promise<Record<string, unknown> | null> {
-  const db = getFirestoreAdmin();
-  const result = await fetchProduct(db, productId);
-  return result?.product ?? null;
-}

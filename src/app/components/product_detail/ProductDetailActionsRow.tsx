@@ -5,12 +5,6 @@ import { Heart, Star, StarHalf, Shield, Truck, Award} from "lucide-react";
 import { useFavorites } from "@/context/FavoritesProvider";
 import { useTranslations } from "next-intl";
 
-import dynamic from "next/dynamic";
-
-const ProductOptionSelector = dynamic(
-  () => import("@/app/components/ProductOptionSelector"),
-  { ssr: false }
-);
 import { Product } from "@/app/models/Product";
 
 interface ProductDetailActionsRowProps {
@@ -195,7 +189,6 @@ const ProductDetailActionsRow: React.FC<ProductDetailActionsRowProps> = ({
 }) => {
   const { addToFavorites, isFavorite: isProductFavorite } = useFavorites();
   
-  const [showOptionSelector, setShowOptionSelector] = useState(false);
   const [, setFavoriteButtonState] = useState<'idle' | 'adding' | 'added' | 'removing' | 'removed'>('idle');
   const [, setShowFavoriteAnimation] = useState(false);
 
@@ -263,15 +256,6 @@ const ProductDetailActionsRow: React.FC<ProductDetailActionsRowProps> = ({
     }
   };
 
-  const handleOptionSelectorConfirm = async (selectedOptions: { selectedColor?: string; selectedColorImage?: string; quantity: number; [key: string]: unknown }) => {
-    setShowOptionSelector(false);
-    await performFavoriteToggle(selectedOptions);
-  };
-
-  const handleOptionSelectorClose = () => {
-    setShowOptionSelector(false);
-  };
-
   if (isLoading || !product) {
     return <LoadingSkeleton />;
   }
@@ -312,14 +296,6 @@ const ProductDetailActionsRow: React.FC<ProductDetailActionsRowProps> = ({
         </div>
       </div>
 
-      {product && (
-        <ProductOptionSelector
-          product={product}
-          isOpen={showOptionSelector}
-          onClose={handleOptionSelectorClose}
-          onConfirm={handleOptionSelectorConfirm}          
-        />
-      )}
     </>
   );
 };

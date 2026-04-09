@@ -94,6 +94,11 @@ export interface BundleDisplayData {
   totalProductCount: number;
 }
 
+export interface SalesConfig {
+  salesPaused: boolean;
+  pauseReason: string;
+}
+
 export interface ProductDetailData {
   product: Record<string, unknown>;
   seller: SellerInfo | null;
@@ -104,4 +109,5 @@ export interface ProductDetailData {
   relatedProducts: RelatedProduct[];
   collection: CollectionData | null;
   bundles: BundleInfo[];
+  salesConfig: SalesConfig;
 }

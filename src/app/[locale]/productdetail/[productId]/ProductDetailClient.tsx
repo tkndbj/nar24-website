@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from "react";
+import React, { useState, useCallback, useMemo, lazy, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
@@ -26,7 +26,6 @@ import ProductDescription from "./ProductDescription";
 import { useCartActions } from "@/hooks/useCartActions";
 import { useDescriptionTranslation } from "@/hooks/useDescriptionTranslation";
 import { useScrollDetection } from "@/hooks/useScrollDetection";
-import { useSalesConfig } from "@/hooks/useSalesConfig";
 
 import type {
   SellerInfo,
@@ -36,6 +35,7 @@ import type {
   CollectionData,
   BundleInfo,
   BundleDisplayData,
+  SalesConfig,
 } from "@/types/product-detail";
 
 const ProductOptionSelector = dynamic(
@@ -72,6 +72,7 @@ interface ProductDetailClientProps {
   relatedProducts: RelatedProduct[];
   collection: CollectionData | null;
   bundles: BundleInfo[];
+  salesConfig: SalesConfig;
   locale: string;
 }
 
@@ -85,6 +86,7 @@ export default function ProductDetailClient({
   relatedProducts,
   collection,
   bundles,
+  salesConfig,
   locale,
 }: ProductDetailClientProps) {
   const router = useRouter();
@@ -92,22 +94,19 @@ export default function ProductDetailClient({
   const { user } = useUser();
   const { addToFavorites, removeMultipleFromFavorites, isFavorite } = useFavorites();
 
-  // Sales config (real-time listener)
-  const { salesPaused, pauseReason } = useSalesConfig();
+  // Sales config from server (no client-side Firestore listener needed)
+  const { salesPaused, pauseReason } = salesConfig;
   const [showSalesPausedDialog, setShowSalesPausedDialog] = useState(false);
 
   // Scroll detection
   const { showHeaderButtons, actionButtonsRef } = useScrollDetection();
 
-  // Bottom sections lazy loading
-  const [shouldLoadBottomSections, setShouldLoadBottomSections] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setShouldLoadBottomSections(true);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [product.id]);
+  // Whether bottom sections have data worth rendering
+  const hasCollection = collection !== null && collection.products.length > 0;
+  const hasBundles = bundles.length > 0;
+  const hasReviews = reviewsTotal > 0;
+  const hasQuestions = questionsTotal > 0;
+  const hasRelatedProducts = relatedProducts.length > 0;
 
   // Translation helper
   const t = useCallback(
@@ -366,94 +365,92 @@ export default function ProductDetailClient({
           </div>
         </div>
 
-        {/* Bottom Sections */}
+        {/* Bottom Sections — only rendered when server prefetch found data */}
         <div className="mt-4 sm:mt-6 space-y-3 sm:space-y-4">
-          {shouldLoadBottomSections && (
-            <>
-              <Suspense
-                fallback={
-                  <div className="h-40 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700" />
-                }
-              >
-                <ProductCollectionWidget
-                  key={`collection-${product.id}`}
-                  productId={product.id}
-                  shopId={product.shopId}
-                  localization={localization}
-                  prefetchedData={collection}
-                />
-              </Suspense>
+          {hasCollection && (
+            <Suspense
+              fallback={
+                <div className="h-40 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700" />
+              }
+            >
+              <ProductCollectionWidget
+                key={`collection-${product.id}`}
+                productId={product.id}
+                shopId={product.shopId}
+                localization={localization}
+                prefetchedData={collection}
+              />
+            </Suspense>
+          )}
 
-              <Suspense
-                fallback={
-                  <div className="h-40 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700" />
-                }
-              >
-                <BundleComponent
-                  key={`bundle-${product.id}`}
-                  productId={product.id}
-                  shopId={product.shopId}
-                  localization={localization}
-                  prefetchedData={bundles as unknown as BundleDisplayData[] | null}
-                />
-              </Suspense>
+          {hasBundles && (
+            <Suspense
+              fallback={
+                <div className="h-40 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700" />
+              }
+            >
+              <BundleComponent
+                key={`bundle-${product.id}`}
+                productId={product.id}
+                shopId={product.shopId}
+                localization={localization}
+                prefetchedData={bundles as unknown as BundleDisplayData[] | null}
+              />
+            </Suspense>
+          )}
 
-              <Suspense
-                fallback={
-                  <div className="h-40 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700" />
-                }
-              >
-                <ProductDetailReviewsTab
-                  key={`reviews-${product.id}`}
-                  productId={product.id}
-                  isShop={!!product.shopId}
-                  localization={localization}
-                  locale={locale}
-                  prefetchedData={
-                    reviews.length > 0
-                      ? { reviews, totalCount: reviewsTotal }
-                      : null
-                  }
-                />
-              </Suspense>
+          {hasReviews && (
+            <Suspense
+              fallback={
+                <div className="h-40 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700" />
+              }
+            >
+              <ProductDetailReviewsTab
+                key={`reviews-${product.id}`}
+                productId={product.id}
+                isShop={!!product.shopId}
+                localization={localization}
+                locale={locale}
+                prefetchedData={{ reviews, totalCount: reviewsTotal }}
+              />
+            </Suspense>
+          )}
 
-              <Suspense
-                fallback={
-                  <div className="h-40 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700" />
-                }
-              >
-                <ProductQuestionsWidget
-                  key={`questions-${product.id}`}
-                  productId={product.id}
-                  sellerId={product.userId}
-                  shopId={product.shopId}
-                  isShop={!!product.shopId}
-                  localization={localization}
-                  locale={locale}
-                  prefetchedData={
-                    questions.length > 0
-                      ? { questions, totalCount: questionsTotal }
-                      : null
-                  }
-                />
-              </Suspense>
+          {hasQuestions && (
+            <Suspense
+              fallback={
+                <div className="h-40 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700" />
+              }
+            >
+              <ProductQuestionsWidget
+                key={`questions-${product.id}`}
+                productId={product.id}
+                sellerId={product.userId}
+                shopId={product.shopId}
+                isShop={!!product.shopId}
+                localization={localization}
+                locale={locale}
+                prefetchedData={{ questions, totalCount: questionsTotal }}
+              />
+            </Suspense>
+          )}
 
-              <Suspense
-                fallback={
-                  <div className="h-40 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700" />
-                }
-              >
-                <ProductDetailRelatedProducts
-                  key={`related-${product.id}`}
-                  productId={product.id}
-                  category={product.category}
-                  subcategory={product.subcategory}
-                  relatedProductIds={product.relatedProductIds}
-                  localization={localization}
-                  prefetchedProducts={relatedProducts as unknown as Product[]}
-                />
-              </Suspense>
-            </>
+          {hasRelatedProducts && (
+            <Suspense
+              fallback={
+                <div className="h-40 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700" />
+              }
+            >
+              <ProductDetailRelatedProducts
+                key={`related-${product.id}`}
+                productId={product.id}
+                category={product.category}
+                subcategory={product.subcategory}
+                relatedProductIds={product.relatedProductIds}
+                localization={localization}
+                prefetchedProducts={relatedProducts as unknown as Product[]}
+              />
+            </Suspense>
           )}
         </div>
 
@@ -478,20 +475,18 @@ export default function ProductDetailClient({
       />
 
       {/* Ask to Seller Bubble */}
-      {shouldLoadBottomSections && (
-        <Suspense fallback={null}>
-          <AskToSellerBubble
-            onTap={() => {
-              const sellerId = product.shopId || product.userId;
-              const isShop = !!product.shopId;
-              router.push(
-                `/asktoseller?productId=${product.id}&sellerId=${sellerId}&isShop=${isShop}`
-              );
-            }}
-            localization={localization}
-          />
-        </Suspense>
-      )}
+      <Suspense fallback={null}>
+        <AskToSellerBubble
+          onTap={() => {
+            const sellerId = product.shopId || product.userId;
+            const isShop = !!product.shopId;
+            router.push(
+              `/asktoseller?productId=${product.id}&sellerId=${sellerId}&isShop=${isShop}`
+            );
+          }}
+          localization={localization}
+        />
+      </Suspense>
 
       {/* Login Modal */}
       <LoginModal

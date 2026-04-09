@@ -1,11 +1,12 @@
 // src/app/[locale]/productdetail/[productId]/page.tsx
 // Server component — fetches data server-side for instant HTML + SEO
+// Uses React cache() to deduplicate fetchAllProductData between generateMetadata and page render
 
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 import {
   fetchAllProductData,
-  fetchProductOnly,
   normalizeProductId,
 } from "@/lib/product-detail-fetcher";
 import { ProductUtils } from "@/app/models/Product";
@@ -15,25 +16,31 @@ interface Props {
   params: Promise<{ productId: string; locale: string }>;
 }
 
+// Deduplicate: both generateMetadata and the page component call this,
+// but React cache() ensures the actual fetch only happens once per request.
+const getCachedProductData = cache(async (normalizedId: string) => {
+  return fetchAllProductData(normalizedId);
+});
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { productId, locale } = await params;
   const normalizedId = normalizeProductId(productId);
 
   try {
-    const productData = await fetchProductOnly(normalizedId);
-    if (!productData) {
+    const data = await getCachedProductData(normalizedId);
+    if (!data) {
       return { title: "Product Not Found" };
     }
 
-    const name = String(productData.productName || "Product");
+    const name = String(data.product.productName || "Product");
     const description = String(
-      productData.description || ""
+      data.product.description || ""
     ).slice(0, 160);
-    const images = Array.isArray(productData.imageUrls)
-      ? productData.imageUrls.map(String)
+    const images = Array.isArray(data.product.imageUrls)
+      ? (data.product.imageUrls as unknown[]).map(String)
       : [];
-    const price = Number(productData.price || 0);
-    const currency = String(productData.currency || "TRY");
+    const price = Number(data.product.price || 0);
+    const currency = String(data.product.currency || "TRY");
 
     return {
       title: name,
@@ -58,7 +65,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function ProductDetailPage({ params }: Props) {
   const { productId, locale } = await params;
   const normalizedId = normalizeProductId(productId);
-  const data = await fetchAllProductData(normalizedId);
+  const data = await getCachedProductData(normalizedId);
 
   if (!data) {
     notFound();
@@ -80,6 +87,7 @@ export default async function ProductDetailPage({ params }: Props) {
       relatedProducts={data.relatedProducts}
       collection={data.collection}
       bundles={data.bundles}
+      salesConfig={data.salesConfig}
       locale={locale}
     />
   );
