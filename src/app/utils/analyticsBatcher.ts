@@ -143,7 +143,7 @@ class AnalyticsBatcher {
     }
   }
 
-  // ── Shop click ────────────────────────────────────────────────────────────
+  // ── Shop click ────────────────────────────────────────────────────────────-
   recordShopClick(shopId: string): void {
     if (this.isDisposed) return;
 
