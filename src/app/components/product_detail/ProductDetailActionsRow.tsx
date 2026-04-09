@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { Heart, Star, StarHalf, Shield, Truck, Award} from "lucide-react";
-import { useFavorites } from "@/context/FavoritesProvider";
 import { useTranslations } from "next-intl";
 
 import { Product } from "@/app/models/Product";
@@ -187,10 +186,6 @@ const ProductDetailActionsRow: React.FC<ProductDetailActionsRowProps> = ({
   onToggleFavorite,
   localization,
 }) => {
-  const { addToFavorites, isFavorite: isProductFavorite } = useFavorites();
-  
-  const [, setFavoriteButtonState] = useState<'idle' | 'adding' | 'added' | 'removing' | 'removed'>('idle');
-  const [, setShowFavoriteAnimation] = useState(false);
 
   // ✅ FIXED: Proper nested translation function that uses JSON files
   const t = useCallback((key: string) => {
@@ -220,41 +215,6 @@ const ProductDetailActionsRow: React.FC<ProductDetailActionsRowProps> = ({
       return key;
     }
   }, [localization]);
-
-  const actualIsFavorite = product ? isProductFavorite(product.id) : false;
-
-  const performFavoriteToggle = async (selectedOptions?: { selectedColor?: string; selectedColorImage?: string; quantity: number; [key: string]: unknown }) => {
-    if (!product) return;
-
-    try {
-      const wasInFavorites = actualIsFavorite;
-      
-      setFavoriteButtonState(wasInFavorites ? 'removing' : 'adding');
-      setShowFavoriteAnimation(true);
-
-      const result = await addToFavorites(product.id, selectedOptions);
-      
-      if (result.includes('Added')) {
-        setFavoriteButtonState('added');
-      } else if (result.includes('Removed')) {
-        setFavoriteButtonState('removed');
-      }
-
-      setTimeout(() => {
-        setFavoriteButtonState('idle');
-        setShowFavoriteAnimation(false);
-      }, 2000);
-
-      if (onToggleFavorite) {
-        onToggleFavorite();
-      }
-
-    } catch (error) {
-      console.error("Error with favorite operation:", error);
-      setFavoriteButtonState('idle');
-      setShowFavoriteAnimation(false);
-    }
-  };
 
   if (isLoading || !product) {
     return <LoadingSkeleton />;
