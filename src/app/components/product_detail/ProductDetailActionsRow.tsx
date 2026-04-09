@@ -183,7 +183,6 @@ const LoadingSkeleton: React.FC = () => (
 const ProductDetailActionsRow: React.FC<ProductDetailActionsRowProps> = ({
   product,
   isLoading = false,
-  onToggleFavorite,
   localization,
 }) => {
 
