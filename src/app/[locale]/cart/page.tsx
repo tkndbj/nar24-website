@@ -701,6 +701,11 @@ useEffect(() => {
 
   const proceedToPayment = useCallback(
     async (freshTotals: CartTotals) => {
+        // ✅ FIX 2b: Final safety gate — never navigate with 0 total
+    if (freshTotals.total <= 0) {
+      alert(t("totalCalculationFailed", "Invalid total. Please refresh and try again."));
+      return;
+    }
       // Build pricing map from Cloud Function totals
       const pricingMap = new Map<string, CartItemTotal>();
       freshTotals.items.forEach((itemTotal) => {
@@ -846,57 +851,70 @@ useEffect(() => {
 
   const handleValidationContinue = useCallback(async () => {
     if (!validationResult) return;
-
+  
     setIsValidating(true);
     setShowValidationDialog(false);
-
+  
     try {
-      // Update cart cache
       if (validationResult.validatedItems.length > 0) {
         await updateCartCacheFromValidation(validationResult.validatedItems);
       }
-
-      // Remove error items
+  
       const errorIds = Object.keys(validationResult.errors);
       setDeselectedProducts((prev) => {
         const newSet = new Set(prev);
         errorIds.forEach((id) => newSet.add(id));
         return newSet;
       });
-
-      // Get valid IDs
+  
       const validIds = validationResult.validatedItems
         .map((item) => item.productId)
         .filter((id) => !errorIds.includes(id));
-
-      setIsValidating(false);
-
-      if (validIds.length > 0) {
-        // ✅ Calculate FRESH totals with excluded IDs (matching Flutter)
-        console.log("💰 Calculating fresh totals after validation...");
-        const allProductIds = cartItems.map((item) => item.productId);
-        const excludedForTotals = allProductIds.filter(
-          (id) => !validIds.includes(id),
-        );
-        const freshTotals = await calculateCartTotals(
-          excludedForTotals.length > 0 ? excludedForTotals : undefined,
-        );
-        console.log("💰 Fresh totals:", freshTotals);
-
-        // Proceed with fresh totals
-        proceedToPayment(freshTotals);
-      } else {
+  
+      if (validIds.length === 0) {
+        setIsValidating(false);
         alert(t("noValidItemsToCheckout", "No valid items to checkout"));
+        return;
       }
+  
+      // ✅ FIX 1a: Refresh local cart state so it reflects updated Firestore docs
+      await refresh();
+  
+      // ✅ FIX 1b: Invalidate local totals cache — prevents stale cache hit
+      if (user) {
+        cartTotalsCache.invalidateForUser(user.uid);
+      }
+  
+      const allProductIds = cartItems.map((item) => item.productId);
+      const excludedForTotals = allProductIds.filter(
+        (id) => !validIds.includes(id),
+      );
+      const freshTotals = await calculateCartTotals(
+        excludedForTotals.length > 0 ? excludedForTotals : undefined,
+      );
+  
+      // ✅ FIX 2a: Never proceed with 0 total
+      if (!freshTotals || freshTotals.total <= 0) {
+        setIsValidating(false);
+        alert(t("totalCalculationFailed", "Could not calculate total. Please try again."));
+        return;
+      }
+  
+      setIsValidating(false);
+      proceedToPayment(freshTotals);
     } catch (error) {
       setIsValidating(false);
-      console.error("❌ Cache update error:", error);
+      console.error("❌ Validation continue error:", error);
+      alert(t("validationFailed", "Checkout failed. Please wait a moment and try again."));
     }
   }, [
     validationResult,
     updateCartCacheFromValidation,
     calculateCartTotals,
     proceedToPayment,
+    refresh,
+    user,
+    cartItems,
     t,
   ]);
 

@@ -1166,14 +1166,14 @@ function ProductPaymentPageContent() {
 
   // ✅ Handle payment submission (matching Flutter's confirmPayment)
   const handleSubmit = async () => {
-    if (!user) {
-      alert(t("pleaseLogin"));
-      return;
-    }
+    if (!user) { alert(t("pleaseLogin")); return; }
+  if (!validateForm()) return;
 
-    if (!validateForm()) {
-      return;
-    }
+  // ✅ FIX 2c: Never submit payment with 0 or negative total
+  if (finalTotal <= 0) {
+    alert(t("invalidTotal") || "Order total must be greater than zero.");
+    return;
+  }
 
     setIsProcessing(true);
 

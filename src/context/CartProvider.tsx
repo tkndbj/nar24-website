@@ -1810,6 +1810,8 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
         console.log(`✅ Cache updated: ${data.updated as number} items`);
 
+        cartTotalsCache.invalidateForUser(user.uid);
+
         return (data.success as boolean) === true;
       } catch (error) {
         console.error("❌ Cache update error:", error);
