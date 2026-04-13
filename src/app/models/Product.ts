@@ -34,6 +34,9 @@ export interface ProductSummary {
   condition: string;
   brandModel?: string;
   imageUrls: string[];
+  imageStoragePaths?: string[];
+  videoStoragePath?: string | null;
+  colorImageStoragePaths?: Record<string, string>;
   averageRating: number;
   reviewCount: number;
   originalPrice?: number;
@@ -83,6 +86,10 @@ export interface Product {
   // ── Media ─────────────────────────────────────────────────────────────────
   imageUrls: string[];
   colorImages: Record<string, string[]>;
+
+  imageStoragePaths?: string[];
+  videoStoragePath?: string | null;
+  colorImageStoragePaths?: Record<string, string>;
 
   // ── Classification ────────────────────────────────────────────────────────
   category: string;
@@ -459,6 +466,20 @@ export class ProductUtils {
       imageUrls: ProductUtils.safeStringArray(d.imageUrls),
       colorImages: ProductUtils.safeColorImages(d.colorImages),
 
+      imageStoragePaths: ProductUtils.safeStringArray(d.imageStoragePaths),
+      videoStoragePath:
+        ProductUtils.safeStringNullable(d.videoStoragePath) ?? null,
+      colorImageStoragePaths:
+        d.colorImageStoragePaths != null &&
+        typeof d.colorImageStoragePaths === "object" &&
+        !Array.isArray(d.colorImageStoragePaths)
+          ? Object.fromEntries(
+              Object.entries(
+                d.colorImageStoragePaths as Record<string, unknown>,
+              ).map(([k, v]) => [String(k), String(v)]),
+            )
+          : {},
+
       // ── Classification ────────────────────────────────────────────────────
       category: ProductUtils.safeString(d.category, "Uncategorized"),
       subcategory: ProductUtils.safeString(d.subcategory),
@@ -712,6 +733,9 @@ export class ProductUtils {
       gender: product.gender,
       availableColors: product.availableColors,
       colorImages: product.colorImages,
+      imageStoragePaths: product.imageStoragePaths,
+      videoStoragePath: product.videoStoragePath,
+      colorImageStoragePaths: product.colorImageStoragePaths,
       sellerName: product.sellerName,
       shopId: product.shopId,
       userId: product.userId,
@@ -757,6 +781,9 @@ export class ProductUtils {
       // Media
       imageUrls: product.imageUrls,
       colorImages: product.colorImages,
+      imageStoragePaths: product.imageStoragePaths,
+      videoStoragePath: product.videoStoragePath,
+      colorImageStoragePaths: product.colorImageStoragePaths,
       // Classification
       category: product.category,
       subcategory: product.subcategory,
@@ -857,6 +884,9 @@ export class ProductUtils {
       // Media
       imageUrls: product.imageUrls,
       colorImages: product.colorImages,
+      imageStoragePaths: product.imageStoragePaths,
+      videoStoragePath: product.videoStoragePath,
+      colorImageStoragePaths: product.colorImageStoragePaths,
       // Classification
       category: product.category,
       subcategory: product.subcategory,

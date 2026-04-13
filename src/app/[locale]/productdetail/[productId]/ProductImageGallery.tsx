@@ -4,9 +4,10 @@ import React, { useState, useCallback, lazy, Suspense } from "react";
 import Image from "next/image";
 import { Play } from "lucide-react";
 import { Product } from "@/app/models/Product";
+import { CloudinaryUrl } from "@/utils/cloudinaryUrl";
 
 const FullScreenImageViewer = lazy(
-  () => import("../../../components/product_detail/FullScreenImageViewer")
+  () => import("../../../components/product_detail/FullScreenImageViewer"),
 );
 
 interface ProductImageGalleryProps {
@@ -20,10 +21,30 @@ export default function ProductImageGallery({
 }: ProductImageGalleryProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [previousImageIndex, setPreviousImageIndex] = useState(0);
-  const [slideDirection, setSlideDirection] = useState<"left" | "right">("right");
+  const [slideDirection, setSlideDirection] = useState<"left" | "right">(
+    "right",
+  );
   const [showFullScreenViewer, setShowFullScreenViewer] = useState(false);
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
+
+  const displayUrls = React.useMemo(() => {
+    if (product.imageStoragePaths && product.imageStoragePaths.length > 0) {
+      return product.imageStoragePaths.map((p: string) =>
+        CloudinaryUrl.product(p, "detail"),
+      );
+    }
+    return product.imageUrls || [];
+  }, [product.imageStoragePaths, product.imageUrls]);
+
+  const thumbnailUrls = React.useMemo(() => {
+    if (product.imageStoragePaths && product.imageStoragePaths.length > 0) {
+      return product.imageStoragePaths.map((p: string) =>
+        CloudinaryUrl.product(p, "thumbnail"),
+      );
+    }
+    return product.imageUrls || [];
+  }, [product.imageStoragePaths, product.imageUrls]);
 
   const handleImageError = useCallback((index: number) => {
     setImageErrors((prev) => new Set(prev).add(index));
@@ -36,20 +57,20 @@ export default function ProductImageGallery({
       setPreviousImageIndex(currentImageIndex);
       setCurrentImageIndex(index);
     },
-    [currentImageIndex]
+    [currentImageIndex],
   );
 
   return (
     <div className="space-y-2 sm:space-y-3 overflow-x-hidden">
       {/* Main Image */}
       <div className="relative w-full h-[400px] sm:h-[480px] lg:h-[560px] rounded-lg overflow-hidden">
-        {product.imageUrls.length > 0 && !imageErrors.has(currentImageIndex) ? (
+        {displayUrls.length > 0 && !imageErrors.has(currentImageIndex) ? (
           <div className="relative w-full h-full overflow-hidden">
             {previousImageIndex !== currentImageIndex && (
               <div className="absolute inset-0">
                 <Image
                   key={`prev-${previousImageIndex}`}
-                  src={product.imageUrls[previousImageIndex]}
+                  src={displayUrls[previousImageIndex]}
                   alt={product.productName}
                   fill
                   className="object-contain"
@@ -67,7 +88,7 @@ export default function ProductImageGallery({
             <div className="absolute inset-0">
               <Image
                 key={`current-${currentImageIndex}`}
-                src={product.imageUrls[currentImageIndex]}
+                src={displayUrls[currentImageIndex]}
                 alt={product.productName}
                 fill
                 className="object-contain cursor-pointer hover:scale-105 transition-transform duration-300"
@@ -94,7 +115,7 @@ export default function ProductImageGallery({
         )}
 
         {/* Video Play Button */}
-        {product.videoUrl && (
+        {(product.videoStoragePath || product.videoUrl) && (
           <button
             onClick={() => setShowVideoModal(true)}
             className="absolute bottom-3 right-3 sm:bottom-4 sm:right-4 p-2 sm:p-3 bg-black/60 backdrop-blur-sm rounded-full text-white hover:bg-black/80 transition-all hover:scale-110"
@@ -112,13 +133,13 @@ export default function ProductImageGallery({
       </div>
 
       {/* Thumbnail Images */}
-      {product.imageUrls.length > 1 && (
+      {displayUrls.length > 1 && (
         <div className="flex justify-center w-full overflow-x-hidden lg:overflow-x-visible">
           <div
             className="flex gap-1.5 sm:gap-2 overflow-x-auto py-2 px-2 scrollbar-hide max-w-full"
             style={{ WebkitOverflowScrolling: "touch" }}
           >
-            {product.imageUrls.map((url, index) => (
+            {thumbnailUrls.map((url, index) => (
               <button
                 key={index}
                 onClick={() => handleImageChange(index)}
@@ -167,7 +188,7 @@ export default function ProductImageGallery({
       {showFullScreenViewer && (
         <Suspense fallback={null}>
           <FullScreenImageViewer
-            imageUrls={product.imageUrls}
+            imageUrls={displayUrls}
             initialIndex={currentImageIndex}
             isOpen={showFullScreenViewer}
             onClose={() => setShowFullScreenViewer(false)}
@@ -177,20 +198,36 @@ export default function ProductImageGallery({
 
       <style jsx>{`
         @keyframes slideInFromRight {
-          0% { transform: translateX(100%); }
-          100% { transform: translateX(0); }
+          0% {
+            transform: translateX(100%);
+          }
+          100% {
+            transform: translateX(0);
+          }
         }
         @keyframes slideInFromLeft {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(0); }
+          0% {
+            transform: translateX(-100%);
+          }
+          100% {
+            transform: translateX(0);
+          }
         }
         @keyframes slideOutToLeft {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-100%); }
+          0% {
+            transform: translateX(0);
+          }
+          100% {
+            transform: translateX(-100%);
+          }
         }
         @keyframes slideOutToRight {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(100%); }
+          0% {
+            transform: translateX(0);
+          }
+          100% {
+            transform: translateX(100%);
+          }
         }
       `}</style>
     </div>

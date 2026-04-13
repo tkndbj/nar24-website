@@ -36,9 +36,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const description = String(
       data.product.description || ""
     ).slice(0, 160);
-    const images = Array.isArray(data.product.imageUrls)
+    const storagePaths = Array.isArray(data.product.imageStoragePaths)
+      ? (data.product.imageStoragePaths as unknown[]).map(String)
+      : [];
+    const legacyUrls = Array.isArray(data.product.imageUrls)
       ? (data.product.imageUrls as unknown[]).map(String)
       : [];
+
+    const ogImage = storagePaths.length > 0
+      ? `https://storage.googleapis.com/emlak-mobile-app.appspot.com/${storagePaths[0]}`
+      : legacyUrls.length > 0
+        ? legacyUrls[0]
+        : undefined;
+
     const price = Number(data.product.price || 0);
     const currency = String(data.product.currency || "TRY");
 
@@ -48,7 +58,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       openGraph: {
         title: name,
         description: description || `${name} - Buy now`,
-        images: images.length > 0 ? [{ url: images[0] }] : undefined,
+        images: ogImage ? [{ url: ogImage }] : undefined,
         type: "website",
         locale,
       },

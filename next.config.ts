@@ -38,14 +38,14 @@ const securityHeaders = [
   {
     key: "Permissions-Policy",
     value: [
-      "camera=(self)",           // Allow camera for potential future features
-      "microphone=()",           // Disable microphone
-      "geolocation=(self)",      // Allow geolocation for shop location
-      "browsing-topics=()",      // Disable FLoC/Topics API
-      "interest-cohort=()",      // Disable FLoC
-      "payment=(self)",          // Allow Payment Request API
-      "usb=()",                  // Disable USB access
-      "magnetometer=()",         // Disable sensors
+      "camera=(self)", // Allow camera for potential future features
+      "microphone=()", // Disable microphone
+      "geolocation=(self)", // Allow geolocation for shop location
+      "browsing-topics=()", // Disable FLoC/Topics API
+      "interest-cohort=()", // Disable FLoC
+      "payment=(self)", // Allow Payment Request API
+      "usb=()", // Disable USB access
+      "magnetometer=()", // Disable sensors
       "gyroscope=()",
       "accelerometer=()",
     ].join(", "),
@@ -56,40 +56,40 @@ const securityHeaders = [
     value: [
       // Default: only allow from same origin
       "default-src 'self'",
-  
+
       // Scripts: self, inline (needed for Next.js), and trusted domains
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com https://accounts.google.com https://maps.googleapis.com https://www.googletagmanager.com https://www.google-analytics.com https://*.firebaseapp.com https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/",
-  
+
       // Styles: self, inline (needed for styled-components/tailwind), Google Fonts
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  
+
       // Images: self, data URIs, blobs, and trusted domains
-      "img-src 'self' data: blob: https://firebasestorage.googleapis.com https://*.googleapis.com https://*.gstatic.com https://*.google.com https://*.algolia.net",
-  
+      "img-src 'self' data: blob: https://firebasestorage.googleapis.com https://storage.googleapis.com https://res.cloudinary.com https://*.googleapis.com https://*.gstatic.com https://*.google.com https://*.algolia.net",
+
       // Fonts: self and Google Fonts
       "font-src 'self' https://fonts.gstatic.com data:",
-  
+
       // Connect (API calls): self and all required services
       "connect-src 'self' https://*.googleapis.com https://*.google.com https://*.firebaseio.com https://*.cloudfunctions.net https://*.algolia.net https://*.algolia.com https://*.algolianet.com wss://*.firebaseio.com https://firebasestorage.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://*.google-analytics.com https://*.vercel-insights.com https://*.vercel-analytics.com https://sanalpos.isbank.com.tr https://*.isbank.com.tr https://recaptchaenterprise.googleapis.com",
-  
+
       // Frames: Google Maps, Firebase Auth, Payment Gateways, reCAPTCHA
       "frame-src 'self' https: https://www.google.com/recaptcha/ https://recaptcha.google.com/",
-  
+
       // Media (video/audio)
       "media-src 'self' https://firebasestorage.googleapis.com",
-  
+
       // Object/embed: none
       "object-src 'none'",
-  
+
       // Base URI: self only
       "base-uri 'self'",
-  
+
       // Form actions: self only
       "form-action 'self' https://sanalpos.isbank.com.tr https://*.isbank.com.tr",
-  
+
       // Frame ancestors: none (prevents embedding)
       "frame-ancestors 'none'",
-  
+
       // Upgrade insecure requests
       "upgrade-insecure-requests",
     ].join("; "),
@@ -104,6 +104,16 @@ const nextConfig: NextConfig = {
         hostname: "firebasestorage.googleapis.com",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "res.cloudinary.com",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "storage.googleapis.com",
+        pathname: "/**",
+      },
     ],
     formats: ["image/webp", "image/avif"],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920],
@@ -112,9 +122,12 @@ const nextConfig: NextConfig = {
     dangerouslyAllowSVG: false,
   },
   compiler: {
-    removeConsole: process.env.NODE_ENV === "production" ? {
-      exclude: ["error", "warn"],
-    } : false,
+    removeConsole:
+      process.env.NODE_ENV === "production"
+        ? {
+            exclude: ["error", "warn"],
+          }
+        : false,
   },
   experimental: {
     optimizePackageImports: [

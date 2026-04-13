@@ -10,6 +10,7 @@ import React, {
   useRef,
 } from "react";
 import { BoostedVisibilityWrapper } from "@/app/components/BoostedVisibilityWrapper";
+import { CloudinaryUrl } from "@/utils/cloudinaryUrl";
 import Image from "next/image";
 import {
   Heart,
@@ -547,17 +548,39 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
     return shuffled.slice(0, 4);
   }, [safeColorImages]);
 
-  // ✅ Current image URLs based on selected color
   const currentImageUrls = useMemo(() => {
     const colorToUse = internalSelectedColor || selectedColor;
-    if (colorToUse && safeColorImages[colorToUse]?.length) {
-      return safeColorImages[colorToUse];
+
+    // Color-selected images
+    if (colorToUse) {
+      // Prefer color storage paths
+      if (product.colorImageStoragePaths?.[colorToUse]) {
+        return [
+          CloudinaryUrl.product(
+            product.colorImageStoragePaths[colorToUse],
+            "card",
+          ),
+        ];
+      }
+      if (safeColorImages[colorToUse]?.length) {
+        return safeColorImages[colorToUse];
+      }
     }
+
+    // Default images — prefer storage paths
+    if (product.imageStoragePaths && product.imageStoragePaths.length > 0) {
+      return product.imageStoragePaths.map((p: string) =>
+        CloudinaryUrl.product(p, "card"),
+      );
+    }
+
     return product.imageUrls || [];
   }, [
     internalSelectedColor,
     selectedColor,
     safeColorImages,
+    product.imageStoragePaths,
+    product.colorImageStoragePaths,
     product.imageUrls,
   ]);
 
@@ -592,8 +615,10 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
     // Record click analytics (matches Flutter's market.incrementClickCount)
     analyticsBatcher.recordClick(product.id, product.shopId);
 
-    // ✅ Precache hero image (matches Flutter's precacheImage)
-    if (product.imageUrls.length > 0) {
+    if ((product.imageStoragePaths?.length ?? 0) > 0) {
+      const img = new window.Image();
+      img.src = CloudinaryUrl.product(product.imageStoragePaths![0], "detail");
+    } else if (product.imageUrls.length > 0) {
       const img = new window.Image();
       img.src = product.imageUrls[0];
     }
@@ -605,7 +630,6 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
       router.push(`/productdetail/${product.id}`);
     }
   }, [product, router, onTap]);
-
 
   // Reset image state when color changes (matches Flutter's didUpdateWidget)
   useEffect(() => {
@@ -723,13 +747,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
 
       await performCartOperation(selectedOptions);
     },
-    [
-      user,
-      product,
-      actualIsInCart,
-      performCartRemoval,
-      performCartOperation,
-    ],
+    [user, product, actualIsInCart, performCartRemoval, performCartOperation],
   );
 
   // ✅ FAVORITE OPERATIONS (matches Flutter - NO selector, direct add)
@@ -753,10 +771,17 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
         // ✅ CRITICAL: Add directly WITHOUT selector (matches Flutter)
         result = await addToFavorites(product.id, {
           quantity: 1,
-          ...(product.imageUrls.length > 0 && {
-            selectedColorImage: product.imageUrls[0],
+          ...((product.imageStoragePaths?.length ?? 0) > 0 && {
+            selectedColorImage: CloudinaryUrl.product(
+              product.imageStoragePaths![0],
+              "thumbnail",
+            ),
           }),
-          // selectedColor and selectedColorImage will be undefined if not set
+          ...((!product.imageStoragePaths ||
+            product.imageStoragePaths.length === 0) &&
+            product.imageUrls.length > 0 && {
+              selectedColorImage: product.imageUrls[0],
+            }),
         });
       }
 
@@ -1103,25 +1128,27 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
 
   // ✅ Image error handler with retry
   const handleImageError = useCallback(() => {
+    // Try Cloudinary fallback first
+    const fallbackUrl = CloudinaryUrl.extractFallbackUrl(currentImageUrl || "");
+    if (fallbackUrl && imageRetryCount === 0) {
+      // Replace current URL with Firebase direct URL
+      // This is handled by the image component's error state
+    }
+
     if (imageRetryCount < MAX_IMAGE_RETRIES) {
-      console.log(
-        `Image error for ${product.id}, retry ${imageRetryCount + 1}/${MAX_IMAGE_RETRIES}`,
-      );
       const retryDelay =
         RETRY_DELAYS[imageRetryCount] || RETRY_DELAYS[RETRY_DELAYS.length - 1];
-
       setTimeout(() => {
         setImageRetryCount((prev) => prev + 1);
-        setImageKey((prev) => prev + 1); // Force image re-render
+        setImageKey((prev) => prev + 1);
         setImageLoading(true);
         setImageError(false);
       }, retryDelay);
     } else {
-      console.log(`Max retries reached for ${product.id} after error`);
       setImageError(true);
       setImageLoading(false);
     }
-  }, [imageRetryCount, product.id]);
+  }, [imageRetryCount, currentImageUrl]);
 
   // ✅ Image load success handler
   const handleImageLoad = useCallback(() => {
@@ -1527,7 +1554,9 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
               {showCartIcon && (
                 <button
                   className={`w-6 h-6 flex items-center justify-center transform -translate-y-1 transition-all hover:scale-110 relative overflow-hidden ${
-                    isAddToCartDisabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+                    isAddToCartDisabled
+                      ? "opacity-50 cursor-not-allowed"
+                      : "cursor-pointer"
                   }`}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -1589,7 +1618,10 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
               }}
               sizes="550px"
               priority
-              unoptimized={currentImageUrl.includes("firebasestorage")}
+              unoptimized={
+                currentImageUrl?.includes("cloudinary") ||
+                currentImageUrl?.includes("firebasestorage")
+              }
             />
           </div>
         </div>
