@@ -76,7 +76,7 @@ const availableColors = [
 
 // Shimmer Loading Component
 const ShimmerLoading: React.FC<{ isDark: boolean }> = ({ isDark }) => {
-  const baseColor = isDark ? "#2D2A42" : "#E5E5E5";
+  const baseColor = isDark ? "#2d2b40" : "#E5E5E5";
 
   return (
     <div className="min-h-screen">

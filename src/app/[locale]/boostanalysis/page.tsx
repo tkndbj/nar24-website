@@ -925,7 +925,7 @@ export default function BoostAnalysisPage() {
       <div
         className={`${small ? "p-2" : "p-3"} rounded-lg border text-center`}
         style={{
-          backgroundColor: isDarkMode ? "#1F2937" : "white",
+          backgroundColor: isDarkMode ? "#252336" : "white",
           borderColor: `${color}40`,
         }}
       >

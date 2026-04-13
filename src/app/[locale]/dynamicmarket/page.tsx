@@ -672,14 +672,14 @@ export default function DynamicMarketPage() {
       <div className="w-full">
         <div
           className="rounded-lg overflow-hidden"
-          style={{ backgroundColor: isDarkMode ? '#1f2937' : '#ffffff' }}
+          style={{ backgroundColor: isDarkMode ? '#252336' : '#ffffff' }}
         >
           {/* Image skeleton with shimmer effect */}
           <div
             className="w-full relative overflow-hidden"
             style={{
               height: "320px",
-              backgroundColor: isDarkMode ? '#374151' : '#f3f4f6'
+              backgroundColor: isDarkMode ? '#2d2b40' : '#f3f4f6'
             }}
           >
             <div className={shimmerClass} />
@@ -693,7 +693,7 @@ export default function DynamicMarketPage() {
                 className="h-3.5 rounded relative overflow-hidden"
                 style={{
                   width: "85%",
-                  backgroundColor: isDarkMode ? '#374151' : '#e5e7eb'
+                  backgroundColor: isDarkMode ? '#2d2b40' : '#e5e7eb'
                 }}
               >
                 <div className={shimmerClass} />
@@ -702,7 +702,7 @@ export default function DynamicMarketPage() {
                 className="h-3.5 rounded relative overflow-hidden"
                 style={{
                   width: "60%",
-                  backgroundColor: isDarkMode ? '#374151' : '#e5e7eb'
+                  backgroundColor: isDarkMode ? '#2d2b40' : '#e5e7eb'
                 }}
               >
                 <div className={shimmerClass} />
@@ -714,7 +714,7 @@ export default function DynamicMarketPage() {
               className="h-5 rounded relative overflow-hidden"
               style={{
                 width: "45%",
-                backgroundColor: isDarkMode ? '#374151' : '#e5e7eb'
+                backgroundColor: isDarkMode ? '#2d2b40' : '#e5e7eb'
               }}
             >
               <div className={shimmerClass} />
@@ -726,7 +726,7 @@ export default function DynamicMarketPage() {
                 className="h-3 rounded relative overflow-hidden"
                 style={{
                   width: "40%",
-                  backgroundColor: isDarkMode ? '#374151' : '#e5e7eb'
+                  backgroundColor: isDarkMode ? '#2d2b40' : '#e5e7eb'
                 }}
               >
                 <div className={shimmerClass} />
@@ -736,7 +736,7 @@ export default function DynamicMarketPage() {
                   <div
                     key={i}
                     className="w-4 h-4 rounded-full relative overflow-hidden"
-                    style={{ backgroundColor: isDarkMode ? '#374151' : '#e5e7eb' }}
+                    style={{ backgroundColor: isDarkMode ? '#2d2b40' : '#e5e7eb' }}
                   >
                     <div className={shimmerClass} />
                   </div>

@@ -62,6 +62,8 @@ export interface RelatedProduct {
   price: number;
   currency: string;
   imageUrls: string[];
+  imageStoragePaths?: string[];
+  colorImageStoragePaths?: Record<string, string>;
   averageRating: number;
   discountPercentage?: number;
   brandModel?: string;

@@ -1242,7 +1242,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
           >
             <div
               className="w-full h-full rounded-t-xl overflow-hidden relative"
-              style={{ backgroundColor: isDarkMode ? "#1f2937" : "#f3f4f6" }}
+              style={{ backgroundColor: isDarkMode ? "#252336" : "#f3f4f6" }}
             >
               {currentImageUrls.length > 0 && currentImageUrl ? (
                 <div className="relative w-full h-full">
@@ -1251,7 +1251,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
                     <div
                       className="absolute inset-0 flex items-center justify-center z-10"
                       style={{
-                        backgroundColor: isDarkMode ? "#1f2937" : "#f3f4f6",
+                        backgroundColor: isDarkMode ? "#252336" : "#f3f4f6",
                       }}
                     >
                       <Image
@@ -1352,7 +1352,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
                 <div
                   className="w-full h-full flex items-center justify-center"
                   style={{
-                    backgroundColor: isDarkMode ? "#1f2937" : "#f3f4f6",
+                    backgroundColor: isDarkMode ? "#252336" : "#f3f4f6",
                   }}
                 >
                   <LogoPlaceholder size={80} />

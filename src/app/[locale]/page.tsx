@@ -206,6 +206,19 @@ function parseProductDoc(
     }
   }
 
+  // Parse colorImageStoragePaths safely
+  let colorImageStoragePaths: Record<string, string> | undefined;
+  if (
+    d.colorImageStoragePaths &&
+    typeof d.colorImageStoragePaths === "object" &&
+    !Array.isArray(d.colorImageStoragePaths)
+  ) {
+    colorImageStoragePaths = {};
+    for (const [key, val] of Object.entries(d.colorImageStoragePaths)) {
+      if (val != null) colorImageStoragePaths[key] = String(val);
+    }
+  }
+
   // Parse colorQuantities safely
   let colorQuantities: Record<string, number> | undefined;
   if (d.colorQuantities && typeof d.colorQuantities === "object") {
@@ -233,6 +246,10 @@ function parseProductDoc(
     id: doc.id,
     productName: (d.productName || d.title || "") as string,
     imageUrls: Array.isArray(d.imageUrls) ? (d.imageUrls as string[]) : [],
+    imageStoragePaths: Array.isArray(d.imageStoragePaths)
+      ? (d.imageStoragePaths as string[])
+      : undefined,
+    colorImageStoragePaths,
     price: Number(d.price) || 0,
     currency: (d.currency as string) || "TL",
     condition: d.condition as string | undefined,

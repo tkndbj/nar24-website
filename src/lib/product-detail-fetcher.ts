@@ -33,6 +33,17 @@ function safeInt(value: unknown, defaultValue: number = 0): number {
   return defaultValue;
 }
 
+function parseColorImageStoragePaths(
+  value: unknown,
+): Record<string, string> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    if (v != null) out[String(k)] = String(v);
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 function safeStringArray(value: unknown): string[] {
   if (!value) return [];
   if (Array.isArray(value)) return value.map((e) => String(e));
@@ -295,6 +306,12 @@ async function fetchRelatedProducts(
             price: safeDouble(data.price),
             currency: safeString(data.currency, "TL"),
             imageUrls: safeStringArray(data.imageUrls),
+            imageStoragePaths: Array.isArray(data.imageStoragePaths)
+              ? safeStringArray(data.imageStoragePaths)
+              : undefined,
+            colorImageStoragePaths: parseColorImageStoragePaths(
+              data.colorImageStoragePaths,
+            ),
             averageRating: safeDouble(data.averageRating),
             discountPercentage: data.discountPercentage
               ? safeInt(data.discountPercentage)
@@ -328,6 +345,12 @@ async function fetchRelatedProducts(
         price: safeDouble(data.price),
         currency: safeString(data.currency, "TL"),
         imageUrls: safeStringArray(data.imageUrls),
+        imageStoragePaths: Array.isArray(data.imageStoragePaths)
+          ? safeStringArray(data.imageStoragePaths)
+          : undefined,
+        colorImageStoragePaths: parseColorImageStoragePaths(
+          data.colorImageStoragePaths,
+        ),
         averageRating: safeDouble(data.averageRating),
         discountPercentage: data.discountPercentage
           ? safeInt(data.discountPercentage)

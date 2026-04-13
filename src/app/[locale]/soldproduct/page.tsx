@@ -257,7 +257,7 @@ export default function SoldProductsPage() {
         status.toLowerCase() as keyof typeof SHIPMENT_STATUSES
       ] || {
         color: isDarkMode ? "#9CA3AF" : "#6B7280",
-        bg: isDarkMode ? "#374151" : "#F3F4F6",
+        bg: isDarkMode ? "#2d2b40" : "#F3F4F6",
         icon: AlertCircle,
         label: status,
       }

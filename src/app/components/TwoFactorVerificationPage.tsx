@@ -116,7 +116,7 @@ export default function TwoFactorVerificationPage({
                 margin: 2,
                 color: {
                   dark: isDark ? "#FFFFFF" : "#000000",
-                  light: isDark ? "#1F2937" : "#FFFFFF",
+                  light: isDark ? "#252336" : "#FFFFFF",
                 },
               });
               setQrCodeDataUrl(qrDataUrl);
@@ -419,7 +419,7 @@ export default function TwoFactorVerificationPage({
         icon: "📋",
         style: {
           borderRadius: "10px",
-          background: "#374151",
+          background: "#2d2b40",
           color: "#fff",
         },
       });

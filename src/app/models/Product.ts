@@ -688,6 +688,16 @@ export class ProductUtils {
       }
     }
 
+    if (typeof patched.colorImageStoragePathsJson === "string") {
+      try {
+        patched.colorImageStoragePaths = JSON.parse(
+          patched.colorImageStoragePathsJson,
+        ) as unknown;
+      } catch {
+        // Leave colorImageStoragePaths as-is
+      }
+    }
+
     return ProductUtils._fromMap(patched, id, undefined, sourceCollection);
   }
 

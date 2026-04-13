@@ -317,7 +317,7 @@ function PasswordResetContent() {
 
 function PasswordResetLoading() {
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
+    <div className="min-h-screen bg-gray-50 dark:bg-surface flex items-center justify-center">
       <div className="w-6 h-6 border-[2px] border-orange-200 border-t-orange-500 rounded-full animate-spin" />
     </div>
   );

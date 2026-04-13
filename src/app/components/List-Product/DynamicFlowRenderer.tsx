@@ -178,7 +178,7 @@ export default function DynamicFlowRenderer({
     console.warn(`No component found for step: ${stepId}`);
     console.log("Available step IDs:", Object.keys(STEP_COMPONENTS));
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 dark:bg-surface flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-2">
             Step Not Available

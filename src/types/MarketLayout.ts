@@ -156,6 +156,8 @@ export interface PrefetchedProduct {
   id: string;
   productName: string;
   imageUrls: string[];
+  imageStoragePaths?: string[];
+  colorImageStoragePaths?: Record<string, string>;
   price: number;
   currency: string;
   condition?: string;

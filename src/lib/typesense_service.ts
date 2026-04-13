@@ -608,7 +608,7 @@ export class TypeSenseService {
     const defaultFields =
       "id,productName,price,originalPrice,discountPercentage,brandModel," +
       "category,subcategory,subsubcategory,gender,availableColors,colorImagesJson,colorQuantitiesJson," +
-      "shopId,imageUrls,currency,quantity,averageRating,reviewCount," +
+      "shopId,imageUrls,imageStoragePaths,colorImageStoragePathsJson,currency,quantity,averageRating,reviewCount," +
       "isBoosted,purchaseCount,deliveryOption,campaignName";
 
     const params = new URLSearchParams({

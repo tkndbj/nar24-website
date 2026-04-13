@@ -931,8 +931,8 @@ export default function ShopDetailPage() {
 
   const Skeleton = () => {
     const shimmer = `shimmer-effect ${isDarkMode ? "shimmer-effect-dark" : "shimmer-effect-light"}`;
-    const base = { backgroundColor: isDarkMode ? "#374151" : "#f3f4f6" };
-    const base2 = { backgroundColor: isDarkMode ? "#374151" : "#e5e7eb" };
+    const base = { backgroundColor: isDarkMode ? "#2d2b40" : "#f3f4f6" };
+    const base2 = { backgroundColor: isDarkMode ? "#2d2b40" : "#e5e7eb" };
     return (
       <div
         className={`rounded-lg overflow-hidden ${isDarkMode ? "bg-gray-800" : "bg-white"}`}

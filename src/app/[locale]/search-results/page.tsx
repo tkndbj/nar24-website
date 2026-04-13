@@ -110,8 +110,8 @@ function toSortCode(opt: SortOption): string {
 
 const LoadingShimmer: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => {
   const shimmer = `shimmer-effect ${isDarkMode ? "shimmer-effect-dark" : "shimmer-effect-light"}`;
-  const base = { backgroundColor: isDarkMode ? "#374151" : "#f3f4f6" };
-  const base2 = { backgroundColor: isDarkMode ? "#374151" : "#e5e7eb" };
+  const base = { backgroundColor: isDarkMode ? "#2d2b40" : "#f3f4f6" };
+  const base2 = { backgroundColor: isDarkMode ? "#2d2b40" : "#e5e7eb" };
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 lg:gap-4">
       {Array.from({ length: 8 }).map((_, i) => (

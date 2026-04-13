@@ -490,8 +490,8 @@ export default function BoughtProductsPage() {
     return (
       SHIPMENT_STATUSES[status.toLowerCase() as keyof typeof SHIPMENT_STATUSES] || {
         color: isDarkMode ? "#9CA3AF" : "#6B7280",
-        bg: isDarkMode ? "#374151" : "#F3F4F6",
-        darkBg: "#374151",
+        bg: isDarkMode ? "#2d2b40" : "#F3F4F6",
+        darkBg: "#2d2b40",
         icon: AlertCircle,
         label: status,
       }
