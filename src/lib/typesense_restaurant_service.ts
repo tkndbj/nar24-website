@@ -19,7 +19,7 @@ export interface RestaurantSearchPage {
   nbPages: number;
   total: number;
 }
-
+  
 export interface FoodSearchPage {
   items: Food[];
   ids: string[];

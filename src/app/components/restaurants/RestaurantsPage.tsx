@@ -16,6 +16,8 @@ import FoodLocationPicker from "./FoodLocationPicker";
 import RestaurantBanner from "./RestaurantBanner";
 import { useUser } from "@/context/UserProvider";
 import { FoodAddress } from "@/app/models/FoodAddress";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 interface RestaurantsPageProps {
   restaurants?: Restaurant[];
@@ -302,6 +304,63 @@ export default function RestaurantsPage({
 
   const pillsRef = useRef<HTMLDivElement>(null);
 
+  const fetchFromCache = useCallback(async (): Promise<boolean> => {
+    if (!deliveryFilterRegions?.length) return false;
+
+    const region = deliveryFilterRegions[0];
+    try {
+      const cacheDoc = await getDoc(doc(db, "food_cache", `region_${region}`));
+      if (!cacheDoc.exists()) return false;
+
+      const data = cacheDoc.data();
+      const rawList = (data.restaurants ?? []) as Record<string, unknown>[];
+      const totalInRegion = (data.restaurantCount as number) ?? rawList.length;
+
+      // If cache is incomplete, fall back to Typesense
+      if (rawList.length < totalInRegion) return false;
+
+      const restaurants: Restaurant[] = rawList.map((r) => ({
+        id: String(r.id ?? ""),
+        name: String(r.name ?? ""),
+        profileImageUrl: r.profileImageUrl ? String(r.profileImageUrl) : undefined,
+        cuisineTypes: Array.isArray(r.cuisineTypes) ? (r.cuisineTypes as string[]) : undefined,
+        foodType: Array.isArray(r.foodType) ? (r.foodType as string[]) : undefined,
+        averageRating: r.averageRating != null ? Number(r.averageRating) : undefined,
+        reviewCount: r.reviewCount != null ? Number(r.reviewCount) : undefined,
+        isActive: r.isActive === true,
+        workingDays: Array.isArray(r.workingDays) ? (r.workingDays as string[]) : undefined,
+        workingHours: (() => {
+          if (typeof r.workingHoursJson !== "string" || !r.workingHoursJson) return undefined;
+          try {
+            const parsed = JSON.parse(r.workingHoursJson);
+            if (parsed?.open && parsed?.close) return { open: parsed.open, close: parsed.close };
+          } catch { /* ignore */ }
+          return undefined;
+        })(),
+        minOrderPrices: (() => {
+          if (typeof r.minOrderPricesJson !== "string" || !r.minOrderPricesJson) return undefined;
+          try {
+            const parsed = JSON.parse(r.minOrderPricesJson);
+            if (Array.isArray(parsed)) return parsed;
+          } catch { /* ignore */ }
+          return undefined;
+        })(),
+      }));
+
+      const rawCuisines = (data.cuisineFacets ?? []) as Array<{ value: string; count: number }>;
+      const cuisines = rawCuisines.filter((f) => f.value && f.count > 0);
+
+      setFilteredRestaurants(restaurants);
+      setCuisineFacets(cuisines);
+      setHasMore(false);
+      initialLoadDone.current = true;
+      return true;
+    } catch (err) {
+      console.warn("[RestaurantsPage] Cache read failed:", err);
+      return false;
+    }
+  }, [deliveryFilterRegions]);
+
   // Show location picker on first visit if user is logged in but hasn't set foodAddress
   useEffect(() => {
     if (isUserLoading || locationPromptShown.current) return;
@@ -311,22 +370,30 @@ export default function RestaurantsPage({
     }
   }, [user, profileData, isUserLoading]);
 
-  // Fetch cuisine facets (with delivery region filter)
-  useEffect(() => {
-    if (isUserLoading) return;
-    const svc = TypeSenseServiceManager.instance.restaurantService;
-    svc
-      .fetchRestaurantFacets({ deliveryRegions: deliveryFilterRegions })
-      .then((facets) => {
-        setCuisineFacets(facets.cuisineTypes ?? []);
-      });
-  }, [isUserLoading, deliveryFilterRegions]);
+ // Fetch facets from Typesense only when filters are active (cache handles default view)
+ useEffect(() => {
+  if (isUserLoading) return;
+
+  const hasFilters =
+    searchQuery.trim() ||
+    selectedCuisine ||
+    selectedFoodType ||
+    sortOption !== "default";
+
+  if (!hasFilters) return; // Cache already set facets
+
+  const svc = TypeSenseServiceManager.instance.restaurantService;
+  svc
+    .fetchRestaurantFacets({ deliveryRegions: deliveryFilterRegions })
+    .then((facets) => {
+      setCuisineFacets(facets.cuisineTypes ?? []);
+    });
+}, [isUserLoading, deliveryFilterRegions, searchQuery, selectedCuisine, selectedFoodType, sortOption]);
 
   // Initial load + filter/search/sort changes — fetch page 0, replace results
   useEffect(() => {
     if (isUserLoading) return;
 
-    // Bump filter version to invalidate any in-flight load-more requests
     filterVersionRef.current += 1;
     currentPageRef.current = 0;
 
@@ -334,36 +401,53 @@ export default function RestaurantsPage({
     setIsLoading(true);
     setHasMore(false);
 
-    const svc = TypeSenseServiceManager.instance.restaurantService;
-    const query = searchQuery.trim();
-    const searchFn = query
-      ? svc.debouncedSearchRestaurants.bind(svc)
-      : svc.searchRestaurants.bind(svc);
+    const isDefaultView =
+      !searchQuery.trim() &&
+      !selectedCuisine &&
+      !selectedFoodType &&
+      sortOption === "default";
 
-    searchFn({
-      query: query || undefined,
-      cuisineTypes: selectedCuisine ? [selectedCuisine] : undefined,
-      foodType: selectedFoodType ? [selectedFoodType] : undefined,
-      isActive: true,
-      sort: sortOption,
-      hitsPerPage: HITS_PER_PAGE,
-      page: 0,
-      deliveryRegions: deliveryFilterRegions,
-    })
-      .then((result) => {
+    const run = async () => {
+      // Try cache for default view
+      if (isDefaultView) {
+        const cacheHit = await fetchFromCache();
+        if (!cancelled && cacheHit) {
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      // Fall back to Typesense
+      const svc = TypeSenseServiceManager.instance.restaurantService;
+      const query = searchQuery.trim();
+      const searchFn = query
+        ? svc.debouncedSearchRestaurants.bind(svc)
+        : svc.searchRestaurants.bind(svc);
+
+      try {
+        const result = await searchFn({
+          query: query || undefined,
+          cuisineTypes: selectedCuisine ? [selectedCuisine] : undefined,
+          foodType: selectedFoodType ? [selectedFoodType] : undefined,
+          isActive: true,
+          sort: sortOption,
+          hitsPerPage: HITS_PER_PAGE,
+          page: 0,
+          deliveryRegions: deliveryFilterRegions,
+        });
+
         if (!cancelled) {
           setFilteredRestaurants(result.items);
           setHasMore(result.page < result.nbPages - 1);
           initialLoadDone.current = true;
         }
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setIsLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
+      }
     };
+
+    run();
+    return () => { cancelled = true; };
   }, [
     selectedCuisine,
     selectedFoodType,
@@ -371,7 +455,9 @@ export default function RestaurantsPage({
     searchQuery,
     isUserLoading,
     deliveryFilterRegions,
+    fetchFromCache,
   ]);
+
 
   // Load next page — called by IntersectionObserver
   const loadMore = useCallback(() => {
