@@ -287,12 +287,12 @@ export default function MarketHeader({ className = "" }: MarketHeaderProps) {
         className="flex items-center flex-shrink-0 cursor-pointer"
       >
         <span
-          className={`${textSize} font-extrabold tracking-tight font-[family-name:var(--font-figtree)] ${isDark ? "text-white" : "text-gray-900"}`}
+          className={`${textSize} font-extrabold tracking-tight font-[family-name:var(--font-google-sans)] ${isDark ? "text-white" : "text-gray-900"}`}
         >
           Nar
         </span>
         <span
-          className={`${textSize} font-extrabold tracking-tight text-orange-500 font-[family-name:var(--font-figtree)]`}
+          className={`${textSize} font-extrabold tracking-tight text-orange-500 font-[family-name:var(--font-google-sans)]`}
         >
           24
         </span>

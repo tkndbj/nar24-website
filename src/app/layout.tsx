@@ -1,21 +1,11 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Figtree } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
-// Optimized font loading - only load weights that are actually used
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  weight: ["400", "500", "600", "700"], // Reduced from 9 weights to 4
-  display: "optional", // Prevents CLS from font swap
-  preload: true,
-});
-
-const figtree = Figtree({
-  subsets: ["latin"],
-  variable: "--font-figtree",
-  weight: ["400", "500", "600", "700"], // Reduced from 7 weights to 4
-  display: "optional", // Prevents CLS from font swap
+const googleSans = localFont({
+  src: "./fonts/GoogleSans_17pt-Regular.ttf",
+  variable: "--font-google-sans",
+  display: "swap",
   preload: true,
 });
 
@@ -56,7 +46,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html className={`${inter.variable} ${figtree.variable}`} suppressHydrationWarning>
+    <html className={googleSans.variable} suppressHydrationWarning>
       <head>
         {/* Theme script - must run before React to prevent flash */}
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
@@ -70,7 +60,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://algolia.net" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://algolia.net" />
       </head>
-      <body className={`${inter.className} antialiased`}>
+      <body className={`${googleSans.className} antialiased`}>
         {children}
       </body>
     </html>

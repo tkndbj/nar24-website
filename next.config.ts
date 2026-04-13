@@ -60,14 +60,14 @@ const securityHeaders = [
       // Scripts: self, inline (needed for Next.js), and trusted domains
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com https://accounts.google.com https://maps.googleapis.com https://www.googletagmanager.com https://www.google-analytics.com https://*.firebaseapp.com https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/",
 
-      // Styles: self, inline (needed for styled-components/tailwind), Google Fonts
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      // Styles: self, inline (needed for styled-components/tailwind)
+      "style-src 'self' 'unsafe-inline'",
 
       // Images: self, data URIs, blobs, and trusted domains
       "img-src 'self' data: blob: https://firebasestorage.googleapis.com https://storage.googleapis.com https://res.cloudinary.com https://*.googleapis.com https://*.gstatic.com https://*.google.com https://*.algolia.net",
 
-      // Fonts: self and Google Fonts
-      "font-src 'self' https://fonts.gstatic.com data:",
+      // Fonts: self only (self-hosted Google Sans)
+      "font-src 'self' data:",
 
       // Connect (API calls): self and all required services
       "connect-src 'self' https://*.googleapis.com https://*.google.com https://*.firebaseio.com https://*.cloudfunctions.net https://*.algolia.net https://*.algolia.com https://*.algolianet.com wss://*.firebaseio.com https://firebasestorage.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://*.google-analytics.com https://*.vercel-insights.com https://*.vercel-analytics.com https://sanalpos.isbank.com.tr https://*.isbank.com.tr https://recaptchaenterprise.googleapis.com",
