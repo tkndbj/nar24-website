@@ -11,10 +11,10 @@
 }
 
 :root.dark {
-  --background: #1e1c2e;
+  --background: #252336;
   --foreground: #ededed;
-  --surface: #1e1c2e;
-  --surface-2: #252336;
+  --surface: #252336;
+  --surface-2: #2d2b40;
 }
 
 @theme inline {
