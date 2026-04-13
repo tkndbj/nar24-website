@@ -682,7 +682,7 @@ const WarningDetail: React.FC<WarningDetailProps> = ({ parsedWarning, t }) => {
       </p>
       <div className="flex items-center gap-2">
         {/* Old Value */}
-        <div className="flex-1 p-2 bg-gray-200 dark:bg-surface-2 rounded-lg">
+        <div className="flex-1 p-2 bg-gray-200 dark:bg-surface rounded-lg">
           <p className="text-[9px] font-semibold text-gray-600 dark:text-gray-500 mb-0.5">
             {t('listProduct.validation.oldLabel')}  {/* ✅ Localized */}
           </p>
@@ -717,7 +717,7 @@ const ProductImage: React.FC<ProductImageProps> = ({ colorImage, product, size }
   if (!imageUrl) {
     return (
       <div
-        className="flex items-center justify-center bg-gray-200 dark:bg-surface-2 rounded-xl flex-shrink-0"
+        className="flex items-center justify-center bg-gray-200 dark:bg-surface rounded-xl flex-shrink-0"
         style={{ width: size, height: size }}
       >
         <ImageOffIcon className="w-6 h-6 text-gray-500" />
@@ -737,7 +737,7 @@ const ProductImage: React.FC<ProductImageProps> = ({ colorImage, product, size }
         const parent = target.parentElement;
         if (parent) {
           parent.innerHTML = `
-            <div class="w-full h-full flex items-center justify-center bg-gray-200 dark:bg-surface-2 rounded-xl">
+            <div class="w-full h-full flex items-center justify-center bg-gray-200 dark:bg-surface rounded-xl">
               <svg class="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
               </svg>

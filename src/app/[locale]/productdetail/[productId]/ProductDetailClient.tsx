@@ -501,7 +501,7 @@ export default function ProductDetailClient({
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             onClick={() => setShowSalesPausedDialog(false)}
           />
-          <div className="relative z-10 w-full max-w-sm mx-4 rounded-2xl overflow-hidden shadow-2xl bg-white dark:bg-surface-2">
+          <div className="relative z-10 w-full max-w-sm mx-4 rounded-2xl overflow-hidden shadow-2xl bg-white dark:bg-surface">
             <div className="px-6 py-5 bg-orange-50 dark:bg-gray-700">
               <div className="flex items-center space-x-3">
                 <div className="w-12 h-12 rounded-full flex items-center justify-center bg-orange-100 dark:bg-orange-500/20">

@@ -64,7 +64,7 @@ export default function ProductDescription({
   );
 
   return (
-    <div className="rounded-lg p-2 sm:p-3 border bg-white dark:bg-surface-2 border-gray-200 dark:border-gray-700">
+    <div className="rounded-lg p-2 sm:p-3 border bg-white dark:bg-surface border-gray-200 dark:border-gray-700">
       <div className="flex items-center justify-between mb-1.5 sm:mb-2">
         <h3 className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white">
           {t("productDescription")}
