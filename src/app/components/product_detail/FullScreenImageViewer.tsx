@@ -1,4 +1,4 @@
-// src/components/productdetail/FullScreenImageViewer.tsx
+// src/components/productdetail/FullScreenImageViewer.tsx.
 
 import React, { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
