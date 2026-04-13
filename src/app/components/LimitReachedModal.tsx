@@ -69,7 +69,7 @@ export default function LimitReachedModal({
       onClick={handleBackdropClick}
     >
       <div
-        className={`relative w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl transition-all duration-200 dark:bg-gray-800 ${
+        className={`relative w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl transition-all duration-200 dark:bg-surface-2 ${
           isAnimating ? "scale-100 opacity-100" : "scale-95 opacity-0"
         }`}
       >

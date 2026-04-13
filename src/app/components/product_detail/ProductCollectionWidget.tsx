@@ -47,7 +47,7 @@ const CollectionProductCard: React.FC<CollectionProductCardProps> = ({
     >
       {/* Product image */}
       <div
-        className="w-28 h-28 flex-shrink-0 relative bg-gray-100 dark:bg-gray-800"
+        className="w-28 h-28 flex-shrink-0 relative bg-gray-100 dark:bg-surface-2"
       >
         {product.imageUrls.length > 0 && !imageError ? (
           <Image
@@ -59,7 +59,7 @@ const CollectionProductCard: React.FC<CollectionProductCardProps> = ({
           />
         ) : (
           <div
-            className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800"
+            className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-surface-2"
           >
             <Package
               className="w-8 h-8 md:w-8 md:h-8 w-6 h-6 text-gray-400 dark:text-gray-600"
@@ -90,7 +90,7 @@ const CollectionProductCard: React.FC<CollectionProductCardProps> = ({
 
 const LoadingSkeleton: React.FC = () => (
   <div
-    className="rounded-2xl md:rounded-2xl rounded-none -mx-3 px-3 py-4 sm:mx-0 sm:p-6 border-0 sm:border shadow-none sm:shadow-sm bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-700"
+    className="rounded-2xl md:rounded-2xl rounded-none -mx-3 px-3 py-4 sm:mx-0 sm:p-6 border-0 sm:border shadow-none sm:shadow-sm bg-white border-gray-200 dark:bg-surface-2 dark:border-gray-700"
   >
     <div className="space-y-6 md:space-y-6 space-y-4">
       {/* Header skeleton */}
@@ -276,7 +276,7 @@ const ProductCollectionWidget: React.FC<ProductCollectionWidgetProps> = ({
 
   return (
     <div
-      className="rounded-2xl md:rounded-2xl rounded-none -mx-3 px-3 py-4 sm:mx-0 sm:p-6 border md:border border-0 shadow-sm md:shadow-sm shadow-none bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-700"
+      className="rounded-2xl md:rounded-2xl rounded-none -mx-3 px-3 py-4 sm:mx-0 sm:p-6 border md:border border-0 shadow-sm md:shadow-sm shadow-none bg-white border-gray-200 dark:bg-surface-2 dark:border-gray-700"
     >
       <div className="space-y-6 md:space-y-6 space-y-4">
         {/* Header */}

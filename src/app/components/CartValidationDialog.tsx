@@ -359,7 +359,7 @@ const CartValidationDialog: React.FC<CartValidationDialogProps> = ({
       />
 
       {/* Modal */}
-      <div className="relative w-full max-w-2xl max-h-[90vh] flex flex-col bg-white dark:bg-gray-900 rounded-3xl shadow-2xl overflow-hidden">
+      <div className="relative w-full max-w-2xl max-h-[90vh] flex flex-col bg-white dark:bg-surface rounded-3xl shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="px-5 pt-5 pb-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-start gap-3">
@@ -452,7 +452,7 @@ const CartValidationDialog: React.FC<CartValidationDialogProps> = ({
         </div>
 
         {/* Action Buttons */}
-        <div className="px-5 py-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+        <div className="px-5 py-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-surface">
           <div className="flex flex-col gap-3">
             {hasValidProducts && (
               <button
@@ -682,7 +682,7 @@ const WarningDetail: React.FC<WarningDetailProps> = ({ parsedWarning, t }) => {
       </p>
       <div className="flex items-center gap-2">
         {/* Old Value */}
-        <div className="flex-1 p-2 bg-gray-200 dark:bg-gray-800 rounded-lg">
+        <div className="flex-1 p-2 bg-gray-200 dark:bg-surface-2 rounded-lg">
           <p className="text-[9px] font-semibold text-gray-600 dark:text-gray-500 mb-0.5">
             {t('listProduct.validation.oldLabel')}  {/* ✅ Localized */}
           </p>
@@ -717,7 +717,7 @@ const ProductImage: React.FC<ProductImageProps> = ({ colorImage, product, size }
   if (!imageUrl) {
     return (
       <div
-        className="flex items-center justify-center bg-gray-200 dark:bg-gray-800 rounded-xl flex-shrink-0"
+        className="flex items-center justify-center bg-gray-200 dark:bg-surface-2 rounded-xl flex-shrink-0"
         style={{ width: size, height: size }}
       >
         <ImageOffIcon className="w-6 h-6 text-gray-500" />
@@ -737,7 +737,7 @@ const ProductImage: React.FC<ProductImageProps> = ({ colorImage, product, size }
         const parent = target.parentElement;
         if (parent) {
           parent.innerHTML = `
-            <div class="w-full h-full flex items-center justify-center bg-gray-200 dark:bg-gray-800 rounded-xl">
+            <div class="w-full h-full flex items-center justify-center bg-gray-200 dark:bg-surface-2 rounded-xl">
               <svg class="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
               </svg>

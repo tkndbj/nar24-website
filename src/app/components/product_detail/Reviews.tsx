@@ -387,7 +387,7 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
 
 const LoadingSkeleton: React.FC = () => (
   <div
-    className="rounded-none sm:rounded-none p-4 sm:p-6 border shadow-sm -mx-4 sm:mx-0 bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-700"
+    className="rounded-none sm:rounded-none p-4 sm:p-6 border shadow-sm -mx-4 sm:mx-0 bg-white border-gray-200 dark:bg-surface-2 dark:border-gray-700"
   >
     <div className="space-y-4 sm:space-y-6">
       {/* Header skeleton */}
@@ -593,7 +593,7 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
 
   return (
     <div
-      className="rounded-none sm:rounded-none p-4 sm:p-6 border shadow-sm -mx-4 sm:mx-0 bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-700"
+      className="rounded-none sm:rounded-none p-4 sm:p-6 border shadow-sm -mx-4 sm:mx-0 bg-white border-gray-200 dark:bg-surface-2 dark:border-gray-700"
     >
       <div className="space-y-4 sm:space-y-6">
         {/* Header */}

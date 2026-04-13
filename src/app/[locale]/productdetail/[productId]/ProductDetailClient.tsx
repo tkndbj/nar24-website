@@ -186,9 +186,9 @@ export default function ProductDetailClient({
   }, [salesPaused, cart]);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50 dark:bg-surface">
       {/* Sticky Header */}
-      <div className="sticky sticky-below-market-header-mobile lg:top-[calc(3.25rem+1px)] xl:top-[calc(3.5rem+1px)] z-[60] border-b transition-all duration-300 bg-white/95 dark:bg-gray-900 backdrop-blur-md border-gray-200 dark:border-gray-700">
+      <div className="sticky sticky-below-market-header-mobile lg:top-[calc(3.25rem+1px)] xl:top-[calc(3.5rem+1px)] z-[60] border-b transition-all duration-300 bg-white/95 dark:bg-surface backdrop-blur-md border-gray-200 dark:border-gray-700">
         <div className="w-full px-3 py-2 sm:max-w-6xl sm:mx-auto sm:px-4 sm:py-3">
           <div className="flex items-center justify-between gap-2">
             <button
@@ -501,7 +501,7 @@ export default function ProductDetailClient({
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             onClick={() => setShowSalesPausedDialog(false)}
           />
-          <div className="relative z-10 w-full max-w-sm mx-4 rounded-2xl overflow-hidden shadow-2xl bg-white dark:bg-gray-800">
+          <div className="relative z-10 w-full max-w-sm mx-4 rounded-2xl overflow-hidden shadow-2xl bg-white dark:bg-surface-2">
             <div className="px-6 py-5 bg-orange-50 dark:bg-gray-700">
               <div className="flex items-center space-x-3">
                 <div className="w-12 h-12 rounded-full flex items-center justify-center bg-orange-100 dark:bg-orange-500/20">

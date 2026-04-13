@@ -345,7 +345,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
 
               {/* Loading Overlay */}
               {!isMapLoaded && (
-                <div className="absolute inset-0 flex items-center justify-center bg-white dark:bg-gray-900">
+                <div className="absolute inset-0 flex items-center justify-center bg-white dark:bg-surface">
                   <div className="text-center">
                     <Loader2
                       size={32}

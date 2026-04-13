@@ -19,8 +19,8 @@ export default function Error({
   }, [error]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
-      <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 text-center">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-surface px-4">
+      <div className="max-w-md w-full bg-white dark:bg-surface-2 rounded-lg shadow-lg p-8 text-center">
         <div className="mb-6">
           <svg
             className="mx-auto h-16 w-16 text-red-500"

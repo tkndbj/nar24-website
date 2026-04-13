@@ -33,7 +33,7 @@ const AttributeCard: React.FC<AttributeCardProps> = ({
   icon,
 }) => (
   <div
-    className="group relative overflow-hidden rounded-md p-1.5 sm:p-2 border transition-all duration-200 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-orange-300 dark:hover:border-orange-500"
+    className="group relative overflow-hidden rounded-md p-1.5 sm:p-2 border transition-all duration-200 bg-white dark:bg-surface-2 border-gray-200 dark:border-gray-700 hover:border-orange-300 dark:hover:border-orange-500"
   >
     <div className="flex items-start gap-1 sm:gap-1.5">
       {icon && (
@@ -254,7 +254,7 @@ const DynamicAttributesWidget: React.FC<DynamicAttributesWidgetProps> = ({
   if (isLoading || !product) {
     return (
       <div
-        className="rounded-lg p-2 sm:p-3 border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
+        className="rounded-lg p-2 sm:p-3 border bg-white dark:bg-surface-2 border-gray-200 dark:border-gray-700"
       >
         <LoadingSkeleton />
       </div>
@@ -267,7 +267,7 @@ const DynamicAttributesWidget: React.FC<DynamicAttributesWidgetProps> = ({
 
   return (
     <div
-      className="rounded-lg p-2 sm:p-3 border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
+      className="rounded-lg p-2 sm:p-3 border bg-white dark:bg-surface-2 border-gray-200 dark:border-gray-700"
     >
       <div className="space-y-2">
         {/* Header */}

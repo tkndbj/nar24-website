@@ -33,7 +33,7 @@ interface ProductDetailSellerInfoProps {
 
 const LoadingSkeleton: React.FC = () => (
   <div
-    className="rounded-2xl p-6 border animate-pulse bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
+    className="rounded-2xl p-6 border animate-pulse bg-white dark:bg-surface-2 border-gray-200 dark:border-gray-700"
   >
     <div className="flex items-center gap-4">
       <div
@@ -184,7 +184,7 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
 
   return (
     <div
-      className={`rounded-2xl p-4 md:p-6 border shadow-sm transition-all duration-200 hover:shadow-md bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700`}
+      className={`rounded-2xl p-4 md:p-6 border shadow-sm transition-all duration-200 hover:shadow-md bg-white dark:bg-surface-2 border-gray-200 dark:border-gray-700`}
     >
       <button
         onClick={handleSellerClick}

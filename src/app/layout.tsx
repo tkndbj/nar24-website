@@ -2,9 +2,9 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 
-const googleSans = localFont({
-  src: "./fonts/GoogleSans_17pt-Regular.ttf",
-  variable: "--font-google-sans",
+const figtree = localFont({
+  src: "./fonts/Figtree-Regular.ttf",
+  variable: "--font-figtree",
   display: "swap",
   preload: true,
 });
@@ -46,7 +46,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html className={googleSans.variable} suppressHydrationWarning>
+    <html className={figtree.variable} suppressHydrationWarning>
       <head>
         {/* Theme script - must run before React to prevent flash */}
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
@@ -60,7 +60,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://algolia.net" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://algolia.net" />
       </head>
-      <body className={`${googleSans.className} antialiased`}>
+      <body className={`${figtree.className} antialiased`}>
         {children}
       </body>
     </html>

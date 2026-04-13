@@ -694,7 +694,7 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
           <LoadingSkeleton />
         ) : reviews.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 md:py-20">
-            <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-3 md:mb-4">
+            <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-gray-100 dark:bg-surface-2 flex items-center justify-center mb-3 md:mb-4">
               <Star className="w-10 h-10 md:w-12 md:h-12 text-gray-400" />
             </div>
             <h2 className={`text-lg md:text-xl font-semibold mb-2 ${colors.text}`}>
