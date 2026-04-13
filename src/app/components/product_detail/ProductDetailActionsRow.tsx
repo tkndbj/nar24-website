@@ -144,7 +144,7 @@ const TrustBadge: React.FC<TrustBadgeProps> = ({
   title,
   value,
 }) => (
-  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-50 dark:bg-surface border border-gray-200 dark:border-gray-700">
+  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-50 dark:bg-surface-2 border border-gray-200 dark:border-gray-700">
     <div className="text-orange-600 dark:text-orange-400">
       {icon}
     </div>

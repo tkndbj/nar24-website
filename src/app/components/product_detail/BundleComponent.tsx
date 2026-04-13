@@ -307,7 +307,7 @@ const BundleComponent: React.FC<BundleComponentProps> = ({
   if (isLoading) {
     return (
       <div
-        className="rounded-2xl sm:rounded-xl p-4 sm:p-6 border shadow-sm bg-white border-gray-200 dark:bg-surface dark:border-gray-700"
+        className="rounded-2xl sm:rounded-xl p-4 sm:p-6 border shadow-sm bg-white border-gray-200 dark:bg-surface-2 dark:border-gray-700"
       >
         <div className="flex items-center justify-center h-32">
           <div className="w-8 h-8 border-2 border-orange-600 border-t-transparent rounded-full animate-spin" />
@@ -322,7 +322,7 @@ const BundleComponent: React.FC<BundleComponentProps> = ({
 
   return (
     <div
-      className="rounded-none sm:rounded-2xl p-4 sm:p-6 border shadow-sm -mx-4 sm:mx-0 bg-white border-gray-200 dark:bg-surface dark:border-gray-700"
+      className="rounded-none sm:rounded-2xl p-4 sm:p-6 border shadow-sm -mx-4 sm:mx-0 bg-white border-gray-200 dark:bg-surface-2 dark:border-gray-700"
     >
       <div className="space-y-4 sm:space-y-6">
         {/* Header */}

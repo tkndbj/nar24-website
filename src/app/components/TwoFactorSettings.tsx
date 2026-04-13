@@ -43,7 +43,7 @@ export default function TwoFactorSettings({
   return (
     <div className={`space-y-6 ${className}`}>
       {/* 2FA Status Card */}
-      <div className="bg-white dark:bg-surface rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+      <div className="bg-white dark:bg-surface-2 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
         <div className="flex items-start justify-between">
           <div className="flex items-start space-x-4">
             <div

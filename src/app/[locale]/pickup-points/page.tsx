@@ -485,7 +485,7 @@
 //         {/* Loading Overlay */}
 //         {isLoading && (
 //           <div className="absolute inset-0 bg-black/30 flex items-center justify-center z-10">
-//             <div className="bg-white dark:bg-surface rounded-lg p-6 shadow-xl">
+//             <div className="bg-white dark:bg-surface-2 rounded-lg p-6 shadow-xl">
 //               <div className="flex items-center space-x-3">
 //                 <div className="animate-spin w-6 h-6 border-3 border-orange-500 border-t-transparent rounded-full"></div>
 //                 <span className={isDarkMode ? "text-white" : "text-gray-900"}>

@@ -20,7 +20,7 @@ export default function Error({
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-surface px-4">
-      <div className="max-w-md w-full bg-white dark:bg-surface rounded-lg shadow-lg p-8 text-center">
+      <div className="max-w-md w-full bg-white dark:bg-surface-2 rounded-lg shadow-lg p-8 text-center">
         <div className="mb-6">
           <svg
             className="mx-auto h-16 w-16 text-red-500"
