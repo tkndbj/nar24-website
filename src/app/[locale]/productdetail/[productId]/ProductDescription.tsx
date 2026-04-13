@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Languages, AlertCircle, X } from "lucide-react";
+import { Languages, AlertCircle } from "lucide-react";
 
 interface ProductDescriptionProps {
   description: string;
@@ -22,7 +22,7 @@ export default function ProductDescription({
   onToggleTranslation,
   t,
 }: ProductDescriptionProps) {
-  const [showModal, setShowModal] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   const displayText = isTranslated ? translatedText : description;
   const isLong = description.length > 250;
@@ -64,91 +64,50 @@ export default function ProductDescription({
   );
 
   return (
-    <>
-      <div className="rounded-lg p-2 sm:p-3 border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-        <div className="flex items-center justify-between mb-1.5 sm:mb-2">
-          <h3 className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white">
-            {t("productDescription")}
-          </h3>
-          {translationButton}
-        </div>
+    <div className="rounded-lg p-2 sm:p-3 border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+      <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+        <h3 className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white">
+          {t("productDescription")}
+        </h3>
+        {translationButton}
+      </div>
 
-        <div className="relative">
-          {isTranslating ? (
-            shimmerLines(Math.min(Math.ceil(description.length / 60), 5))
-          ) : (
-            <>
-              <p className="leading-relaxed text-xs sm:text-sm text-gray-700 dark:text-gray-300 line-clamp-[6]">
-                {displayText}
-              </p>
-              {isLong && !isTranslating && (
-                <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-white dark:from-gray-800 via-white/80 dark:via-gray-800/80 to-transparent pointer-events-none" />
-              )}
-            </>
-          )}
-        </div>
-
-        {translationError && !isTranslating && (
-          <div className="flex items-center gap-1.5 mt-2 text-xs text-red-500 dark:text-red-400">
-            <AlertCircle className="w-3 h-3" />
-            <span>{translationError}</span>
-          </div>
-        )}
-
-        {isLong && !isTranslating && (
-          <button
-            onClick={() => setShowModal(true)}
-            className="mt-2 text-xs sm:text-sm font-semibold text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 transition-colors"
-          >
-            {t("readAll") || "Read All"}
-          </button>
+      <div className="relative">
+        {isTranslating ? (
+          shimmerLines(Math.min(Math.ceil(description.length / 60), 5))
+        ) : (
+          <>
+            <p
+              className={`leading-relaxed text-xs sm:text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap ${
+                expanded ? "" : "line-clamp-[6]"
+              }`}
+            >
+              {displayText}
+            </p>
+            {isLong && !isTranslating && !expanded && (
+              <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-white dark:from-gray-800 via-white/80 dark:via-gray-800/80 to-transparent pointer-events-none" />
+            )}
+          </>
         )}
       </div>
 
-      {/* Description Modal */}
-      {showModal && (
-        <>
-          <div
-            className="fixed inset-0 z-[999]"
-            onClick={() => setShowModal(false)}
-          />
-          <div className="fixed top-20 right-4 z-[1000] max-w-md w-[calc(100vw-2rem)]">
-            <div className="rounded-lg shadow-2xl border overflow-hidden bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 animate-slideInFromTop">
-              <div className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white">
-                  {t("productDescription")}
-                </h3>
-                <div className="flex items-center gap-2">
-                  {translationButton}
-                  <button
-                    onClick={() => setShowModal(false)}
-                    className="p-1 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-              <div className="p-3 max-h-[70vh] overflow-y-auto text-gray-700 dark:text-gray-300">
-                {isTranslating ? (
-                  shimmerLines(Math.min(Math.ceil(description.length / 50), 8))
-                ) : (
-                  <>
-                    <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap">
-                      {displayText}
-                    </p>
-                    {translationError && (
-                      <div className="flex items-center gap-1.5 mt-3 text-xs text-red-500 dark:text-red-400">
-                        <AlertCircle className="w-3 h-3" />
-                        <span>{translationError}</span>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        </>
+      {translationError && !isTranslating && (
+        <div className="flex items-center gap-1.5 mt-2 text-xs text-red-500 dark:text-red-400">
+          <AlertCircle className="w-3 h-3" />
+          <span>{translationError}</span>
+        </div>
       )}
-    </>
+
+      {isLong && !isTranslating && (
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-2 text-xs sm:text-sm font-semibold text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 transition-colors"
+        >
+          {expanded
+            ? t("showLess") || "Show Less"
+            : t("readAll") || "Read All"}
+        </button>
+      )}
+    </div>
   );
 }

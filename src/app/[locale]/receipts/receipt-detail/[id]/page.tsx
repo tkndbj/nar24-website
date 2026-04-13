@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useUser } from "@/context/UserProvider";
 import {
@@ -23,8 +23,6 @@ import {
   QrCode,
   RefreshCw,
   X,
-  Mail,
-  Send,
   FileText,
   Package,
   Info,
@@ -52,6 +50,7 @@ interface Receipt {
   paymentMethod: string;
   deliveryOption: string;
   receiptUrl?: string;
+  filePath?: string;
   itemsSubtotal: number;
   deliveryPrice: number;
   originalDeliveryPrice: number;
@@ -100,13 +99,9 @@ export default function ReceiptDetailPage() {
   );
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
   const [isRetryingQR, setIsRetryingQR] = useState(false);
-  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
-  const [emailAddress, setEmailAddress] = useState("");
-  const [isSendingEmail, setIsSendingEmail] = useState(false);
 
   const { user, isLoading: authLoading } = useUser();
   const router = useRouter();
-  const emailInputRef = useRef<HTMLInputElement>(null);
   const t = useTranslations();
   const l = (key: string) => t(key) || key.split(".").pop() || key;
 
@@ -155,6 +150,7 @@ export default function ReceiptDetailPage() {
           paymentMethod: rd.paymentMethod || "",
           deliveryOption: rd.deliveryOption || "",
           receiptUrl: rd.receiptUrl,
+          filePath: rd.filePath,
           itemsSubtotal: rd.itemsSubtotal || rd.totalPrice || 0,
           deliveryPrice: rd.deliveryPrice || 0,
           originalDeliveryPrice:
@@ -189,11 +185,6 @@ export default function ReceiptDetailPage() {
             };
           }),
         );
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        if (userDoc.exists()) {
-          const ud = userDoc.data();
-          setEmailAddress(ud.email || user.email || "");
-        }
       } catch (error) {
         console.error("Error fetching receipt details:", error);
       } finally {
@@ -245,32 +236,6 @@ export default function ReceiptDetailPage() {
     } else window.open(deliveryQRUrl, "_blank");
   };
 
-  // Email functions
-  const sendReceiptByEmail = async () => {
-    if (!receipt || !emailAddress.trim()) return;
-    setIsSendingEmail(true);
-    try {
-      const { getFunctions, httpsCallable } =
-        await import("firebase/functions");
-      const functions = getFunctions(undefined, "europe-west3");
-      const sendEmail = httpsCallable(functions, "sendReceiptEmail");
-      const result = await sendEmail({
-        receiptId: receipt.receiptId,
-        orderId: receipt.orderId,
-        email: emailAddress,
-      });
-      if ((result.data as { success: boolean }).success) {
-        setIsEmailModalOpen(false);
-        alert(l("ReceiptDetail.receiptSentSuccessfully") || "Receipt sent!");
-      } else throw new Error("Failed");
-    } catch (error) {
-      console.error("Error sending receipt email:", error);
-      alert(l("ReceiptDetail.failedToSendEmail") || "Failed to send email.");
-    } finally {
-      setIsSendingEmail(false);
-    }
-  };
-
   // Utility
   const formatDate = (ts: Date) =>
     `${ts.getDate().toString().padStart(2, "0")}/${(ts.getMonth() + 1).toString().padStart(2, "0")}/${ts.getFullYear()} ${ts.getHours().toString().padStart(2, "0")}:${ts.getMinutes().toString().padStart(2, "0")}`;
@@ -306,9 +271,27 @@ export default function ReceiptDetailPage() {
     }
   };
 
-  const downloadReceipt = () => {
-    if (receipt?.receiptUrl) window.open(receipt.receiptUrl, "_blank");
-    else alert(l("ReceiptDetail.receiptPdfNotAvailable") || "Not available");
+  const downloadReceipt = async () => {
+    try {
+      let url = receipt?.receiptUrl;
+      if (!url && receipt?.filePath) {
+        const { getStorage, ref, getDownloadURL } =
+          await import("firebase/storage");
+        const storage = getStorage();
+        url = await getDownloadURL(ref(storage, receipt.filePath));
+      }
+      if (url) {
+        window.open(url, "_blank");
+      } else {
+        alert(
+          l("ReceiptDetail.receiptPdfNotAvailable") || "PDF not available yet.",
+        );
+      }
+    } catch {
+      alert(
+        l("ReceiptDetail.receiptPdfNotAvailable") || "PDF not available yet.",
+      );
+    }
   };
   const copyOrderId = () => {
     if (receipt) {
@@ -537,13 +520,8 @@ export default function ReceiptDetailPage() {
                 onClick: () => setIsQRModalOpen(true),
                 title: "QR",
               },
-              {
-                icon: Mail,
-                onClick: () => setIsEmailModalOpen(true),
-                title: "Email",
-              },
               { icon: Share2, onClick: shareReceipt, title: "Share" },
-              ...(receipt.receiptUrl
+              ...(receipt.receiptUrl || receipt.filePath
                 ? [
                     {
                       icon: Download,
@@ -946,129 +924,6 @@ export default function ReceiptDetailPage() {
         </div>
       )}
 
-      {/* Email Modal */}
-      {isEmailModalOpen && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div
-            className={`w-full max-w-sm rounded-2xl shadow-2xl ${isDarkMode ? "bg-gray-800" : "bg-white"}`}
-          >
-            <div
-              className={`flex items-center justify-between p-4 border-b ${isDarkMode ? "border-gray-700" : "border-gray-100"}`}
-            >
-              <div className="flex items-center gap-2">
-                <div
-                  className={`w-8 h-8 rounded-xl flex items-center justify-center ${isDarkMode ? "bg-orange-900/30" : "bg-orange-50"}`}
-                >
-                  <Mail className="w-4 h-4 text-orange-500" />
-                </div>
-                <div>
-                  <h3
-                    className={`text-sm font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}
-                  >
-                    {l("ReceiptDetail.sendReceiptByEmail") || "Send by Email"}
-                  </h3>
-                  <p
-                    className={`text-[11px] ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
-                  >
-                    {l("ReceiptDetail.receiptWillBeSentToEmail") ||
-                      "Receipt will be sent to email below"}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => !isSendingEmail && setIsEmailModalOpen(false)}
-                className={`w-8 h-8 flex items-center justify-center rounded-lg ${isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
-              >
-                <X
-                  className={`w-4 h-4 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
-                />
-              </button>
-            </div>
-
-            <div className="p-4 space-y-3">
-              <div>
-                <label
-                  className={`text-[11px] font-semibold uppercase tracking-wider mb-1 block ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
-                >
-                  {l("ReceiptDetail.emailAddress") || "Email"}
-                </label>
-                <div
-                  className={`flex items-center rounded-xl border ${isDarkMode ? "bg-gray-700 border-gray-600" : "bg-gray-50 border-gray-200"}`}
-                >
-                  <Mail
-                    className={`w-4 h-4 ml-3 ${isDarkMode ? "text-gray-400" : "text-gray-400"}`}
-                  />
-                  <input
-                    ref={emailInputRef}
-                    type="email"
-                    value={emailAddress}
-                    onChange={(e) => setEmailAddress(e.target.value)}
-                    placeholder={
-                      l("ReceiptDetail.enterEmailAddress") || "Enter email"
-                    }
-                    className={`flex-1 px-3 py-2.5 bg-transparent outline-none text-sm ${isDarkMode ? "text-white placeholder-gray-500" : "text-gray-900 placeholder-gray-400"}`}
-                  />
-                </div>
-              </div>
-
-              <div
-                className={`rounded-xl p-3 border ${isDarkMode ? "bg-orange-900/10 border-orange-700/30" : "bg-orange-50 border-orange-100"}`}
-              >
-                <div className="flex items-center gap-2">
-                  <div
-                    className={`w-7 h-7 rounded-lg flex items-center justify-center ${isDarkMode ? "bg-orange-900/30" : "bg-orange-100"}`}
-                  >
-                    <FileText className="w-3.5 h-3.5 text-orange-500" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p
-                      className={`text-xs font-semibold ${isDarkMode ? "text-white" : "text-gray-900"}`}
-                    >
-                      {l("ReceiptDetail.receipt") || "Receipt"} #
-                      {receipt.receiptId.substring(0, 8).toUpperCase()}
-                    </p>
-                    <p
-                      className={`text-[11px] ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
-                    >
-                      {l("ReceiptDetail.orders") || "Order"} #
-                      {receipt.orderId.substring(0, 8).toUpperCase()}
-                    </p>
-                  </div>
-                  <span className="text-xs font-bold text-orange-500">
-                    {receipt.totalPrice.toFixed(0)} {receipt.currency}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div
-              className={`flex gap-2 p-4 border-t ${isDarkMode ? "border-gray-700" : "border-gray-100"}`}
-            >
-              <button
-                onClick={() => !isSendingEmail && setIsEmailModalOpen(false)}
-                disabled={isSendingEmail}
-                className={`flex-1 py-2.5 rounded-xl text-xs font-medium transition-colors disabled:opacity-50 ${isDarkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
-              >
-                {l("ReceiptDetail.cancel") || "Cancel"}
-              </button>
-              <button
-                onClick={sendReceiptByEmail}
-                disabled={isSendingEmail || !emailAddress.trim()}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-medium bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50 transition-colors"
-              >
-                {isSendingEmail ? (
-                  <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : (
-                  <>
-                    <Send className="w-3.5 h-3.5" />
-                    {l("ReceiptDetail.sendEmail") || "Send"}
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
