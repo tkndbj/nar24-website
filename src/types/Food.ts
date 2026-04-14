@@ -19,6 +19,7 @@ export interface Food {
   foodCategory: string;
   foodType: string;
   imageUrl?: string;
+  imageStoragePath?: string;
   isAvailable: boolean;
   preparationTime?: number;
   price: number;

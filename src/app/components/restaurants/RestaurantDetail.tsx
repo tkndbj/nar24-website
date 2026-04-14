@@ -40,6 +40,8 @@ import RestaurantReviews from "./RestaurantReviews";
 import LoginModal from "@/app/components/LoginModal";
 import FoodLocationPicker from "./FoodLocationPicker";
 import { useUser } from "@/context/UserProvider";
+import CloudinaryImage from "../CloudinaryImage";
+import { CloudinaryUrl } from "@/utils/cloudinaryUrl";
 
 interface RestaurantDetailProps {
   restaurant: Restaurant | null;
@@ -81,13 +83,12 @@ function RestaurantHeader({
         <div className="flex items-start gap-4">
           {/* Profile image */}
           <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden border-2 border-white shadow-md flex-shrink-0 dark:border-gray-700">
-            {restaurant.profileImageUrl ? (
-              <Image
-                src={restaurant.profileImageUrl}
+          {(restaurant.profileImageStoragePath || restaurant.profileImageUrl) ? (
+              <CloudinaryImage.Banner
+                source={restaurant.profileImageStoragePath || restaurant.profileImageUrl!}
+                cdnWidth={200}
+                fit="cover"
                 alt={restaurant.name}
-                width={80}
-                height={80}
-                className="object-cover w-full h-full"
               />
             ) : (
               <div
@@ -223,13 +224,14 @@ function FoodImageLightbox({
         onClick={(e) => e.stopPropagation()}
       >
         <Image
-          src={src}
+          src={CloudinaryUrl.bannerCdn(src, 1600)}
           alt={alt}
           width={800}
           height={800}
           className="object-contain max-h-[85vh] rounded-2xl"
           sizes="90vw"
           priority
+          unoptimized
         />
       </div>
     </div>,
@@ -384,23 +386,22 @@ function FoodCard({
         {/* Food image — only shown when available */}
         {food.imageUrl && (
           <button
-            type="button"
-            onClick={() => setLightboxOpen(true)}
-            className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-xl overflow-hidden flex-shrink-0 cursor-zoom-in"
-          >
-            <Image
-              src={food.imageUrl}
-              alt={food.name}
-              fill
-              className="object-cover"
-              sizes="128px"
-            />
-            {isDiscountActive && food.discount && (
-              <div className="absolute top-1.5 left-1.5 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md shadow-sm">
-                -{food.discount.percentage}%
-              </div>
-            )}
-          </button>
+          type="button"
+          onClick={() => setLightboxOpen(true)}
+          className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-xl overflow-hidden flex-shrink-0 cursor-zoom-in"
+        >
+          <CloudinaryImage.Banner
+            source={food.imageStoragePath || food.imageUrl!}
+            cdnWidth={400}
+            fit="cover"
+            alt={food.name}
+          />
+          {isDiscountActive && food.discount && (
+            <div className="absolute top-1.5 left-1.5 z-10 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md shadow-sm">
+              -{food.discount.percentage}%
+            </div>
+          )}
+        </button>
         )}
 
         {/* Food info */}
@@ -538,10 +539,10 @@ function FoodCard({
         allowedExtras={food.extras}
         isDarkMode={isDarkMode}
       />
-
-      {lightboxOpen && food.imageUrl && (
+      
+{lightboxOpen && food.imageUrl && (
         <FoodImageLightbox
-          src={food.imageUrl}
+          src={food.imageStoragePath || food.imageUrl}
           alt={food.name}
           onClose={() => setLightboxOpen(false)}
         />

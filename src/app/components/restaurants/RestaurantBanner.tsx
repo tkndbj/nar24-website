@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useLocale } from "next-intl";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
+import CloudinaryImage from "../CloudinaryImage";
 import { db } from "@/lib/firebase";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -79,7 +79,8 @@ export default function RestaurantBanner() {
             const data = d.data();
             return {
               id: d.id,
-              imageUrl: (data.imageUrl as string) ?? "",
+              imageUrl: (data.imageStoragePath as string) ||
+                (data.imageUrl as string) || "",
               title: (data.title as string) ?? "",
               linkedRestaurantId: (data.linkedRestaurantId as string) || undefined,
             };
@@ -135,8 +136,7 @@ export default function RestaurantBanner() {
           style={{
             opacity: i === current ? 1 : 0,
             transform: i === current ? "scale(1)" : "scale(1.05)",
-            transition:
-              "opacity 600ms ease-in-out, transform 600ms ease-in-out",
+            transition: "opacity 600ms ease-in-out, transform 600ms ease-in-out",
             pointerEvents: i === current ? "auto" : "none",
           }}
           onClick={() => {
@@ -145,14 +145,13 @@ export default function RestaurantBanner() {
             }
           }}
         >
-          <Image
-            src={banner.imageUrl}
-            alt={banner.title || `Banner ${i + 1}`}
-            fill
-            className="object-cover"
+          <CloudinaryImage.Banner
+            source={banner.imageUrl}
+            cdnWidth={1600}
+            fit="cover"
             priority={i === 0}
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 90vw, 1400px"
-            unoptimized // required for external Firebase Storage URLs
+            alt={banner.title || `Banner ${i + 1}`}
           />
         </div>
       ))}
