@@ -104,7 +104,7 @@ export default function ShopCard({ shop, isDarkMode }: ShopCardProps) {
 const profileSource = shop.profileImageStoragePath ||
   shop.profileImageUrl || '';
   const [isFavorite, setIsFavorite] = useState(false);
-  const [imageError, setImageError] = useState(false);
+  const [imageError, ] = useState(false);
   const [lastNavigationTime, setLastNavigationTime] = useState<number>(0);
 
   const t = useTranslations();
