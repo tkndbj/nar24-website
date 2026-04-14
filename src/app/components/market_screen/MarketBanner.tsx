@@ -347,8 +347,6 @@ export default function MarketBannerGrid({ initialData }: { initialData?: Prefet
     <CloudinaryImage.Banner
       source={banner.url}
       cdnWidth={1600}
-      width={800}
-      height={320}
       fit="cover"
       sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
       alt={`Banner ${banner.id}`}
