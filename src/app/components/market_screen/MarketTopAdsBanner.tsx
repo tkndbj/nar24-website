@@ -313,11 +313,6 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
     setCurrentIndex((prev) => (prev + 1) % banners.length);
   }, [banners.length]);
 
-  // ✅ OPTIMIZED: Image error handler
-  const handleImageError = useCallback((index: number) => {
-    setImageErrors(prev => new Set(prev).add(index));
-  }, []);
-
   // Cleanup on unmount
   useEffect(() => {
     return () => {

@@ -290,23 +290,6 @@ export default function MarketBannerGrid({ initialData }: { initialData?: Prefet
     }
   }, []);
 
-  const handleImageLoad = useCallback((imageId: string) => {
-    setLoadingImages((prev) => {
-      const newSet = new Set(prev);
-      newSet.delete(imageId);
-      return newSet;
-    });
-  }, []);
-
-  const handleImageError = useCallback((imageId: string) => {
-    setImageErrors((prev) => new Set(prev).add(imageId));
-    setLoadingImages((prev) => {
-      const newSet = new Set(prev);
-      newSet.delete(imageId);
-      return newSet;
-    });
-  }, []);
-
   // Error state (matches Flutter: empty + error)
   if (error && banners.length === 0) {
     return (
