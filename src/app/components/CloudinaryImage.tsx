@@ -273,14 +273,14 @@ function Product({ source, size, ...rest }: ProductProps) {
 // Mirrors Flutter's CloudinaryImage.fromUrl factory.
 
 interface BannerProps extends BaseProps {
-  /** Full image URL (e.g. from Firestore banner doc) */
-  url: string;
+  /** Storage path OR legacy full URL */
+  source: string;
   /** CDN width to request from Cloudinary */
   cdnWidth: number;
 }
 
-function Banner({ url, cdnWidth, ...rest }: BannerProps) {
-  if (!url) {
+function Banner({ source, cdnWidth, ...rest }: BannerProps) {
+  if (!source) {
     return (
       rest.errorWidget ?? (
         <DefaultError width={rest.width} height={rest.height} />
@@ -288,10 +288,9 @@ function Banner({ url, cdnWidth, ...rest }: BannerProps) {
     );
   }
 
-  const cdnUrl = CloudinaryUrl.fromUrl(url, cdnWidth);
-  const fallback = cdnUrl !== url ? url : null;
+  const { primary, fallback } = CloudinaryUrl.resolveBanner(source, cdnWidth);
 
-  return <CoreImage primary={cdnUrl} fallback={fallback} {...rest} />;
+  return <CoreImage primary={primary} fallback={fallback} {...rest} />;
 }
 
 // ── CloudinaryImage.Compat ──────────────────────────────────────────

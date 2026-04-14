@@ -9,7 +9,8 @@ import React, {
 } from "react";
 import { getFirebaseDb } from "@/lib/firebase-lazy";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
+import { CloudinaryUrl } from "@/utils/cloudinaryUrl";
+import CloudinaryImage from "../CloudinaryImage";
 import type { PrefetchedBannerItem } from "@/types/MarketLayout";
 
 interface BannerItem {
@@ -52,7 +53,7 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
     if (!initialData || initialData.length === 0) return [];
     return initialData.map((item) => ({
       id: item.id,
-      url: item.imageUrl,
+      url: item.imageStoragePath || item.imageUrl,
       color: convertDominantColor(item.dominantColor),
       linkType: item.linkType,
       linkId: item.linkedShopId || item.linkedProductId,
@@ -153,27 +154,30 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
 
         snapshot.docs.forEach((doc, index) => {
           const data = doc.data();
-          const url = data.imageUrl as string;
-
-          if (!url) return;
-
+          // ✅ Prefer storage path, fall back to URL
+          const source = (data.imageStoragePath as string) ||
+            (data.imageUrl as string) || "";
+        
+          if (!source) return;
+        
           const color = convertDominantColor(data.dominantColor as number);
           const linkId = data.linkedShopId || data.linkedProductId;
-
+        
           items.push({
             id: doc.id,
-            url,
+            url: source,
             color,
             linkType: data.linkType as string | undefined,
             linkId: linkId as string | undefined,
           });
-
-          if (!cachedUrls.current.has(url)) {
-            cachedUrls.current.add(url);
+        
+          // Prefetch with CDN URL
+          if (!cachedUrls.current.has(source)) {
+            cachedUrls.current.add(source);
             if (index > 0) {
               setTimeout(() => {
                 const img = new window.Image();
-                img.src = url;
+                img.src = CloudinaryUrl.bannerCdn(source, 1600);
               }, index * 100);
             }
           }
@@ -361,18 +365,22 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
             >
               {/* ✅ RESTORED: Original image rendering */}
               {isAdjacent && !hasError ? (
-                <Image
-                  src={banner.url}
-                  alt={`Banner ${index + 1}`}
-                  fill
-                  className="object-fill"
-                  priority={index === 0}
-                  sizes="(min-width: 600px) 90vw, 100vw"
-                  quality={isActive ? 85 : 75}
-                  loading={index === 0 ? "eager" : "lazy"}
-                  onError={() => handleImageError(index)}
-                />
-              ) : hasError ? (
+  <CloudinaryImage.Banner
+    source={banner.url}
+    cdnWidth={1600}
+    fit="fill"
+    priority={index === 0}
+    sizes="(min-width: 600px) 90vw, 100vw"
+    alt={`Banner ${index + 1}`}
+    errorWidget={
+      <div className="absolute inset-0 bg-transparent flex items-center justify-center">
+        <svg className="text-gray-400 w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+      </div>
+    }
+  />
+) : hasError ? (
                 // Error placeholder
                 <div className="absolute inset-0 bg-transparent flex items-center justify-center">
                   <svg

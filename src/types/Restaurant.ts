@@ -15,6 +15,7 @@ export interface Restaurant {
   contactNo?: string;
   coverImageUrls?: string[];
   profileImageUrl?: string;
+  profileImageStoragePath?: string;
   followerCount?: number;
   isActive?: boolean;
   isBoosted?: boolean;

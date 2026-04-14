@@ -110,6 +110,7 @@ export const VALID_WIDGET_TYPES: readonly WidgetType[] = [
 export interface PrefetchedBannerItem {
   id: string;
   imageUrl: string;
+  imageStoragePath?: string;
   dominantColor?: number;
   linkType?: string;
   linkedShopId?: string;

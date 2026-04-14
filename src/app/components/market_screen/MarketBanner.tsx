@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import NextImage from "next/image";
+import { CloudinaryUrl } from "@/utils/cloudinaryUrl";
+import CloudinaryImage from "../CloudinaryImage";
 import { useTheme } from "@/hooks/useTheme";
 import type { PrefetchedBannerItem } from "@/types/MarketLayout";
 import {
@@ -69,7 +70,7 @@ const useMarketBanners = (initialItems?: PrefetchedBannerItem[] | null) => {
     if (!initialItems || initialItems.length === 0) return [];
     return initialItems.map((item) => ({
       id: item.id,
-      url: item.imageUrl,
+      url: item.imageStoragePath || item.imageUrl,
       linkType: item.linkType,
       linkId: item.linkedShopId || item.linkedProductId,
     }));
@@ -130,22 +131,22 @@ const useMarketBanners = (initialItems?: PrefetchedBannerItem[] | null) => {
 
       // Process documents exactly like Flutter
       const processedBanners: MarketBannerItem[] = snapshot.docs
-        .map((doc): MarketBannerItem | null => {
-          const data = doc.data();
-          const url = data.imageUrl || "";
+  .map((doc): MarketBannerItem | null => {
+    const data = doc.data();
+    // ✅ Prefer storage path, fall back to URL
+    const source = (data.imageStoragePath as string) ||
+      (data.imageUrl as string) || "";
 
-          if (!url) return null;
+    if (!source) return null;
 
-          return {
-            id: doc.id,
-            url: url,
-            linkType: data.linkType as string | undefined,
-            linkId: (data.linkedShopId || data.linkedProductId) as
-              | string
-              | undefined,
-          };
-        })
-        .filter((banner): banner is MarketBannerItem => banner !== null);
+    return {
+      id: doc.id,
+      url: source,
+      linkType: data.linkType as string | undefined,
+      linkId: (data.linkedShopId || data.linkedProductId) as string | undefined,
+    };
+  })
+  .filter((banner): banner is MarketBannerItem => banner !== null);
 
       // Update banners list - filter out duplicates to prevent key errors
       setBanners((prev) => {
@@ -166,7 +167,10 @@ const useMarketBanners = (initialItems?: PrefetchedBannerItem[] | null) => {
 
       // Prefetch first few images for smooth scrolling (matches Flutter)
       const toPrefetch = processedBanners.slice(0, PREFETCH_COUNT);
-      toPrefetch.forEach((banner) => prefetchImage(banner.url));
+      toPrefetch.forEach((banner) => {
+        const img = new Image();
+        img.src = CloudinaryUrl.bannerCdn(banner.url, 1600);
+      });
 
       console.log("Fetched banners:", processedBanners.length);
     } catch (err) {
@@ -354,22 +358,20 @@ export default function MarketBannerGrid({ initialData }: { initialData?: Prefet
 
                     {/* Error state */}
                     {imageErrors.has(banner.id) ? (
-                      <ErrorCard isDarkMode={isDarkMode} />
-                    ) : (
-                      <div className="relative w-full aspect-[2.5/1]">
-                        <NextImage
-                          src={banner.url}
-                          alt={`Banner ${banner.id}`}
-                          fill
-                          className="object-cover"
-                          onLoad={() => handleImageLoad(banner.id)}
-                          onError={() => handleImageError(banner.id)}
-                          loading="lazy"
-                          sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                          quality={85}
-                        />
-                      </div>
-                    )}
+  <ErrorCard isDarkMode={isDarkMode} />
+) : (
+  <div className="relative w-full aspect-[2.5/1]">
+    <CloudinaryImage.Banner
+      source={banner.url}
+      cdnWidth={1600}
+      width={800}
+      height={320}
+      fit="cover"
+      sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+      alt={`Banner ${banner.id}`}
+    />
+  </div>
+)}
                   </div>
                 </div>
               ))}

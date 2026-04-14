@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import Image from "next/image";
+import CloudinaryImage from "../CloudinaryImage";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useTheme } from "@/hooks/useTheme";
@@ -110,18 +110,18 @@ function RestaurantCard({
         isDarkMode ? "border border-gray-700/40" : "border border-gray-200"
       }`}
     >
-      {/* Profile Image */}
-      <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden flex-shrink-0">
-        {restaurant.profileImageUrl ? (
-          <Image
-            src={restaurant.profileImageUrl}
-            alt={restaurant.name}
-            fill
-            className={`object-cover transition-transform duration-500 group-hover:scale-105 ${
-              !isOpen ? "grayscale opacity-60" : ""
-            }`}
-            sizes="80px"
-          />
+     {/* Profile Image */}
+     <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden flex-shrink-0">
+        {(restaurant.profileImageStoragePath || restaurant.profileImageUrl) ? (
+          <div className={!isOpen ? "grayscale opacity-60" : ""}>
+            <CloudinaryImage.Banner
+              source={restaurant.profileImageStoragePath || restaurant.profileImageUrl!}
+              cdnWidth={200}
+              fit="cover"
+              alt={restaurant.name}
+              sizes="80px"
+            />
+          </div>
         ) : (
           <div
             className={`w-full h-full flex items-center justify-center ${

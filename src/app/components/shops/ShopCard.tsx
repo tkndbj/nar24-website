@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
+import CloudinaryImage from "../CloudinaryImage";
 import {
   HeartIcon,
   StarIcon,
@@ -21,6 +21,8 @@ interface Shop {
   name: string;
   profileImageUrl: string;
   coverImageUrls: string[];
+  profileImageStoragePath?: string; 
+  coverImageStoragePaths?: string[];
   address: string;
   averageRating: number;
   reviewCount: number;
@@ -97,6 +99,10 @@ const getCategoryTranslationKey = (category: string): string => {
 };
 
 export default function ShopCard({ shop, isDarkMode }: ShopCardProps) {
+  const coverSource = (shop.coverImageStoragePaths?.[0]) ||
+  (shop.coverImageUrls?.[0]) || '';
+const profileSource = shop.profileImageStoragePath ||
+  shop.profileImageUrl || '';
   const [isFavorite, setIsFavorite] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [lastNavigationTime, setLastNavigationTime] = useState<number>(0);
@@ -174,16 +180,20 @@ export default function ShopCard({ shop, isDarkMode }: ShopCardProps) {
       >
         {/* Left: Image Section */}
         <div className="relative w-28 h-28 flex-shrink-0">
-          {shop.coverImageUrls &&
-          shop.coverImageUrls.length > 0 &&
-          !imageError ? (
-            <Image
-              src={shop.coverImageUrls[0]}
-              alt={`${shop.name} cover`}
-              fill
-              className="object-cover"
-              onError={() => setImageError(true)}
-            />
+        {coverSource && !imageError ? (
+  <CloudinaryImage.Banner
+    source={coverSource}
+    cdnWidth={400}
+    fit="cover"
+    alt={`${shop.name} cover`}
+    errorWidget={
+      <div className={`w-full h-full flex items-center justify-center ${
+        isDarkMode ? "bg-gray-700" : "bg-gray-100"
+      }`}>
+        <div className={`text-3xl ${isDarkMode ? "text-gray-600" : "text-gray-300"}`}>🏪</div>
+      </div>
+    }
+  />
           ) : (
             <div
               className={`w-full h-full flex items-center justify-center ${
@@ -206,13 +216,13 @@ export default function ShopCard({ shop, isDarkMode }: ShopCardProps) {
                 isDarkMode ? "border-gray-800" : "border-white"
               }`}
             >
-              {shop.profileImageUrl ? (
-                <Image
-                  src={shop.profileImageUrl}
-                  alt={shop.name}
-                  fill
-                  className="object-cover"
-                />
+              {profileSource ? (
+  <CloudinaryImage.Banner
+    source={profileSource}
+    cdnWidth={100}
+    fit="cover"
+    alt={shop.name}
+  />
               ) : (
                 <div
                   className={`w-full h-full flex items-center justify-center ${
@@ -384,16 +394,21 @@ export default function ShopCard({ shop, isDarkMode }: ShopCardProps) {
         <div
           className={`relative h-40 overflow-hidden ${isDarkMode ? "bg-gray-700" : "bg-gray-100"}`}
         >
-          {shop.coverImageUrls &&
-          shop.coverImageUrls.length > 0 &&
-          !imageError ? (
-            <Image
-              src={shop.coverImageUrls[0]}
-              alt={`${shop.name} cover`}
-              fill
-              className="object-cover transition-transform duration-300 group-hover:scale-105"
-              onError={() => setImageError(true)}
-            />
+          {coverSource && !imageError ? (
+  <CloudinaryImage.Banner
+    source={coverSource}
+    cdnWidth={800}
+    fit="cover"
+    alt={`${shop.name} cover`}
+    sizes="(max-width: 768px) 100vw, 50vw"
+    errorWidget={
+      <div className={`w-full h-full flex items-center justify-center ${
+        isDarkMode ? "bg-gray-700" : "bg-gray-100"
+      }`}>
+        <div className={`text-5xl ${isDarkMode ? "text-gray-600" : "text-gray-300"}`}>🏪</div>
+      </div>
+    }
+  />
           ) : (
             <div
               className={`w-full h-full flex items-center justify-center ${
@@ -419,13 +434,13 @@ export default function ShopCard({ shop, isDarkMode }: ShopCardProps) {
               isDarkMode ? "border-gray-800" : "border-white"
             }`}
           >
-            {shop.profileImageUrl ? (
-              <Image
-                src={shop.profileImageUrl}
-                alt={shop.name}
-                fill
-                className="object-cover"
-              />
+           {profileSource ? (
+  <CloudinaryImage.Banner
+    source={profileSource}
+    cdnWidth={200}
+    fit="cover"
+    alt={shop.name}
+  />
             ) : (
               <div
                 className={`w-full h-full flex items-center justify-center ${
