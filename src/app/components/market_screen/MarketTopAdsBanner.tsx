@@ -65,7 +65,7 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(ssrBanners.length === 0);
   const [isClient, setIsClient] = useState(false);
-  const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
+  const [imageErrors] = useState<Set<number>>(new Set());
 
   // ✅ OPTIMIZED: Refs for cleanup and performance
   const cachedUrls = useRef(new Set<string>());

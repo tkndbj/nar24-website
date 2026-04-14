@@ -219,8 +219,8 @@ const useMarketBanners = (initialItems?: PrefetchedBannerItem[] | null) => {
 // Main Market Banner component
 export default function MarketBannerGrid({ initialData }: { initialData?: PrefetchedBannerItem[] | null }) {
   const isDarkMode = useTheme();
-  const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
-  const [loadingImages, setLoadingImages] = useState<Set<string>>(new Set());
+  const [imageErrors] = useState<Set<string>>(new Set());
+  const [loadingImages] = useState<Set<string>>(new Set());
   const { banners, isLoading, error, hasMore, fetchNextPage } =
     useMarketBanners(initialData);
   const observerRef = useRef<IntersectionObserver | null>(null);
