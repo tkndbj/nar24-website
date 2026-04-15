@@ -1,11 +1,6 @@
 "use client";
 
-import React, {
-  useState,
-  useCallback,
-  useMemo,
-
-} from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import Image from "next/image";
 import { Link } from "@/navigation";
 
@@ -36,7 +31,6 @@ import {
   Plus,
   StickyNote,
   CheckCircle2,
- 
 } from "lucide-react";
 
 // ============================================================================
@@ -242,23 +236,26 @@ function FoodCheckoutContent() {
   const t = useTranslations("foodCheckout");
   const router = useRouter();
   const { user, profileData } = useUser();
-  const { items, currentRestaurant, totals, isInitialized } = useFoodCartState();
+  const { items, currentRestaurant, totals, isInitialized } =
+    useFoodCartState();
   const { clearCart } = useFoodCartActions();
 
   // Parse the user's saved food address from their profile
   const foodAddress = useMemo(
     () =>
       profileData?.foodAddress
-        ? FoodAddress.fromMap(profileData.foodAddress as Record<string, unknown>)
+        ? FoodAddress.fromMap(
+            profileData.foodAddress as Record<string, unknown>,
+          )
         : null,
     [profileData?.foodAddress],
   );
 
   // Form state
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("pay_at_door");
+  const [paymentMethod, setPaymentMethod] =
+    useState<PaymentMethod>("pay_at_door");
   const [deliveryType, setDeliveryType] = useState<DeliveryType>("delivery");
   const [orderNotes, setOrderNotes] = useState("");
-
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -319,6 +316,7 @@ function FoodCheckoutContent() {
           quantity: item.quantity,
           extras: item.extras.map(({ name, quantity }) => ({ name, quantity })),
           specialNotes: item.specialNotes,
+          foodCategory: item.foodCategory,
         })),
         paymentMethod: "pay_at_door",
         deliveryType,
@@ -344,7 +342,9 @@ function FoodCheckoutContent() {
     } catch (err: unknown) {
       console.error("[FoodCheckout] Order error:", err);
       const message =
-        err instanceof Error ? err.message : "An error occurred. Please try again.";
+        err instanceof Error
+          ? err.message
+          : "An error occurred. Please try again.";
       const firebaseMsg = (err as { details?: string })?.details || message;
       setError(firebaseMsg);
     } finally {
@@ -384,6 +384,7 @@ function FoodCheckoutContent() {
           quantity: item.quantity,
           extras: item.extras.map(({ name, quantity }) => ({ name, quantity })),
           specialNotes: item.specialNotes,
+          foodCategory: item.foodCategory,
         })),
         deliveryType,
         deliveryAddress: deliveryAddressPayload,
@@ -459,7 +460,9 @@ function FoodCheckoutContent() {
           >
             {t("orderPlaced")}
           </h2>
-          <p className={`text-sm mb-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+          <p
+            className={`text-sm mb-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+          >
             {t("orderConfirmation")}
           </p>
 
@@ -471,11 +474,14 @@ function FoodCheckoutContent() {
                   : "bg-orange-50 text-orange-600"
               }`}
             >
-              <Clock className="w-4 h-4" />~{orderSuccess.estimatedPrepTime} {t("min")}
+              <Clock className="w-4 h-4" />~{orderSuccess.estimatedPrepTime}{" "}
+              {t("min")}
             </div>
           )}
 
-          <p className={`text-xs mt-4 ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>
+          <p
+            className={`text-xs mt-4 ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}
+          >
             {t("orderId")}: {orderSuccess.orderId.substring(0, 8).toUpperCase()}
           </p>
 
@@ -520,10 +526,14 @@ function FoodCheckoutContent() {
         <ShoppingBag
           className={`w-16 h-16 mb-4 ${isDarkMode ? "text-gray-600" : "text-gray-300"}`}
         />
-        <h2 className={`text-xl font-semibold mb-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+        <h2
+          className={`text-xl font-semibold mb-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}
+        >
           {t("emptyCart")}
         </h2>
-        <p className={`text-sm mb-6 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+        <p
+          className={`text-sm mb-6 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+        >
           {t("emptyCartSubtitle")}
         </p>
         <Link
@@ -584,12 +594,17 @@ function FoodCheckoutContent() {
                 </div>
               )}
               <div className="min-w-0">
-                <p className={`text-sm font-semibold truncate ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                <p
+                  className={`text-sm font-semibold truncate ${isDarkMode ? "text-white" : "text-gray-900"}`}
+                >
                   {currentRestaurant.name}
                 </p>
                 {estimatedPrepTime > 0 && (
-                  <p className={`text-xs flex items-center gap-1 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
-                    <Clock className="w-3 h-3" />~{estimatedPrepTime} {t("min")} {t("prepTime")}
+                  <p
+                    className={`text-xs flex items-center gap-1 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
+                  >
+                    <Clock className="w-3 h-3" />~{estimatedPrepTime} {t("min")}{" "}
+                    {t("prepTime")}
                   </p>
                 )}
               </div>
@@ -600,7 +615,11 @@ function FoodCheckoutContent() {
           <Section title={t("yourOrder")} isDarkMode={isDarkMode}>
             <div className="space-y-3">
               {items.map((item) => (
-                <CartItemRow key={item.foodId} item={item} isDarkMode={isDarkMode} />
+                <CartItemRow
+                  key={item.foodId}
+                  item={item}
+                  isDarkMode={isDarkMode}
+                />
               ))}
             </div>
           </Section>
@@ -630,14 +649,22 @@ function FoodCheckoutContent() {
                   >
                     <Icon
                       className={`w-5 h-5 flex-shrink-0 ${
-                        isSelected ? "text-orange-500" : isDarkMode ? "text-gray-500" : "text-gray-400"
+                        isSelected
+                          ? "text-orange-500"
+                          : isDarkMode
+                            ? "text-gray-500"
+                            : "text-gray-400"
                       }`}
                     />
                     <span
                       className={`text-sm font-medium ${
                         isSelected
-                          ? isDarkMode ? "text-orange-400" : "text-orange-700"
-                          : isDarkMode ? "text-gray-300" : "text-gray-700"
+                          ? isDarkMode
+                            ? "text-orange-400"
+                            : "text-orange-700"
+                          : isDarkMode
+                            ? "text-gray-300"
+                            : "text-gray-700"
                       }`}
                     >
                       {t(type)}
@@ -661,24 +688,33 @@ function FoodCheckoutContent() {
                     <MapPin className="w-4 h-4 text-orange-500" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-semibold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                    <p
+                      className={`text-sm font-semibold ${isDarkMode ? "text-white" : "text-gray-900"}`}
+                    >
                       {foodAddress.addressLine1}
                     </p>
                     {foodAddress.addressLine2 && (
-                      <p className={`text-xs mt-0.5 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+                      <p
+                        className={`text-xs mt-0.5 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
+                      >
                         {foodAddress.addressLine2}
                       </p>
                     )}
-                    <p className={`text-xs mt-0.5 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-                      {[foodAddress.city, foodAddress.mainRegion].filter(Boolean).join(", ")}
+                    <p
+                      className={`text-xs mt-0.5 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                    >
+                      {[foodAddress.city, foodAddress.mainRegion]
+                        .filter(Boolean)
+                        .join(", ")}
                     </p>
                     {foodAddress.phoneNumber && (
-                      <p className={`text-xs mt-0.5 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+                      <p
+                        className={`text-xs mt-0.5 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
+                      >
                         {foodAddress.phoneNumber}
                       </p>
                     )}
                   </div>
-                 
                 </div>
               ) : (
                 <div
@@ -686,8 +722,12 @@ function FoodCheckoutContent() {
                     isDarkMode ? "border-gray-700" : "border-gray-300"
                   }`}
                 >
-                  <MapPin className={`w-5 h-5 flex-shrink-0 ${isDarkMode ? "text-gray-600" : "text-gray-400"}`} />
-                  <p className={`text-sm flex-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                  <MapPin
+                    className={`w-5 h-5 flex-shrink-0 ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}
+                  />
+                  <p
+                    className={`text-sm flex-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                  >
                     {t("noDeliveryAddressSet")}
                   </p>
                   <Link
@@ -753,12 +793,20 @@ function FoodCheckoutContent() {
                   >
                     <div
                       className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                        isSelected ? "bg-orange-500/20" : isDarkMode ? "bg-gray-800" : "bg-gray-100"
+                        isSelected
+                          ? "bg-orange-500/20"
+                          : isDarkMode
+                            ? "bg-gray-800"
+                            : "bg-gray-100"
                       }`}
                     >
                       <Icon
                         className={`w-5 h-5 ${
-                          isSelected ? "text-orange-500" : isDarkMode ? "text-gray-500" : "text-gray-400"
+                          isSelected
+                            ? "text-orange-500"
+                            : isDarkMode
+                              ? "text-gray-500"
+                              : "text-gray-400"
                         }`}
                       />
                     </div>
@@ -766,13 +814,19 @@ function FoodCheckoutContent() {
                       <p
                         className={`text-sm font-semibold ${
                           isSelected
-                            ? isDarkMode ? "text-orange-400" : "text-orange-700"
-                            : isDarkMode ? "text-gray-200" : "text-gray-800"
+                            ? isDarkMode
+                              ? "text-orange-400"
+                              : "text-orange-700"
+                            : isDarkMode
+                              ? "text-gray-200"
+                              : "text-gray-800"
                         }`}
                       >
                         {label}
                       </p>
-                      <p className={`text-xs ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+                      <p
+                        className={`text-xs ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
+                      >
                         {desc}
                       </p>
                     </div>
@@ -796,7 +850,9 @@ function FoodCheckoutContent() {
           {error && (
             <div
               className={`flex items-start gap-2 mb-3 p-3 rounded-xl text-sm ${
-                isDarkMode ? "bg-red-500/10 text-red-400" : "bg-red-50 text-red-600"
+                isDarkMode
+                  ? "bg-red-500/10 text-red-400"
+                  : "bg-red-50 text-red-600"
               }`}
             >
               <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
@@ -806,10 +862,14 @@ function FoodCheckoutContent() {
 
           <div className="flex items-center justify-between mb-3">
             <div>
-              <p className={`text-xs ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+              <p
+                className={`text-xs ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
+              >
                 {t("total")} ({totals.itemCount} {t("items")})
               </p>
-              <p className={`text-xl font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+              <p
+                className={`text-xl font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}
+              >
                 {totals.subtotal.toLocaleString()} TL
               </p>
             </div>
@@ -861,7 +921,9 @@ function FoodCheckoutSkeleton({ isDarkMode }: { isDarkMode: boolean }) {
       <div className={`h-7 w-32 rounded-lg ${bg} mb-6`} />
 
       <div className="space-y-4">
-        <div className={`flex items-center gap-3 rounded-2xl px-4 py-3 border ${cardBorder}`}>
+        <div
+          className={`flex items-center gap-3 rounded-2xl px-4 py-3 border ${cardBorder}`}
+        >
           <div className={`w-10 h-10 rounded-xl flex-shrink-0 ${bg}`} />
           <div className="flex-1 space-y-1.5">
             <div className={`h-4 w-36 rounded ${bg}`} />
@@ -873,7 +935,10 @@ function FoodCheckoutSkeleton({ isDarkMode }: { isDarkMode: boolean }) {
           <div className={`h-3.5 w-24 rounded ${bg} mb-3`} />
           <div className="space-y-3">
             {[0, 1].map((i) => (
-              <div key={i} className={`flex gap-3 p-3 rounded-xl ${isDarkMode ? "bg-gray-800/60" : "bg-gray-50"}`}>
+              <div
+                key={i}
+                className={`flex gap-3 p-3 rounded-xl ${isDarkMode ? "bg-gray-800/60" : "bg-gray-50"}`}
+              >
                 <div className={`w-16 h-16 rounded-lg flex-shrink-0 ${bg}`} />
                 <div className="flex-1 space-y-2">
                   <div className={`h-4 w-3/4 rounded ${bg}`} />
