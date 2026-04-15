@@ -24,6 +24,7 @@ import {
   Percent,
   AlertTriangle,
   X,
+  CupSoda,
 } from "lucide-react";
 import TypeSenseServiceManager from "@/lib/typesense_service_manager";
 import FilterIcons from "./FilterIcons";
@@ -46,6 +47,7 @@ import { CloudinaryUrl } from "@/utils/cloudinaryUrl";
 interface RestaurantDetailProps {
   restaurant: Restaurant | null;
   foods: Food[];
+  drinks: DrinkItem[];
   loading: boolean;
 }
 
@@ -83,9 +85,13 @@ function RestaurantHeader({
         <div className="flex items-start gap-4">
           {/* Profile image */}
           <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden border-2 border-white shadow-md flex-shrink-0 dark:border-gray-700">
-          {(restaurant.profileImageStoragePath || restaurant.profileImageUrl) ? (
+            {restaurant.profileImageStoragePath ||
+            restaurant.profileImageUrl ? (
               <CloudinaryImage.Banner
-                source={restaurant.profileImageStoragePath || restaurant.profileImageUrl!}
+                source={
+                  restaurant.profileImageStoragePath ||
+                  restaurant.profileImageUrl!
+                }
                 cdnWidth={200}
                 fit="cover"
                 alt={restaurant.name}
@@ -259,6 +265,14 @@ interface PendingConflict {
   specialNotes: string;
 }
 
+interface DrinkItem {
+  id: string;
+  restaurantId: string;
+  name: string;
+  price: number;
+  isAvailable: boolean;
+}
+
 function FoodCard({
   food,
   isDarkMode,
@@ -386,22 +400,22 @@ function FoodCard({
         {/* Food image — only shown when available */}
         {food.imageUrl && (
           <button
-          type="button"
-          onClick={() => setLightboxOpen(true)}
-          className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-xl overflow-hidden flex-shrink-0 cursor-zoom-in"
-        >
-          <CloudinaryImage.Banner
-            source={food.imageStoragePath || food.imageUrl!}
-            cdnWidth={400}
-            fit="cover"
-            alt={food.name}
-          />
-          {isDiscountActive && food.discount && (
-            <div className="absolute top-1.5 left-1.5 z-10 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md shadow-sm">
-              -{food.discount.percentage}%
-            </div>
-          )}
-        </button>
+            type="button"
+            onClick={() => setLightboxOpen(true)}
+            className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-xl overflow-hidden flex-shrink-0 cursor-zoom-in"
+          >
+            <CloudinaryImage.Banner
+              source={food.imageStoragePath || food.imageUrl!}
+              cdnWidth={400}
+              fit="cover"
+              alt={food.name}
+            />
+            {isDiscountActive && food.discount && (
+              <div className="absolute top-1.5 left-1.5 z-10 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md shadow-sm">
+                -{food.discount.percentage}%
+              </div>
+            )}
+          </button>
         )}
 
         {/* Food info */}
@@ -539,8 +553,8 @@ function FoodCard({
         allowedExtras={food.extras}
         isDarkMode={isDarkMode}
       />
-      
-{lightboxOpen && food.imageUrl && (
+
+      {lightboxOpen && food.imageUrl && (
         <FoodImageLightbox
           src={food.imageStoragePath || food.imageUrl}
           alt={food.name}
@@ -548,6 +562,102 @@ function FoodCard({
         />
       )}
     </>
+  );
+}
+
+function DrinkCard({
+  drink,
+  isDarkMode,
+  isOpen,
+  deliversToUser,
+  cartQuantity,
+  onAdd,
+  onRemove,
+}: {
+  drink: DrinkItem;
+  isDarkMode: boolean;
+  isOpen: boolean;
+  deliversToUser: boolean;
+  cartQuantity: number;
+  onAdd: () => void;
+  onRemove: () => void;
+}) {
+  const t = useTranslations("restaurantDetail");
+
+  return (
+    <div
+      className={`flex items-center gap-4 rounded-2xl p-4 ${
+        isDarkMode ? "border border-gray-700/40" : "border border-gray-200"
+      }`}
+    >
+      {/* Drink icon */}
+      <div
+        className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
+          isDarkMode ? "bg-orange-500/10" : "bg-orange-50"
+        }`}
+      >
+        <CupSoda
+          className={`w-5 h-5 ${
+            isDarkMode ? "text-orange-400" : "text-orange-500"
+          }`}
+        />
+      </div>
+
+      {/* Name + price */}
+      <div className="flex-1 min-w-0">
+        <h3
+          className={`font-semibold text-sm truncate ${
+            isDarkMode ? "text-white" : "text-gray-900"
+          }`}
+        >
+          {drink.name}
+        </h3>
+        <span
+          className={`text-base font-bold mt-0.5 block ${
+            isDarkMode ? "text-orange-400" : "text-orange-600"
+          }`}
+        >
+          {drink.price.toLocaleString()} TL
+        </span>
+      </div>
+
+      {/* Add / in-cart button */}
+      <button
+        onClick={cartQuantity > 0 ? onRemove : onAdd}
+        disabled={!isOpen}
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
+          !isOpen
+            ? "bg-gray-200 text-gray-400 cursor-not-allowed dark:bg-gray-700 dark:text-gray-500"
+            : !deliversToUser
+              ? isDarkMode
+                ? "bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 border border-yellow-500/20"
+                : "bg-yellow-50 text-yellow-600 hover:bg-yellow-100 border border-yellow-200"
+              : cartQuantity > 0
+                ? isDarkMode
+                  ? "bg-green-500/15 text-green-400 hover:bg-green-500/25"
+                  : "bg-green-50 text-green-600 hover:bg-green-100"
+                : isDarkMode
+                  ? "bg-orange-500/15 text-orange-400 hover:bg-orange-500/25"
+                  : "bg-orange-50 text-orange-600 hover:bg-orange-100"
+        }`}
+      >
+        {!isOpen ? (
+          <span>{t("closed")}</span>
+        ) : !deliversToUser ? (
+          <span>{t("noDeliveryToAddress")}</span>
+        ) : cartQuantity > 0 ? (
+          <>
+            <Check className="w-3.5 h-3.5" />
+            {cartQuantity}
+          </>
+        ) : (
+          <>
+            <Plus className="w-3.5 h-3.5" />
+            {t("add")}
+          </>
+        )}
+      </button>
+    </div>
   );
 }
 
@@ -623,6 +733,7 @@ function LoadingSkeleton({ isDarkMode }: { isDarkMode: boolean }) {
 export default function RestaurantDetail({
   restaurant,
   foods,
+  drinks,
   loading,
 }: RestaurantDetailProps) {
   const isDarkMode = useTheme();
@@ -641,8 +752,23 @@ export default function RestaurantDetail({
   >([]);
   const [activeTab, setActiveTab] = useState<"menu" | "reviews">("menu");
 
+  const { addItem, clearAndAddFromNewRestaurant, removeItem } =
+    useFoodCartActions();
+
   const { items, currentRestaurant: cartRestaurant } = useFoodCartState();
-  const { clearAndAddFromNewRestaurant, removeItem } = useFoodCartActions();
+  // ── Restaurant conflict dialog ──
+  const [pendingConflict, setPendingConflict] =
+    useState<PendingConflict | null>(null);
+
+  const handleConflict = useCallback((pending: PendingConflict) => {
+    setPendingConflict(pending);
+  }, []);
+
+  const handleConflictReplace = useCallback(async () => {
+    if (!pendingConflict) return;
+    await clearAndAddFromNewRestaurant(pendingConflict);
+    setPendingConflict(null);
+  }, [pendingConflict, clearAndAddFromNewRestaurant]);
 
   // Parse user's food address for delivery check
   const foodAddress = useMemo(
@@ -680,19 +806,83 @@ export default function RestaurantDetail({
     [items, removeItem],
   );
 
-  // ── Restaurant conflict dialog ──
-  const [pendingConflict, setPendingConflict] =
-    useState<PendingConflict | null>(null);
+  const isOpen = useMemo(
+    () => (restaurant ? isRestaurantOpen(restaurant) : false),
+    [restaurant],
+  );
 
-  const handleConflict = useCallback((pending: PendingConflict) => {
-    setPendingConflict(pending);
-  }, []);
+  const handleAddDrinkToCart = useCallback(
+    async (drink: DrinkItem) => {
+      if (!isOpen) return;
+      if (!user) {
+        setShowLoginModal(true);
+        return;
+      }
+      if (!foodAddress) {
+        setShowLocationPicker(true);
+        return;
+      }
+      if (!deliversToUser) {
+        setShowNoDeliveryModal(true);
+        return;
+      }
 
-  const handleConflictReplace = useCallback(async () => {
-    if (!pendingConflict) return;
-    await clearAndAddFromNewRestaurant(pendingConflict);
-    setPendingConflict(null);
-  }, [pendingConflict, clearAndAddFromNewRestaurant]);
+      const cartRest: FoodCartRestaurant = {
+        id: restaurant!.id,
+        name: restaurant!.name,
+        profileImageUrl: restaurant!.profileImageUrl,
+      };
+
+      const result = await addItem({
+        food: {
+          id: drink.id,
+          name: drink.name,
+          price: drink.price,
+          foodCategory: "drink",
+          foodType: "drink",
+        },
+        restaurant: cartRest,
+        quantity: 1,
+        extras: [],
+        specialNotes: "",
+      });
+
+      if (result === "restaurant_conflict") {
+        handleConflict({
+          food: {
+            id: drink.id,
+            name: drink.name,
+            price: drink.price,
+            foodCategory: "drink",
+            foodType: "drink",
+          },
+          restaurant: cartRest,
+          quantity: 1,
+          extras: [],
+          specialNotes: "",
+        });
+      }
+    },
+    [
+      isOpen,
+      user,
+      foodAddress,
+      deliversToUser,
+      restaurant,
+      addItem,
+      handleConflict,
+    ],
+  );
+
+  const handleRemoveDrinkFromCart = useCallback(
+    async (drinkId: string) => {
+      const matching = items.filter((i) => i.originalFoodId === drinkId);
+      for (const item of matching) {
+        await removeItem(item.foodId);
+      }
+    },
+    [items, removeItem],
+  );
 
   // Fetch this restaurant's food categories from Typesense facets
   useEffect(() => {
@@ -787,8 +977,6 @@ export default function RestaurantDetail({
       </main>
     );
   }
-
-  const isOpen = isRestaurantOpen(restaurant);
 
   return (
     <main className="flex-1">
@@ -939,80 +1127,128 @@ export default function RestaurantDetail({
                   />
                 )}
 
-                {/* Food list */}
-                {filteredFoods.length > 0 ? (
-                  groupedFoods ? (
-                    // Grouped by category
-                    <div className="space-y-8 pb-10">
-                      {Array.from(groupedFoods.entries()).map(
-                        ([category, items], idx) => (
-                          <div key={category}>
-                            {idx > 0 && (
-                              <hr
-                                className={`mb-8 border-t ${isDarkMode ? "border-gray-700" : "border-gray-200"}`}
-                              />
-                            )}
-                            <h3
-                              className={`text-base font-bold mb-3 ${isDarkMode ? "text-white" : "text-gray-900"}`}
-                            >
-                              {category}
-                            </h3>
-                            <div className="grid grid-cols-1 gap-4">
-                              {items.map((food) => (
-                                <FoodCard
-                                  key={food.id}
-                                  food={food}
-                                  isDarkMode={isDarkMode}
-                                  restaurant={restaurant}
-                                  isOpen={isOpen}
-                                  deliversToUser={deliversToUser}
-                                  cartQuantity={
-                                    cartQuantityMap.get(food.id) ?? 0
-                                  }
-                                  onConflict={handleConflict}
-                                  onRemoveFromCart={handleRemoveFromCart}
-                                  isAuthenticated={!!user}
-                                  hasFoodAddress={!!foodAddress}
-                                  onLoginRequired={() =>
-                                    setShowLoginModal(true)
-                                  }
-                                  onAddressRequired={() =>
-                                    setShowLocationPicker(true)
-                                  }
-                                  onNoDelivery={() =>
-                                    setShowNoDeliveryModal(true)
-                                  }
-                                />
-                              ))}
-                            </div>
-                          </div>
-                        ),
-                      )}
-                    </div>
-                  ) : (
-                    // Flat list when search/filter is active
-                    <div className="grid grid-cols-1 gap-4 pb-10">
-                      {filteredFoods.map((food) => (
-                        <FoodCard
-                          key={food.id}
-                          food={food}
-                          isDarkMode={isDarkMode}
-                          restaurant={restaurant}
-                          isOpen={isOpen}
-                          deliversToUser={deliversToUser}
-                          cartQuantity={cartQuantityMap.get(food.id) ?? 0}
-                          onConflict={handleConflict}
-                          onRemoveFromCart={handleRemoveFromCart}
-                          isAuthenticated={!!user}
-                          hasFoodAddress={!!foodAddress}
-                          onLoginRequired={() => setShowLoginModal(true)}
-                          onAddressRequired={() => setShowLocationPicker(true)}
-                          onNoDelivery={() => setShowNoDeliveryModal(true)}
-                        />
+                {/* Food + Drinks list */}
+                {filteredFoods.length > 0 || drinks.length > 0 ? (
+                  <>
+                    {/* Foods */}
+                    {filteredFoods.length > 0 &&
+                      (groupedFoods ? (
+                        <div className="space-y-8 pb-4">
+                          {Array.from(groupedFoods.entries()).map(
+                            ([category, items], idx) => (
+                              <div key={category}>
+                                {idx > 0 && (
+                                  <hr
+                                    className={`mb-8 border-t ${isDarkMode ? "border-gray-700" : "border-gray-200"}`}
+                                  />
+                                )}
+                                <h3
+                                  className={`text-base font-bold mb-3 ${isDarkMode ? "text-white" : "text-gray-900"}`}
+                                >
+                                  {category}
+                                </h3>
+                                <div className="grid grid-cols-1 gap-4">
+                                  {items.map((food) => (
+                                    <FoodCard
+                                      key={food.id}
+                                      food={food}
+                                      isDarkMode={isDarkMode}
+                                      restaurant={restaurant}
+                                      isOpen={isOpen}
+                                      deliversToUser={deliversToUser}
+                                      cartQuantity={
+                                        cartQuantityMap.get(food.id) ?? 0
+                                      }
+                                      onConflict={handleConflict}
+                                      onRemoveFromCart={handleRemoveFromCart}
+                                      isAuthenticated={!!user}
+                                      hasFoodAddress={!!foodAddress}
+                                      onLoginRequired={() =>
+                                        setShowLoginModal(true)
+                                      }
+                                      onAddressRequired={() =>
+                                        setShowLocationPicker(true)
+                                      }
+                                      onNoDelivery={() =>
+                                        setShowNoDeliveryModal(true)
+                                      }
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                            ),
+                          )}
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 gap-4 pb-4">
+                          {filteredFoods.map((food) => (
+                            <FoodCard
+                              key={food.id}
+                              food={food}
+                              isDarkMode={isDarkMode}
+                              restaurant={restaurant}
+                              isOpen={isOpen}
+                              deliversToUser={deliversToUser}
+                              cartQuantity={cartQuantityMap.get(food.id) ?? 0}
+                              onConflict={handleConflict}
+                              onRemoveFromCart={handleRemoveFromCart}
+                              isAuthenticated={!!user}
+                              hasFoodAddress={!!foodAddress}
+                              onLoginRequired={() => setShowLoginModal(true)}
+                              onAddressRequired={() =>
+                                setShowLocationPicker(true)
+                              }
+                              onNoDelivery={() => setShowNoDeliveryModal(true)}
+                            />
+                          ))}
+                        </div>
                       ))}
-                    </div>
-                  )
-                ) : foods.length === 0 ? (
+
+                    {/* Drinks section */}
+                    {drinks.length > 0 && !hasActiveFilters && (
+                      <div className="pb-10">
+                        <div className="flex items-center gap-2.5 mb-4 mt-4">
+                          <div
+                            className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+                              isDarkMode ? "bg-orange-500/10" : "bg-orange-50"
+                            }`}
+                          >
+                            <CupSoda
+                              className={`w-3.5 h-3.5 ${
+                                isDarkMode
+                                  ? "text-orange-400"
+                                  : "text-orange-600"
+                              }`}
+                            />
+                          </div>
+                          <h3
+                            className={`text-base font-bold ${
+                              isDarkMode ? "text-white" : "text-gray-900"
+                            }`}
+                          >
+                            {t("drinks")}
+                          </h3>
+                        </div>
+                        <div className="grid grid-cols-1 gap-3">
+                          {drinks.map((drink) => (
+                            <DrinkCard
+                              key={drink.id}
+                              drink={drink}
+                              isDarkMode={isDarkMode}
+                              isOpen={isOpen}
+                              deliversToUser={deliversToUser}
+                              cartQuantity={cartQuantityMap.get(drink.id) ?? 0}
+                              onAdd={() => handleAddDrinkToCart(drink)}
+                              onRemove={() =>
+                                handleRemoveDrinkFromCart(drink.id)
+                              }
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : foods.length === 0 && drinks.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-20">
                     <UtensilsCrossed
                       className={`w-16 h-16 mb-4 ${
@@ -1066,7 +1302,6 @@ export default function RestaurantDetail({
                 )}
               </>
             ) : (
-              /* Reviews tab */
               <RestaurantReviews
                 restaurantId={restaurant.id}
                 isDarkMode={isDarkMode}
