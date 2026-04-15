@@ -11,6 +11,7 @@ import React, {
 } from "react";
 import { BoostedVisibilityWrapper } from "@/app/components/BoostedVisibilityWrapper";
 import { CloudinaryUrl } from "@/utils/cloudinaryUrl";
+import CloudinaryImage from "@/app/components/CloudinaryImage";
 import Image from "next/image";
 import {
   Heart,
@@ -73,9 +74,6 @@ interface ProductCardProps {
 // ✅ Static constants for performance
 const NAVIGATION_THROTTLE = 500;
 const JADE_GREEN = "#00A86B";
-const IMAGE_LOAD_TIMEOUT = 10000; // 10 seconds timeout for image loading
-const MAX_IMAGE_RETRIES = 3; // Maximum number of retry attempts
-const RETRY_DELAYS = [1000, 2000, 4000]; // Exponential backoff delays
 
 // ✅ Static color map (computed once)
 const COLOR_MAP: Record<string, string> = {
@@ -502,11 +500,6 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
     string | null
   >(selectedColor || null);
   const [isHovered, setIsHovered] = useState(false);
-  const [imageError, setImageError] = useState(false);
-  const [imageLoading, setImageLoading] = useState(true);
-  const [imageRetryCount, setImageRetryCount] = useState(0);
-  const [imageKey, setImageKey] = useState(0); // Force re-render of image
-  const imageLoadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [showEnlargedImage, setShowEnlargedImage] = useState(false);
   const [enlargedImagePosition, setEnlargedImagePosition] = useState<{
     top: number;
@@ -548,30 +541,22 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
     return shuffled.slice(0, 4);
   }, [safeColorImages]);
 
-  const currentImageUrls = useMemo(() => {
+  // Raw image sources — storage paths when available, else legacy URLs.
+  // CloudinaryImage.Compat resolves each one to Cloudinary + Firebase fallback.
+  const currentImageSources = useMemo(() => {
     const colorToUse = internalSelectedColor || selectedColor;
 
-    // Color-selected images
     if (colorToUse) {
-      // Prefer color storage paths
       if (product.colorImageStoragePaths?.[colorToUse]) {
-        return [
-          CloudinaryUrl.product(
-            product.colorImageStoragePaths[colorToUse],
-            "card",
-          ),
-        ];
+        return [product.colorImageStoragePaths[colorToUse]];
       }
       if (safeColorImages[colorToUse]?.length) {
         return safeColorImages[colorToUse];
       }
     }
 
-    // Default images — prefer storage paths
     if (product.imageStoragePaths && product.imageStoragePaths.length > 0) {
-      return product.imageStoragePaths.map((p: string) =>
-        CloudinaryUrl.product(p, "card"),
-      );
+      return product.imageStoragePaths;
     }
 
     return product.imageUrls || [];
@@ -631,18 +616,9 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
     }
   }, [product, router, onTap]);
 
-  // Reset image state when color changes (matches Flutter's didUpdateWidget)
+  // Reset carousel index when color changes (matches Flutter's didUpdateWidget)
   useEffect(() => {
     setCurrentImageIndex(0);
-    setImageError(false);
-    setImageLoading(true);
-    setImageRetryCount(0);
-    setImageKey((prev) => prev + 1);
-    // Clear any pending timeout
-    if (imageLoadTimeoutRef.current) {
-      clearTimeout(imageLoadTimeoutRef.current);
-      imageLoadTimeoutRef.current = null;
-    }
   }, [internalSelectedColor, selectedColor]);
 
   // Update internal selected color when prop changes
@@ -995,28 +971,20 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
     (e: React.MouseEvent) => {
       e.stopPropagation();
       setCurrentImageIndex((prev) =>
-        prev === currentImageUrls.length - 1 ? 0 : prev + 1,
+        prev === currentImageSources.length - 1 ? 0 : prev + 1,
       );
-      // Reset image loading state for new image
-      setImageLoading(true);
-      setImageError(false);
-      setImageRetryCount(0);
     },
-    [currentImageUrls.length],
+    [currentImageSources.length],
   );
 
   const handlePrevImage = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
       setCurrentImageIndex((prev) =>
-        prev === 0 ? currentImageUrls.length - 1 : prev - 1,
+        prev === 0 ? currentImageSources.length - 1 : prev - 1,
       );
-      // Reset image loading state for new image
-      setImageLoading(true);
-      setImageError(false);
-      setImageRetryCount(0);
     },
-    [currentImageUrls.length],
+    [currentImageSources.length],
   );
 
   const imageContainerRef = useRef<HTMLDivElement>(null);
@@ -1077,89 +1045,10 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
       if (hoverTimeoutRef.current) {
         clearTimeout(hoverTimeoutRef.current);
       }
-      if (imageLoadTimeoutRef.current) {
-        clearTimeout(imageLoadTimeoutRef.current);
-      }
     };
   }, []);
 
-  // ✅ Image load timeout and retry logic
-  const currentImageUrl = currentImageUrls[currentImageIndex];
-
-  // Start timeout when image starts loading
-  useEffect(() => {
-    if (!currentImageUrl || !imageLoading || imageError) return;
-
-    // Clear any existing timeout
-    if (imageLoadTimeoutRef.current) {
-      clearTimeout(imageLoadTimeoutRef.current);
-    }
-
-    // Set timeout for image loading
-    imageLoadTimeoutRef.current = setTimeout(() => {
-      if (imageLoading && imageRetryCount < MAX_IMAGE_RETRIES) {
-        // Image is still loading after timeout, trigger retry
-        console.log(
-          `Image load timeout for ${product.id}, retry ${imageRetryCount + 1}/${MAX_IMAGE_RETRIES}`,
-        );
-        const retryDelay =
-          RETRY_DELAYS[imageRetryCount] ||
-          RETRY_DELAYS[RETRY_DELAYS.length - 1];
-
-        setTimeout(() => {
-          setImageRetryCount((prev) => prev + 1);
-          setImageKey((prev) => prev + 1); // Force image re-render
-          setImageLoading(true);
-        }, retryDelay);
-      } else if (imageLoading && imageRetryCount >= MAX_IMAGE_RETRIES) {
-        // Max retries reached, show error state
-        console.log(`Max retries reached for ${product.id}, showing error`);
-        setImageError(true);
-        setImageLoading(false);
-      }
-    }, IMAGE_LOAD_TIMEOUT);
-
-    return () => {
-      if (imageLoadTimeoutRef.current) {
-        clearTimeout(imageLoadTimeoutRef.current);
-      }
-    };
-  }, [currentImageUrl, imageLoading, imageError, imageRetryCount, product.id]);
-
-  // ✅ Image error handler with retry
-  const handleImageError = useCallback(() => {
-    // Try Cloudinary fallback first
-    const fallbackUrl = CloudinaryUrl.extractFallbackUrl(currentImageUrl || "");
-    if (fallbackUrl && imageRetryCount === 0) {
-      // Replace current URL with Firebase direct URL
-      // This is handled by the image component's error state
-    }
-
-    if (imageRetryCount < MAX_IMAGE_RETRIES) {
-      const retryDelay =
-        RETRY_DELAYS[imageRetryCount] || RETRY_DELAYS[RETRY_DELAYS.length - 1];
-      setTimeout(() => {
-        setImageRetryCount((prev) => prev + 1);
-        setImageKey((prev) => prev + 1);
-        setImageLoading(true);
-        setImageError(false);
-      }, retryDelay);
-    } else {
-      setImageError(true);
-      setImageLoading(false);
-    }
-  }, [imageRetryCount, currentImageUrl]);
-
-  // ✅ Image load success handler
-  const handleImageLoad = useCallback(() => {
-    // Clear timeout on successful load
-    if (imageLoadTimeoutRef.current) {
-      clearTimeout(imageLoadTimeoutRef.current);
-      imageLoadTimeoutRef.current = null;
-    }
-    setImageLoading(false);
-    setImageError(false);
-  }, []);
+  const currentImageSource = currentImageSources[currentImageIndex];
 
   // ✅ Global mouse position check to ensure enlarged image dismisses properly
   useEffect(() => {
@@ -1203,14 +1092,14 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
 
   // ✅ Determine active dot for pagination (matches Flutter logic)
   const getActiveDotIndex = useCallback(() => {
-    const imageCount = currentImageUrls.length;
+    const imageCount = currentImageSources.length;
     if (imageCount <= 3) {
       return Math.min(currentImageIndex, imageCount - 1);
     }
     if (currentImageIndex === 0) return 0;
     if (currentImageIndex === imageCount - 1) return 2;
     return 1;
-  }, [currentImageUrls.length, currentImageIndex]);
+  }, [currentImageSources.length, currentImageIndex]);
 
   const cartButtonContent = getCartButtonContent();
   const favoriteButtonContent = getFavoriteButtonContent();
@@ -1244,51 +1133,47 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
               className="w-full h-full rounded-t-xl overflow-hidden relative"
               style={{ backgroundColor: isDarkMode ? "#252336" : "#f3f4f6" }}
             >
-              {currentImageUrls.length > 0 && currentImageUrl ? (
+              {currentImageSources.length > 0 && currentImageSource ? (
                 <div className="relative w-full h-full">
-                  {/* Loading placeholder with narsiyah logo (no shimmer) */}
-                  {imageLoading && (
-                    <div
-                      className="absolute inset-0 flex items-center justify-center z-10"
-                      style={{
-                        backgroundColor: isDarkMode ? "#252336" : "#f3f4f6",
-                      }}
-                    >
-                      <Image
-                        src="/images/narsiyah.png"
-                        alt="Loading"
-                        width={60}
-                        height={60}
-                        className="object-contain opacity-40"
-                        priority
-                      />
-                    </div>
-                  )}
-                  {/* Main image - always rendered */}
-                  {!imageError ? (
-                    <Image
-                      key={`${currentImageUrl}-${imageKey}`}
-                      src={currentImageUrl}
-                      alt={product.productName}
-                      fill
-                      className={`object-cover transition-opacity duration-300 ${imageLoading ? "opacity-0" : "opacity-100"}`}
-                      onError={handleImageError}
-                      onLoad={handleImageLoad}
-                      sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
-                      priority={priority || currentImageIndex === 0}
-                      loading={
-                        priority || currentImageIndex === 0 ? "eager" : "lazy"
-                      }
-                      unoptimized={imageRetryCount > 0} // Bypass cache on retry
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <ImageOff size={32} className="text-gray-400" />
-                    </div>
-                  )}
+                  {/* Single source of truth: Cloudinary primary + Firebase fallback */}
+                  <CloudinaryImage.Compat
+                    source={currentImageSource}
+                    size="card"
+                    fit="cover"
+                    alt={product.productName}
+                    priority={priority || currentImageIndex === 0}
+                    sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
+                    placeholder={
+                      <div
+                        className="w-full h-full flex items-center justify-center"
+                        style={{
+                          backgroundColor: isDarkMode ? "#252336" : "#f3f4f6",
+                        }}
+                      >
+                        <Image
+                          src="/images/narsiyah.png"
+                          alt="Loading"
+                          width={60}
+                          height={60}
+                          className="object-contain opacity-40"
+                          priority
+                        />
+                      </div>
+                    }
+                    errorWidget={
+                      <div
+                        className="w-full h-full flex items-center justify-center"
+                        style={{
+                          backgroundColor: isDarkMode ? "#252336" : "#f3f4f6",
+                        }}
+                      >
+                        <ImageOff size={32} className="text-gray-400" />
+                      </div>
+                    }
+                  />
 
                   {/* Navigation buttons */}
-                  {currentImageUrls.length > 1 && !isFantasy && (
+                  {currentImageSources.length > 1 && !isFantasy && (
                     <>
                       <button
                         className={`absolute left-2 top-1/2 transform -translate-y-1/2 w-8 h-8 bg-black bg-opacity-50 rounded-full flex items-center justify-center text-white transition-opacity duration-150 ${
@@ -1449,11 +1334,11 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
             )}
 
             {/* Image Dots */}
-            {currentImageUrls.length > 1 && !isFantasy && (
+            {currentImageSources.length > 1 && !isFantasy && (
               <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2">
                 <div className="px-2 py-1 bg-gray-600 bg-opacity-80 rounded-full flex gap-1">
                   {Array.from(
-                    { length: Math.min(currentImageUrls.length, 3) },
+                    { length: Math.min(currentImageSources.length, 3) },
                     (_, i) => {
                       const isActive = i === getActiveDotIndex();
                       return (
@@ -1587,7 +1472,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
       </div>
 
       {/* Enlarged Image Preview - Positioned near the product card */}
-      {showEnlargedImage && currentImageUrl && enlargedImagePosition && (
+      {showEnlargedImage && currentImageSource && enlargedImagePosition && (
         <div
           className="fixed z-[99999]"
           style={{
@@ -1605,23 +1490,17 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
               padding: "8px",
               width: "550px",
               height: "550px",
+              boxShadow: "0 20px 40px rgba(0, 0, 0, 0.6)",
             }}
           >
-            <Image
-              src={currentImageUrl}
+            <CloudinaryImage.Compat
+              source={currentImageSource}
+              size="detail"
+              fit="contain"
               alt={product.productName}
-              fill
-              className="object-contain rounded-lg"
-              style={{
-                boxShadow: "0 20px 40px rgba(0, 0, 0, 0.6)",
-                border: "3px solid white",
-              }}
               sizes="550px"
               priority
-              unoptimized={
-                currentImageUrl?.includes("cloudinary") ||
-                currentImageUrl?.includes("firebasestorage")
-              }
+              className="rounded-lg"
             />
           </div>
         </div>
