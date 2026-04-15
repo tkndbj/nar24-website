@@ -100,7 +100,46 @@ export const CloudinaryUrl = {
   /** Handles both legacy URLs and new storage paths */
   productCompat(urlOrPath: string, size: ImageSize = "card"): string {
     if (this.isStoragePath(urlOrPath)) return this.product(urlOrPath, size);
+    if (!_enabled) return urlOrPath;
+    // Legacy full URL — extract storage path and rewrite through Cloudinary
+    const path = this.extractPathFromUrl(urlOrPath);
+    if (path) return this.product(path, size);
     return urlOrPath;
+  },
+
+  /** Resolve a product source (storage path OR legacy URL) to primary + fallback */
+  resolveProduct(
+    source: string,
+    size: ImageSize = "card",
+  ): { primary: string; fallback: string | null } {
+    if (!source) return { primary: "", fallback: null };
+
+    if (!_enabled) {
+      if (this.isStoragePath(source)) {
+        return { primary: this.firebaseUrl(source), fallback: null };
+      }
+      return { primary: source, fallback: null };
+    }
+
+    // Storage path (post-migration)
+    if (this.isStoragePath(source)) {
+      return {
+        primary: this.product(source, size),
+        fallback: this.firebaseUrl(source),
+      };
+    }
+
+    // Legacy URL — extract path, CDN-optimize, original as fallback
+    const path = this.extractPathFromUrl(source);
+    if (path) {
+      return {
+        primary: this.product(path, size),
+        fallback: source,
+      };
+    }
+
+    // Opaque URL — pass through, no CDN available
+    return { primary: source, fallback: null };
   },
 
   /** Extract storage path from Firebase download URL */

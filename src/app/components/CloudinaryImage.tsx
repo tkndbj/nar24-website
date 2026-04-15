@@ -314,10 +314,7 @@ function Compat({ source, size, ...rest }: CompatProps) {
     );
   }
 
-  const primary = CloudinaryUrl.productCompat(source, size);
-  const fallback = CloudinaryUrl.isStoragePath(source)
-    ? CloudinaryUrl.firebaseUrl(source)
-    : null;
+  const { primary, fallback } = CloudinaryUrl.resolveProduct(source, size);
 
   return <CoreImage primary={primary} fallback={fallback} {...rest} />;
 }
