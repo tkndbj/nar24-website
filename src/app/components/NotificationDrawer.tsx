@@ -286,6 +286,10 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
         return { icon: Star, color: "text-amber-500" };
       case "shipment":
         return { icon: Truck, color: "text-blue-500" };
+      case "market_order_status_update":
+        return { icon: ShoppingBag, color: "text-blue-500" };
+      case "market_order_delivered_review":
+        return { icon: Star, color: "text-blue-400" };
       case "shop_approved":
         return { icon: Store, color: "text-green-500" };
       case "shop_disapproved":
@@ -321,7 +325,10 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
         return "Yükseltme Süresi Doldu";
       case "food_order_delivered_review":
         return t("food_order_delivered_review.title");
-
+      case "market_order_status_update":
+        return t("market_order_status_update.title");
+      case "market_order_delivered_review":
+        return t("market_order_delivered_review.title");
       case "shipment":
         return "Kargo";
       case "shop_approved":
@@ -360,6 +367,18 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
         return t(`food_order_status_update.${notification.orderStatus}`, {
           restaurantName: notification.restaurantName ?? "",
         });
+      case "market_order_status_update":
+        switch (notification.orderStatus) {
+          case "out_for_delivery":
+            return t("market_order_status_update.out_for_delivery");
+          case "delivered":
+            return t("market_order_status_update.delivered");
+          default:
+            return "";
+        }
+
+      case "market_order_delivered_review":
+        return t("market_order_delivered_review.body");
       default: {
         if (locale === "en") {
           return notification.messageEn || notification.message || "";
@@ -580,6 +599,17 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
         break;
       case "food_order_status_update":
         router.push("/orders?tab=food");
+        break;
+      case "market_order_status_update":
+        router.push("/orders?tab=market"); // adjust to your actual web route
+        break;
+
+      case "market_order_delivered_review":
+        if (notification.orderId) {
+          router.push(`/market-order/${notification.orderId}`); // adjust to your actual web route
+        } else {
+          router.push("/orders?tab=market");
+        }
         break;
       default:
         break;

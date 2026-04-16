@@ -5747,6 +5747,15 @@
     "food_order_delivered_review": {
       "title": "Order Delivered! 🎉",
       "body": "Your order from {restaurantName} has arrived. Tap to leave a review!"
+    },
+    "market_order_status_update": {
+      "title": "Market Order 🛒",
+      "out_for_delivery": "Your market order is on the way! 🛵",
+      "delivered": "Your market order has been delivered. 🎉"
+    },
+    "market_order_delivered_review": {
+      "title": "Market Order Delivered! 🎉",
+      "body": "Your market order has arrived. Tap to leave a review! ⭐"
     }
   }
 }

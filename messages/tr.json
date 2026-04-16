@@ -5759,6 +5759,15 @@
     "food_order_delivered_review": {
       "title": "Sipariş Teslim Edildi! 🎉",
       "body": "{restaurantName} siparişiniz teslim edildi. Değerlendirme yapmak için tıklayın!"
+    },
+    "market_order_status_update": {
+      "title": "Market Siparişi 🛒",
+      "out_for_delivery": "Market siparişiniz yola çıktı! 🛵",
+      "delivered": "Market siparişiniz teslim edildi. 🎉"
+    },
+    "market_order_delivered_review": {
+      "title": "Market Siparişi Teslim Edildi! 🎉",
+      "body": "Market siparişiniz ulaştı. Değerlendirme yapmak için tıklayın! ⭐"
     }
   }
 }
