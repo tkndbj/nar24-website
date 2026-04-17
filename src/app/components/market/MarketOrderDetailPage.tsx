@@ -517,7 +517,6 @@ function OrderHeaderCard({
   isDarkMode: boolean;
 }) {
   const t = useTranslations("market");
-  const locale = useLocale();
   const isCard = order.paymentMethod === "card";
 
   return (
