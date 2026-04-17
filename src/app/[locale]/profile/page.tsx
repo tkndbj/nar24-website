@@ -33,6 +33,8 @@ import {
   Ticket,
   CheckCircle,
   Store,
+  UtensilsCrossed,
+  ShoppingBasket,
 } from "lucide-react";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
@@ -227,7 +229,9 @@ export default function ProfilePage() {
           color: "text-purple-600 dark:text-purple-400",
         }]
       : []),
-    { icon: Package, label: t("ProfilePage.myOrders"), path: "/orders", description: t("ProfilePage.trackRecentPurchases"), color: "text-orange-500 dark:text-orange-400" },
+    { icon: Package, label: t("ProfilePage.myProductOrders"), path: "/orders", description: t("ProfilePage.productOrdersDescription"), color: "text-orange-500 dark:text-orange-400" },
+    { icon: UtensilsCrossed, label: t("ProfilePage.myFoodOrders"), path: "/food-orders", description: t("ProfilePage.foodOrdersDescription"), color: "text-rose-500 dark:text-rose-400" },
+    { icon: ShoppingBasket, label: t("ProfilePage.myMarketOrders"), path: "/market-orders", description: t("ProfilePage.marketOrdersDescription"), color: "text-green-500 dark:text-green-400" },
     { icon: Upload, label: t("ProfilePage.sellOnVitrin"), path: "/listproduct", description: t("ProfilePage.startSellingProducts"), color: "text-emerald-500 dark:text-emerald-400" },
     { icon: Star, label: t("ProfilePage.myReviews"), path: "/reviews", description: t("ProfilePage.yourWrittenReviews"), color: "text-amber-500 dark:text-amber-400" },
     { icon: Zap, label: t("ProfilePage.boosts"), path: "/boosts", description: t("ProfilePage.promoteYourListings"), color: "text-blue-500 dark:text-blue-400" },
