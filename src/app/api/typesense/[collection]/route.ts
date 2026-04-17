@@ -11,6 +11,8 @@ const ALLOWED_COLLECTIONS = new Set([
   "shops",
   "orders",
   "restaurants",
+  "foods",
+  "market_items", // ← NEW: nar24 market grocery catalogue
 ]);
 
 export async function GET(
