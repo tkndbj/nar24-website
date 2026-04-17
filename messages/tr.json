@@ -5351,6 +5351,10 @@
     "restaurants": "Restoranlar",
     "back": "Geri"
   },
+  "MarketHeader": {
+    "market": "Market",
+    "back": "Geri"
+  },
   "FoodCart": {
     "loginRequired": "Giriş Gerekli",
     "loginToViewCart": "Yemek sepetinizi görmek için giriş yapın",

@@ -1756,6 +1756,10 @@
     "restaurants": "Restaurants",
     "back": "Back"
   },
+  "MarketHeader": {
+    "market": "Market",
+    "back": "Back"
+  },
   "market": {
     "categoryTitle": "Market Categories",
     "categoryDescription": "Browse all market categories and shop from our wide selection",

@@ -9,6 +9,11 @@ const RestaurantHeader = dynamic(
   { ssr: false, loading: () => null },
 );
 
+const MarketSectionHeader = dynamic(
+  () => import("@/app/components/market/MarketSectionHeader"),
+  { ssr: false, loading: () => null },
+);
+
 const HIDE_HEADER_ROUTES = [
   "/login",
   "/registration",
@@ -26,6 +31,16 @@ const RESTAURANT_ROUTE_PREFIXES = [
   "/restaurantdetail",
   "/cart-food",
   "/food-checkout",
+];
+
+const MARKET_SECTION_ROUTE_PREFIXES = [
+  "/market-categories",
+  "/market-cart",
+  "/market-checkout",
+  "/market-orders",
+  "/market-receipts",
+  "/market-search",
+  "/isbankmarketpayment",
 ];
 
 function stripLocale(pathname: string): string {
@@ -52,6 +67,14 @@ export default function ConditionalHeader() {
 
   if (isRestaurantRoute) {
     return <RestaurantHeader />;
+  }
+
+  const isMarketSectionRoute = MARKET_SECTION_ROUTE_PREFIXES.some((prefix) =>
+    stripped.startsWith(prefix),
+  );
+
+  if (isMarketSectionRoute) {
+    return <MarketSectionHeader />;
   }
 
   return <MarketHeader />;
