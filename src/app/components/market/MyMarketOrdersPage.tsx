@@ -5,22 +5,8 @@
 // Lists the signed-in user's orders from `orders-market`, filtered by
 // `buyerId`, ordered by `createdAt desc`, paginated at 20/page.
 //
-// Web-specific behavior:
-//   • Responsive layout — single column on mobile, 2-col on tablet, 3-col on
-//     wide screens. The order card is list-optimized so a dense layout works.
-//   • URL-driven success toast — when a user lands here from the payment
-//     success redirect (`?success=true&orderId=…`), we show a dismissible
-//     banner. Also cleans up the URL so a refresh doesn't re-show it.
-//   • Unauthenticated users get a sign-in CTA, not an empty list. They hit
-//     this URL from the payment flow, sidebar, or deep links and it should
-//     be obvious what to do.
-//   • Infinite scroll via IntersectionObserver (same pattern as other pages).
-//   • Pull-to-refresh → we don't replicate that on web; the manual refresh
-//     needs a button, which I've put in the header for quick reloads.
-//
-// Route convention: cards link to `/market-orders/{id}` (matching the
-// detail route we built earlier). Flutter uses `/market-order-detail/{id}`
-// but there's no reason to duplicate URL hierarchies on web.
+// Design matches the food-orders page: sticky translucent header, inline
+// search, single-column card list with status strip, emerald accent.
 
 "use client";
 
@@ -30,10 +16,10 @@ import {
   useMemo,
   useRef,
   useState,
+  Suspense,
 } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense } from "react";
 import { useTranslations } from "next-intl";
 import {
   AlertCircle,
@@ -44,7 +30,7 @@ import {
   Clock,
   CreditCard,
   Package,
-  RefreshCw,
+  Search,
   ShoppingBag,
   Truck,
   Wallet,
@@ -222,24 +208,24 @@ function parseOrderDoc(
 // ════════════════════════════════════════════════════════════════════════════
 
 function formatDate(ts: Timestamp): string {
-  // Flutter: dd/MM/yyyy
   const d = ts.toDate();
   const pad = (n: number) => n.toString().padStart(2, "0");
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
 }
 
 function formatMoney(amount: number): string {
-  // Integer, no decimals — matches Flutter toStringAsFixed(0)
   return Math.round(amount).toString();
 }
 
-function itemsPreviewText(
-  order: MarketOrder,
-  fallback: string,
-): string {
+function itemsPreviewText(order: MarketOrder, fallback: string): string {
   if (order.items.length === 0) return fallback;
-  const names = order.items.slice(0, 3).map((i) => i.name).join(", ");
-  return order.items.length > 3 ? `${names}…` : names;
+  const names = order.items
+    .slice(0, 2)
+    .map((i) => (i.quantity > 1 ? `${i.quantity}× ${i.name}` : i.name))
+    .join(", ");
+  return order.items.length > 2
+    ? `${names} +${order.items.length - 2}`
+    : names;
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -247,10 +233,11 @@ function itemsPreviewText(
 // ════════════════════════════════════════════════════════════════════════════
 
 const PAGE_SIZE = 20;
+const SEARCH_DEBOUNCE_DELAY = 300;
+const SCROLL_THROTTLE_DELAY = 100;
 
 export default function MyMarketOrdersPage() {
   return (
-    // useSearchParams needs a Suspense boundary in Next 15.
     <Suspense fallback={null}>
       <OrdersPageInner />
     </Suspense>
@@ -264,40 +251,50 @@ function OrdersPageInner() {
   const searchParams = useSearchParams();
   const { user, isLoading: isUserLoading } = useUser();
 
-  // ── State ────────────────────────────────────────────────────────────────
   const [orders, setOrders] = useState<MarketOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // ── Refs ─────────────────────────────────────────────────────────────────
+  const [searchValue, setSearchValue] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+
   const lastDocRef = useRef<QueryDocumentSnapshot<DocumentData> | null>(null);
   const fetchTokenRef = useRef(0);
-  const sentinelRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const scrollThrottleRef = useRef<NodeJS.Timeout | null>(null);
 
-  // ── Success banner from payment redirect ─────────────────────────────────
-  // When we arrive with `?success=true&orderId=…`, show a toast once and then
-  // scrub the params from the URL so a refresh doesn't re-trigger it.
-  const successOrderId = searchParams.get("success") === "true"
-    ? searchParams.get("orderId") ?? ""
-    : null;
+  // Success banner from payment redirect — show once, scrub URL.
+  const successOrderId =
+    searchParams.get("success") === "true"
+      ? searchParams.get("orderId") ?? ""
+      : null;
   const [showSuccessBanner, setShowSuccessBanner] = useState(
     successOrderId !== null,
   );
 
   useEffect(() => {
     if (successOrderId === null) return;
-    // Clean the URL — replace so we don't pollute history.
     router.replace("/market-orders", { scroll: false });
-    // Auto-dismiss after 6s.
     const timer = setTimeout(() => setShowSuccessBanner(false), 6_000);
     return () => clearTimeout(timer);
-    // Only react to the initial URL state; subsequent navigations clear it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Loader ───────────────────────────────────────────────────────────────
+  // Debounce search input.
+  useEffect(() => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      setSearchQuery(searchValue.trim().toLowerCase());
+    }, SEARCH_DEBOUNCE_DELAY);
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    };
+  }, [searchValue]);
 
   const fetchPage = useCallback(
     async (reset: boolean) => {
@@ -348,7 +345,6 @@ function OrdersPageInner() {
     [user, t],
   );
 
-  // Initial + auth-change refetch
   useEffect(() => {
     if (isUserLoading) return;
     if (!user) {
@@ -358,38 +354,135 @@ function OrdersPageInner() {
     void fetchPage(true);
   }, [isUserLoading, user, fetchPage]);
 
-  // Infinite scroll
-  useEffect(() => {
-    const sentinel = sentinelRef.current;
-    if (!sentinel) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (!entries[0]?.isIntersecting) return;
-        if (isLoading || isLoadingMore || !hasMore) return;
+  const handleScroll = useCallback(() => {
+    if (scrollThrottleRef.current) return;
+    scrollThrottleRef.current = setTimeout(() => {
+      const container = scrollRef.current;
+      if (!container || isLoading || isLoadingMore || !hasMore) {
+        scrollThrottleRef.current = null;
+        return;
+      }
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      if (scrollHeight - scrollTop <= clientHeight + 200) {
         void fetchPage(false);
-      },
-      { rootMargin: "300px" },
-    );
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [hasMore, isLoading, isLoadingMore, fetchPage]);
+      }
+      scrollThrottleRef.current = null;
+    }, SCROLL_THROTTLE_DELAY);
+  }, [isLoading, isLoadingMore, hasMore, fetchPage]);
 
-  // ── Render state routing ─────────────────────────────────────────────────
+  const clearSearch = () => {
+    setSearchValue("");
+    setSearchQuery("");
+    searchInputRef.current?.blur();
+  };
+
+  const dismissKeyboard = () => {
+    if (isSearchFocused) {
+      searchInputRef.current?.blur();
+      setIsSearchFocused(false);
+    }
+  };
+
+  const filteredOrders = useMemo(() => {
+    if (!searchQuery) return orders;
+    return orders.filter((o) => {
+      if (o.id.toLowerCase().includes(searchQuery)) return true;
+      return o.items.some(
+        (i) =>
+          i.name.toLowerCase().includes(searchQuery) ||
+          i.brand.toLowerCase().includes(searchQuery),
+      );
+    });
+  }, [orders, searchQuery]);
 
   return (
-    <main
+    <div
       className={`min-h-screen ${
-        isDarkMode ? "bg-[#1C1A29]" : "bg-[#F5F5F5]"
+        isDarkMode ? "bg-gray-900" : "bg-gray-50/50"
       }`}
+      onClick={dismissKeyboard}
     >
-      <TopBar
-        isDarkMode={isDarkMode}
-        onBack={() => router.back()}
-        onRefresh={user ? () => fetchPage(true) : undefined}
-        isRefreshing={isLoading && !!user}
-      />
+      <div
+        className={`sticky top-14 z-30 border-b ${
+          isDarkMode
+            ? "bg-gray-900/80 backdrop-blur-xl border-gray-700/80"
+            : "bg-white/80 backdrop-blur-xl border-gray-100/80"
+        }`}
+      >
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center gap-3 px-3 sm:px-6 pt-3 pb-2">
+            <button
+              onClick={() => router.back()}
+              className={`w-9 h-9 flex items-center justify-center border rounded-xl transition-colors flex-shrink-0 ${
+                isDarkMode
+                  ? "bg-gray-800 border-gray-700 hover:bg-gray-700"
+                  : "bg-gray-50 border-gray-200 hover:bg-gray-100"
+              }`}
+              aria-label={t("back")}
+            >
+              <ArrowLeft
+                className={`w-4 h-4 ${
+                  isDarkMode ? "text-gray-300" : "text-gray-600"
+                }`}
+              />
+            </button>
+            <h1
+              className={`text-lg font-bold truncate ${
+                isDarkMode ? "text-white" : "text-gray-900"
+              }`}
+            >
+              {t("myOrdersTitle")}
+            </h1>
+            {filteredOrders.length > 0 && (
+              <span className="px-2 py-0.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-xs font-semibold rounded-full flex-shrink-0">
+                {filteredOrders.length}
+              </span>
+            )}
+          </div>
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="px-3 sm:px-6 pb-3">
+            <div className="relative">
+              <Search
+                className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${
+                  isDarkMode ? "text-gray-400" : "text-gray-400"
+                }`}
+              />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchValue}
+                onChange={(e) => setSearchValue(e.target.value)}
+                onFocus={() => setIsSearchFocused(true)}
+                onBlur={() => setIsSearchFocused(false)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") dismissKeyboard();
+                }}
+                placeholder={t("ordersSearchPlaceholder")}
+                className={`w-full pl-9 pr-9 py-2 border rounded-xl text-sm placeholder-gray-400 focus:outline-none transition-all ${
+                  isDarkMode
+                    ? "bg-gray-800 border-gray-700 text-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400"
+                    : "bg-gray-50/80 border-gray-200 text-gray-900 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-300"
+                }`}
+              />
+              {searchValue && (
+                <button
+                  onClick={clearSearch}
+                  className="absolute right-3 top-1/2 -translate-y-1/2"
+                  aria-label={t("clearSearch")}
+                >
+                  <X
+                    className={`w-4 h-4 ${
+                      isDarkMode ? "text-gray-400" : "text-gray-400"
+                    }`}
+                  />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-4xl mx-auto px-3 sm:px-6 py-4">
         {showSuccessBanner && successOrderId && (
           <SuccessBanner
             orderId={successOrderId}
@@ -408,81 +501,33 @@ function OrdersPageInner() {
           />
         ) : isLoading ? (
           <ListSkeleton isDarkMode={isDarkMode} />
-        ) : orders.length === 0 ? (
-          <EmptyState isDarkMode={isDarkMode} />
+        ) : filteredOrders.length === 0 ? (
+          <EmptyState
+            isDarkMode={isDarkMode}
+            searching={searchQuery.length > 0}
+          />
         ) : (
-          <>
-            <ul className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
-              {orders.map((order) => (
-                <li key={order.id}>
-                  <OrderCard order={order} isDarkMode={isDarkMode} />
-                </li>
-              ))}
-            </ul>
-
-            <div ref={sentinelRef} aria-hidden className="h-px mt-6" />
+          <div
+            ref={scrollRef}
+            onScroll={handleScroll}
+            className="space-y-3 max-h-[calc(100vh-220px)] overflow-y-auto"
+          >
+            {filteredOrders.map((order) => (
+              <OrderCard
+                key={order.id}
+                order={order}
+                isDarkMode={isDarkMode}
+              />
+            ))}
             {isLoadingMore && (
-              <div className="flex justify-center py-6">
-                <span
-                  role="status"
-                  aria-label={t("loading")}
-                  className="w-6 h-6 border-[3px] border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin"
-                />
+              <div className="flex justify-center py-8">
+                <div className="w-5 h-5 border-[3px] border-emerald-200 border-t-emerald-600 rounded-full animate-spin" />
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
-    </main>
-  );
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-// TOP BAR
-// ════════════════════════════════════════════════════════════════════════════
-
-function TopBar({
-  onBack,
-  onRefresh,
-  isRefreshing,
-}: {
-  isDarkMode: boolean;
-  onBack: () => void;
-  onRefresh?: () => void;
-  isRefreshing: boolean;
-}) {
-  const t = useTranslations("market");
-  return (
-    <header className="sticky top-0 z-20 bg-[#00A86B] text-white">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={onBack}
-          aria-label={t("back")}
-          className="-ml-2 p-2 rounded-full hover:bg-white/10 outline-none focus-visible:ring-2 focus-visible:ring-white"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-
-        <h1 className="flex-1 text-base sm:text-lg font-semibold truncate">
-          {t("myOrdersTitle")}
-        </h1>
-
-        {onRefresh && (
-          <button
-            type="button"
-            onClick={onRefresh}
-            disabled={isRefreshing}
-            aria-label={t("ordersRefresh")}
-            className="p-2 rounded-full hover:bg-white/10 disabled:opacity-50 outline-none focus-visible:ring-2 focus-visible:ring-white"
-          >
-            <RefreshCw
-              className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`}
-            />
-          </button>
-        )}
-      </div>
-    </header>
+    </div>
   );
 }
 
@@ -581,54 +626,57 @@ function OrderCard({
       aria-label={t("orderCardAriaLabel", {
         id: order.id.slice(0, 8).toUpperCase(),
       })}
-      className={`group block rounded-2xl overflow-hidden transition-shadow outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 ${
+      className={`block rounded-2xl border overflow-hidden cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all ${
         isDarkMode
-          ? "bg-[#211F31] shadow-[0_2px_6px_rgba(0,0,0,0.25)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.35)] focus-visible:ring-offset-[#1C1A29]"
-          : "bg-white shadow-sm hover:shadow-md focus-visible:ring-offset-[#F5F5F5]"
+          ? "bg-gray-800 border-gray-700"
+          : "bg-white border-gray-100"
       }`}
     >
-      {/* Main row */}
-      <div className="p-4 flex items-start gap-3">
+      <div className="px-4 py-3 flex items-center gap-3">
         <div
-          className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
-            isDarkMode ? "bg-[#2D2B3F]" : "bg-emerald-50"
+          className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+            isDarkMode ? "bg-gray-700" : "bg-emerald-50"
           }`}
         >
-          <ShoppingBag
-            className="w-6 h-6 text-emerald-600"
-            aria-hidden
-          />
+          <ShoppingBag className="w-4 h-4 text-emerald-600" aria-hidden />
         </div>
 
         <div className="flex-1 min-w-0">
-          <p
-            className={`text-sm font-bold ${
+          <h4
+            className={`text-sm font-semibold truncate ${
               isDarkMode ? "text-white" : "text-gray-900"
             }`}
           >
             {t("brandName")}
-          </p>
+          </h4>
           <p
-            className={`mt-0.5 text-xs truncate ${
-              isDarkMode ? "text-gray-400" : "text-gray-600"
+            className={`text-[11px] truncate mt-0.5 ${
+              isDarkMode ? "text-gray-400" : "text-gray-500"
             }`}
             title={preview}
           >
             {preview}
           </p>
-          <p
-            className={`mt-1 text-xs font-bold tabular-nums ${
-              isDarkMode ? "text-emerald-400" : "text-emerald-700"
-            }`}
-          >
-            {formatMoney(order.totalPrice)} {order.currency}
-          </p>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span
+              className={`text-xs font-bold tabular-nums ${
+                isDarkMode ? "text-emerald-400" : "text-emerald-600"
+              }`}
+            >
+              {formatMoney(order.totalPrice)} {order.currency}
+            </span>
+          </div>
         </div>
 
-        <div className="flex flex-col items-end flex-shrink-0">
-          <ChevronRight className="w-5 h-5 text-emerald-600" aria-hidden />
+        <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+          <ChevronRight
+            className={`w-4 h-4 ${
+              isDarkMode ? "text-gray-500" : "text-gray-400"
+            }`}
+            aria-hidden
+          />
           <span
-            className={`mt-1.5 text-[11px] tabular-nums ${
+            className={`text-[11px] tabular-nums ${
               isDarkMode ? "text-gray-500" : "text-gray-400"
             }`}
           >
@@ -637,38 +685,47 @@ function OrderCard({
         </div>
       </div>
 
-      {/* Status strip */}
       <div
-        className={`px-4 py-2 flex items-center gap-2 border-t ${
+        className={`px-4 py-2 border-t flex items-center justify-between ${
           isDarkMode
-            ? "bg-white/[0.04] border-white/10"
-            : "bg-gray-50 border-gray-100"
+            ? "border-gray-700 bg-gray-800/50"
+            : "border-gray-50 bg-gray-50/50"
         }`}
       >
         <span
           className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border"
           style={{
-            backgroundColor: `${visual.color}1F`, // ~12% alpha
+            backgroundColor: `${visual.color}1F`,
             color: visual.color,
-            borderColor: `${visual.color}59`, // ~35% alpha
+            borderColor: `${visual.color}59`,
           }}
         >
-          <StatusIcon className="w-2.5 h-2.5" aria-hidden />
+          <StatusIcon className="w-3 h-3" aria-hidden />
           {t(visual.labelKey)}
         </span>
 
-        <span className="flex-1" />
-
         <span
-          className="inline-flex items-center gap-1 text-[11px] font-semibold"
-          style={{ color: order.isPaid ? "#00A86B" : "#D97706" }}
+          className={`inline-flex items-center gap-1 text-[11px] font-semibold ${
+            order.isPaid
+              ? isDarkMode
+                ? "text-emerald-400"
+                : "text-emerald-600"
+              : isDarkMode
+                ? "text-amber-400"
+                : "text-amber-600"
+          }`}
         >
           {order.isPaid ? (
-            <CreditCard className="w-3 h-3" aria-hidden />
+            <>
+              <CreditCard className="w-3 h-3" aria-hidden />
+              {t("paymentPaid")}
+            </>
           ) : (
-            <Wallet className="w-3 h-3" aria-hidden />
+            <>
+              <Wallet className="w-3 h-3" aria-hidden />
+              {t("paymentAtDoor")}
+            </>
           )}
-          {order.isPaid ? t("paymentPaid") : t("paymentAtDoor")}
         </span>
       </div>
     </Link>
@@ -679,42 +736,46 @@ function OrderCard({
 // STATES
 // ════════════════════════════════════════════════════════════════════════════
 
-function EmptyState({ isDarkMode }: { isDarkMode: boolean }) {
+function EmptyState({
+  isDarkMode,
+  searching,
+}: {
+  isDarkMode: boolean;
+  searching: boolean;
+}) {
   const t = useTranslations("market");
   return (
-    <div className="flex flex-col items-center justify-center text-center py-16 sm:py-24 px-4">
-      <div
-        className={`w-24 h-24 rounded-3xl flex items-center justify-center ${
-          isDarkMode ? "bg-[#2D2B3F]" : "bg-emerald-50"
+    <div className="text-center py-16">
+      <ShoppingBag
+        className={`w-12 h-12 mx-auto mb-3 ${
+          isDarkMode ? "text-gray-600" : "text-gray-300"
         }`}
-      >
-        <ShoppingBag
-          className={`w-10 h-10 ${
-            isDarkMode ? "text-gray-600" : "text-emerald-400"
-          }`}
-          aria-hidden
-        />
-      </div>
-      <h2
-        className={`mt-6 text-[17px] font-bold ${
+        aria-hidden
+      />
+      <h3
+        className={`text-sm font-semibold mb-1 ${
           isDarkMode ? "text-white" : "text-gray-900"
         }`}
       >
-        {t("ordersEmptyTitle")}
-      </h2>
+        {searching ? t("ordersNoResultsTitle") : t("ordersEmptyTitle")}
+      </h3>
       <p
-        className={`mt-1.5 text-[13px] max-w-sm ${
-          isDarkMode ? "text-gray-500" : "text-gray-600"
+        className={`text-xs max-w-xs mx-auto ${
+          isDarkMode ? "text-gray-400" : "text-gray-500"
         }`}
       >
-        {t("ordersEmptySubtitle")}
+        {searching
+          ? t("ordersNoResultsSubtitle")
+          : t("ordersEmptySubtitle")}
       </p>
-      <Link
-        href="/market-categories"
-        className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#00A86B] text-white text-sm font-semibold hover:bg-emerald-700 transition-colors"
-      >
-        {t("continueShopping")}
-      </Link>
+      {!searching && (
+        <Link
+          href="/market-categories"
+          className="mt-4 inline-flex items-center px-4 py-2 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-colors text-xs font-medium"
+        >
+          {t("continueShopping")}
+        </Link>
+      )}
     </div>
   );
 }
@@ -722,36 +783,30 @@ function EmptyState({ isDarkMode }: { isDarkMode: boolean }) {
 function SignInState({ isDarkMode }: { isDarkMode: boolean }) {
   const t = useTranslations("market");
   return (
-    <div className="flex flex-col items-center justify-center text-center py-16 sm:py-24 px-4">
-      <div
-        className={`w-24 h-24 rounded-3xl flex items-center justify-center ${
-          isDarkMode ? "bg-[#2D2B3F]" : "bg-emerald-50"
+    <div className="text-center py-16">
+      <ShoppingBag
+        className={`w-12 h-12 mx-auto mb-3 ${
+          isDarkMode ? "text-gray-600" : "text-gray-300"
         }`}
-      >
-        <ShoppingBag
-          className={`w-10 h-10 ${
-            isDarkMode ? "text-gray-600" : "text-emerald-400"
-          }`}
-          aria-hidden
-        />
-      </div>
-      <h2
-        className={`mt-6 text-[17px] font-bold ${
+        aria-hidden
+      />
+      <h3
+        className={`text-sm font-semibold mb-1 ${
           isDarkMode ? "text-white" : "text-gray-900"
         }`}
       >
         {t("ordersSignInTitle")}
-      </h2>
+      </h3>
       <p
-        className={`mt-1.5 text-[13px] max-w-sm ${
-          isDarkMode ? "text-gray-500" : "text-gray-600"
+        className={`text-xs max-w-xs mx-auto ${
+          isDarkMode ? "text-gray-400" : "text-gray-500"
         }`}
       >
         {t("ordersSignInSubtitle")}
       </p>
       <Link
         href="/login"
-        className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#00A86B] text-white text-sm font-semibold hover:bg-emerald-700 transition-colors"
+        className="mt-4 inline-flex items-center px-4 py-2 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-colors text-xs font-medium"
       >
         {t("signIn")}
       </Link>
@@ -770,23 +825,26 @@ function ErrorState({
 }) {
   const t = useTranslations("market");
   return (
-    <div className="flex flex-col items-center justify-center text-center py-16 px-4">
-      <div className="w-16 h-16 rounded-2xl bg-red-500/10 flex items-center justify-center">
-        <AlertCircle className="w-7 h-7 text-red-500" aria-hidden />
+    <div className="text-center py-16">
+      <div
+        className={`w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3 ${
+          isDarkMode ? "bg-red-900/20" : "bg-red-50"
+        }`}
+      >
+        <AlertCircle className="w-5 h-5 text-red-500" aria-hidden />
       </div>
-      <p
-        className={`mt-4 text-base font-semibold ${
+      <h3
+        className={`text-sm font-semibold mb-1 ${
           isDarkMode ? "text-white" : "text-gray-900"
         }`}
       >
         {message}
-      </p>
+      </h3>
       <button
         type="button"
         onClick={onRetry}
-        className="mt-4 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#00A86B] text-white text-sm font-bold hover:bg-emerald-700 transition-colors"
+        className="mt-3 inline-flex items-center px-4 py-2 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-colors text-xs font-medium"
       >
-        <RefreshCw className="w-4 h-4" />
         {t("ordersTryAgain")}
       </button>
     </div>
@@ -798,34 +856,18 @@ function ErrorState({
 // ════════════════════════════════════════════════════════════════════════════
 
 function ListSkeleton({ isDarkMode }: { isDarkMode: boolean }) {
-  const card = isDarkMode ? "bg-[#211F31]" : "bg-white";
-  const bg = isDarkMode ? "bg-[#3A3850]" : "bg-gray-200";
   return (
-    <ul className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3 animate-pulse">
+    <div className="space-y-3">
       {Array.from({ length: 6 }).map((_, i) => (
-        <li
+        <div
           key={i}
-          className={`rounded-2xl overflow-hidden ${card} shadow-sm`}
-        >
-          <div className="p-4 flex items-start gap-3">
-            <div className={`w-12 h-12 rounded-xl ${bg}`} />
-            <div className="flex-1 space-y-2">
-              <div className={`h-3 w-24 rounded ${bg}`} />
-              <div className={`h-3 w-3/4 rounded ${bg}`} />
-              <div className={`h-3 w-16 rounded ${bg}`} />
-            </div>
-            <div className="space-y-2">
-              <div className={`w-5 h-5 rounded ${bg}`} />
-              <div className={`h-2.5 w-12 rounded ${bg}`} />
-            </div>
-          </div>
-          <div
-            className={`h-8 ${
-              isDarkMode ? "bg-white/[0.04]" : "bg-gray-50"
-            } border-t ${isDarkMode ? "border-white/10" : "border-gray-100"}`}
-          />
-        </li>
+          className={`rounded-2xl border h-24 animate-pulse ${
+            isDarkMode
+              ? "bg-gray-800 border-gray-700"
+              : "bg-white border-gray-100"
+          }`}
+        />
       ))}
-    </ul>
+    </div>
   );
 }

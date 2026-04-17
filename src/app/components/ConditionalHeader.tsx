@@ -37,8 +37,6 @@ const MARKET_SECTION_ROUTE_PREFIXES = [
   "/market-categories",
   "/market-cart",
   "/market-checkout",
-  "/market-orders",
-  "/market-receipts",
   "/market-search",
   "/isbankmarketpayment",
 ];
