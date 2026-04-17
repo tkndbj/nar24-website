@@ -33,17 +33,17 @@ export const MarketBubbles: React.FC<MarketBubblesProps> = ({}) => {
       showComingSoon: false,
     },
     {
+      label: t("market"),
+      description: t("marketDesc"),
+      image: "/images/marketbubble.png",
+      accentColor: "#ec4899",
+      showComingSoon: false,
+    },
+    {
       label: t("shops"),
       description: t("shopsDesc"),
       image: "/images/shopbubble.png",
       accentColor: "#f97316",
-      showComingSoon: false,
-    },
-    {
-      label: t("becomeASeller"),
-      description: t("becomeASellerDesc"),
-      image: "/images/createshop.png",
-      accentColor: "#8b5cf6",
       showComingSoon: false,
     },
     {
@@ -54,11 +54,11 @@ export const MarketBubbles: React.FC<MarketBubblesProps> = ({}) => {
       showComingSoon: false,
     },
     {
-      label: t("market"),
-      description: t("marketDesc"),
-      image: "/images/marketbubble.png",
-      accentColor: "#ec4899",
-      showComingSoon: true,
+      label: t("becomeASeller"),
+      description: t("becomeASellerDesc"),
+      image: "/images/createshop.png",
+      accentColor: "#8b5cf6",
+      showComingSoon: false,
     },
   ];
 
@@ -66,16 +66,18 @@ export const MarketBubbles: React.FC<MarketBubblesProps> = ({}) => {
     if (index === 0) {
       router.push("/restaurants");
     } else if (index === 1) {
-      router.push("/shops");
+      router.push("/market-categories");
     } else if (index === 2) {
-      router.push("/createshop");
+      router.push("/shops");
     } else if (index === 3) {
       router.push("/dynamicteras");
+    } else if (index === 4) {
+      router.push("/createshop");
     }
   };
 
   return (
-    <div className="flex gap-3 overflow-x-auto scrollbar-hide sm:grid sm:grid-cols-3 lg:grid-cols-5 lg:gap-4">
+    <div className="flex gap-3 overflow-x-auto scrollbar-hide sm:grid sm:grid-cols-3 lg:grid-cols-5 lg:gap-4 py-1">
       {cards.map((card, index) => (
         <div
           key={card.label}

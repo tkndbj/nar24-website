@@ -26,8 +26,10 @@ import {
   LogIn,
   UtensilsCrossed,
   ShoppingBag,
+  ShoppingBasket,
   MapPin,
   Banknote,
+  Truck,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 
@@ -35,7 +37,7 @@ import { useLocale, useTranslations } from "next-intl";
 // INTERFACES
 // ============================================================================
 
-type Tab = "product" | "food";
+type Tab = "product" | "food" | "market";
 
 interface Receipt {
   id: string;
@@ -61,6 +63,19 @@ interface FoodReceipt {
   deliveryType: string;
   restaurantName: string;
   filePath?: string;
+}
+
+interface MarketReceipt {
+  id: string;
+  orderId: string;
+  receiptId: string;
+  totalPrice: number;
+  currency: string;
+  timestamp: Date;
+  paymentMethod: string;
+  isPaid: boolean;
+  filePath?: string;
+  downloadUrl?: string;
 }
 
 const RECEIPTS_LIMIT = 20;
@@ -89,6 +104,15 @@ export default function ReceiptsPage() {
   const [lastFoodDocument, setLastFoodDocument] =
     useState<QueryDocumentSnapshot<DocumentData> | null>(null);
   const [foodFetched, setFoodFetched] = useState(false);
+
+  // ── Market receipts state ────────────────────────────────────────
+  const [marketReceipts, setMarketReceipts] = useState<MarketReceipt[]>([]);
+  const [isMarketLoading, setIsMarketLoading] = useState(false);
+  const [isMarketInitialLoad, setIsMarketInitialLoad] = useState(true);
+  const [hasMarketMore, setHasMarketMore] = useState(true);
+  const [lastMarketDocument, setLastMarketDocument] =
+    useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [marketFetched, setMarketFetched] = useState(false);
 
   const locale = useLocale();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -233,18 +257,80 @@ export default function ReceiptsPage() {
     [user, isFoodLoading, lastFoodDocument],
   );
 
+  // ── Fetch market receipts ────────────────────────────────────────
+  // Same Firestore path the Flutter app uses and the market receipt detail
+  // page reads from: users/{uid}/marketReceipts, ordered by timestamp desc.
+  const fetchMarketReceipts = useCallback(
+    async (loadMore = false) => {
+      if (!user || isMarketLoading) return;
+      setIsMarketLoading(true);
+      try {
+        const ref = collection(db, "users", user.uid, "marketReceipts");
+        let q = query(ref, orderBy("timestamp", "desc"), limit(RECEIPTS_LIMIT));
+        if (loadMore && lastMarketDocument) {
+          q = query(
+            ref,
+            orderBy("timestamp", "desc"),
+            startAfter(lastMarketDocument),
+            limit(RECEIPTS_LIMIT),
+          );
+        }
+        const snapshot = await getDocs(q);
+        if (snapshot.docs.length > 0) {
+          const items: MarketReceipt[] = snapshot.docs.map((doc) => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              orderId: data.orderId || "",
+              receiptId: data.receiptId || "",
+              totalPrice: data.totalPrice || 0,
+              currency: data.currency || "TL",
+              timestamp:
+                data.timestamp instanceof Timestamp
+                  ? data.timestamp.toDate()
+                  : new Date(data.timestamp),
+              paymentMethod: data.paymentMethod || "",
+              isPaid: data.isPaid || false,
+              filePath: data.filePath,
+              downloadUrl: data.downloadUrl,
+            };
+          });
+          setLastMarketDocument(snapshot.docs[snapshot.docs.length - 1]);
+          if (loadMore) setMarketReceipts((prev) => [...prev, ...items]);
+          else setMarketReceipts(items);
+          setHasMarketMore(snapshot.docs.length >= RECEIPTS_LIMIT);
+        } else {
+          setHasMarketMore(false);
+        }
+      } catch (error) {
+        console.error("Error fetching market receipts:", error);
+        alert(
+          `Error: ${l("Receipts.errorFetchingReceipts") || "Error fetching receipts"}`,
+        );
+      } finally {
+        setIsMarketLoading(false);
+        setIsMarketInitialLoad(false);
+        setMarketFetched(true);
+      }
+    },
+    [user, isMarketLoading, lastMarketDocument],
+  );
+
   // ── Initial load (product) ───────────────────────────────────────
   useEffect(() => {
     if (user) fetchReceipts();
     else setIsInitialLoad(false);
   }, [user]);
 
-  // ── Load food receipts when tab first switches ───────────────────
+  // ── Lazy fetch on tab switch ─────────────────────────────────────
   useEffect(() => {
     if (activeTab === "food" && user && !foodFetched) {
       fetchFoodReceipts();
     }
-  }, [activeTab, user, foodFetched]);
+    if (activeTab === "market" && user && !marketFetched) {
+      fetchMarketReceipts();
+    }
+  }, [activeTab, user, foodFetched, marketFetched]);
 
   // ── Refresh handlers ─────────────────────────────────────────────
   const refreshReceipts = useCallback(async () => {
@@ -264,6 +350,15 @@ export default function ReceiptsPage() {
     await fetchFoodReceipts();
   }, [fetchFoodReceipts]);
 
+  const refreshMarketReceipts = useCallback(async () => {
+    setMarketReceipts([]);
+    setLastMarketDocument(null);
+    setHasMarketMore(true);
+    setIsMarketInitialLoad(true);
+    setMarketFetched(false);
+    await fetchMarketReceipts();
+  }, [fetchMarketReceipts]);
+
   // ── Load more handlers ───────────────────────────────────────────
   const loadMoreReceipts = useCallback(() => {
     if (hasMore && !isLoading) fetchReceipts(true);
@@ -273,6 +368,10 @@ export default function ReceiptsPage() {
     if (hasFoodMore && !isFoodLoading) fetchFoodReceipts(true);
   }, [hasFoodMore, isFoodLoading, fetchFoodReceipts]);
 
+  const loadMoreMarketReceipts = useCallback(() => {
+    if (hasMarketMore && !isMarketLoading) fetchMarketReceipts(true);
+  }, [hasMarketMore, isMarketLoading, fetchMarketReceipts]);
+
   // ── Infinite scroll ──────────────────────────────────────────────
   useEffect(() => {
     const handleScroll = () => {
@@ -280,7 +379,8 @@ export default function ReceiptsPage() {
       const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
       if (scrollHeight - scrollTop <= clientHeight + 200) {
         if (activeTab === "product") loadMoreReceipts();
-        else loadMoreFoodReceipts();
+        else if (activeTab === "food") loadMoreFoodReceipts();
+        else if (activeTab === "market") loadMoreMarketReceipts();
       }
     };
     const el = scrollRef.current;
@@ -288,7 +388,12 @@ export default function ReceiptsPage() {
       el.addEventListener("scroll", handleScroll);
       return () => el.removeEventListener("scroll", handleScroll);
     }
-  }, [activeTab, loadMoreReceipts, loadMoreFoodReceipts]);
+  }, [
+    activeTab,
+    loadMoreReceipts,
+    loadMoreFoodReceipts,
+    loadMoreMarketReceipts,
+  ]);
 
   // ── Navigation ───────────────────────────────────────────────────
   const goToReceiptDetail = (receipt: Receipt) => {
@@ -297,6 +402,11 @@ export default function ReceiptsPage() {
 
   const goToFoodReceiptDetail = (receipt: FoodReceipt) => {
     router.push(`/${locale}/receipts/food-receipt-detail/${receipt.id}`);
+  };
+
+  const goToMarketReceiptDetail = (receipt: MarketReceipt) => {
+    // Matches the route we built in the market receipt detail page.
+    router.push(`/${locale}/market-receipts/${receipt.id}`);
   };
 
   // ── Formatters ───────────────────────────────────────────────────
@@ -368,9 +478,27 @@ export default function ReceiptsPage() {
     );
   }
 
-  const currentIsLoading = activeTab === "product" ? isLoading : isFoodLoading;
+  // ── Active-tab derived values ────────────────────────────────────
+  const currentIsLoading =
+    activeTab === "product"
+      ? isLoading
+      : activeTab === "food"
+        ? isFoodLoading
+        : isMarketLoading;
+
   const currentCount =
-    activeTab === "product" ? receipts.length : foodReceipts.length;
+    activeTab === "product"
+      ? receipts.length
+      : activeTab === "food"
+        ? foodReceipts.length
+        : marketReceipts.length;
+
+  const currentRefresh =
+    activeTab === "product"
+      ? refreshReceipts
+      : activeTab === "food"
+        ? refreshFoodReceipts
+        : refreshMarketReceipts;
 
   return (
     <div
@@ -412,11 +540,7 @@ export default function ReceiptsPage() {
             <div className="flex-1" />
             {user && (
               <button
-                onClick={
-                  activeTab === "product"
-                    ? refreshReceipts
-                    : refreshFoodReceipts
-                }
+                onClick={currentRefresh}
                 disabled={currentIsLoading}
                 className={`w-9 h-9 flex items-center justify-center border rounded-xl transition-colors flex-shrink-0 ${
                   isDarkMode
@@ -432,10 +556,11 @@ export default function ReceiptsPage() {
           </div>
 
           {/* Tab switcher */}
-          <div className="flex gap-1 pb-3">
+          {/* Horizontal scroll on narrow viewports so three tabs don't wrap. */}
+          <div className="flex gap-1 pb-3 overflow-x-auto scrollbar-none -mx-1 px-1">
             <button
               onClick={() => setActiveTab("product")}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap flex-shrink-0 ${
                 activeTab === "product"
                   ? "bg-orange-500 text-white shadow-sm"
                   : isDarkMode
@@ -448,7 +573,7 @@ export default function ReceiptsPage() {
             </button>
             <button
               onClick={() => setActiveTab("food")}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap flex-shrink-0 ${
                 activeTab === "food"
                   ? "bg-orange-500 text-white shadow-sm"
                   : isDarkMode
@@ -458,6 +583,19 @@ export default function ReceiptsPage() {
             >
               <UtensilsCrossed className="w-3.5 h-3.5" />
               {l("Receipts.foodOrders") || "Food Orders"}
+            </button>
+            <button
+              onClick={() => setActiveTab("market")}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap flex-shrink-0 ${
+                activeTab === "market"
+                  ? "bg-emerald-600 text-white shadow-sm"
+                  : isDarkMode
+                    ? "text-gray-400 hover:text-gray-200 hover:bg-gray-800"
+                    : "text-gray-500 hover:text-gray-800 hover:bg-gray-100"
+              }`}
+            >
+              <ShoppingBasket className="w-3.5 h-3.5" />
+              {l("Receipts.marketOrders") || "Market"}
             </button>
           </div>
         </div>
@@ -622,8 +760,193 @@ export default function ReceiptsPage() {
               )}
             </div>
           )
-        ) : /* ── Food Receipts ────────────────────────────────────── */
-        isFoodInitialLoad ? (
+        ) : activeTab === "food" ? (
+          /* ── Food Receipts ──────────────────────────────────── */
+          isFoodInitialLoad ? (
+            /* Initial Loading */
+            <div className="space-y-3">
+              {[...Array(5)].map((_, i) => (
+                <div
+                  key={i}
+                  className={`rounded-2xl border h-20 animate-pulse ${
+                    isDarkMode
+                      ? "bg-gray-800 border-gray-700"
+                      : "bg-white border-gray-100"
+                  }`}
+                />
+              ))}
+            </div>
+          ) : foodReceipts.length === 0 ? (
+            /* Empty */
+            <div className="text-center py-16">
+              <UtensilsCrossed
+                className={`w-12 h-12 mx-auto mb-3 ${isDarkMode ? "text-gray-600" : "text-gray-300"}`}
+              />
+              <h3
+                className={`text-sm font-semibold mb-1 ${isDarkMode ? "text-white" : "text-gray-900"}`}
+              >
+                {l("Receipts.noReceiptsFound") || "No Receipts Found"}
+              </h3>
+              <p
+                className={`text-xs max-w-xs mx-auto ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+              >
+                {l("Receipts.foodReceiptsWillAppearHere") ||
+                  "Your food order receipts will appear here."}
+              </p>
+            </div>
+          ) : (
+            /* Food Receipts List */
+            <div className="space-y-3">
+              {foodReceipts.map((receipt) => (
+                <div
+                  key={receipt.id}
+                  onClick={() => goToFoodReceiptDetail(receipt)}
+                  className={`rounded-2xl border overflow-hidden cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all ${
+                    isDarkMode
+                      ? "bg-gray-800 border-gray-700"
+                      : "bg-white border-gray-100"
+                  }`}
+                >
+                  {/* Main row */}
+                  <div className="px-4 py-3 flex items-center gap-3">
+                    {/* Icon */}
+                    <div
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                        isDarkMode ? "bg-gray-700" : "bg-orange-50"
+                      }`}
+                    >
+                      <UtensilsCrossed className="w-4 h-4 text-orange-500" />
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <h3
+                        className={`text-sm font-semibold truncate ${isDarkMode ? "text-white" : "text-gray-900"}`}
+                      >
+                        {receipt.restaurantName ||
+                          l("Receipts.foodOrder") ||
+                          "Food Order"}
+                      </h3>
+                      <div className="flex items-center gap-3 mt-0.5">
+                        <div className="flex items-center gap-1">
+                          <Calendar
+                            className={`w-3 h-3 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
+                          />
+                          <span
+                            className={`text-[11px] ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                          >
+                            {formatDate(receipt.timestamp)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {receipt.paymentMethod === "pay_at_door" ? (
+                            <Banknote
+                              className={`w-3 h-3 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
+                            />
+                          ) : (
+                            <CreditCard
+                              className={`w-3 h-3 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
+                            />
+                          )}
+                          <span
+                            className={`text-[11px] ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                          >
+                            {localizePaymentMethod(receipt.paymentMethod)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Price + Delivery + Arrow */}
+                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`text-xs font-bold ${isDarkMode ? "text-orange-400" : "text-orange-600"}`}
+                        >
+                          {receipt.totalPrice.toFixed(0)} {receipt.currency}
+                        </span>
+                        <ChevronRight
+                          className={`w-4 h-4 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
+                        />
+                      </div>
+                      <span
+                        className={`flex items-center gap-0.5 text-[11px] font-medium ${
+                          receipt.deliveryType === "pickup"
+                            ? isDarkMode
+                              ? "text-blue-400"
+                              : "text-blue-600"
+                            : isDarkMode
+                              ? "text-green-400"
+                              : "text-green-600"
+                        }`}
+                      >
+                        {receipt.deliveryType === "pickup" ? (
+                          <ShoppingBag className="w-2.5 h-2.5" />
+                        ) : (
+                          <MapPin className="w-2.5 h-2.5" />
+                        )}
+                        {localizeFoodDeliveryType(receipt.deliveryType)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Paid / Pay-at-door badge strip */}
+                  <div
+                    className={`px-4 py-1.5 flex items-center justify-between border-t ${
+                      isDarkMode ? "border-gray-700/60" : "border-gray-50"
+                    } ${
+                      receipt.isPaid
+                        ? isDarkMode
+                          ? "bg-green-900/10"
+                          : "bg-green-50/60"
+                        : isDarkMode
+                          ? "bg-amber-900/10"
+                          : "bg-amber-50/60"
+                    }`}
+                  >
+                    <span
+                      className={`text-[10px] font-semibold uppercase tracking-wider ${
+                        receipt.isPaid
+                          ? isDarkMode
+                            ? "text-green-400"
+                            : "text-green-600"
+                          : isDarkMode
+                            ? "text-amber-400"
+                            : "text-amber-600"
+                      }`}
+                    >
+                      {receipt.isPaid
+                        ? l("Receipts.paid") || "Paid"
+                        : l("Receipts.payAtDoor") || "Pay at Door"}
+                    </span>
+                    <span
+                      className={`text-[10px] ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}
+                    >
+                      #{receipt.orderId.substring(0, 8).toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+              ))}
+
+              {/* Load More Spinner */}
+              {isFoodLoading && !isFoodInitialLoad && (
+                <div className="flex justify-center py-8">
+                  <div className="w-5 h-5 border-[3px] border-orange-200 border-t-orange-600 rounded-full animate-spin" />
+                </div>
+              )}
+
+              {/* End of List */}
+              {!hasFoodMore && foodReceipts.length > 0 && (
+                <p
+                  className={`text-center text-[11px] py-4 ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}
+                >
+                  {l("Receipts.noMoreReceipts") || "No more receipts to load"}
+                </p>
+              )}
+            </div>
+          )
+        ) : /* ── Market Receipts ────────────────────────────────── */
+        isMarketInitialLoad ? (
           /* Initial Loading */
           <div className="space-y-3">
             {[...Array(5)].map((_, i) => (
@@ -637,10 +960,10 @@ export default function ReceiptsPage() {
               />
             ))}
           </div>
-        ) : foodReceipts.length === 0 ? (
+        ) : marketReceipts.length === 0 ? (
           /* Empty */
           <div className="text-center py-16">
-            <UtensilsCrossed
+            <ShoppingBasket
               className={`w-12 h-12 mx-auto mb-3 ${isDarkMode ? "text-gray-600" : "text-gray-300"}`}
             />
             <h3
@@ -651,17 +974,17 @@ export default function ReceiptsPage() {
             <p
               className={`text-xs max-w-xs mx-auto ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
             >
-              {l("Receipts.foodReceiptsWillAppearHere") ||
-                "Your food order receipts will appear here."}
+              {l("Receipts.marketReceiptsWillAppearHere") ||
+                "Your market order receipts will appear here."}
             </p>
           </div>
         ) : (
-          /* Food Receipts List */
+          /* Market Receipts List */
           <div className="space-y-3">
-            {foodReceipts.map((receipt) => (
+            {marketReceipts.map((receipt) => (
               <div
                 key={receipt.id}
-                onClick={() => goToFoodReceiptDetail(receipt)}
+                onClick={() => goToMarketReceiptDetail(receipt)}
                 className={`rounded-2xl border overflow-hidden cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all ${
                   isDarkMode
                     ? "bg-gray-800 border-gray-700"
@@ -670,13 +993,13 @@ export default function ReceiptsPage() {
               >
                 {/* Main row */}
                 <div className="px-4 py-3 flex items-center gap-3">
-                  {/* Icon */}
+                  {/* Icon — emerald palette to signal Market, not food/product */}
                   <div
                     className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                      isDarkMode ? "bg-gray-700" : "bg-orange-50"
+                      isDarkMode ? "bg-gray-700" : "bg-emerald-50"
                     }`}
                   >
-                    <UtensilsCrossed className="w-4 h-4 text-orange-500" />
+                    <ShoppingBasket className="w-4 h-4 text-emerald-600" />
                   </div>
 
                   {/* Info */}
@@ -684,9 +1007,7 @@ export default function ReceiptsPage() {
                     <h3
                       className={`text-sm font-semibold truncate ${isDarkMode ? "text-white" : "text-gray-900"}`}
                     >
-                      {receipt.restaurantName ||
-                        l("Receipts.foodOrder") ||
-                        "Food Order"}
+                      {l("Receipts.marketBrand") || "Nar24 Market"}
                     </h3>
                     <div className="flex items-center gap-3 mt-0.5">
                       <div className="flex items-center gap-1">
@@ -718,11 +1039,11 @@ export default function ReceiptsPage() {
                     </div>
                   </div>
 
-                  {/* Price + Delivery + Arrow */}
+                  {/* Price + Delivery badge + Arrow */}
                   <div className="flex flex-col items-end gap-1 flex-shrink-0">
                     <div className="flex items-center gap-1.5">
                       <span
-                        className={`text-xs font-bold ${isDarkMode ? "text-orange-400" : "text-orange-600"}`}
+                        className={`text-xs font-bold ${isDarkMode ? "text-emerald-400" : "text-emerald-600"}`}
                       >
                         {receipt.totalPrice.toFixed(0)} {receipt.currency}
                       </span>
@@ -732,26 +1053,16 @@ export default function ReceiptsPage() {
                     </div>
                     <span
                       className={`flex items-center gap-0.5 text-[11px] font-medium ${
-                        receipt.deliveryType === "pickup"
-                          ? isDarkMode
-                            ? "text-blue-400"
-                            : "text-blue-600"
-                          : isDarkMode
-                            ? "text-green-400"
-                            : "text-green-600"
+                        isDarkMode ? "text-green-400" : "text-green-600"
                       }`}
                     >
-                      {receipt.deliveryType === "pickup" ? (
-                        <ShoppingBag className="w-2.5 h-2.5" />
-                      ) : (
-                        <MapPin className="w-2.5 h-2.5" />
-                      )}
-                      {localizeFoodDeliveryType(receipt.deliveryType)}
+                      <Truck className="w-2.5 h-2.5" />
+                      {l("Receipts.delivery") || "Delivery"}
                     </span>
                   </div>
                 </div>
 
-                {/* Paid / Pay-at-door badge strip */}
+                {/* Paid / Pay-at-door badge strip — mirrors food layout exactly */}
                 <div
                   className={`px-4 py-1.5 flex items-center justify-between border-t ${
                     isDarkMode ? "border-gray-700/60" : "border-gray-50"
@@ -790,14 +1101,14 @@ export default function ReceiptsPage() {
             ))}
 
             {/* Load More Spinner */}
-            {isFoodLoading && !isFoodInitialLoad && (
+            {isMarketLoading && !isMarketInitialLoad && (
               <div className="flex justify-center py-8">
-                <div className="w-5 h-5 border-[3px] border-orange-200 border-t-orange-600 rounded-full animate-spin" />
+                <div className="w-5 h-5 border-[3px] border-emerald-200 border-t-emerald-600 rounded-full animate-spin" />
               </div>
             )}
 
             {/* End of List */}
-            {!hasFoodMore && foodReceipts.length > 0 && (
+            {!hasMarketMore && marketReceipts.length > 0 && (
               <p
                 className={`text-center text-[11px] py-4 ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}
               >

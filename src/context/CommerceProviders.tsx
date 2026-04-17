@@ -12,6 +12,7 @@ import type { Functions } from "firebase/functions";
 import { ProductCacheProvider } from "./ProductCacheProvider";
 import { CartProvider } from "./CartProvider";
 import { FavoritesProvider } from "./FavoritesProvider";
+import { MarketCartProvider } from "./MarketCartProvider";
 
 interface CommerceProvidersProps {
   children: ReactNode;
@@ -25,14 +26,18 @@ interface CommerceProvidersProps {
  *
  * This provider wraps:
  * - ProductCacheProvider - Product data caching
- * - CartProvider - Shopping cart state and actions
+ * - CartProvider - Shopping cart state and actions (regular products)
  * - FavoritesProvider - Favorites/wishlist state and actions
+ * - MarketCartProvider - Market (grocery) cart state and actions
  *
  * CouponProvider and DiscountSelectionProvider are NOT included here.
  * They are wrapped per-page (cart, productpayment) via CouponProviders.
  *
+ * FoodCartProvider is also NOT included here — it is intentionally
+ * scoped to restaurant routes only (mounted inside food pages).
+ *
  * Dependencies:
- * - Requires user from UserProvider
+ * - Requires user from UserProvider (MarketCartProvider reads it via useUser internally)
  * - Requires db and functions from FirebaseProvider (lazy loaded)
  */
 export const CommerceProviders: React.FC<CommerceProvidersProps> = ({
@@ -45,7 +50,7 @@ export const CommerceProviders: React.FC<CommerceProvidersProps> = ({
     <ProductCacheProvider>
       <CartProvider user={user} db={db} functions={functions}>
         <FavoritesProvider db={db}>
-          {children}
+          <MarketCartProvider>{children}</MarketCartProvider>
         </FavoritesProvider>
       </CartProvider>
     </ProductCacheProvider>

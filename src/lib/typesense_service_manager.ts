@@ -1,8 +1,8 @@
 /**
- * typesense_service_manager.ts
+ * lib/typesense_service_manager.ts
  *
  * Singleton manager that owns all TypeSenseService instances and exposes them
- * by concern (products, shop products, orders, shops).
+ * by concern (products, shop products, orders, shops, restaurants, market).
  *
  * Mirrors the Flutter TypeSenseServiceManager exactly.
  * No `any` types — Vercel-safe.
@@ -10,9 +10,11 @@
 
 import { TypeSenseService } from "./typesense_service";
 import { RestaurantTypesenseService } from "./typesense_restaurant_service";
+import { MarketTypesenseService } from "./typesense_market_service";
 
 export { TypeSenseService } from "./typesense_service";
 export { RestaurantTypesenseService } from "./typesense_restaurant_service";
+export { MarketTypesenseService } from "./typesense_market_service";
 export type {
   TypeSensePage,
   TypeSenseDocument,
@@ -28,14 +30,16 @@ export type {
   RestaurantSortOption,
   FoodSortOption,
 } from "./typesense_restaurant_service";
+export type {
+  MarketItem,
+  MarketSearchPage,
+  MarketFacets,
+  MarketGlobalFacets,
+  MarketFacetValue,
+  MarketSortOption,
+} from "./typesense_market_service";
 
 // ── Configuration ─────────────────────────────────────────────────────────────
-// Read from environment variables so secrets never live in source code.
-// Set NEXT_PUBLIC_TYPESENSE_HOST and NEXT_PUBLIC_TYPESENSE_SEARCH_KEY in your
-// .env.local (or Vercel project settings).
-//
-// If the env vars are absent we fall back to the same values that are
-// hard-coded in the Flutter app so the service still works during dev.
 
 const TYPESENSE_HOST =
   process.env.NEXT_PUBLIC_TYPESENSE_HOST ??
@@ -50,16 +54,14 @@ const TYPESENSE_SEARCH_KEY =
 class TypeSenseServiceManager {
   private static _instance: TypeSenseServiceManager | null = null;
 
-  // Lazily-created service instances — one per Typesense collection group
   private _mainService: TypeSenseService | null = null;
   private _shopService: TypeSenseService | null = null;
   private _ordersService: TypeSenseService | null = null;
   private _shopsService: TypeSenseService | null = null;
   private _restaurantService: RestaurantTypesenseService | null = null;
+  private _marketService: MarketTypesenseService | null = null;
 
-  private constructor() {
-    // Private — use TypeSenseServiceManager.instance
-  }
+  private constructor() {}
 
   static get instance(): TypeSenseServiceManager {
     if (!TypeSenseServiceManager._instance) {
@@ -133,6 +135,17 @@ class TypeSenseServiceManager {
     return this._restaurantService;
   }
 
+  /** Market items search (`market_items` collection) */
+  get marketService(): MarketTypesenseService {
+    if (!this._marketService) {
+      this._marketService = new MarketTypesenseService({
+        typesenseHost: TYPESENSE_HOST,
+        typesenseSearchKey: TYPESENSE_SEARCH_KEY,
+      });
+    }
+    return this._marketService;
+  }
+
   // ── Helpers ─────────────────────────────────────────────────────────────────
 
   get isInitialized(): boolean {
@@ -141,27 +154,21 @@ class TypeSenseServiceManager {
       this._shopService !== null &&
       this._ordersService !== null &&
       this._shopsService !== null &&
-      this._restaurantService !== null
+      this._restaurantService !== null &&
+      this._marketService !== null
     );
   }
 
-  /**
-   * Tear down all service instances.
-   * Useful in tests or when reconfiguring connection details at runtime.
-   */
   resetServices(): void {
+    this._marketService?.dispose();
     this._mainService = null;
     this._shopService = null;
     this._ordersService = null;
     this._shopsService = null;
     this._restaurantService = null;
+    this._marketService = null;
   }
 
-  /**
-   * Ping all four collections in parallel.
-   * Returns `true` only when every collection responds with a non-5xx status.
-   * Times out after 5 seconds (mirrors Flutter implementation).
-   */
   async isHealthy(): Promise<boolean> {
     try {
       const results = await Promise.all([
@@ -170,6 +177,7 @@ class TypeSenseServiceManager {
         this.ordersService.isServiceReachable(),
         this.shopsService.isServiceReachable(),
         this.restaurantService.isServiceReachable(),
+        this.marketService.isServiceReachable(),
       ]);
       return results.every(Boolean);
     } catch (err) {
