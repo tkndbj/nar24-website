@@ -213,6 +213,10 @@ export class MarketTypesenseService {
     this.searchKey = config.typesenseSearchKey;
   }
 
+  cachedUnfilteredFacets(category: string): MarketFacets | undefined {
+    return this.unfilteredFacetCache.get(cacheKeyForCategory(category));
+  }
+
   dispose(): void {
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer);
