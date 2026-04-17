@@ -9,9 +9,9 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import MarketPaymentPage from "../../components/market/MarketPaymentPage";
 
-export const metadata: Metadata = {
-  // Explicitly disallow search indexing — this URL carries one-shot payment
-  // parameters and should never appear in the wild.
+// Explicitly disallow search indexing — this URL carries one-shot payment
+// parameters and should never appear in the wild.
+const baseMetadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
@@ -19,11 +19,11 @@ export async function generateMetadata(): Promise<Metadata> {
   try {
     const t = await getTranslations("market");
     return {
-      ...metadata,
+      ...baseMetadata,
       title: t("paymentSecureTitle"),
     };
   } catch {
-    return { ...metadata, title: "Secure Payment" };
+    return { ...baseMetadata, title: "Secure Payment" };
   }
 }
 

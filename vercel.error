@@ -1,0 +1,88 @@
+[@sentry/nextjs] Could not find `onRequestError` hook in instrumentation file. This indicates outdated configuration of the Sentry SDK. Use `Sentry.captureRequestError` to instrument the `onRequestError` hook: https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/#errors-from-nested-react-server-components
+[@sentry/nextjs] It seems like you don't have a global error handler set up. It is recommended that you add a 'global-error.js' file with Sentry instrumentation so that React rendering errors are reported to Sentry. Read more: https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/#react-render-errors-in-app-router (you can suppress this warning by setting SENTRY_SUPPRESS_GLOBAL_ERROR_HANDLER_FILE_WARNING=1 as environment variable)
+[@sentry/nextjs] DEPRECATION WARNING: It is recommended renaming your `sentry.client.config.ts` file, or moving its content to `instrumentation-client.ts`. When using Turbopack `sentry.client.config.ts` will no longer work. Read more about the `instrumentation-client.ts` file: https://nextjs.org/docs/app/api-reference/file-conventions/instrumentation-client
+Failed to compile.
+./src/app/[locale]/isbankmarketpayment/page.tsx
+Error:   x "metadata" and "generateMetadata" cannot be exported at the same time, please keep one of them. Read more: https://nextjs.org/docs/app/api-reference/file-conventions/metadata
+  |
+    ,-[/vercel/path0/src/app/[locale]/isbankmarketpayment/page.tsx:12:1]
+  9 | import { getTranslations } from "next-intl/server";
+ 10 | import MarketPaymentPage from "../../components/market/MarketPaymentPage";
+ 11 | 
+ 12 | export const metadata: Metadata = {
+    :              ^^^^^^^^
+ 13 |   // Explicitly disallow search indexing — this URL carries one-shot payment
+ 14 |   // parameters and should never appear in the wild.
+ 15 |   robots: { index: false, follow: false },
+ 16 | };
+ 17 | 
+ 18 | export async function generateMetadata(): Promise<Metadata> {
+    :                       ^^^^^^^^^^^^^^^^
+ 19 |   try {
+ 20 |     const t = await getTranslations("market");
+ 21 |     return {
+    `----
+    ./src/app/[locale]/isbankmarketpayment/page.tsx
+./src/app/[locale]/market-orders/[orderId]/page.tsx
+Error:   x "metadata" and "generateMetadata" cannot be exported at the same time, please keep one of them. Read more: https://nextjs.org/docs/app/api-reference/file-conventions/metadata
+  |
+    ,-[/vercel/path0/src/app/[locale]/market-orders/[orderId]/page.tsx:15:1]
+ 12 |   params: Promise<{ orderId: string }>;
+ 13 | }
+ 14 | 
+ 15 | export const metadata: Metadata = {
+    :              ^^^^^^^^
+ 16 |   // Order URLs should never be indexed.
+ 17 |   robots: { index: false, follow: false },
+ 18 | };
+ 19 | 
+ 20 | export async function generateMetadata(): Promise<Metadata> {
+    :                       ^^^^^^^^^^^^^^^^
+ 21 |   try {
+ 22 |     const t = await getTranslations("market");
+ 23 |     return { ...metadata, title: t("orderDetailTitle") };
+    `----
+    Import trace for requested module:
+./src/app/[locale]/market-orders/[orderId]/page.tsx
+./src/app/[locale]/market-orders/page.tsx
+Error:   x "metadata" and "generateMetadata" cannot be exported at the same time, please keep one of them. Read more: https://nextjs.org/docs/app/api-reference/file-conventions/metadata
+  |
+    ,-[/vercel/path0/src/app/[locale]/market-orders/page.tsx:9:1]
+  6 | import { getTranslations } from "next-intl/server";
+  7 | import MyMarketOrdersPage from "../../components/market/MyMarketOrdersPage";
+  8 | 
+  9 | export const metadata: Metadata = {
+    :              ^^^^^^^^
+ 10 |   robots: { index: false, follow: false },
+ 11 | };
+ 12 | 
+ 13 | export async function generateMetadata(): Promise<Metadata> {
+    :                       ^^^^^^^^^^^^^^^^
+ 14 |   try {
+ 15 |     const t = await getTranslations("market");
+ 16 |     return {
+    `----
+    Import trace for requested module:
+./src/app/[locale]/market-orders/page.tsx
+./src/app/[locale]/market-receipts/[receiptId]/page.tsx
+Error:   x "metadata" and "generateMetadata" cannot be exported at the same time, please keep one of them. Read more: https://nextjs.org/docs/app/api-reference/file-conventions/metadata
+  |
+    ,-[/vercel/path0/src/app/[locale]/market-receipts/[receiptId]/page.tsx:15:1]
+ 12 |   params: Promise<{ receiptId: string }>;
+ 13 | }
+ 14 | 
+ 15 | export const metadata: Metadata = {
+    :              ^^^^^^^^
+ 16 |   robots: { index: false, follow: false },
+ 17 | };
+ 18 | 
+ 19 | export async function generateMetadata(): Promise<Metadata> {
+    :                       ^^^^^^^^^^^^^^^^
+ 20 |   try {
+ 21 |     const t = await getTranslations("market");
+ 22 |     return { ...metadata, title: t("receiptTitle") };
+    `----
+    Import trace for requested module:
+./src/app/[locale]/market-receipts/[receiptId]/page.tsx
+> Build failed because of webpack errors
+Error: Command "npm run build" exited with 1

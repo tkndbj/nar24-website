@@ -12,17 +12,17 @@ interface RouteParams {
   params: Promise<{ orderId: string }>;
 }
 
-export const metadata: Metadata = {
-  // Order URLs should never be indexed.
+// Order URLs should never be indexed.
+const baseMetadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
 export async function generateMetadata(): Promise<Metadata> {
   try {
     const t = await getTranslations("market");
-    return { ...metadata, title: t("orderDetailTitle") };
+    return { ...baseMetadata, title: t("orderDetailTitle") };
   } catch {
-    return { ...metadata, title: "Order Detail" };
+    return { ...baseMetadata, title: "Order Detail" };
   }
 }
 
