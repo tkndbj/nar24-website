@@ -34,7 +34,7 @@ import {
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import {
   AlertCircle,
   ArrowLeft,
@@ -221,7 +221,7 @@ function parseOrderDoc(
 // FORMATTERS
 // ════════════════════════════════════════════════════════════════════════════
 
-function formatDate(ts: Timestamp, _locale: string): string {
+function formatDate(ts: Timestamp): string {
   // Flutter: dd/MM/yyyy
   const d = ts.toDate();
   const pad = (n: number) => n.toString().padStart(2, "0");
@@ -442,7 +442,6 @@ function OrdersPageInner() {
 // ════════════════════════════════════════════════════════════════════════════
 
 function TopBar({
-  isDarkMode: _isDarkMode,
   onBack,
   onRefresh,
   isRefreshing,
@@ -566,7 +565,6 @@ function OrderCard({
   isDarkMode: boolean;
 }) {
   const t = useTranslations("market");
-  const locale = useLocale();
 
   const preview = useMemo(
     () =>
@@ -634,7 +632,7 @@ function OrderCard({
               isDarkMode ? "text-gray-500" : "text-gray-400"
             }`}
           >
-            {formatDate(order.createdAt, locale)}
+            {formatDate(order.createdAt)}
           </span>
         </div>
       </div>

@@ -25,13 +25,12 @@
 import {
   useCallback,
   useEffect,
-  useMemo,
   useState,
   type ReactNode,
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import {
   ArrowLeft,
   Minus,

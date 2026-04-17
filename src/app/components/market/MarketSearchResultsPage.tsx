@@ -42,7 +42,6 @@ import {
   SearchX,
   ShoppingBag,
   X,
-  type LucideIcon,
 } from "lucide-react";
 
 import { useTheme } from "@/hooks/useTheme";
@@ -94,7 +93,7 @@ export default function MarketSearchResultsPage() {
     new Set(),
   );
 
-  const [sortOption, setSortOption] = useState<MarketSortOption>("newest");
+  const [sortOption] = useState<MarketSortOption>("newest");
 
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);

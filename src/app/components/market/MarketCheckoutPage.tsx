@@ -86,17 +86,6 @@ interface InitPaymentResponse {
   paymentParams?: Record<string, string | number | boolean>;
 }
 
-/**
- * Key under which we stash the gateway params for /isbankmarketpayment to
- * consume. Kept as a narrow shape so the payment page can type-check it.
- */
-const PAYMENT_INIT_STORAGE_KEY = "marketPaymentInit" as const;
-interface StoredPaymentInit {
-  gatewayUrl: string;
-  orderNumber: string;
-  paymentParams: Record<string, string | number | boolean>;
-}
-
 const ORDER_NOTES_MAX = 1000;
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -391,7 +380,6 @@ export default function MarketCheckoutPage() {
 // ═════════════════════════════════════════════════════════════════════════════
 
 function TopBar({
-  isDarkMode: _isDarkMode,
   onBack,
 }: {
   isDarkMode: boolean;
@@ -560,7 +548,6 @@ function AddressCard({
 // ═════════════════════════════════════════════════════════════════════════════
 
 function PaymentMethodButton({
-  method: _method,
   icon: Icon,
   isSelected,
   isDarkMode,
@@ -636,7 +623,6 @@ function PaymentMethodButton({
 function OrderSummary({
   items,
   subtotal,
-  itemCount: _itemCount,
   isDarkMode,
   error,
   isSubmitting,

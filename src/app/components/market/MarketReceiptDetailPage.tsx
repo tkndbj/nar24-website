@@ -26,7 +26,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import {
   AlertCircle,
   ArrowLeft,
@@ -211,13 +211,13 @@ function parseOrder(snap: DocumentSnapshot<DocumentData>): {
 // FORMATTERS
 // ════════════════════════════════════════════════════════════════════════════
 
-function formatMoney(amount: number, locale: string): string {
+function formatMoney(amount: number): string {
   // Flutter uses toStringAsFixed(0) — integer amounts, no grouping, no decimals.
   // Match exactly; numbers shown on a receipt should look like receipts.
   return Math.round(amount).toString();
 }
 
-function formatDate(d: Date, locale: string): string {
+function formatDate(d: Date): string {
   // Flutter: dd/MM/yyyy HH:mm
   const pad = (n: number) => n.toString().padStart(2, "0");
   const dd = pad(d.getDate());
@@ -245,7 +245,6 @@ export default function MarketReceiptDetailPage({
 }: {
   receiptId: string;
 }) {
-  const t = useTranslations("market");
   const isDarkMode = useTheme();
   const router = useRouter();
   const { user, isLoading: isUserLoading } = useUser();
@@ -356,7 +355,6 @@ export default function MarketReceiptDetailPage({
 // ════════════════════════════════════════════════════════════════════════════
 
 function HeroHeader({
-  isDarkMode: _isDarkMode,
   onBack,
   receipt,
 }: {
@@ -598,7 +596,6 @@ function HeaderHeroCard({
   isDarkMode: boolean;
 }) {
   const t = useTranslations("market");
-  const locale = useLocale();
 
   const paidBgColor = receipt.isPaid
     ? isDarkMode
@@ -642,7 +639,7 @@ function HeaderHeroCard({
             isDarkMode ? "text-gray-400" : "text-gray-500"
           }`}
         >
-          {formatDate(receipt.timestamp, locale)}
+          {formatDate(receipt.timestamp)}
         </p>
 
         <span
@@ -940,7 +937,6 @@ function ItemsCard({
   isDarkMode: boolean;
 }) {
   const t = useTranslations("market");
-  const locale = useLocale();
 
   return (
     <Card isDarkMode={isDarkMode}>
@@ -1007,7 +1003,6 @@ function ItemRow({
   isDarkMode: boolean;
 }) {
   const t = useTranslations("market");
-  const locale = useLocale();
 
   return (
     <InnerPanel isDarkMode={isDarkMode}>
@@ -1041,7 +1036,7 @@ function ItemRow({
         </div>
 
         <span className="text-[13px] font-bold text-emerald-600 tabular-nums whitespace-nowrap">
-          {formatMoney(lineTotal(item), locale)} {currency}
+          {formatMoney(lineTotal(item))} {currency}
         </span>
       </div>
 
@@ -1052,7 +1047,7 @@ function ItemRow({
           }`}
         >
           {t("receiptPerUnit", {
-            price: `${formatMoney(item.price, locale)} ${currency}`,
+            price: `${formatMoney(item.price)} ${currency}`,
           })}
         </p>
       )}
@@ -1072,7 +1067,6 @@ function SummaryCard({
   isDarkMode: boolean;
 }) {
   const t = useTranslations("market");
-  const locale = useLocale();
   const deliveryIsFree = receipt.deliveryFee === 0;
 
   return (
@@ -1095,7 +1089,7 @@ function SummaryCard({
                 isDarkMode ? "text-white" : "text-gray-900"
               }`}
             >
-              {formatMoney(receipt.subtotal, locale)} {receipt.currency}
+              {formatMoney(receipt.subtotal)} {receipt.currency}
             </span>
           </InfoRow>
           <InfoRow
@@ -1115,7 +1109,7 @@ function SummaryCard({
             >
               {deliveryIsFree
                 ? t("orderDeliveryFree")
-                : `${formatMoney(receipt.deliveryFee, locale)} ${receipt.currency}`}
+                : `${formatMoney(receipt.deliveryFee)} ${receipt.currency}`}
             </span>
           </InfoRow>
         </dl>
@@ -1142,7 +1136,7 @@ function SummaryCard({
             {t("orderTotalLabel")}
           </span>
           <span className="text-xl font-extrabold text-emerald-600 tabular-nums">
-            {formatMoney(receipt.totalPrice, locale)} {receipt.currency}
+            {formatMoney(receipt.totalPrice)} {receipt.currency}
           </span>
         </div>
       </div>

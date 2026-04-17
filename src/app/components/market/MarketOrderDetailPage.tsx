@@ -20,7 +20,7 @@
 
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
@@ -259,7 +259,7 @@ function formatMoney(amount: number, locale: string): string {
   });
 }
 
-function formatDate(ts: Timestamp, locale: string): string {
+function formatDate(ts: Timestamp): string {
   // Match Flutter's `dd/MM/yy HH:mm`
   const d = ts.toDate();
   const pad = (n: number) => n.toString().padStart(2, "0");
@@ -288,7 +288,6 @@ export default function MarketOrderDetailPage({
 }: {
   orderId: string;
 }) {
-  const t = useTranslations("market");
   const isDarkMode = useTheme();
   const router = useRouter();
 
@@ -348,7 +347,6 @@ export default function MarketOrderDetailPage({
 // ════════════════════════════════════════════════════════════════════════════
 
 function HeroHeader({
-  isDarkMode: _isDarkMode,
   onBack,
 }: {
   isDarkMode: boolean;
@@ -559,7 +557,7 @@ function OrderHeaderCard({
           <span className={`text-xs font-semibold ${
             isDarkMode ? "text-white" : "text-gray-900"
           }`}>
-            {formatDate(order.createdAt, locale)}
+            {formatDate(order.createdAt)}
           </span>
         </InfoCell>
 

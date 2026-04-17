@@ -486,7 +486,7 @@ export default function MarketPaymentPage() {
           />
 
           {!iframeLoaded && (
-            <LoadingOverlay isDarkMode={isDarkMode} />
+            <LoadingOverlay />
           )}
         </div>
       </div>
@@ -583,7 +583,7 @@ function PaymentHeader({
 // LOADING OVERLAY
 // ════════════════════════════════════════════════════════════════════════════
 
-function LoadingOverlay({ isDarkMode: _isDarkMode }: { isDarkMode: boolean }) {
+function LoadingOverlay() {
   const t = useTranslations("market");
   return (
     <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm z-10">
