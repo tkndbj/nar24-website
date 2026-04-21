@@ -35,23 +35,35 @@ export default function ProductImageGallery({
     () => new Set([0]),
   );
 
-  const displayUrls = React.useMemo(() => {
+  // Prefer storage paths (post-migration) but route legacy imageUrls
+  // through Cloudinary as well via productCompat, which extracts the
+  // storage path from a Firebase download URL and rebuilds the CDN URL.
+  // Without this, older products (only `imageUrls`) would bypass the
+  // CDN and pull original bytes from Firebase Storage.
+  const sources = React.useMemo<string[]>(() => {
     if (product.imageStoragePaths && product.imageStoragePaths.length > 0) {
-      return product.imageStoragePaths.map((p: string) =>
-        CloudinaryUrl.product(p, "detail"),
-      );
+      return product.imageStoragePaths;
     }
     return product.imageUrls || [];
   }, [product.imageStoragePaths, product.imageUrls]);
 
-  const thumbnailUrls = React.useMemo(() => {
-    if (product.imageStoragePaths && product.imageStoragePaths.length > 0) {
-      return product.imageStoragePaths.map((p: string) =>
-        CloudinaryUrl.product(p, "thumbnail"),
-      );
-    }
-    return product.imageUrls || [];
-  }, [product.imageStoragePaths, product.imageUrls]);
+  const displayUrls = React.useMemo(
+    () => sources.map((s) => CloudinaryUrl.productCompat(s, "detail")),
+    [sources],
+  );
+
+  const thumbnailUrls = React.useMemo(
+    () => sources.map((s) => CloudinaryUrl.productCompat(s, "thumbnail")),
+    [sources],
+  );
+
+  // Built once and passed to the full-screen viewer so it doesn't have
+  // to guess at CDN URL structure; the zoom bucket is 1600w in the
+  // shared Cloudinary config.
+  const zoomUrls = React.useMemo(
+    () => sources.map((s) => CloudinaryUrl.productCompat(s, "zoom")),
+    [sources],
+  );
 
   const handleImageError = useCallback((index: number) => {
     setImageErrors((prev) => new Set(prev).add(index));
@@ -214,7 +226,7 @@ export default function ProductImageGallery({
       {showFullScreenViewer && (
         <Suspense fallback={null}>
           <FullScreenImageViewer
-            imageUrls={displayUrls}
+            imageUrls={zoomUrls}
             initialIndex={currentImageIndex}
             isOpen={showFullScreenViewer}
             onClose={() => setShowFullScreenViewer(false)}

@@ -23,15 +23,9 @@ const FullScreenImageViewer: React.FC<FullScreenImageViewerProps> = ({
   const [imagesLoaded, setImagesLoaded] = useState<Set<number>>(new Set());
   const [mounted, setMounted] = useState(false);
 
-  const zoomUrls = React.useMemo(() => {
-    return imageUrls.map((url) => {
-      // If it's a Cloudinary URL, swap the width to 1600
-      if (url.includes("res.cloudinary.com") && url.includes("/c_limit,w_")) {
-        return url.replace(/w_\d+/, "w_1600");
-      }
-      return url;
-    });
-  }, [imageUrls]);
+  // Callers pass pre-built zoom URLs; no client-side URL rewriting
+  // needed. Legacy URLs (opaque) pass through unchanged.
+  const zoomUrls = imageUrls;
 
   useEffect(() => {
     setMounted(true);
