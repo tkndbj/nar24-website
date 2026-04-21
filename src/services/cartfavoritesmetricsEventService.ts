@@ -1,17 +1,10 @@
 // services/cartfavoritesmetricsEventService.ts
 
-import {
-  doc,
-  writeBatch,
-  increment,
-  serverTimestamp,
-} from "firebase/firestore";
+import { getFunctions, httpsCallable } from "firebase/functions";
 import { getAnalytics, logEvent } from "firebase/analytics";
 import { getAuth } from "firebase/auth";
-import { db } from "@/lib/firebase";
 
 let analytics: ReturnType<typeof getAnalytics> | null = null;
-
 function getAnalyticsInstance() {
   if (!analytics && typeof window !== "undefined") {
     try {
@@ -23,12 +16,31 @@ function getAnalyticsInstance() {
   return analytics;
 }
 
+interface EventRecord {
+  productId: string;
+  collection: "products" | "shop_products";
+  shopId: string | null;
+  type: "cart" | "favorite";
+  delta: 1 | -1;
+}
+
 class MetricsEventService {
   private static instance: MetricsEventService | null = null;
 
+  // ── Cooldown ──────────────────────────────────────────────────────────────
   private lastActionTime = new Map<string, number>();
   private readonly ACTION_COOLDOWN_MS = 1000;
   private readonly MAX_COOLDOWN_ENTRIES = 500;
+
+  // ── Buffer (mirrors analyticsBatcher pattern) ─────────────────────────────
+  private buffer: EventRecord[] = [];
+  private batchTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly BATCH_INTERVAL = 15_000;
+  private readonly MAX_BATCH_SIZE = 30;
+  private readonly MAX_RETRIES = 3;
+  private retryCount = 0;
+  private isSending = false;
+  private isDisposed = false;
 
   private _auth: ReturnType<typeof getAuth> | null = null;
   private get auth() {
@@ -36,7 +48,28 @@ class MetricsEventService {
     return this._auth;
   }
 
-  private constructor() {}
+  private _callable: ReturnType<typeof httpsCallable> | null = null;
+  private get callable() {
+    if (!this._callable) {
+      const functions = getFunctions(undefined, "europe-west3");
+      this._callable = httpsCallable(functions, "trackCartFavEvent");
+    }
+    return this._callable;
+  }
+
+  private constructor() {
+    if (typeof window !== "undefined") {
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) this.flush();
+      });
+
+      window.addEventListener("beforeunload", () => {
+        this.persistBuffer();
+      });
+
+      this.loadPersistedBuffer();
+    }
+  }
 
   static getInstance(): MetricsEventService {
     if (!MetricsEventService.instance) {
@@ -81,56 +114,21 @@ class MetricsEventService {
     }
   }
 
-  // ── Core write ────────────────────────────────────────────────────────────
+  // ── Core: enqueue event ───────────────────────────────────────────────────
 
-  private async incrementMetric(
-    productId: string,
-    shopId?: string | null,
-    options?: { cart?: number; favorite?: number },
-  ): Promise<void> {
+  private enqueue(event: EventRecord): void {
+    if (this.isDisposed) return;
     if (!this.auth.currentUser) return;
 
-    const cart = options?.cart ?? 0;
-    const favorite = options?.favorite ?? 0;
-    const collection = shopId ? "shop_products" : "products";
+    this.buffer.push(event);
+    this.scheduleBatch();
 
-    try {
-      const batch = writeBatch(db);
-
-      const updateData: Record<
-        string,
-        ReturnType<typeof increment> | ReturnType<typeof serverTimestamp>
-      > = {
-        metricsUpdatedAt: serverTimestamp(),
-      };
-      if (cart !== 0) updateData.cartCount = increment(cart);
-      if (favorite !== 0) updateData.favoritesCount = increment(favorite);
-
-      batch.update(doc(db, collection, productId), updateData);
-
-      if (shopId) {
-        const shopUpdate: Record<
-          string,
-          ReturnType<typeof increment> | ReturnType<typeof serverTimestamp>
-        > = {
-          "metrics.lastUpdated": serverTimestamp(),
-        };
-        if (cart > 0) shopUpdate["metrics.totalCartAdditions"] = increment(1);
-        if (favorite > 0)
-          shopUpdate["metrics.totalFavoriteAdditions"] = increment(1);
-
-        if (Object.keys(shopUpdate).length > 1) {
-          batch.update(doc(db, "shops", shopId), shopUpdate);
-        }
-      }
-
-      await batch.commit();
-    } catch (e) {
-      console.warn("⚠️ MetricsEventService: write failed —", e);
+    if (this.buffer.length >= this.MAX_BATCH_SIZE) {
+      this.sendBatch();
     }
   }
 
-  // ── Cart ──────────────────────────────────────────────────────────────────
+  // ── Public API ────────────────────────────────────────────────────────────
 
   logCartAdded({
     productId,
@@ -141,7 +139,13 @@ class MetricsEventService {
   }): void {
     if (!this.checkCooldown(`cart_added:${productId}`)) return;
     this.logAnalytics("cart_added", productId, shopId);
-    this.incrementMetric(productId, shopId, { cart: 1 });
+    this.enqueue({
+      productId,
+      collection: shopId ? "shop_products" : "products",
+      shopId: shopId ?? null,
+      type: "cart",
+      delta: 1,
+    });
   }
 
   logCartRemoved({
@@ -153,10 +157,14 @@ class MetricsEventService {
   }): void {
     if (!this.checkCooldown(`cart_removed:${productId}`)) return;
     this.logAnalytics("cart_removed", productId, shopId);
-    this.incrementMetric(productId, shopId, { cart: -1 });
+    this.enqueue({
+      productId,
+      collection: shopId ? "shop_products" : "products",
+      shopId: shopId ?? null,
+      type: "cart",
+      delta: -1,
+    });
   }
-
-  // ── Favorites ─────────────────────────────────────────────────────────────
 
   logFavoriteAdded({
     productId,
@@ -167,7 +175,13 @@ class MetricsEventService {
   }): void {
     if (!this.checkCooldown(`favorite_added:${productId}`)) return;
     this.logAnalytics("favorite_added", productId, shopId);
-    this.incrementMetric(productId, shopId, { favorite: 1 });
+    this.enqueue({
+      productId,
+      collection: shopId ? "shop_products" : "products",
+      shopId: shopId ?? null,
+      type: "favorite",
+      delta: 1,
+    });
   }
 
   logFavoriteRemoved({
@@ -179,7 +193,13 @@ class MetricsEventService {
   }): void {
     if (!this.checkCooldown(`favorite_removed:${productId}`)) return;
     this.logAnalytics("favorite_removed", productId, shopId);
-    this.incrementMetric(productId, shopId, { favorite: -1 });
+    this.enqueue({
+      productId,
+      collection: shopId ? "shop_products" : "products",
+      shopId: shopId ?? null,
+      type: "favorite",
+      delta: -1,
+    });
   }
 
   // ── Batch operations ──────────────────────────────────────────────────────
@@ -191,35 +211,8 @@ class MetricsEventService {
     productIds: string[];
     shopIds: Record<string, string | null | undefined>;
   }): void {
-    if (!this.auth.currentUser) return;
-
-    const chunks = this.chunkList(productIds, 200);
-
-    for (const chunk of chunks) {
-      const batch = writeBatch(db);
-
-      for (const id of chunk) {
-        if (!this.checkCooldown(`cart_removed:${id}`)) continue;
-        this.logAnalytics("cart_removed", id, shopIds[id]);
-
-        const shopId = shopIds[id];
-        const collection = shopId ? "shop_products" : "products";
-
-        batch.update(doc(db, collection, id), {
-          cartCount: increment(-1),
-          metricsUpdatedAt: serverTimestamp(),
-        });
-
-        if (shopId) {
-          batch.update(doc(db, "shops", shopId), {
-            "metrics.lastUpdated": serverTimestamp(),
-          });
-        }
-      }
-
-      batch.commit().catch((e) => {
-        console.warn("⚠️ MetricsEventService: batch cart removal failed —", e);
-      });
+    for (const id of productIds) {
+      this.logCartRemoved({ productId: id, shopId: shopIds[id] });
     }
   }
 
@@ -230,42 +223,11 @@ class MetricsEventService {
     productIds: string[];
     shopIds: Record<string, string | null | undefined>;
   }): void {
-    if (!this.auth.currentUser) return;
-
-    const chunks = this.chunkList(productIds, 200);
-
-    for (const chunk of chunks) {
-      const batch = writeBatch(db);
-
-      for (const id of chunk) {
-        if (!this.checkCooldown(`favorite_removed:${id}`)) continue;
-        this.logAnalytics("favorite_removed", id, shopIds[id]);
-
-        const shopId = shopIds[id];
-        const collection = shopId ? "shop_products" : "products";
-
-        batch.update(doc(db, collection, id), {
-          favoritesCount: increment(-1),
-          metricsUpdatedAt: serverTimestamp(),
-        });
-
-        if (shopId) {
-          batch.update(doc(db, "shops", shopId), {
-            "metrics.lastUpdated": serverTimestamp(),
-          });
-        }
-      }
-
-      batch.commit().catch((e) => {
-        console.warn(
-          "⚠️ MetricsEventService: batch favorite removal failed —",
-          e,
-        );
-      });
+    for (const id of productIds) {
+      this.logFavoriteRemoved({ productId: id, shopId: shopIds[id] });
     }
   }
 
-  // Backward compatibility
   logEvent({
     eventType,
     productId,
@@ -306,18 +268,101 @@ class MetricsEventService {
     }
   }
 
-  // No-ops (no buffer to flush or dispose)
-  async flush(): Promise<void> {}
-  async dispose(): Promise<void> {}
+  // ── Batch sending ─────────────────────────────────────────────────────────
 
-  // ── Utility ───────────────────────────────────────────────────────────────
+  private scheduleBatch(): void {
+    if (this.batchTimer) clearTimeout(this.batchTimer);
+    this.batchTimer = setTimeout(() => this.sendBatch(), this.BATCH_INTERVAL);
+  }
 
-  private chunkList<T>(list: T[], size: number): T[][] {
-    const chunks: T[][] = [];
-    for (let i = 0; i < list.length; i += size) {
-      chunks.push(list.slice(i, i + size));
+  private async sendBatch(): Promise<void> {
+    if (this.buffer.length === 0 || this.isSending) return;
+    if (!this.auth.currentUser) return;
+
+    this.isSending = true;
+
+    const toSend = [...this.buffer];
+    this.buffer = [];
+    if (this.batchTimer) {
+      clearTimeout(this.batchTimer);
+      this.batchTimer = null;
     }
-    return chunks;
+
+    try {
+      await this.callable({ events: toSend });
+
+      console.log(
+        `📊 MetricsEventService: sent ${toSend.length} events in 1 batch call`,
+      );
+      this.retryCount = 0;
+      localStorage.removeItem("pending_cartfav_buffer");
+    } catch (e) {
+      console.error("❌ MetricsEventService: batch send failed —", e);
+
+      if (this.retryCount < this.MAX_RETRIES) {
+        this.retryCount++;
+        this.buffer.unshift(...toSend);
+        setTimeout(() => {
+          if (!this.isDisposed) this.sendBatch();
+        }, 2000 * this.retryCount);
+      } else {
+        console.warn(
+          `❌ MetricsEventService: max retries, dropping ${toSend.length} events`,
+        );
+        this.retryCount = 0;
+      }
+    } finally {
+      this.isSending = false;
+    }
+  }
+
+  // ── Persistence ───────────────────────────────────────────────────────────
+
+  private persistBuffer(): void {
+    if (this.buffer.length === 0) {
+      localStorage.removeItem("pending_cartfav_buffer");
+      return;
+    }
+    try {
+      localStorage.setItem(
+        "pending_cartfav_buffer",
+        JSON.stringify(this.buffer),
+      );
+    } catch {}
+  }
+
+  private loadPersistedBuffer(): void {
+    try {
+      const stored = localStorage.getItem("pending_cartfav_buffer");
+      if (!stored) return;
+      const data: EventRecord[] = JSON.parse(stored);
+      if (Array.isArray(data) && data.length > 0) {
+        this.buffer.push(...data);
+        console.log(
+          `📦 MetricsEventService: restored ${data.length} buffered events`,
+        );
+        this.scheduleBatch();
+      }
+      localStorage.removeItem("pending_cartfav_buffer");
+    } catch {
+      localStorage.removeItem("pending_cartfav_buffer");
+    }
+  }
+
+  async flush(): Promise<void> {
+    if (this.batchTimer) {
+      clearTimeout(this.batchTimer);
+      this.batchTimer = null;
+    }
+    await this.sendBatch();
+  }
+
+  async dispose(): Promise<void> {
+    this.isDisposed = true;
+    if (this.batchTimer) clearTimeout(this.batchTimer);
+    this.persistBuffer();
+    this.buffer = [];
+    this.lastActionTime.clear();
   }
 }
 
