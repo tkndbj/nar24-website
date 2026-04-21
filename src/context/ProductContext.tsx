@@ -28,6 +28,14 @@ interface ProductData {
   editProductId?: string | null;
 }
 
+// Paired URL + storage path — both are needed for edit mode:
+// the URL renders thumbnails, the path preserves the storage reference
+// so approvals don't lose track of which Storage object is which.
+export interface ExistingMediaRef {
+  url: string;
+  path: string;
+}
+
 interface ProductFiles {
   images: File[];
   video: File | null;
@@ -37,9 +45,9 @@ interface ProductFiles {
   // Media already uploaded to Firebase Storage in a prior submission.
   // Populated in edit mode; preserved through upload (not re-uploaded)
   // and merged with newly uploaded URLs on the final write.
-  existingImageUrls?: string[];
-  existingVideoUrl?: string | null;
-  existingColorImageUrls?: { [key: string]: string[] };
+  existingImages?: ExistingMediaRef[];
+  existingVideo?: ExistingMediaRef | null;
+  existingColorImages?: { [colorKey: string]: ExistingMediaRef };
 }
 
 interface ProductContextType {

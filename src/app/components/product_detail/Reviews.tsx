@@ -13,7 +13,7 @@ import {
   Shield,
   AlertCircle,
 } from "lucide-react";
-import Image from "next/image";
+import SmartImage from "@/app/components/SmartImage";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import translationService, {
@@ -101,8 +101,9 @@ const FullScreenImageModal: React.FC<FullScreenImageModalProps> = ({
         >
           <X className="w-6 h-6" />
         </button>
-        <Image
-          src={imageUrl}
+        <SmartImage
+          source={imageUrl}
+          size="zoom"
           alt={t("reviewImage")}
           width={800}
           height={600}
@@ -266,8 +267,9 @@ const ReviewTile: React.FC<ReviewTileProps> = ({
                 className="flex-shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden cursor-pointer hover:opacity-80 transition-all duration-200 hover:scale-105"
                 onClick={() => handleImageClick(imageUrl)}
               >
-                <Image
-                  src={imageUrl}
+                <SmartImage
+                  source={imageUrl}
+                  size="thumbnail"
                   alt={`${t("reviewImage")} ${index + 1}`}
                   width={56}
                   height={56}

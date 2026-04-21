@@ -38,6 +38,7 @@ import {
 import { httpsCallable, HttpsCallableResult } from "firebase/functions";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
+import SmartImage from "@/app/components/SmartImage";
 import imageCompression from "browser-image-compression";
 import { useTheme } from "@/hooks/useTheme";
 
@@ -1433,8 +1434,9 @@ export default function ReviewsPage() {
                         className={`w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 relative ${thumbBg}`}
                       >
                         {review.productImage ? (
-                          <Image
-                            src={review.productImage}
+                          <SmartImage
+                            source={review.productImage}
+                            size="thumbnail"
                             alt={review.productName}
                             fill
                             className="object-cover"
@@ -1517,8 +1519,9 @@ export default function ReviewsPage() {
                           className={`w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 relative ${thumbBg}`}
                         >
                           {order.restaurantProfileImage ? (
-                            <Image
-                              src={order.restaurantProfileImage}
+                            <SmartImage
+                              source={order.restaurantProfileImage}
+                              size="thumbnail"
                               alt={order.restaurantName}
                               fill
                               className="object-cover"
@@ -1619,8 +1622,9 @@ export default function ReviewsPage() {
                           className={`w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 relative ${thumbBg}`}
                         >
                           {review.productImage ? (
-                            <Image
-                              src={review.productImage}
+                            <SmartImage
+                              source={review.productImage}
+                              size="thumbnail"
                               alt={review.productName || "Product"}
                               fill
                               className="object-cover"
@@ -1693,8 +1697,9 @@ export default function ReviewsPage() {
                               onClick={() => setSelectedImage(url)}
                               className={`w-14 h-14 rounded-xl overflow-hidden hover:opacity-80 transition-opacity relative flex-shrink-0 ${thumbBg}`}
                             >
-                              <Image
-                                src={url}
+                              <SmartImage
+                                source={url}
+                                size="thumbnail"
                                 alt={`Review image ${idx + 1}`}
                                 fill
                                 className="object-cover"
@@ -1756,8 +1761,9 @@ export default function ReviewsPage() {
                               onClick={() => setSelectedImage(url)}
                               className={`w-14 h-14 rounded-xl overflow-hidden hover:opacity-80 transition-opacity relative flex-shrink-0 ${thumbBg}`}
                             >
-                              <Image
-                                src={url}
+                              <SmartImage
+                                source={url}
+                                size="thumbnail"
                                 alt={`Review image ${idx + 1}`}
                                 fill
                                 className="object-cover"
@@ -2011,8 +2017,9 @@ export default function ReviewsPage() {
             className="relative max-w-4xl max-h-[90vh] w-full flex items-center justify-center"
             onClick={(e) => e.stopPropagation()}
           >
-            <Image
-              src={selectedImage}
+            <SmartImage
+              source={selectedImage}
+              size="zoom"
               alt="Review image"
               width={800}
               height={600}

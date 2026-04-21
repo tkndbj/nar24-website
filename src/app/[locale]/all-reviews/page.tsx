@@ -20,7 +20,7 @@ import {
   
   Award,
 } from "lucide-react";
-import Image from "next/image";
+import SmartImage from "@/app/components/SmartImage";
 import { format } from "date-fns";
 import { useUser } from "@/context/UserProvider";
 import { maskName } from "@/utils/maskName";
@@ -479,8 +479,9 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
             <div className="flex items-start gap-2 md:gap-3">
               <div className="w-8 h-8 md:w-10 md:h-10 rounded-full overflow-hidden bg-gradient-to-br from-orange-400 to-orange-600 flex-shrink-0">
                 {review.userImage ? (
-                  <Image
-                    src={review.userImage}
+                  <SmartImage
+                    source={review.userImage}
+                    size="thumbnail"
                     alt={review.userName || "User"}
                     width={40}
                     height={40}
@@ -528,8 +529,9 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
                   onClick={() => setImageGallery({ urls: review.imageUrls!, index })}
                   className="relative w-20 h-20 md:w-24 md:h-24 rounded-lg overflow-hidden flex-shrink-0 border-2 border-transparent hover:border-orange-500 transition-colors"
                 >
-                  <Image
-                    src={url}
+                  <SmartImage
+                    source={url}
+                    size="thumbnail"
                     alt={`Review image ${index + 1}`}
                     fill
                     className="object-cover"
@@ -787,8 +789,9 @@ const AllReviewsPage: React.FC<AllReviewsPageProps> = ({ }) => {
           )}
 
           <div className="relative w-full max-w-4xl aspect-square">
-            <Image
-              src={imageGallery.urls[imageGallery.index]}
+            <SmartImage
+              source={imageGallery.urls[imageGallery.index]}
+              size="zoom"
               alt={`Review image ${imageGallery.index + 1}`}
               fill
               className="object-contain"

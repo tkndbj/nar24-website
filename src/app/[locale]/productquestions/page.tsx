@@ -35,7 +35,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useTranslations } from "next-intl";
-import Image from "next/image";
+import SmartImage from "@/app/components/SmartImage";
 import { useTheme } from "@/hooks/useTheme";
 
 interface ProductQuestion {
@@ -612,8 +612,9 @@ export default function ProductQuestionsPage() {
                 >
                   <div className={`w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 relative ${bubbleBg}`}>
                     {question.productImage ? (
-                      <Image
-                        src={question.productImage}
+                      <SmartImage
+                        source={question.productImage}
+                        size="thumbnail"
                         alt={question.productName}
                         fill
                         className="object-cover"

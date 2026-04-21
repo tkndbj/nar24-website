@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useEffect } from "react";
 import Image from "next/image";
+import SmartImage from "@/app/components/SmartImage";
 import {
   ShoppingBag,
   Trash2,
@@ -87,8 +88,9 @@ function SidebarCartItem({
               isDarkMode ? "border-gray-700" : "border-gray-200"
             }`}
           >
-            <Image
-              src={item.imageUrl}
+            <SmartImage
+              source={item.imageUrl}
+              size="thumbnail"
               alt={item.name}
               fill
               className="object-cover"

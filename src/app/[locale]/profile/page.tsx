@@ -36,7 +36,7 @@ import {
   UtensilsCrossed,
   ShoppingBasket,
 } from "lucide-react";
-import Image from "next/image";
+import SmartImage from "@/app/components/SmartImage";
 import { useTranslations } from "next-intl";
 import Footer from "@/app/components/Footer";
 
@@ -360,8 +360,9 @@ export default function ProfilePage() {
             <div className="relative flex-shrink-0">
               <div className={`w-16 h-16 md:w-[72px] md:h-[72px] rounded-full overflow-hidden ring-2 ${isDarkMode ? "ring-gray-700 bg-gray-800" : "ring-gray-200 bg-gray-100"}`}>
                 {profileData?.profileImage ? (
-                  <Image
-                    src={profileData.profileImage}
+                  <SmartImage
+                    source={profileData.profileImage}
+                    size="thumbnail"
                     alt="Profile"
                     fill
                     className="object-cover"

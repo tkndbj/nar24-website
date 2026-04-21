@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { ChevronLeft, ChevronRight, Package } from "lucide-react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
+import SmartImage from "@/app/components/SmartImage";
 import { useTranslations } from "next-intl";
 
 interface Product {
@@ -50,12 +50,13 @@ const CollectionProductCard: React.FC<CollectionProductCardProps> = ({
         className="w-28 h-28 flex-shrink-0 relative bg-gray-100 dark:bg-surface-2"
       >
         {product.imageUrls.length > 0 && !imageError ? (
-          <Image
-            src={product.imageUrls[0]}
+          <SmartImage
+            source={product.imageUrls[0]}
+            size="card"
             alt={product.productName}
             fill
             className="object-cover transition-transform duration-300"
-            onError={() => setImageError(true)}
+            onFallbackError={() => setImageError(true)}
           />
         ) : (
           <div

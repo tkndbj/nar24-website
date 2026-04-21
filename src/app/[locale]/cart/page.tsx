@@ -33,6 +33,7 @@ import { useTranslations } from "next-intl";
 import type { AttributeLocalizationUtils as AttributeLocalizationUtilsType } from "@/constants/AttributeLocalization";
 import { db } from "@/lib/firebase";
 import Image from "next/image";
+import SmartImage from "@/app/components/SmartImage";
 import { Product } from "@/app/models/Product";
 import { doc, onSnapshot } from "firebase/firestore";
 
@@ -1116,12 +1117,13 @@ useEffect(() => {
                 }`}
                 onClick={() => router.push(`/productdetail/${item.productId}`)}
               >
-                <Image
-                  src={
+                <SmartImage
+                  source={
                     item.selectedColorImage ||
                     item.product?.imageUrls?.[0] ||
                     ""
                   }
+                  size="thumbnail"
                   alt={item.product?.productName || ""}
                   fill
                   className="object-cover"
@@ -1285,12 +1287,13 @@ useEffect(() => {
                     router.push(`/productdetail/${item.productId}`)
                   }
                 >
-                  <Image
-                    src={
+                  <SmartImage
+                    source={
                       item.selectedColorImage ||
                       item.product?.imageUrls?.[0] ||
                       ""
                     }
+                    size="thumbnail"
                     alt={item.product?.productName || ""}
                     fill
                     className="object-cover"

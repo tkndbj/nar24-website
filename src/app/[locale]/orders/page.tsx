@@ -33,7 +33,7 @@ import {
 import { db } from "@/lib/firebase";
 import { useTranslations } from "next-intl";
 import { useTheme } from "@/hooks/useTheme";
-import Image from "next/image";
+import SmartImage from "@/app/components/SmartImage";
 
 type BuyerShipmentStatus =
   | "pending"
@@ -787,8 +787,9 @@ export default function OrdersPage() {
                 >
                   <div className="px-4 py-3 flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl overflow-hidden bg-gray-50 dark:bg-gray-700 flex-shrink-0 relative">
-                      <Image
-                        src={imageUrl}
+                      <SmartImage
+                        source={imageUrl}
+                        size="thumbnail"
                         alt={transaction.productName}
                         fill
                         className="object-cover"

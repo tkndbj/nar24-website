@@ -3,17 +3,19 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
-import Image from "next/image";
+import SmartImage from "@/app/components/SmartImage";
 
 interface FullScreenImageViewerProps {
-  imageUrls: string[];
+  /** Raw sources — storage paths or legacy Firebase URLs. SmartImage
+   *  routes to Cloudinary at the requested size bucket internally. */
+  sources: string[];
   initialIndex?: number;
   isOpen: boolean;
   onClose: () => void;
 }
 
 const FullScreenImageViewer: React.FC<FullScreenImageViewerProps> = ({
-  imageUrls,
+  sources,
   initialIndex = 0,
   isOpen,
   onClose,
@@ -22,10 +24,6 @@ const FullScreenImageViewer: React.FC<FullScreenImageViewerProps> = ({
   const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
   const [imagesLoaded, setImagesLoaded] = useState<Set<number>>(new Set());
   const [mounted, setMounted] = useState(false);
-
-  // Callers pass pre-built zoom URLs; no client-side URL rewriting
-  // needed. Legacy URLs (opaque) pass through unchanged.
-  const zoomUrls = imageUrls;
 
   useEffect(() => {
     setMounted(true);
@@ -36,12 +34,12 @@ const FullScreenImageViewer: React.FC<FullScreenImageViewerProps> = ({
   }, [initialIndex, isOpen]);
 
   const goToPrevious = useCallback(() => {
-    setCurrentIndex((prev) => (prev > 0 ? prev - 1 : imageUrls.length - 1));
-  }, [imageUrls.length]);
+    setCurrentIndex((prev) => (prev > 0 ? prev - 1 : sources.length - 1));
+  }, [sources.length]);
 
   const goToNext = useCallback(() => {
-    setCurrentIndex((prev) => (prev < imageUrls.length - 1 ? prev + 1 : 0));
-  }, [imageUrls.length]);
+    setCurrentIndex((prev) => (prev < sources.length - 1 ? prev + 1 : 0));
+  }, [sources.length]);
 
   const goToIndex = useCallback((index: number) => {
     setCurrentIndex(index);
@@ -98,9 +96,9 @@ const FullScreenImageViewer: React.FC<FullScreenImageViewerProps> = ({
 
   if (!isOpen || !mounted) return null;
 
-  const currentImageUrl = zoomUrls[currentIndex];
+  const currentSource = sources[currentIndex];
   const hasImageError = imageErrors.has(currentIndex);
-  const hasMultipleImages = imageUrls.length > 1;
+  const hasMultipleImages = sources.length > 1;
 
   const viewerContent = (
     <div
@@ -134,7 +132,7 @@ const FullScreenImageViewer: React.FC<FullScreenImageViewerProps> = ({
       {/* Image Counter - Top Center (Mobile) / Top Right (Desktop) */}
       <div className="absolute top-4 right-4 z-50 md:top-6 md:right-6">
         <div className="px-3 py-1.5 md:px-4 md:py-2 rounded-full bg-white/10 backdrop-blur-sm text-white text-sm md:text-base font-medium">
-          {currentIndex + 1} / {imageUrls.length}
+          {currentIndex + 1} / {sources.length}
         </div>
       </div>
 
@@ -165,18 +163,18 @@ const FullScreenImageViewer: React.FC<FullScreenImageViewerProps> = ({
         <div className="relative w-full h-full flex items-center justify-center">
           {!hasImageError ? (
             <>
-              <img
+              <SmartImage
                 key={currentIndex}
-                src={currentImageUrl}
+                source={currentSource}
+                size="zoom"
                 alt={`Product image ${currentIndex + 1}`}
-                onError={() => handleImageError(currentIndex)}
+                fill
+                sizes="100vw"
+                priority
+                onFallbackError={() => handleImageError(currentIndex)}
                 onLoad={() => handleImageLoaded(currentIndex)}
                 className="object-contain select-none transition-opacity duration-200"
                 style={{
-                  maxHeight: "100%",
-                  maxWidth: "100%",
-                  width: "auto",
-                  height: "auto",
                   opacity: imagesLoaded.has(currentIndex) ? 1 : 0,
                 }}
               />
@@ -222,7 +220,7 @@ const FullScreenImageViewer: React.FC<FullScreenImageViewerProps> = ({
             }}
           >
             <div className="flex gap-2 md:gap-3 justify-start md:justify-center min-w-min">
-              {imageUrls.map((url, index) => (
+              {sources.map((s, index) => (
                 <button
                   key={index}
                   onClick={() => goToIndex(index)}
@@ -239,12 +237,13 @@ const FullScreenImageViewer: React.FC<FullScreenImageViewerProps> = ({
                 >
                   {!imageErrors.has(index) ? (
                     <div className="relative w-full h-full bg-white/5">
-                      <Image
-                        src={url}
+                      <SmartImage
+                        source={s}
+                        size="thumbnail"
                         alt={`Thumbnail ${index + 1}`}
                         fill
                         className="object-cover"
-                        onError={() => handleImageError(index)}
+                        onFallbackError={() => handleImageError(index)}
                         sizes="60px"
                       />
                     </div>

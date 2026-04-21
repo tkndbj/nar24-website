@@ -34,7 +34,7 @@ import {
   Unsubscribe,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import Image from "next/image";
+import SmartImage from "@/app/components/SmartImage";
 
 // Types
 interface Product {
@@ -720,8 +720,9 @@ export default function BoostAnalysisPage() {
             {/* Product Image */}
             <div className="relative w-24 h-24 flex-shrink-0">
               {item.imageUrls && item.imageUrls[0] ? (
-                <Image
-                  src={item.imageUrls[0]}
+                <SmartImage
+                  source={item.imageUrls[0]}
+                  size="card"
                   alt={item.itemName}
                   fill
                   className="object-cover rounded-lg"
@@ -824,8 +825,9 @@ export default function BoostAnalysisPage() {
             {/* Product Image */}
             <div className="relative w-16 h-16 flex-shrink-0">
               {boost.productImage ? (
-                <Image
-                  src={boost.productImage}
+                <SmartImage
+                  source={boost.productImage}
+                  size="card"
                   alt={boost.itemName}
                   fill
                   className="object-cover rounded-lg"

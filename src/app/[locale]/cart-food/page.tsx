@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useMemo, useEffect } from "react";
 import Image from "next/image";
+import SmartImage from "@/app/components/SmartImage";
 import {
   ArrowLeft,
   Trash2,
@@ -408,8 +409,9 @@ function FoodCartPageContent() {
                     }`}
                   >
                     {currentRestaurant.profileImageUrl ? (
-                      <Image
-                        src={currentRestaurant.profileImageUrl}
+                      <SmartImage
+                        source={currentRestaurant.profileImageUrl}
+                        size="thumbnail"
                         alt={currentRestaurant.name}
                         width={44}
                         height={44}
@@ -788,8 +790,9 @@ function FoodCartItemCard({
                 isDark ? "border-gray-700" : "border-gray-200"
               }`}
             >
-              <Image
-                src={item.imageUrl}
+              <SmartImage
+                source={item.imageUrl}
+                size="thumbnail"
                 alt={item.name}
                 fill
                 className="object-cover"

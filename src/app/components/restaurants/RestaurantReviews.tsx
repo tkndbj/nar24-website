@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Star, MessageSquare, ChevronDown, User, X } from "lucide-react";
-import Image from "next/image";
+import SmartImage from "@/app/components/SmartImage";
 import { useTranslations } from "next-intl";
 import {
   collection,
@@ -155,8 +155,9 @@ function ReviewCard({
                   isDarkMode ? "bg-gray-700" : "bg-gray-100"
                 }`}
               >
-                <Image
-                  src={url}
+                <SmartImage
+                  source={url}
+                  size="thumbnail"
                   alt={`Review photo ${idx + 1}`}
                   fill
                   className="object-cover"
@@ -184,8 +185,9 @@ function ReviewCard({
             className="relative max-w-[90vw] max-h-[85vh]"
             onClick={(e) => e.stopPropagation()}
           >
-            <Image
-              src={lightboxUrl}
+            <SmartImage
+              source={lightboxUrl}
+              size="zoom"
               alt="Review photo"
               width={800}
               height={800}

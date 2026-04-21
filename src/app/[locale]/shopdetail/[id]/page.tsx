@@ -25,7 +25,7 @@ import React, {
 } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import Image from "next/image";
+import SmartImage from "@/app/components/SmartImage";
 import {
   doc,
   getDoc,
@@ -1038,8 +1038,9 @@ export default function ShopDetailPage() {
               router.push(`/productdetail/${linkedProductId}`)
             }
           >
-            <Image
-              src={imageUrl}
+            <SmartImage
+              source={imageUrl}
+              size="detail"
               alt={`${shopData.name} home image ${index + 1}`}
               width={800}
               height={400}
@@ -1077,8 +1078,9 @@ export default function ShopDetailPage() {
             <div className="flex items-center space-x-4">
               <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-200">
                 {col.imageUrl ? (
-                  <Image
-                    src={col.imageUrl}
+                  <SmartImage
+                    source={col.imageUrl}
+                    size="thumbnail"
                     alt={col.name}
                     width={64}
                     height={64}
@@ -1304,14 +1306,14 @@ export default function ShopDetailPage() {
           <div className="relative h-80 hover:h-[32rem] overflow-hidden bg-gradient-to-br from-orange-500 to-pink-500 transition-all duration-500 ease-in-out cursor-pointer group">
             {shopData.coverImageUrls && shopData.coverImageUrls.length > 0 && (
               <>
-                <Image
-                  src={shopData.coverImageUrls[0]}
+                <SmartImage
+                  source={shopData.coverImageUrls[0]}
+                  size="zoom"
                   alt={`${shopData.name} cover`}
                   fill
                   sizes="100vw"
                   className="object-cover object-center"
                   priority
-                  unoptimized
                 />
                 <div className="absolute inset-0 bg-black/30 group-hover:bg-black/10 transition-all duration-500 pointer-events-none" />
               </>
@@ -1328,8 +1330,9 @@ export default function ShopDetailPage() {
               <div className="flex items-end space-x-4">
                 <div className="relative w-24 h-24 rounded-full border-4 border-white overflow-hidden shadow-lg bg-white">
                   {shopData.profileImageUrl ? (
-                    <Image
-                      src={shopData.profileImageUrl}
+                    <SmartImage
+                      source={shopData.profileImageUrl}
+                      size="thumbnail"
                       alt={shopData.name}
                       fill
                       className="object-cover object-center"

@@ -23,6 +23,7 @@ import {
   X,
 } from "lucide-react";
 import Image from "next/image";
+import SmartImage from "@/app/components/SmartImage";
 import { FavoriteBasketWidget } from "@/app/components/FavoriteBasketWidget";
 import { useFavorites } from "@/context/FavoritesProvider";
 import { useUser } from "@/context/UserProvider";
@@ -477,10 +478,13 @@ export default function FavoriteProductsPage() {
                             className={`cursor-pointer aspect-[4/5] relative overflow-hidden ${isDark ? "bg-gray-800" : "bg-gray-50"}`}
                           >
                             {imageUrl ? (
-                              <img
-                                src={imageUrl}
+                              <SmartImage
+                                source={imageUrl}
+                                size="card"
                                 alt={product.productName || "Product"}
-                                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                fill
+                                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                                className="object-cover transition-transform duration-300 group-hover:scale-105"
                               />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center">

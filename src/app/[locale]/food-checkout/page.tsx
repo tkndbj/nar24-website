@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useMemo } from "react";
 import Image from "next/image";
+import SmartImage from "@/app/components/SmartImage";
 import { Link } from "@/navigation";
 
 import { useTranslations } from "next-intl";
@@ -67,8 +68,9 @@ function CartItemRow({
     >
       {item.imageUrl ? (
         <div className="relative w-16 h-16 rounded-lg overflow-hidden flex-shrink-0">
-          <Image
-            src={item.imageUrl}
+          <SmartImage
+            source={item.imageUrl}
+            size="thumbnail"
             alt={item.name}
             fill
             className="object-cover"
@@ -584,8 +586,9 @@ function FoodCheckoutContent() {
             >
               {currentRestaurant.profileImageUrl && (
                 <div className="w-10 h-10 rounded-xl overflow-hidden flex-shrink-0">
-                  <Image
-                    src={currentRestaurant.profileImageUrl}
+                  <SmartImage
+                    source={currentRestaurant.profileImageUrl}
+                    size="thumbnail"
                     alt={currentRestaurant.name}
                     width={40}
                     height={40}

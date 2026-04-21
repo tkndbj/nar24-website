@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, memo, useRef, useCallback } from "react";
-import Image from "next/image";
+import SmartImage from "@/app/components/SmartImage";
 import Link from "next/link";
 import { ChevronRight, ChevronLeft } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -122,8 +122,9 @@ const ShopCard = memo(
               }}
             >
               {displayCoverImage ? (
-                <Image
-                  src={displayCoverImage}
+                <SmartImage
+                  source={displayCoverImage}
+                  size="card"
                   alt={`${shop.name} cover`}
                   fill
                   className="object-cover"
@@ -159,8 +160,9 @@ const ShopCard = memo(
                 }}
               >
                 {profileImageUrl ? (
-                  <Image
-                    src={profileImageUrl}
+                  <SmartImage
+                    source={profileImageUrl}
+                    size="thumbnail"
                     alt={shop.name}
                     width={48}
                     height={48}

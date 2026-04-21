@@ -1,10 +1,9 @@
 "use client";
 
 import React, { useState, useCallback, lazy, Suspense } from "react";
-import Image from "next/image";
 import { Play } from "lucide-react";
 import { Product } from "@/app/models/Product";
-import { CloudinaryUrl } from "@/utils/cloudinaryUrl";
+import SmartImage from "@/app/components/SmartImage";
 
 const FullScreenImageViewer = lazy(
   () => import("../../../components/product_detail/FullScreenImageViewer"),
@@ -35,35 +34,15 @@ export default function ProductImageGallery({
     () => new Set([0]),
   );
 
-  // Prefer storage paths (post-migration) but route legacy imageUrls
-  // through Cloudinary as well via productCompat, which extracts the
-  // storage path from a Firebase download URL and rebuilds the CDN URL.
-  // Without this, older products (only `imageUrls`) would bypass the
-  // CDN and pull original bytes from Firebase Storage.
+  // Prefer storage paths (post-migration); legacy `imageUrls` are
+  // accepted by SmartImage too — it extracts the storage path from
+  // Firebase download URLs and still routes the request through the CDN.
   const sources = React.useMemo<string[]>(() => {
     if (product.imageStoragePaths && product.imageStoragePaths.length > 0) {
       return product.imageStoragePaths;
     }
     return product.imageUrls || [];
   }, [product.imageStoragePaths, product.imageUrls]);
-
-  const displayUrls = React.useMemo(
-    () => sources.map((s) => CloudinaryUrl.productCompat(s, "detail")),
-    [sources],
-  );
-
-  const thumbnailUrls = React.useMemo(
-    () => sources.map((s) => CloudinaryUrl.productCompat(s, "thumbnail")),
-    [sources],
-  );
-
-  // Built once and passed to the full-screen viewer so it doesn't have
-  // to guess at CDN URL structure; the zoom bucket is 1600w in the
-  // shared Cloudinary config.
-  const zoomUrls = React.useMemo(
-    () => sources.map((s) => CloudinaryUrl.productCompat(s, "zoom")),
-    [sources],
-  );
 
   const handleImageError = useCallback((index: number) => {
     setImageErrors((prev) => new Set(prev).add(index));
@@ -92,13 +71,14 @@ export default function ProductImageGallery({
     <div className="space-y-2 sm:space-y-3 overflow-x-hidden">
       {/* Main Image */}
       <div className="relative w-full h-[400px] sm:h-[480px] lg:h-[560px] rounded-lg overflow-hidden">
-        {displayUrls.length > 0 && !imageErrors.has(currentImageIndex) ? (
+        {sources.length > 0 && !imageErrors.has(currentImageIndex) ? (
           <div className="relative w-full h-full overflow-hidden">
             {previousImageIndex !== currentImageIndex && (
               <div className="absolute inset-0">
-                <Image
+                <SmartImage
                   key={`prev-${previousImageIndex}`}
-                  src={displayUrls[previousImageIndex]}
+                  source={sources[previousImageIndex]}
+                  size="detail"
                   alt={product.productName}
                   fill
                   className="object-contain"
@@ -114,9 +94,10 @@ export default function ProductImageGallery({
             )}
 
             <div className="absolute inset-0">
-              <Image
+              <SmartImage
                 key={`current-${currentImageIndex}`}
-                src={displayUrls[currentImageIndex]}
+                source={sources[currentImageIndex]}
+                size="detail"
                 alt={product.productName}
                 fill
                 className="object-contain cursor-pointer hover:scale-105 transition-transform duration-300"
@@ -128,7 +109,7 @@ export default function ProductImageGallery({
                 }}
                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                 onClick={() => setShowFullScreenViewer(true)}
-                onError={() => handleImageError(currentImageIndex)}
+                onFallbackError={() => handleImageError(currentImageIndex)}
                 onLoad={() => handleImageLoaded(currentImageIndex)}
                 priority
               />
@@ -171,13 +152,13 @@ export default function ProductImageGallery({
       </div>
 
       {/* Thumbnail Images */}
-      {displayUrls.length > 1 && (
+      {sources.length > 1 && (
         <div className="flex justify-center w-full overflow-x-hidden lg:overflow-x-visible">
           <div
             className="flex gap-1.5 sm:gap-2 overflow-x-auto py-2 px-2 scrollbar-hide max-w-full"
             style={{ WebkitOverflowScrolling: "touch" }}
           >
-            {thumbnailUrls.map((url, index) => (
+            {sources.map((s, index) => (
               <button
                 key={index}
                 onClick={() => handleImageChange(index)}
@@ -188,13 +169,14 @@ export default function ProductImageGallery({
                     : "border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500"
                 }`}
               >
-                <Image
-                  src={url}
+                <SmartImage
+                  source={s}
+                  size="thumbnail"
                   alt={`${t("productImage")} ${index + 1}`}
                   width={56}
                   height={56}
                   className="w-full h-full object-cover"
-                  onError={() => handleImageError(index)}
+                  onFallbackError={() => handleImageError(index)}
                 />
               </button>
             ))}
@@ -226,7 +208,7 @@ export default function ProductImageGallery({
       {showFullScreenViewer && (
         <Suspense fallback={null}>
           <FullScreenImageViewer
-            imageUrls={zoomUrls}
+            sources={sources}
             initialIndex={currentImageIndex}
             isOpen={showFullScreenViewer}
             onClose={() => setShowFullScreenViewer(false)}

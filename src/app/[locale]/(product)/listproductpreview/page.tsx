@@ -14,7 +14,7 @@ import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { User } from "firebase/auth";
-import { useProduct } from "../../../../context/ProductContext";
+import { useProduct, type ExistingMediaRef } from "../../../../context/ProductContext";
 import { useTranslations, useLocale } from "next-intl";
 import UploadProgressOverlay from "../../../components/List-Product/UploadProgressOverlay";
 import {
@@ -38,6 +38,9 @@ interface UploadResult {
   imageUrls: string[];
   videoUrl: string | null;
   colorImageUrls: Record<string, string[]>;
+  imageStoragePaths: string[];
+  videoStoragePath: string | null;
+  colorImageStoragePaths: Record<string, string>;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -114,15 +117,13 @@ export default function ListProductPreview() {
       fileIndex: number,
       onBytesUpdate: (fileIndex: number, bytes: number) => void,
       maxRetries = 2
-    ): Promise<string> => {
+    ): Promise<{ url: string; path: string }> => {
       let attempt = 0;
       while (true) {
         try {
           const fileName = `${Date.now()}_${file.name}`;
-          const ref = storageRef(
-            storage,
-            `products/${userId}/${folder}/${fileName}`
-          );
+          const path = `products/${userId}/${folder}/${fileName}`;
+          const ref = storageRef(storage, path);
           const task = uploadBytesResumable(ref, file);
 
           await new Promise<void>((resolve, reject) => {
@@ -134,11 +135,11 @@ export default function ListProductPreview() {
             );
           });
 
-          return await getDownloadURL(task.snapshot.ref);
+          const url = await getDownloadURL(task.snapshot.ref);
+          return { url, path };
         } catch (err) {
           attempt++;
           if (attempt > maxRetries) throw err;
-          // Reset this file's progress before retrying
           onBytesUpdate(fileIndex, 0);
           await new Promise((r) => setTimeout(r, attempt * 2000));
         }
@@ -158,7 +159,14 @@ export default function ListProductPreview() {
   const uploadAllFiles = useCallback(
     async (userId: string): Promise<UploadResult> => {
       if (!productFiles) {
-        return { imageUrls: [], videoUrl: null, colorImageUrls: {} };
+        return {
+          imageUrls: [],
+          videoUrl: null,
+          colorImageUrls: {},
+          imageStoragePaths: [],
+          videoStoragePath: null,
+          colorImageStoragePaths: {},
+        };
       }
 
       const mainFiles = productFiles.images;
@@ -171,7 +179,14 @@ export default function ListProductPreview() {
       ][];
 
       if (mainFiles.length === 0 && !videoFile && colorEntries.length === 0) {
-        return { imageUrls: [], videoUrl: null, colorImageUrls: {} };
+        return {
+          imageUrls: [],
+          videoUrl: null,
+          colorImageUrls: {},
+          imageStoragePaths: [],
+          videoStoragePath: null,
+          colorImageStoragePaths: {},
+        };
       }
 
       const jobs: UploadJob[] = [];
@@ -272,7 +287,9 @@ export default function ListProductPreview() {
       };
 
       const maxConcurrent = 3;
-      const uploadedUrls: string[] = new Array(jobs.length).fill("");
+      const uploadedUrls: { url: string; path: string }[] = new Array(
+        jobs.length
+      ).fill({ url: "", path: "" });
 
       for (let start = 0; start < jobs.length; start += maxConcurrent) {
         const end = Math.min(start + maxConcurrent, jobs.length);
@@ -294,24 +311,38 @@ export default function ListProductPreview() {
         );
       }
 
-      // ── Assemble results ───────────────────────────────────────
-      const imageUrls: string[] = [];
-      let videoUrl: string | null = null;
-      const colorImageUrls: Record<string, string[]> = {};
+     // ── Assemble results ───────────────────────────────────────
+     const imageUrls: string[] = [];
+     const imageStoragePaths: string[] = [];
+     let videoUrl: string | null = null;
+     let videoStoragePath: string | null = null;
+     const colorImageUrls: Record<string, string[]> = {};
+     const colorImageStoragePaths: Record<string, string> = {};
 
-      for (let i = 0; i < jobs.length; i++) {
-        const job = jobs[i];
-        if (job.isVideo) {
-          videoUrl = uploadedUrls[i];
-        } else if (job.colorKey) {
-          colorImageUrls[job.colorKey] = [uploadedUrls[i]];
-        } else {
-          imageUrls.push(uploadedUrls[i]);
-        }
-      }
+     for (let i = 0; i < jobs.length; i++) {
+       const job = jobs[i];
+       const { url, path } = uploadedUrls[i];
+       if (job.isVideo) {
+         videoUrl = url;
+         videoStoragePath = path;
+       } else if (job.colorKey) {
+         colorImageUrls[job.colorKey] = [url];
+         colorImageStoragePaths[job.colorKey] = path;
+       } else {
+         imageUrls.push(url);
+         imageStoragePaths.push(path);
+       }
+     }
 
-      return { imageUrls, videoUrl, colorImageUrls };
-    },
+     return {
+       imageUrls,
+       videoUrl,
+       colorImageUrls,
+       imageStoragePaths,
+       videoStoragePath,
+       colorImageStoragePaths,
+     };
+   },
     [productFiles, setUploadStateSafe, uploadFileWithRetry]
   );
 
@@ -376,25 +407,36 @@ export default function ListProductPreview() {
     }
   };
 
-  // Per-color URL merge used by both new-product and edit-application writes.
-  // For each color: a newly picked File wins (its uploaded URL replaces the
-  // existing one); otherwise the existing URL is preserved.
+  // Per-color merge used by both new-product and edit-application writes.
+  // For each color: a newly picked File wins (its uploaded URL/path replaces
+  // the existing one); otherwise the existing ref is preserved.
   const mergeColorImages = (
     availableColors: string[],
     selected: { [key: string]: { quantity: string; image: File | null } },
-    existing: { [key: string]: string[] } | undefined,
-    uploaded: Record<string, string[]>
-  ): Record<string, string[]> => {
-    const out: Record<string, string[]> = {};
+    existing: { [key: string]: ExistingMediaRef } | undefined,
+    uploadedUrls: Record<string, string[]>,
+    uploadedPaths: Record<string, string>
+  ): {
+    colorImages: Record<string, string[]>;
+    colorImageStoragePaths: Record<string, string>;
+  } => {
+    const colorImages: Record<string, string[]> = {};
+    const colorImageStoragePaths: Record<string, string> = {};
     for (const color of availableColors) {
       const hasNew = !!selected?.[color]?.image;
-      if (hasNew && uploaded[color]) {
-        out[color] = uploaded[color];
-      } else if (existing?.[color]?.length) {
-        out[color] = existing[color];
+      if (hasNew && uploadedUrls[color]) {
+        colorImages[color] = uploadedUrls[color];
+        if (uploadedPaths[color]) {
+          colorImageStoragePaths[color] = uploadedPaths[color];
+        }
+      } else if (existing?.[color]) {
+        colorImages[color] = [existing[color].url];
+        if (existing[color].path) {
+          colorImageStoragePaths[color] = existing[color].path;
+        }
       }
     }
-    return out;
+    return { colorImages, colorImageStoragePaths };
   };
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -521,23 +563,36 @@ export default function ListProductPreview() {
       ibanOwnerSurname: productData.ibanOwnerSurname ?? "",
       iban: productData.iban ?? "",
 
-      // Media — merge kept-existing URLs with newly uploaded ones.
-      // For new listings `existingImageUrls` etc. are absent, so this
-      // collapses to the previous behaviour.
+    // Media — merge kept-existing refs with newly uploaded ones.
+      // Each URL has a corresponding storage path at the same index.
       imageUrls: [
-        ...(productFiles.existingImageUrls ?? []),
+        ...(productFiles.existingImages ?? []).map((r) => r.url),
         ...upload.imageUrls,
       ],
+      imageStoragePaths: [
+        ...(productFiles.existingImages ?? []).map((r) => r.path),
+        ...upload.imageStoragePaths,
+      ],
       videoUrl:
-        upload.videoUrl ?? productFiles.existingVideoUrl ?? null,
-      colorImages: mergeColorImages(
+        upload.videoUrl ?? productFiles.existingVideo?.url ?? null,
+      videoStoragePath:
+        upload.videoStoragePath ?? productFiles.existingVideo?.path ?? null,
+        ...(() => {
+          const merged = mergeColorImages(
+            availableColors,
+            productFiles.selectedColorImages,
+            productFiles.existingColorImages,
+            upload.colorImageUrls,
+            upload.colorImageStoragePaths
+          );
+          return {
+            colorImages: merged.colorImages,
+            colorImageStoragePaths: merged.colorImageStoragePaths,
+          };
+        })(),
+  
+        colorQuantities,
         availableColors,
-        productFiles.selectedColorImages,
-        productFiles.existingColorImageUrls,
-        upload.colorImageUrls
-      ),
-      colorQuantities,
-      availableColors,
 
       // Extracted gender
       gender: genderValue,
@@ -693,82 +748,170 @@ export default function ListProductPreview() {
       productData.ibanOwnerName ||
       t("unknownSeller");
 
-    const mergedImageUrls = [
-      ...(productFiles.existingImageUrls ?? []),
-      ...upload.imageUrls,
-    ];
-    const mergedVideoUrl =
-      upload.videoUrl ?? productFiles.existingVideoUrl ?? null;
-    const mergedColorImages = mergeColorImages(
-      availableColors,
-      productFiles.selectedColorImages,
-      productFiles.existingColorImageUrls,
-      upload.colorImageUrls
-    );
+      const mergedImageUrls = [
+        ...(productFiles.existingImages ?? []).map((r) => r.url),
+        ...upload.imageUrls,
+      ];
+      const mergedImageStoragePaths = [
+        ...(productFiles.existingImages ?? []).map((r) => r.path),
+        ...upload.imageStoragePaths,
+      ];
+      const mergedVideoUrl =
+        upload.videoUrl ?? productFiles.existingVideo?.url ?? null;
+      const mergedVideoStoragePath =
+        upload.videoStoragePath ?? productFiles.existingVideo?.path ?? null;
+      const mergedColor = mergeColorImages(
+        availableColors,
+        productFiles.selectedColorImages,
+        productFiles.existingColorImages,
+        upload.colorImageUrls,
+        upload.colorImageStoragePaths
+      );
+      const mergedColorImages = mergedColor.colorImages;
+      const mergedColorImageStoragePaths = mergedColor.colorImageStoragePaths;
+  
+      // Colors removed during edit (present in original, absent now).
+      const originalColors = Object.keys(productFiles.existingColorImages ?? {});
+      const deletedColors = originalColors.filter(
+        (c) => !availableColors.includes(c)
+      );
 
-    const editApplicationData: Record<string, unknown> = {
-      // Identity — this is the edit application, not the product itself.
-      id: editApplicationId,
-      originalProductId,
-      userId: uid,
-      ownerId: uid,
-      shopId: null,
+   // Load the live product so we can snapshot it + detect changes.
+   const originalSnap = await getDoc(doc(db, "products", originalProductId));
+   if (!originalSnap.exists()) {
+     throw new Error("Original product not found.");
+   }
+   const originalProductData = originalSnap.data() as Record<string, unknown>;
 
-      // Proposed new values (same shape as products/* top-level fields)
-      productName: productData.title.trim(),
-      description: productData.description.trim(),
-      price: parseFloat(productData.price),
-      currency: "TL",
-      condition: productData.condition,
-      brandModel: productData.brand ?? "",
-      category: productData.category,
-      subcategory: productData.subcategory,
-      subsubcategory: productData.subsubcategory,
-      quantity: parseInt(productData.quantity) || 1,
-      deliveryOption: productData.deliveryOption,
+   // Build the "new" product snapshot for change detection.
+   const newProductSnapshot: Record<string, unknown> = {
+     productName: productData.title.trim(),
+     description: productData.description.trim(),
+     price: parseFloat(productData.price),
+     condition: productData.condition,
+     brandModel: productData.brand ?? "",
+     category: productData.category,
+     subcategory: productData.subcategory,
+     subsubcategory: productData.subsubcategory,
+     gender: genderValue,
+     quantity: parseInt(productData.quantity) || 1,
+     deliveryOption: productData.deliveryOption,
+     colorQuantities,
+     availableColors,
+     imageStoragePaths: mergedImageStoragePaths,
+     videoStoragePath: mergedVideoStoragePath,
+     colorImageStoragePaths: mergedColorImageStoragePaths,
+     ...(productType && { productType }),
+     ...(clothingSizes && { clothingSizes }),
+     ...(clothingFit && { clothingFit }),
+     ...(clothingTypes && { clothingTypes }),
+     ...(pantSizes && { pantSizes }),
+     ...(pantFabricTypes && { pantFabricTypes }),
+     ...(footwearSizes && { footwearSizes }),
+     ...(jewelryMaterials && { jewelryMaterials }),
+     ...(consoleBrand && { consoleBrand }),
+     ...(curtainMaxWidth != null && { curtainMaxWidth }),
+     ...(curtainMaxHeight != null && { curtainMaxHeight }),
+   };
 
-      sellerName,
-      phone: productData.phone ?? "",
-      region: productData.region ?? "",
-      address: productData.address ?? "",
-      ibanOwnerName: productData.ibanOwnerName ?? "",
-      ibanOwnerSurname: productData.ibanOwnerSurname ?? "",
-      iban: productData.iban ?? "",
+   // Detect changes — mirrors Flutter's _detectChanges.
+   const normalize = (v: unknown): unknown => {
+     if (v === null || v === undefined || v === "") return null;
+     if (Array.isArray(v) && v.length === 0) return null;
+     if (
+       typeof v === "object" &&
+       v !== null &&
+       !Array.isArray(v) &&
+       Object.keys(v as object).length === 0
+     )
+       return null;
+     return v;
+   };
+   const editedFields: string[] = [];
+   const changes: Record<string, { old: unknown; new: unknown }> = {};
+   for (const [field, newVal] of Object.entries(newProductSnapshot)) {
+     const oldVal = originalProductData[field];
+     if (JSON.stringify(normalize(oldVal)) !== JSON.stringify(normalize(newVal))) {
+       editedFields.push(field);
+       changes[field] = { old: oldVal ?? null, new: newVal };
+     }
+   }
 
-      imageUrls: mergedImageUrls,
-      videoUrl: mergedVideoUrl,
-      colorImages: mergedColorImages,
-      colorQuantities,
-      availableColors,
+   const editApplicationData: Record<string, unknown> = {
+     // Identity
+     id: originalProductId,
+     ilanNo: originalProductData.ilanNo ?? originalProductId,
+     originalProductId,
+     userId: uid,
+     ownerId: uid,
+     shopId: null,
 
-      gender: genderValue,
+     // Proposed new values
+     productName: productData.title.trim(),
+     description: productData.description.trim(),
+     price: parseFloat(productData.price),
+     currency: "TL",
+     condition: productData.condition,
+     brandModel: productData.brand ?? "",
+     category: productData.category,
+     subcategory: productData.subcategory,
+     subsubcategory: productData.subsubcategory,
+     quantity: parseInt(productData.quantity) || 1,
+     deliveryOption: productData.deliveryOption,
 
-      ...(productType && { productType }),
-      ...(clothingSizes && { clothingSizes }),
-      ...(clothingFit && { clothingFit }),
-      ...(clothingTypes && { clothingTypes }),
-      ...(pantSizes && { pantSizes }),
-      ...(pantFabricTypes && { pantFabricTypes }),
-      ...(footwearSizes && { footwearSizes }),
-      ...(jewelryMaterials && { jewelryMaterials }),
-      ...(consoleBrand && { consoleBrand }),
-      ...(curtainMaxWidth != null && { curtainMaxWidth }),
-      ...(curtainMaxHeight != null && { curtainMaxHeight }),
-      ...cleanedAttributes,
+     sellerName,
+     phone: productData.phone ?? "",
+     region: productData.region ?? "",
+     address: productData.address ?? "",
+     ibanOwnerName: productData.ibanOwnerName ?? "",
+     ibanOwnerSurname: productData.ibanOwnerSurname ?? "",
+     iban: productData.iban ?? "",
 
-      // Review pipeline fields — no runtime counters here; those belong
-      // to the live product document and are applied on approval.
-      status: "pending",
-      searchIndex,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    };
+     // URLs (backward-compat)
+     imageUrls: mergedImageUrls,
+     imageStoragePaths: mergedImageStoragePaths,
+     videoUrl: mergedVideoUrl,
+     videoStoragePath: mergedVideoStoragePath,
+     colorImages: mergedColorImages,
+     colorImageStoragePaths: mergedColorImageStoragePaths,
+     colorQuantities,
+     availableColors,
+     deletedColors,
 
-    await setDoc(
-      doc(db, "vitrin_edit_product_applications", editApplicationId),
-      editApplicationData
-    );
-  };
+     gender: genderValue,
+
+     ...(productType && { productType }),
+     ...(clothingSizes && { clothingSizes }),
+     ...(clothingFit && { clothingFit }),
+     ...(clothingTypes && { clothingTypes }),
+     ...(pantSizes && { pantSizes }),
+     ...(pantFabricTypes && { pantFabricTypes }),
+     ...(footwearSizes && { footwearSizes }),
+     ...(jewelryMaterials && { jewelryMaterials }),
+     ...(consoleBrand && { consoleBrand }),
+     ...(curtainMaxWidth != null && { curtainMaxWidth }),
+     ...(curtainMaxHeight != null && { curtainMaxHeight }),
+     ...cleanedAttributes,
+
+     // Edit pipeline fields — match Flutter
+     editType: "product_edit",
+     sourceCollection: "products",
+     editedFields,
+     changes,
+     originalProductData,
+
+     status: "pending",
+     searchIndex,
+     submittedAt: serverTimestamp(),
+     createdAt: serverTimestamp(),
+     updatedAt: serverTimestamp(),
+   };
+
+   await setDoc(
+     doc(db, "vitrin_edit_product_applications", editApplicationId),
+     editApplicationData
+   );
+ };
 
   // ─────────────────────────────────────────────────────────────────────────
   // Render helpers
@@ -888,24 +1031,24 @@ export default function ListProductPreview() {
             {/* Media Gallery — shows kept-existing URLs (edit mode) and newly picked Files together */}
             <SectionCard title={t("sections.mediaGallery")} icon="📸">
               <div className="space-y-4">
-                {(productFiles.images.length > 0 ||
-                  (productFiles.existingImageUrls?.length ?? 0) > 0) && (
+              {(productFiles.images.length > 0 ||
+                  (productFiles.existingImages?.length ?? 0) > 0) && (
                   <div>
                     <p className="text-xs text-gray-500 mb-2">
                       {t("productImages", {
                         count:
                           productFiles.images.length +
-                          (productFiles.existingImageUrls?.length ?? 0),
+                          (productFiles.existingImages?.length ?? 0),
                       })}
                     </p>
                     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
-                      {(productFiles.existingImageUrls ?? []).map((url, idx) => (
+                      {(productFiles.existingImages ?? []).map((ref, idx) => (
                         <div
-                          key={`existing-${idx}`}
+                          key={`existing-${ref.path || ref.url || idx}`}
                           className="aspect-square relative rounded-lg overflow-hidden border border-gray-200"
                         >
                           <Image
-                            src={url}
+                            src={ref.url}
                             alt={t("productImageAlt", { index: idx + 1 })}
                             fill
                             className="object-cover"
@@ -942,13 +1085,13 @@ export default function ListProductPreview() {
                       className="w-48 h-auto rounded-lg border border-gray-200"
                     />
                   </div>
-                ) : productFiles.existingVideoUrl ? (
+                ) : productFiles.existingVideo ? (
                   <div>
                     <p className="text-xs text-gray-500 mb-2">
                       {t("productVideo")}
                     </p>
                     <video
-                      src={productFiles.existingVideoUrl}
+                      src={productFiles.existingVideo.url}
                       controls
                       className="w-48 h-auto rounded-lg border border-gray-200"
                     />
@@ -1067,10 +1210,10 @@ export default function ListProductPreview() {
                                 unoptimized
                               />
                             </div>
-                          ) : productFiles.existingColorImageUrls?.[color]?.[0] ? (
+                          ) : productFiles.existingColorImages?.[color] ? (
                             <div className="w-8 h-8 rounded overflow-hidden border border-gray-200">
                               <Image
-                                src={productFiles.existingColorImageUrls[color][0]}
+                                src={productFiles.existingColorImages[color].url}
                                 alt={t("colorVariantAlt", { color })}
                                 width={32}
                                 height={32}

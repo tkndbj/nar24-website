@@ -36,7 +36,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useTranslations } from "next-intl";
-import Image from "next/image";
+import SmartImage from "@/app/components/SmartImage";
 
 interface Product {
   id: string;
@@ -293,8 +293,9 @@ export default function MyProductsPage() {
             onClick={() => router.push(`/productdetail/${product.id}`)}
           >
             {product.imageUrls.length > 0 ? (
-              <Image
-                src={product.imageUrls[0]}
+              <SmartImage
+                source={product.imageUrls[0]}
+                size="card"
                 alt={product.productName}
                 fill
                 className="object-cover"

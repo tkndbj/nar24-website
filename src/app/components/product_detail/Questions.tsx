@@ -10,7 +10,7 @@ import {
   Languages,
   AlertCircle,
 } from "lucide-react";
-import Image from "next/image";
+import SmartImage from "@/app/components/SmartImage";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import translationService, {
@@ -227,8 +227,9 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
           {/* Seller avatar */}
           <div className="flex-shrink-0">
             {sellerImageUrl ? (
-              <Image
-                src={sellerImageUrl}
+              <SmartImage
+                source={sellerImageUrl}
+                size="thumbnail"
                 alt={t("seller")}
                 width={28}
                 height={28}

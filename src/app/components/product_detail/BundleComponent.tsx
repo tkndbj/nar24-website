@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
+import SmartImage from "@/app/components/SmartImage";
 import { Sparkles, Package } from "lucide-react";
 import { Product, ProductUtils } from "@/app/models/Product";
 import { useTranslations } from "next-intl";
@@ -76,12 +76,13 @@ const BundleProductCard: React.FC<BundleProductCardProps> = ({
         <div className="relative w-20 h-20 sm:w-24 sm:h-24 flex-shrink-0">
           <div className="w-full h-full rounded-xl overflow-hidden bg-gray-100">
             {product.imageUrls.length > 0 && !imageError ? (
-              <Image
-                src={product.imageUrls[0]}
+              <SmartImage
+                source={product.imageUrls[0]}
+                size="card"
                 alt={product.productName}
                 fill
                 className="object-cover group-hover:scale-110 transition-transform duration-300"
-                onError={() => setImageError(true)}
+                onFallbackError={() => setImageError(true)}
               />
             ) : (
               <div

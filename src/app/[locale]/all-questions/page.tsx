@@ -13,7 +13,7 @@ import {
   Loader2,
   Languages,
 } from "lucide-react";
-import Image from "next/image";
+import SmartImage from "@/app/components/SmartImage";
 import { format } from "date-fns";
 import translationService, {
   RateLimitException,
@@ -399,8 +399,9 @@ const AllQuestionsPage: React.FC<AllQuestionsPageProps> = ({}) => {
               <div className="flex items-start gap-2 md:gap-3">
                 <div className="w-7 h-7 md:w-8 md:h-8 rounded-full overflow-hidden flex-shrink-0 bg-gradient-to-br from-orange-400 to-orange-600">
                   {answererImage ? (
-                    <Image
-                      src={answererImage}
+                    <SmartImage
+                      source={answererImage}
+                      size="thumbnail"
                       alt={answererName}
                       width={32}
                       height={32}
@@ -483,8 +484,9 @@ const AllQuestionsPage: React.FC<AllQuestionsPageProps> = ({}) => {
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 md:w-8 md:h-8 rounded-full overflow-hidden bg-gradient-to-br from-orange-400 to-orange-600">
                   {sellerInfo.profileImageUrl ? (
-                    <Image
-                      src={sellerInfo.profileImageUrl}
+                    <SmartImage
+                      source={sellerInfo.profileImageUrl}
+                      size="thumbnail"
                       alt={sellerInfo.name}
                       width={32}
                       height={32}

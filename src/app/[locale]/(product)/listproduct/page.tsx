@@ -14,7 +14,7 @@ import {
   onSnapshot,
 } from "firebase/firestore";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useProduct } from "../../../../context/ProductContext";
+import { ExistingMediaRef, useProduct } from "../../../../context/ProductContext";
 import { useTranslations, useLocale } from "next-intl";
 import DynamicFlowRenderer from "../../../components/List-Product/DynamicFlowRenderer";
 import {
@@ -28,6 +28,7 @@ import {
 // again at upload time (listproductpreview) as defense in depth.
 const MAX_MAIN_IMAGES = 10;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10MB per file
+const MAX_VIDEO_BYTES = 80 * 1024 * 1024; // 80MB — matches Flutter
 
 // Types matching Flutter structure exactly
 interface NextStep {
@@ -140,13 +141,15 @@ export default function ListProductForm() {
     };
   }, [videoPreviewUrl]);
 
-  // Edit-mode media: URLs already uploaded to Firebase Storage.
+ // Edit-mode media: references already uploaded to Firebase Storage.
   // Kept separate from `images`/`video` so they aren't re-uploaded
   // during preview submission.
-  const [existingImageUrls, setExistingImageUrls] = useState<string[]>([]);
-  const [existingVideoUrl, setExistingVideoUrl] = useState<string | null>(null);
-  const [existingColorImageUrls, setExistingColorImageUrls] = useState<{
-    [key: string]: string[];
+  const [existingImages, setExistingImages] = useState<ExistingMediaRef[]>([]);
+  const [existingVideo, setExistingVideo] = useState<ExistingMediaRef | null>(
+    null
+  );
+  const [existingColorImages, setExistingColorImages] = useState<{
+    [colorKey: string]: ExistingMediaRef;
   }>({});
   const [editProductId, setEditProductId] = useState<string | null>(null);
   const [, setIsLoadingEditProduct] = useState(false);
@@ -350,11 +353,11 @@ export default function ListProductForm() {
       setVideo(productFiles.video || null);
       setSelectedColorImages(productFiles.selectedColorImages || {});
 
-      // Edit-mode restoration from context (returning from preview page)
-      setEditProductId(productData.editProductId || null);
-      setExistingImageUrls(productFiles.existingImageUrls || []);
-      setExistingVideoUrl(productFiles.existingVideoUrl || null);
-      setExistingColorImageUrls(productFiles.existingColorImageUrls || {});
+     // Edit-mode restoration from context (returning from preview page)
+     setEditProductId(productData.editProductId || null);
+     setExistingImages(productFiles.existingImages || []);
+     setExistingVideo(productFiles.existingVideo || null);
+     setExistingColorImages(productFiles.existingColorImages || {});
 
       // FIX: Don't execute flow, just mark it as completed since all data is already there
       if (
@@ -580,6 +583,9 @@ export default function ListProductForm() {
           "iban",
           "imageUrls",
           "videoUrl",
+          "imageStoragePaths",
+  "videoStoragePath",
+  "colorImageStoragePaths",
           "colorImages",
           "colorQuantities",
           "availableColors",
@@ -641,23 +647,52 @@ export default function ListProductForm() {
         }
         setAttributes(rebuiltAttributes);
 
-        // Existing media (kept as URLs, not re-uploaded)
+       // Pair each URL with its storage path. Both must exist and be
+        // the same length — if the product was created before storage
+        // paths were tracked, we warn and skip path association (the
+        // edit will still work but admin approval may lose path refs).
         const imageUrls = Array.isArray(data.imageUrls)
           ? (data.imageUrls as string[])
           : [];
-        setExistingImageUrls(imageUrls);
+        const imageStoragePaths = Array.isArray(data.imageStoragePaths)
+          ? (data.imageStoragePaths as string[])
+          : [];
+
+        const pairedImages: ExistingMediaRef[] = imageUrls.map((url, idx) => ({
+          url,
+          path: imageStoragePaths[idx] ?? "",
+        }));
+        if (
+          imageStoragePaths.length > 0 &&
+          imageStoragePaths.length !== imageUrls.length
+        ) {
+          console.warn(
+            "imageUrls and imageStoragePaths length mismatch on product",
+            editProductIdParam
+          );
+        }
+        setExistingImages(pairedImages);
         setImages([]);
 
         const videoUrl =
           typeof data.videoUrl === "string" ? (data.videoUrl as string) : null;
-        setExistingVideoUrl(videoUrl);
+        const videoStoragePath =
+          typeof data.videoStoragePath === "string"
+            ? (data.videoStoragePath as string)
+            : null;
+        setExistingVideo(
+          videoUrl ? { url: videoUrl, path: videoStoragePath ?? "" } : null
+        );
         setVideo(null);
 
-        // Color images: existing URLs + form-state placeholders (image: null)
-        // so the "colors already chosen" block renders via selectedColorImages.
-        const colorImages = (data.colorImages ?? {}) as Record<
+        // Color images
+        const colorImagesMap = (data.colorImages ?? {}) as Record<
           string,
           string[]
+        >;
+        const colorStoragePaths = (data.colorImageStoragePaths ?? {}) as Record<
+          string,
+          string
         >;
         const colorQuantities = (data.colorQuantities ?? {}) as Record<
           string,
@@ -665,9 +700,19 @@ export default function ListProductForm() {
         >;
         const availableColors = Array.isArray(data.availableColors)
           ? (data.availableColors as string[])
-          : Object.keys({ ...colorImages, ...colorQuantities });
+          : Object.keys({ ...colorImagesMap, ...colorQuantities });
 
-        setExistingColorImageUrls(colorImages);
+        const pairedColors: { [colorKey: string]: ExistingMediaRef } = {};
+        for (const color of availableColors) {
+          const url = colorImagesMap[color]?.[0];
+          if (!url) continue;
+          pairedColors[color] = {
+            url,
+            path: colorStoragePaths[color] ?? "",
+          };
+        }
+        setExistingColorImages(pairedColors);
+
         const rebuiltColorImages: {
           [key: string]: { quantity: string; image: File | null };
         } = {};
@@ -989,9 +1034,9 @@ export default function ListProductForm() {
     setShowDynamicStep(false);
     setIsDirty(false);
     setEditProductId(null);
-    setExistingImageUrls([]);
-    setExistingVideoUrl(null);
-    setExistingColorImageUrls({});
+    setExistingImages([]);
+    setExistingVideo(null);
+    setExistingColorImages({});
 
     sessionStorage.removeItem("productPreviewData");
   };
@@ -1260,7 +1305,7 @@ export default function ListProductForm() {
   // bytes than the user chose).
   const processImagePicks = async (incoming: File[]): Promise<File[]> => {
     const slotsRemaining =
-      MAX_MAIN_IMAGES - images.length - existingImageUrls.length;
+    MAX_MAIN_IMAGES - images.length - existingImages.length;
     if (slotsRemaining <= 0) {
       alert(
         t("errors.maxImagesReached", {
@@ -1366,10 +1411,20 @@ export default function ListProductForm() {
     const imageFiles = files.filter((file) => file.type.startsWith("image/"));
     const videoFiles = files.filter((file) => file.type.startsWith("video/"));
 
-    // Handle video files (no compression needed)
-    if (videoFiles.length > 0 && !video) {
-      setVideo(videoFiles[0]);
+   // Handle video files (no compression, but enforce size limit)
+   if (videoFiles.length > 0 && !video) {
+    const candidate = videoFiles[0];
+    if (candidate.size > MAX_VIDEO_BYTES) {
+      const mb = (candidate.size / (1024 * 1024)).toFixed(1);
+      alert(
+        t("errors.videoTooLarge", {
+          fallback: `Video exceeds 80MB limit (${mb}MB). Please choose a shorter clip.`,
+        })
+      );
+    } else {
+      setVideo(candidate);
     }
+  }
 
     if (imageFiles.length === 0) return;
     const accepted = await processImagePicks(imageFiles);
@@ -1382,28 +1437,41 @@ export default function ListProductForm() {
   };
 
   const removeExistingImage = (idx: number) => {
-    setExistingImageUrls((prev) => prev.filter((_, i) => i !== idx));
+    setExistingImages((prev) => prev.filter((_, i) => i !== idx));
   };
 
   const handleVideoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
+    e.target.value = "";
+    if (!file) {
+      setVideo(null);
+      return;
+    }
+    if (file.size > MAX_VIDEO_BYTES) {
+      const mb = (file.size / (1024 * 1024)).toFixed(1);
+      alert(
+        t("errors.videoTooLarge", {
+          fallback: `Video exceeds 80MB limit (${mb}MB). Please choose a shorter clip.`,
+        })
+      );
+      return;
+    }
     setVideo(file);
-    // Replacing the video implicitly drops the previously uploaded URL.
-    if (file) setExistingVideoUrl(null);
+    setExistingVideo(null);
   };
 
   const removeVideo = () => setVideo(null);
 
-  const removeExistingVideo = () => setExistingVideoUrl(null);
+  const removeExistingVideo = () => setExistingVideo(null);
 
   // Handle final submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsDirty(false);
 
-    // Validation (like Flutter's _navigateToPreview validation)
-    // In edit mode, existing (already-uploaded) image URLs count toward the minimum.
-    const totalImageCount = images.length + existingImageUrls.length;
+     // Validation (like Flutter's _navigateToPreview validation)
+    // In edit mode, existing (already-uploaded) images count toward the minimum.
+    const totalImageCount = images.length + existingImages.length;
     if (
       !title.trim() ||
       !description.trim() ||
@@ -1422,11 +1490,10 @@ export default function ListProductForm() {
       return;
     }
 
-    // Check color images — either a newly picked File or a kept existing URL.
+    // Check color images — either a newly picked File or a kept existing ref.
     for (const color of Object.keys(selectedColorImages)) {
       const hasNewImage = !!selectedColorImages[color].image;
-      const hasExistingImage =
-        (existingColorImageUrls[color]?.length ?? 0) > 0;
+      const hasExistingImage = !!existingColorImages[color];
       if (!hasNewImage && !hasExistingImage) {
         alert(t("validation.addImageForColor", { color }));
         return;
@@ -1494,9 +1561,9 @@ export default function ListProductForm() {
         images,
         video,
         selectedColorImages,
-        existingImageUrls,
-        existingVideoUrl,
-        existingColorImageUrls,
+        existingImages,
+        existingVideo,
+        existingColorImages,
       };
 
       await saveProductForPreview(productData, productFiles);
@@ -1604,19 +1671,19 @@ export default function ListProductForm() {
               </h2>
               <span
                 className={`text-xs font-semibold ${
-                  existingImageUrls.length + images.length >= MAX_MAIN_IMAGES
+                  existingImages.length + images.length >= MAX_MAIN_IMAGES
                     ? "text-orange-500"
                     : mutedColor
                 }`}
               >
-                {existingImageUrls.length + images.length}/{MAX_MAIN_IMAGES}
+                {existingImages.length + images.length}/{MAX_MAIN_IMAGES}
               </span>
             </div>
 
             {/* Drag & Drop Zone */}
             <div
               className={`relative border-2 border-dashed rounded-xl p-6 text-center transition-all duration-200 ${
-                existingImageUrls.length + images.length >= MAX_MAIN_IMAGES
+                existingImages.length + images.length >= MAX_MAIN_IMAGES
                   ? "border-gray-300 opacity-60 cursor-not-allowed"
                   : dragActive
                   ? "border-orange-500 bg-orange-500/10"
@@ -1625,7 +1692,7 @@ export default function ListProductForm() {
                   : "border-gray-200 hover:border-orange-300 hover:bg-orange-50/30"
               }`}
               onDrop={
-                existingImageUrls.length + images.length >= MAX_MAIN_IMAGES
+                existingImages.length + images.length >= MAX_MAIN_IMAGES
                   ? (e) => {
                       e.preventDefault();
                       setDragActive(false);
@@ -1634,7 +1701,7 @@ export default function ListProductForm() {
               }
               onDragOver={(e) => {
                 e.preventDefault();
-                if (existingImageUrls.length + images.length < MAX_MAIN_IMAGES) {
+                if (existingImages.length + images.length < MAX_MAIN_IMAGES) {
                   setDragActive(true);
                 }
               }}
@@ -1674,7 +1741,7 @@ export default function ListProductForm() {
                 onChange={handleImageChange}
                 disabled={
                   isCompressing ||
-                  existingImageUrls.length + images.length >= MAX_MAIN_IMAGES
+                  existingImages.length + images.length >= MAX_MAIN_IMAGES
                 }
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
               />
@@ -1691,20 +1758,20 @@ export default function ListProductForm() {
             )}
 
             {/* Image Preview Grid — existing URLs (edit mode) then new Files */}
-            {(existingImageUrls.length > 0 || images.length > 0) && (
+            {(existingImages.length > 0 || images.length > 0) && (
               <div className="mt-4">
                 <h4 className={`text-xs font-semibold mb-2 ${labelColor}`}>
                   {t("media.uploadedImages")} (
-                  {existingImageUrls.length + images.length})
+                  {existingImages.length + images.length})
                 </h4>
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-                  {existingImageUrls.map((url, idx) => (
+                  {existingImages.map((ref, idx) => (
                     <div
-                      key={`existing-${idx}`}
+                      key={`existing-${ref.path || ref.url || idx}`}
                       className="group relative aspect-square"
                     >
                       <Image
-                        src={url}
+                        src={ref.url}
                         alt={t("media.preview")}
                         width={200}
                         height={200}
@@ -1767,10 +1834,10 @@ export default function ListProductForm() {
                     ✕
                   </button>
                 </div>
-              ) : existingVideoUrl ? (
+              ) : existingVideo ? (
                 <div className="relative inline-block">
                   <video
-                    src={existingVideoUrl}
+                    src={existingVideo.url}
                     controls
                     className="w-48 h-auto rounded-xl"
                   />

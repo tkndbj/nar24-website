@@ -20,7 +20,7 @@ import {
   ChevronUp,
   Search,
 } from "lucide-react";
-import Image from "next/image";
+import SmartImage from "@/app/components/SmartImage";
 import { ProductCard } from "@/app/components/ProductCard";
 import type { globalBrands as globalBrandsType } from "@/constants/brands";
 
@@ -146,12 +146,13 @@ const FullScreenImageView: React.FC<{
   return (
     <div className="fixed inset-0 bg-black z-50 flex items-center justify-center">
       <div className="relative w-full h-full">
-        <Image
-          src={imageUrl}
+        <SmartImage
+          source={imageUrl}
+          size="zoom"
           alt="Collection Cover"
           fill
           className="object-contain"
-          onError={() => {
+          onFallbackError={() => {
             console.error("Failed to load full screen image");
           }}
         />
@@ -676,12 +677,13 @@ export default function CollectionPage() {
             onClick={() => setShowFullScreenImage(true)}
             className="w-full h-full relative"
           >
-            <Image
-              src={collectionData.imageUrl}
+            <SmartImage
+              source={collectionData.imageUrl}
+              size="detail"
               alt={collectionData.name}
               fill
               className="object-cover"
-              onError={() => {
+              onFallbackError={() => {
                 console.error("Failed to load collection image");
               }}
             />

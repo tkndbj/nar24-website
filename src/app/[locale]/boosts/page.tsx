@@ -32,7 +32,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useTranslations } from "next-intl";
-import Image from "next/image";
+import SmartImage from "@/app/components/SmartImage";
 import { httpsCallable, getFunctions } from "firebase/functions";
 
 // Types
@@ -842,8 +842,9 @@ export default function BoostPage() {
                     className={`relative h-36 ${isDarkMode ? "bg-gray-700" : "bg-gray-50"}`}
                   >
                     {mainProduct.imageUrl ? (
-                      <Image
-                        src={mainProduct.imageUrl}
+                      <SmartImage
+                        source={mainProduct.imageUrl}
+                        size="card"
                         alt={mainProduct.productName}
                         fill
                         className="object-cover"
@@ -951,8 +952,9 @@ export default function BoostPage() {
                           </div>
                           <div className="w-10 h-10 rounded-xl overflow-hidden bg-gray-50 flex-shrink-0 relative">
                             {product.imageUrl ? (
-                              <Image
-                                src={product.imageUrl}
+                              <SmartImage
+                                source={product.imageUrl}
+                                size="thumbnail"
                                 alt={product.productName}
                                 fill
                                 className="object-cover"

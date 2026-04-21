@@ -32,7 +32,7 @@ import {
 import { db } from "@/lib/firebase";
 import { useTranslations } from "next-intl";
 import { useTheme } from "@/hooks/useTheme";
-import Image from "next/image";
+import SmartImage from "@/app/components/SmartImage";
 
 type FoodOrderStatus =
   | "pending"
@@ -466,8 +466,9 @@ export default function FoodOrdersPage() {
                     >
                       {order.restaurantProfileImage ? (
                         <div className="w-10 h-10 rounded-xl overflow-hidden relative">
-                          <Image
-                            src={order.restaurantProfileImage}
+                          <SmartImage
+                            source={order.restaurantProfileImage}
+                            size="thumbnail"
                             alt={order.restaurantName}
                             fill
                             className="object-cover"

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, memo, useMemo } from "react";
-import Image from "next/image";
+import SmartImage from "@/app/components/SmartImage";
 import { useRouter } from "next/navigation";
 import { getFirebaseDb } from "@/lib/firebase-lazy";
 import type { PrefetchedBannerItem } from "@/types/MarketLayout";
@@ -301,17 +301,14 @@ const MarketThinBanner = memo(
               }`}
               style={{ opacity: isTransitioning ? 0.7 : 1 }}
             >
-              <Image
-                src={currentBanner.url}
+              <SmartImage
+                source={currentBanner.url}
+                size="detail"
                 alt="Promotional banner"
                 fill
                 className="object-cover"
                 sizes="(max-width: 768px) 100vw, 768px"
                 priority={currentIndex === 0}
-                onError={(e) => {
-                  // Hide broken images
-                  (e.target as HTMLImageElement).style.display = "none";
-                }}
               />
             </div>
 

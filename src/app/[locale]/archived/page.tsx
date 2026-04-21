@@ -35,7 +35,7 @@ import {
   User,
   Star,
 } from "lucide-react";
-import Image from "next/image";
+import SmartImage from "@/app/components/SmartImage";
 import { useTranslations } from "next-intl";
 
 interface ArchivedProduct {
@@ -747,8 +747,9 @@ function ArchivedProductCard({
           className="w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 relative group"
         >
           {imageUrl ? (
-            <Image
-              src={imageUrl}
+            <SmartImage
+              source={imageUrl}
+              size="thumbnail"
               alt={product.productName}
               fill
               className="object-cover group-hover:scale-105 transition-transform"

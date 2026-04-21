@@ -33,7 +33,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useTranslations } from "next-intl";
-import Image from "next/image";
+import SmartImage from "@/app/components/SmartImage";
 import { AttributeLocalizationUtils } from "@/constants/AttributeLocalization";
 
 // ============================================================================
@@ -828,8 +828,9 @@ export default function BoughtProductsPage() {
                       }`}
                     >
                       {item.productImage ? (
-                        <Image
-                          src={item.productImage}
+                        <SmartImage
+                          source={item.productImage}
+                          size="thumbnail"
                           alt={item.productName}
                           width={48}
                           height={48}

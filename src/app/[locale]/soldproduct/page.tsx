@@ -27,7 +27,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useTranslations } from "next-intl";
-import Image from "next/image";
+import SmartImage from "@/app/components/SmartImage";
 
 // Types
 interface SoldItem {
@@ -637,8 +637,9 @@ export default function SoldProductsPage() {
                     `}
                   >
                     {item.productImage ? (
-                      <Image
-                        src={item.productImage}
+                      <SmartImage
+                        source={item.productImage}
+                        size="thumbnail"
                         alt={item.productName}
                         width={48}
                         height={48}

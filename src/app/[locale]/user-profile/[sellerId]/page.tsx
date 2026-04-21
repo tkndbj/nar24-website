@@ -22,7 +22,7 @@ import { useTranslations } from "next-intl";
 import { useUser } from "@/context/UserProvider";
 import { Product } from "@/app/models/Product";
 import ProductCard from "@/app/components/ProductCard";
-import Image from "next/image";
+import SmartImage from "@/app/components/SmartImage";
 import {
   ArrowLeft,
   Heart,
@@ -515,8 +515,9 @@ export default function UserProfilePage() {
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-200">
                   {userData.profileImage ? (
-                    <Image
-                      src={userData.profileImage}
+                    <SmartImage
+                      source={userData.profileImage}
+                      size="thumbnail"
                       alt={userData.displayName}
                       width={36}
                       height={36}
