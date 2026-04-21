@@ -22,6 +22,10 @@ interface ProductData {
   ibanOwnerSurname: string;
   iban: string;
   shopId: string | null;
+  // Edit-mode marker. When present, listproductpreview writes the
+  // submission to vitrin_edit_product_applications (referencing this id)
+  // instead of creating a new vitrin_product_applications document.
+  editProductId?: string | null;
 }
 
 interface ProductFiles {
@@ -30,6 +34,12 @@ interface ProductFiles {
   selectedColorImages: {
     [key: string]: { quantity: string; image: File | null };
   };
+  // Media already uploaded to Firebase Storage in a prior submission.
+  // Populated in edit mode; preserved through upload (not re-uploaded)
+  // and merged with newly uploaded URLs on the final write.
+  existingImageUrls?: string[];
+  existingVideoUrl?: string | null;
+  existingColorImageUrls?: { [key: string]: string[] };
 }
 
 interface ProductContextType {

@@ -18,6 +18,7 @@ export interface ProductData {
   ibanOwnerSurname: string;
   iban: string;
   shopId: string | null;
+  editProductId?: string | null;
 }
 
 export interface ProductFiles {
@@ -26,6 +27,9 @@ export interface ProductFiles {
   selectedColorImages: {
     [key: string]: { quantity: string; image: File | null };
   };
+  existingImageUrls?: string[];
+  existingVideoUrl?: string | null;
+  existingColorImageUrls?: { [key: string]: string[] };
 }
 
 export interface StoredProduct {

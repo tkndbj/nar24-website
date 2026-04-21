@@ -174,6 +174,17 @@ export default function ColorOptionStep({
         return;
       }
 
+      // Hard size cap — rejected BEFORE compression so abusive files
+      // never enter memory budget / compression pipeline.
+      const MAX_COLOR_IMAGE_BYTES = 10 * 1024 * 1024; // 10MB
+      if (file.size > MAX_COLOR_IMAGE_BYTES) {
+        alert(
+          `Image too large (${formatFileSize(file.size)}). Max 10MB per color image.`
+        );
+        event.target.value = "";
+        return;
+      }
+
       // Check if color exists in selectedColors
       setSelectedColors((currentColors) => {
         if (!currentColors[colorName]) {
@@ -198,22 +209,32 @@ export default function ColorOptionStep({
           );
 
           const result = await smartCompress(file, "color");
-          finalFile = result.compressedFile;
+          const compressed = result.compressedFile;
 
           if (
-            !finalFile ||
-            !(finalFile instanceof File) ||
-            finalFile.size === 0
+            !compressed ||
+            !(compressed instanceof File) ||
+            compressed.size === 0
           ) {
             throw new Error("Compression failed: Invalid result");
           }
 
-          console.log(`✅ Compression successful for ${colorName}`);
-
-          setCompressionStats((prev) => ({
-            ...prev,
-            [colorName]: result,
-          }));
+          // Canvas can occasionally produce a larger file (e.g. when
+          // re-encoding an already tightly-compressed source, or PNG
+          // output that ignores the quality argument). Keep whichever
+          // is smaller so we never upload more than the user picked.
+          if (compressed.size < file.size) {
+            finalFile = compressed;
+            setCompressionStats((prev) => ({
+              ...prev,
+              [colorName]: result,
+            }));
+            console.log(`✅ Compression successful for ${colorName}`);
+          } else {
+            console.log(
+              `⏩ Keeping original for ${colorName} (compression produced larger file)`
+            );
+          }
         }
 
         // FIXED: Use atomic state update with validation

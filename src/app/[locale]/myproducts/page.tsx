@@ -401,7 +401,7 @@ export default function MyProductsPage() {
                 <BarChart3 size={15} />
               </button>
               <button
-                onClick={() => router.push(`/edit-product/${product.id}`)}
+                onClick={() => router.push(`/listproduct?edit=${product.id}`)}
                 className={`p-1.5 rounded-lg transition-colors ${
                   isDarkMode
                     ? "hover:bg-gray-800 text-gray-500 hover:text-gray-300"
@@ -463,7 +463,7 @@ export default function MyProductsPage() {
                   <button
                     onClick={() => {
                       setActiveMenu(null);
-                      router.push(`/edit-product/${product.id}`);
+                      router.push(`/listproduct?edit=${product.id}`);
                     }}
                     className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors ${
                       isDarkMode

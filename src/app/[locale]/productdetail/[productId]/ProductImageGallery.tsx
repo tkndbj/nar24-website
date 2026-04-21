@@ -27,6 +27,13 @@ export default function ProductImageGallery({
   const [showFullScreenViewer, setShowFullScreenViewer] = useState(false);
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
+  // Track which image indices have finished loading so we can hide the
+  // spinner overlay once the new image paints. Index 0 starts marked so
+  // the initial render doesn't flash a spinner while the priority image
+  // is already in-flight.
+  const [imagesLoaded, setImagesLoaded] = useState<Set<number>>(
+    () => new Set([0]),
+  );
 
   const displayUrls = React.useMemo(() => {
     if (product.imageStoragePaths && product.imageStoragePaths.length > 0) {
@@ -48,6 +55,15 @@ export default function ProductImageGallery({
 
   const handleImageError = useCallback((index: number) => {
     setImageErrors((prev) => new Set(prev).add(index));
+  }, []);
+
+  const handleImageLoaded = useCallback((index: number) => {
+    setImagesLoaded((prev) => {
+      if (prev.has(index)) return prev;
+      const next = new Set(prev);
+      next.add(index);
+      return next;
+    });
   }, []);
 
   const handleImageChange = useCallback(
@@ -101,9 +117,19 @@ export default function ProductImageGallery({
                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                 onClick={() => setShowFullScreenViewer(true)}
                 onError={() => handleImageError(currentImageIndex)}
+                onLoad={() => handleImageLoaded(currentImageIndex)}
                 priority
               />
             </div>
+
+            {/* Loading spinner — shown only while the current image has
+                not finished loading. Positioned above the sliding Image
+                layers so it's visible during the transition. */}
+            {!imagesLoaded.has(currentImageIndex) && (
+              <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/5 backdrop-blur-[2px]">
+                <div className="w-10 h-10 border-4 border-gray-200/60 border-t-orange-500 rounded-full animate-spin" />
+              </div>
+            )}
           </div>
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-700">

@@ -20,6 +20,7 @@ const FullScreenImageViewer: React.FC<FullScreenImageViewerProps> = ({
 }) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
+  const [imagesLoaded, setImagesLoaded] = useState<Set<number>>(new Set());
   const [mounted, setMounted] = useState(false);
 
   const zoomUrls = React.useMemo(() => {
@@ -54,6 +55,15 @@ const FullScreenImageViewer: React.FC<FullScreenImageViewerProps> = ({
 
   const handleImageError = useCallback((index: number) => {
     setImageErrors((prev) => new Set(prev).add(index));
+  }, []);
+
+  const handleImageLoaded = useCallback((index: number) => {
+    setImagesLoaded((prev) => {
+      if (prev.has(index)) return prev;
+      const next = new Set(prev);
+      next.add(index);
+      return next;
+    });
   }, []);
 
   const handleKeyDown = useCallback(
@@ -160,18 +170,28 @@ const FullScreenImageViewer: React.FC<FullScreenImageViewerProps> = ({
         {/* Current Image */}
         <div className="relative w-full h-full flex items-center justify-center">
           {!hasImageError ? (
-            <img
-              src={currentImageUrl}
-              alt={`Product image ${currentIndex + 1}`}
-              onError={() => handleImageError(currentIndex)}
-              className="object-contain select-none"
-              style={{
-                maxHeight: "100%",
-                maxWidth: "100%",
-                width: "auto",
-                height: "auto",
-              }}
-            />
+            <>
+              <img
+                key={currentIndex}
+                src={currentImageUrl}
+                alt={`Product image ${currentIndex + 1}`}
+                onError={() => handleImageError(currentIndex)}
+                onLoad={() => handleImageLoaded(currentIndex)}
+                className="object-contain select-none transition-opacity duration-200"
+                style={{
+                  maxHeight: "100%",
+                  maxWidth: "100%",
+                  width: "auto",
+                  height: "auto",
+                  opacity: imagesLoaded.has(currentIndex) ? 1 : 0,
+                }}
+              />
+              {!imagesLoaded.has(currentIndex) && (
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                  <div className="w-12 h-12 md:w-14 md:h-14 border-4 border-white/20 border-t-orange-500 rounded-full animate-spin" />
+                </div>
+              )}
+            </>
           ) : (
             <div className="flex items-center justify-center w-48 h-48 md:w-64 md:h-64 rounded-lg bg-white/5">
               <div className="text-center text-white/60">

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import { ArrowLeft } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
@@ -13,7 +13,7 @@ import {
   where,
   onSnapshot,
 } from "firebase/firestore";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useProduct } from "../../../../context/ProductContext";
 import { useTranslations, useLocale } from "next-intl";
 import DynamicFlowRenderer from "../../../components/List-Product/DynamicFlowRenderer";
@@ -23,6 +23,11 @@ import {
   formatFileSize,
   CompressionResult,
 } from "../../../utils/imageCompression";
+
+// Hard caps to prevent abuse. Enforced both at pick time (UX) and
+// again at upload time (listproductpreview) as defense in depth.
+const MAX_MAIN_IMAGES = 10;
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10MB per file
 
 // Types matching Flutter structure exactly
 interface NextStep {
@@ -90,6 +95,8 @@ export default function ListProductForm() {
   const { saveProductForPreview, productData, productFiles, isRestored } =
     useProduct();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editProductIdParam = searchParams?.get("edit") ?? null;
   const locale = useLocale(); // ADD THIS
 
   const [isCompressing, setIsCompressing] = useState(false);
@@ -108,13 +115,51 @@ export default function ListProductForm() {
   const [images, setImages] = useState<File[]>([]);
   const [video, setVideo] = useState<File | null>(null);
 
+  // Object URLs for previews. Memoised against the File[] reference so
+  // unrelated re-renders (e.g. typing in the description box) don't
+  // recreate them — which previously caused <Image> to reload the blob
+  // and flicker on every keystroke. Revoked on change/unmount to avoid
+  // leaking blob URLs across the session.
+  const imagePreviewUrls = useMemo(
+    () => images.map((file) => URL.createObjectURL(file)),
+    [images]
+  );
+  useEffect(() => {
+    return () => {
+      imagePreviewUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [imagePreviewUrls]);
+
+  const videoPreviewUrl = useMemo(
+    () => (video ? URL.createObjectURL(video) : null),
+    [video]
+  );
+  useEffect(() => {
+    return () => {
+      if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl);
+    };
+  }, [videoPreviewUrl]);
+
+  // Edit-mode media: URLs already uploaded to Firebase Storage.
+  // Kept separate from `images`/`video` so they aren't re-uploaded
+  // during preview submission.
+  const [existingImageUrls, setExistingImageUrls] = useState<string[]>([]);
+  const [existingVideoUrl, setExistingVideoUrl] = useState<string | null>(null);
+  const [existingColorImageUrls, setExistingColorImageUrls] = useState<{
+    [key: string]: string[];
+  }>({});
+  const [editProductId, setEditProductId] = useState<string | null>(null);
+  const [, setIsLoadingEditProduct] = useState(false);
+
   // Basic info
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
+  // Quantity and deliveryOption are hidden from the form UI and fixed to
+  // sensible defaults. Edit-mode still reads whatever is on the live doc.
   const [quantity, setQuantity] = useState("1");
   const [condition, setCondition] = useState("");
-  const [deliveryOption, setDeliveryOption] = useState("");
+  const [deliveryOption, setDeliveryOption] = useState("Fast Delivery");
 
   // Core product fields (exactly like Flutter)
   const [category, setCategory] = useState("");
@@ -148,8 +193,8 @@ export default function ListProductForm() {
   const [isDirty, setIsDirty] = useState(false);
   const isDarkMode = useTheme();
 
-  // Edit mode detection (like Flutter)
-  const isEditMode = false; // TODO: Add edit mode support
+  // Edit mode detection — URL carries ?edit=<productId> when editing.
+  const isEditMode = !!editProductId;
 
   // Flow data loading from Firestore (matching Flutter)
   useEffect(() => {
@@ -190,9 +235,7 @@ export default function ListProductForm() {
       title.trim() ||
       description.trim() ||
       price ||
-      quantity !== "1" ||
       condition ||
-      deliveryOption ||
       category ||
       subcategory ||
       subsubcategory ||
@@ -207,9 +250,7 @@ export default function ListProductForm() {
     title,
     description,
     price,
-    quantity,
     condition,
-    deliveryOption,
     category,
     subcategory,
     subsubcategory,
@@ -281,6 +322,13 @@ export default function ListProductForm() {
   useEffect(() => {
     if (!isRestored) return;
 
+    // When the URL carries ?edit=<id> and the context doesn't already hold
+    // that same edit (e.g. fresh entry from My Products), skip the context
+    // restore and let the Firestore-load effect populate state instead.
+    if (editProductIdParam && productData?.editProductId !== editProductIdParam) {
+      return;
+    }
+
     if (productData && productFiles) {
       console.log("✅ " + t("console.restoringFromContext"));
 
@@ -290,7 +338,7 @@ export default function ListProductForm() {
       setPrice(productData.price || "");
       setQuantity(productData.quantity || "1");
       setCondition(productData.condition || "");
-      setDeliveryOption(productData.deliveryOption || "");
+      setDeliveryOption(productData.deliveryOption || "Fast Delivery");
       setCategory(productData.category || "");
       setSubcategory(productData.subcategory || "");
       setSubsubcategory(productData.subsubcategory || "");
@@ -301,6 +349,12 @@ export default function ListProductForm() {
       setImages(productFiles.images || []);
       setVideo(productFiles.video || null);
       setSelectedColorImages(productFiles.selectedColorImages || {});
+
+      // Edit-mode restoration from context (returning from preview page)
+      setEditProductId(productData.editProductId || null);
+      setExistingImageUrls(productFiles.existingImageUrls || []);
+      setExistingVideoUrl(productFiles.existingVideoUrl || null);
+      setExistingColorImageUrls(productFiles.existingColorImageUrls || {});
 
       // FIX: Don't execute flow, just mark it as completed since all data is already there
       if (
@@ -347,7 +401,7 @@ export default function ListProductForm() {
         setPrice(parsed.price || "");
         setQuantity(parsed.quantity || "1");
         setCondition(parsed.condition || "");
-        setDeliveryOption(parsed.deliveryOption || "");
+        setDeliveryOption(parsed.deliveryOption || "Fast Delivery");
         setCategory(parsed.category || "");
         setSubcategory(parsed.subcategory || "");
         setSubsubcategory(parsed.subsubcategory || "");
@@ -452,6 +506,208 @@ export default function ListProductForm() {
       }, 500);
     }
   }, []);
+
+  // Edit-mode loader: fetch the product from Firestore and hydrate the form.
+  // Runs only when ?edit=<id> is present in the URL AND the context doesn't
+  // already hold that same product (the context path is handled by the
+  // restore effect above — this covers the fresh-navigation-from-MyProducts case).
+  useEffect(() => {
+    if (!isRestored) return;
+    if (!editProductIdParam) return;
+    if (editProductId === editProductIdParam) return;
+    if (productData?.editProductId === editProductIdParam) return;
+
+    let cancelled = false;
+
+    const loadForEdit = async () => {
+      setIsLoadingEditProduct(true);
+      try {
+        const snap = await getDoc(doc(db, "products", editProductIdParam));
+        if (cancelled) return;
+
+        if (!snap.exists()) {
+          alert(t("errors.productNotFound", { fallback: "Product not found." }));
+          router.push(buildLocalizedUrl("/myproducts"));
+          return;
+        }
+
+        const data = snap.data() as Record<string, unknown>;
+
+        // Core product fields
+        setTitle((data.productName as string) ?? "");
+        setDescription((data.description as string) ?? "");
+        setPrice(
+          data.price != null ? String(data.price) : ""
+        );
+        setQuantity(
+          data.quantity != null ? String(data.quantity) : "1"
+        );
+        setCondition((data.condition as string) ?? "");
+        setDeliveryOption(
+          (data.deliveryOption as string) ?? "Fast Delivery"
+        );
+        setCategory((data.category as string) ?? "");
+        setSubcategory((data.subcategory as string) ?? "");
+        setSubsubcategory((data.subsubcategory as string) ?? "");
+        setBrand((data.brandModel as string) ?? "");
+
+        // Rebuild the attributes map from anything that isn't a core
+        // metadata/counter field. Mirrors how submitVitrinProduct flattens
+        // attributes onto the top-level document.
+        const METADATA_FIELDS = new Set([
+          "id",
+          "ilanNo",
+          "userId",
+          "ownerId",
+          "shopId",
+          "productName",
+          "description",
+          "price",
+          "currency",
+          "condition",
+          "brandModel",
+          "category",
+          "subcategory",
+          "subsubcategory",
+          "quantity",
+          "deliveryOption",
+          "sellerName",
+          "phone",
+          "region",
+          "address",
+          "ibanOwnerName",
+          "ibanOwnerSurname",
+          "iban",
+          "imageUrls",
+          "videoUrl",
+          "colorImages",
+          "colorQuantities",
+          "availableColors",
+          "averageRating",
+          "reviewCount",
+          "clickCount",
+          "clickCountAtStart",
+          "favoritesCount",
+          "cartCount",
+          "purchaseCount",
+          "isFeatured",
+          "isTrending",
+          "isBoosted",
+          "boostedImpressionCount",
+          "boostImpressionCountAtStart",
+          "boostClickCountAtStart",
+          "promotionScore",
+          "rankingScore",
+          "dailyClickCount",
+          "boostStartTime",
+          "boostEndTime",
+          "lastClickDate",
+          "paused",
+          "relatedProductIds",
+          "relatedLastUpdated",
+          "relatedCount",
+          "status",
+          "searchIndex",
+          "needsSync",
+          "createdAt",
+          "updatedAt",
+        ]);
+
+        const rebuiltAttributes: {
+          [key: string]: string | string[] | number | boolean;
+        } = {};
+        for (const [key, value] of Object.entries(data)) {
+          if (METADATA_FIELDS.has(key)) continue;
+          if (value === null || value === undefined) continue;
+          if (
+            typeof value === "string" ||
+            typeof value === "number" ||
+            typeof value === "boolean"
+          ) {
+            rebuiltAttributes[key] = value;
+          } else if (Array.isArray(value)) {
+            // Keep only primitive-array attributes (sizes, materials, …)
+            if (
+              value.every(
+                (v) =>
+                  typeof v === "string" ||
+                  typeof v === "number" ||
+                  typeof v === "boolean"
+              )
+            ) {
+              rebuiltAttributes[key] = value as string[];
+            }
+          }
+        }
+        setAttributes(rebuiltAttributes);
+
+        // Existing media (kept as URLs, not re-uploaded)
+        const imageUrls = Array.isArray(data.imageUrls)
+          ? (data.imageUrls as string[])
+          : [];
+        setExistingImageUrls(imageUrls);
+        setImages([]);
+
+        const videoUrl =
+          typeof data.videoUrl === "string" ? (data.videoUrl as string) : null;
+        setExistingVideoUrl(videoUrl);
+        setVideo(null);
+
+        // Color images: existing URLs + form-state placeholders (image: null)
+        // so the "colors already chosen" block renders via selectedColorImages.
+        const colorImages = (data.colorImages ?? {}) as Record<
+          string,
+          string[]
+        >;
+        const colorQuantities = (data.colorQuantities ?? {}) as Record<
+          string,
+          number
+        >;
+        const availableColors = Array.isArray(data.availableColors)
+          ? (data.availableColors as string[])
+          : Object.keys({ ...colorImages, ...colorQuantities });
+
+        setExistingColorImageUrls(colorImages);
+        const rebuiltColorImages: {
+          [key: string]: { quantity: string; image: File | null };
+        } = {};
+        for (const colorName of availableColors) {
+          rebuiltColorImages[colorName] = {
+            quantity:
+              colorQuantities[colorName] != null
+                ? String(colorQuantities[colorName])
+                : "1",
+            image: null,
+          };
+        }
+        setSelectedColorImages(rebuiltColorImages);
+
+        // Flow is already complete for existing products — skip flow execution.
+        setFlowCompleted(true);
+        setShowDynamicStep(false);
+        setEditProductId(editProductIdParam);
+
+        console.log("✅ Edit mode: product loaded", editProductIdParam);
+      } catch (err) {
+        if (cancelled) return;
+        console.error("Failed to load product for edit:", err);
+        alert(
+          t("errors.loadEditFailed", {
+            fallback: "Failed to load product for editing.",
+          })
+        );
+      } finally {
+        if (!cancelled) setIsLoadingEditProduct(false);
+      }
+    };
+
+    loadForEdit();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRestored, editProductIdParam]);
 
   const getLocalizedAttributeValue = (
     key: string,
@@ -720,7 +976,7 @@ export default function ListProductForm() {
     setPrice("");
     setQuantity("1");
     setCondition("");
-    setDeliveryOption("");
+    setDeliveryOption("Fast Delivery");
     setCategory("");
     setSubcategory("");
     setSubsubcategory("");
@@ -732,6 +988,10 @@ export default function ListProductForm() {
     setFlowCompleted(false);
     setShowDynamicStep(false);
     setIsDirty(false);
+    setEditProductId(null);
+    setExistingImageUrls([]);
+    setExistingVideoUrl(null);
+    setExistingColorImageUrls({});
 
     sessionStorage.removeItem("productPreviewData");
   };
@@ -993,58 +1253,82 @@ export default function ListProductForm() {
     return null;
   };
 
-  // Media handlers
-  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
+  // Shared pipeline for picker and drag-drop: filter by size, cap count,
+  // compress, and verify the compressed result is actually smaller than
+  // the original (canvas PNG encoding occasionally inflates files — when
+  // that happens we keep the smaller original so we never upload more
+  // bytes than the user chose).
+  const processImagePicks = async (incoming: File[]): Promise<File[]> => {
+    const slotsRemaining =
+      MAX_MAIN_IMAGES - images.length - existingImageUrls.length;
+    if (slotsRemaining <= 0) {
+      alert(
+        t("errors.maxImagesReached", {
+          fallback: `You can upload at most ${MAX_MAIN_IMAGES} images.`,
+        })
+      );
+      return [];
+    }
+
+    const oversize = incoming.filter((f) => f.size > MAX_IMAGE_BYTES);
+    if (oversize.length > 0) {
+      alert(
+        t("errors.imageTooLarge", {
+          fallback: `Each image must be under 10MB. Rejected: ${oversize
+            .map((f) => f.name)
+            .join(", ")}`,
+        })
+      );
+    }
+    const sized = incoming.filter((f) => f.size <= MAX_IMAGE_BYTES);
+    if (sized.length === 0) return [];
+
+    const overCap = sized.length > slotsRemaining;
+    const toProcess = sized.slice(0, slotsRemaining);
+    if (overCap) {
+      alert(
+        t("errors.tooManyImages", {
+          fallback: `Only ${slotsRemaining} more image(s) allowed (max ${MAX_MAIN_IMAGES}).`,
+        })
+      );
+    }
 
     setIsCompressing(true);
-
     try {
       const compressionResults: CompressionResult[] = [];
-      const compressedFiles: File[] = [];
+      const finalFiles: File[] = [];
 
-      // Process each file
-      for (const file of files) {
-        if (shouldCompress(file, 300)) {
-          // Compress if larger than 300KB
-          console.log(
-            `🔄 Compressing ${file.name} (${formatFileSize(file.size)})`
-          );
-
+      for (const file of toProcess) {
+        if (!shouldCompress(file, 300)) {
+          finalFiles.push(file);
+          continue;
+        }
+        try {
           const result = await smartCompress(file, "gallery");
-          compressionResults.push(result);
-          compressedFiles.push(result.compressedFile);
-
-          console.log(
-            `✅ Compressed ${file.name}: ${formatFileSize(
-              result.originalSize
-            )} → ${formatFileSize(
-              result.compressedSize
-            )} (${result.compressionRatio.toFixed(1)}% reduction)`
-          );
-        } else {
-          // File is already small enough
-          compressedFiles.push(file);
-          console.log(
-            `⏩ Skipping compression for ${file.name} (already optimized)`
-          );
+          // Only keep compressed version if it actually shrank the file.
+          if (result.compressedFile.size < file.size) {
+            compressionResults.push(result);
+            finalFiles.push(result.compressedFile);
+          } else {
+            finalFiles.push(file);
+          }
+        } catch (err) {
+          console.error("Compression failed for", file.name, err);
+          finalFiles.push(file);
         }
       }
 
-      // Update compression stats
       if (compressionResults.length > 0) {
         const totalOriginal = compressionResults.reduce(
-          (sum, r) => sum + r.originalSize,
+          (s, r) => s + r.originalSize,
           0
         );
         const totalCompressed = compressionResults.reduce(
-          (sum, r) => sum + r.compressedSize,
+          (s, r) => s + r.compressedSize,
           0
         );
         const avgRatio =
           ((totalOriginal - totalCompressed) / totalOriginal) * 100;
-
         setCompressionStats({
           originalSize: totalOriginal,
           compressedSize: totalCompressed,
@@ -1052,18 +1336,22 @@ export default function ListProductForm() {
         });
       }
 
-      // Add compressed images to state
-      setImages((prev) => [...prev, ...compressedFiles]);
-    } catch (error) {
-      console.error("❌ Image compression failed:", error);
-      alert(
-        t("errors.compressionFailed", {
-          fallback: "Image compression failed. Please try again.",
-        })
-      );
+      return finalFiles;
     } finally {
       setIsCompressing(false);
     }
+  };
+
+  // Media handlers
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    // Reset the input so picking the same file(s) again still triggers onChange.
+    e.target.value = "";
+    if (files.length === 0) return;
+
+    const accepted = await processImagePicks(files);
+    if (accepted.length === 0) return;
+    setImages((prev) => [...prev, ...accepted]);
   };
 
   const handleDrop = async (e: React.DragEvent) => {
@@ -1083,45 +1371,30 @@ export default function ListProductForm() {
       setVideo(videoFiles[0]);
     }
 
-    // Handle image files with compression
-    if (imageFiles.length > 0) {
-      setIsCompressing(true);
-
-      try {
-        const compressedFiles: File[] = [];
-
-        for (const file of imageFiles) {
-          if (shouldCompress(file, 300)) {
-            const result = await smartCompress(file, "gallery");
-            compressedFiles.push(result.compressedFile);
-          } else {
-            compressedFiles.push(file);
-          }
-        }
-
-        setImages((prev) => [...prev, ...compressedFiles]);
-      } catch (error) {
-        console.error("❌ Drag & drop compression failed:", error);
-        alert(
-          t("errors.compressionFailed", {
-            fallback: "Image compression failed. Please try again.",
-          })
-        );
-      } finally {
-        setIsCompressing(false);
-      }
-    }
+    if (imageFiles.length === 0) return;
+    const accepted = await processImagePicks(imageFiles);
+    if (accepted.length === 0) return;
+    setImages((prev) => [...prev, ...accepted]);
   };
 
   const removeImage = (idx: number) => {
     setImages((prev) => prev.filter((_, i) => i !== idx));
   };
 
+  const removeExistingImage = (idx: number) => {
+    setExistingImageUrls((prev) => prev.filter((_, i) => i !== idx));
+  };
+
   const handleVideoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setVideo(e.target.files?.[0] || null);
+    const file = e.target.files?.[0] || null;
+    setVideo(file);
+    // Replacing the video implicitly drops the previously uploaded URL.
+    if (file) setExistingVideoUrl(null);
   };
 
   const removeVideo = () => setVideo(null);
+
+  const removeExistingVideo = () => setExistingVideoUrl(null);
 
   // Handle final submission
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1129,6 +1402,8 @@ export default function ListProductForm() {
     setIsDirty(false);
 
     // Validation (like Flutter's _navigateToPreview validation)
+    // In edit mode, existing (already-uploaded) image URLs count toward the minimum.
+    const totalImageCount = images.length + existingImageUrls.length;
     if (
       !title.trim() ||
       !description.trim() ||
@@ -1141,15 +1416,18 @@ export default function ListProductForm() {
       !category ||
       !subcategory ||
       !subsubcategory ||
-      images.length === 0
+      totalImageCount === 0
     ) {
       alert(t("validation.fillAllFields"));
       return;
     }
 
-    // Check color images (like Flutter validation)
+    // Check color images — either a newly picked File or a kept existing URL.
     for (const color of Object.keys(selectedColorImages)) {
-      if (!selectedColorImages[color].image) {
+      const hasNewImage = !!selectedColorImages[color].image;
+      const hasExistingImage =
+        (existingColorImageUrls[color]?.length ?? 0) > 0;
+      if (!hasNewImage && !hasExistingImage) {
         alert(t("validation.addImageForColor", { color }));
         return;
       }
@@ -1209,12 +1487,16 @@ export default function ListProductForm() {
         ibanOwnerSurname: sellerInfo?.ibanOwnerSurname ?? "",
         iban: sellerInfo?.iban ?? "",
         shopId: null,
+        editProductId: editProductId,
       };
 
       const productFiles = {
         images,
         video,
         selectedColorImages,
+        existingImageUrls,
+        existingVideoUrl,
+        existingColorImageUrls,
       };
 
       await saveProductForPreview(productData, productFiles);
@@ -1316,23 +1598,45 @@ export default function ListProductForm() {
         <form onSubmit={handleSubmit} className="space-y-3">
           {/* Media Upload Section */}
           <div className={cardClass}>
-            <h2 className={`text-sm font-bold mb-3 ${headingColor}`}>
-              {t("sections.mediaGallery")}
-            </h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className={`text-sm font-bold ${headingColor}`}>
+                {t("sections.mediaGallery")}
+              </h2>
+              <span
+                className={`text-xs font-semibold ${
+                  existingImageUrls.length + images.length >= MAX_MAIN_IMAGES
+                    ? "text-orange-500"
+                    : mutedColor
+                }`}
+              >
+                {existingImageUrls.length + images.length}/{MAX_MAIN_IMAGES}
+              </span>
+            </div>
 
             {/* Drag & Drop Zone */}
             <div
               className={`relative border-2 border-dashed rounded-xl p-6 text-center transition-all duration-200 ${
-                dragActive
+                existingImageUrls.length + images.length >= MAX_MAIN_IMAGES
+                  ? "border-gray-300 opacity-60 cursor-not-allowed"
+                  : dragActive
                   ? "border-orange-500 bg-orange-500/10"
                   : isDarkMode
                   ? "border-gray-700 hover:border-orange-500/50 hover:bg-gray-800/50"
                   : "border-gray-200 hover:border-orange-300 hover:bg-orange-50/30"
               }`}
-              onDrop={handleDrop}
+              onDrop={
+                existingImageUrls.length + images.length >= MAX_MAIN_IMAGES
+                  ? (e) => {
+                      e.preventDefault();
+                      setDragActive(false);
+                    }
+                  : handleDrop
+              }
               onDragOver={(e) => {
                 e.preventDefault();
-                setDragActive(true);
+                if (existingImageUrls.length + images.length < MAX_MAIN_IMAGES) {
+                  setDragActive(true);
+                }
               }}
               onDragLeave={(e) => {
                 e.preventDefault();
@@ -1358,12 +1662,20 @@ export default function ListProductForm() {
               <p className={`text-xs mt-1 ${mutedColor}`}>
                 {t("media.dragDropSubtitle")}
               </p>
+              <p className={`text-[11px] mt-1 ${mutedColor}`}>
+                {t("media.limitHint", {
+                  fallback: `Up to ${MAX_MAIN_IMAGES} images · max 10MB each`,
+                })}
+              </p>
               <input
                 type="file"
                 multiple
                 accept="image/*"
                 onChange={handleImageChange}
-                disabled={isCompressing}
+                disabled={
+                  isCompressing ||
+                  existingImageUrls.length + images.length >= MAX_MAIN_IMAGES
+                }
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
               />
             </div>
@@ -1378,17 +1690,43 @@ export default function ListProductForm() {
               </div>
             )}
 
-            {/* Image Preview Grid */}
-            {images.length > 0 && (
+            {/* Image Preview Grid — existing URLs (edit mode) then new Files */}
+            {(existingImageUrls.length > 0 || images.length > 0) && (
               <div className="mt-4">
                 <h4 className={`text-xs font-semibold mb-2 ${labelColor}`}>
-                  {t("media.uploadedImages")} ({images.length})
+                  {t("media.uploadedImages")} (
+                  {existingImageUrls.length + images.length})
                 </h4>
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-                  {images.map((file, idx) => (
-                    <div key={idx} className="group relative aspect-square">
+                  {existingImageUrls.map((url, idx) => (
+                    <div
+                      key={`existing-${idx}`}
+                      className="group relative aspect-square"
+                    >
                       <Image
-                        src={URL.createObjectURL(file)}
+                        src={url}
+                        alt={t("media.preview")}
+                        width={200}
+                        height={200}
+                        className="w-full h-full object-cover rounded-xl"
+                        unoptimized
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeExistingImage(idx)}
+                        className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-md flex items-center justify-center z-20 text-xs"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                  {images.map((_file, idx) => (
+                    <div
+                      key={`new-${idx}`}
+                      className="group relative aspect-square"
+                    >
+                      <Image
+                        src={imagePreviewUrls[idx]}
                         alt={t("media.preview")}
                         width={200}
                         height={200}
@@ -1414,7 +1752,37 @@ export default function ListProductForm() {
                 {t("media.video")}
               </h4>
 
-              {!video ? (
+              {video && videoPreviewUrl ? (
+                <div className="relative inline-block">
+                  <video
+                    src={videoPreviewUrl}
+                    controls
+                    className="w-48 h-auto rounded-xl"
+                  />
+                  <button
+                    type="button"
+                    onClick={removeVideo}
+                    className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-md flex items-center justify-center z-20 text-xs"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ) : existingVideoUrl ? (
+                <div className="relative inline-block">
+                  <video
+                    src={existingVideoUrl}
+                    controls
+                    className="w-48 h-auto rounded-xl"
+                  />
+                  <button
+                    type="button"
+                    onClick={removeExistingVideo}
+                    className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-md flex items-center justify-center z-20 text-xs"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ) : (
                 <div className={`border-2 border-dashed rounded-xl p-4 text-center relative ${isDarkMode ? "border-gray-700 hover:border-orange-500/50" : "border-gray-200 hover:border-orange-300"}`}>
                   <input
                     type="file"
@@ -1426,21 +1794,6 @@ export default function ListProductForm() {
                   <p className={`text-xs mt-1 ${mutedColor}`}>
                     {t("media.uploadVideo")}
                   </p>
-                </div>
-              ) : (
-                <div className="relative inline-block">
-                  <video
-                    src={URL.createObjectURL(video)}
-                    controls
-                    className="w-48 h-auto rounded-xl"
-                  />
-                  <button
-                    type="button"
-                    onClick={removeVideo}
-                    className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-md flex items-center justify-center z-20 text-xs"
-                  >
-                    ✕
-                  </button>
                 </div>
               )}
             </div>
@@ -1493,18 +1846,6 @@ export default function ListProductForm() {
                 />
               </div>
 
-              <div>
-                <label className={`text-[11px] font-semibold uppercase tracking-wider mb-1.5 block ${mutedColor}`}>
-                  {t("form.quantity")}
-                </label>
-                <input
-                  type="number"
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
-                  className={inputClass}
-                />
-              </div>
-
               <div className="lg:col-span-2">
                 <label className={`text-[11px] font-semibold uppercase tracking-wider mb-1.5 block ${mutedColor}`}>
                   {t("form.condition.title")}
@@ -1540,39 +1881,6 @@ export default function ListProductForm() {
                 </div>
               </div>
 
-              <div className="lg:col-span-2">
-                <label className={`text-[11px] font-semibold uppercase tracking-wider mb-1.5 block ${mutedColor}`}>
-                  {t("form.delivery.title")}
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { key: "Fast Delivery", label: t("form.delivery.fastDelivery") },
-                    { key: "Self Delivery", label: t("form.delivery.selfDelivery") },
-                  ].map((opt) => (
-                    <label key={opt.key} className="cursor-pointer">
-                      <input
-                        type="radio"
-                        name="deliveryOption"
-                        value={opt.key}
-                        checked={deliveryOption === opt.key}
-                        onChange={() => setDeliveryOption(opt.key)}
-                        className="sr-only"
-                      />
-                      <div
-                        className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${
-                          deliveryOption === opt.key
-                            ? "border-orange-500 bg-orange-500/10 text-orange-600"
-                            : isDarkMode
-                            ? "border-gray-700 bg-gray-800 text-gray-300 hover:border-gray-600"
-                            : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300"
-                        }`}
-                      >
-                        {opt.label}
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              </div>
             </div>
           </div>
 
