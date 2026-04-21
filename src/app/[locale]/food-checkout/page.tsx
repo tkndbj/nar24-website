@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useCallback, useMemo } from "react";
-import Image from "next/image";
 import SmartImage from "@/app/components/SmartImage";
 import { Link } from "@/navigation";
 
