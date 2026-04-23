@@ -12,6 +12,8 @@ import {
 import { ProductUtils } from "@/app/models/Product";
 import ProductDetailClient from "./ProductDetailClient";
 
+export const revalidate = 60;
+
 interface Props {
   params: Promise<{ productId: string; locale: string }>;
 }
