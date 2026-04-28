@@ -21,6 +21,8 @@ import {
 // Market Banner Item interface
 interface MarketBannerItem {
   url: string;
+  /** Tokenized Firebase Storage download URL — used as fallback if Cloudinary fails */
+  fallbackUrl?: string;
   linkType?: string;
   linkId?: string;
   id: string;
@@ -66,14 +68,24 @@ const ErrorCard = ({ isDarkMode }: { isDarkMode: boolean }) => {
 
 // Hook for Firebase collection listener - matches Flutter provider exactly
 const useMarketBanners = (initialItems?: PrefetchedBannerItem[] | null) => {
-  const ssrBanners = useMemo(() => {
+  const ssrBanners = useMemo<MarketBannerItem[]>(() => {
     if (!initialItems || initialItems.length === 0) return [];
-    return initialItems.map((item) => ({
-      id: item.id,
-      url: item.imageStoragePath || item.imageUrl,
-      linkType: item.linkType,
-      linkId: item.linkedShopId || item.linkedProductId,
-    }));
+    return initialItems
+      .map((item): MarketBannerItem | null => {
+        const url = item.imageStoragePath || item.imageUrl;
+        if (!url) return null;
+        const banner: MarketBannerItem = {
+          id: item.id,
+          url,
+          linkType: item.linkType,
+          linkId: item.linkedShopId || item.linkedProductId,
+        };
+        if (item.imageStoragePath && item.imageUrl) {
+          banner.fallbackUrl = item.imageUrl;
+        }
+        return banner;
+      })
+      .filter((b): b is MarketBannerItem => b !== null);
   }, [initialItems]);
 
   const [banners, setBanners] = useState<MarketBannerItem[]>(ssrBanners);
@@ -133,15 +145,16 @@ const useMarketBanners = (initialItems?: PrefetchedBannerItem[] | null) => {
       const processedBanners: MarketBannerItem[] = snapshot.docs
   .map((doc): MarketBannerItem | null => {
     const data = doc.data();
-    // ✅ Prefer storage path, fall back to URL
-    const source = (data.imageStoragePath as string) ||
-      (data.imageUrl as string) || "";
+    const storagePath = data.imageStoragePath as string | undefined;
+    const tokenUrl = data.imageUrl as string | undefined;
+    const source = storagePath || tokenUrl || "";
 
     if (!source) return null;
 
     return {
       id: doc.id,
       url: source,
+      fallbackUrl: storagePath ? tokenUrl : undefined,
       linkType: data.linkType as string | undefined,
       linkId: (data.linkedShopId || data.linkedProductId) as string | undefined,
     };
@@ -346,6 +359,7 @@ export default function MarketBannerGrid({ initialData }: { initialData?: Prefet
   <div className="relative w-full aspect-[2.5/1]">
     <CloudinaryImage.Banner
       source={banner.url}
+      fallbackUrl={banner.fallbackUrl}
       cdnWidth={1600}
       fit="cover"
       sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"

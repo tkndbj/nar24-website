@@ -120,10 +120,15 @@ function parseBannerDoc(
   doc: FirebaseFirestore.QueryDocumentSnapshot,
 ): PrefetchedBannerItem | null {
   const d = doc.data();
-  if (!d.imageUrl) return null;
+  const imageUrl = (d.imageUrl as string | undefined) ?? "";
+  const imageStoragePath = d.imageStoragePath as string | undefined;
+  // Need at least one image source. The tokenized imageUrl is preferred as
+  // the runtime fallback; the storage path drives the Cloudinary CDN URL.
+  if (!imageUrl && !imageStoragePath) return null;
   return {
     id: doc.id,
-    imageUrl: d.imageUrl as string,
+    imageUrl,
+    imageStoragePath,
     dominantColor: d.dominantColor as number | undefined,
     linkType: d.linkType as string | undefined,
     linkedShopId: d.linkedShopId as string | undefined,

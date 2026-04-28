@@ -245,10 +245,16 @@ interface ProductProps extends BaseProps {
   source: string;
   /** Standard size bucket: thumbnail(200), card(400), detail(800), zoom(1600) */
   size: ImageSize;
+  /**
+   * Optional explicit fallback — typically the tokenized Firebase Storage
+   * download URL stored alongside the path in Firestore. Strongly preferred
+   * over a synthesized GCS URL for buckets without public read.
+   */
+  fallbackUrl?: string | null;
 }
 
-function Product({ source, size, ...rest }: ProductProps) {
-  if (!source) {
+function Product({ source, size, fallbackUrl, ...rest }: ProductProps) {
+  if (!source && !fallbackUrl) {
     return (
       rest.errorWidget ?? (
         <DefaultError width={rest.width} height={rest.height} />
@@ -256,13 +262,11 @@ function Product({ source, size, ...rest }: ProductProps) {
     );
   }
 
-  const primary = CloudinaryUrl.isStoragePath(source)
-    ? CloudinaryUrl.product(source, size)
-    : CloudinaryUrl.productCompat(source, size);
-
-  const fallback = CloudinaryUrl.isStoragePath(source)
-    ? CloudinaryUrl.firebaseUrl(source)
-    : null;
+  const { primary, fallback } = CloudinaryUrl.resolveProduct(
+    source,
+    size,
+    fallbackUrl,
+  );
 
   return <CoreImage primary={primary} fallback={fallback} {...rest} />;
 }
@@ -277,10 +281,16 @@ interface BannerProps extends BaseProps {
   source: string;
   /** CDN width to request from Cloudinary */
   cdnWidth: number;
+  /**
+   * Optional explicit fallback — typically the tokenized Firebase Storage
+   * download URL stored alongside the path in Firestore. Strongly preferred
+   * over a synthesized GCS URL for buckets without public read.
+   */
+  fallbackUrl?: string | null;
 }
 
-function Banner({ source, cdnWidth, ...rest }: BannerProps) {
-  if (!source) {
+function Banner({ source, cdnWidth, fallbackUrl, ...rest }: BannerProps) {
+  if (!source && !fallbackUrl) {
     return (
       rest.errorWidget ?? (
         <DefaultError width={rest.width} height={rest.height} />
@@ -288,7 +298,11 @@ function Banner({ source, cdnWidth, ...rest }: BannerProps) {
     );
   }
 
-  const { primary, fallback } = CloudinaryUrl.resolveBanner(source, cdnWidth);
+  const { primary, fallback } = CloudinaryUrl.resolveBanner(
+    source,
+    cdnWidth,
+    fallbackUrl,
+  );
 
   return <CoreImage primary={primary} fallback={fallback} {...rest} />;
 }
@@ -303,10 +317,15 @@ interface CompatProps extends BaseProps {
   source: string;
   /** Standard size bucket */
   size: ImageSize;
+  /**
+   * Optional explicit fallback — typically the tokenized Firebase Storage
+   * download URL stored alongside the path in Firestore.
+   */
+  fallbackUrl?: string | null;
 }
 
-function Compat({ source, size, ...rest }: CompatProps) {
-  if (!source) {
+function Compat({ source, size, fallbackUrl, ...rest }: CompatProps) {
+  if (!source && !fallbackUrl) {
     return (
       rest.errorWidget ?? (
         <DefaultError width={rest.width} height={rest.height} />
@@ -314,7 +333,11 @@ function Compat({ source, size, ...rest }: CompatProps) {
     );
   }
 
-  const { primary, fallback } = CloudinaryUrl.resolveProduct(source, size);
+  const { primary, fallback } = CloudinaryUrl.resolveProduct(
+    source,
+    size,
+    fallbackUrl,
+  );
 
   return <CoreImage primary={primary} fallback={fallback} {...rest} />;
 }

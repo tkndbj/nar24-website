@@ -3300,7 +3300,22 @@
     "emailMismatch": "Email doesn't match your account email",
     "deleteAccountFailed": "Failed to delete account. Please try again.",
     "twoFactorSetupError": "Failed to setup two-factor authentication",
-    "twoFactorDisableError": "Failed to disable two-factor authentication"
+    "twoFactorDisableError": "Failed to disable two-factor authentication",
+    "checkingYourAccount": "Checking your account…",
+    "transferOwnershipTitle": "Transfer ownership",
+    "transferOwnershipConfirmTitle": "Transfer ownership?",
+    "transferOwnershipConfirmMessage": "Make {memberName} the new owner of \"{entityName}\"? You will become a co-owner.",
+    "transferAction": "Transfer",
+    "ownershipTransferredSuccess": "Ownership of \"{entityName}\" transferred to {memberName}.",
+    "continueAction": "Continue",
+    "roleCoOwner": "Co-owner",
+    "roleEditor": "Editor",
+    "roleViewer": "Viewer",
+    "shopLabel": "Shop",
+    "restaurantLabel": "Restaurant",
+    "unknownMember": "Unknown",
+    "transferFailed": "Could not transfer ownership. Please try again.",
+    "precheckFailed": "Could not check your account. Please try again."
   },
   "PickupPoints": {
     "pickupPointsMap": "Pickup Points Map",

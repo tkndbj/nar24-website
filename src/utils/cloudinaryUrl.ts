@@ -16,6 +16,13 @@ const SIZE_WIDTHS: Record<ImageSize, number> = {
 // Reads from environment or defaults to true
 let _enabled = true;
 
+// Encode a storage path for safe URL interpolation. Segment-aware so the
+// "/" separators stay intact while spaces, "#", "?", non-ASCII etc. get
+// percent-encoded. Required because raw paths break both Cloudinary and
+// the GCS direct URL.
+const encodePath = (path: string): string =>
+  path.split("/").map(encodeURIComponent).join("/");
+
 export const CloudinaryUrl = {
   get enabled() {
     return _enabled;
@@ -27,25 +34,35 @@ export const CloudinaryUrl = {
   /** Custom width URL from a storage path */
   custom(storagePath: string, width: number): string {
     if (!_enabled) return this.firebaseUrl(storagePath);
-    return `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_limit,w_${width},f_auto,q_auto/${AUTO_UPLOAD_FOLDER}/${storagePath}`;
+    return `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_limit,w_${width},f_auto,q_auto/${AUTO_UPLOAD_FOLDER}/${encodePath(storagePath)}`;
   },
 
-  /** Resolve a banner source (storage path OR legacy URL) to primary + fallback */
-  resolveBanner(source: string, width: number): { primary: string; fallback: string | null } {
-    if (!source) return { primary: '', fallback: null };
+  /**
+   * Resolve a banner source (storage path OR legacy URL) to primary + fallback.
+   *
+   * `explicitFallback` — the original tokenized Firebase Storage download URL
+   * stored in Firestore. Strongly preferred when available: a tokenized URL
+   * always works, whereas the synthesized `firebaseUrl(path)` requires the
+   * bucket to be publicly readable.
+   */
+  resolveBanner(
+    source: string,
+    width: number,
+    explicitFallback?: string | null,
+  ): { primary: string; fallback: string | null } {
+    const fallback = explicitFallback || null;
+    if (!source) return { primary: fallback ?? '', fallback: null };
 
     if (!_enabled) {
-      if (this.isStoragePath(source)) {
-        return { primary: this.firebaseUrl(source), fallback: null };
-      }
-      return { primary: source, fallback: null };
+      const direct = this.isStoragePath(source) ? this.firebaseUrl(source) : source;
+      return { primary: fallback ?? direct, fallback: null };
     }
 
     // Storage path (post-migration)
     if (this.isStoragePath(source)) {
       return {
         primary: this.custom(source, width),
-        fallback: this.firebaseUrl(source),
+        fallback: fallback ?? this.firebaseUrl(source),
       };
     }
 
@@ -54,12 +71,12 @@ export const CloudinaryUrl = {
     if (path) {
       return {
         primary: this.custom(path, width),
-        fallback: source,
+        fallback: fallback ?? source,
       };
     }
 
     // Opaque URL — pass through
-    return { primary: source, fallback: null };
+    return { primary: source, fallback };
   },
 
   /** Single CDN URL from path or URL — use for prefetching */
@@ -76,7 +93,7 @@ export const CloudinaryUrl = {
   product(storagePath: string, size: ImageSize = "card"): string {
     if (!_enabled) return this.firebaseUrl(storagePath);
     const w = SIZE_WIDTHS[size];
-    return `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_limit,w_${w},f_auto,q_auto/${AUTO_UPLOAD_FOLDER}/${storagePath}`;
+    return `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_limit,w_${w},f_auto,q_auto/${AUTO_UPLOAD_FOLDER}/${encodePath(storagePath)}`;
   },
 
   /** Convert a full Firebase URL to Cloudinary URL */
@@ -84,12 +101,12 @@ export const CloudinaryUrl = {
     if (!_enabled) return url;
     const path = this.extractPathFromUrl(url);
     if (!path) return url;
-    return `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_limit,w_${width},f_auto,q_auto/${AUTO_UPLOAD_FOLDER}/${path}`;
+    return `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_limit,w_${width},f_auto,q_auto/${AUTO_UPLOAD_FOLDER}/${encodePath(path)}`;
   },
 
   /** Direct Firebase Storage URL (fallback) */
   firebaseUrl(storagePath: string): string {
-    return `https://storage.googleapis.com/${STORAGE_BUCKET}/${storagePath}`;
+    return `https://storage.googleapis.com/${STORAGE_BUCKET}/${encodePath(storagePath)}`;
   },
 
   /** True if value is a storage path, not a full URL */
@@ -107,25 +124,29 @@ export const CloudinaryUrl = {
     return urlOrPath;
   },
 
-  /** Resolve a product source (storage path OR legacy URL) to primary + fallback */
+  /**
+   * Resolve a product source (storage path OR legacy URL) to primary + fallback.
+   *
+   * `explicitFallback` — see `resolveBanner` for rationale (tokenized download URL).
+   */
   resolveProduct(
     source: string,
     size: ImageSize = "card",
+    explicitFallback?: string | null,
   ): { primary: string; fallback: string | null } {
-    if (!source) return { primary: "", fallback: null };
+    const fallback = explicitFallback || null;
+    if (!source) return { primary: fallback ?? "", fallback: null };
 
     if (!_enabled) {
-      if (this.isStoragePath(source)) {
-        return { primary: this.firebaseUrl(source), fallback: null };
-      }
-      return { primary: source, fallback: null };
+      const direct = this.isStoragePath(source) ? this.firebaseUrl(source) : source;
+      return { primary: fallback ?? direct, fallback: null };
     }
 
     // Storage path (post-migration)
     if (this.isStoragePath(source)) {
       return {
         primary: this.product(source, size),
-        fallback: this.firebaseUrl(source),
+        fallback: fallback ?? this.firebaseUrl(source),
       };
     }
 
@@ -134,12 +155,12 @@ export const CloudinaryUrl = {
     if (path) {
       return {
         primary: this.product(path, size),
-        fallback: source,
+        fallback: fallback ?? source,
       };
     }
 
     // Opaque URL — pass through, no CDN available
-    return { primary: source, fallback: null };
+    return { primary: source, fallback };
   },
 
   /** Extract storage path from Firebase download URL */

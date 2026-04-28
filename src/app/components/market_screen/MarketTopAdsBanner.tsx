@@ -15,7 +15,14 @@ import type { PrefetchedBannerItem } from "@/types/MarketLayout";
 
 interface BannerItem {
   id: string;
+  /** Storage path (preferred) or legacy full URL — drives the Cloudinary URL */
   url: string;
+  /**
+   * Original tokenized Firebase Storage download URL. Used as the fallback
+   * if the Cloudinary CDN request fails — works regardless of bucket ACLs
+   * because the token authenticates the read.
+   */
+  fallbackUrl?: string;
   color: string;
   linkType?: string;
   linkId?: string;
@@ -49,15 +56,27 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
   const router = useRouter();
 
   // Convert server-prefetched data to component format
-  const ssrBanners = useMemo(() => {
+  const ssrBanners = useMemo<BannerItem[]>(() => {
     if (!initialData || initialData.length === 0) return [];
-    return initialData.map((item) => ({
-      id: item.id,
-      url: item.imageStoragePath || item.imageUrl,
-      color: convertDominantColor(item.dominantColor),
-      linkType: item.linkType,
-      linkId: item.linkedShopId || item.linkedProductId,
-    }));
+    return initialData
+      .map((item): BannerItem | null => {
+        const url = item.imageStoragePath || item.imageUrl;
+        if (!url) return null;
+        const banner: BannerItem = {
+          id: item.id,
+          url,
+          color: convertDominantColor(item.dominantColor),
+          linkType: item.linkType,
+          linkId: item.linkedShopId || item.linkedProductId,
+        };
+        // The tokenized download URL is only useful when the primary is a
+        // path-derived Cloudinary URL — i.e. when imageStoragePath exists.
+        if (item.imageStoragePath && item.imageUrl) {
+          banner.fallbackUrl = item.imageUrl;
+        }
+        return banner;
+      })
+      .filter((b): b is BannerItem => b !== null);
   }, [initialData]);
 
   // ✅ OPTIMIZED: Minimal state — use SSR data as initial values
@@ -154,23 +173,27 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
 
         snapshot.docs.forEach((doc, index) => {
           const data = doc.data();
-          // ✅ Prefer storage path, fall back to URL
-          const source = (data.imageStoragePath as string) ||
-            (data.imageUrl as string) || "";
-        
+          const storagePath = data.imageStoragePath as string | undefined;
+          const tokenUrl = data.imageUrl as string | undefined;
+          // Prefer storage path, fall back to URL
+          const source = storagePath || tokenUrl || "";
+
           if (!source) return;
-        
+
           const color = convertDominantColor(data.dominantColor as number);
           const linkId = data.linkedShopId || data.linkedProductId;
-        
+
           items.push({
             id: doc.id,
             url: source,
+            // Only use the tokenized URL as fallback when the primary will be
+            // a path-based Cloudinary URL — otherwise it's already the source.
+            fallbackUrl: storagePath ? tokenUrl : undefined,
             color,
             linkType: data.linkType as string | undefined,
             linkId: linkId as string | undefined,
           });
-        
+
           // Prefetch with CDN URL
           if (!cachedUrls.current.has(source)) {
             cachedUrls.current.add(source);
@@ -362,6 +385,7 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
               {isAdjacent && !hasError ? (
   <CloudinaryImage.Banner
     source={banner.url}
+    fallbackUrl={banner.fallbackUrl}
     cdnWidth={1600}
     fit="fill"
     priority={index === 0}

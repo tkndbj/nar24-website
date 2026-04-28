@@ -12,7 +12,10 @@ import { db } from "@/lib/firebase";
 
 interface BannerItem {
   id: string;
-  imageUrl: string;
+  /** Storage path (preferred) or legacy full URL — drives the Cloudinary URL */
+  source: string;
+  /** Tokenized Firebase Storage download URL — fallback if Cloudinary fails */
+  fallbackUrl?: string;
   title: string;
   linkedRestaurantId?: string;
 }
@@ -77,15 +80,18 @@ export default function RestaurantBanner() {
         const items: BannerItem[] = snap.docs
           .map((d) => {
             const data = d.data();
+            const storagePath = data.imageStoragePath as string | undefined;
+            const tokenUrl = data.imageUrl as string | undefined;
+            const source = storagePath || tokenUrl || "";
             return {
               id: d.id,
-              imageUrl: (data.imageStoragePath as string) ||
-                (data.imageUrl as string) || "",
+              source,
+              fallbackUrl: storagePath ? tokenUrl : undefined,
               title: (data.title as string) ?? "",
               linkedRestaurantId: (data.linkedRestaurantId as string) || undefined,
             };
           })
-          .filter((b) => b.imageUrl);
+          .filter((b) => b.source);
         setBanners(items);
       } catch {
         // leave banners empty → renders fallback
@@ -146,7 +152,8 @@ export default function RestaurantBanner() {
           }}
         >
           <CloudinaryImage.Banner
-            source={banner.imageUrl}
+            source={banner.source}
+            fallbackUrl={banner.fallbackUrl}
             cdnWidth={1600}
             fit="cover"
             priority={i === 0}

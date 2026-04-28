@@ -3328,7 +3328,22 @@
     "emailMismatch": "E-posta hesap e-postanızla eşleşmiyor",
     "deleteAccountFailed": "Hesap silinirken hata oluştu. Lütfen tekrar deneyin.",
     "twoFactorSetupError": "İki faktörlü kimlik doğrulama kurulumu başarısız",
-    "twoFactorDisableError": "İki faktörlü kimlik doğrulama devre dışı bırakma başarısız"
+    "twoFactorDisableError": "İki faktörlü kimlik doğrulama devre dışı bırakma başarısız",
+    "checkingYourAccount": "Hesabınız kontrol ediliyor…",
+    "transferOwnershipTitle": "Sahipliği devret",
+    "transferOwnershipConfirmTitle": "Sahiplik devredilsin mi?",
+    "transferOwnershipConfirmMessage": "{memberName} kullanıcısını \"{entityName}\" işletmesinin yeni sahibi yapmak ister misiniz? Siz ortak sahip olacaksınız.",
+    "transferAction": "Devret",
+    "ownershipTransferredSuccess": "\"{entityName}\" işletmesinin sahipliği {memberName} kullanıcısına devredildi.",
+    "continueAction": "Devam et",
+    "roleCoOwner": "Ortak sahip",
+    "roleEditor": "Editör",
+    "roleViewer": "Görüntüleyici",
+    "shopLabel": "Mağaza",
+    "restaurantLabel": "Restoran",
+    "unknownMember": "Bilinmeyen",
+    "transferFailed": "Sahiplik devredilemedi. Lütfen tekrar deneyin.",
+    "precheckFailed": "Hesabınız kontrol edilemedi. Lütfen tekrar deneyin."
   },
   "PickupPoints": {
     "pickupPointsMap": "Teslim Noktaları Haritası",
