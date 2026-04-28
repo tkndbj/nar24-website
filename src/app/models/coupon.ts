@@ -41,6 +41,7 @@ export interface CouponData {
   usedAt?: Timestamp | null;
   orderId?: string | null;
   isUsed: boolean;
+  celebratedAt?: Timestamp | null;
 }
 
 export class Coupon {
@@ -56,6 +57,7 @@ export class Coupon {
   readonly usedAt: Timestamp | null;
   readonly orderId: string | null;
   readonly isUsed: boolean;
+  readonly celebratedAt: Timestamp | null;
 
   constructor(id: string, data: CouponData) {
     this.id = id;
@@ -70,6 +72,7 @@ export class Coupon {
     this.usedAt = data.usedAt ?? null;
     this.orderId = data.orderId ?? null;
     this.isUsed = data.isUsed ?? false;
+    this.celebratedAt = data.celebratedAt ?? null;
   }
 
   /**
@@ -115,6 +118,7 @@ export class Coupon {
       usedAt: (data.usedAt as Timestamp) ?? null,
       orderId: (data.orderId as string) ?? null,
       isUsed: (data.isUsed as boolean) ?? false,
+      celebratedAt: (data.celebratedAt as Timestamp) ?? null,
     });
   }
 
@@ -134,6 +138,7 @@ export class Coupon {
       usedAt: this.usedAt,
       orderId: this.orderId,
       isUsed: this.isUsed,
+      celebratedAt: this.celebratedAt,
     };
   }
 
@@ -153,6 +158,7 @@ export class Coupon {
       usedAt: updates.usedAt !== undefined ? updates.usedAt : this.usedAt,
       orderId: updates.orderId !== undefined ? updates.orderId : this.orderId,
       isUsed: updates.isUsed ?? this.isUsed,
+      celebratedAt: updates.celebratedAt !== undefined ? updates.celebratedAt : this.celebratedAt,
     });
   }
 
@@ -176,6 +182,7 @@ export interface UserBenefitData {
   orderId?: string | null;
   isUsed: boolean;
   metadata?: Record<string, unknown> | null;
+  celebratedAt?: Timestamp | null;
 }
 
 export class UserBenefit {
@@ -190,6 +197,7 @@ export class UserBenefit {
   readonly orderId: string | null;
   readonly isUsed: boolean;
   readonly metadata: Record<string, unknown> | null;
+  readonly celebratedAt: Timestamp | null;
 
   constructor(id: string, data: UserBenefitData) {
     this.id = id;
@@ -203,6 +211,7 @@ export class UserBenefit {
     this.orderId = data.orderId ?? null;
     this.isUsed = data.isUsed ?? false;
     this.metadata = data.metadata ?? null;
+    this.celebratedAt = data.celebratedAt ?? null;
   }
 
   /**
@@ -295,6 +304,7 @@ export class UserBenefit {
       orderId: (data.orderId as string) ?? null,
       isUsed: (data.isUsed as boolean) ?? false,
       metadata: (data.metadata as Record<string, unknown>) ?? null,
+      celebratedAt: (data.celebratedAt as Timestamp) ?? null,
     });
   }
 
@@ -313,6 +323,7 @@ export class UserBenefit {
       orderId: this.orderId,
       isUsed: this.isUsed,
       metadata: this.metadata,
+      celebratedAt: this.celebratedAt,
     };
   }
 
@@ -331,6 +342,7 @@ export class UserBenefit {
       orderId: updates.orderId !== undefined ? updates.orderId : this.orderId,
       isUsed: updates.isUsed ?? this.isUsed,
       metadata: updates.metadata !== undefined ? updates.metadata : this.metadata,
+      celebratedAt: updates.celebratedAt !== undefined ? updates.celebratedAt : this.celebratedAt,
     });
   }
 

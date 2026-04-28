@@ -49,34 +49,6 @@ export const useCelebration = () => {
 };
 
 // ============================================================================
-// STORAGE HELPERS
-// ============================================================================
-
-const STORAGE_KEY_PREFIX = "coupon_celebration_ids_";
-
-const getCelebratedIds = (userId: string): Set<string> => {
-  if (typeof window === "undefined") return new Set();
-  try {
-    const stored = localStorage.getItem(`${STORAGE_KEY_PREFIX}${userId}`);
-    return stored ? new Set(JSON.parse(stored)) : new Set();
-  } catch {
-    return new Set();
-  }
-};
-
-const setCelebratedIds = (userId: string, ids: Set<string>) => {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(
-      `${STORAGE_KEY_PREFIX}${userId}`,
-      JSON.stringify([...ids])
-    );
-  } catch (e) {
-    console.error("Failed to save celebrated IDs:", e);
-  }
-};
-
-// ============================================================================
 // PARTICLE GENERATOR
 // ============================================================================
 
@@ -353,6 +325,7 @@ export const CelebrationProvider: React.FC<CelebrationProviderProps> = ({
   const couponContext = useCouponOptional();
   const coupons = couponContext?.coupons ?? [];
   const isInitialized = couponContext?.isInitialized ?? false;
+  const markCelebrated = couponContext?.markCelebrated;
   const [, setCelebrationQueue] = useState<Coupon[]>([]);
   const [currentCoupon, setCurrentCoupon] = useState<Coupon | null>(null);
   const hasCheckedRef = useRef(false);
@@ -360,11 +333,12 @@ export const CelebrationProvider: React.FC<CelebrationProviderProps> = ({
   const checkAndShowCelebrations = useCallback(() => {
     if (!user?.uid || !isInitialized || coupons.length === 0) return;
 
-    const celebratedIds = getCelebratedIds(user.uid);
     const now = new Date();
 
+    // Source of truth is the server-stamped celebratedAt — same filter the
+    // Flutter app uses, so suppression carries across devices and reinstalls.
     const newCoupons = coupons.filter((coupon) => {
-      if (celebratedIds.has(coupon.id)) return false;
+      if (coupon.celebratedAt !== null) return false;
       if (coupon.isUsed) return false;
       if (coupon.expiresAt && coupon.expiresAt.toDate() < now) return false;
       return true;
@@ -388,12 +362,12 @@ export const CelebrationProvider: React.FC<CelebrationProviderProps> = ({
   }, [isInitialized, user?.uid, checkAndShowCelebrations]);
 
   const handleDismiss = useCallback(() => {
-    if (!currentCoupon || !user?.uid) return;
+    if (!currentCoupon) return;
 
-    const celebratedIds = getCelebratedIds(user.uid);
-    celebratedIds.add(currentCoupon.id);
-    setCelebratedIds(user.uid, celebratedIds);
+    const dismissedId = currentCoupon.id;
 
+    // Pop overlay immediately — the Firestore stamp happens in the background.
+    // If it fails, the worst case is the overlay re-appears on next launch.
     setCelebrationQueue((prev) => {
       const newQueue = prev.slice(1);
       if (newQueue.length > 0) {
@@ -405,7 +379,11 @@ export const CelebrationProvider: React.FC<CelebrationProviderProps> = ({
       }
       return newQueue;
     });
-  }, [currentCoupon, user?.uid]);
+
+    if (markCelebrated) {
+      void markCelebrated({ couponIds: [dismissedId] });
+    }
+  }, [currentCoupon, markCelebrated]);
 
   const showCelebration = useCallback((coupon: Coupon) => {
     setCurrentCoupon(coupon);
@@ -429,9 +407,3 @@ export const CelebrationProvider: React.FC<CelebrationProviderProps> = ({
 // ============================================================================
 
 export default CelebrationOverlay;
-
-export const resetCelebrations = (userId: string) => {
-  if (typeof window === "undefined") return;
-  localStorage.removeItem(`${STORAGE_KEY_PREFIX}${userId}`);
-  console.log(`🎟️ Reset coupon celebrations for user: ${userId}`);
-};

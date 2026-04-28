@@ -22,6 +22,7 @@ import {
   doc,
   serverTimestamp,
   getDocs,
+  writeBatch,
   Firestore,
   QuerySnapshot,
   Unsubscribe,
@@ -69,6 +70,12 @@ interface CouponContextType {
   // Benefit operations
   fetchAllBenefits: () => Promise<UserBenefit[]>;
   markBenefitAsUsed: (benefitId: string, orderId: string) => Promise<boolean>;
+
+  // Celebration suppression — cross-device "seen" state stamped on the doc
+  markCelebrated: (params: {
+    couponIds?: string[];
+    benefitIds?: string[];
+  }) => Promise<void>;
 
   isCouponApplicable: (coupon: Coupon, cartTotal: number) => boolean;
 getMinimumForCoupon: (coupon: Coupon) => number;
@@ -403,6 +410,45 @@ export const CouponProvider: React.FC<CouponProviderProps> = ({
   );
 
   // ========================================================================
+  // CELEBRATION SUPPRESSION
+  // ========================================================================
+
+  // Stamps celebratedAt = serverTimestamp() on every supplied coupon/benefit
+  // doc in a single batched write. The Firestore rule rejects re-stamping
+  // (previous celebratedAt must be null), so calls are idempotent across
+  // devices — the first dismiss anywhere wins.
+  const markCelebrated = useCallback(
+    async (params: {
+      couponIds?: string[];
+      benefitIds?: string[];
+    }): Promise<void> => {
+      if (!user || !db) return;
+
+      const couponIds = params.couponIds ?? [];
+      const benefitIds = params.benefitIds ?? [];
+      if (couponIds.length === 0 && benefitIds.length === 0) return;
+
+      try {
+        const batch = writeBatch(db);
+        const stamp = { celebratedAt: serverTimestamp() };
+
+        for (const id of couponIds) {
+          batch.update(doc(db, "users", user.uid, "coupons", id), stamp);
+        }
+        for (const id of benefitIds) {
+          batch.update(doc(db, "users", user.uid, "benefits", id), stamp);
+        }
+
+        await batch.commit();
+      } catch (error) {
+        // Errors are logged but never surfaced — overlay UX is fire-and-forget.
+        console.error("❌ Error marking celebrated:", error);
+      }
+    },
+    [user, db]
+  );
+
+  // ========================================================================
   // CHECKOUT HELPERS
   // ========================================================================
 
@@ -572,6 +618,9 @@ export const CouponProvider: React.FC<CouponProviderProps> = ({
       fetchAllBenefits,
       markBenefitAsUsed,
 
+      // Celebration suppression
+      markCelebrated,
+
       // Checkout helpers
       calculateCheckoutDiscounts,
       markDiscountsAsUsed,
@@ -598,6 +647,7 @@ export const CouponProvider: React.FC<CouponProviderProps> = ({
       markCouponAsUsed,
       fetchAllBenefits,
       markBenefitAsUsed,
+      markCelebrated,
       calculateCheckoutDiscounts,
       markDiscountsAsUsed,
       refresh,

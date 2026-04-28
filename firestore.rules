@@ -1154,16 +1154,30 @@ function isValidSellerInfo(sellerInfo) {
 match /coupons/{couponId} {
   // Users can read their own coupons
   allow read: if request.auth != null && request.auth.uid == userId;
-  
-  // Users can update their own coupons (for marking as used)
- allow update: if request.auth != null 
+
+  // Users can update their own coupons in one of two shapes:
+  //  1. Mark-as-used: only isUsed/usedAt/orderId may change.
+  //  2. Mark-as-celebrated: only celebratedAt may change, and the previous
+  //     value must have been null (idempotent — can't re-stamp).
+  allow update: if request.auth != null
     && request.auth.uid == userId
-    && request.resource.data.diff(resource.data).affectedKeys()
-         .hasOnly(['isUsed', 'usedAt', 'orderId'])
-    && request.resource.data.isUsed == true
-    && request.resource.data.usedAt is timestamp
-    && request.resource.data.orderId is string;
-  
+    && (
+      (
+        request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['isUsed', 'usedAt', 'orderId'])
+        && request.resource.data.isUsed == true
+        && request.resource.data.usedAt is timestamp
+        && request.resource.data.orderId is string
+      )
+      ||
+      (
+        request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['celebratedAt'])
+        && request.resource.data.celebratedAt is timestamp
+        && resource.data.get('celebratedAt', null) == null
+      )
+    );
+
   // Only Cloud Functions (admin) can create or delete coupons
   allow create, delete: if false;
 }
@@ -1172,16 +1186,30 @@ match /coupons/{couponId} {
 match /benefits/{benefitId} {
   // Users can read their own benefits
   allow read: if request.auth != null && request.auth.uid == userId;
-  
-  // Users can update their own benefits (for marking as used)
-  allow update: if request.auth != null 
+
+  // Users can update their own benefits in one of two shapes:
+  //  1. Mark-as-used: only isUsed/usedAt/orderId may change.
+  //  2. Mark-as-celebrated: only celebratedAt may change, and the previous
+  //     value must have been null (idempotent — can't re-stamp).
+  allow update: if request.auth != null
     && request.auth.uid == userId
-    && request.resource.data.diff(resource.data).affectedKeys()
-         .hasOnly(['isUsed', 'usedAt', 'orderId'])
-    && request.resource.data.isUsed == true
-    && request.resource.data.usedAt is timestamp
-    && request.resource.data.orderId is string;
-  
+    && (
+      (
+        request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['isUsed', 'usedAt', 'orderId'])
+        && request.resource.data.isUsed == true
+        && request.resource.data.usedAt is timestamp
+        && request.resource.data.orderId is string
+      )
+      ||
+      (
+        request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['celebratedAt'])
+        && request.resource.data.celebratedAt is timestamp
+        && resource.data.get('celebratedAt', null) == null
+      )
+    );
+
   // Only Cloud Functions (admin) can create or delete benefits
   allow create, delete: if false;
 }
