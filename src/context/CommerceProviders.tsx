@@ -13,6 +13,7 @@ import { ProductCacheProvider } from "./ProductCacheProvider";
 import { CartProvider } from "./CartProvider";
 import { FavoritesProvider } from "./FavoritesProvider";
 import { MarketCartProvider } from "./MarketCartProvider";
+import { CouponProvider } from "./CouponProvider";
 
 interface CommerceProvidersProps {
   children: ReactNode;
@@ -29,9 +30,11 @@ interface CommerceProvidersProps {
  * - CartProvider - Shopping cart state and actions (regular products)
  * - FavoritesProvider - Favorites/wishlist state and actions
  * - MarketCartProvider - Market (grocery) cart state and actions
+ * - CouponProvider - User's coupons & benefits stream (mounted globally so
+ *   the celebration overlay in UIProviders can read them on launch)
  *
- * CouponProvider and DiscountSelectionProvider are NOT included here.
- * They are wrapped per-page (cart, productpayment) via CouponProviders.
+ * DiscountSelectionProvider is NOT included here — it is page-scoped
+ * (cart, productpayment) via CouponProviders.
  *
  * FoodCartProvider is also NOT included here — it is intentionally
  * scoped to restaurant routes only (mounted inside food pages).
@@ -50,7 +53,9 @@ export const CommerceProviders: React.FC<CommerceProvidersProps> = ({
     <ProductCacheProvider>
       <CartProvider user={user} db={db} functions={functions}>
         <FavoritesProvider db={db}>
-          <MarketCartProvider>{children}</MarketCartProvider>
+          <CouponProvider user={user} db={db}>
+            <MarketCartProvider>{children}</MarketCartProvider>
+          </CouponProvider>
         </FavoritesProvider>
       </CartProvider>
     </ProductCacheProvider>
