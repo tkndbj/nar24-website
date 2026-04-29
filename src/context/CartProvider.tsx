@@ -190,9 +190,13 @@ interface CartActionsContextType {
   // NEW: callable on every cart screen visit (matches Flutter loadCart())
   loadCart: () => Promise<void>;
   loadMoreItems: () => Promise<void>;
-  calculateCartTotals: (excludedProductIds?: string[]) => Promise<CartTotals>;
-  // NEW: optimistic-then-server totals update (matches Flutter)
-  updateTotalsForExcluded: (excludedProductIds: string[]) => Promise<void>;
+  // Server-authoritative cart total. Caller passes the exact selection it
+  // wants priced — this is the same set the Cloud Function consumes, so the
+  // provider stays free of stale-ref derivations that broke bundle pricing.
+  calculateCartTotals: (selectedProductIds: string[]) => Promise<CartTotals>;
+  // Optimistic-then-server totals update. Caller passes the exact selection
+  // (matches Flutter's contract — page is the source of truth, not the provider's refs).
+  updateTotalsForSelection: (selectedProductIds: string[]) => Promise<void>;
   validateForPayment: (
     selectedProductIds: string[],
     reserveStock?: boolean,
@@ -941,14 +945,20 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   // ========================================================================
 
   const calculateCartTotals = useCallback(
-    async (excludedProductIds?: string[]): Promise<CartTotals> => {
+    async (selectedProductIds: string[]): Promise<CartTotals> => {
       if (!user || !functions) {
         return { total: 0, items: [], currency: "TL" };
       }
 
-      // Dedup key — for in-flight request sharing only, no result caching
-      const excludedSorted = [...(excludedProductIds ?? [])].sort();
-      const dedupKey = `totals_all_minus_${excludedSorted.join(",")}`;
+      // Empty selection short-circuits: no point calling the CF.
+      if (selectedProductIds.length === 0) {
+        return { total: 0, items: [], currency: "TL" };
+      }
+
+      // Dedup key — for in-flight request sharing only, no result caching.
+      // Keyed on the actual selection so distinct selections don't collide.
+      const sortedIds = [...selectedProductIds].sort();
+      const dedupKey = `totals_${sortedIds.join(",")}`;
 
       if (pendingFetchesRef.current.has(dedupKey)) {
         console.log("⏳ Joining in-flight totals calculation...");
@@ -969,14 +979,8 @@ export const CartProvider: React.FC<CartProviderProps> = ({
                 "calculateCartTotals",
               );
 
-              const allIds = Array.from(cartProductIdsRef.current);
-              const selectedIds =
-                excludedProductIds == null || excludedProductIds.length === 0
-                  ? allIds
-                  : allIds.filter((id) => !excludedProductIds.includes(id));
-
               const result = await calculateCartTotalsFunction({
-                selectedProductIds: selectedIds,
+                selectedProductIds,
               });
 
               const rawData = result.data;
@@ -1043,37 +1047,36 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   );
 
   // ========================================================================
-  // updateTotalsForExcluded — Matches Flutter (optimistic + server verify)
+  // updateTotalsForSelection — Matches Flutter (optimistic + server verify)
+  //
+  // The selection is supplied by the caller (always the page rendering the
+  // cart), which holds fresh React state. This avoids the previous bug where
+  // `cartProductIdsRef.current` lagged the latest render — the totals call
+  // would ship a stale (sometimes empty, sometimes partial) selection to the
+  // CF, dropping bundle members and producing wildly different totals on
+  // refresh.
   // ========================================================================
 
-  const updateTotalsForExcluded = useCallback(
-    async (excludedProductIds: string[]): Promise<void> => {
-      const allIds = cartProductIdsRef.current;
+  const updateTotalsForSelection = useCallback(
+    async (selectedProductIds: string[]): Promise<void> => {
+      // Snapshot the requested selection so a late server response can be
+      // discarded if the user has since changed selection.
+      const requestedSet = new Set(selectedProductIds);
+      currentTotalsProductIdsRef.current = requestedSet;
 
-      if (allIds.size > 0 && excludedProductIds.length >= allIds.size) {
-        setCartTotals({ total: 0, items: [], currency: "TL" });
-        currentTotalsProductIdsRef.current = new Set();
-        return;
-      }
-
-      const selectedIds = Array.from(allIds).filter(
-        (id) => !excludedProductIds.includes(id),
-      );
-
-      currentTotalsProductIdsRef.current = new Set(selectedIds);
-
-      if (selectedIds.length === 0) {
+      if (selectedProductIds.length === 0) {
         setCartTotals({ total: 0, items: [], currency: "TL" });
         return;
       }
 
-      // Detect if any selected item participates in a bundle.
-      // Optimistic per-item math cannot reproduce bundle pricing,
-      // so showing it would cause flicker when the server total returns.
-      const selectedItems = cartItemsRef.current.filter((item) =>
-        selectedIds.includes(item.productId),
+      // Optimistic step uses cartItemsRef purely as a preview. If the ref lags
+      // by a render its accuracy is limited to the items we already know
+      // about; the server response below is the source of truth and will
+      // overwrite the optimistic value.
+      const knownSelectedItems = cartItemsRef.current.filter((item) =>
+        requestedSet.has(item.productId),
       );
-      const hasBundleEligibleItems = selectedItems.some((item) => {
+      const hasBundleEligibleItems = knownSelectedItems.some((item) => {
         const bundleIds = item.product?.bundleIds;
         const bundleData = item.product?.bundleData;
         return (
@@ -1082,30 +1085,27 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         );
       });
 
-      // Step 1: Optimistic update — only when safe (no bundles involved).
-      // When bundles are present, keep existing totals (or null) and rely on
-      // the loading skeleton until the server responds.
+      // Optimistic update — skip when bundles are involved, since per-item
+      // math cannot reproduce bundle pricing and would cause a price flicker.
       if (!hasBundleEligibleItems) {
-        const optimistic = calculateOptimisticTotals(selectedIds);
+        const optimistic = calculateOptimisticTotals(selectedProductIds);
         setCartTotals(optimistic);
       }
 
       setIsTotalsLoading(true);
 
       try {
-        const serverTotals = await calculateCartTotals(
-          excludedProductIds.length > 0 ? excludedProductIds : undefined,
-        );
-        // Only apply if the selection hasn't changed in the meantime
+        const serverTotals = await calculateCartTotals(selectedProductIds);
+        // Only apply if the user's selection hasn't changed mid-flight.
         const currentSet = currentTotalsProductIdsRef.current;
         const stillSameSelection =
-          currentSet.size === selectedIds.length &&
-          selectedIds.every((id) => currentSet.has(id));
+          currentSet.size === requestedSet.size &&
+          selectedProductIds.every((id) => currentSet.has(id));
         if (stillSameSelection) {
           setCartTotals(serverTotals);
         }
       } catch (e) {
-        console.warn("⚠️ Server totals failed, using optimistic:", e);
+        console.warn("⚠️ Server totals failed, keeping optimistic value:", e);
       } finally {
         setIsTotalsLoading(false);
       }
@@ -1122,15 +1122,17 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     // Fire and forget — Flutter uses `unawaited(_backgroundRefreshTotals())`
     (async () => {
       try {
-        // Recompute against the most recent selection (or all if none tracked)
+        // Refresh against the most recent selection the page reported. Falls
+        // back to all known cart IDs if no page has reported a selection yet.
         const currentSelection = currentTotalsProductIdsRef.current;
-        const allIds = cartProductIdsRef.current;
-        const excluded =
-          currentSelection.size === 0
-            ? []
-            : Array.from(allIds).filter((id) => !currentSelection.has(id));
+        const selectedIds =
+          currentSelection.size > 0
+            ? Array.from(currentSelection)
+            : Array.from(cartProductIdsRef.current);
 
-        await calculateCartTotals(excluded.length > 0 ? excluded : undefined);
+        if (selectedIds.length === 0) return;
+
+        await calculateCartTotals(selectedIds);
         console.log("⚡ Background totals cached");
       } catch (e) {
         console.warn("⚠️ Background total refresh failed:", e);
@@ -1714,15 +1716,10 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       const currentSelection = currentTotalsProductIdsRef.current;
       if (currentSelection.size === 0) return;
 
+      const selectedIds = Array.from(currentSelection);
       try {
-        const allIds = cartProductIdsRef.current;
-        const excluded = Array.from(allIds).filter(
-          (id) => !currentSelection.has(id),
-        );
-        const serverTotals = await calculateCartTotals(
-          excluded.length > 0 ? excluded : undefined,
-        );
-        // Re-check selection didn't change
+        const serverTotals = await calculateCartTotals(selectedIds);
+        // Apply only if the user's selection hasn't shifted mid-flight.
         const stillSame = setsEqual(
           currentTotalsProductIdsRef.current,
           currentSelection,
@@ -2308,7 +2305,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       loadCart,
       loadMoreItems,
       calculateCartTotals,
-      updateTotalsForExcluded,
+      updateTotalsForSelection,
       validateForPayment,
       updateCartCacheFromValidation,
       refresh,
@@ -2325,7 +2322,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       loadCart,
       loadMoreItems,
       calculateCartTotals,
-      updateTotalsForExcluded,
+      updateTotalsForSelection,
       validateForPayment,
       updateCartCacheFromValidation,
       refresh,

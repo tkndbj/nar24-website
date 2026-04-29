@@ -428,6 +428,53 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     [twoFactorService],
   );
 
+  // Background self-heal: ensure the user's Firestore doc has all canonical
+  // required fields. Mirrors Flutter AuthService._queueBackgroundTask call to
+  // ensureUserDocument after sign-in. Fire-and-forget, idempotent on the
+  // server (transactional, only patches missing fields, never clobbers).
+  const triggerEnsureUserDocument = useCallback(
+    (currentLanguageCode?: string) => {
+      void (async () => {
+        try {
+          const { httpsCallable, getFunctions } = await import(
+            "firebase/functions"
+          );
+          let languageCode = currentLanguageCode;
+          if (!languageCode && typeof window !== "undefined") {
+            languageCode = localStorage.getItem("locale") || "tr";
+          }
+          if (!languageCode) languageCode = "tr";
+          const fns = getFunctions(undefined, "europe-west3");
+          const ensure = httpsCallable<
+            { languageCode?: string },
+            { ok: boolean; created: boolean; uid: string }
+          >(fns, "ensureUserDocument");
+          await ensure({ languageCode });
+          // Re-fetch so freshly-written fields propagate to the UI.
+          if (
+            dbRef.current &&
+            firestoreModuleRef.current &&
+            authRef.current?.currentUser
+          ) {
+            const { doc, getDoc } = firestoreModuleRef.current;
+            const fresh = await getDoc(
+              doc(dbRef.current, "users", authRef.current.currentUser.uid),
+            );
+            if (fresh.exists()) {
+              authEffectDepsRef.current?.updateUserDataFromDoc(
+                fresh.data(),
+                authRef.current.currentUser,
+              );
+            }
+          }
+        } catch (err) {
+          console.warn("ensureUserDocument self-heal failed:", err);
+        }
+      })();
+    },
+    [],
+  );
+
   // Fetch user data
   const fetchUserData = useCallback(async () => {
     const currentUser = user || internalFirebaseUser;
@@ -587,6 +634,26 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
                     firebaseUser.uid,
                     data.languageCode as string | undefined,
                   );
+
+                  // Self-heal: if any canonical required field is missing,
+                  // ask the server to patch it. Mirrors Flutter's background
+                  // ensureUserDocument call after sign-in. Idempotent and
+                  // never clobbers existing values.
+                  const missingRequired =
+                    data.email == null ||
+                    data.email === "" ||
+                    data.createdAt == null ||
+                    data.referralCode == null ||
+                    data.languageCode == null;
+                  if (missingRequired) {
+                    triggerEnsureUserDocument(
+                      data.languageCode as string | undefined,
+                    );
+                  }
+                } else {
+                  // Doc is missing entirely (orphaned Auth user — e.g. an
+                  // earlier client-side write was interrupted). Heal now.
+                  triggerEnsureUserDocument();
                 }
               }
             } catch (error) {

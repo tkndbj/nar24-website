@@ -6,11 +6,10 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
   signOut,
-  User,
+  getAdditionalUserInfo,
 } from "firebase/auth";
-import { auth, db } from "@/lib/firebase";
-import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore";
-import { getFunctions, httpsCallable } from "firebase/functions";
+import { auth, functions } from "@/lib/firebase";
+import { httpsCallable } from "firebase/functions";
 import {
   EyeIcon,
   EyeSlashIcon,
@@ -210,36 +209,6 @@ function RegistrationContent() {
     return true;
   };
 
-  // Create user document in Firestore
-  const createUserDocument = async (
-    user: User,
-    isGoogleUser: boolean = false
-  ) => {
-    try {
-      const userData = {
-        displayName: isGoogleUser
-          ? user.displayName || user.email?.split("@")[0] || "User"
-          : `${formData.name} ${formData.surname}`,
-        email: user.email || "",
-        name: isGoogleUser
-          ? user.displayName?.split(" ")[0] || ""
-          : formData.name,
-        surname: isGoogleUser
-          ? user.displayName?.split(" ").slice(1).join(" ") || ""
-          : formData.surname,
-        ...(formData.languageCode && { languageCode: formData.languageCode }),
-        createdAt: serverTimestamp(),
-        lastLoginAt: serverTimestamp(),
-        isNew: true,
-      };
-
-      await setDoc(doc(db, "users", user.uid), userData, { merge: true });
-    } catch (error) {
-      console.error("Error creating user document:", error);
-      // Don't throw - continue with registration even if doc creation fails
-    }
-  };
-
   // Updated handleRegisterWithPassword function with improvements
   const handleRegisterWithPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -250,7 +219,6 @@ function RegistrationContent() {
 
     try {
       // Call the cloud function
-      const functions = getFunctions(undefined, "europe-west3");
       const registerWithEmailPassword = httpsCallable(
         functions,
         "registerWithEmailPassword"
@@ -346,48 +314,69 @@ function RegistrationContent() {
   // Handle Google registration
   const handleGoogleRegistration = async () => {
     setIsLoading(true);
-  
+
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({
         prompt: "select_account",
       });
-  
+
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
-  
+
       if (user) {
-        // Check if user document already exists
-        const userDocRef = doc(db, "users", user.uid);
-        const userDoc = await getDoc(userDocRef);
-  
-        if (!userDoc.exists()) {
-          // ✅ New user - create document and redirect to complete profile
-          await createUserDocument(user, true);
-  
-          toast.success(t("RegistrationPage.googleRegistrationSuccess"), {
+        // Canonical user-doc creation/self-heal (mirrors Flutter signInWithGoogle).
+        // ensureUserDocument is idempotent: it transactionally writes the full
+        // canonical schema (email, displayName, isNew, isVerified, referralCode,
+        // createdAt, languageCode, emailVerifiedAt) for new users and patches
+        // missing fields for existing ones. Replaces previous client-side write
+        // which produced docs missing isVerified/referralCode/emailVerifiedAt
+        // and (for Google flows) often missing languageCode.
+        const additionalInfo = getAdditionalUserInfo(result);
+        const isNewUser = additionalInfo?.isNewUser ?? false;
+
+        // Prefer language picked in the form; fall back to localStorage, then 'tr'.
+        let languageCode = formData.languageCode;
+        if (!languageCode && typeof window !== "undefined") {
+          languageCode = localStorage.getItem("locale") || "";
+        }
+        if (!languageCode) languageCode = "tr";
+
+        try {
+          const ensureUserDocument = httpsCallable<
+            { languageCode?: string },
+            { ok: boolean; created: boolean; uid: string }
+          >(functions, "ensureUserDocument");
+          await ensureUserDocument({ languageCode });
+        } catch (ensureErr) {
+          if (isNewUser) {
+            // Don't leave an orphaned Auth account behind. Sign out and rethrow
+            // so the user sees a clean error and can retry.
+            try {
+              await signOut(auth);
+            } catch {
+              /* ignore */
+            }
+            throw ensureErr;
+          }
+          // Existing user: best-effort. UserProvider's self-heal will retry.
+          console.warn("ensureUserDocument failed (existing user):", ensureErr);
+        }
+
+        toast.success(
+          isNewUser
+            ? t("RegistrationPage.googleRegistrationSuccess")
+            : t("RegistrationPage.googleSignInSuccess"),
+          {
             icon: "🚀",
             style: {
               borderRadius: "10px",
               background: "#10B981",
               color: "#fff",
             },
-          });
-  
-          router.push("/");
-          return;
-        }
-  
-        // ✅ Existing user - go to home
-        toast.success(t("RegistrationPage.googleSignInSuccess"), {
-          icon: "🚀",
-          style: {
-            borderRadius: "10px",
-            background: "#10B981",
-            color: "#fff",
           },
-        });
-  
+        );
+
         router.push("/");
       }
     } catch (error: unknown) {

@@ -941,17 +941,9 @@ function ProductPaymentPageContent() {
           return;
         }
 
-        const allCartItemIds = firebaseCartItems.map((item) => item.productId);
-
-        // Calculate excluded IDs (items NOT selected)
-        const excludedIds = allCartItemIds.filter(
-          (id) => !selectedIds.includes(id),
-        );
-
-        // Pass excluded IDs (matching cart page behavior)
-        const freshTotals = await calculateCartTotals(
-          excludedIds.length > 0 ? excludedIds : undefined,
-        );
+        // Pass the explicit selection to the CF — same contract the cart
+        // page uses, no derivation from provider refs.
+        const freshTotals = await calculateCartTotals(selectedIds);
 
         // Build a per-product pricing map from server response.
         // Server returns two shapes of entries:
@@ -1012,6 +1004,38 @@ function ProductPaymentPageContent() {
           // Fallback to cart's denormalized price if server didn't return pricing for this id
           // (shouldn't happen, but matches Flutter's defensive approach).
           const fallbackUnit = item.product?.price ?? 0;
+
+          // Build the variant payload sent to the payment CF. Mirrors Flutter's
+          // _prepareItemsForPayment: prefer `selectedAttributes` already built
+          // upstream by CartProvider.createCartItem, then defensively fold in
+          // `cartData.selectedColor` and `cartData.attributes` so items that
+          // bypassed that builder (legacy docs, buy-now flow) still reach the
+          // CF with full variant context. Without this, the CF picks the
+          // wrong color stock bucket and saves orders without variant info.
+          const mergedAttributes: Record<string, unknown> = {
+            ...(item.selectedAttributes ?? {}),
+          };
+          const rawColor = item.cartData?.selectedColor;
+          if (
+            typeof rawColor === "string" &&
+            rawColor !== "" &&
+            rawColor !== "default" &&
+            !("selectedColor" in mergedAttributes)
+          ) {
+            mergedAttributes.selectedColor = rawColor;
+          }
+          const rawAttrs = item.cartData?.attributes;
+          if (rawAttrs && typeof rawAttrs === "object") {
+            for (const [k, v] of Object.entries(
+              rawAttrs as Record<string, unknown>,
+            )) {
+              if (v == null || v === "") continue;
+              if (Array.isArray(v) && v.length === 0) continue;
+              if (k in mergedAttributes) continue;
+              mergedAttributes[k] = v;
+            }
+          }
+
           return {
             productId: item.productId,
             quantity: item.quantity,
@@ -1025,6 +1049,10 @@ function ProductPaymentPageContent() {
             isShop: item.isShop,
             selectedColor: item.cartData?.selectedColor,
             selectedSize: item.cartData?.selectedSize,
+            selectedAttributes:
+              Object.keys(mergedAttributes).length > 0
+                ? mergedAttributes
+                : undefined,
             product: item.product ?? undefined,
             salePreferences: item.salePreferences,
             cartData: item.cartData,

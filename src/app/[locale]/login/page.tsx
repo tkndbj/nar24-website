@@ -15,8 +15,9 @@ import {
   OAuthProvider,
   AuthError,
   getAdditionalUserInfo,
+  updateProfile,
 } from "firebase/auth";
-import { auth, db } from "@/lib/firebase";
+import { auth, db, functions } from "@/lib/firebase";
 import {
   EyeIcon,
   EyeSlashIcon,
@@ -26,11 +27,11 @@ import {
   GlobeAltIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
-import { getFunctions, httpsCallable } from "firebase/functions";
+import { httpsCallable } from "firebase/functions";
 import { useTranslations, useLocale } from "next-intl";
 import TwoFactorService from "@/services/TwoFactorService";
 import { useUser } from "@/context/UserProvider";
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 
 const AUTH_TIMEOUT_MS = 30000;
 
@@ -279,19 +280,38 @@ function LoginContent() {
       );
       const user = result.user;
       if (user) {
-        const userDocRef = doc(db, "users", user.uid);
-        const userDoc = await getDoc(userDocRef);
-        if (!userDoc.exists()) {
-          toast.success(t("LoginPage.googleLoginSuccess"), {
-            icon: "🚀",
-            style: {
-              borderRadius: "10px",
-              background: "#10B981",
-              color: "#fff",
-            },
-          });
-          router.push("/");
-          return;
+        // Canonical user-doc creation/self-heal (mirrors Flutter signInWithGoogle).
+        // ensureUserDocument is idempotent: it creates a fully populated doc for
+        // new users and patches missing required fields for existing ones. If
+        // creation fails for a brand-new Auth user, sign out so we don't leave
+        // an orphaned Auth account behind — matching Flutter behavior.
+        const additionalInfo = getAdditionalUserInfo(result);
+        const isNewUser = additionalInfo?.isNewUser ?? false;
+        let languageCode = "tr";
+        if (typeof window !== "undefined") {
+          languageCode = localStorage.getItem("locale") || "tr";
+        }
+        try {
+          const ensureUserDocument = httpsCallable<
+            { languageCode?: string },
+            { ok: boolean; created: boolean; uid: string }
+          >(functions, "ensureUserDocument");
+          await withTimeout(
+            ensureUserDocument({ languageCode }),
+            AUTH_TIMEOUT_MS,
+            "AUTH_TIMEOUT",
+          );
+        } catch (ensureErr) {
+          if (isNewUser) {
+            try {
+              await auth.signOut();
+            } catch {
+              /* ignore */
+            }
+            throw ensureErr;
+          }
+          // Existing user: best-effort. UserProvider's self-heal will retry.
+          console.warn("ensureUserDocument failed (existing user):", ensureErr);
         }
         const loginComplete = await checkAndHandle2FA();
         if (loginComplete) {
@@ -358,6 +378,9 @@ function LoginContent() {
       const additionalInfo = getAdditionalUserInfo(result);
       const isNewUser = additionalInfo?.isNewUser ?? false;
       if (user) {
+        // Apple only returns givenName/familyName on the *first* sign-in.
+        // Capture it now so we can persist it both to the Auth profile (so
+        // ensureUserDocument server-side picks it up) and to the Firestore doc.
         let displayName: string | null = null;
         const userEmail = user.email || "";
         const profile = additionalInfo?.profile as
@@ -373,8 +396,6 @@ function LoginContent() {
         if (!displayName && user.displayName) {
           displayName = user.displayName;
         }
-        const userDocRef = doc(db, "users", user.uid);
-        const userDoc = await getDoc(userDocRef);
         const emailPrefix = userEmail.split("@")[0];
         const hasValidName =
           displayName !== null &&
@@ -383,52 +404,101 @@ function LoginContent() {
           displayName !== "No Name" &&
           displayName !== emailPrefix &&
           !displayName.includes("@");
-        let needsName = !hasValidName;
 
-        if (isNewUser || !userDoc.exists()) {
-          let languageCode = "tr";
-          if (typeof window !== "undefined") {
-            languageCode = localStorage.getItem("locale") || "tr";
+        // Mirror Flutter: write captured name to Firebase Auth profile so the
+        // server-side ensureUserDocument reads it via admin.auth().getUser.
+        // Best-effort — failure here doesn't block sign-in.
+        if (hasValidName && displayName) {
+          try {
+            await updateProfile(user, { displayName });
+          } catch (e) {
+            console.warn("Apple updateProfile failed:", e);
           }
-          await setDoc(
-            userDocRef,
-            {
-              displayName: hasValidName ? displayName : null,
-              email: userEmail,
-              isNew: true,
-              createdAt: serverTimestamp(),
-              emailVerifiedAt: user.emailVerified ? serverTimestamp() : null,
-              languageCode,
-            },
-            { merge: true },
-          );
-          needsName = !hasValidName;
-        } else {
-          const userData = userDoc.data();
-          if (displayName && hasValidName) {
-            const existingName = userData.displayName;
-            if (
-              !existingName ||
-              existingName === "User" ||
-              existingName === "No Name" ||
-              existingName === emailPrefix
-            ) {
-              await setDoc(userDocRef, { displayName }, { merge: true });
-            }
-          }
-          const existingDisplayName = userData.displayName as
-            | string
-            | undefined;
-          const existingEmailPrefix = (userData.email || userEmail).split(
-            "@",
-          )[0];
-          needsName =
-            !existingDisplayName ||
-            existingDisplayName === "" ||
-            existingDisplayName === "User" ||
-            existingDisplayName === "No Name" ||
-            existingDisplayName === existingEmailPrefix;
         }
+
+        // Canonical user-doc creation/self-heal via Cloud Function. Same path
+        // as Google sign-in and Flutter Apple flow. Idempotent — creates the
+        // full canonical schema for new users, patches missing required fields
+        // for existing ones.
+        let languageCode = "tr";
+        if (typeof window !== "undefined") {
+          languageCode = localStorage.getItem("locale") || "tr";
+        }
+        try {
+          const ensureUserDocument = httpsCallable<
+            { languageCode?: string },
+            { ok: boolean; created: boolean; uid: string }
+          >(functions, "ensureUserDocument");
+          await withTimeout(
+            ensureUserDocument({ languageCode }),
+            AUTH_TIMEOUT_MS,
+            "AUTH_TIMEOUT",
+          );
+        } catch (ensureErr) {
+          if (isNewUser) {
+            try {
+              await auth.signOut();
+            } catch {
+              /* ignore */
+            }
+            throw ensureErr;
+          }
+          console.warn("ensureUserDocument failed (existing user):", ensureErr);
+        }
+
+        // For an existing user whose doc has a placeholder/missing displayName,
+        // patch it now if we just captured a real one from Apple. Mirrors
+        // Flutter's _updateUserDisplayNameIfMissing (auth_service.dart:992).
+        // ensureUserDocument doesn't overwrite an existing displayName, so this
+        // legacy-patch step is what carries Apple's first-time name through.
+        let needsName = !hasValidName;
+        if (!isNewUser) {
+          try {
+            const userDocRef = doc(db, "users", user.uid);
+            const userDoc = await getDoc(userDocRef);
+            if (userDoc.exists()) {
+              const userData = userDoc.data();
+              const updates: Record<string, unknown> = {};
+              const existingName = userData.displayName as string | undefined;
+              if (
+                hasValidName &&
+                displayName &&
+                (!existingName ||
+                  existingName === "" ||
+                  existingName === "User" ||
+                  existingName === "No Name" ||
+                  existingName === emailPrefix)
+              ) {
+                updates.displayName = displayName;
+              }
+              if (
+                userEmail &&
+                (userData.email == null || userData.email === "")
+              ) {
+                updates.email = userEmail;
+              }
+              if (Object.keys(updates).length > 0) {
+                await setDoc(userDocRef, updates, { merge: true });
+              }
+              const finalDisplayName =
+                (updates.displayName as string | undefined) ?? existingName;
+              const existingEmailPrefix = (
+                (userData.email as string | undefined) ||
+                userEmail ||
+                ""
+              ).split("@")[0];
+              needsName =
+                !finalDisplayName ||
+                finalDisplayName === "" ||
+                finalDisplayName === "User" ||
+                finalDisplayName === "No Name" ||
+                finalDisplayName === existingEmailPrefix;
+            }
+          } catch (e) {
+            console.warn("Apple displayName patch failed:", e);
+          }
+        }
+
         if (needsName) {
           setNameComplete(false);
         } else {
@@ -518,7 +588,6 @@ function LoginContent() {
       );
       const user = userCredential.user;
       if (user && !user.emailVerified) {
-        const functions = getFunctions(undefined, "europe-west3");
         const resendEmailVerificationCode = httpsCallable(
           functions,
           "resendEmailVerificationCode",

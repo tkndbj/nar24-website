@@ -120,6 +120,7 @@ function CartPageContent() {
 
   const {
     cartItems,
+    cartProductIds,
     cartCount,
     isLoading,
     isLoadingMore,
@@ -132,7 +133,7 @@ function CartPageContent() {
     loadCart,
     loadMoreItems,
     calculateCartTotals,
-    updateTotalsForExcluded,
+    updateTotalsForSelection,
     validateForPayment,
     updateCartCacheFromValidation,
   } = useCart();
@@ -239,11 +240,16 @@ function CartPageContent() {
     return activeCoupons.length > 0 || activeFreeShippingBenefits.length > 0;
   }, [activeCoupons, activeFreeShippingBenefits]);
 
+  // Source selection from the canonical full-cart set (mirrored from the
+  // user doc) — not from the paginated cartItems list. This guarantees the
+  // CF receives every item the user is actually paying for, which is
+  // essential for bundle pricing (a bundle only applies if all of its
+  // members are in the selection).
   const selectedIds = useMemo(() => {
-    return cartItems
-      .filter((item) => !deselectedProducts.has(item.productId))
-      .map((item) => item.productId);
-  }, [cartItems, deselectedProducts]);
+    return Array.from(cartProductIds).filter(
+      (id) => !deselectedProducts.has(id),
+    );
+  }, [cartProductIds, deselectedProducts]);
 
   const displayTotals = useMemo(() => {
     return {
@@ -356,31 +362,29 @@ function CartPageContent() {
       .join("|");
   }, [cartItems]);
 
-  const deselectedSignature = useMemo(
-    () => Array.from(deselectedProducts).sort().join(","),
-    [deselectedProducts],
+  const selectedIdsSignature = useMemo(
+    () => [...selectedIds].sort().join(","),
+    [selectedIds],
   );
 
   useEffect(() => {
-    if (cartItems.length === 0) return;
-
-    const excludedIds = Array.from(deselectedProducts);
+    if (selectedIds.length === 0) return;
 
     // Initial calculation — fire immediately
     if (!hasInitializedTotalsRef.current) {
       hasInitializedTotalsRef.current = true;
-      updateTotalsForExcluded(excludedIds);
+      updateTotalsForSelection(selectedIds);
       return;
     }
 
     // Subsequent updates — debounced to coalesce rapid changes
     const timer = setTimeout(() => {
-      updateTotalsForExcluded(excludedIds);
+      updateTotalsForSelection(selectedIds);
     }, 400);
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cartTotalsSignature, deselectedSignature, updateTotalsForExcluded]);
+  }, [cartTotalsSignature, selectedIdsSignature, updateTotalsForSelection]);
 
   useEffect(() => {
     if (!user) {
@@ -663,7 +667,6 @@ function CartPageContent() {
       router.push("/productpayment");
     },
     [
-      cartItems,
       selectedIds,
       selectedCoupon,
       selectedBenefit,
@@ -703,10 +706,7 @@ function CartPageContent() {
         // Calculate fresh totals before payment
         console.log("💰 Calculating fresh totals before payment...");
 
-        const excludedIds = Array.from(deselectedProducts);
-        const freshTotals = await calculateCartTotals(
-          excludedIds.length > 0 ? excludedIds : undefined,
-        );
+        const freshTotals = await calculateCartTotals(selectedIds);
 
         if (!freshTotals || freshTotals.total <= 0) {
           setIsValidating(false);
@@ -739,7 +739,6 @@ function CartPageContent() {
     }
   }, [
     selectedIds,
-    deselectedProducts,
     validateForPayment,
     calculateCartTotals,
     proceedToPayment,
@@ -780,14 +779,8 @@ function CartPageContent() {
         return;
       }
 
-      // Calculate totals from validated items (using their IDs as the selected set)
-      const allProductIds = cartItems.map((item) => item.productId);
-      const excludedForTotals = allProductIds.filter(
-        (id) => !validIds.includes(id),
-      );
-      const freshTotals = await calculateCartTotals(
-        excludedForTotals.length > 0 ? excludedForTotals : undefined,
-      );
+      // Calculate totals using validated items as the explicit selection.
+      const freshTotals = await calculateCartTotals(validIds);
 
       if (!freshTotals || freshTotals.total <= 0) {
         setIsValidating(false);
@@ -817,8 +810,6 @@ function CartPageContent() {
     updateCartCacheFromValidation,
     calculateCartTotals,
     proceedToPayment,
-    user,
-    cartItems,
     t,
   ]);
 
