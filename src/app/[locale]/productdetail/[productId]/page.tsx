@@ -1,12 +1,18 @@
 // src/app/[locale]/productdetail/[productId]/page.tsx
-// Server component — fetches data server-side for instant HTML + SEO
-// Uses React cache() to deduplicate fetchAllProductData between generateMetadata and page render
+// Server component — fetches ONLY essential product data so the HTML shell
+// paints fast (~150–300ms). Bottom sections (seller, reviews, questions,
+// related, collection, bundles) self-fetch client-side after hydration —
+// the Flutter staged-rendering pattern.
+//
+// Internal navigations (clicking a product card) get even faster: loading.tsx
+// reads the click-time product cache and renders the cached product instantly
+// while this server component runs in the background.
 
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import {
-  fetchAllProductData,
+  fetchProductEssentials,
   normalizeProductId,
 } from "@/lib/product-detail-fetcher";
 import { ProductUtils } from "@/app/models/Product";
@@ -20,8 +26,8 @@ interface Props {
 
 // Deduplicate: both generateMetadata and the page component call this,
 // but React cache() ensures the actual fetch only happens once per request.
-const getCachedProductData = cache(async (normalizedId: string) => {
-  return fetchAllProductData(normalizedId);
+const getCachedEssentials = cache(async (normalizedId: string) => {
+  return fetchProductEssentials(normalizedId);
 });
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -29,7 +35,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const normalizedId = normalizeProductId(productId);
 
   try {
-    const data = await getCachedProductData(normalizedId);
+    const data = await getCachedEssentials(normalizedId);
     if (!data) {
       return { title: "Product Not Found" };
     }
@@ -77,7 +83,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function ProductDetailPage({ params }: Props) {
   const { productId, locale } = await params;
   const normalizedId = normalizeProductId(productId);
-  const data = await getCachedProductData(normalizedId);
+  const data = await getCachedEssentials(normalizedId);
 
   if (!data) {
     notFound();
@@ -88,17 +94,19 @@ export default async function ProductDetailPage({ params }: Props) {
   // Serialize product for the client boundary (ensure JSON-safe)
   const serializedProduct = JSON.parse(JSON.stringify(product));
 
+  // Bottom sections self-fetch client-side (matches Flutter pattern).
+  // Pass null so child widgets fall through to their own fetch logic.
   return (
     <ProductDetailClient
       product={serializedProduct}
-      seller={data.seller}
-      reviews={data.reviews}
-      reviewsTotal={data.reviewsTotal}
-      questions={data.questions}
-      questionsTotal={data.questionsTotal}
-      relatedProducts={data.relatedProducts}
-      collection={data.collection}
-      bundles={data.bundles}
+      seller={null}
+      reviews={[]}
+      reviewsTotal={null}
+      questions={[]}
+      questionsTotal={null}
+      relatedProducts={null}
+      collection={null}
+      bundles={null}
       salesConfig={data.salesConfig}
       locale={locale}
     />

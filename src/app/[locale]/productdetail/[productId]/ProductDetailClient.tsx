@@ -62,16 +62,21 @@ const AskToSellerBubble = lazy(
   () => import("@/app/components/product_detail/AskToSeller")
 );
 
+// Secondary-section props are nullable: when the server passes `null`, the
+// child widgets fall through to their own client-side fetch (matches the
+// Flutter staged-rendering pattern). The page route always passes `null`;
+// the SSR-prefetched shape is preserved for future use (e.g. a share-link
+// flow that wants warm data).
 interface ProductDetailClientProps {
   product: Product;
   seller: SellerInfo | null;
   reviews: Review[];
-  reviewsTotal: number;
+  reviewsTotal: number | null;
   questions: Question[];
-  questionsTotal: number;
-  relatedProducts: RelatedProduct[];
+  questionsTotal: number | null;
+  relatedProducts: RelatedProduct[] | null;
   collection: CollectionData | null;
-  bundles: BundleInfo[];
+  bundles: BundleInfo[] | null;
   salesConfig: SalesConfig;
   locale: string;
 }
@@ -101,12 +106,27 @@ export default function ProductDetailClient({
   // Scroll detection
   const { showHeaderButtons, actionButtonsRef } = useScrollDetection();
 
-  // Whether bottom sections have data worth rendering
-  const hasCollection = collection !== null && collection.products.length > 0;
-  const hasBundles = bundles.length > 0;
-  const hasReviews = reviewsTotal > 0;
-  const hasQuestions = questionsTotal > 0;
-  const hasRelatedProducts = relatedProducts.length > 0;
+  // Decide whether to mount a section. With nullable props we fall back to
+  // simple hints derived from the product itself when the server didn't
+  // pre-resolve the totals. The widgets themselves self-hide when their
+  // own fetch returns nothing.
+  const hasCollection =
+    collection !== null
+      ? collection.products.length > 0
+      : !!product.shopId; // collections are shop-scoped
+  const hasBundles =
+    bundles !== null ? bundles.length > 0 : !!product.shopId;
+  // Reviews / questions / related: always mount and let the widget decide.
+  // The `prefetchedData={null}` path triggers the widget's internal fetch,
+  // and an empty result hides the section.
+  const hasReviews = reviewsTotal === null ? true : reviewsTotal > 0;
+  const hasQuestions = questionsTotal === null ? true : questionsTotal > 0;
+  const hasRelatedProducts =
+    relatedProducts !== null
+      ? relatedProducts.length > 0
+      : (product.relatedProductIds?.length ?? 0) > 0 ||
+        !!product.subcategory; // category-based fallback
+
 
   // Translation helper
   const t = useCallback(
@@ -411,7 +431,11 @@ export default function ProductDetailClient({
                 isShop={!!product.shopId}
                 localization={localization}
                 locale={locale}
-                prefetchedData={{ reviews, totalCount: reviewsTotal }}
+                prefetchedData={
+                  reviewsTotal === null
+                    ? null
+                    : { reviews, totalCount: reviewsTotal }
+                }
               />
             </Suspense>
           )}
@@ -430,7 +454,11 @@ export default function ProductDetailClient({
                 isShop={!!product.shopId}
                 localization={localization}
                 locale={locale}
-                prefetchedData={{ questions, totalCount: questionsTotal }}
+                prefetchedData={
+                  questionsTotal === null
+                    ? null
+                    : { questions, totalCount: questionsTotal }
+                }
               />
             </Suspense>
           )}
@@ -448,7 +476,11 @@ export default function ProductDetailClient({
                 subcategory={product.subcategory}
                 relatedProductIds={product.relatedProductIds}
                 localization={localization}
-                prefetchedProducts={relatedProducts as unknown as Product[]}
+                prefetchedProducts={
+                  relatedProducts === null
+                    ? undefined
+                    : (relatedProducts as unknown as Product[])
+                }
               />
             </Suspense>
           )}

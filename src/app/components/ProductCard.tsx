@@ -524,8 +524,6 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
   // ✅ Navigation throttling (matches Flutter implementation)
   const lastNavigationTimeRef = useRef<number>(0);
 
-  // ✅ Prefetch dedupe — only warm the route + hero image once per product
-  const prefetchedRef = useRef<boolean>(false);
   const productPath = `/productdetail/${product.id}`;
 
   // ✅ Safe color images extraction
@@ -573,43 +571,12 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
     product.imageUrls,
   ]);
 
-  // ✅ Cache product on mount (matches Flutter's ProductDetailProvider pattern)
+  // ✅ Cache product on mount. ProductDetailClient (and its loading.tsx)
+  // read from this cache to render the detail page instantly with the data
+  // already on screen — Flutter-parity pattern: no extra fetch on click.
   useEffect(() => {
     setProduct(product.id, product);
   }, [product, setProduct]);
-
-  // Reset prefetch flag when this card is reused for a different product
-  // (matters for virtualized lists / pagination)
-  useEffect(() => {
-    prefetchedRef.current = false;
-  }, [product.id]);
-
-  // ✅ Warm the product detail route + hero image at the moment of intent
-  // (hover / focus / touchstart). This shrinks the perceived load by the time
-  // it takes the server to run fetchAllProductData — usually 1–2s.
-  const handlePrefetch = useCallback(() => {
-    if (prefetchedRef.current) return;
-    prefetchedRef.current = true;
-
-    // Prefetch the RSC payload + JS bundle for the detail page.
-    // Locale-aware router auto-prefixes the active locale.
-    router.prefetch(productPath);
-
-    // Preload the hero image at detail-size so it's in the HTTP cache before
-    // the user lands on the page.
-    if ((product.imageStoragePaths?.length ?? 0) > 0) {
-      const img = new window.Image();
-      img.src = CloudinaryUrl.product(product.imageStoragePaths![0], "detail");
-    } else if (product.imageUrls.length > 0) {
-      const img = new window.Image();
-      img.src = product.imageUrls[0];
-    }
-  }, [
-    router,
-    productPath,
-    product.imageStoragePaths,
-    product.imageUrls,
-  ]);
 
   // ✅ CRITICAL: Throttled navigation (matches Flutter's 500ms throttle)
   const handleCardClick = useCallback(() => {
@@ -621,11 +588,6 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
     }
 
     lastNavigationTimeRef.current = now;
-
-    // Safety net: ensure prefetch + image preload happened, in case the user
-    // tapped without ever firing hover/touchstart (e.g. keyboard activation).
-    // Idempotent thanks to prefetchedRef.
-    handlePrefetch();
 
     userActivityService.trackClick({
       productId: product.id,
@@ -642,13 +604,23 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
     // Record click analytics (matches Flutter's market.incrementClickCount)
     analyticsBatcher.recordClick(product.id, product.shopId);
 
+    // Preload the hero image at detail-size so it's in the HTTP cache by
+    // the time the detail page renders.
+    if ((product.imageStoragePaths?.length ?? 0) > 0) {
+      const img = new window.Image();
+      img.src = CloudinaryUrl.product(product.imageStoragePaths![0], "detail");
+    } else if (product.imageUrls.length > 0) {
+      const img = new window.Image();
+      img.src = product.imageUrls[0];
+    }
+
     // Navigate
     if (onTap) {
       onTap();
     } else {
       router.push(productPath);
     }
-  }, [product, router, onTap, productPath, handlePrefetch]);
+  }, [product, router, onTap, productPath]);
 
   // Reset carousel index when color changes (matches Flutter's didUpdateWidget)
   useEffect(() => {
@@ -1152,8 +1124,6 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
       <div
         className="w-full cursor-pointer transition-transform duration-200 hover:scale-105"
         onClick={handleCardClick}
-        onMouseEnter={handlePrefetch}
-        onTouchStart={handlePrefetch}
         style={{ transform: `scale(${effectiveScaleFactor})` }}
       >
         <div className="flex flex-col w-full">

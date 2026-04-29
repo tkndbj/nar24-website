@@ -89,17 +89,8 @@ function parseTimestamp(value: unknown): string {
   return new Date().toISOString();
 }
 
-export function normalizeProductId(productId: string): string {
-  let rawId = productId.trim();
-
-  if (rawId.startsWith("products_")) {
-    rawId = rawId.substring("products_".length);
-  } else if (rawId.startsWith("shop_products_")) {
-    rawId = rawId.substring("shop_products_".length);
-  }
-
-  return rawId;
-}
+// Re-export the pure helper so existing server-side imports keep working
+export { normalizeProductId } from "./product-id";
 
 // ============= FETCH FUNCTIONS =============
 
@@ -450,6 +441,36 @@ async function fetchSalesConfig(
     };
   }
   return { salesPaused: false, pauseReason: "" };
+}
+
+// ============= ESSENTIALS-ONLY FETCH =============
+// Used by the page route: returns just the product + sales config so the
+// HTML shell paints fast (~150–300ms). All bottom sections (seller, reviews,
+// questions, related, collection, bundles) self-fetch client-side after
+// hydration, matching the Flutter staged-rendering pattern.
+
+export interface ProductEssentials {
+  product: Record<string, unknown>;
+  salesConfig: { salesPaused: boolean; pauseReason: string };
+}
+
+export async function fetchProductEssentials(
+  productId: string
+): Promise<ProductEssentials | null> {
+  const db = getFirestoreAdmin();
+
+  // Both queries run in parallel; both are single-doc reads.
+  const [productResult, salesConfigResult] = await Promise.all([
+    fetchProduct(db, productId),
+    fetchSalesConfig(db).catch(() => ({ salesPaused: false, pauseReason: "" })),
+  ]);
+
+  if (!productResult) return null;
+
+  return {
+    product: productResult.product,
+    salesConfig: salesConfigResult,
+  };
 }
 
 // ============= MAIN ORCHESTRATOR =============
