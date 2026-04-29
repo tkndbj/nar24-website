@@ -12,6 +12,7 @@ import {
   Calendar,
   X,
   Archive,
+  ClipboardList,
   Heart,
   ShoppingCart,
   Eye,
@@ -748,6 +749,18 @@ export default function MyProductsPage() {
             >
               <Archive size={12} />
               {t("archivedProducts") || "Archived"}
+            </button>
+
+            <button
+              onClick={() => router.push("/pending-product-applications")}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                isDarkMode
+                  ? "border-gray-800 text-gray-400 hover:border-gray-700 bg-gray-900"
+                  : "border-gray-200 text-gray-600 hover:border-gray-300 bg-white"
+              }`}
+            >
+              <ClipboardList size={12} />
+              {t("pendingApplications") || "My Applications"}
             </button>
 
             {selectedDateRange && (
