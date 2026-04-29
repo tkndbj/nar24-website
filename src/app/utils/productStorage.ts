@@ -19,6 +19,7 @@ export interface ProductData {
   iban: string;
   shopId: string | null;
   editProductId?: string | null;
+  isFromArchivedCollection?: boolean;
 }
 
 export interface ProductFiles {

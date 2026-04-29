@@ -34,7 +34,7 @@
 
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import Image from "next/image";
 import { CloudinaryUrl, type ImageSize } from "@/utils/cloudinaryUrl";
 
@@ -133,6 +133,7 @@ function CoreImage({
   const [src, setSrc] = useState(primary);
   const [hasErrored, setHasErrored] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const imgRef = useRef<HTMLImageElement | null>(null);
 
   const handleError = useCallback(() => {
     if (src === primary && fallback && fallback !== primary) {
@@ -153,11 +154,24 @@ function CoreImage({
   }, []);
 
   // Reset state when primary URL changes (e.g. product navigation)
-  React.useEffect(() => {
+  useEffect(() => {
     setSrc(primary);
     setHasErrored(false);
     setIsLoading(true);
   }, [primary]);
+
+  // Cache-hit safety net: when next/image's src is already in the browser's
+  // HTTP cache (SPA navigation, hydration, state-driven src swap), the native
+  // `load` event can fire before React attaches the listener, so `onLoad`
+  // never runs and `isLoading` would stay true forever — leaving the
+  // placeholder over the (already decoded) image. Check `complete` on the
+  // underlying <img> after each commit and clear the loading flag manually.
+  useEffect(() => {
+    const img = imgRef.current;
+    if (img && img.complete && img.naturalWidth > 0) {
+      setIsLoading(false);
+    }
+  }, [src]);
 
   if (!primary || hasErrored) {
     return <>{errorWidget ?? <DefaultError width={width} height={height} />}</>;
@@ -193,6 +207,7 @@ function CoreImage({
 
       {useFill ? (
         <Image
+          ref={imgRef}
           src={src}
           alt={alt}
           fill
@@ -209,6 +224,7 @@ function CoreImage({
         />
       ) : (
         <Image
+          ref={imgRef}
           src={src}
           alt={alt}
           width={width ?? 400}

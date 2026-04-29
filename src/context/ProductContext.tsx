@@ -26,6 +26,11 @@ interface ProductData {
   // submission to vitrin_edit_product_applications (referencing this id)
   // instead of creating a new vitrin_product_applications document.
   editProductId?: string | null;
+  // True when the product being edited lives in `paused_products` rather
+  // than `products`. Drives the archived-edit branch of the preview submit
+  // (editType=archived_product_update, sourceCollection=paused_products,
+  // archive-clear fields) so the admin pipeline reactivates it correctly.
+  isFromArchivedCollection?: boolean;
 }
 
 // Paired URL + storage path — both are needed for edit mode:

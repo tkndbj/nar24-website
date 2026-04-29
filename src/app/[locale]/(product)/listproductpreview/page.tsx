@@ -5,11 +5,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { auth, db, storage } from "@/lib/firebase";
-import {
-  ref as storageRef,
-  uploadBytesResumable,
-  getDownloadURL,
-} from "firebase/storage";
+import { ref as storageRef, uploadBytesResumable } from "firebase/storage";
 import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -21,9 +17,10 @@ import {
   UploadPhase,
   UploadState,
   makeUploadState
- 
+
 } from "../../../components/List-Product/uploadState";
 import { smartCompress, shouldCompress } from "../../../utils/imageCompression";
+import { CloudinaryUrl } from "@/utils/cloudinaryUrl";
 
 // ─── Internal types ───────────────────────────────────────────────────────────
 
@@ -135,7 +132,12 @@ export default function ListProductPreview() {
             );
           });
 
-          const url = await getDownloadURL(task.snapshot.ref);
+          // Synthesize the public GCS URL the same way Flutter does in
+          // _submitVitrinProduct, instead of calling getDownloadURL() which
+          // returns a tokenized firebasestorage URL. Keeps the imageUrls /
+          // videoUrl / colorImages columns in the same format across both
+          // clients so anything that parses them sees one shape.
+          const url = CloudinaryUrl.firebaseUrl(path);
           return { url, path };
         } catch (err) {
           attempt++;
@@ -219,12 +221,12 @@ export default function ListProductPreview() {
             ).toFixed(1)}MB). Max 10MB per image.`
           );
         }
-        jobs.push({ file: fileToUpload, folder: "default_images" });
+        jobs.push({ file: fileToUpload, folder: "main" });
       }
 
       // Video — no compression
       if (videoFile) {
-        jobs.push({ file: videoFile, folder: "preview_videos", isVideo: true });
+        jobs.push({ file: videoFile, folder: "video", isVideo: true });
       }
 
       // Color images — compress here (Flutter also compresses them during upload)
@@ -250,7 +252,7 @@ export default function ListProductPreview() {
         }
         jobs.push({
           file: fileToUpload,
-          folder: `color_images/${colorKey}`,
+          folder: `colors/${colorKey}`,
           colorKey,
         });
       }
@@ -776,8 +778,16 @@ export default function ListProductPreview() {
         (c) => !availableColors.includes(c)
       );
 
-   // Load the live product so we can snapshot it + detect changes.
-   const originalSnap = await getDoc(doc(db, "products", originalProductId));
+   // Archived edits live in paused_products (the archive collection),
+   // not products. Mirrors Flutter's isFromArchivedCollection branching
+   // so the snapshot we take + the editType/sourceCollection we write
+   // line up with what approveArchivedProductEdit (or the regular
+   // product_edit admin merge) expects.
+   const isArchivedEdit = productData?.isFromArchivedCollection === true;
+   const originalCollection = isArchivedEdit ? "paused_products" : "products";
+   const originalSnap = await getDoc(
+     doc(db, originalCollection, originalProductId)
+   );
    if (!originalSnap.exists()) {
      throw new Error("Original product not found.");
    }
@@ -893,12 +903,24 @@ export default function ListProductPreview() {
      ...(curtainMaxHeight != null && { curtainMaxHeight }),
      ...cleanedAttributes,
 
-     // Edit pipeline fields — match Flutter
-     editType: "product_edit",
-     sourceCollection: "products",
+     // Edit pipeline fields — match Flutter's isFromArchivedCollection branch.
+     // Archived edits route through approveArchivedProductEdit, which expects
+     // editType=archived_product_update + sourceCollection=paused_products
+     // and these archive-clear fields (mirrored from Flutter exactly so the
+     // CF's reactivation logic finds them where it looks).
+     editType: isArchivedEdit ? "archived_product_update" : "product_edit",
+     sourceCollection: isArchivedEdit ? "paused_products" : "products",
      editedFields,
      changes,
      originalProductData,
+     ...(isArchivedEdit && {
+       needsUpdate: false,
+       archiveReason: null,
+       archivedByAdmin: false,
+       archivedByAdminAt: null,
+       archivedByAdminId: null,
+       paused: false,
+     }),
 
      status: "pending",
      searchIndex,

@@ -497,7 +497,7 @@ export default function ArchivedProductsPage() {
                   }
                   onUpdate={() =>
                     router.push(
-                      `/listproduct?editId=${product.id}&fromArchived=true`,
+                      `/listproduct?edit=${product.id}&fromArchived=true`,
                     )
                   }
                   onView={() => router.push(`/product/${product.id}`)}

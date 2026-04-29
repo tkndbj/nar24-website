@@ -98,6 +98,7 @@ export default function ListProductForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editProductIdParam = searchParams?.get("edit") ?? null;
+  const fromArchivedParam = searchParams?.get("fromArchived") === "true";
   const locale = useLocale(); // ADD THIS
 
   const [isCompressing, setIsCompressing] = useState(false);
@@ -152,6 +153,11 @@ export default function ListProductForm() {
     [colorKey: string]: ExistingMediaRef;
   }>({});
   const [editProductId, setEditProductId] = useState<string | null>(null);
+  // Tracks whether the product being edited lives in paused_products
+  // rather than products. Driven by `?fromArchived=true` on entry from
+  // the archived page; preserved when bouncing back from preview.
+  const [isFromArchivedCollection, setIsFromArchivedCollection] =
+    useState<boolean>(false);
   const [, setIsLoadingEditProduct] = useState(false);
 
   // Basic info
@@ -355,6 +361,7 @@ export default function ListProductForm() {
 
      // Edit-mode restoration from context (returning from preview page)
      setEditProductId(productData.editProductId || null);
+     setIsFromArchivedCollection(productData.isFromArchivedCollection === true);
      setExistingImages(productFiles.existingImages || []);
      setExistingVideo(productFiles.existingVideo || null);
      setExistingColorImages(productFiles.existingColorImages || {});
@@ -525,12 +532,20 @@ export default function ListProductForm() {
     const loadForEdit = async () => {
       setIsLoadingEditProduct(true);
       try {
-        const snap = await getDoc(doc(db, "products", editProductIdParam));
+        // Archived products live in paused_products; everything else
+        // is in products. Mirrors Flutter's isFromArchivedCollection
+        // routing in list_product_screen.
+        const sourceCollection = fromArchivedParam
+          ? "paused_products"
+          : "products";
+        const snap = await getDoc(
+          doc(db, sourceCollection, editProductIdParam)
+        );
         if (cancelled) return;
 
         if (!snap.exists()) {
           alert(t("errors.productNotFound", { fallback: "Product not found." }));
-          router.push(buildLocalizedUrl("/myproducts"));
+          router.push(buildLocalizedUrl(fromArchivedParam ? "/archived" : "/myproducts"));
           return;
         }
 
@@ -731,6 +746,7 @@ export default function ListProductForm() {
         setFlowCompleted(true);
         setShowDynamicStep(false);
         setEditProductId(editProductIdParam);
+        setIsFromArchivedCollection(fromArchivedParam);
 
         console.log("✅ Edit mode: product loaded", editProductIdParam);
       } catch (err) {
@@ -752,7 +768,7 @@ export default function ListProductForm() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isRestored, editProductIdParam]);
+  }, [isRestored, editProductIdParam, fromArchivedParam]);
 
   const getLocalizedAttributeValue = (
     key: string,
@@ -1034,6 +1050,7 @@ export default function ListProductForm() {
     setShowDynamicStep(false);
     setIsDirty(false);
     setEditProductId(null);
+    setIsFromArchivedCollection(false);
     setExistingImages([]);
     setExistingVideo(null);
     setExistingColorImages({});
@@ -1555,6 +1572,7 @@ export default function ListProductForm() {
         iban: sellerInfo?.iban ?? "",
         shopId: null,
         editProductId: editProductId,
+        isFromArchivedCollection,
       };
 
       const productFiles = {
