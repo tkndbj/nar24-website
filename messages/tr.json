@@ -6093,12 +6093,61 @@
   "foodExtraWhippedCream": "Krem Şanti",
   "foodExtraIce": "Buz",
   "NotificationDrawer": {
+    "header": "Bildirimler",
+    "count": "{count} bildirim",
+    "loading": "Bildirimleriniz yükleniyor…",
+    "loadingMore": "Daha fazla bildirim yükleniyor…",
+    "empty": "Henüz hiç bildiriminiz bulunmuyor.",
+    "emptyTitle": "Bildirim Yok",
+    "loginRequired": "Bildirimlerinizi görüntülemek için lütfen giriş yapın.",
+    "loginRequiredTitle": "Giriş Yapın",
+    "login": "Giriş Yap",
+    "loadMore": "Daha Fazla Göster",
+    "endOfList": "Tüm bildirimler yüklendi",
+    "deleteConfirm": "Bu bildirimi silmek istiyor musunuz?",
+    "delete": "Sil",
+    "cancel": "İptal",
+    "accept": "Kabul Et",
+    "reject": "Reddet",
+    "ok": "Tamam",
+    "done": "Tamam",
+    "rejectionReason": "Reddedilme Sebebi",
+    "joiningShop": "Mağazaya katılınıyor…",
+    "joiningRestaurant": "Restorana katılınıyor…",
+    "invitationRejected": "Davet reddedildi",
+    "invitationAlreadyResponded": "Bu davete daha önce yanıt verilmiş.",
+    "errorGeneric": "Bir hata oluştu. Lütfen tekrar deneyin.",
+    "fallbackTitle": "Bildirim",
+    "shopInvitation": {
+      "title": "Davet",
+      "body": "{inviterName} sizi {shopName} mağazasına davet etti."
+    },
+    "restaurantInvitation": {
+      "title": "Restoran Daveti",
+      "body": "{inviterName} sizi {shopName} restoranına davet etti."
+    },
+    "boosted": {
+      "title": "Öne Çıkarıldı ⚡"
+    },
+    "boost_expired": {
+      "title": "Öne Çıkarma Süresi Doldu",
+      "generic": "\"{productName}\" ürünündeki öne çıkarma süresi doldu.",
+      "adminArchived": "\"{productName}\" ürünü admin tarafından arşivlendiği için öne çıkarma süresi doldu.",
+      "sellerArchived": "\"{productName}\" ürününü arşivlediğiniz için öne çıkarma süresi doldu."
+    },
+    "shipment": {
+      "title": "Kargo Güncellemesi"
+    },
+    "order_delivered": {
+      "title": "Sipariş Teslim Edildi! 🎉"
+    },
     "food_order_status_update": {
       "title": "Yemek Siparişiniz Güncellendi 🔔",
       "accepted": "{restaurantName} siparişinizi onayladı.",
       "rejected": "{restaurantName} siparişinizi reddetti.",
       "preparing": "{restaurantName} siparişinizi hazırlamaya başladı.",
       "ready": "{restaurantName} siparişiniz hazır!",
+      "out_for_delivery": "{restaurantName} siparişiniz yola çıktı!",
       "delivered": "{restaurantName} siparişiniz teslim edildi."
     },
     "food_order_delivered_review": {
@@ -6113,6 +6162,78 @@
     "market_order_delivered_review": {
       "title": "Market Siparişi Teslim Edildi! 🎉",
       "body": "Market siparişiniz ulaştı. Değerlendirme yapmak için tıklayın! ⭐"
+    },
+    "product_archived_by_admin": {
+      "title": "Ürün Arşivlendi",
+      "simple": "\"{productName}\" ürününüz admin tarafından arşivlendi.",
+      "needsUpdate": "\"{productName}\" ürününüz arşivlendi. Sebep: {reason}. Lütfen güncelleyin.",
+      "boostNote": "Bu ürün için aktif olan öne çıkarma da durduruldu."
+    },
+    "refund_request_approved": {
+      "title": "İade Onaylandı ✅",
+      "body": "İade talebiniz onaylandı.",
+      "officeAddress": "İade işleminiz için iade ofisimizi ziyaret edin."
+    },
+    "refund_request_rejected": {
+      "title": "İade Reddedildi",
+      "body": "İade talebiniz reddedildi."
+    },
+    "product_question_answered": {
+      "title": "Sorunuz Yanıtlandı 💬",
+      "body": "Bir ürüne sorduğunuz soru yanıtlandı."
+    },
+    "product_question": {
+      "title": "Ürün Sorusu",
+      "body": "{askerName} ürününüze bir soru sordu."
+    },
+    "product_edit_approved": {
+      "title": "Düzenleme Onaylandı ✅",
+      "body": "Ürün düzenlemeniz onaylandı."
+    },
+    "product_edit_rejected": {
+      "title": "Düzenleme Reddedildi",
+      "body": "Ürün düzenlemeniz reddedildi."
+    },
+    "campaign": {
+      "title": "Kampanya 📣"
+    },
+    "shop_approved": {
+      "title": "Mağaza Onaylandı",
+      "body": "Mağazanızı ziyaret etmek için dokunun."
+    },
+    "shop_disapproved": {
+      "title": "Mağaza Başvurusu Reddedildi",
+      "body": "Mağaza başvurunuz reddedildi."
+    },
+    "product_review": {
+      "title": "Ürün Yorumu"
+    },
+    "product_review_shop": {
+      "title": "Ürün Yorumu"
+    },
+    "product_review_user": {
+      "title": "Ürün Yorumu"
+    },
+    "seller_review_shop": {
+      "title": "Satıcı Yorumu"
+    },
+    "seller_review_user": {
+      "title": "Satıcı Yorumu"
+    },
+    "product_sold_shop": {
+      "title": "Ürün Satıldı"
+    },
+    "product_sold_user": {
+      "title": "Ürün Satıldı"
+    },
+    "product_out_of_stock": {
+      "title": "Stok Tükendi"
+    },
+    "product_out_of_stock_seller_panel": {
+      "title": "Stok Tükendi"
+    },
+    "ad_approved": {
+      "title": "Reklam Onaylandı 📣"
     }
   }
 }

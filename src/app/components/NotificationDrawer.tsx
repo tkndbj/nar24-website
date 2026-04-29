@@ -10,13 +10,21 @@ import {
   LogIn,
   TrendingUp,
   Truck,
-  Store,
   Star,
   AlertCircle,
   HelpCircle,
-  ShoppingBag,
+  ShoppingCart,
   UserPlus,
   Megaphone,
+  Archive,
+  CheckCircle2,
+  XCircle,
+  MessageSquare,
+  Tag,
+  UtensilsCrossed,
+  Receipt,
+  ShieldCheck,
+  ShieldAlert,
 } from "lucide-react";
 import { useUser } from "@/context/UserProvider";
 import { useRouter } from "next/navigation";
@@ -34,6 +42,7 @@ import {
   DocumentSnapshot,
   Timestamp,
 } from "firebase/firestore";
+import { httpsCallable, getFunctions } from "firebase/functions";
 import { db } from "@/lib/firebase";
 
 interface NotificationData {
@@ -47,14 +56,17 @@ interface NotificationData {
   messageRu?: string;
   itemType?: string;
   productId?: string;
+  productName?: string;
   shopId?: string;
+  shopName?: string;
   campaignName?: string;
   campaignDescription?: string;
   transactionId?: string;
   senderId?: string;
   sellerId?: string;
   inviterName?: string;
-  shopName?: string;
+  invitationId?: string;
+  businessType?: string;
   role?: string;
   status?: string;
   rejectionReason?: string;
@@ -62,12 +74,73 @@ interface NotificationData {
   restaurantName?: string;
   orderStatus?: string;
   orderId?: string;
+  // boost_expired carries a `reason` ("admin_archived", "seller_archived" or
+  // anything else for the generic message) plus an optional productName.
+  reason?: string;
+  // product_archived_by_admin carries these three:
+  needsUpdate?: boolean;
+  archiveReason?: string;
+  boostExpired?: boolean;
+  // product_question carries the asker's name for the title body.
+  askerName?: string;
 }
 
 interface NotificationDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   isDarkMode?: boolean;
+}
+
+// Parse a Firestore notification doc into our local shape. Mirrors the
+// fields read by Flutter's NotificationModel.fromFirestore — kept in one
+// place so initial-load and load-more paths can't drift.
+function parseNotificationDoc(
+  docId: string,
+  data: Record<string, unknown>,
+): NotificationData {
+  const payload = (data.payload as Record<string, unknown> | undefined) ?? {};
+  const pick = <T,>(...candidates: unknown[]): T | undefined => {
+    for (const c of candidates) {
+      if (c !== undefined && c !== null) return c as T;
+    }
+    return undefined;
+  };
+
+  return {
+    id: docId,
+    type: (data.type as string) || "general",
+    timestamp: (data.timestamp as Timestamp) || Timestamp.now(),
+    isRead: (data.isRead as boolean) || false,
+    message: data.message as string | undefined,
+    messageEn: data.message_en as string | undefined,
+    messageTr: data.message_tr as string | undefined,
+    messageRu: data.message_ru as string | undefined,
+    itemType: data.itemType as string | undefined,
+    productId: data.productId as string | undefined,
+    productName: data.productName as string | undefined,
+    shopId: data.shopId as string | undefined,
+    shopName: data.shopName as string | undefined,
+    campaignName: data.campaignName as string | undefined,
+    campaignDescription: data.campaignDescription as string | undefined,
+    transactionId: data.transactionId as string | undefined,
+    senderId: data.senderId as string | undefined,
+    sellerId: data.sellerId as string | undefined,
+    inviterName: data.inviterName as string | undefined,
+    invitationId: data.invitationId as string | undefined,
+    businessType: data.businessType as string | undefined,
+    role: data.role as string | undefined,
+    status: data.status as string | undefined,
+    rejectionReason: data.rejectionReason as string | undefined,
+    isShopProduct: data.isShopProduct as boolean | undefined,
+    restaurantName: pick<string>(payload.restaurantName, data.restaurantName),
+    orderStatus: pick<string>(payload.orderStatus, data.orderStatus),
+    orderId: pick<string>(payload.orderId, data.orderId),
+    reason: data.reason as string | undefined,
+    needsUpdate: data.needsUpdate as boolean | undefined,
+    archiveReason: data.archiveReason as string | undefined,
+    boostExpired: data.boostExpired as boolean | undefined,
+    askerName: data.askerName as string | undefined,
+  };
 }
 
 export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
@@ -89,6 +162,22 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
 
   const [isAnimating, setIsAnimating] = useState(false);
   const [shouldRender, setShouldRender] = useState(false);
+
+  // Modal state — different notification types open one of these
+  // dialogs instead of (or before) navigating. Mirrors the
+  // showDialog branches in notification_screen.dart.
+  type DetailModal =
+    | { kind: "refundApproved"; notification: NotificationData }
+    | { kind: "refundRejected"; notification: NotificationData }
+    | { kind: "editRejected"; notification: NotificationData }
+    | { kind: "shopDisapproved"; notification: NotificationData }
+    | {
+        kind: "invitationDecision";
+        notification: NotificationData;
+      }
+    | { kind: "invitationProcessing"; entityName: string; isRestaurant: boolean }
+    | { kind: "toast"; message: string };
+  const [detailModal, setDetailModal] = useState<DetailModal | null>(null);
 
   const LIMIT = 20;
 
@@ -173,33 +262,10 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
           )
             return;
 
-          const notification: NotificationData = {
-            id: doc.id,
-            type: data.type || "general",
-            timestamp: data.timestamp || Timestamp.now(),
-            isRead: data.isRead || false,
-            message: data.message,
-            messageEn: data.message_en,
-            messageTr: data.message_tr,
-            messageRu: data.message_ru,
-            itemType: data.itemType,
-            productId: data.productId,
-            shopId: data.shopId,
-            campaignName: data.campaignName,
-            campaignDescription: data.campaignDescription,
-            transactionId: data.transactionId,
-            senderId: data.senderId,
-            sellerId: data.sellerId,
-            inviterName: data.inviterName,
-            shopName: data.shopName,
-            role: data.role,
-            status: data.status,
-            rejectionReason: data.rejectionReason,
-            isShopProduct: data.isShopProduct,
-            restaurantName: data.payload?.restaurantName ?? data.restaurantName,
-            orderStatus: data.payload?.orderStatus ?? data.orderStatus,
-            orderId: data.payload?.orderId ?? data.orderId,
-          };
+          const notification: NotificationData = parseNotificationDoc(
+            doc.id,
+            data,
+          );
 
           newNotifications.push(notification);
 
@@ -269,104 +335,191 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
     loadMoreNotifications,
   ]);
 
-  // Get notification icon and color
+  // Get notification icon and color — kept in sync with Flutter's
+  // notification_screen.dart switch around line 1356.
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case "shop_invitation":
+      case "restaurant_invitation":
         return { icon: UserPlus, color: "text-orange-500" };
       case "boosted":
       case "boost_expired":
         return { icon: TrendingUp, color: "text-green-500" };
+      case "order_delivered":
+        return { icon: Truck, color: "text-green-500" };
+      case "food_order_status_update":
+        return { icon: UtensilsCrossed, color: "text-orange-500" };
+      case "food_order_delivered_review":
+        return { icon: Star, color: "text-amber-500" };
+      case "market_order_status_update":
+        return { icon: ShoppingCart, color: "text-blue-500" };
+      case "market_order_delivered_review":
+        return { icon: Star, color: "text-blue-400" };
+      case "product_archived_by_admin":
+        return { icon: Archive, color: "text-red-500" };
+      case "product_review":
       case "product_review_shop":
       case "product_review_user":
       case "seller_review_shop":
       case "seller_review_user":
+      case "seller_review":
         return { icon: Star, color: "text-yellow-500" };
-      case "food_order_delivered_review":
-        return { icon: Star, color: "text-amber-500" };
       case "shipment":
-        return { icon: Truck, color: "text-blue-500" };
-      case "market_order_status_update":
-        return { icon: ShoppingBag, color: "text-blue-500" };
-      case "market_order_delivered_review":
-        return { icon: Star, color: "text-blue-400" };
+        return { icon: Truck, color: "text-green-500" };
+      case "product_question_answered":
+        return { icon: MessageSquare, color: "text-green-500" };
       case "shop_approved":
-        return { icon: Store, color: "text-green-500" };
+        return { icon: ShieldCheck, color: "text-green-500" };
       case "shop_disapproved":
-        return { icon: Store, color: "text-red-500" };
+        return { icon: ShieldAlert, color: "text-red-500" };
       case "product_out_of_stock":
       case "product_out_of_stock_seller_panel":
         return { icon: AlertCircle, color: "text-orange-500" };
-      case "food_order_status_update":
-        return { icon: Store, color: "text-orange-500" };
+      case "ad_approved":
       case "campaign":
         return { icon: Megaphone, color: "text-purple-500" };
       case "product_sold_shop":
       case "product_sold_user":
-        return { icon: ShoppingBag, color: "text-green-500" };
+        return { icon: Tag, color: "text-green-500" };
       case "product_question":
         return { icon: HelpCircle, color: "text-blue-500" };
+      case "refund_request_approved":
+        return { icon: CheckCircle2, color: "text-green-500" };
+      case "refund_request_rejected":
+        return { icon: XCircle, color: "text-red-500" };
+      case "product_edit_approved":
+        return { icon: CheckCircle2, color: "text-green-500" };
+      case "product_edit_rejected":
+        return { icon: XCircle, color: "text-red-500" };
       default:
-        return { icon: Bell, color: "text-gray-500" };
+        return { icon: Bell, color: "text-orange-500" };
     }
   };
 
-  // Get notification title
-  const getNotificationTitle = (type: string) => {
-    switch (type) {
-      case "product_sold_shop":
-      case "product_sold_user":
-        return "Ürün Satıldı";
-      case "shop_invitation":
-        return "Davet";
-      case "boosted":
-        return "Yükseltildi";
-      case "boost_expired":
-        return "Yükseltme Süresi Doldu";
-      case "food_order_delivered_review":
-        return t("food_order_delivered_review.title");
-      case "market_order_status_update":
-        return t("market_order_status_update.title");
-      case "market_order_delivered_review":
-        return t("market_order_delivered_review.title");
-      case "shipment":
-        return "Kargo";
-      case "shop_approved":
-        return "Mağaza Onaylandı";
-      case "shop_disapproved":
-        return "Mağaza Reddedildi";
-      case "product_review_shop":
-      case "product_review_user":
-        return "Ürün Yorumu";
-      case "seller_review_shop":
-      case "seller_review_user":
-        return "Satıcı Yorumu";
-      case "product_out_of_stock":
-      case "product_out_of_stock_seller_panel":
-        return "Stok Tükendi";
-      case "food_order_status_update":
-        return t("food_order_status_update.title");
-      case "campaign":
-        return "Kampanya";
-      case "product_question":
-        return "Ürün Sorusu";
-      default:
-        return "Bildirim";
+  // Get notification title — every type maps to a translatable key.
+  // For unknown types we fall through to the generic "Notification"
+  // label rather than leaving the field blank.
+  const getNotificationTitle = (
+    notification: NotificationData,
+  ): string => {
+    const type = notification.type;
+    // Campaign: prefer the seller-supplied campaign name as the title
+    // (matches Flutter's row at line 1524). Falls back to the localized
+    // "Campaign" label if absent.
+    if (type === "campaign") {
+      return notification.campaignName || t("campaign.title");
     }
+
+    const titleKeys: Record<string, string> = {
+      shop_invitation: "shopInvitation.title",
+      restaurant_invitation: "restaurantInvitation.title",
+      boosted: "boosted.title",
+      boost_expired: "boost_expired.title",
+      order_delivered: "order_delivered.title",
+      food_order_status_update: "food_order_status_update.title",
+      food_order_delivered_review: "food_order_delivered_review.title",
+      market_order_status_update: "market_order_status_update.title",
+      market_order_delivered_review: "market_order_delivered_review.title",
+      product_archived_by_admin: "product_archived_by_admin.title",
+      shipment: "shipment.title",
+      shop_approved: "shop_approved.title",
+      shop_disapproved: "shop_disapproved.title",
+      product_review: "product_review.title",
+      product_review_shop: "product_review_shop.title",
+      product_review_user: "product_review_user.title",
+      seller_review_shop: "seller_review_shop.title",
+      seller_review_user: "seller_review_user.title",
+      seller_review: "seller_review_user.title",
+      product_question_answered: "product_question_answered.title",
+      product_question: "product_question.title",
+      product_edit_approved: "product_edit_approved.title",
+      product_edit_rejected: "product_edit_rejected.title",
+      product_out_of_stock: "product_out_of_stock.title",
+      product_out_of_stock_seller_panel: "product_out_of_stock_seller_panel.title",
+      product_sold_shop: "product_sold_shop.title",
+      product_sold_user: "product_sold_user.title",
+      refund_request_approved: "refund_request_approved.title",
+      refund_request_rejected: "refund_request_rejected.title",
+      ad_approved: "ad_approved.title",
+    };
+
+    const key = titleKeys[type];
+    return key ? t(key) : t("fallbackTitle");
   };
 
-  // Get notification message with i18n support
+  // Get notification body. For types where we localize on the client
+  // (boost_expired variants, food/market status updates, archived-by-admin,
+  // invitations, shop approval, etc.) we synthesize a message from fields
+  // on the doc — same as Flutter's switch around line 1251. For everything
+  // else we fall through to the server-localized message_{en,tr,ru} fields.
   const getNotificationMessage = (notification: NotificationData): string => {
     switch (notification.type) {
+      case "shop_invitation":
+        return t("shopInvitation.body", {
+          inviterName: notification.inviterName ?? "",
+          shopName: notification.shopName ?? "",
+        });
+
+      case "restaurant_invitation":
+        return t("restaurantInvitation.body", {
+          inviterName: notification.inviterName ?? "",
+          shopName: notification.shopName ?? "",
+        });
+
+      case "boost_expired": {
+        const productName = notification.productName ?? "";
+        const reason = notification.reason ?? "";
+        if (reason === "admin_archived") {
+          return t("boost_expired.adminArchived", { productName });
+        }
+        if (reason === "seller_archived") {
+          return t("boost_expired.sellerArchived", { productName });
+        }
+        return t("boost_expired.generic", { productName });
+      }
+
+      case "product_archived_by_admin": {
+        const productName = notification.productName ?? "";
+        const reason = notification.archiveReason ?? "";
+        const needsUpdate = notification.needsUpdate ?? false;
+        const base =
+          needsUpdate && reason
+            ? t("product_archived_by_admin.needsUpdate", {
+                productName,
+                reason,
+              })
+            : t("product_archived_by_admin.simple", { productName });
+        return notification.boostExpired
+          ? `${base} ${t("product_archived_by_admin.boostNote")}`
+          : base;
+      }
+
       case "food_order_delivered_review":
         return t("food_order_delivered_review.body", {
           restaurantName: notification.restaurantName ?? "",
         });
 
-      case "food_order_status_update":
-        return t(`food_order_status_update.${notification.orderStatus}`, {
-          restaurantName: notification.restaurantName ?? "",
-        });
+      case "food_order_status_update": {
+        // Only show a body if the orderStatus is one we have a string for.
+        // Flutter falls back to the bare restaurant name for unknown
+        // statuses; we mirror that.
+        const valid = [
+          "accepted",
+          "rejected",
+          "preparing",
+          "ready",
+          "out_for_delivery",
+          "delivered",
+        ];
+        const status = notification.orderStatus ?? "";
+        if (valid.includes(status)) {
+          return t(`food_order_status_update.${status}`, {
+            restaurantName: notification.restaurantName ?? "",
+          });
+        }
+        return notification.restaurantName ?? "";
+      }
+
       case "market_order_status_update":
         switch (notification.orderStatus) {
           case "out_for_delivery":
@@ -379,11 +532,40 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
 
       case "market_order_delivered_review":
         return t("market_order_delivered_review.body");
-      default: {
-        if (locale === "en") {
-          return notification.messageEn || notification.message || "";
+
+      case "shop_approved":
+        return notification.message || t("shop_approved.body");
+      case "shop_disapproved":
+        return notification.message || t("shop_disapproved.body");
+      case "refund_request_approved":
+        return notification.message || t("refund_request_approved.body");
+      case "refund_request_rejected":
+        return notification.message || t("refund_request_rejected.body");
+      case "product_edit_approved":
+        return notification.message || t("product_edit_approved.body");
+      case "product_edit_rejected":
+        return notification.message || t("product_edit_rejected.body");
+      case "product_question_answered":
+        return notification.message || t("product_question_answered.body");
+      case "product_question":
+        if (notification.askerName) {
+          return t("product_question.body", {
+            askerName: notification.askerName,
+          });
         }
-        return notification.messageTr || notification.message || "";
+        return notification.message ?? "";
+
+      case "campaign":
+        return notification.campaignDescription || notification.message || "";
+
+      default: {
+        if (locale === "tr") {
+          return notification.messageTr || notification.message || "";
+        }
+        if (locale === "ru") {
+          return notification.messageRu || notification.message || "";
+        }
+        return notification.messageEn || notification.message || "";
       }
     }
   };
@@ -447,11 +629,18 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
           snapshot.docs.forEach((doc) => {
             const data = doc.data();
 
-            // Filter out message types and answered invitations
+            // Filter out message types and already-actioned invitations.
+            // Mirrors notification_screen.dart: shop_invitation and
+            // restaurant_invitation rows are dropped once status is
+            // accepted/rejected/cancelled — keeps the drawer from
+            // showing dead invitations after a CF response.
             if (data.type === "message") return;
             if (
-              data.type === "shop_invitation" &&
-              (data.status === "accepted" || data.status === "rejected")
+              (data.type === "shop_invitation" ||
+                data.type === "restaurant_invitation") &&
+              (data.status === "accepted" ||
+                data.status === "rejected" ||
+                data.status === "cancelled")
             )
               return;
 
@@ -560,61 +749,266 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
     }
   };
 
-  // Handle notification tap
+  // Handle notification tap. Mirrors notification_screen.dart's switch
+  // around line 457, but routes target the website's actual paths
+  // (which differ from Flutter's go_router routes — see comments inline).
+  // Types that are seller-panel-only on Flutter (product_review_shop,
+  // seller_review_shop, product_sold_shop, product_out_of_stock_seller_panel,
+  // product_question for shops, shop_approved, campaign-as-seller) don't
+  // have a corresponding consumer-website screen, so we just close the
+  // drawer and let the user read the body. Marking-as-read still happens.
   const handleNotificationTap = (notification: NotificationData) => {
-    onClose();
+    const type = notification.type;
 
-    switch (notification.type) {
+    // Modal-only types — open the dialog without closing the drawer.
+    if (type === "refund_request_approved") {
+      setDetailModal({ kind: "refundApproved", notification });
+      return;
+    }
+    if (type === "refund_request_rejected") {
+      setDetailModal({ kind: "refundRejected", notification });
+      return;
+    }
+    if (type === "product_edit_rejected") {
+      setDetailModal({ kind: "editRejected", notification });
+      return;
+    }
+    if (type === "shop_disapproved") {
+      setDetailModal({ kind: "shopDisapproved", notification });
+      return;
+    }
+    if (type === "shop_invitation" || type === "restaurant_invitation") {
+      setDetailModal({ kind: "invitationDecision", notification });
+      return;
+    }
+
+    // Navigation types — close drawer, then push.
+    switch (type) {
       case "boosted":
-      case "boost_expired":
-        if (notification.productId) {
-          router.push(`/boost/${notification.productId}`);
+      case "boost_expired": {
+        // Flutter: BoostScreen with productId for personal products,
+        // seller-panel route for shop products. Web is consumer-only,
+        // so we route to /boost?productId=... regardless and let the
+        // boost page show "not yours" if the product is shop-owned.
+        const productId = notification.productId;
+        if (productId) {
+          onClose();
+          router.push(`/boost?productId=${productId}`);
         }
         break;
-      case "product_edit_approved":
-        if (notification.productId) {
-          router.push(`/product/${notification.productId}`);
-        }
+      }
+
+      case "food_order_status_update":
+        onClose();
+        router.push("/food-orders");
         break;
+
       case "food_order_delivered_review":
+        onClose();
         router.push("/reviews");
         break;
-      case "product_review":
-        if (notification.productId) {
-          router.push(`/product/${notification.productId}`);
-        }
-        break;
-      case "shipment":
-        if (notification.transactionId) {
-          router.push(`/orders/${notification.transactionId}`);
-        }
-        break;
-      case "shop_approved":
-        if (notification.shopId) {
-          router.push(`/seller-panel?shopId=${notification.shopId}`);
-        }
-        break;
-      case "product_sold_user":
-        router.push("/my-orders?tab=1");
-        break;
-      case "food_order_status_update":
-        router.push("/orders?tab=food");
-        break;
+
       case "market_order_status_update":
-        router.push("/orders?tab=market"); // adjust to your actual web route
+        onClose();
+        router.push("/market-orders");
         break;
 
       case "market_order_delivered_review":
-        if (notification.orderId) {
-          router.push(`/market-order/${notification.orderId}`); // adjust to your actual web route
+        // Flutter routes to /my-reviews when an orderId is present,
+        // otherwise to /my-market-orders. The web equivalent is
+        // /reviews and /market-orders respectively.
+        onClose();
+        router.push(notification.orderId ? "/reviews" : "/market-orders");
+        break;
+
+      case "order_delivered":
+        onClose();
+        router.push("/reviews");
+        break;
+
+      case "product_archived_by_admin":
+        onClose();
+        router.push("/archived");
+        break;
+
+      case "product_question_answered":
+        onClose();
+        router.push("/productquestions");
+        break;
+
+      case "product_edit_approved": {
+        const productId = notification.productId;
+        if (productId) {
+          onClose();
+          router.push(`/productdetail/${productId}`);
         } else {
-          router.push("/orders?tab=market");
+          setDetailModal({
+            kind: "toast",
+            message: t("errorGeneric"),
+          });
         }
         break;
+      }
+
+      case "product_review":
+      case "product_review_user": {
+        const productId = notification.productId;
+        if (productId) {
+          onClose();
+          router.push(`/productdetail/${productId}`);
+        }
+        break;
+      }
+
+      case "seller_review_user": {
+        const sellerId = notification.sellerId;
+        if (sellerId) {
+          onClose();
+          router.push(`/user-profile/${sellerId}`);
+        }
+        break;
+      }
+
+      case "product_out_of_stock": {
+        const productId = notification.productId;
+        if (productId) {
+          onClose();
+          router.push(`/productdetail/${productId}`);
+        }
+        break;
+      }
+
+      case "shipment":
+        // Flutter opens ShipmentStatusScreen(orderId: transactionId).
+        // The website doesn't have a per-order detail page yet, so we
+        // route to the orders list and let the user pick.
+        onClose();
+        router.push("/orders");
+        break;
+
+      case "product_sold_user":
+        // Flutter: /my_orders?tab=1. Web has /orders.
+        onClose();
+        router.push("/orders?tab=1");
+        break;
+
+      case "product_question": {
+        // Buyer side only — questions about products you own as a
+        // shop seller go to the seller panel which the consumer site
+        // doesn't have. For asks-on-your-personal-products we send
+        // them to the product questions page.
+        if (notification.isShopProduct) {
+          // No-op on consumer site.
+          break;
+        }
+        onClose();
+        router.push("/productquestions");
+        break;
+      }
+
+      // Seller-only types: close the drawer but don't navigate.
+      case "shop_approved":
+      case "campaign":
+      case "ad_approved":
+      case "product_sold_shop":
+      case "product_review_shop":
+      case "seller_review_shop":
+      case "seller_review":
+      case "product_out_of_stock_seller_panel":
       default:
+        // Close the drawer; the read-mark already happened on render.
+        onClose();
         break;
     }
   };
+
+  // Accept / reject a shop or restaurant invitation. Mirrors Flutter's
+  // _handleInvitationResponse — calls the same `handleShopInvitation`
+  // callable in europe-west3 with {invitationId, accepted, shopId, role}.
+  // On accept we force-refresh the auth token so any new shopId claim
+  // applied server-side is picked up immediately.
+  const handleInvitationResponse = useCallback(
+    async (notification: NotificationData, accepted: boolean) => {
+      const isRestaurant = notification.businessType === "restaurant";
+      const entityName = notification.shopName ?? "";
+
+      if (accepted) {
+        setDetailModal({
+          kind: "invitationProcessing",
+          entityName,
+          isRestaurant,
+        });
+      }
+
+      try {
+        const callable = httpsCallable<
+          {
+            invitationId?: string;
+            accepted: boolean;
+            shopId?: string;
+            role?: string;
+          },
+          { shouldRefreshToken?: boolean }
+        >(getFunctions(undefined, "europe-west3"), "handleShopInvitation");
+
+        const result = await callable({
+          invitationId: notification.invitationId,
+          accepted,
+          shopId: notification.shopId,
+          role: notification.role,
+        });
+
+        if (accepted) {
+          if (result.data?.shouldRefreshToken) {
+            await user?.getIdToken(true);
+          }
+          // The notification doc gets status=accepted by the CF; remove
+          // it from the local list so the user sees an immediate state
+          // change rather than waiting for the snapshot to re-emit.
+          setNotifications((prev) =>
+            prev.filter((n) => n.id !== notification.id),
+          );
+          setDetailModal(null);
+          onClose();
+        } else {
+          setNotifications((prev) =>
+            prev.filter((n) => n.id !== notification.id),
+          );
+          setDetailModal({
+            kind: "toast",
+            message: t("invitationRejected"),
+          });
+        }
+      } catch (err: unknown) {
+        // The CF returns not-found / failed-precondition when the
+        // invitation has already been actioned (e.g. on another device).
+        // Treat that as a no-op success: drop the row and show a hint.
+        const code =
+          err && typeof err === "object" && "code" in err
+            ? String((err as { code: unknown }).code)
+            : "";
+        if (
+          code === "functions/not-found" ||
+          code === "functions/failed-precondition"
+        ) {
+          setNotifications((prev) =>
+            prev.filter((n) => n.id !== notification.id),
+          );
+          setDetailModal({
+            kind: "toast",
+            message: t("invitationAlreadyResponded"),
+          });
+        } else {
+          console.error("handleShopInvitation error:", err);
+          setDetailModal({
+            kind: "toast",
+            message: t("errorGeneric"),
+          });
+        }
+      }
+    },
+    [user, onClose, t],
+  );
 
   // Initialize notifications when drawer opens
   useEffect(() => {
@@ -694,7 +1088,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
                     ${isDarkMode ? "text-white" : "text-gray-900"}
                   `}
                 >
-                  Bildirimler
+                  {t("header")}
                 </h2>
                 {user && notifications.length > 0 && (
                   <p
@@ -703,7 +1097,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
                       ${isDarkMode ? "text-gray-400" : "text-gray-500"}
                     `}
                   >
-                    {notifications.length} bildirim
+                    {t("count", { count: notifications.length })}
                   </p>
                 )}
               </div>
@@ -748,7 +1142,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
                     ${isDarkMode ? "text-white" : "text-gray-900"}
                   `}
                 >
-                  Giriş Yapın
+                  {t("loginRequiredTitle")}
                 </h3>
                 <p
                   className={`
@@ -756,7 +1150,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
                     ${isDarkMode ? "text-gray-400" : "text-gray-600"}
                   `}
                 >
-                  Bildirimlerinizi görüntülemek için lütfen giriş yapın.
+                  {t("loginRequired")}
                 </p>
                 <button
                   onClick={() => {
@@ -772,7 +1166,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
                   "
                 >
                   <LogIn size={18} />
-                  <span className="font-medium">Giriş Yap</span>
+                  <span className="font-medium">{t("login")}</span>
                 </button>
               </div>
             ) : /* Loading State */ isLoading && notifications.length === 0 ? (
@@ -784,7 +1178,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
                     ${isDarkMode ? "text-gray-400" : "text-gray-600"}
                   `}
                 >
-                  Bildirimleriniz yükleniyor...
+                  {t("loading")}
                 </p>
               </div>
             ) : /* Empty Notifications State */ notifications.length === 0 ? (
@@ -806,7 +1200,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
                     ${isDarkMode ? "text-white" : "text-gray-900"}
                   `}
                 >
-                  Bildirim Yok
+                  {t("emptyTitle")}
                 </h3>
                 <p
                   className={`
@@ -814,7 +1208,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
                     ${isDarkMode ? "text-gray-400" : "text-gray-600"}
                   `}
                 >
-                  Henüz hiç bildiriminiz bulunmuyor.
+                  {t("empty")}
                 </p>
               </div>
             ) : (
@@ -859,10 +1253,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between mb-1">
                                 <h4 className="text-sm font-bold text-orange-500">
-                                  {notification.type === "campaign"
-                                    ? notification.campaignName ||
-                                      getNotificationTitle(notification.type)
-                                    : getNotificationTitle(notification.type)}
+                                  {getNotificationTitle(notification)}
                                 </h4>
                                 <button
                                   onClick={(e) => {
@@ -934,7 +1325,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
                     <div className="flex justify-center py-6">
                       <div className="flex items-center space-x-2 text-sm text-gray-500">
                         <RefreshCw size={16} className="animate-spin" />
-                        <span>Daha fazla bildirim yükleniyor...</span>
+                        <span>{t("loadingMore")}</span>
                       </div>
                     </div>
                   )}
@@ -947,7 +1338,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
                           isDarkMode ? "text-gray-400" : "text-gray-500"
                         }`}
                       >
-                        Tüm bildirimler yüklendi
+                        {t("endOfList")}
                       </p>
                     </div>
                   )}
@@ -968,7 +1359,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
                           }
                         `}
                         >
-                          Daha Fazla Göster
+                          {t("loadMore")}
                         </button>
                       </div>
                     )}
@@ -976,6 +1367,242 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
               </div>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* Modal layer — sits above the drawer (z-[1100] vs drawer's
+          z-[1000]) so dialogs from drawer rows can't be hidden by it. */}
+      {detailModal && (
+        <DetailModalRenderer
+          modal={detailModal}
+          isDarkMode={isDarkMode}
+          t={t}
+          onClose={() => setDetailModal(null)}
+          onAccept={(n) => handleInvitationResponse(n, true)}
+          onReject={(n) => handleInvitationResponse(n, false)}
+        />
+      )}
+    </div>
+  );
+};
+
+// ─── Detail modal renderer ──────────────────────────────────────────
+// Centralized modal layer for refund/edit-rejected/shop-disapproved/
+// invitation flows. Pulled out of the main component to keep the
+// drawer body readable and so the same dialog primitives can serve all
+// six modal kinds without nested JSX.
+
+interface DetailModalRendererProps {
+  modal:
+    | { kind: "refundApproved"; notification: NotificationData }
+    | { kind: "refundRejected"; notification: NotificationData }
+    | { kind: "editRejected"; notification: NotificationData }
+    | { kind: "shopDisapproved"; notification: NotificationData }
+    | { kind: "invitationDecision"; notification: NotificationData }
+    | { kind: "invitationProcessing"; entityName: string; isRestaurant: boolean }
+    | { kind: "toast"; message: string };
+  isDarkMode: boolean;
+  t: ReturnType<typeof useTranslations>;
+  onClose: () => void;
+  onAccept: (n: NotificationData) => void;
+  onReject: (n: NotificationData) => void;
+}
+
+const DetailModalRenderer: React.FC<DetailModalRendererProps> = ({
+  modal,
+  isDarkMode,
+  t,
+  onClose,
+  onAccept,
+  onReject,
+}) => {
+  // Auto-dismiss the toast variant after 2.5s. Other modal kinds stay
+  // open until the user clicks an action button — invitations in
+  // particular need an explicit decision so we never auto-close them.
+  useEffect(() => {
+    if (modal.kind !== "toast") return;
+    const timer = setTimeout(onClose, 2500);
+    return () => clearTimeout(timer);
+  }, [modal, onClose]);
+
+  // Lock body scroll while a modal is open and close on Escape.
+  // Skip the scroll lock for the toast variant since it's a small
+  // banner that doesn't block the page.
+  useEffect(() => {
+    if (modal.kind === "toast") return;
+    const original = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && modal.kind !== "invitationProcessing") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = original;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [modal, onClose]);
+
+  if (modal.kind === "toast") {
+    return (
+      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[1200] px-4 py-2 rounded-lg bg-gray-900 text-white text-sm shadow-xl">
+        {modal.message}
+      </div>
+    );
+  }
+
+  if (modal.kind === "invitationProcessing") {
+    return (
+      <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/50">
+        <div
+          className={`px-6 py-5 rounded-2xl shadow-2xl flex flex-col items-center gap-3 max-w-xs w-full mx-4 ${
+            isDarkMode ? "bg-gray-900 text-white" : "bg-white text-gray-900"
+          }`}
+        >
+          <div className="w-10 h-10 border-[3px] border-emerald-200 border-t-emerald-500 rounded-full animate-spin" />
+          <p className="text-sm font-semibold text-center">
+            {modal.isRestaurant
+              ? t("joiningRestaurant")
+              : t("joiningShop")}
+          </p>
+          {modal.entityName && (
+            <p
+              className={`text-xs text-center ${
+                isDarkMode ? "text-gray-400" : "text-gray-500"
+              }`}
+            >
+              {modal.entityName}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const sheetClass = isDarkMode
+    ? "bg-gray-900 border-gray-800 text-gray-100"
+    : "bg-white border-gray-200 text-gray-900";
+
+  // Decision modal (shop / restaurant invitation): two action buttons.
+  if (modal.kind === "invitationDecision") {
+    const n = modal.notification;
+    const isRestaurant = n.businessType === "restaurant";
+    const titleKey = isRestaurant
+      ? "restaurantInvitation.title"
+      : "shopInvitation.title";
+    const bodyKey = isRestaurant
+      ? "restaurantInvitation.body"
+      : "shopInvitation.body";
+    return (
+      <div
+        className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+        onClick={onClose}
+      >
+        <div
+          className={`max-w-sm w-full rounded-2xl border shadow-2xl ${sheetClass}`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="px-5 pt-5 pb-3">
+            <h3 className="text-base font-bold mb-2">{t(titleKey)}</h3>
+            <p className="text-sm">
+              {t(bodyKey, {
+                inviterName: n.inviterName ?? "",
+                shopName: n.shopName ?? "",
+              })}
+            </p>
+          </div>
+          <div
+            className={`flex gap-2 px-4 py-3 border-t ${
+              isDarkMode ? "border-gray-800" : "border-gray-100"
+            }`}
+          >
+            <button
+              onClick={() => onReject(n)}
+              className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
+                isDarkMode
+                  ? "bg-gray-800 hover:bg-gray-700 text-gray-200"
+                  : "bg-gray-100 hover:bg-gray-200 text-gray-800"
+              }`}
+            >
+              {t("reject")}
+            </button>
+            <button
+              onClick={() => onAccept(n)}
+              className="flex-1 py-2.5 rounded-lg text-sm font-semibold bg-emerald-500 hover:bg-emerald-600 text-white transition-colors"
+            >
+              {t("accept")}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Reason-style dialogs (refund approved/rejected, edit rejected,
+  // shop disapproved). All four share the same shape: a title, a body
+  // paragraph, an optional rejection-reason callout, and a single OK.
+  const n = modal.notification;
+  const titleByKind: Record<typeof modal.kind, string> = {
+    refundApproved: "refund_request_approved.title",
+    refundRejected: "refund_request_rejected.title",
+    editRejected: "product_edit_rejected.title",
+    shopDisapproved: "shop_disapproved.title",
+  };
+  const bodyByKind: Record<typeof modal.kind, string> = {
+    refundApproved: "refund_request_approved.body",
+    refundRejected: "refund_request_rejected.body",
+    editRejected: "product_edit_rejected.body",
+    shopDisapproved: "shop_disapproved.body",
+  };
+  const showReason =
+    modal.kind === "refundRejected" ||
+    modal.kind === "editRejected" ||
+    modal.kind === "shopDisapproved";
+  const reason = n.rejectionReason?.trim();
+  const showRefundOffice = modal.kind === "refundApproved";
+
+  return (
+    <div
+      className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className={`max-w-md w-full rounded-2xl border shadow-2xl ${sheetClass}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-5 pt-5 pb-3 space-y-3">
+          <h3 className="text-base font-bold">{t(titleByKind[modal.kind])}</h3>
+          <p className="text-sm whitespace-pre-line">
+            {n.message || t(bodyByKind[modal.kind])}
+          </p>
+          {showRefundOffice && (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 dark:bg-emerald-500/10 dark:border-emerald-500/20 px-3 py-2 text-xs text-emerald-800 dark:text-emerald-200">
+              {t("refund_request_approved.officeAddress")}
+            </div>
+          )}
+          {showReason && reason && (
+            <div className="rounded-lg border border-red-200 bg-red-50 dark:bg-red-500/10 dark:border-red-500/20 px-3 py-2">
+              <p className="text-xs font-semibold text-red-700 dark:text-red-300 mb-1">
+                {t("rejectionReason")}
+              </p>
+              <p className="text-sm text-red-800 dark:text-red-200 whitespace-pre-line">
+                {reason}
+              </p>
+            </div>
+          )}
+        </div>
+        <div
+          className={`px-4 py-3 border-t ${
+            isDarkMode ? "border-gray-800" : "border-gray-100"
+          }`}
+        >
+          <button
+            onClick={onClose}
+            className="w-full py-2.5 rounded-lg text-sm font-semibold bg-emerald-500 hover:bg-emerald-600 text-white transition-colors"
+          >
+            {t("ok")}
+          </button>
         </div>
       </div>
     </div>

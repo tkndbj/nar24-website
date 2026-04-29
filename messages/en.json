@@ -6081,12 +6081,61 @@
   "foodExtraWhippedCream": "Whipped Cream",
   "foodExtraIce": "Ice",
   "NotificationDrawer": {
+    "header": "Notifications",
+    "count": "{count} notifications",
+    "loading": "Loading your notifications…",
+    "loadingMore": "Loading more notifications…",
+    "empty": "No notifications yet.",
+    "emptyTitle": "No Notifications",
+    "loginRequired": "Please log in to view your notifications.",
+    "loginRequiredTitle": "Log in",
+    "login": "Log in",
+    "loadMore": "Show more",
+    "endOfList": "All notifications loaded",
+    "deleteConfirm": "Delete this notification?",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "accept": "Accept",
+    "reject": "Reject",
+    "ok": "OK",
+    "done": "Done",
+    "rejectionReason": "Reason for rejection",
+    "joiningShop": "Joining shop…",
+    "joiningRestaurant": "Joining restaurant…",
+    "invitationRejected": "Invitation rejected",
+    "invitationAlreadyResponded": "This invitation has already been responded to.",
+    "errorGeneric": "Something went wrong. Please try again.",
+    "fallbackTitle": "Notification",
+    "shopInvitation": {
+      "title": "Invitation",
+      "body": "{inviterName} has invited you to join {shopName}."
+    },
+    "restaurantInvitation": {
+      "title": "Restaurant Invitation",
+      "body": "{inviterName} has invited you to join {shopName}."
+    },
+    "boosted": {
+      "title": "Boosted ⚡"
+    },
+    "boost_expired": {
+      "title": "Boost Expired",
+      "generic": "The boost on \"{productName}\" has expired.",
+      "adminArchived": "The boost on \"{productName}\" expired because the product was archived by an admin.",
+      "sellerArchived": "The boost on \"{productName}\" expired because you archived the product."
+    },
+    "shipment": {
+      "title": "Shipment Update"
+    },
+    "order_delivered": {
+      "title": "Order Delivered! 🎉"
+    },
     "food_order_status_update": {
       "title": "Food Order Status Updated 🔔",
       "accepted": "{restaurantName} accepted your food order.",
       "rejected": "{restaurantName} rejected your food order.",
       "preparing": "{restaurantName} started preparing your food order.",
       "ready": "{restaurantName} your food order is ready!",
+      "out_for_delivery": "{restaurantName} your food order is on the way!",
       "delivered": "{restaurantName} your food order is delivered."
     },
     "food_order_delivered_review": {
@@ -6101,6 +6150,78 @@
     "market_order_delivered_review": {
       "title": "Market Order Delivered! 🎉",
       "body": "Your market order has arrived. Tap to leave a review! ⭐"
+    },
+    "product_archived_by_admin": {
+      "title": "Product Archived",
+      "simple": "Your product \"{productName}\" was archived by an admin.",
+      "needsUpdate": "Your product \"{productName}\" was archived. Reason: {reason}. Please update it.",
+      "boostNote": "Any active boost on this product was also stopped."
+    },
+    "refund_request_approved": {
+      "title": "Refund Approved ✅",
+      "body": "Your refund request has been approved.",
+      "officeAddress": "Visit our refund office to receive your refund."
+    },
+    "refund_request_rejected": {
+      "title": "Refund Rejected",
+      "body": "Your refund request has been rejected."
+    },
+    "product_question_answered": {
+      "title": "Question Answered 💬",
+      "body": "Your question on a product has been answered."
+    },
+    "product_question": {
+      "title": "Product Question",
+      "body": "{askerName} asked a question about your product."
+    },
+    "product_edit_approved": {
+      "title": "Edit Approved ✅",
+      "body": "Your product edit was approved."
+    },
+    "product_edit_rejected": {
+      "title": "Edit Rejected",
+      "body": "Your product edit was rejected."
+    },
+    "campaign": {
+      "title": "Campaign 📣"
+    },
+    "shop_approved": {
+      "title": "Shop Approved",
+      "body": "Tap to visit your shop."
+    },
+    "shop_disapproved": {
+      "title": "Shop Application Rejected",
+      "body": "Your shop application was rejected."
+    },
+    "product_review": {
+      "title": "Product Review"
+    },
+    "product_review_shop": {
+      "title": "Product Review"
+    },
+    "product_review_user": {
+      "title": "Product Review"
+    },
+    "seller_review_shop": {
+      "title": "Seller Review"
+    },
+    "seller_review_user": {
+      "title": "Seller Review"
+    },
+    "product_sold_shop": {
+      "title": "Product Sold"
+    },
+    "product_sold_user": {
+      "title": "Product Sold"
+    },
+    "product_out_of_stock": {
+      "title": "Out of Stock"
+    },
+    "product_out_of_stock_seller_panel": {
+      "title": "Out of Stock"
+    },
+    "ad_approved": {
+      "title": "Ad Approved 📣"
     }
   }
 }
