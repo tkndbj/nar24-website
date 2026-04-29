@@ -554,31 +554,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   // HELPER FUNCTIONS
   // ========================================================================
 
-  const getProductShopId = useCallback(
-    async (productId: string): Promise<string | null> => {
-      if (!db) return null;
-      try {
-        const shopProductDoc = await getDoc(
-          doc(db, "shop_products", productId),
-        );
-        if (shopProductDoc.exists()) {
-          const data = shopProductDoc.data();
-          return (data?.shopId as string) || null;
-        }
-        const productDoc = await getDoc(doc(db, "products", productId));
-        if (productDoc.exists()) {
-          const data = productDoc.data();
-          return (data?.shopId as string) || null;
-        }
-        return null;
-      } catch (error) {
-        console.warn("⚠️ Failed to get product shopId:", error);
-        return null;
-      }
-    },
-    [db],
-  );
-
   const clearOptimisticUpdate = useCallback((productId: string) => {
     optimisticCacheRef.current.delete(productId);
     const timer = optimisticTimeoutsRef.current.get(productId);
@@ -1235,11 +1210,11 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       return;
     }
 
-    const loadPromise = (async () => {
-      setIsLoading(true);
-      lastDocumentRef.current = null;
-      setHasMore(true);
+    setIsLoading(true);
+    lastDocumentRef.current = null;
+    setHasMore(true);
 
+    const loadPromise = (async () => {
       try {
         const cartQuery = query(
           collection(db, "users", user.uid, "cart"),
@@ -1261,10 +1236,11 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
         setIsInitialized(true);
 
-        // Best-effort reconcile (non-blocking semantics)
-        reconcileCartIds();
+        // Await reconciliation (matches Flutter)
+        await reconcileCartIds();
       } catch (error) {
         console.error("❌ Cart load error:", error);
+        throw error;
       } finally {
         setIsLoading(false);
       }
@@ -1273,6 +1249,8 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     pendingFetchesRef.current.set("init", loadPromise);
     try {
       await loadPromise;
+    } catch {
+      // Already logged inside; surface to caller via the awaiter chain
     } finally {
       pendingFetchesRef.current.delete("init");
     }
@@ -1353,7 +1331,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       newIds.add(productId);
       setCartProductIds(newIds);
       setCartCount(newIds.size);
-      updateLocalProfileField("cartItemIds", [...newIds]);
 
       const timeout = setTimeout(() => {
         if (optimisticCacheRef.current.has(productId)) {
@@ -1367,7 +1344,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     [
       clearOptimisticUpdate,
       buildProductFromCartData,
-      updateLocalProfileField,
       createCartItem,
     ],
   );
@@ -1401,9 +1377,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     ): Promise<string> => {
       if (!user) return "Please log in first";
       if (!db) return "Loading...";
-      if (!isInitialized) {
-        await initializeCartIfNeeded();
-      }
 
       if (!addToCartLimiterRef.current.canProceed(`add_${product.id}`)) {
         return "Please wait before adding again";
@@ -1466,6 +1439,13 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
         clearOptimisticUpdate(product.id);
 
+        // Optimistic local sync of user doc cartItemIds (matches Flutter)
+        const currentIds = [
+          ...(getProfileField<string[]>("cartItemIds") ?? []),
+        ];
+        if (!currentIds.includes(product.id)) currentIds.push(product.id);
+        updateLocalProfileField("cartItemIds", currentIds);
+
         userActivityService.trackAddToCart({
           productId: product.id,
           shopId: product.shopId,
@@ -1479,10 +1459,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           quantity,
         });
 
-        const shopId = await getProductShopId(product.id);
         metricsEventService.logCartAdded({
           productId: product.id,
-          shopId,
+          shopId: product.shopId ?? null,
         });
 
         console.log("✅ Added to cart:", product.id);
@@ -1500,13 +1479,12 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     [
       user,
       db,
-      isInitialized,
-      initializeCartIfNeeded,
       applyOptimisticAdd,
       rollbackOptimisticUpdate,
       backgroundRefreshTotals,
-      getProductShopId,
       clearOptimisticUpdate,
+      getProfileField,
+      updateLocalProfileField,
     ],
   );
 
@@ -1610,6 +1588,22 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       try {
         applyOptimisticRemove(productId);
 
+        // Read cart data for analytics before deleting (matches Flutter)
+        let cartData: FirestoreCartData | undefined;
+        try {
+          const cartDocSnap = await getDoc(
+            doc(db, "users", user.uid, "cart", productId),
+          );
+          trackReads("Cart:RemovePreFetch", 1);
+          cartData = cartDocSnap.data();
+        } catch {
+          // Non-fatal — fall back to local item
+        }
+
+        const analyticsShopId =
+          (cartData?.shopId as string | undefined) ??
+          (shopId ?? undefined);
+
         const batch = writeBatch(db);
         batch.delete(doc(db, "users", user.uid, "cart", productId));
         batch.update(doc(db, "users", user.uid), {
@@ -1627,12 +1621,24 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
         userActivityService.trackRemoveFromCart({
           productId,
-          shopId: shopId || undefined,
+          shopId: analyticsShopId,
+          productName:
+            (cartData?.productName as string | undefined) ??
+            localItem?.product?.productName,
+          category:
+            (cartData?.category as string | undefined) ??
+            localItem?.product?.category,
+          brand:
+            (cartData?.brandModel as string | undefined) ??
+            localItem?.product?.brandModel,
+          gender:
+            (cartData?.gender as string | undefined) ??
+            localItem?.product?.gender,
         });
 
         metricsEventService.logCartRemoved({
           productId,
-          shopId,
+          shopId: analyticsShopId ?? null,
         });
 
         cartTotalsCache.invalidateForUser(user.uid);
@@ -1642,12 +1648,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       } catch (error) {
         console.error("❌ Remove error:", error);
         rollbackOptimisticRemove(productId);
-        if (localItem) {
-          setCartItems((items) => {
-            if (items.some((i) => i.productId === productId)) return items;
-            return [...items, localItem];
-          });
-        }
         return "Failed to remove from cart";
       }
     },
@@ -1885,29 +1885,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       const snapshot = await getDocsFromServer(cartQuery);
       trackReads("Cart:Refresh", snapshot.docs.length || 1);
 
-      // Preserve optimistic items the server hasn't confirmed yet
-      const serverIds = new Set(snapshot.docs.map((d) => d.id));
-      const pendingOptimistic = cartItemsRef.current.filter(
-        (item) =>
-          item.isOptimistic &&
-          !serverIds.has(item.productId) &&
-          !optimisticCacheRef.current.get(item.productId)?._deleted,
-      );
-
       await buildCartItemsFromDocs(snapshot.docs);
-
-      if (pendingOptimistic.length > 0) {
-        setCartItems((prev) => {
-          const ids = new Set(prev.map((i) => i.productId));
-          const merged = [...prev];
-          for (const opt of pendingOptimistic) {
-            if (!ids.has(opt.productId)) {
-              merged.push(opt);
-            }
-          }
-          return merged;
-        });
-      }
 
       if (snapshot.docs.length > 0) {
         lastDocumentRef.current = snapshot.docs[snapshot.docs.length - 1];
@@ -2098,8 +2076,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       return;
     }
 
+    setIsLoadingMore(true);
+
     const loadMorePromise = (async () => {
-      setIsLoadingMore(true);
       try {
         let cartQuery = query(
           collection(db, "users", user.uid, "cart"),
@@ -2163,6 +2142,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         }
       } catch (error) {
         console.error("❌ Load more error:", error);
+        throw error;
       } finally {
         setIsLoadingMore(false);
       }
@@ -2171,6 +2151,8 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     pendingFetchesRef.current.set("loadMore", loadMorePromise);
     try {
       await loadMorePromise;
+    } catch {
+      // Already logged; allow caller to observe failure
     } finally {
       pendingFetchesRef.current.delete("loadMore");
     }
@@ -2195,21 +2177,11 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     setCartItems([]);
     setCartProductIds(new Set());
     setCartCount(0);
-    setCartTotals(null);
-    setIsTotalsLoading(false);
     setIsInitialized(false);
 
     optimisticCacheRef.current.clear();
     optimisticTimeoutsRef.current.forEach((t) => clearTimeout(t));
     optimisticTimeoutsRef.current.clear();
-    quantityUpdateLocksRef.current.clear();
-    pendingQuantityWritesRef.current.clear();
-    currentTotalsProductIdsRef.current = new Set();
-
-    if (totalsVerificationTimerRef.current) {
-      clearTimeout(totalsVerificationTimerRef.current);
-      totalsVerificationTimerRef.current = null;
-    }
 
     lastDocumentRef.current = null;
     setHasMore(true);
@@ -2219,59 +2191,79 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     }
   }, [user]);
 
+  const clearAllData = useCallback(() => {
+    console.log("🗑️ _clearAllData called");
+    setCartCount(0);
+    setCartProductIds(new Set());
+    setCartItems([]);
+    setCartTotals(null);
+    currentTotalsProductIdsRef.current = new Set();
+    setIsInitialized(false);
+    setIsLoading(false);
+    setIsTotalsLoading(false);
+    optimisticCacheRef.current.clear();
+
+    if (totalsVerificationTimerRef.current) {
+      clearTimeout(totalsVerificationTimerRef.current);
+      totalsVerificationTimerRef.current = null;
+    }
+    optimisticTimeoutsRef.current.forEach((t) => clearTimeout(t));
+    optimisticTimeoutsRef.current.clear();
+    quantityUpdateLocksRef.current.clear();
+    pendingQuantityWritesRef.current.clear();
+
+    cartTotalsCache.clearAll();
+  }, []);
+
   // ========================================================================
   // EFFECTS
   // ========================================================================
 
-  // Handle user changes — distinguish same-user re-emit vs different user
-  useEffect(() => {
-    if (!user) {
-      if (currentUserIdRef.current !== null) {
-        currentUserIdRef.current = null;
-        clearLocalCache();
-      }
-      return;
+ // Handle user changes — clear data on user switch / logout. 
+ // Cross-device ID sync is handled by the dedicated cartItemIds listener below.
+ useEffect(() => {
+  if (!user) {
+    if (currentUserIdRef.current !== null) {
+      currentUserIdRef.current = null;
+      clearAllData();
     }
+    return;
+  }
 
-    // Same user re-emitting — just resync IDs from user doc, don't wipe items
-    if (currentUserIdRef.current === user.uid) {
-      const ids = new Set<string>(
-        getProfileField<string[]>("cartItemIds") ?? [],
-      );
-      setCartProductIds(ids);
-      setCartCount(ids.size);
-      return;
-    }
+  // Same user re-emitting — let the cartItemIds listener handle ID sync.
+  if (currentUserIdRef.current === user.uid) {
+    return;
+  }
 
-    // Different user — full clear and re-seed
-    currentUserIdRef.current = user.uid;
-    clearLocalCache();
+  // Different user — full clear. The cartItemIds listener will re-seed
+  // once profileData is populated.
+  currentUserIdRef.current = user.uid;
+  clearAllData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [user]);
 
-    // Wait for profile to load before seeding
-    if (!profileData) return;
-    const ids = new Set<string>(
-      getProfileField<string[]>("cartItemIds") ?? [],
-    );
-    setCartProductIds(ids);
-    setCartCount(ids.size);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, profileData]);
-
-  // Listen to user doc cart IDs changes (cross-device sync)
+// Listen to user doc cart IDs changes (cross-device sync)
+  // Matches Flutter's _onUserDocCartIdsChanged — always syncs IDs/count,
+  // but preserves any in-flight optimistic adds/removes.
   useEffect(() => {
     if (!user || !profileData) return;
     const ids = new Set<string>(
       getProfileField<string[]>("cartItemIds") ?? [],
     );
-    // Only update if we haven't initialized yet (otherwise our local state is authoritative
-    // until next loadCart). This matches Flutter's _onUserDocCartIdsChanged behavior:
-    // it only updates badge counts when no full cart is loaded.
-    if (!isInitialized) {
-      setCartProductIds(ids);
-      setCartCount(ids.size);
-    }
+
+    // Apply optimistic overlay (matches updateCartIds behavior)
+    optimisticCacheRef.current.forEach((value, key) => {
+      if (value._deleted === true) {
+        ids.delete(key);
+      } else {
+        ids.add(key);
+      }
+    });
+
+    setCartProductIds(ids);
+    setCartCount(ids.size);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profileData?.cartItemIds, user, isInitialized]);
+  }, [profileData?.cartItemIds, user]);
 
   // Initialize cache on mount
   useEffect(() => {

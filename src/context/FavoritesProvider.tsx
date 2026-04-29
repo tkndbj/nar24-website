@@ -1322,6 +1322,7 @@ const removeMultipleFromFavorites = useCallback(
 
         setFavoriteIds(previousIds);
         setFavoriteCount(previousIds.size);
+        updateLocalProfileField("favoriteItemIds", [...previousIds]);
 
         return "Error removing from favorites";
       }
@@ -1725,53 +1726,70 @@ const removeMultipleFromFavorites = useCallback(
 
   const loadFreshPage = useCallback(
     async (limit: number = 50) => {
+      // Coalesce concurrent calls — every caller gets the real result.
+      // Mirrors Flutter's _loadFavoritesInFlight completer.
+      const inFlight = pendingFetches.current.get("loadFresh");
+      if (inFlight) {
+        await inFlight;
+        return;
+      }
+
       paginationGenRef.current++;
 
-      lastDocument.current = null;
-      isLoadingMoreRef.current = false;
-      hasMoreDataRef.current = true;
-      setHasMoreData(true);
-      setIsLoadingMore(false);
-      paginatedFavoritesMap.current.clear();
-      setPaginatedFavorites([]);
-      setIsInitialLoadComplete(false);
+      const freshPromise = (async () => {
+        lastDocument.current = null;
+        isLoadingMoreRef.current = false;
+        hasMoreDataRef.current = true;
+        setHasMoreData(true);
+        setIsLoadingMore(false);
+        paginatedFavoritesMap.current.clear();
+        setPaginatedFavorites([]);
+        setIsInitialLoadComplete(false);
 
-      isLoadingMoreRef.current = true;
-      setIsLoadingMore(true);
+        isLoadingMoreRef.current = true;
+        setIsLoadingMore(true);
 
-      try {
-        const result = await fetchPaginatedFavorites(null, limit);
-        const docs = result.docs as DocumentSnapshot[];
-        const hasMore = result.hasMore;
-        const productIds = result.productIds;
+        try {
+          const result = await fetchPaginatedFavorites(null, limit);
+          const docs = result.docs as DocumentSnapshot[];
+          const hasMore = result.hasMore;
+          const productIds = result.productIds;
 
-        if (docs.length > 0) {
-          lastDocument.current = docs[docs.length - 1];
-          hasMoreDataRef.current = hasMore;
-          setHasMoreData(hasMore);
+          if (docs.length > 0) {
+            lastDocument.current = docs[docs.length - 1];
+            hasMoreDataRef.current = hasMore;
+            setHasMoreData(hasMore);
 
-          if (productIds) {
-            const newItems = await fetchProductDetailsForIds(
-              Array.from(productIds),
-              docs
-            );
-            addPaginatedItems(newItems);
+            if (productIds) {
+              const newItems = await fetchProductDetailsForIds(
+                Array.from(productIds),
+                docs
+              );
+              addPaginatedItems(newItems);
+            }
+          } else {
+            hasMoreDataRef.current = false;
+            setHasMoreData(false);
           }
-        } else {
+
+          setIsLoadingMore(false);
+          isLoadingMoreRef.current = false;
+          setIsInitialLoadComplete(true);
+        } catch (error) {
+          console.error("❌ loadFreshPage ERROR:", error);
+          setIsLoadingMore(false);
+          isLoadingMoreRef.current = false;
           hasMoreDataRef.current = false;
           setHasMoreData(false);
+          setIsInitialLoadComplete(true);
         }
+      })();
 
-        setIsLoadingMore(false);
-        isLoadingMoreRef.current = false;
-        setIsInitialLoadComplete(true);
-      } catch (error) {
-        console.error("❌ loadFreshPage ERROR:", error);
-        setIsLoadingMore(false);
-        isLoadingMoreRef.current = false;
-        hasMoreDataRef.current = false;
-        setHasMoreData(false);
-        setIsInitialLoadComplete(true);
+      pendingFetches.current.set("loadFresh", freshPromise);
+      try {
+        await freshPromise;
+      } finally {
+        pendingFetches.current.delete("loadFresh");
       }
     },
     [fetchPaginatedFavorites, fetchProductDetailsForIds, addPaginatedItems]
