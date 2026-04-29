@@ -101,6 +101,13 @@ export default function DynamicMarketPage() {
 
   // ── Product state ──────────────────────────────────────────────────────────
   const [products, setProducts] = useState<Product[]>([]);
+
+  // Progressively reveal products to spread out image requests; mounting 20+
+  // <ProductCard>s at once causes the browser/CDN to drop or stall some image
+  // fetches (no onLoad/onError fires, placeholder gets stuck).
+  const [streamedProducts, setStreamedProducts] = useState<Product[]>([]);
+  const streamIndexRef = useRef(0);
+
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isProductsLoading, setIsProductsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -131,9 +138,45 @@ export default function DynamicMarketPage() {
     });
   }, [filters]);
 
+  // Debounced filter key: rapid checkbox clicks coalesce into a single fetch
+  // instead of firing N requests that immediately abort each other.
+  // Initialised to filterKey so the very first fetch runs without delay.
+  const FILTER_DEBOUNCE_MS = 200;
+  const [debouncedFilterKey, setDebouncedFilterKey] = useState(filterKey);
+  useEffect(() => {
+    if (filterKey === debouncedFilterKey) return;
+    const tid = setTimeout(
+      () => setDebouncedFilterKey(filterKey),
+      FILTER_DEBOUNCE_MS,
+    );
+    return () => clearTimeout(tid);
+  }, [filterKey, debouncedFilterKey]);
+
   // Concurrency guards
   const abortRef = useRef<AbortController | null>(null);
   const seqRef = useRef(0);
+
+  // ── Streaming reveal: drip-feed products into the grid in 4-item batches
+  // per frame so image requests don't burst all at once. ────────────────────
+  useEffect(() => {
+    if (products.length === 0) {
+      setStreamedProducts([]);
+      streamIndexRef.current = 0;
+      return;
+    }
+    if (streamIndexRef.current > products.length) {
+      streamIndexRef.current = 0;
+      setStreamedProducts([]);
+    }
+    const BATCH = 4;
+    const tick = () => {
+      const next = streamIndexRef.current + BATCH;
+      setStreamedProducts(products.slice(0, Math.min(next, products.length)));
+      streamIndexRef.current = next;
+      if (next < products.length) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }, [products]);
 
   // ── Side effects: impressions ──────────────────────────────────────────────
   useEffect(() => {
@@ -272,6 +315,12 @@ export default function DynamicMarketPage() {
       if (reset) {
         setIsProductsLoading(true);
         setError(null);
+        // Clear products so the streaming-reveal effect resets its index;
+        // otherwise a 20→20 swap keeps the old stream cursor and the new
+        // batch flushes in one go (image-burst we're trying to avoid).
+        setProducts([]);
+        setCurrentPage(0);
+        setHasMore(true);
       } else {
         setIsLoadingMore(true);
       }
@@ -321,11 +370,10 @@ export default function DynamicMarketPage() {
         if (reset) {
           setProducts(data.products || []);
           if (data.specFacets) setSpecFacets(data.specFacets);
-          setCurrentPage(0);
         } else {
           setProducts((prev) => [...prev, ...(data.products || [])]);
-          setCurrentPage(page);
         }
+        setCurrentPage(page);
         setHasMore(data.hasMore ?? false);
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") return;
@@ -345,7 +393,9 @@ export default function DynamicMarketPage() {
     [category, subcategory, subsubcategory, filters],
   );
 
-  // Unified fetch effect — fires on any context/filter change
+  // Unified fetch effect — fires on any context/filter change.
+  // Filter changes go through `debouncedFilterKey`; URL-driven context
+  // changes (category/subcategory) are intentionally not debounced.
   useEffect(() => {
     if (!category) {
       setIsInitialLoading(false);
@@ -353,7 +403,7 @@ export default function DynamicMarketPage() {
     }
     fetchProducts(0, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [category, subcategory, subsubcategory, filterKey]);
+  }, [category, subcategory, subsubcategory, debouncedFilterKey]);
 
   // Cancel in-flight request on unmount
   useEffect(() => {
@@ -612,9 +662,9 @@ export default function DynamicMarketPage() {
               {/* Products */}
               {!isInitialLoading &&
                 !isProductsLoading &&
-                products.length > 0 && (
+                streamedProducts.length > 0 && (
                   <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 lg:gap-4">
-                    {products.map((p) => (
+                    {streamedProducts.map((p) => (
                       <ProductCard
                         key={p.id}
                         product={p}
@@ -627,6 +677,14 @@ export default function DynamicMarketPage() {
                         localization={t}
                       />
                     ))}
+                    {/* Trailing skeletons while streaming */}
+                    {streamedProducts.length < products.length &&
+                      Array.from({
+                        length: Math.min(
+                          4,
+                          products.length - streamedProducts.length,
+                        ),
+                      }).map((_, i) => <Skeleton key={`s-${i}`} />)}
                   </div>
                 )}
 

@@ -179,13 +179,6 @@ function CartPageContent() {
     validatedItems: ValidatedCartItem[];
   } | null>(null);
 
-  // Use provider totals (matches Flutter's cartTotalsNotifier subscription)
-  const totals: CartTotals = cartTotals ?? {
-    total: 0,
-    currency: "TL",
-    items: [],
-  };
-
   // ========================================================================
   // THEME DETECTION
   // ========================================================================
@@ -252,39 +245,13 @@ function CartPageContent() {
       .map((item) => item.productId);
   }, [cartItems, deselectedProducts]);
 
-  // Locally-derived totals — the single source of truth for the cart UI.
-  // The server-side cartTotals (from the CF) is racy for fast UI updates because
-  // its cache key is keyed on excluded IDs only, so quantity edits don't bust it
-  // until the Firestore write commits. handleCheckout still fetches fresh
-  // server totals before navigating to payment, so checkout correctness is
-  // unaffected by displaying a locally computed total here.
-  const displayTotals = useMemo(() => {
-    let total = 0;
-    let currency: string = totals.currency || "TL";
 
-    for (const item of cartItems) {
-      if (deselectedProducts.has(item.productId)) continue;
-
-      const salePrefs = item.salePreferences || item.salePreferenceInfo;
-      let unitPrice = item.product?.price ?? 0;
-
-      if (
-        salePrefs?.discountThreshold &&
-        salePrefs?.bulkDiscountPercentage &&
-        item.quantity >= salePrefs.discountThreshold
-      ) {
-        unitPrice = unitPrice * (1 - salePrefs.bulkDiscountPercentage / 100);
-      }
-
-      total += unitPrice * item.quantity;
-      if (item.product?.currency) currency = item.product.currency;
-    }
-
-    return {
-      total: Math.round(total * 100) / 100,
-      currency,
-    };
-  }, [cartItems, deselectedProducts, totals.currency]);
+const displayTotals = useMemo(() => {
+  return {
+    total: cartTotals?.total ?? 0,
+    currency: cartTotals?.currency ?? "TL",
+  };
+}, [cartTotals]);
 
   const couponDiscount = useMemo(() => {
     return calculateCouponDiscount(displayTotals.total);
@@ -378,17 +345,22 @@ function CartPageContent() {
     });
   }, [cartItems]);
 
- // Update totals whenever selection changes (delegates to provider)
-useEffect(() => {
-  const excludedIds = Array.from(deselectedProducts);
+  useEffect(() => {
+    const excludedIds = Array.from(deselectedProducts);
+    
+    // Initial calculation — no debounce, fire immediately so user doesn't see 0.00
+    if (cartTotals === null && cartItems.length > 0) {
+      updateTotalsForExcluded(excludedIds);
+      return;
+    }
+    
+    // Subsequent updates — debounced for rapid selection toggling
+    const timer = setTimeout(() => {
+      updateTotalsForExcluded(excludedIds);
+    }, 400);
   
-  // Debounce — selection toggles fire rapidly, batch into one call
-  const timer = setTimeout(() => {
-    updateTotalsForExcluded(excludedIds);
-  }, 400);
-
-  return () => clearTimeout(timer);
-}, [deselectedProducts, cartItems, updateTotalsForExcluded]);
+    return () => clearTimeout(timer);
+  }, [deselectedProducts, cartItems, updateTotalsForExcluded, cartTotals]);
 
 
   // ========================================================================
@@ -598,7 +570,6 @@ useEffect(() => {
 
   const proceedToPayment = useCallback(
     async (freshTotals: CartTotals) => {
-      // Final safety gate — never navigate with 0 total
       if (freshTotals.total <= 0) {
         alert(
           t(
@@ -608,20 +579,24 @@ useEffect(() => {
         );
         return;
       }
-
-      const pricingMap = new Map<string, unknown>();
+  
+      // Build the set of every productId covered by freshTotals — including
+      // those rolled up under bundle entries (which use productIds[] plural).
+      const coveredProductIds = new Set<string>();
       freshTotals.items.forEach((itemTotal) => {
-        pricingMap.set(itemTotal.productId, itemTotal);
+        // Non-bundle entry: has productId
+        const single = (itemTotal as { productId?: string }).productId;
+        if (single) coveredProductIds.add(single);
+  
+        // Bundle entry: has productIds[]
+        const bundleIds = (itemTotal as { productIds?: string[] }).productIds;
+        if (Array.isArray(bundleIds)) {
+          bundleIds.forEach((id) => coveredProductIds.add(id));
+        }
       });
-
-      const itemsWithPricing = cartItems.filter(
-        (item) =>
-          selectedIds.includes(item.productId) &&
-          pricingMap.has(item.productId),
-      );
-
-      if (itemsWithPricing.length !== selectedIds.length) {
-        const missingIds = selectedIds.filter((id) => !pricingMap.has(id));
+  
+      const missingIds = selectedIds.filter((id) => !coveredProductIds.has(id));
+      if (missingIds.length > 0) {
         console.error("❌ Missing pricing for items:", missingIds);
         alert(
           t(
@@ -631,7 +606,7 @@ useEffect(() => {
         );
         return;
       }
-
+  
       if (typeof window !== "undefined") {
         sessionStorage.setItem(
           "checkoutSelectedIds",
@@ -653,7 +628,7 @@ useEffect(() => {
           }),
         );
       }
-
+  
       router.push("/productpayment");
     },
     [
