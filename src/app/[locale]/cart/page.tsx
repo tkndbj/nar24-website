@@ -135,8 +135,7 @@ function CartPageContent() {
     calculateCartTotals,
     updateTotalsForExcluded,
     validateForPayment,
-    updateCartCacheFromValidation,
-    refresh,
+    updateCartCacheFromValidation,   
   } = useCart();
 
   const {
