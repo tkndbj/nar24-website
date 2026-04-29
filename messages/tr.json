@@ -1513,7 +1513,13 @@
     "endDate": "Bitiş Tarihi",
     "all": "Tümünü Gör",
     "productReviews": "Ürün Değerlendirmeleri",
-    "sellerReviews": "Satıcı Değerlendirmeleri"
+    "sellerReviews": "Satıcı Değerlendirmeleri",
+    "market": "Market",
+    "marketReview": "Market Değerlendirmesi",
+    "marketOrder": "Nar24 Market",
+    "writeMarketReview": "Market Değerlendirmesi Yaz",
+    "imageRejected": "{index}. resim moderasyon tarafından reddedildi",
+    "imageTooLargeMax10": "Dosya çok büyük (en fazla 10MB)"
   },
   "FoodOrderDetail": {
     "orderDetails": "Yemek Siparişi Detayı",

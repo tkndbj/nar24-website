@@ -8,6 +8,7 @@ import {
   Send,
   Store,
   ShoppingBag,
+  ShoppingBasket,
   Camera,
   ArrowLeft,
   Package,
@@ -106,17 +107,36 @@ interface FoodReview {
   timestamp: Timestamp;
 }
 
+// Pending market order awaiting review (orders-market with needsReview=true)
+interface MarketPendingReview {
+  id: string;
+  items: { name: string; quantity: number; brand?: string }[];
+  totalPrice: number;
+  currency: string;
+  createdAt: Timestamp;
+}
+
+// Submitted market review (stored under nar24market/stats/reviews)
+interface MarketReview {
+  id: string;
+  orderId: string;
+  rating: number;
+  comment: string;
+  imageUrls: string[];
+  timestamp: Timestamp;
+}
+
 interface FilterOptions {
   productId?: string;
   sellerId?: string;
   startDate?: Date;
   endDate?: Date;
-  reviewType: "all" | "product" | "seller" | "food";
+  reviewType: "all" | "product" | "seller" | "food" | "market";
 }
 
 type ReviewTab = "pending" | "myReviews";
-// "food" is a separate modal category, not a tab
-type ReviewCategory = "product" | "seller" | "food";
+// "food" and "market" are separate modal categories, not tabs
+type ReviewCategory = "product" | "seller" | "food" | "market";
 
 interface ImageValidationResult {
   valid: boolean;
@@ -163,6 +183,13 @@ interface SubmitFoodReviewData {
   imageUrls: string[]; // ← just add this line
 }
 
+interface SubmitMarketReviewData {
+  orderId: string;
+  rating: number;
+  comment: string;
+  imageUrls: string[];
+}
+
 // ============================================================================
 // CONSTANTS
 // ============================================================================
@@ -170,6 +197,7 @@ interface SubmitFoodReviewData {
 const FOOD_MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 const PAGE_SIZE = 20;
 const FOOD_PAGE_SIZE = 20;
+const MARKET_PAGE_SIZE = 20;
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = [
   "image/jpeg",
@@ -230,6 +258,22 @@ export default function ReviewsPage() {
   const [myFoodReviewsLastDoc, setMyFoodReviewsLastDoc] =
     useState<QueryDocumentSnapshot<DocumentData> | null>(null);
 
+  // Pending market reviews state (orders-market with needsReview=true)
+  const [marketPendingReviews, setMarketPendingReviews] = useState<
+    MarketPendingReview[]
+  >([]);
+  const [marketPendingLoading, setMarketPendingLoading] = useState(false);
+  const [marketPendingHasMore, setMarketPendingHasMore] = useState(true);
+  const [marketPendingLastDoc, setMarketPendingLastDoc] =
+    useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+
+  // My market reviews state (nar24market/stats/reviews where buyerId == uid)
+  const [myMarketReviews, setMyMarketReviews] = useState<MarketReview[]>([]);
+  const [myMarketReviewsLoading, setMyMarketReviewsLoading] = useState(false);
+  const [myMarketReviewsHasMore, setMyMarketReviewsHasMore] = useState(true);
+  const [myMarketReviewsLastDoc, setMyMarketReviewsLastDoc] =
+    useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+
   // Modal states
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showLoadingModal, setShowLoadingModal] = useState(false);
@@ -238,6 +282,8 @@ export default function ReviewsPage() {
   );
   const [selectedFoodReview, setSelectedFoodReview] =
     useState<FoodPendingReview | null>(null);
+  const [selectedMarketReview, setSelectedMarketReview] =
+    useState<MarketPendingReview | null>(null);
 
   // Review form state
   const [rating, setRating] = useState(0);
@@ -549,6 +595,147 @@ export default function ReviewsPage() {
     [user, myFoodReviewsLoading, myFoodReviewsLastDoc, myFoodReviewsHasMore],
   );
 
+  // Pending market orders awaiting review — same shape as Flutter's
+  // _fetchMarketPendingPage: orders-market filtered by buyerId + needsReview.
+  const loadMarketPendingReviews = useCallback(
+    async (reset = false) => {
+      if (!user) return;
+      if (marketPendingLoading) return;
+      if (!reset && !marketPendingHasMore) return;
+
+      setMarketPendingLoading(true);
+      try {
+        let q = query(
+          collection(db, "orders-market"),
+          where("buyerId", "==", user.uid),
+          where("needsReview", "==", true),
+          orderBy("createdAt", "desc"),
+          limit(MARKET_PAGE_SIZE),
+        );
+
+        if (!reset && marketPendingLastDoc) {
+          q = query(q, startAfter(marketPendingLastDoc));
+        }
+
+        const snapshot = await getDocs(q);
+        const newOrders: MarketPendingReview[] = snapshot.docs.map((doc) => {
+          const d = doc.data();
+          return {
+            id: doc.id,
+            items: Array.isArray(d.items)
+              ? d.items.map(
+                  (i: { name?: string; quantity?: number; brand?: string }) => ({
+                    name: i.name ?? "",
+                    quantity: i.quantity ?? 1,
+                    brand: i.brand ?? "",
+                  }),
+                )
+              : [],
+            totalPrice: d.totalPrice || 0,
+            currency: d.currency || "TL",
+            createdAt: d.createdAt,
+          };
+        });
+
+        const hasMore = newOrders.length === MARKET_PAGE_SIZE;
+        setMarketPendingHasMore(hasMore);
+
+        if (reset) {
+          setMarketPendingReviews(newOrders);
+        } else {
+          setMarketPendingReviews((prev) => {
+            const combined = [...prev, ...newOrders];
+            const uniqueMap = new Map<string, MarketPendingReview>();
+            combined.forEach((o) => uniqueMap.set(o.id, o));
+            return Array.from(uniqueMap.values());
+          });
+        }
+
+        if (newOrders.length > 0) {
+          setMarketPendingLastDoc(snapshot.docs[snapshot.docs.length - 1]);
+        } else if (reset) {
+          setMarketPendingLastDoc(null);
+        }
+      } catch (error) {
+        console.error("Error loading market pending reviews:", error);
+      } finally {
+        setMarketPendingLoading(false);
+      }
+    },
+    [user, marketPendingLoading, marketPendingLastDoc, marketPendingHasMore],
+  );
+
+  // My submitted market reviews — Flutter reads from nar24market/stats/reviews
+  // and filters by buyerId. Same here.
+  const loadMyMarketReviews = useCallback(
+    async (reset = false) => {
+      if (!user) return;
+      if (myMarketReviewsLoading) return;
+      if (!reset && !myMarketReviewsHasMore) return;
+
+      setMyMarketReviewsLoading(true);
+      try {
+        let q = query(
+          collection(db, "nar24market", "stats", "reviews"),
+          where("buyerId", "==", user.uid),
+          orderBy("timestamp", "desc"),
+          limit(MARKET_PAGE_SIZE),
+        );
+
+        if (!reset && myMarketReviewsLastDoc) {
+          q = query(q, startAfter(myMarketReviewsLastDoc));
+        }
+
+        const snapshot = await getDocs(q);
+        const newReviews: MarketReview[] = snapshot.docs.map((doc) => {
+          const d = doc.data();
+          return {
+            id: doc.id,
+            orderId: (d.orderId as string) ?? "",
+            rating: (d.rating as number) ?? 0,
+            comment: (d.comment as string) ?? "",
+            imageUrls: Array.isArray(d.imageUrls)
+              ? (d.imageUrls as unknown[]).filter(
+                  (u): u is string => typeof u === "string",
+                )
+              : [],
+            timestamp: d.timestamp as Timestamp,
+          };
+        });
+
+        const hasMore = newReviews.length === MARKET_PAGE_SIZE;
+        setMyMarketReviewsHasMore(hasMore);
+
+        if (reset) {
+          setMyMarketReviews(newReviews);
+        } else {
+          setMyMarketReviews((prev) => {
+            const combined = [...prev, ...newReviews];
+            const uniqueMap = new Map<string, MarketReview>();
+            combined.forEach((r) => uniqueMap.set(r.id, r));
+            return Array.from(uniqueMap.values());
+          });
+        }
+
+        if (newReviews.length > 0) {
+          setMyMarketReviewsLastDoc(snapshot.docs[snapshot.docs.length - 1]);
+        } else if (reset) {
+          setMyMarketReviewsLastDoc(null);
+        }
+      } catch (error) {
+        console.error("Error loading market reviews:", error);
+      } finally {
+        setMyMarketReviewsLoading(false);
+      }
+    },
+    [
+      user,
+      myMarketReviewsLoading,
+      myMarketReviewsLastDoc,
+      myMarketReviewsHasMore,
+    ],
+  );
+
   // ============================================================================
   // EFFECTS
   // ============================================================================
@@ -564,8 +751,10 @@ export default function ReviewsPage() {
       resetPaginationState();
       loadPendingReviews(true);
       loadFoodPendingReviews(true);
+      loadMarketPendingReviews(true);
       loadMyReviews(true);
       loadMyFoodReviews(true);
+      loadMyMarketReviews(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
@@ -577,10 +766,14 @@ export default function ReviewsPage() {
       if (filtersChanged) {
         setMyReviews([]);
         setMyFoodReviews([]);
+        setMyMarketReviews([]);
         setMyReviewsLastDoc(null);
         setMyFoodReviewsLastDoc(null);
+        setMyMarketReviewsLastDoc(null);
 
-        if (filters.reviewType !== "food") {
+        // Product/seller reviews — query covers both. Hide when the filter
+        // explicitly narrows to food or market only.
+        if (filters.reviewType !== "food" && filters.reviewType !== "market") {
           setMyReviewsHasMore(true);
           loadMyReviews(true);
         } else {
@@ -591,7 +784,14 @@ export default function ReviewsPage() {
           setMyFoodReviewsHasMore(true);
           loadMyFoodReviews(true);
         } else {
-          setMyFoodReviewsHasMore(false); // prevent scroll from triggering it
+          setMyFoodReviewsHasMore(false);
+        }
+
+        if (filters.reviewType === "all" || filters.reviewType === "market") {
+          setMyMarketReviewsHasMore(true);
+          loadMyMarketReviews(true);
+        } else {
+          setMyMarketReviewsHasMore(false);
         }
 
         prevFilters.current = filters;
@@ -629,6 +829,16 @@ export default function ReviewsPage() {
               isLoadingMoreRef.current = false;
             });
           }
+          if (
+            marketPendingHasMore &&
+            !marketPendingLoading &&
+            !isLoadingMoreRef.current
+          ) {
+            isLoadingMoreRef.current = true;
+            loadMarketPendingReviews(false).finally(() => {
+              isLoadingMoreRef.current = false;
+            });
+          }
         } else if (activeTab === "myReviews") {
           if (
             myReviewsHasMore &&
@@ -650,6 +860,16 @@ export default function ReviewsPage() {
               isLoadingMoreRef.current = false;
             });
           }
+          if (
+            myMarketReviewsHasMore &&
+            !myMarketReviewsLoading &&
+            !isLoadingMoreRef.current
+          ) {
+            isLoadingMoreRef.current = true;
+            loadMyMarketReviews(false).finally(() => {
+              isLoadingMoreRef.current = false;
+            });
+          }
         }
       }
     };
@@ -662,14 +882,20 @@ export default function ReviewsPage() {
     pendingLoading,
     foodPendingHasMore,
     foodPendingLoading,
+    marketPendingHasMore,
+    marketPendingLoading,
     myReviewsHasMore,
     myReviewsLoading,
     myFoodReviewsHasMore,
     myFoodReviewsLoading,
+    myMarketReviewsHasMore,
+    myMarketReviewsLoading,
     loadPendingReviews,
     loadFoodPendingReviews,
+    loadMarketPendingReviews,
     loadMyReviews,
     loadMyFoodReviews,
+    loadMyMarketReviews,
   ]);
 
   // ============================================================================
@@ -679,16 +905,22 @@ export default function ReviewsPage() {
   const resetPaginationState = () => {
     setPendingReviews([]);
     setFoodPendingReviews([]);
+    setMarketPendingReviews([]);
     setMyReviews([]);
     setMyFoodReviews([]);
+    setMyMarketReviews([]);
     setPendingLastDoc(null);
     setFoodPendingLastDoc(null);
+    setMarketPendingLastDoc(null);
     setMyReviewsLastDoc(null);
     setMyFoodReviewsLastDoc(null);
+    setMyMarketReviewsLastDoc(null);
     setPendingHasMore(true);
     setFoodPendingHasMore(true);
+    setMarketPendingHasMore(true);
     setMyReviewsHasMore(true);
     setMyFoodReviewsHasMore(true);
+    setMyMarketReviewsHasMore(true);
     isLoadingMoreRef.current = false;
   };
 
@@ -698,6 +930,7 @@ export default function ReviewsPage() {
     setReviewImages([]);
     setSelectedReview(null);
     setSelectedFoodReview(null);
+    setSelectedMarketReview(null);
   };
 
   const getActiveFiltersCount = () => {
@@ -710,11 +943,17 @@ export default function ReviewsPage() {
     return count;
   };
 
-  const totalPendingCount = pendingReviews.length + foodPendingReviews.length;
+  const totalPendingCount =
+    pendingReviews.length +
+    foodPendingReviews.length +
+    marketPendingReviews.length;
   const totalMyReviewsCount =
     myReviews.length +
     (filters.reviewType === "all" || filters.reviewType === "food"
       ? myFoodReviews.length
+      : 0) +
+    (filters.reviewType === "all" || filters.reviewType === "market"
+      ? myMarketReviews.length
       : 0);
   const currentCount =
     activeTab === "pending" ? totalPendingCount : totalMyReviewsCount;
@@ -834,7 +1073,16 @@ export default function ReviewsPage() {
   const openFoodReviewModal = (order: FoodPendingReview) => {
     setSelectedFoodReview(order);
     setSelectedReview(null);
+    setSelectedMarketReview(null);
     setReviewCategory("food");
+    setShowReviewModal(true);
+  };
+
+  const openMarketReviewModal = (order: MarketPendingReview) => {
+    setSelectedMarketReview(order);
+    setSelectedReview(null);
+    setSelectedFoodReview(null);
+    setReviewCategory("market");
     setShowReviewModal(true);
   };
 
@@ -896,6 +1144,8 @@ export default function ReviewsPage() {
 
     if (reviewCategory === "food") {
       submitFoodReviewAsync();
+    } else if (reviewCategory === "market") {
+      submitMarketReviewAsync();
     } else {
       submitReviewAsync();
     }
@@ -1109,6 +1359,103 @@ export default function ReviewsPage() {
     }
   };
 
+  // Market review submission — same pipeline as Flutter's _submitMarketReview:
+  // upload each image to market_reviews/{uid}/, run moderateImage on each
+  // resulting URL, then call submitMarketReview with the approved URL list.
+  // Storage path layout matches Flutter so any per-user storage rule (or
+  // future cleanup job) sees both clients writing to the same place.
+  const submitMarketReviewAsync = async () => {
+    if (!user || !selectedMarketReview) {
+      setShowLoadingModal(false);
+      showErrorToast("Missing user or market order data");
+      return;
+    }
+
+    try {
+      const approvedUrls: string[] = [];
+      const uploadedRefs: string[] = [];
+
+      if (reviewImages.length > 0) {
+        const storagePath = `market_reviews/${user.uid}`;
+        for (let i = 0; i < reviewImages.length; i++) {
+          const result = await processImage(reviewImages[i], storagePath, i);
+          if (!result.success) {
+            // Roll back any prior uploads from this same submission so a
+            // mid-batch moderation rejection doesn't leave orphans in
+            // Storage that nothing references.
+            for (const refPath of uploadedRefs) {
+              try {
+                await deleteObject(ref(storage, refPath));
+              } catch {
+                console.error("Error deleting image:", refPath);
+              }
+            }
+            setShowLoadingModal(false);
+            let message = `Image ${i + 1}: `;
+            switch (result.error) {
+              case "adult_content":
+                message += "Contains inappropriate adult content";
+                break;
+              case "violent_content":
+                message += "Contains violent content";
+                break;
+              case "file_too_large":
+                message += t("imageTooLargeMax10") || "File too large (max 10MB)";
+                break;
+              case "invalid_format":
+                message += "Invalid format (JPG, PNG, HEIC, WEBP only)";
+                break;
+              default:
+                message += result.message || "Inappropriate content detected";
+            }
+            showErrorToast(message);
+            resetReviewForm();
+            return;
+          }
+          if (result.url && result.ref) {
+            approvedUrls.push(result.url);
+            uploadedRefs.push(result.ref);
+          }
+        }
+      }
+
+      const submitMarketReviewFunction = httpsCallable<
+        SubmitMarketReviewData,
+        { success: boolean }
+      >(functions, "submitMarketReview");
+
+      await submitMarketReviewFunction({
+        orderId: selectedMarketReview.id,
+        rating,
+        comment: reviewText.trim(),
+        imageUrls: approvedUrls,
+      });
+
+      setShowLoadingModal(false);
+      showSuccessToast(
+        t("reviewSubmittedSuccessfully") || "Review submitted successfully!",
+      );
+
+      setMarketPendingReviews((prev) =>
+        prev.filter((o) => o.id !== selectedMarketReview.id),
+      );
+
+      resetReviewForm();
+
+      setMyMarketReviews([]);
+      setMyMarketReviewsLastDoc(null);
+      setMyMarketReviewsHasMore(true);
+      loadMyMarketReviews(true);
+    } catch (error) {
+      setShowLoadingModal(false);
+      console.error("Error submitting market review:", error);
+      showErrorToast(
+        error instanceof Error ? error.message : "An unexpected error occurred",
+      );
+      resetReviewForm();
+    }
+  };
+
   // ============================================================================
   // TOAST NOTIFICATIONS
   // ============================================================================
@@ -1160,6 +1507,8 @@ export default function ReviewsPage() {
   const filteredMyReviews = myReviews;
   const showFoodReviewsInTab2 =
     filters.reviewType === "all" || filters.reviewType === "food";
+  const showMarketReviewsInTab2 =
+    filters.reviewType === "all" || filters.reviewType === "market";
 
   // Style helpers
   const cardClass = isDarkMode
@@ -1338,7 +1687,8 @@ export default function ReviewsPage() {
                           | "all"
                           | "product"
                           | "seller"
-                          | "food",
+                          | "food"
+                          | "market",
                       }))
                     }
                     className={inputClass}
@@ -1347,6 +1697,7 @@ export default function ReviewsPage() {
                     <option value="product">{t("product") || "Product"}</option>
                     <option value="seller">{t("seller") || "Seller"}</option>
                     <option value="food">{t("food") || "Food"}</option>
+                    <option value="market">{t("market") || "Market"}</option>
                   </select>
                 </div>
               )}
@@ -1399,7 +1750,8 @@ export default function ReviewsPage() {
           <div className="space-y-3">
             {totalPendingCount === 0 &&
             !pendingLoading &&
-            !foodPendingLoading ? (
+            !foodPendingLoading &&
+            !marketPendingLoading ? (
               <div className="text-center py-16">
                 <Star
                   className={`w-12 h-12 mx-auto mb-3 ${isDarkMode ? "text-gray-700" : "text-gray-300"}`}
@@ -1571,10 +1923,71 @@ export default function ReviewsPage() {
                     </div>
                   );
                 })}
+
+                {/* Market pending reviews */}
+                {Array.from(
+                  new Map(marketPendingReviews.map((r) => [r.id, r])).values(),
+                ).map((order) => {
+                  const itemsPreview =
+                    order.items
+                      .slice(0, 2)
+                      .map((i) =>
+                        i.quantity > 1 ? `${i.quantity}× ${i.name}` : i.name,
+                      )
+                      .join(", ") +
+                    (order.items.length > 2
+                      ? ` +${order.items.length - 2}`
+                      : "");
+
+                  return (
+                    <div key={`market-pending-${order.id}`} className={cardClass}>
+                      <div
+                        className={`px-4 py-3 ${cardBorderClass} flex items-center gap-3`}
+                      >
+                        <div
+                          className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isDarkMode ? "bg-emerald-950/30" : "bg-emerald-50"}`}
+                        >
+                          <ShoppingBasket className="w-4 h-4 text-emerald-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3
+                            className={`font-semibold text-sm truncate ${headingColor}`}
+                          >
+                            {t("marketOrder") || "Nar24 Market"}
+                          </h3>
+                          <p
+                            className={`text-[11px] truncate mt-0.5 ${mutedColor}`}
+                          >
+                            {itemsPreview}
+                          </p>
+                          <p className="text-xs font-bold text-orange-600 mt-0.5">
+                            {order.totalPrice.toFixed(0)} {order.currency}
+                          </p>
+                        </div>
+                        <span
+                          className={`text-[11px] flex-shrink-0 ${mutedColor}`}
+                        >
+                          {order.createdAt
+                            ?.toDate()
+                            .toLocaleDateString("tr-TR")}
+                        </span>
+                      </div>
+                      <div className="px-4 py-3">
+                        <button
+                          onClick={() => openMarketReviewModal(order)}
+                          className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-colors text-xs font-medium"
+                        >
+                          <Star className="w-3.5 h-3.5" />
+                          {t("writeMarketReview") || "Write Market Review"}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </>
             )}
 
-            {(pendingLoading || foodPendingLoading) && (
+            {(pendingLoading || foodPendingLoading || marketPendingLoading) && (
               <div className="flex justify-center py-8">
                 <div className="w-5 h-5 border-[3px] border-orange-200 border-t-orange-600 rounded-full animate-spin" />
               </div>
@@ -1585,8 +1998,10 @@ export default function ReviewsPage() {
           <div className="space-y-3">
             {filteredMyReviews.length === 0 &&
             myFoodReviews.length === 0 &&
+            myMarketReviews.length === 0 &&
             !myReviewsLoading &&
-            !myFoodReviewsLoading ? (
+            !myFoodReviewsLoading &&
+            !myMarketReviewsLoading ? (
               <div className="text-center py-16">
                 <Star
                   className={`w-12 h-12 mx-auto mb-3 ${isDarkMode ? "text-gray-700" : "text-gray-300"}`}
@@ -1782,10 +2197,75 @@ export default function ReviewsPage() {
                       )}
                     </div>
                   ))}
+
+                {/* Market reviews */}
+                {showMarketReviewsInTab2 &&
+                  Array.from(
+                    new Map(myMarketReviews.map((r) => [r.id, r])).values(),
+                  ).map((review) => (
+                    <div key={`market_${review.id}`} className={cardClass}>
+                      <div
+                        className={`px-4 py-3 ${cardBorderClass} flex items-center gap-3`}
+                      >
+                        <div
+                          className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isDarkMode ? "bg-emerald-950/30" : "bg-emerald-50"}`}
+                        >
+                          <ShoppingBasket className="w-4 h-4 text-emerald-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3
+                            className={`font-semibold text-sm ${headingColor}`}
+                          >
+                            {t("marketOrder") || "Nar24 Market"}
+                          </h3>
+                          <p className={`text-xs mt-0.5 ${mutedColor}`}>
+                            {t("marketReview") || "Market Review"}
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                          {renderStars(review.rating)}
+                          <span className={`text-[11px] ${mutedColor}`}>
+                            {review.timestamp
+                              ?.toDate()
+                              .toLocaleDateString("tr-TR")}
+                          </span>
+                        </div>
+                      </div>
+                      {review.imageUrls && review.imageUrls.length > 0 && (
+                        <div className="px-4 pt-3 flex gap-2">
+                          {review.imageUrls.map((url, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => setSelectedImage(url)}
+                              className={`w-14 h-14 rounded-xl overflow-hidden hover:opacity-80 transition-opacity relative flex-shrink-0 ${thumbBg}`}
+                            >
+                              <SmartImage
+                                source={url}
+                                size="thumbnail"
+                                alt={`Review image ${idx + 1}`}
+                                fill
+                                className="object-cover"
+                                sizes="56px"
+                              />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {review.comment && (
+                        <div className="px-4 py-3">
+                          <p className={`text-sm leading-relaxed ${bodyColor}`}>
+                            {review.comment}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
               </>
             )}
 
-            {(myReviewsLoading || myFoodReviewsLoading) && (
+            {(myReviewsLoading ||
+              myFoodReviewsLoading ||
+              myMarketReviewsLoading) && (
               <div className="flex justify-center py-8">
                 <div className="w-5 h-5 border-[3px] border-orange-200 border-t-orange-600 rounded-full animate-spin" />
               </div>
@@ -1795,7 +2275,8 @@ export default function ReviewsPage() {
       </div>
 
       {/* ── Review Modal ── */}
-      {showReviewModal && (selectedReview || selectedFoodReview) && (
+      {showReviewModal &&
+        (selectedReview || selectedFoodReview || selectedMarketReview) && (
         <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div
             className={`rounded-2xl max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto ${isDarkMode ? "bg-gray-900" : "bg-white"}`}
@@ -1809,7 +2290,9 @@ export default function ReviewsPage() {
                   ? t("productReview") || "Product Review"
                   : reviewCategory === "seller"
                     ? t("sellerReview") || "Seller Review"
-                    : t("restaurantReview") || "Restaurant Review"}
+                    : reviewCategory === "market"
+                      ? t("marketReview") || "Market Review"
+                      : t("restaurantReview") || "Restaurant Review"}
               </h3>
               <button
                 onClick={() => {
@@ -1845,6 +2328,35 @@ export default function ReviewsPage() {
                         .join(", ")}
                       {selectedFoodReview.items.length > 2 &&
                         ` +${selectedFoodReview.items.length - 2}`}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {reviewCategory === "market" && selectedMarketReview && (
+                <div
+                  className={`flex items-center gap-3 p-3 rounded-xl ${isDarkMode ? "bg-gray-800" : "bg-gray-50"}`}
+                >
+                  <div
+                    className={`w-9 h-9 rounded-lg flex items-center justify-center ${isDarkMode ? "bg-emerald-950/30" : "bg-emerald-50"}`}
+                  >
+                    <ShoppingBasket className="w-4 h-4 text-emerald-500" />
+                  </div>
+                  <div>
+                    <p className={`text-sm font-semibold ${headingColor}`}>
+                      {t("marketOrder") || "Nar24 Market"}
+                    </p>
+                    <p className={`text-[11px] ${mutedColor}`}>
+                      {selectedMarketReview.items
+                        .slice(0, 2)
+                        .map((i) =>
+                          i.quantity > 1
+                            ? `${i.quantity}× ${i.name}`
+                            : i.name,
+                        )
+                        .join(", ")}
+                      {selectedMarketReview.items.length > 2 &&
+                        ` +${selectedMarketReview.items.length - 2}`}
                     </p>
                   </div>
                 </div>
@@ -1895,8 +2407,11 @@ export default function ReviewsPage() {
                 />
               </div>
 
-              {/* Image Upload - product reviews only */}
-              {(reviewCategory === "product" || reviewCategory === "food") && (
+              {/* Image Upload — supported for product / food / market reviews
+                  (seller reviews don't take photos in either client). */}
+              {(reviewCategory === "product" ||
+                reviewCategory === "food" ||
+                reviewCategory === "market") && (
                 <div>
                   <label
                     className={`text-[11px] font-semibold uppercase tracking-wider mb-1.5 block ${mutedColor}`}
@@ -1904,24 +2419,36 @@ export default function ReviewsPage() {
                     {t("uploadPhotos") || "Upload Photos"}
                   </label>
                   {reviewImages.length > 0 && (
-                    <div className="flex gap-2 mb-2.5">
+                    // Extra top padding + horizontal padding so the close
+                    // button — which is intentionally pulled outside the
+                    // thumb (-top-1.5 / -right-1.5) — has room to render
+                    // without clipping. The thumb has `overflow-hidden`
+                    // for the rounded-corner crop, but the button lives
+                    // in an outer wrapper without overflow clipping.
+                    <div className="flex gap-3 mb-2.5 pt-2 px-1.5">
                       {reviewImages.map((file, index) => (
                         <div
                           key={index}
-                          className={`w-14 h-14 rounded-xl overflow-hidden relative flex-shrink-0 ${thumbBg}`}
+                          className="relative flex-shrink-0"
                         >
-                          <Image
-                            src={URL.createObjectURL(file)}
-                            alt={`New image ${index + 1}`}
-                            fill
-                            className="object-cover"
-                            sizes="56px"
-                          />
-                          <button
-                            onClick={() => removeImage(index)}
-                            className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center"
+                          <div
+                            className={`w-14 h-14 rounded-xl overflow-hidden relative ${thumbBg}`}
                           >
-                            <X className="w-2.5 h-2.5" />
+                            <Image
+                              src={URL.createObjectURL(file)}
+                              alt={`New image ${index + 1}`}
+                              fill
+                              className="object-cover"
+                              sizes="56px"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeImage(index)}
+                            aria-label={`Remove image ${index + 1}`}
+                            className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-md ring-2 ring-white dark:ring-gray-900 z-10 transition-colors"
+                          >
+                            <X className="w-3 h-3" />
                           </button>
                         </div>
                       ))}

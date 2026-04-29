@@ -1513,7 +1513,13 @@
     "endDate": "End Date",
     "all": "All",
     "productReviews": "Product Reviews",
-    "sellerReviews": "Seller Reviews"
+    "sellerReviews": "Seller Reviews",
+    "market": "Market",
+    "marketReview": "Market Review",
+    "marketOrder": "Nar24 Market",
+    "writeMarketReview": "Write Market Review",
+    "imageRejected": "Image {index} was rejected by moderation",
+    "imageTooLargeMax10": "File too large (max 10MB)"
   },
   "FoodOrderDetail": {
     "orderDetails": "Food Order Details",
