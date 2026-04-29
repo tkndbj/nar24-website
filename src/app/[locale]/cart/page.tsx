@@ -253,31 +253,70 @@ function CartPageContent() {
       .map((item) => item.productId);
   }, [cartItems, deselectedProducts]);
 
+  // Locally-derived totals — the single source of truth for the cart UI.
+  // The server-side cartTotals (from the CF) is racy for fast UI updates because
+  // its cache key is keyed on excluded IDs only, so quantity edits don't bust it
+  // until the Firestore write commits. handleCheckout still fetches fresh
+  // server totals before navigating to payment, so checkout correctness is
+  // unaffected by displaying a locally computed total here.
+  const displayTotals = useMemo(() => {
+    let total = 0;
+    let currency: string = totals.currency || "TL";
+
+    for (const item of cartItems) {
+      if (deselectedProducts.has(item.productId)) continue;
+
+      const salePrefs = item.salePreferences || item.salePreferenceInfo;
+      let unitPrice = item.product?.price ?? 0;
+
+      if (
+        salePrefs?.discountThreshold &&
+        salePrefs?.bulkDiscountPercentage &&
+        item.quantity >= salePrefs.discountThreshold
+      ) {
+        unitPrice = unitPrice * (1 - salePrefs.bulkDiscountPercentage / 100);
+      }
+
+      total += unitPrice * item.quantity;
+      if (item.product?.currency) currency = item.product.currency;
+    }
+
+    return {
+      total: Math.round(total * 100) / 100,
+      currency,
+    };
+  }, [cartItems, deselectedProducts, totals.currency]);
+
   const couponDiscount = useMemo(() => {
-    return calculateCouponDiscount(totals.total);
-  }, [calculateCouponDiscount, totals.total]);
+    return calculateCouponDiscount(displayTotals.total);
+  }, [calculateCouponDiscount, displayTotals.total]);
 
   const finalTotal = useMemo(() => {
-    return calculateFinalTotal(totals.total);
-  }, [calculateFinalTotal, totals.total]);
+    return calculateFinalTotal(displayTotals.total);
+  }, [calculateFinalTotal, displayTotals.total]);
 
   // Auto-clear coupon if no longer applicable
   useEffect(() => {
-    if (selectedCoupon && couponDiscount === 0 && totals.total > 0) {
+    if (selectedCoupon && couponDiscount === 0 && displayTotals.total > 0) {
       selectCoupon(null);
     }
-  }, [selectedCoupon, couponDiscount, totals.total, selectCoupon]);
+  }, [selectedCoupon, couponDiscount, displayTotals.total, selectCoupon]);
 
   // Auto-clear free shipping if no longer applicable
   useEffect(() => {
     if (
       useFreeShipping &&
-      !isFreeShippingApplicable(totals.total) &&
-      totals.total > 0
+      !isFreeShippingApplicable(displayTotals.total) &&
+      displayTotals.total > 0
     ) {
       setFreeShipping(false);
     }
-  }, [useFreeShipping, totals.total, isFreeShippingApplicable, setFreeShipping]);
+  }, [
+    useFreeShipping,
+    displayTotals.total,
+    isFreeShippingApplicable,
+    setFreeShipping,
+  ]);
 
   // ========================================================================
   // EFFECTS
@@ -790,7 +829,7 @@ function CartPageContent() {
 
   const renderPriceBreakdown = useCallback(() => {
     if (!hasAnyDiscount) return null;
-    const subtotal = totals.total;
+    const subtotal = displayTotals.total;
 
     return (
       <div
@@ -809,7 +848,7 @@ function CartPageContent() {
           <span
             className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}
           >
-            {subtotal.toFixed(2)} {totals.currency}
+            {subtotal.toFixed(2)} {displayTotals.currency}
           </span>
         </div>
 
@@ -822,7 +861,7 @@ function CartPageContent() {
               </span>
             </div>
             <span className="text-xs font-semibold text-emerald-600">
-              -{couponDiscount.toFixed(2)} {totals.currency}
+              -{couponDiscount.toFixed(2)} {displayTotals.currency}
             </span>
           </div>
         )}
@@ -842,7 +881,15 @@ function CartPageContent() {
         )}
       </div>
     );
-  }, [hasAnyDiscount, totals, couponDiscount, selectedCoupon, useFreeShipping, isDark, t]);
+  }, [
+    hasAnyDiscount,
+    displayTotals,
+    couponDiscount,
+    selectedCoupon,
+    useFreeShipping,
+    isDark,
+    t,
+  ]);
 
   const renderCompactCouponButton = useCallback(() => {
     if (!hasAnyCouponsOrBenefits) return null;
@@ -1639,22 +1686,19 @@ function CartPageContent() {
                                 isDark ? "text-gray-600" : "text-gray-400"
                               }`}
                             >
-                              {totals.total.toFixed(2)} {totals.currency}
+                              {displayTotals.total.toFixed(2)}{" "}
+                              {displayTotals.currency}
                             </span>
                           )}
-                          {isTotalsLoading ? (
-                            <div className="w-5 h-5 border-[2px] border-orange-200 border-t-orange-500 rounded-full animate-spin" />
-                          ) : (
-                            <span
-                              className={`text-xl font-bold ${
-                                hasAnyDiscount
-                                  ? "text-emerald-500"
-                                  : "text-orange-500"
-                              }`}
-                            >
-                              {finalTotal.toFixed(2)} {totals.currency}
-                            </span>
-                          )}
+                          <span
+                            className={`text-xl font-bold ${
+                              hasAnyDiscount
+                                ? "text-emerald-500"
+                                : "text-orange-500"
+                            }`}
+                          >
+                            {finalTotal.toFixed(2)} {displayTotals.currency}
+                          </span>
                         </div>
                       </div>
                       {renderCompactCouponButton()}
@@ -1810,7 +1854,7 @@ function CartPageContent() {
       <CouponSelectionSheet
         isOpen={showCouponSheet}
         onClose={() => setShowCouponSheet(false)}
-        cartTotal={totals.total}
+        cartTotal={displayTotals.total}
         selectedCoupon={selectedCoupon}
         useFreeShipping={useFreeShipping}
         onCouponSelected={handleCouponSelected}

@@ -57,6 +57,7 @@ const DynamicMarketPage: React.FC = () => {
   const router = useRouter();
   const t = useTranslations();
   const abortRef = useRef<AbortController | null>(null);
+const seqRef = useRef(0);
 
   // ── URL params ─────────────────────────────────────────────────────────────
   const urlParams = useMemo(
@@ -100,19 +101,23 @@ const DynamicMarketPage: React.FC = () => {
   const [specFacets, setSpecFacets] = useState<SpecFacets>({});
 
   /** Stable serialised key so fetch effects only re-run when filters truly change */
-  const filterKey = useMemo(
-    () =>
-      JSON.stringify({
-        subcategories: [...filters.subcategories].sort(),
-        colors: [...filters.colors].sort(),
-        brands: [...filters.brands].sort(),
-        specFilters: filters.specFilters,
-        minPrice: filters.minPrice,
-        maxPrice: filters.maxPrice,
-        minRating: filters.minRating,
-      }),
-    [filters],
-  );
+  const filterKey = useMemo(() => {
+    const sortedSpecFilters: Record<string, string[]> = {};
+    Object.keys(filters.specFilters)
+      .sort()
+      .forEach((k) => {
+        sortedSpecFilters[k] = [...filters.specFilters[k]].sort();
+      });
+    return JSON.stringify({
+      subcategories: [...filters.subcategories].sort(),
+      colors: [...filters.colors].sort(),
+      brands: [...filters.brands].sort(),
+      specFilters: sortedSpecFilters,
+      minPrice: filters.minPrice,
+      maxPrice: filters.maxPrice,
+      minRating: filters.minRating,
+    });
+  }, [filters]);
 
   // ── Streaming: progressively reveal products after each fetch ─────────────
   useEffect(() => {
@@ -190,21 +195,21 @@ const DynamicMarketPage: React.FC = () => {
 
   const fetchProducts = useCallback(
     async (page: number = 0, reset = false) => {
+      const mySeq = ++seqRef.current;
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
-
+  
+      if (reset) {
+        setIsProductsLoading(true);
+        setProducts([]);
+        setCurrentPage(0);
+        setHasMore(true);
+      } else {
+        setIsLoadingMore(true);
+      }
+  
       try {
-        if (reset) {
-          setIsProductsLoading(true);
-          setProducts([]);
-
-          setCurrentPage(0);
-          setHasMore(true);
-        } else {
-          setIsLoadingMore(true);
-        }
-
         const qp = new URLSearchParams({
           ...(urlParams.category && { category: urlParams.category }),
           ...(urlParams.selectedSubcategory && {
@@ -222,7 +227,7 @@ const DynamicMarketPage: React.FC = () => {
           page: page.toString(),
           sort: toSortCode(selectedSort),
         });
-
+  
         if (filters.subcategories.length > 0)
           qp.set("filterSubcategories", filters.subcategories.join(","));
         if (filters.colors.length > 0)
@@ -235,40 +240,35 @@ const DynamicMarketPage: React.FC = () => {
           qp.set("maxPrice", filters.maxPrice.toString());
         if (filters.minRating !== undefined)
           qp.set("minRating", filters.minRating.toString());
-
-        // Spec filters: one param per field, comma-separated values
+  
         for (const [field, vals] of Object.entries(filters.specFilters)) {
           if (vals.length > 0) qp.set(`spec_${field}`, vals.join(","));
         }
-
+  
         const res = await fetch(`/api/fetchDynamicProducts?${qp}`, {
           signal: controller.signal,
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-
+  
+        if (mySeq !== seqRef.current) return;
+  
         if (reset) {
           setProducts(data.products || []);
-
-          // Spec facets arrive on the initial load response
           if (data.specFacets) setSpecFacets(data.specFacets as SpecFacets);
         } else {
           setProducts((prev) => [...prev, ...(data.products || [])]);
         }
-
         setHasMore(data.hasMore ?? false);
         setCurrentPage(page);
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") return;
+        if (mySeq !== seqRef.current) return;
         console.error("DynamicMarketPage fetch error:", err);
         setHasMore(false);
-        if (reset) {
-          setProducts([]);
-        }
+        if (reset) setProducts([]);
       } finally {
-        // Only clear loading states if this request wasn't superseded by a newer one.
-        // Aborted requests should not touch state — the newer request owns it.
-        if (!controller.signal.aborted) {
+        if (mySeq === seqRef.current) {
           setIsInitialLoading(false);
           setIsProductsLoading(false);
           setIsLoadingMore(false);
@@ -279,23 +279,20 @@ const DynamicMarketPage: React.FC = () => {
     [urlParams, selectedSort, filterKey],
   );
 
-  // Initial load
-  useEffect(() => {
-    if (urlParams.category) fetchProducts(0, true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    urlParams.category,
-    urlParams.selectedSubcategory,
-    urlParams.selectedSubSubcategory,
-    urlParams.buyerCategory,
-    urlParams.buyerSubcategory,
-  ]);
-
-  // Re-fetch on sort / filter change
-  useEffect(() => {
-    if (urlParams.category) fetchProducts(0, true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSort, filterKey]);
+  // Unified fetch effect — fires on any context/sort/filter change
+useEffect(() => {
+  if (!urlParams.category) return;
+  fetchProducts(0, true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [
+  urlParams.category,
+  urlParams.selectedSubcategory,
+  urlParams.selectedSubSubcategory,
+  urlParams.buyerCategory,
+  urlParams.buyerSubcategory,
+  selectedSort,
+  filterKey,
+]);
 
   // Scroll-based load-more
   useEffect(() => {

@@ -1185,22 +1185,18 @@ function ProductPaymentPageContent() {
           quantity: item.quantity,
         };
 
-        // Extract dynamic attributes from selectedAttributes map
-        if (
-          item.selectedAttributes &&
-          typeof item.selectedAttributes === "object"
-        ) {
-          const attrs = item.selectedAttributes as Record<string, unknown>;
-          Object.entries(attrs).forEach(([key, value]) => {
-            if (
-              value != null &&
-              value !== "" &&
-              (!Array.isArray(value) || value.length > 0)
-            ) {
-              payload[key] = value as string | number | boolean | string[];
-            }
-          });
-        }
+       // Extract dynamic attributes from selectedAttributes map
+       if (
+        item.selectedAttributes &&
+        typeof item.selectedAttributes === "object"
+      ) {
+        const attrs = item.selectedAttributes as Record<string, unknown>;
+        Object.entries(attrs).forEach(([key, value]) => {
+          if (value != null && value !== "") {
+            payload[key] = value as string | number | boolean | string[];
+          }
+        });
+      }
 
         return payload as PaymentItemPayload;
       });
@@ -1213,12 +1209,13 @@ function ProductPaymentPageContent() {
       // Normalize phone number (matching Flutter)
       const normalizedPhone = `0${formData.phoneNumber.replace(/\D/g, "")}`;
 
-      // ✅ Prepare cart data with discount info (matching Flutter's cartData)
+      // Pricing fields are NOT sent — server recomputes the items subtotal,
+      // delivery price, and final total from authoritative product/coupon/
+      // settings docs. Client may suggest a total via clientExpectedTotal
+      // (sent below) for cross-check only.
       const cartData = {
         items: itemsPayload,
-        cartCalculatedTotal: totalPrice,
         deliveryOption: selectedDeliveryOption,
-        deliveryPrice: getEffectiveDeliveryPrice(), // ✅ Use effective price
         address: {
           addressLine1: formData.addressLine1,
           addressLine2: formData.addressLine2,
@@ -1231,12 +1228,10 @@ function ProductPaymentPageContent() {
         },
         paymentMethod: "Card",
         saveAddress: formData.saveAddress,
-        // ✅ Add discount data (matching Flutter)
         couponId: appliedCoupon?.id ?? null,
         freeShippingBenefitId: useFreeShipping
           ? (freeShippingBenefit?.id ?? selectedBenefitId)
           : null,
-        clientDeliveryPrice: getDeliveryPrice(), // Original delivery price before free shipping
       };
 
       console.log("🔍 Initializing İşbank payment with:", {
@@ -1250,7 +1245,9 @@ function ProductPaymentPageContent() {
       // Initialize İşbank payment
       const initPayment = httpsCallable(functions, "initializeIsbankPayment");
       const initResponse = await initPayment({
-        amount: finalTotal, // ✅ Use finalTotal (matching Flutter)
+        // Server-side cross-check only. Server hard-blocks if its own
+        // calculation diverges from this by more than the tolerance.
+        clientExpectedTotal: finalTotal,
         orderNumber,
         customerName,
         customerEmail,
@@ -1337,10 +1334,43 @@ function ProductPaymentPageContent() {
       } else {
         alert(t("paymentFailed") || "Payment failed. Please try again.");
       }
+
+      // Log error to Firestore (fire-and-forget, non-blocking)
+      logClientError({
+        userId: user?.uid,
+        context: "confirmPayment",
+        error: error instanceof Error ? error.message : String(error),
+        orderNumber: null,
+      });
     } finally {
       setIsProcessing(false);
     }
   };
+
+  // Fire-and-forget error logging. Logging should never break the app.
+  const logClientError = useCallback(
+    async (params: {
+      userId?: string;
+      context: string;
+      error: string;
+      orderNumber: string | null;
+    }) => {
+      try {
+        const { addDoc, collection: fsCollection, serverTimestamp } =
+          await import("firebase/firestore");
+        await addDoc(fsCollection(db, "_client_errors"), {
+          userId: params.userId ?? null,
+          context: params.context,
+          error: params.error,
+          orderNumber: params.orderNumber,
+          timestamp: serverTimestamp(),
+        });
+      } catch {
+        // Silent — logging should never break the app
+      }
+    },
+    [],
+  );
 
   // ========================================================================
   // RENDER

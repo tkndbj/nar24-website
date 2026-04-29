@@ -321,37 +321,38 @@ export default function FavoriteProductsPage() {
 
   return (
     <div className={`min-h-screen flex flex-col transition-colors duration-200 ${isDark ? "bg-gray-950" : "bg-gray-50"}`}>
-      <div className="max-w-6xl mx-auto px-4 pt-6 pb-6 lg:px-8 lg:pt-8 lg:pb-8 flex-1">
+      <div className="max-w-7xl w-full mx-auto px-4 pt-6 pb-10 sm:px-6 lg:px-10 lg:pt-10 lg:pb-16 flex-1">
         {/* Back Button */}
-        <div className="mb-4 lg:mb-6">
+        <div className="mb-6 lg:mb-8">
           <button
             onClick={() => router.back()}
-            className={`p-2 rounded-lg transition-colors border ${isDark ? "bg-gray-800 hover:bg-gray-700 text-gray-400 border-gray-700" : "bg-white hover:bg-gray-100 text-gray-500 border-gray-200"}`}
+            className={`inline-flex items-center gap-2 pl-2.5 pr-3.5 py-2 rounded-full text-sm font-medium transition-colors border ${isDark ? "bg-gray-900 hover:bg-gray-800 text-gray-300 border-gray-800" : "bg-white hover:bg-gray-100 text-gray-700 border-gray-200"}`}
           >
             <ArrowLeft className="w-4 h-4" />
+            <span>{t("back") || "Back"}</span>
           </button>
         </div>
 
         {/* Auth Loading */}
         {isAuthLoading ? (
-          <div className="flex flex-col items-center py-20">
-            <div className="w-6 h-6 border-[2px] border-orange-200 border-t-orange-500 rounded-full animate-spin" />
+          <div className="flex flex-col items-center py-32">
+            <div className="w-8 h-8 border-[2.5px] border-orange-200 border-t-orange-500 rounded-full animate-spin" />
           </div>
         ) : !user ? (
           /* Not Authenticated */
-          <div className={`max-w-md mx-auto rounded-2xl border shadow-sm p-8 text-center ${isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"}`}>
-            <div className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4 ${isDark ? "bg-gray-800" : "bg-gray-100"}`}>
-              <User size={24} className={isDark ? "text-gray-500" : "text-gray-400"} />
+          <div className={`max-w-md mx-auto rounded-3xl border shadow-sm p-10 text-center ${isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"}`}>
+            <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${isDark ? "bg-gray-800" : "bg-orange-50"}`}>
+              <User size={32} className={isDark ? "text-gray-500" : "text-orange-500"} />
             </div>
-            <h3 className={`text-base font-bold mb-1.5 ${isDark ? "text-white" : "text-gray-900"}`}>
+            <h3 className={`text-xl font-bold mb-2 ${isDark ? "text-white" : "text-gray-900"}`}>
               {t("loginRequired") || "Login Required"}
             </h3>
-            <p className={`text-sm mb-5 leading-relaxed ${isDark ? "text-gray-500" : "text-gray-500"}`}>
+            <p className={`text-sm mb-7 leading-relaxed ${isDark ? "text-gray-400" : "text-gray-500"}`}>
               {t("loginToViewFavorites") || "Please log in to view your favorites"}
             </p>
             <button
               onClick={() => router.push("/")}
-              className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-[13px] font-semibold transition-colors"
+              className="inline-flex items-center gap-2 px-7 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold transition-colors shadow-sm"
             >
               <LogIn size={16} />
               <span>{t("login") || "Login"}</span>
@@ -360,21 +361,22 @@ export default function FavoriteProductsPage() {
         ) : (
           /* Authenticated Content */
           <>
-            {/* Title + Count */}
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-3">
-                <h1 className={`text-xl font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
+            {/* Header — Title + Count */}
+            <div className="mb-6 lg:mb-8">
+              <div className="flex items-end gap-3 flex-wrap">
+                <h1 className={`text-3xl lg:text-4xl font-bold tracking-tight ${isDark ? "text-white" : "text-gray-900"}`}>
                   {t("myFavorites")}
                 </h1>
-                <span className={`text-sm ${isDark ? "text-gray-500" : "text-gray-400"}`}>
-                  ({hasMoreData ? `${favoriteCount}+` : favoriteCount} {t("items")})
+                <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold mb-1.5 ${isDark ? "bg-gray-800 text-gray-300" : "bg-gray-100 text-gray-600"}`}>
+                  {hasMoreData ? `${favoriteCount}+` : favoriteCount} {t("items")}
                 </span>
               </div>
+              <div className={`mt-3 h-px w-full ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
             </div>
 
             {/* Basket Widget + Search Row */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
-              <div className="flex-1">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-8">
+              <div className="flex-1 min-w-0">
                 <FavoriteBasketWidget
                   isDarkMode={isDark}
                   onBasketChanged={handleBasketChanged}
@@ -382,13 +384,13 @@ export default function FavoriteProductsPage() {
               </div>
 
               {paginatedFavorites.length > 20 && (
-                <div className={`flex items-center px-3 py-2 rounded-xl border sm:w-64 ${isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200"}`}>
-                  <Search size={14} className={isDark ? "text-gray-600" : "text-gray-400"} />
+                <div className={`flex items-center px-4 py-2.5 rounded-xl border sm:w-72 transition-colors ${isDark ? "bg-gray-900 border-gray-800 focus-within:border-gray-700" : "bg-white border-gray-200 focus-within:border-gray-300 shadow-sm"}`}>
+                  <Search size={16} className={isDark ? "text-gray-500" : "text-gray-400"} />
                   <input
                     type="text"
                     placeholder={t("searchFavorites") || "Search favorites..."}
                     onChange={(e) => onSearchChanged(e.target.value)}
-                    className={`flex-1 ml-2 bg-transparent outline-none text-[13px] ${isDark ? "text-white placeholder-gray-600" : "text-gray-900 placeholder-gray-400"}`}
+                    className={`flex-1 ml-2.5 bg-transparent outline-none text-sm ${isDark ? "text-white placeholder-gray-500" : "text-gray-900 placeholder-gray-400"}`}
                   />
                 </div>
               )}
@@ -398,22 +400,22 @@ export default function FavoriteProductsPage() {
             <div ref={scrollContainerRef} className="w-full">
               {shouldShowShimmer ? (
                 /* Shimmer Grid */
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 lg:gap-4">
-                  {[...Array(10)].map((_, i) => (
+                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5 lg:gap-6">
+                  {[...Array(8)].map((_, i) => (
                     <div
                       key={i}
-                      className={`rounded-xl border animate-pulse overflow-hidden ${isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"}`}
+                      className={`rounded-2xl border animate-pulse overflow-hidden ${isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"}`}
                     >
                       <div className={`aspect-[4/5] w-full ${isDark ? "bg-gray-800" : "bg-gray-100"}`} />
-                      <div className="p-3 space-y-2.5">
-                        <div className={`h-2.5 rounded w-1/3 ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
-                        <div className="space-y-1.5">
-                          <div className={`h-3 rounded w-full ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
-                          <div className={`h-3 rounded w-3/4 ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
+                      <div className="p-4 space-y-3">
+                        <div className={`h-3 rounded w-1/3 ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
+                        <div className="space-y-2">
+                          <div className={`h-4 rounded w-full ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
+                          <div className={`h-4 rounded w-3/4 ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
                         </div>
-                        <div className="flex items-center justify-between pt-1">
-                          <div className={`h-4 rounded w-2/5 ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
-                          <div className={`h-3 rounded w-1/6 ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
+                        <div className="flex items-center justify-between pt-2">
+                          <div className={`h-5 rounded w-2/5 ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
+                          <div className={`h-4 rounded w-1/5 ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
                         </div>
                       </div>
                     </div>
@@ -421,23 +423,23 @@ export default function FavoriteProductsPage() {
                 </div>
               ) : getFilteredItems.length === 0 && !isInitialLoading && !hasMoreData ? (
                 /* Empty State */
-                <div className="flex flex-col items-center py-16">
+                <div className={`flex flex-col items-center justify-center py-20 px-6 rounded-3xl border ${isDark ? "bg-gray-900/50 border-gray-800" : "bg-white border-gray-100"}`}>
                   <Image
                     src="/images/empty-product2.png"
                     alt="No favorites"
-                    width={180}
-                    height={180}
-                    className="mb-6 opacity-90"
+                    width={200}
+                    height={200}
+                    className="mb-7 opacity-90"
                   />
-                  <h3 className={`text-lg font-bold mb-1.5 ${isDark ? "text-white" : "text-gray-900"}`}>
+                  <h3 className={`text-xl font-bold mb-2 ${isDark ? "text-white" : "text-gray-900"}`}>
                     {t("emptyFavorites") || "No Favorites Yet"}
                   </h3>
-                  <p className={`text-sm mb-6 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                  <p className={`text-sm mb-7 max-w-sm text-center ${isDark ? "text-gray-400" : "text-gray-500"}`}>
                     {t("discoverProducts") || "Start exploring and add products to your favorites"}
                   </p>
                   <button
                     onClick={() => router.push("/")}
-                    className="inline-flex items-center space-x-2 px-6 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold transition-colors"
+                    className="inline-flex items-center gap-2 px-7 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold transition-colors shadow-sm"
                   >
                     <ShoppingBag size={16} />
                     <span>{t("discover") || "Discover"}</span>
@@ -446,7 +448,7 @@ export default function FavoriteProductsPage() {
               ) : (
                 /* Favorites Grid */
                 <>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 lg:gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5 lg:gap-6">
                     {getFilteredItems.map((item) => {
                       const product = item.product;
                       const attrs = item.attributes;
@@ -456,19 +458,20 @@ export default function FavoriteProductsPage() {
                       return (
                         <div
                           key={product.id}
-                          className={`group relative rounded-xl overflow-hidden transition-all duration-200 border ${
-                            isDark ? "bg-gray-900 border-gray-800 hover:border-gray-700" : "bg-white border-gray-100 hover:border-gray-200 hover:shadow-md"
-                          } ${isSelected ? (isDark ? "ring-2 ring-orange-500/50 border-orange-500/30" : "ring-2 ring-orange-500/40 border-orange-200") : ""}`}
+                          className={`group relative rounded-2xl overflow-hidden transition-all duration-200 border ${
+                            isDark ? "bg-gray-900 border-gray-800 hover:border-gray-700 hover:shadow-lg hover:shadow-black/30" : "bg-white border-gray-100 hover:border-gray-200 hover:shadow-lg hover:shadow-gray-200/60"
+                          } ${isSelected ? (isDark ? "ring-2 ring-orange-500/60 border-orange-500/40" : "ring-2 ring-orange-500/50 border-orange-300") : ""}`}
                         >
                           {/* Selection Toggle */}
                           <button
                             onClick={() => handleProductSelect(product.id)}
-                            className={`absolute top-2.5 left-2.5 z-10 p-0.5 rounded-full transition-all ${isDark ? "bg-gray-900/80 hover:bg-gray-900" : "bg-white/90 hover:bg-white"} shadow-sm`}
+                            className={`absolute top-3 left-3 z-10 p-1 rounded-full transition-all backdrop-blur-md ${isDark ? "bg-gray-900/80 hover:bg-gray-900 ring-1 ring-white/10" : "bg-white/90 hover:bg-white ring-1 ring-black/5"} shadow-sm`}
+                            aria-label={isSelected ? "Deselect" : "Select"}
                           >
                             {isSelected ? (
-                              <CheckCircle size={20} className="text-orange-500" />
+                              <CheckCircle size={22} className="text-orange-500" />
                             ) : (
-                              <Circle size={20} className={`${isDark ? "text-gray-600" : "text-gray-300"} group-hover:text-gray-400`} />
+                              <Circle size={22} className={`${isDark ? "text-gray-500" : "text-gray-400"} group-hover:text-gray-500`} />
                             )}
                           </button>
 
@@ -483,12 +486,12 @@ export default function FavoriteProductsPage() {
                                 size="card"
                                 alt={product.productName || "Product"}
                                 fill
-                                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                                className="object-cover transition-transform duration-300 group-hover:scale-105"
+                                sizes="(max-width: 640px) 50vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                                className="object-cover transition-transform duration-500 group-hover:scale-[1.04]"
                               />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center">
-                                <Heart size={28} className={isDark ? "text-gray-700" : "text-gray-300"} />
+                                <Heart size={36} className={isDark ? "text-gray-700" : "text-gray-300"} />
                               </div>
                             )}
                           </div>
@@ -496,24 +499,24 @@ export default function FavoriteProductsPage() {
                           {/* Product Info */}
                           <div
                             onClick={() => router.push(`/productdetail/${product.id}`)}
-                            className="cursor-pointer p-3"
+                            className="cursor-pointer p-4"
                           >
                             {product.brandModel && (
-                              <p className={`text-[10px] font-semibold mb-0.5 ${isDark ? "text-blue-400" : "text-blue-600"}`}>
+                              <p className={`text-[11px] font-semibold uppercase tracking-wide mb-1 truncate ${isDark ? "text-blue-400" : "text-blue-600"}`}>
                                 {product.brandModel}
                               </p>
                             )}
-                            <h3 className={`text-xs font-medium line-clamp-2 leading-snug ${isDark ? "text-gray-200" : "text-gray-800"}`}>
+                            <h3 className={`text-sm font-medium line-clamp-2 leading-snug min-h-[2.5rem] ${isDark ? "text-gray-100" : "text-gray-800"}`}>
                               {product.productName || "Product"}
                             </h3>
-                            <div className="flex items-center justify-between mt-2">
-                              <span className={`text-sm font-bold ${isDark ? "text-orange-400" : "text-orange-600"}`}>
+                            <div className={`flex items-center justify-between mt-3 pt-3 border-t border-dashed gap-2 ${isDark ? "border-gray-800" : "border-gray-100"}`}>
+                              <span className={`text-base lg:text-lg font-bold ${isDark ? "text-orange-400" : "text-orange-600"}`}>
                                 {(product.price || 0).toFixed(2)} {product.currency || "TL"}
                               </span>
                               {(product.averageRating || 0) > 0 && (
-                                <div className="flex items-center space-x-0.5">
-                                  <span className="text-amber-400 text-[10px]">&#9733;</span>
-                                  <span className={`text-[10px] ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                                <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md ${isDark ? "bg-gray-800" : "bg-amber-50"}`}>
+                                  <span className="text-amber-400 text-xs leading-none">&#9733;</span>
+                                  <span className={`text-[11px] font-semibold ${isDark ? "text-gray-300" : "text-amber-700"}`}>
                                     {(product.averageRating || 0).toFixed(1)}
                                   </span>
                                 </div>
@@ -527,13 +530,13 @@ export default function FavoriteProductsPage() {
 
                   {/* Loading More Indicator */}
                   {hasMoreData && (
-                    <div className="flex justify-center py-4">
-                      <div className="w-4 h-4 border-[2px] border-orange-200 border-t-orange-500 rounded-full animate-spin" />
+                    <div className="flex justify-center py-8">
+                      <div className="w-6 h-6 border-[2.5px] border-orange-200 border-t-orange-500 rounded-full animate-spin" />
                     </div>
                   )}
 
                   {/* Bottom Padding for bottom sheet */}
-                  {showBottomSheet && <div className="h-20" />}
+                  {showBottomSheet && <div className="h-24" />}
                 </>
               )}
             </div>
@@ -542,23 +545,23 @@ export default function FavoriteProductsPage() {
                 BOTTOM ACTION BAR - Fixed at bottom when product selected
                 ================================================================ */}
             {showBottomSheet && selectedProductId && (
-              <div className={`fixed bottom-0 left-0 right-0 z-40 border-t px-4 py-3 sm:px-6 ${isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200"}`}>
-                <div className="max-w-6xl mx-auto flex space-x-2">
+              <div className={`fixed bottom-0 left-0 right-0 z-40 border-t backdrop-blur-md px-4 py-4 sm:px-6 ${isDark ? "bg-gray-900/95 border-gray-800" : "bg-white/95 border-gray-200"} shadow-[0_-4px_20px_rgba(0,0,0,0.06)]`}>
+                <div className="max-w-7xl mx-auto flex flex-col sm:flex-row gap-2.5 sm:gap-3">
                   {/* Remove Button */}
                   <button
                     onClick={removeSelectedFromFavorites}
-                    className={`flex-1 flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded-xl text-[12px] font-semibold transition-colors ${isDark ? "bg-red-900/40 text-red-300 hover:bg-red-900/60" : "bg-red-50 text-red-600 hover:bg-red-100"}`}
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-semibold transition-colors ${isDark ? "bg-red-900/40 text-red-300 hover:bg-red-900/60" : "bg-red-50 text-red-600 hover:bg-red-100"}`}
                   >
-                    <Trash2 size={14} />
+                    <Trash2 size={16} />
                     <span>{t("remove") || "Remove"}</span>
                   </button>
 
                   {/* Transfer Button */}
                   <button
                     onClick={showTransferBasketDialog}
-                    className={`flex-1 flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded-xl text-[12px] font-semibold transition-colors ${isDark ? "bg-teal-900/40 text-teal-300 hover:bg-teal-900/60" : "bg-teal-50 text-teal-600 hover:bg-teal-100"}`}
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-semibold transition-colors ${isDark ? "bg-teal-900/40 text-teal-300 hover:bg-teal-900/60" : "bg-teal-50 text-teal-600 hover:bg-teal-100"}`}
                   >
-                    <ArrowRight size={14} />
+                    <ArrowRight size={16} />
                     <span>{t("transfer") || "Transfer"}</span>
                   </button>
 
@@ -566,12 +569,12 @@ export default function FavoriteProductsPage() {
                   <button
                     onClick={addSelectedToCart}
                     disabled={isAddingToCart}
-                    className="flex-1 flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-[12px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
                   >
                     {isAddingToCart ? (
-                      <div className="w-3.5 h-3.5 border-[2px] border-white/30 border-t-white rounded-full animate-spin" />
+                      <div className="w-4 h-4 border-[2px] border-white/30 border-t-white rounded-full animate-spin" />
                     ) : (
-                      <ShoppingCart size={14} />
+                      <ShoppingCart size={16} />
                     )}
                     <span>{t("addToCart") || "Add to Cart"}</span>
                   </button>
@@ -587,39 +590,39 @@ export default function FavoriteProductsPage() {
           ================================================================ */}
       {showTransferDialog && selectedProductId && user && (
         <div
-          className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           onClick={() => setShowTransferDialog(false)}
         >
           <div
-            className={`w-full max-w-sm rounded-2xl border shadow-lg p-5 sm:p-6 ${isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"}`}
+            className={`w-full max-w-md rounded-2xl border shadow-2xl p-6 sm:p-7 ${isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"}`}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className={`text-base font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className={`text-lg font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
                 {t("transferToBasket") || "Transfer to Basket"}
               </h3>
               <button
                 onClick={() => setShowTransferDialog(false)}
-                className={`p-1.5 rounded-lg transition-colors ${isDark ? "hover:bg-gray-800 text-gray-500" : "hover:bg-gray-100 text-gray-400"}`}
+                className={`p-2 rounded-lg transition-colors ${isDark ? "hover:bg-gray-800 text-gray-400" : "hover:bg-gray-100 text-gray-500"}`}
               >
                 <X size={18} />
               </button>
             </div>
 
-            <p className={`text-xs mb-4 ${isDark ? "text-gray-500" : "text-gray-500"}`}>
+            <p className={`text-sm mb-5 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
               {t("selectTargetBasket") || "Select where to move this item:"}
             </p>
 
-            <div className="space-y-2 max-h-64 overflow-y-auto">
+            <div className="space-y-2 max-h-72 overflow-y-auto pr-1 -mr-1">
               {/* Default Favorites Option - only show if currently in a basket */}
               {selectedBasketId && (
                 <button
                   onClick={() => handleTransferToBasket(null)}
                   disabled={isTransferring}
-                  className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-left text-[13px] transition-colors ${isDark ? "bg-gray-800/50 border-gray-800 hover:bg-gray-800 text-white" : "bg-gray-50/50 border-gray-100 hover:bg-gray-100 text-gray-900"} ${isTransferring ? "opacity-50 cursor-not-allowed" : ""}`}
+                  className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl border text-left text-sm transition-colors ${isDark ? "bg-gray-800/50 border-gray-800 hover:bg-gray-800 text-white" : "bg-gray-50 border-gray-100 hover:bg-gray-100 text-gray-900"} ${isTransferring ? "opacity-50 cursor-not-allowed" : ""}`}
                 >
                   <span className="font-medium">{t("allFavorites") || "All Favorites"}</span>
-                  <ArrowRight size={14} className={isDark ? "text-gray-600" : "text-gray-400"} />
+                  <ArrowRight size={16} className={isDark ? "text-gray-500" : "text-gray-400"} />
                 </button>
               )}
 
@@ -631,25 +634,25 @@ export default function FavoriteProductsPage() {
                     key={basket.id}
                     onClick={() => handleTransferToBasket(basket.id)}
                     disabled={isTransferring}
-                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-left text-[13px] transition-colors ${isDark ? "bg-gray-800/50 border-gray-800 hover:bg-gray-800 text-white" : "bg-gray-50/50 border-gray-100 hover:bg-gray-100 text-gray-900"} ${isTransferring ? "opacity-50 cursor-not-allowed" : ""}`}
+                    className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl border text-left text-sm transition-colors ${isDark ? "bg-gray-800/50 border-gray-800 hover:bg-gray-800 text-white" : "bg-gray-50 border-gray-100 hover:bg-gray-100 text-gray-900"} ${isTransferring ? "opacity-50 cursor-not-allowed" : ""}`}
                   >
                     <span className="font-medium">{basket.name}</span>
-                    <ArrowRight size={14} className={isDark ? "text-gray-600" : "text-gray-400"} />
+                    <ArrowRight size={16} className={isDark ? "text-gray-500" : "text-gray-400"} />
                   </button>
                 ))}
 
               {/* No baskets available message */}
               {favoriteBaskets.length === 0 && !selectedBasketId && (
-                <div className={`text-center py-6 ${isDark ? "text-gray-500" : "text-gray-500"}`}>
-                  <p className="text-xs mb-1">{t("noBaskets") || "No baskets available"}</p>
-                  <p className="text-[10px]">{t("createBasketFirst") || "Create a basket first to transfer items"}</p>
+                <div className={`text-center py-8 rounded-xl border border-dashed ${isDark ? "text-gray-500 border-gray-800" : "text-gray-500 border-gray-200"}`}>
+                  <p className="text-sm font-medium mb-1">{t("noBaskets") || "No baskets available"}</p>
+                  <p className="text-xs">{t("createBasketFirst") || "Create a basket first to transfer items"}</p>
                 </div>
               )}
 
               {favoriteBaskets.length === 0 && selectedBasketId === null && (
-                <div className={`text-center py-6 ${isDark ? "text-gray-500" : "text-gray-500"}`}>
-                  <p className="text-xs mb-1">{t("noBaskets") || "No baskets available"}</p>
-                  <p className="text-[10px]">{t("createBasketFirst") || "Create a basket first to transfer items"}</p>
+                <div className={`text-center py-8 rounded-xl border border-dashed ${isDark ? "text-gray-500 border-gray-800" : "text-gray-500 border-gray-200"}`}>
+                  <p className="text-sm font-medium mb-1">{t("noBaskets") || "No baskets available"}</p>
+                  <p className="text-xs">{t("createBasketFirst") || "Create a basket first to transfer items"}</p>
                 </div>
               )}
             </div>
@@ -657,7 +660,7 @@ export default function FavoriteProductsPage() {
             {/* Cancel Button */}
             <button
               onClick={() => setShowTransferDialog(false)}
-              className={`w-full mt-4 py-2.5 px-4 rounded-xl text-[13px] font-medium transition-colors ${isDark ? "bg-gray-800 text-gray-300 hover:bg-gray-750" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+              className={`w-full mt-5 py-3 px-4 rounded-xl text-sm font-semibold transition-colors ${isDark ? "bg-gray-800 text-gray-300 hover:bg-gray-700" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
             >
               {t("cancel") || "Cancel"}
             </button>
