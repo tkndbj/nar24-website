@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
 import { createPortal } from "react-dom";
 import {
   ArrowLeft,
@@ -28,7 +34,11 @@ import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/lib/firebase";
-import { mainRegions, regionHierarchy, getMainRegion } from "@/constants/regions";
+import {
+  mainRegions,
+  regionHierarchy,
+  getMainRegion,
+} from "@/constants/regions";
 import type { Product } from "@/app/models/Product";
 
 // ✅ Import discount system
@@ -598,8 +608,10 @@ function ProductPaymentPageContent() {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node;
       if (
-        regionButtonRef.current && !regionButtonRef.current.contains(target) &&
-        dropdownRef.current && !dropdownRef.current.contains(target)
+        regionButtonRef.current &&
+        !regionButtonRef.current.contains(target) &&
+        dropdownRef.current &&
+        !dropdownRef.current.contains(target)
       ) {
         setShowRegionDropdown(false);
       }
@@ -929,42 +941,85 @@ function ProductPaymentPageContent() {
           return;
         }
 
-
         const allCartItemIds = firebaseCartItems.map((item) => item.productId);
 
         // Calculate excluded IDs (items NOT selected)
         const excludedIds = allCartItemIds.filter(
           (id) => !selectedIds.includes(id),
         );
-        
+
         // Pass excluded IDs (matching cart page behavior)
         const freshTotals = await calculateCartTotals(
           excludedIds.length > 0 ? excludedIds : undefined,
         );
 
+        // Build a per-product pricing map from server response.
+        // Server returns two shapes of entries:
+        //   1. Non-bundle: { productId, unitPrice, total, ... }
+        //   2. Bundle:     { productIds: [id1, id2, ...], unitPrice, total, isBundleItem: true, ... }
+        // For bundle entries we map each constituent productId to the bundle's per-unit price.
+        // This matches Flutter's behavior: per-item prices on the payment screen are display-only
+        // (the authoritative total is `freshTotals.total`, server re-validates everything anyway).
         const pricingMap = new Map<
           string,
-          { unitPrice: number; total: number; isBundleItem?: boolean }
+          { unitPrice: number; total: number; isBundleItem: boolean }
         >();
+
+        // Pre-build a lookup of cart items by productId so bundle expansion below
+        // is O(1) per id instead of O(n). Matters when carts get large.
+        const cartItemsByProductId = new Map(
+          selectedCartItems.map((ci) => [ci.productId, ci]),
+        );
+
         freshTotals.items.forEach((itemTotal) => {
-          pricingMap.set(itemTotal.productId, {
-            unitPrice: itemTotal.unitPrice,
-            total: itemTotal.total,
-            isBundleItem: itemTotal.isBundleItem,
-          });
+          const isBundle = itemTotal.isBundleItem === true;
+          const unitPrice = itemTotal.unitPrice ?? 0;
+          const total = itemTotal.total ?? 0;
+
+          // Non-bundle entry — single productId
+          if (typeof itemTotal.productId === "string" && itemTotal.productId) {
+            pricingMap.set(itemTotal.productId, {
+              unitPrice,
+              total,
+              isBundleItem: isBundle,
+            });
+            return;
+          }
+
+          // Bundle entry — split the bundle total across constituent products for display.
+          // `unitPrice` from server is already per-product within the bundle; line total
+          // for each is unitPrice * (that product's quantity in cart).
+          const bundleIds = (itemTotal as { productIds?: string[] }).productIds;
+          if (Array.isArray(bundleIds) && bundleIds.length > 0) {
+            bundleIds.forEach((pid) => {
+              if (typeof pid !== "string" || !pid) return;
+
+              // O(1) lookup instead of array scan
+              const cartItem = cartItemsByProductId.get(pid);
+              const qty = cartItem?.quantity ?? 1;
+
+              pricingMap.set(pid, {
+                unitPrice,
+                total: unitPrice * qty,
+                isBundleItem: true,
+              });
+            });
+          }
         });
 
         const itemsWithPricing: CartItem[] = selectedCartItems.map((item) => {
           const pricing = pricingMap.get(item.productId);
+          // Fallback to cart's denormalized price if server didn't return pricing for this id
+          // (shouldn't happen, but matches Flutter's defensive approach).
+          const fallbackUnit = item.product?.price ?? 0;
           return {
             productId: item.productId,
             quantity: item.quantity,
             productName: item.product?.productName,
             currency: item.product?.currency || "TL",
-            calculatedUnitPrice: pricing?.unitPrice || item.product?.price || 0,
-            calculatedTotal:
-              pricing?.total || (item.product?.price || 0) * item.quantity,
-            isBundleItem: pricing?.isBundleItem || false,
+            calculatedUnitPrice: pricing?.unitPrice ?? fallbackUnit,
+            calculatedTotal: pricing?.total ?? fallbackUnit * item.quantity,
+            isBundleItem: pricing?.isBundleItem ?? false,
             sellerName: item.sellerName,
             sellerId: item.sellerId,
             isShop: item.isShop,
@@ -1166,14 +1221,17 @@ function ProductPaymentPageContent() {
 
   // ✅ Handle payment submission (matching Flutter's confirmPayment)
   const handleSubmit = async () => {
-    if (!user) { alert(t("pleaseLogin")); return; }
-  if (!validateForm()) return;
+    if (!user) {
+      alert(t("pleaseLogin"));
+      return;
+    }
+    if (!validateForm()) return;
 
-  // ✅ FIX 2c: Never submit payment with 0 or negative total
-  if (finalTotal <= 0) {
-    alert(t("invalidTotal") || "Order total must be greater than zero.");
-    return;
-  }
+    // ✅ FIX 2c: Never submit payment with 0 or negative total
+    if (finalTotal <= 0) {
+      alert(t("invalidTotal") || "Order total must be greater than zero.");
+      return;
+    }
 
     setIsProcessing(true);
 
@@ -1185,18 +1243,18 @@ function ProductPaymentPageContent() {
           quantity: item.quantity,
         };
 
-       // Extract dynamic attributes from selectedAttributes map
-       if (
-        item.selectedAttributes &&
-        typeof item.selectedAttributes === "object"
-      ) {
-        const attrs = item.selectedAttributes as Record<string, unknown>;
-        Object.entries(attrs).forEach(([key, value]) => {
-          if (value != null && value !== "") {
-            payload[key] = value as string | number | boolean | string[];
-          }
-        });
-      }
+        // Extract dynamic attributes from selectedAttributes map
+        if (
+          item.selectedAttributes &&
+          typeof item.selectedAttributes === "object"
+        ) {
+          const attrs = item.selectedAttributes as Record<string, unknown>;
+          Object.entries(attrs).forEach(([key, value]) => {
+            if (value != null && value !== "") {
+              payload[key] = value as string | number | boolean | string[];
+            }
+          });
+        }
 
         return payload as PaymentItemPayload;
       });
@@ -1356,8 +1414,11 @@ function ProductPaymentPageContent() {
       orderNumber: string | null;
     }) => {
       try {
-        const { addDoc, collection: fsCollection, serverTimestamp } =
-          await import("firebase/firestore");
+        const {
+          addDoc,
+          collection: fsCollection,
+          serverTimestamp,
+        } = await import("firebase/firestore");
         await addDoc(fsCollection(db, "_client_errors"), {
           userId: params.userId ?? null,
           context: params.context,
@@ -1851,8 +1912,12 @@ function ProductPaymentPageContent() {
                           <span
                             className={
                               formData.city
-                                ? isDarkMode ? "text-white" : "text-gray-900"
-                                : isDarkMode ? "text-gray-500" : "text-gray-500"
+                                ? isDarkMode
+                                  ? "text-white"
+                                  : "text-gray-900"
+                                : isDarkMode
+                                  ? "text-gray-500"
+                                  : "text-gray-500"
                             }
                           >
                             {formData.city || t("selectYourCity")}
@@ -1863,80 +1928,97 @@ function ProductPaymentPageContent() {
                           />
                         </button>
 
-                        {showRegionDropdown && regionButtonRef.current && createPortal(
-                          <div
-                            ref={dropdownRef}
-                            style={{
-                              position: "fixed",
-                              top: regionButtonRef.current.getBoundingClientRect().bottom + 4,
-                              left: regionButtonRef.current.getBoundingClientRect().left,
-                              width: regionButtonRef.current.getBoundingClientRect().width,
-                              zIndex: 9999,
-                            }}
-                          >
+                        {showRegionDropdown &&
+                          regionButtonRef.current &&
+                          createPortal(
                             <div
-                              className={`border rounded-xl shadow-xl max-h-60 overflow-y-auto backdrop-blur-sm ${
-                                isDarkMode
-                                  ? "bg-gray-800/95 border-gray-600"
-                                  : "bg-white/95 border-gray-300"
-                              }`}
+                              ref={dropdownRef}
+                              style={{
+                                position: "fixed",
+                                top:
+                                  regionButtonRef.current.getBoundingClientRect()
+                                    .bottom + 4,
+                                left: regionButtonRef.current.getBoundingClientRect()
+                                  .left,
+                                width:
+                                  regionButtonRef.current.getBoundingClientRect()
+                                    .width,
+                                zIndex: 9999,
+                              }}
                             >
-                              {!selectedMainRegion ? (
-                                mainRegions.map((region) => (
-                                  <button
-                                    key={region}
-                                    type="button"
-                                    onClick={() => setSelectedMainRegion(region)}
-                                    className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 text-left transition-colors text-sm sm:text-base flex items-center justify-between ${
-                                      isDarkMode
-                                        ? "text-white hover:bg-gray-700"
-                                        : "text-gray-900 hover:bg-gray-100"
-                                    }`}
-                                  >
-                                    <span className="font-medium">{region}</span>
-                                    <ChevronDown size={14} className={`sm:size-4 -rotate-90 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`} />
-                                  </button>
-                                ))
-                              ) : (
-                                <>
-                                  <button
-                                    type="button"
-                                    onClick={() => setSelectedMainRegion("")}
-                                    className={`w-full px-3 sm:px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider border-b flex items-center gap-1.5 ${
-                                      isDarkMode
-                                        ? "text-orange-400 border-gray-600 bg-gray-800/80"
-                                        : "text-orange-600 border-gray-200 bg-gray-50"
-                                    }`}
-                                  >
-                                    <ChevronDown size={12} className={`rotate-90 ${isDarkMode ? "text-orange-400" : "text-orange-600"}`} />
-                                    {selectedMainRegion}
-                                  </button>
-                                  {subregions.map((sub) => (
+                              <div
+                                className={`border rounded-xl shadow-xl max-h-60 overflow-y-auto backdrop-blur-sm ${
+                                  isDarkMode
+                                    ? "bg-gray-800/95 border-gray-600"
+                                    : "bg-white/95 border-gray-300"
+                                }`}
+                              >
+                                {!selectedMainRegion ? (
+                                  mainRegions.map((region) => (
                                     <button
-                                      key={sub}
+                                      key={region}
                                       type="button"
-                                      onClick={() => {
-                                        handleInputChange("city", sub);
-                                        setShowRegionDropdown(false);
-                                        setSelectedMainRegion("");
-                                      }}
-                                      className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 text-left transition-colors text-sm sm:text-base ${
-                                        formData.city === sub
-                                          ? "bg-orange-500 text-white"
-                                          : isDarkMode
-                                            ? "text-white hover:bg-gray-700"
-                                            : "text-gray-900 hover:bg-gray-100"
+                                      onClick={() =>
+                                        setSelectedMainRegion(region)
+                                      }
+                                      className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 text-left transition-colors text-sm sm:text-base flex items-center justify-between ${
+                                        isDarkMode
+                                          ? "text-white hover:bg-gray-700"
+                                          : "text-gray-900 hover:bg-gray-100"
                                       }`}
                                     >
-                                      {sub}
+                                      <span className="font-medium">
+                                        {region}
+                                      </span>
+                                      <ChevronDown
+                                        size={14}
+                                        className={`sm:size-4 -rotate-90 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
+                                      />
                                     </button>
-                                  ))}
-                                </>
-                              )}
-                            </div>
-                          </div>,
-                          document.body
-                        )}
+                                  ))
+                                ) : (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => setSelectedMainRegion("")}
+                                      className={`w-full px-3 sm:px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider border-b flex items-center gap-1.5 ${
+                                        isDarkMode
+                                          ? "text-orange-400 border-gray-600 bg-gray-800/80"
+                                          : "text-orange-600 border-gray-200 bg-gray-50"
+                                      }`}
+                                    >
+                                      <ChevronDown
+                                        size={12}
+                                        className={`rotate-90 ${isDarkMode ? "text-orange-400" : "text-orange-600"}`}
+                                      />
+                                      {selectedMainRegion}
+                                    </button>
+                                    {subregions.map((sub) => (
+                                      <button
+                                        key={sub}
+                                        type="button"
+                                        onClick={() => {
+                                          handleInputChange("city", sub);
+                                          setShowRegionDropdown(false);
+                                          setSelectedMainRegion("");
+                                        }}
+                                        className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 text-left transition-colors text-sm sm:text-base ${
+                                          formData.city === sub
+                                            ? "bg-orange-500 text-white"
+                                            : isDarkMode
+                                              ? "text-white hover:bg-gray-700"
+                                              : "text-gray-900 hover:bg-gray-100"
+                                        }`}
+                                      >
+                                        {sub}
+                                      </button>
+                                    ))}
+                                  </>
+                                )}
+                              </div>
+                            </div>,
+                            document.body,
+                          )}
 
                         {errors.city && (
                           <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm text-red-500 flex items-center space-x-1">
@@ -2341,7 +2423,9 @@ function ProductPaymentPageContent() {
                           : (typeof item.price === "number" ? item.price : 0) *
                             item.quantity
                         ).toFixed(2)}{" "}
-                        <span className="text-xs font-normal">{item.currency || "TL"}</span>
+                        <span className="text-xs font-normal">
+                          {item.currency || "TL"}
+                        </span>
                       </span>
                     </div>
                   </div>

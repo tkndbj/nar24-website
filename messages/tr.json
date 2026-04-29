@@ -5160,6 +5160,19 @@
       }
     }
   },
+  "agreementModal": {
+    "title": "Nar24'e Hoş Geldiniz",
+    "subtitle": "Devam etmeden önce lütfen aşağıdaki sözleşmeleri inceleyip kabul edin.",
+    "iAccept": "Kabul ediyorum:",
+    "membershipAgreement": "Üyelik Sözleşmesi",
+    "personalDataProtection": "Kişisel Verilerin Korunması Politikası",
+    "termsAndConditions": "Kullanım Koşulları",
+    "acceptButton": "Kabul Et & Devam Et",
+    "saving": "Kaydediliyor...",
+    "errors": {
+      "saveFailed": "Kaydedilemedi. Lütfen tekrar deneyin."
+    }
+  },
   "completeProfile": {
     "title": "Profilini Tamamla",
     "subtitle": "Devam etmek için lütfen eksik alanları doldurun",

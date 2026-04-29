@@ -5059,6 +5059,19 @@
       "description": "For exercising your right of withdrawal, you can use the withdrawal form by contacting our customer service or downloading it from our website. The form should include: Order date or delivery date, goods or services subject to withdrawal, price, buyer's name and surname, ID/passport number, telephone, address, and signature (if sent on paper)."
     }
   },
+  "agreementModal": {
+    "title": "Welcome to Nar24",
+    "subtitle": "Before you continue, please review and accept the following agreements.",
+    "iAccept": "I accept the",
+    "membershipAgreement": "Membership Agreement",
+    "personalDataProtection": "Personal Data Protection Policy",
+    "termsAndConditions": "Terms and Conditions",
+    "acceptButton": "Accept & Continue",
+    "saving": "Saving...",
+    "errors": {
+      "saveFailed": "Failed to save. Please try again."
+    }
+  },
   "completeProfile": {
     "title": "Complete Your Profile",
     "subtitle": "Please fill in the missing fields to continue",

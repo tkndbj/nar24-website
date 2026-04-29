@@ -30,6 +30,12 @@ const AppDownloadModal = dynamic(
   { ssr: false },
 );
 
+// Lazy load AgreementModal - only shown to signed-in users without accepted agreements
+const AgreementModal = dynamic(
+  () => import("../components/AgreementModal"),
+  { ssr: false },
+);
+
 // Inner component that has access to user context and lazy-loaded Firebase
 // Uses composite providers to reduce visual nesting from 14 levels to 6
 function AppProviders({
@@ -51,6 +57,7 @@ function AppProviders({
         <main className="isolate">{children}</main>
         <CookieConsent />
         <AppDownloadModal />
+        <AgreementModal />
       </UIProviders>
     </CommerceProviders>
   );
