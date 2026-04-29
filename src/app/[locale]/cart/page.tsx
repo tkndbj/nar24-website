@@ -833,48 +833,48 @@ function CartPageContent() {
 
     return (
       <div
-        className={`p-3 rounded-xl mb-3 border ${
+        className={`p-4 rounded-xl mb-4 border ${
           isDark
             ? "bg-emerald-900/15 border-emerald-800/40"
-            : "bg-emerald-50/50 border-emerald-200"
+            : "bg-emerald-50/60 border-emerald-200"
         }`}
       >
         <div className="flex justify-between items-center">
           <span
-            className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}
+            className={`text-xs font-medium ${isDark ? "text-gray-400" : "text-gray-600"}`}
           >
             {t("subtotal", "Subtotal")}
           </span>
           <span
-            className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}
+            className={`text-xs font-semibold ${isDark ? "text-gray-300" : "text-gray-700"}`}
           >
             {subtotal.toFixed(2)} {displayTotals.currency}
           </span>
         </div>
 
         {couponDiscount > 0 && (
-          <div className="flex justify-between items-center mt-1.5">
-            <div className="flex items-center space-x-1">
-              <Tag size={12} className="text-emerald-500" />
-              <span className="text-xs font-medium text-emerald-600">
+          <div className="flex justify-between items-center mt-2">
+            <div className="flex items-center gap-1.5">
+              <Tag size={13} className="text-emerald-500" />
+              <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
                 {selectedCoupon?.code || t("coupon", "Coupon")}
               </span>
             </div>
-            <span className="text-xs font-semibold text-emerald-600">
+            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
               -{couponDiscount.toFixed(2)} {displayTotals.currency}
             </span>
           </div>
         )}
 
         {useFreeShipping && (
-          <div className="flex justify-between items-center mt-1.5">
-            <div className="flex items-center space-x-1">
-              <Truck size={12} className="text-emerald-500" />
-              <span className="text-xs font-medium text-emerald-600">
+          <div className="flex justify-between items-center mt-2">
+            <div className="flex items-center gap-1.5">
+              <Truck size={13} className="text-emerald-500" />
+              <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
                 {t("freeShipping", "Free Shipping")}
               </span>
             </div>
-            <span className="text-xs font-semibold text-emerald-600">
+            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
               {t("applied", "Applied")}
             </span>
           </div>
@@ -898,21 +898,21 @@ function CartPageContent() {
     return (
       <button
         onClick={showCouponSelectionSheet}
-        className={`px-2.5 py-1.5 rounded-lg border transition-colors ${
+        className={`flex-shrink-0 px-3 py-2 rounded-xl border transition-all hover:shadow-sm ${
           hasAnyDiscount
-            ? "border-emerald-500/30 bg-emerald-500/10"
-            : "border-orange-500/30 bg-orange-500/10"
+            ? "border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/15"
+            : "border-orange-500/40 bg-orange-500/10 hover:bg-orange-500/15"
         }`}
       >
-        <div className="flex items-center space-x-1.5">
+        <div className="flex items-center gap-1.5">
           {hasAnyDiscount ? (
-            <Check size={12} className="text-emerald-500" />
+            <Check size={13} className="text-emerald-500" />
           ) : (
-            <Ticket size={12} className="text-orange-500" />
+            <Ticket size={13} className="text-orange-500" />
           )}
           <span
-            className={`text-[11px] font-semibold ${
-              hasAnyDiscount ? "text-emerald-600" : "text-orange-600"
+            className={`text-xs font-semibold ${
+              hasAnyDiscount ? "text-emerald-600 dark:text-emerald-400" : "text-orange-600 dark:text-orange-400"
             }`}
           >
             {hasAnyDiscount
@@ -962,24 +962,24 @@ function CartPageContent() {
         <div key={item.productId}>
           {item.showSellerHeader && (
             <div
-              className={`flex items-center space-x-1.5 px-2 py-1.5 mb-1 rounded-lg ${
-                isDark ? "bg-gray-800/60" : "bg-orange-500"
+              className={`flex items-center gap-2 px-3 py-2 mt-3 rounded-lg ${
+                isDark ? "bg-gray-800/70" : "bg-orange-50"
               }`}
             >
               {item.isShop ? (
                 <ShoppingBag
-                  size={11}
-                  className={isDark ? "text-orange-500" : "text-white"}
+                  size={13}
+                  className={isDark ? "text-orange-400" : "text-orange-500"}
                 />
               ) : (
                 <User
-                  size={11}
-                  className={isDark ? "text-orange-500" : "text-white"}
+                  size={13}
+                  className={isDark ? "text-orange-400" : "text-orange-500"}
                 />
               )}
               <span
-                className={`text-[11px] font-medium ${
-                  isDark ? "text-gray-300" : "text-white"
+                className={`text-xs font-semibold ${
+                  isDark ? "text-gray-200" : "text-orange-700"
                 }`}
               >
                 {item.sellerName}
@@ -988,7 +988,7 @@ function CartPageContent() {
           )}
 
           <div
-            className={`py-4 px-2 sm:px-0 ${
+            className={`py-5 ${
               index < cartItems.length - 1
                 ? `border-b ${isDark ? "border-gray-800/60" : "border-gray-100"}`
                 : ""
@@ -1021,8 +1021,8 @@ function CartPageContent() {
               </div>
 
               <div
-                className={`relative w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden cursor-pointer border ${
-                  isDark ? "border-gray-700" : "border-gray-200"
+                className={`relative w-20 h-20 flex-shrink-0 rounded-xl overflow-hidden cursor-pointer border ${
+                  isDark ? "border-gray-800 bg-gray-800" : "border-gray-100 bg-gray-50"
                 }`}
                 onClick={() => router.push(`/productdetail/${item.productId}`)}
               >
@@ -1036,7 +1036,7 @@ function CartPageContent() {
                   alt={item.product?.productName || ""}
                   fill
                   className="object-cover"
-                  sizes="64px"
+                  sizes="80px"
                 />
               </div>
 
@@ -1046,7 +1046,7 @@ function CartPageContent() {
               >
                 {item.product?.brandModel && (
                   <p
-                    className={`text-[10px] font-medium mb-0.5 ${
+                    className={`text-[11px] font-semibold uppercase tracking-wide mb-0.5 ${
                       isDark ? "text-blue-400" : "text-blue-600"
                     }`}
                   >
@@ -1054,7 +1054,7 @@ function CartPageContent() {
                   </p>
                 )}
                 <h3
-                  className={`text-sm font-medium line-clamp-2 leading-snug ${
+                  className={`text-sm font-semibold line-clamp-2 leading-snug ${
                     isDark ? "text-white" : "text-gray-900"
                   }`}
                 >
@@ -1063,18 +1063,18 @@ function CartPageContent() {
                 </h3>
                 {attributesDisplay && (
                   <p
-                    className={`text-[11px] mt-0.5 ${
-                      isDark ? "text-gray-500" : "text-gray-400"
+                    className={`text-xs mt-1 ${
+                      isDark ? "text-gray-500" : "text-gray-500"
                     }`}
                   >
                     {attributesDisplay}
                   </p>
                 )}
                 {availableStock < 10 && (
-                  <p className="text-[10px] text-red-500 mt-0.5">
+                  <span className="inline-block mt-1.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400">
                     {t("onlyLeft", "Only")} {availableStock}{" "}
                     {t("left", "left")}
-                  </p>
+                  </span>
                 )}
               </div>
 
@@ -1088,7 +1088,7 @@ function CartPageContent() {
                 </span>
                 {hasBulkDiscount && (
                   <p
-                    className={`text-[10px] line-through ${
+                    className={`text-[11px] line-through ${
                       isDark ? "text-gray-600" : "text-gray-400"
                     }`}
                   >
@@ -1100,7 +1100,7 @@ function CartPageContent() {
               <div className="flex items-center justify-center">
                 <div
                   className={`inline-flex items-center rounded-lg border ${
-                    isDark ? "border-gray-700" : "border-gray-200"
+                    isDark ? "border-gray-700 bg-gray-800/40" : "border-gray-200 bg-gray-50"
                   }`}
                 >
                   <button
@@ -1111,16 +1111,16 @@ function CartPageContent() {
                       }
                     }}
                     disabled={item.quantity <= 1 || item.isOptimistic}
-                    className={`p-1.5 transition-colors ${
+                    className={`p-2 transition-colors ${
                       isDark
-                        ? "hover:bg-gray-700 text-gray-400"
-                        : "hover:bg-gray-100 text-gray-500"
+                        ? "hover:bg-gray-700 text-gray-300"
+                        : "hover:bg-gray-200 text-gray-600"
                     } disabled:opacity-40 disabled:cursor-not-allowed`}
                   >
-                    <Minus size={13} />
+                    <Minus size={14} />
                   </button>
                   <span
-                    className={`min-w-[32px] text-center text-sm font-semibold ${
+                    className={`min-w-[36px] text-center text-sm font-bold ${
                       isDark ? "text-white" : "text-gray-900"
                     }`}
                   >
@@ -1134,20 +1134,20 @@ function CartPageContent() {
                       }
                     }}
                     disabled={item.quantity >= maxQuantity || item.isOptimistic}
-                    className={`p-1.5 transition-colors ${
+                    className={`p-2 transition-colors ${
                       isDark
-                        ? "hover:bg-gray-700 text-gray-400"
-                        : "hover:bg-gray-100 text-gray-500"
+                        ? "hover:bg-gray-700 text-gray-300"
+                        : "hover:bg-gray-200 text-gray-600"
                     } disabled:opacity-40 disabled:cursor-not-allowed`}
                   >
-                    <Plus size={13} />
+                    <Plus size={14} />
                   </button>
                 </div>
               </div>
 
               <div className="text-right">
                 <span
-                  className={`text-sm font-bold ${
+                  className={`text-base font-bold ${
                     isDark ? "text-white" : "text-gray-900"
                   }`}
                 >
@@ -1161,19 +1161,20 @@ function CartPageContent() {
                   handleRemoveItem(item.productId);
                 }}
                 disabled={item.isOptimistic}
-                className={`p-1.5 rounded-lg transition-colors ${
+                className={`p-2 rounded-lg transition-colors ${
                   isDark
-                    ? "text-gray-600 hover:text-red-400 hover:bg-red-900/20"
-                    : "text-gray-300 hover:text-red-500 hover:bg-red-50"
+                    ? "text-gray-500 hover:text-red-400 hover:bg-red-900/20"
+                    : "text-gray-400 hover:text-red-500 hover:bg-red-50"
                 } disabled:opacity-50 disabled:cursor-not-allowed`}
+                aria-label={t("remove", "Remove")}
               >
-                <Trash2 size={15} />
+                <Trash2 size={16} />
               </button>
             </div>
 
             {/* Mobile layout */}
             <div className="lg:hidden">
-              <div className="flex items-start space-x-2 sm:space-x-3">
+              <div className="flex items-start gap-3">
                 <div
                   onClick={(e) => {
                     e.stopPropagation();
@@ -1187,7 +1188,7 @@ function CartPageContent() {
                       return newSet;
                     });
                   }}
-                  className="cursor-pointer pt-1"
+                  className="cursor-pointer pt-1.5"
                 >
                   <input
                     type="checkbox"
@@ -1199,8 +1200,8 @@ function CartPageContent() {
                 </div>
 
                 <div
-                  className={`relative w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden cursor-pointer border ${
-                    isDark ? "border-gray-700" : "border-gray-200"
+                  className={`relative w-24 h-24 flex-shrink-0 rounded-xl overflow-hidden cursor-pointer border ${
+                    isDark ? "border-gray-800 bg-gray-800" : "border-gray-100 bg-gray-50"
                   }`}
                   onClick={() =>
                     router.push(`/productdetail/${item.productId}`)
@@ -1216,7 +1217,7 @@ function CartPageContent() {
                     alt={item.product?.productName || ""}
                     fill
                     className="object-cover"
-                    sizes="80px"
+                    sizes="96px"
                   />
                 </div>
 
@@ -1229,7 +1230,7 @@ function CartPageContent() {
                   >
                     {item.product?.brandModel && (
                       <p
-                        className={`text-[10px] font-medium mb-0.5 ${
+                        className={`text-[11px] font-semibold uppercase tracking-wide mb-0.5 ${
                           isDark ? "text-blue-400" : "text-blue-600"
                         }`}
                       >
@@ -1237,7 +1238,7 @@ function CartPageContent() {
                       </p>
                     )}
                     <h3
-                      className={`text-sm font-medium line-clamp-2 leading-snug ${
+                      className={`text-sm font-semibold line-clamp-2 leading-snug ${
                         isDark ? "text-white" : "text-gray-900"
                       }`}
                     >
@@ -1246,8 +1247,8 @@ function CartPageContent() {
                     </h3>
                     {attributesDisplay && (
                       <p
-                        className={`text-[11px] mt-0.5 ${
-                          isDark ? "text-gray-500" : "text-gray-400"
+                        className={`text-xs mt-1 ${
+                          isDark ? "text-gray-500" : "text-gray-500"
                         }`}
                       >
                         {attributesDisplay}
@@ -1255,30 +1256,32 @@ function CartPageContent() {
                     )}
                   </div>
 
-                  <p className="text-sm font-bold text-orange-500 mt-1">
-                    {subtotal.toFixed(2)} {currency}
+                  <div className="flex items-baseline gap-2 mt-2 flex-wrap">
+                    <span className="text-base font-bold text-orange-500">
+                      {subtotal.toFixed(2)} {currency}
+                    </span>
                     {item.quantity > 1 && (
                       <span
-                        className={`text-[10px] font-normal ml-1.5 ${
+                        className={`text-[11px] ${
                           isDark ? "text-gray-500" : "text-gray-400"
                         }`}
                       >
-                        ({effectivePrice.toFixed(2)} x {item.quantity})
+                        ({effectivePrice.toFixed(2)} × {item.quantity})
                       </span>
                     )}
-                  </p>
+                  </div>
 
                   {availableStock < 10 && (
-                    <p className="text-[10px] text-red-500 mt-0.5">
+                    <span className="inline-block mt-1.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400">
                       {t("onlyLeft", "Only")} {availableStock}{" "}
                       {t("left", "left")}
-                    </p>
+                    </span>
                   )}
 
-                  <div className="flex items-center justify-between mt-2">
+                  <div className="flex items-center justify-between mt-3">
                     <div
                       className={`inline-flex items-center rounded-lg border ${
-                        isDark ? "border-gray-700" : "border-gray-200"
+                        isDark ? "border-gray-700 bg-gray-800/40" : "border-gray-200 bg-gray-50"
                       }`}
                     >
                       <button
@@ -1292,16 +1295,16 @@ function CartPageContent() {
                           }
                         }}
                         disabled={item.quantity <= 1 || item.isOptimistic}
-                        className={`p-1 transition-colors ${
+                        className={`p-1.5 transition-colors ${
                           isDark
-                            ? "hover:bg-gray-700 text-gray-400"
-                            : "hover:bg-gray-100 text-gray-500"
+                            ? "hover:bg-gray-700 text-gray-300"
+                            : "hover:bg-gray-200 text-gray-600"
                         } disabled:opacity-40 disabled:cursor-not-allowed`}
                       >
-                        <Minus size={13} />
+                        <Minus size={14} />
                       </button>
                       <span
-                        className={`min-w-[28px] text-center text-xs font-semibold ${
+                        className={`min-w-[32px] text-center text-sm font-bold ${
                           isDark ? "text-white" : "text-gray-900"
                         }`}
                       >
@@ -1320,13 +1323,13 @@ function CartPageContent() {
                         disabled={
                           item.quantity >= maxQuantity || item.isOptimistic
                         }
-                        className={`p-1 transition-colors ${
+                        className={`p-1.5 transition-colors ${
                           isDark
-                            ? "hover:bg-gray-700 text-gray-400"
-                            : "hover:bg-gray-100 text-gray-500"
+                            ? "hover:bg-gray-700 text-gray-300"
+                            : "hover:bg-gray-200 text-gray-600"
                         } disabled:opacity-40 disabled:cursor-not-allowed`}
                       >
-                        <Plus size={13} />
+                        <Plus size={14} />
                       </button>
                     </div>
                     <button
@@ -1335,13 +1338,14 @@ function CartPageContent() {
                         handleRemoveItem(item.productId);
                       }}
                       disabled={item.isOptimistic}
-                      className={`p-1.5 rounded-lg transition-colors ${
+                      className={`p-2 rounded-lg transition-colors ${
                         isDark
-                          ? "text-gray-600 hover:text-red-400"
-                          : "text-gray-400 hover:text-red-500"
+                          ? "text-gray-500 hover:text-red-400 hover:bg-red-900/20"
+                          : "text-gray-400 hover:text-red-500 hover:bg-red-50"
                       } disabled:opacity-50 disabled:cursor-not-allowed`}
+                      aria-label={t("remove", "Remove")}
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={16} />
                     </button>
                   </div>
                 </div>
@@ -1351,7 +1355,7 @@ function CartPageContent() {
             {/* Sale Preference Label */}
             {salePrefs?.discountThreshold &&
               salePrefs?.bulkDiscountPercentage && (
-                <div className="mt-2 lg:ml-[88px]">
+                <div className="mt-2 lg:ml-[128px]">
                   <div
                     className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
                       item.quantity >= salePrefs.discountThreshold
@@ -1379,7 +1383,7 @@ function CartPageContent() {
               )}
 
             {item.isShop && item.sellerId && (
-              <div className="mt-2 lg:ml-[88px]">
+              <div className="mt-2 lg:ml-[128px]">
                 <CompactBundleWidget
                   productId={item.productId}
                   shopId={item.sellerId}
@@ -1415,320 +1419,259 @@ function CartPageContent() {
         isDark ? "bg-gray-950" : "bg-gray-50"
       }`}
     >
-      <div className="max-w-6xl mx-auto px-0 sm:px-4 pt-4 pb-0 lg:px-8 lg:pt-8 lg:pb-8 flex-1 w-full">
-        <div className="mb-4 lg:mb-6 px-2 sm:px-0">
+      <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-10 pt-6 pb-10 lg:pt-10 lg:pb-16 flex-1">
+        <div className="mb-6 lg:mb-8">
           <button
             onClick={() => router.back()}
-            className={`p-2 rounded-lg transition-colors border ${
+            className={`inline-flex items-center gap-2 pl-2.5 pr-3.5 py-2 rounded-full text-sm font-medium transition-colors border ${
               isDark
-                ? "bg-gray-800 hover:bg-gray-700 text-gray-400 border-gray-700"
-                : "bg-white hover:bg-gray-100 text-gray-500 border-gray-200"
+                ? "bg-gray-900 hover:bg-gray-800 text-gray-300 border-gray-800"
+                : "bg-white hover:bg-gray-100 text-gray-700 border-gray-200"
             }`}
           >
             <ArrowLeft className="w-4 h-4" />
+            <span>{t("back", "Back")}</span>
           </button>
         </div>
 
         {isAuthLoading ? (
-          <div className="flex flex-col items-center py-20">
-            <div className="w-6 h-6 border-[2px] border-orange-200 border-t-orange-500 rounded-full animate-spin" />
+          <div className="flex flex-col items-center py-32">
+            <div className="w-8 h-8 border-[2.5px] border-orange-200 border-t-orange-500 rounded-full animate-spin" />
           </div>
         ) : !user ? (
           <div
-            className={`max-w-md mx-auto rounded-2xl border shadow-sm p-8 text-center ${
+            className={`max-w-md mx-auto rounded-3xl border shadow-sm p-10 text-center ${
               isDark
                 ? "bg-gray-900 border-gray-800"
                 : "bg-white border-gray-100"
             }`}
           >
             <div
-              className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4 ${
-                isDark ? "bg-gray-800" : "bg-gray-100"
+              className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${
+                isDark ? "bg-gray-800" : "bg-orange-50"
               }`}
             >
               <User
-                size={24}
-                className={isDark ? "text-gray-500" : "text-gray-400"}
+                size={32}
+                className={isDark ? "text-gray-500" : "text-orange-500"}
               />
             </div>
             <h3
-              className={`text-base font-bold mb-1.5 ${
+              className={`text-xl font-bold mb-2 ${
                 isDark ? "text-white" : "text-gray-900"
               }`}
             >
               {t("loginRequired", "Login Required")}
             </h3>
             <p
-              className={`text-sm mb-5 leading-relaxed ${
-                isDark ? "text-gray-500" : "text-gray-500"
+              className={`text-sm mb-7 leading-relaxed ${
+                isDark ? "text-gray-400" : "text-gray-500"
               }`}
             >
               {t("loginToViewCart", "Please log in to view your cart")}
             </p>
             <button
               onClick={() => router.push("/")}
-              className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-[13px] font-semibold transition-colors"
+              className="inline-flex items-center gap-2 px-7 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold transition-colors shadow-sm"
             >
               <LogIn size={16} />
               <span>{t("login", "Login")}</span>
             </button>
           </div>
         ) : isLoading && !isInitialized ? (
-          <div className="flex flex-col items-center py-20">
-            <div className="w-6 h-6 border-[2px] border-orange-200 border-t-orange-500 rounded-full animate-spin mb-3" />
+          <div className="flex flex-col items-center py-32">
+            <div className="w-8 h-8 border-[2.5px] border-orange-200 border-t-orange-500 rounded-full animate-spin mb-4" />
             <p
-              className={`text-sm ${isDark ? "text-gray-500" : "text-gray-400"}`}
+              className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}
             >
               {t("loading", "Loading...")}
             </p>
           </div>
         ) : cartCount === 0 ? (
-          <div className="flex flex-col items-center py-16">
+          <div
+            className={`flex flex-col items-center justify-center py-20 px-6 rounded-3xl border ${
+              isDark
+                ? "bg-gray-900/50 border-gray-800"
+                : "bg-white border-gray-100"
+            }`}
+          >
             <Image
               src="/images/empty-product2.png"
               alt="Empty cart"
-              width={180}
-              height={180}
-              className="mb-6 opacity-90"
+              width={200}
+              height={200}
+              className="mb-7 opacity-90"
             />
             <h3
-              className={`text-lg font-bold mb-1.5 ${
+              className={`text-xl font-bold mb-2 ${
                 isDark ? "text-white" : "text-gray-900"
               }`}
             >
               {t("emptyCart", "Your cart is empty")}
             </h3>
             <p
-              className={`text-sm mb-6 ${
-                isDark ? "text-gray-500" : "text-gray-400"
+              className={`text-sm mb-7 max-w-sm text-center ${
+                isDark ? "text-gray-400" : "text-gray-500"
               }`}
             >
               {t("emptyCartDescription", "Start shopping to add items")}
             </p>
             <button
               onClick={() => router.push("/")}
-              className="inline-flex items-center space-x-2 px-6 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold transition-colors"
+              className="inline-flex items-center gap-2 px-7 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold transition-colors shadow-sm"
             >
               <Heart size={16} />
               <span>{t("startShopping", "Start Shopping")}</span>
             </button>
           </div>
         ) : (
-          <div className="flex flex-col lg:flex-row lg:gap-8">
-            {/* Left: Cart Items */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center space-x-3 mb-4 px-2 sm:px-0">
+          <>
+            {/* Page Title */}
+            <div className="mb-6 lg:mb-8">
+              <div className="flex items-end gap-3 flex-wrap">
                 <h1
-                  className={`text-xl font-bold ${
+                  className={`text-3xl lg:text-4xl font-bold tracking-tight ${
                     isDark ? "text-white" : "text-gray-900"
                   }`}
                 >
                   {t("title", "My Cart")}
                 </h1>
                 <span
-                  className={`text-sm ${
-                    isDark ? "text-gray-500" : "text-gray-400"
+                  className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold mb-1.5 ${
+                    isDark ? "bg-gray-800 text-gray-300" : "bg-gray-100 text-gray-600"
                   }`}
                 >
-                  ({cartCount} {t("itemsCount", "items")})
+                  {cartCount} {t("itemsCount", "items")}
                 </span>
               </div>
-
               <div
-                className={`hidden lg:grid lg:grid-cols-[auto_auto_1fr_100px_120px_100px_auto] lg:gap-4 lg:items-center px-0 pb-3 mb-1 border-b ${
-                  isDark ? "border-gray-800" : "border-gray-200"
-                }`}
-              >
-                <div className="w-4" />
-                <div className="w-16" />
-                <span
-                  className={`text-xs font-semibold uppercase tracking-wider ${
-                    isDark ? "text-gray-500" : "text-gray-400"
-                  }`}
-                >
-                  {t("product", "Product")}
-                </span>
-                <span
-                  className={`text-xs font-semibold uppercase tracking-wider text-right ${
-                    isDark ? "text-gray-500" : "text-gray-400"
-                  }`}
-                >
-                  {t("price", "Price")}
-                </span>
-                <span
-                  className={`text-xs font-semibold uppercase tracking-wider text-center ${
-                    isDark ? "text-gray-500" : "text-gray-400"
-                  }`}
-                >
-                  {t("quantity", "Quantity")}
-                </span>
-                <span
-                  className={`text-xs font-semibold uppercase tracking-wider text-right ${
-                    isDark ? "text-gray-500" : "text-gray-400"
-                  }`}
-                >
-                  {t("subtotal", "Subtotal")}
-                </span>
-                <div className="w-[30px]" />
-              </div>
-
-              <div
-                ref={scrollContainerRef}
-                onScroll={
-                  handleScroll as unknown as React.UIEventHandler<HTMLDivElement>
-                }
-              >
-                {renderCartItems}
-
-                {hasMore && (
-                  <div
-                    ref={loadMoreSentinelRef}
-                    className="flex justify-center py-4"
-                    aria-hidden="true"
-                  >
-                    {isLoadingMore ? (
-                      <div className="flex items-center space-x-2">
-                        <div className="w-4 h-4 border-[2px] border-orange-200 border-t-orange-500 rounded-full animate-spin" />
-                        <span
-                          className={`text-xs ${
-                            isDark ? "text-gray-500" : "text-gray-400"
-                          }`}
-                        >
-                          {t("loadingMore", "Loading more...")}
-                        </span>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={handleLoadMore}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                          isDark
-                            ? "bg-gray-800 text-gray-400 hover:bg-gray-700"
-                            : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                        }`}
-                      >
-                        {t("loadMore", "Load More")}
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
+                className={`mt-3 h-px w-full ${isDark ? "bg-gray-800" : "bg-gray-200"}`}
+              />
             </div>
 
-            {/* Right: Order Summary */}
-            <div className="w-full lg:w-[380px] lg:flex-shrink-0 mt-4 lg:mt-0">
-              <div className="lg:sticky lg:top-6">
+            <div className="flex flex-col lg:flex-row lg:gap-8">
+              {/* Left: Cart Items */}
+              <div className="flex-1 min-w-0">
                 <div
-                  className={`rounded-none lg:rounded-2xl border-t lg:border shadow-sm ${
+                  className={`rounded-2xl border overflow-hidden ${
                     isDark
                       ? "bg-gray-900 border-gray-800"
-                      : "bg-white border-gray-100"
+                      : "bg-white border-gray-100 shadow-sm"
                   }`}
                 >
-                  <div className="px-4 py-3 sm:px-6 sm:py-5">
-                    <h2
-                      className={`text-sm font-bold mb-4 ${
-                        isDark ? "text-white" : "text-gray-900"
+                  <div
+                    className={`hidden lg:grid lg:grid-cols-[auto_auto_1fr_100px_120px_100px_auto] lg:gap-4 lg:items-center px-5 py-3 border-b ${
+                      isDark
+                        ? "border-gray-800 bg-gray-900/50"
+                        : "border-gray-100 bg-gray-50/50"
+                    }`}
+                  >
+                    <div className="w-4" />
+                    <div className="w-16" />
+                    <span
+                      className={`text-[11px] font-semibold uppercase tracking-wider ${
+                        isDark ? "text-gray-500" : "text-gray-500"
                       }`}
                     >
-                      {t("orderSummary", "Order Summary")}
-                    </h2>
+                      {t("product", "Product")}
+                    </span>
+                    <span
+                      className={`text-[11px] font-semibold uppercase tracking-wider text-right ${
+                        isDark ? "text-gray-500" : "text-gray-500"
+                      }`}
+                    >
+                      {t("price", "Price")}
+                    </span>
+                    <span
+                      className={`text-[11px] font-semibold uppercase tracking-wider text-center ${
+                        isDark ? "text-gray-500" : "text-gray-500"
+                      }`}
+                    >
+                      {t("quantity", "Quantity")}
+                    </span>
+                    <span
+                      className={`text-[11px] font-semibold uppercase tracking-wider text-right ${
+                        isDark ? "text-gray-500" : "text-gray-500"
+                      }`}
+                    >
+                      {t("subtotal", "Subtotal")}
+                    </span>
+                    <div className="w-[30px]" />
+                  </div>
 
-                    {salesPaused && (
+                  <div
+                    ref={scrollContainerRef}
+                    onScroll={
+                      handleScroll as unknown as React.UIEventHandler<HTMLDivElement>
+                    }
+                    className="px-3 sm:px-5"
+                  >
+                    {renderCartItems}
+
+                    {hasMore && (
                       <div
-                        className={`mb-3 p-3 rounded-xl border flex items-start space-x-2 ${
-                          isDark
-                            ? "bg-orange-900/15 border-orange-800/40"
-                            : "bg-orange-50 border-orange-200"
-                        }`}
+                        ref={loadMoreSentinelRef}
+                        className="flex justify-center py-5"
+                        aria-hidden="true"
                       >
-                        <svg
-                          className="w-4 h-4 text-orange-500 flex-shrink-0 mt-0.5"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                          />
-                        </svg>
-                        <p
-                          className={`text-xs font-medium ${
-                            isDark ? "text-orange-400" : "text-orange-700"
-                          }`}
-                        >
-                          {pauseReason ||
-                            t(
-                              "salesTemporarilyPaused",
-                              "Sales are temporarily paused",
-                            )}
-                        </p>
-                      </div>
-                    )}
-
-                    {renderPriceBreakdown()}
-
-                    <div className="flex items-end justify-between mb-4">
-                      <div className="flex flex-col">
-                        <span
-                          className={`text-[10px] ${
-                            isDark ? "text-gray-600" : "text-gray-400"
-                          }`}
-                        >
-                          {selectedIds.length} {t("items", "items")}
-                        </span>
-                        <div className="flex items-baseline space-x-2 mt-0.5">
-                          {couponDiscount > 0 && (
+                        {isLoadingMore ? (
+                          <div className="flex items-center gap-2">
+                            <div className="w-5 h-5 border-[2px] border-orange-200 border-t-orange-500 rounded-full animate-spin" />
                             <span
-                              className={`text-xs line-through ${
-                                isDark ? "text-gray-600" : "text-gray-400"
+                              className={`text-xs ${
+                                isDark ? "text-gray-400" : "text-gray-500"
                               }`}
                             >
-                              {displayTotals.total.toFixed(2)}{" "}
-                              {displayTotals.currency}
+                              {t("loadingMore", "Loading more...")}
                             </span>
-                          )}
-                          <span
-                            className={`text-xl font-bold ${
-                              hasAnyDiscount
-                                ? "text-emerald-500"
-                                : "text-orange-500"
+                          </div>
+                        ) : (
+                          <button
+                            onClick={handleLoadMore}
+                            className={`px-4 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                              isDark
+                                ? "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                             }`}
                           >
-                            {finalTotal.toFixed(2)} {displayTotals.currency}
-                          </span>
-                        </div>
+                            {t("loadMore", "Load More")}
+                          </button>
+                        )}
                       </div>
-                      {renderCompactCouponButton()}
-                    </div>
+                    )}
+                  </div>
+                </div>
+              </div>
 
-                    <button
-                      onClick={handleCheckout}
-                      disabled={
-                        isTotalsLoading ||
-                        isValidating ||
-                        salesPaused ||
-                        selectedIds.length === 0
-                      }
-                      className={`w-full py-2.5 sm:py-3 px-4 rounded-xl text-[13px] font-semibold transition-colors flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed ${
-                        salesPaused
-                          ? isDark
-                            ? "bg-gray-700 text-gray-400"
-                            : "bg-gray-300 text-gray-500"
-                          : "bg-orange-500 hover:bg-orange-600 text-white"
-                      }`}
-                    >
-                      {isValidating ? (
-                        <>
-                          <div className="w-4 h-4 border-[2px] border-white/30 border-t-white rounded-full animate-spin" />
-                          <span>{t("validating", "Validating...")}</span>
-                        </>
-                      ) : salesPaused ? (
-                        <>
+              {/* Right: Order Summary */}
+              <div className="w-full lg:w-[380px] lg:flex-shrink-0 mt-6 lg:mt-0">
+                <div className="lg:sticky lg:top-6">
+                  <div
+                    className={`rounded-2xl border ${
+                      isDark
+                        ? "bg-gray-900 border-gray-800"
+                        : "bg-white border-gray-100 shadow-sm"
+                    }`}
+                  >
+                    <div className="px-5 py-5 sm:px-6 sm:py-6">
+                      <h2
+                        className={`text-base font-bold mb-5 ${
+                          isDark ? "text-white" : "text-gray-900"
+                        }`}
+                      >
+                        {t("orderSummary", "Order Summary")}
+                      </h2>
+
+                      {salesPaused && (
+                        <div
+                          className={`mb-4 p-3.5 rounded-xl border flex items-start gap-2.5 ${
+                            isDark
+                              ? "bg-orange-900/15 border-orange-800/40"
+                              : "bg-orange-50 border-orange-200"
+                          }`}
+                        >
                           <svg
-                            className="w-4 h-4"
+                            className="w-4 h-4 text-orange-500 flex-shrink-0 mt-0.5"
                             fill="none"
                             viewBox="0 0 24 24"
                             stroke="currentColor"
@@ -1737,25 +1680,124 @@ function CartPageContent() {
                               strokeLinecap="round"
                               strokeLinejoin="round"
                               strokeWidth={2}
-                              d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                             />
                           </svg>
-                          <span>
-                            {t("checkoutPaused", "Checkout Paused")}
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <span>{t("checkout", "Checkout")}</span>
-                          <ArrowRight size={16} />
-                        </>
+                          <p
+                            className={`text-xs font-medium leading-relaxed ${
+                              isDark ? "text-orange-400" : "text-orange-700"
+                            }`}
+                          >
+                            {pauseReason ||
+                              t(
+                                "salesTemporarilyPaused",
+                                "Sales are temporarily paused",
+                              )}
+                          </p>
+                        </div>
                       )}
-                    </button>
+
+                      {renderPriceBreakdown()}
+
+                      <div
+                        className={`flex items-end justify-between gap-3 pb-4 mb-4 border-b border-dashed ${
+                          isDark ? "border-gray-800" : "border-gray-200"
+                        }`}
+                      >
+                        <div className="flex flex-col min-w-0">
+                          <span
+                            className={`text-[11px] font-medium uppercase tracking-wide ${
+                              isDark ? "text-gray-500" : "text-gray-400"
+                            }`}
+                          >
+                            {selectedIds.length} {t("items", "items")} • {t("total", "Total")}
+                          </span>
+                          <div className="flex items-baseline gap-2 mt-1 flex-wrap">
+                            {couponDiscount > 0 && (
+                              <span
+                                className={`text-xs line-through ${
+                                  isDark ? "text-gray-600" : "text-gray-400"
+                                }`}
+                              >
+                                {displayTotals.total.toFixed(2)}{" "}
+                                {displayTotals.currency}
+                              </span>
+                            )}
+                            <span
+                              className={`text-2xl font-bold ${
+                                hasAnyDiscount
+                                  ? "text-emerald-500"
+                                  : "text-orange-500"
+                              }`}
+                            >
+                              {finalTotal.toFixed(2)} {displayTotals.currency}
+                            </span>
+                          </div>
+                        </div>
+                        {renderCompactCouponButton()}
+                      </div>
+
+                      <button
+                        onClick={handleCheckout}
+                        disabled={
+                          isTotalsLoading ||
+                          isValidating ||
+                          salesPaused ||
+                          selectedIds.length === 0
+                        }
+                        className={`w-full py-3.5 px-4 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm ${
+                          salesPaused
+                            ? isDark
+                              ? "bg-gray-700 text-gray-400"
+                              : "bg-gray-300 text-gray-500"
+                            : "bg-orange-500 hover:bg-orange-600 text-white"
+                        }`}
+                      >
+                        {isValidating ? (
+                          <>
+                            <div className="w-4 h-4 border-[2px] border-white/30 border-t-white rounded-full animate-spin" />
+                            <span>{t("validating", "Validating...")}</span>
+                          </>
+                        ) : salesPaused ? (
+                          <>
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                              />
+                            </svg>
+                            <span>
+                              {t("checkoutPaused", "Checkout Paused")}
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <span>{t("checkout", "Checkout")}</span>
+                            <ArrowRight size={16} />
+                          </>
+                        )}
+                      </button>
+
+                      <p
+                        className={`mt-3 text-[11px] text-center ${
+                          isDark ? "text-gray-500" : "text-gray-400"
+                        }`}
+                      >
+                        {t("secureCheckout", "Secure encrypted checkout")}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
+          </>
         )}
       </div>
 

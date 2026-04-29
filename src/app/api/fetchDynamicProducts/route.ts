@@ -185,6 +185,11 @@ function decideBackend(p: QueryParams): "firestore" | "typesense" {
     p.minRating !== null
   )
     return "typesense";
+  // Gender (buyerCategory) queries require a Firestore composite index on
+  // gender + promotionScore + __name__ that isn't deployed; route them to
+  // Typesense, which already indexes the gender facet.
+  if (p.buyerCategory === "Women" || p.buyerCategory === "Men")
+    return "typesense";
   return "firestore";
 }
 

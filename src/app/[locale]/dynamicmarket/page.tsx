@@ -288,9 +288,8 @@ export default function DynamicMarketPage() {
           qp.set("category", category);
         }
 
-        if (subcategory) qp.set("subcategory", formatPathSegment(subcategory));
-        if (subsubcategory)
-          qp.set("subsubcategory", formatPathSegment(subsubcategory));
+        if (subcategory) qp.set("subcategory", subcategory);
+        if (subsubcategory) qp.set("subsubcategory", subsubcategory);
 
         qp.set("page", page.toString());
         qp.set("sort", "date");

@@ -329,7 +329,7 @@ export default function FavoriteProductsPage() {
             className={`inline-flex items-center gap-2 pl-2.5 pr-3.5 py-2 rounded-full text-sm font-medium transition-colors border ${isDark ? "bg-gray-900 hover:bg-gray-800 text-gray-300 border-gray-800" : "bg-white hover:bg-gray-100 text-gray-700 border-gray-200"}`}
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>{t("back") || "Back"}</span>
+            
           </button>
         </div>
 
@@ -400,22 +400,22 @@ export default function FavoriteProductsPage() {
             <div ref={scrollContainerRef} className="w-full">
               {shouldShowShimmer ? (
                 /* Shimmer Grid */
-                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5 lg:gap-6">
-                  {[...Array(8)].map((_, i) => (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
+                  {[...Array(10)].map((_, i) => (
                     <div
                       key={i}
-                      className={`rounded-2xl border animate-pulse overflow-hidden ${isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"}`}
+                      className={`rounded-xl border animate-pulse overflow-hidden ${isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"}`}
                     >
                       <div className={`aspect-[4/5] w-full ${isDark ? "bg-gray-800" : "bg-gray-100"}`} />
-                      <div className="p-4 space-y-3">
-                        <div className={`h-3 rounded w-1/3 ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
-                        <div className="space-y-2">
-                          <div className={`h-4 rounded w-full ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
-                          <div className={`h-4 rounded w-3/4 ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
+                      <div className="p-2.5 space-y-2">
+                        <div className={`h-2.5 rounded w-1/3 ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
+                        <div className="space-y-1.5">
+                          <div className={`h-3 rounded w-full ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
+                          <div className={`h-3 rounded w-3/4 ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
                         </div>
-                        <div className="flex items-center justify-between pt-2">
-                          <div className={`h-5 rounded w-2/5 ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
-                          <div className={`h-4 rounded w-1/5 ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
+                        <div className="flex items-center justify-between pt-1.5">
+                          <div className={`h-4 rounded w-2/5 ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
+                          <div className={`h-3 rounded w-1/5 ${isDark ? "bg-gray-800" : "bg-gray-200"}`} />
                         </div>
                       </div>
                     </div>
@@ -448,7 +448,7 @@ export default function FavoriteProductsPage() {
               ) : (
                 /* Favorites Grid */
                 <>
-                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5 lg:gap-6">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
                     {getFilteredItems.map((item) => {
                       const product = item.product;
                       const attrs = item.attributes;
@@ -458,20 +458,20 @@ export default function FavoriteProductsPage() {
                       return (
                         <div
                           key={product.id}
-                          className={`group relative rounded-2xl overflow-hidden transition-all duration-200 border ${
-                            isDark ? "bg-gray-900 border-gray-800 hover:border-gray-700 hover:shadow-lg hover:shadow-black/30" : "bg-white border-gray-100 hover:border-gray-200 hover:shadow-lg hover:shadow-gray-200/60"
+                          className={`group relative rounded-xl overflow-hidden transition-all duration-200 border ${
+                            isDark ? "bg-gray-900 border-gray-800 hover:border-gray-700 hover:shadow-md hover:shadow-black/30" : "bg-white border-gray-100 hover:border-gray-200 hover:shadow-md hover:shadow-gray-200/60"
                           } ${isSelected ? (isDark ? "ring-2 ring-orange-500/60 border-orange-500/40" : "ring-2 ring-orange-500/50 border-orange-300") : ""}`}
                         >
                           {/* Selection Toggle */}
                           <button
                             onClick={() => handleProductSelect(product.id)}
-                            className={`absolute top-3 left-3 z-10 p-1 rounded-full transition-all backdrop-blur-md ${isDark ? "bg-gray-900/80 hover:bg-gray-900 ring-1 ring-white/10" : "bg-white/90 hover:bg-white ring-1 ring-black/5"} shadow-sm`}
+                            className={`absolute top-2 left-2 z-10 p-0.5 rounded-full transition-all backdrop-blur-md ${isDark ? "bg-gray-900/80 hover:bg-gray-900 ring-1 ring-white/10" : "bg-white/90 hover:bg-white ring-1 ring-black/5"} shadow-sm`}
                             aria-label={isSelected ? "Deselect" : "Select"}
                           >
                             {isSelected ? (
-                              <CheckCircle size={22} className="text-orange-500" />
+                              <CheckCircle size={18} className="text-orange-500" />
                             ) : (
-                              <Circle size={22} className={`${isDark ? "text-gray-500" : "text-gray-400"} group-hover:text-gray-500`} />
+                              <Circle size={18} className={`${isDark ? "text-gray-500" : "text-gray-400"} group-hover:text-gray-500`} />
                             )}
                           </button>
 
@@ -486,12 +486,12 @@ export default function FavoriteProductsPage() {
                                 size="card"
                                 alt={product.productName || "Product"}
                                 fill
-                                sizes="(max-width: 640px) 50vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                                sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
                                 className="object-cover transition-transform duration-500 group-hover:scale-[1.04]"
                               />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center">
-                                <Heart size={36} className={isDark ? "text-gray-700" : "text-gray-300"} />
+                                <Heart size={28} className={isDark ? "text-gray-700" : "text-gray-300"} />
                               </div>
                             )}
                           </div>
@@ -499,24 +499,24 @@ export default function FavoriteProductsPage() {
                           {/* Product Info */}
                           <div
                             onClick={() => router.push(`/productdetail/${product.id}`)}
-                            className="cursor-pointer p-4"
+                            className="cursor-pointer p-2.5"
                           >
                             {product.brandModel && (
-                              <p className={`text-[11px] font-semibold uppercase tracking-wide mb-1 truncate ${isDark ? "text-blue-400" : "text-blue-600"}`}>
+                              <p className={`text-[10px] font-semibold uppercase tracking-wide mb-0.5 truncate ${isDark ? "text-blue-400" : "text-blue-600"}`}>
                                 {product.brandModel}
                               </p>
                             )}
-                            <h3 className={`text-sm font-medium line-clamp-2 leading-snug min-h-[2.5rem] ${isDark ? "text-gray-100" : "text-gray-800"}`}>
+                            <h3 className={`text-[13px] font-medium line-clamp-2 leading-snug min-h-[2.25rem] ${isDark ? "text-gray-100" : "text-gray-800"}`}>
                               {product.productName || "Product"}
                             </h3>
-                            <div className={`flex items-center justify-between mt-3 pt-3 border-t border-dashed gap-2 ${isDark ? "border-gray-800" : "border-gray-100"}`}>
-                              <span className={`text-base lg:text-lg font-bold ${isDark ? "text-orange-400" : "text-orange-600"}`}>
+                            <div className={`flex items-center justify-between mt-2 pt-2 border-t border-dashed gap-2 ${isDark ? "border-gray-800" : "border-gray-100"}`}>
+                              <span className={`text-sm font-bold ${isDark ? "text-orange-400" : "text-orange-600"}`}>
                                 {(product.price || 0).toFixed(2)} {product.currency || "TL"}
                               </span>
                               {(product.averageRating || 0) > 0 && (
-                                <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md ${isDark ? "bg-gray-800" : "bg-amber-50"}`}>
-                                  <span className="text-amber-400 text-xs leading-none">&#9733;</span>
-                                  <span className={`text-[11px] font-semibold ${isDark ? "text-gray-300" : "text-amber-700"}`}>
+                                <div className={`flex items-center gap-0.5 px-1 py-0.5 rounded ${isDark ? "bg-gray-800" : "bg-amber-50"}`}>
+                                  <span className="text-amber-400 text-[10px] leading-none">&#9733;</span>
+                                  <span className={`text-[10px] font-semibold ${isDark ? "text-gray-300" : "text-amber-700"}`}>
                                     {(product.averageRating || 0).toFixed(1)}
                                   </span>
                                 </div>
