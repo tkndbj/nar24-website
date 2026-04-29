@@ -22,7 +22,6 @@ import {
   MessageSquare,
   Tag,
   UtensilsCrossed,
-  Receipt,
   ShieldCheck,
   ShieldAlert,
 } from "lucide-react";
@@ -175,7 +174,11 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
         kind: "invitationDecision";
         notification: NotificationData;
       }
-    | { kind: "invitationProcessing"; entityName: string; isRestaurant: boolean }
+    | {
+        kind: "invitationProcessing";
+        entityName: string;
+        isRestaurant: boolean;
+      }
     | { kind: "toast"; message: string };
   const [detailModal, setDetailModal] = useState<DetailModal | null>(null);
 
@@ -399,9 +402,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
   // Get notification title — every type maps to a translatable key.
   // For unknown types we fall through to the generic "Notification"
   // label rather than leaving the field blank.
-  const getNotificationTitle = (
-    notification: NotificationData,
-  ): string => {
+  const getNotificationTitle = (notification: NotificationData): string => {
     const type = notification.type;
     // Campaign: prefer the seller-supplied campaign name as the title
     // (matches Flutter's row at line 1524). Falls back to the localized
@@ -435,7 +436,8 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
       product_edit_approved: "product_edit_approved.title",
       product_edit_rejected: "product_edit_rejected.title",
       product_out_of_stock: "product_out_of_stock.title",
-      product_out_of_stock_seller_panel: "product_out_of_stock_seller_panel.title",
+      product_out_of_stock_seller_panel:
+        "product_out_of_stock_seller_panel.title",
       product_sold_shop: "product_sold_shop.title",
       product_sold_user: "product_sold_user.title",
       refund_request_approved: "refund_request_approved.title",
@@ -1399,7 +1401,11 @@ interface DetailModalRendererProps {
     | { kind: "editRejected"; notification: NotificationData }
     | { kind: "shopDisapproved"; notification: NotificationData }
     | { kind: "invitationDecision"; notification: NotificationData }
-    | { kind: "invitationProcessing"; entityName: string; isRestaurant: boolean }
+    | {
+        kind: "invitationProcessing";
+        entityName: string;
+        isRestaurant: boolean;
+      }
     | { kind: "toast"; message: string };
   isDarkMode: boolean;
   t: ReturnType<typeof useTranslations>;
@@ -1462,9 +1468,7 @@ const DetailModalRenderer: React.FC<DetailModalRendererProps> = ({
         >
           <div className="w-10 h-10 border-[3px] border-emerald-200 border-t-emerald-500 rounded-full animate-spin" />
           <p className="text-sm font-semibold text-center">
-            {modal.isRestaurant
-              ? t("joiningRestaurant")
-              : t("joiningShop")}
+            {modal.isRestaurant ? t("joiningRestaurant") : t("joiningShop")}
           </p>
           {modal.entityName && (
             <p
