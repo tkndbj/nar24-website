@@ -29,12 +29,12 @@ const AUTH_TIMEOUT_MS = 30000;
 const withTimeout = <T,>(
   promise: Promise<T>,
   ms: number,
-  errorMessage: string
+  errorMessage: string,
 ): Promise<T> => {
   return Promise.race([
     promise,
     new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error(errorMessage)), ms)
+      setTimeout(() => reject(new Error(errorMessage)), ms),
     ),
   ]);
 };
@@ -149,7 +149,7 @@ export default function LoginModal({
       const needs2FA = await withTimeout(
         twoFactorService.is2FAEnabled(),
         10000,
-        "2FA_CHECK_TIMEOUT"
+        "2FA_CHECK_TIMEOUT",
       );
       if (needs2FA) {
         setTwoFAPending(true);
@@ -190,12 +190,12 @@ export default function LoginModal({
         const userCredential = await withTimeout(
           signInWithEmailAndPassword(auth, email.trim(), password),
           AUTH_TIMEOUT_MS,
-          "AUTH_TIMEOUT"
+          "AUTH_TIMEOUT",
         );
         const user = userCredential.user;
         if (user && !user.emailVerified) {
           const isEmailPasswordUser = user.providerData.some(
-            (info) => info.providerId === "password"
+            (info) => info.providerId === "password",
           );
           if (isEmailPasswordUser) {
             await auth.signOut();
@@ -266,7 +266,16 @@ export default function LoginModal({
         setIsLoading(false);
       }
     },
-    [email, password, t, twoFactorService, router, checkAndHandle2FA, handleSuccessClose, onSuccess]
+    [
+      email,
+      password,
+      t,
+      twoFactorService,
+      router,
+      checkAndHandle2FA,
+      handleSuccessClose,
+      onSuccess,
+    ],
   );
 
   const handleGoogleSignIn = useCallback(async () => {
@@ -278,7 +287,7 @@ export default function LoginModal({
       const result = await withTimeout(
         signInWithPopup(auth, provider),
         AUTH_TIMEOUT_MS,
-        "AUTH_TIMEOUT"
+        "AUTH_TIMEOUT",
       );
       const user = result.user;
       if (user) {
@@ -373,7 +382,14 @@ export default function LoginModal({
     } finally {
       setIsLoading(false);
     }
-  }, [t, twoFactorService, router, checkAndHandle2FA, handleSuccessClose, onSuccess]);
+  }, [
+    t,
+    twoFactorService,
+    router,
+    checkAndHandle2FA,
+    handleSuccessClose,
+    onSuccess,
+  ]);
 
   const handleAppleSignIn = useCallback(async () => {
     twoFactorService.reset();
@@ -385,7 +401,7 @@ export default function LoginModal({
       const result = await withTimeout(
         signInWithPopup(auth, provider),
         AUTH_TIMEOUT_MS,
-        "AUTH_TIMEOUT"
+        "AUTH_TIMEOUT",
       );
       const user = result.user;
       const additionalInfo = getAdditionalUserInfo(result);
@@ -417,7 +433,7 @@ export default function LoginModal({
           displayName !== emailPrefix &&
           !displayName.includes("@");
         let needsName = !hasValidName;
-        let needsCompletion = true;
+
         if (isNewUser || !userDoc.exists()) {
           let languageCode = "tr";
           if (typeof window !== "undefined") {
@@ -430,15 +446,12 @@ export default function LoginModal({
               email: userEmail,
               isNew: true,
               createdAt: serverTimestamp(),
-              emailVerifiedAt: user.emailVerified
-                ? serverTimestamp()
-                : null,
+              emailVerifiedAt: user.emailVerified ? serverTimestamp() : null,
               languageCode,
             },
-            { merge: true }
+            { merge: true },
           );
           needsName = !hasValidName;
-          needsCompletion = true;
         } else {
           const userData = userDoc.data();
           if (displayName && hasValidName) {
@@ -456,7 +469,7 @@ export default function LoginModal({
             | string
             | undefined;
           const existingEmailPrefix = (userData.email || userEmail).split(
-            "@"
+            "@",
           )[0];
           needsName =
             !existingDisplayName ||
@@ -464,10 +477,6 @@ export default function LoginModal({
             existingDisplayName === "User" ||
             existingDisplayName === "No Name" ||
             existingDisplayName === existingEmailPrefix;
-          needsCompletion =
-            !userData.gender ||
-            !userData.birthDate ||
-            !userData.languageCode;
         }
         if (needsName) {
           setNameComplete(false);
@@ -490,7 +499,7 @@ export default function LoginModal({
               background: "#10B981",
               color: "#fff",
             },
-          }
+          },
         );
         if (needsName) {
           handleClose();
@@ -553,13 +562,20 @@ export default function LoginModal({
               background: "#EF4444",
               color: "#fff",
             },
-          }
+          },
         );
       }
     } finally {
       setIsLoading(false);
     }
-  }, [t, twoFactorService, router, setNameComplete, handleSuccessClose, onSuccess]);
+  }, [
+    t,
+    twoFactorService,
+    router,
+    setNameComplete,
+    handleSuccessClose,
+    onSuccess,
+  ]);
 
   const isDisabled = isLoading || isPending2FA || twoFAPending;
 
@@ -580,11 +596,7 @@ export default function LoginModal({
           rounded-t-3xl sm:rounded-2xl
           shadow-2xl border
           transition-all duration-300 ease-out
-          ${
-            isDark
-              ? "bg-gray-900 border-gray-800"
-              : "bg-white border-gray-100"
-          }
+          ${isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"}
           ${
             isAnimating
               ? "opacity-100 translate-y-0 sm:scale-100"
@@ -795,11 +807,7 @@ export default function LoginModal({
                   : "bg-black text-white hover:bg-gray-900"
               }`}
             >
-              <svg
-                className="w-4 h-4"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-              >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
               </svg>
               <span>
