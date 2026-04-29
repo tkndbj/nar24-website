@@ -678,7 +678,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     if (isOnAuthPage) return;
 
     // Completion pages - don't redirect (user is already completing something)
-    const completionPages = ["/complete-name", "/complete-profile"];
+    const completionPages = ["/complete-name"];
     const isOnCompletionPage = completionPages.some((path) =>
       currentPath.includes(path),
     );
@@ -694,12 +694,6 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       return;
     }
 
-    // TODO: Re-enable profile completion redirect later
-    // if (!isProfileComplete) {
-    //   console.log("🔀 Redirecting to /complete-profile - Profile incomplete");
-    //   window.location.href = "/complete-profile";
-    //   return;
-    // }
   }, [
     user,
     isLoading,

@@ -21,7 +21,6 @@ const HIDE_HEADER_ROUTES = [
   "/verify-email",
   "/two-factor-verification",
   "/email-verification",
-  "/complete-profile",
   "/complete-name",
   "/password-reset",
 ];

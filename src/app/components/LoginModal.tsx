@@ -293,24 +293,12 @@ export default function LoginModal({
               color: "#fff",
             },
           });
-          handleClose();
-          router.push("/complete-profile");
-          return;
-        }
-        const userData = userDoc.data();
-        const isProfileIncomplete =
-          !userData.gender || !userData.birthDate || !userData.languageCode;
-        if (isProfileIncomplete) {
-          toast.success(t("LoginPage.googleLoginSuccess"), {
-            icon: "🚀",
-            style: {
-              borderRadius: "10px",
-              background: "#10B981",
-              color: "#fff",
-            },
-          });
-          handleClose();
-          router.push("/complete-profile");
+          if (onSuccess) {
+            handleSuccessClose();
+          } else {
+            handleClose();
+            router.push("/");
+          }
           return;
         }
         const loginComplete = await checkAndHandle2FA();
@@ -507,9 +495,6 @@ export default function LoginModal({
         if (needsName) {
           handleClose();
           router.push("/complete-name");
-        } else if (needsCompletion) {
-          handleClose();
-          router.push("/complete-profile");
         } else if (onSuccess) {
           handleSuccessClose();
         } else {

@@ -14,7 +14,6 @@ export default function ConditionalFooter() {
     "/verify-email",
     "/two-factor-verification",
     "/email-verification",
-    "/complete-profile",
     "/dynamicteras",
     "/dynamicmarket",
     "/dynamicmarket2",

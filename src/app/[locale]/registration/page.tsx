@@ -374,7 +374,7 @@ function RegistrationContent() {
             },
           });
   
-          router.push("/complete-profile");
+          router.push("/");
           return;
         }
   

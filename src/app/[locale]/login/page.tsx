@@ -263,14 +263,7 @@ function LoginContent() {
         const userDoc = await getDoc(userDocRef);
         if (!userDoc.exists()) {
           toast.success(t("LoginPage.googleLoginSuccess"), { icon: "🚀", style: { borderRadius: "10px", background: "#10B981", color: "#fff" } });
-          router.push("/complete-profile");
-          return;
-        }
-        const userData = userDoc.data();
-        const isProfileIncomplete = !userData.gender || !userData.birthDate || !userData.languageCode;
-        if (isProfileIncomplete) {
-          toast.success(t("LoginPage.googleLoginSuccess"), { icon: "🚀", style: { borderRadius: "10px", background: "#10B981", color: "#fff" } });
-          router.push("/complete-profile");
+          router.push("/");
           return;
         }
         const loginComplete = await checkAndHandle2FA();
@@ -360,7 +353,7 @@ function LoginContent() {
           return;
         }
         toast.success(t("LoginPage.appleLoginSuccess") || t("LoginPage.googleLoginSuccess"), { icon: "🍎", style: { borderRadius: "10px", background: "#10B981", color: "#fff" } });
-        if (needsName) { router.push("/complete-name"); } else if (needsCompletion) { router.push("/complete-profile"); } else { router.push("/"); }
+        if (needsName) { router.push("/complete-name"); } else { router.push("/"); }
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "";

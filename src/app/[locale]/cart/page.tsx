@@ -134,7 +134,7 @@ function CartPageContent() {
     calculateCartTotals,
     updateTotalsForExcluded,
     validateForPayment,
-    updateCartCacheFromValidation,   
+    updateCartCacheFromValidation,
   } = useCart();
 
   const {
@@ -245,13 +245,12 @@ function CartPageContent() {
       .map((item) => item.productId);
   }, [cartItems, deselectedProducts]);
 
-
-const displayTotals = useMemo(() => {
-  return {
-    total: cartTotals?.total ?? 0,
-    currency: cartTotals?.currency ?? "TL",
-  };
-}, [cartTotals]);
+  const displayTotals = useMemo(() => {
+    return {
+      total: cartTotals?.total ?? 0,
+      currency: cartTotals?.currency ?? "TL",
+    };
+  }, [cartTotals]);
 
   const couponDiscount = useMemo(() => {
     return calculateCouponDiscount(displayTotals.total);
@@ -347,23 +346,41 @@ const displayTotals = useMemo(() => {
 
   const hasInitializedTotalsRef = useRef(false);
 
+  // Stable signature of cart contents that affect totals.
+  // Changes only when items are added/removed or quantities change —
+  // NOT when array references change due to unrelated state updates.
+  const cartTotalsSignature = useMemo(() => {
+    return cartItems
+      .map((item) => `${item.productId}:${item.quantity}`)
+      .sort()
+      .join("|");
+  }, [cartItems]);
+
+  const deselectedSignature = useMemo(
+    () => Array.from(deselectedProducts).sort().join(","),
+    [deselectedProducts],
+  );
+
   useEffect(() => {
+    if (cartItems.length === 0) return;
+
     const excludedIds = Array.from(deselectedProducts);
-    
-    // Initial calculation — no debounce, fire immediately
-    if (!hasInitializedTotalsRef.current && cartItems.length > 0) {
+
+    // Initial calculation — fire immediately
+    if (!hasInitializedTotalsRef.current) {
       hasInitializedTotalsRef.current = true;
       updateTotalsForExcluded(excludedIds);
       return;
     }
-    
-    // Subsequent updates — debounced
+
+    // Subsequent updates — debounced to coalesce rapid changes
     const timer = setTimeout(() => {
       updateTotalsForExcluded(excludedIds);
     }, 400);
-  
+
     return () => clearTimeout(timer);
-  }, [deselectedProducts, cartItems, updateTotalsForExcluded]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartTotalsSignature, deselectedSignature, updateTotalsForExcluded]);
 
   useEffect(() => {
     if (!user) {
@@ -593,7 +610,7 @@ const displayTotals = useMemo(() => {
         );
         return;
       }
-  
+
       // Build the set of every productId covered by freshTotals — including
       // those rolled up under bundle entries (which use productIds[] plural).
       const coveredProductIds = new Set<string>();
@@ -601,14 +618,14 @@ const displayTotals = useMemo(() => {
         // Non-bundle entry: has productId
         const single = (itemTotal as { productId?: string }).productId;
         if (single) coveredProductIds.add(single);
-  
+
         // Bundle entry: has productIds[]
         const bundleIds = (itemTotal as { productIds?: string[] }).productIds;
         if (Array.isArray(bundleIds)) {
           bundleIds.forEach((id) => coveredProductIds.add(id));
         }
       });
-  
+
       const missingIds = selectedIds.filter((id) => !coveredProductIds.has(id));
       if (missingIds.length > 0) {
         console.error("❌ Missing pricing for items:", missingIds);
@@ -620,7 +637,7 @@ const displayTotals = useMemo(() => {
         );
         return;
       }
-  
+
       if (typeof window !== "undefined") {
         sessionStorage.setItem(
           "checkoutSelectedIds",
@@ -642,7 +659,7 @@ const displayTotals = useMemo(() => {
           }),
         );
       }
-  
+
       router.push("/productpayment");
     },
     [
@@ -682,10 +699,7 @@ const displayTotals = useMemo(() => {
         return;
       }
 
-      if (
-        validation.isValid &&
-        Object.keys(validation.warnings).length === 0
-      ) {
+      if (validation.isValid && Object.keys(validation.warnings).length === 0) {
         // Calculate fresh totals before payment
         console.log("💰 Calculating fresh totals before payment...");
 
@@ -897,7 +911,9 @@ const displayTotals = useMemo(() => {
           )}
           <span
             className={`text-xs font-semibold ${
-              hasAnyDiscount ? "text-emerald-600 dark:text-emerald-400" : "text-orange-600 dark:text-orange-400"
+              hasAnyDiscount
+                ? "text-emerald-600 dark:text-emerald-400"
+                : "text-orange-600 dark:text-orange-400"
             }`}
           >
             {hasAnyDiscount
@@ -1007,7 +1023,9 @@ const displayTotals = useMemo(() => {
 
               <div
                 className={`relative w-20 h-20 flex-shrink-0 rounded-xl overflow-hidden cursor-pointer border ${
-                  isDark ? "border-gray-800 bg-gray-800" : "border-gray-100 bg-gray-50"
+                  isDark
+                    ? "border-gray-800 bg-gray-800"
+                    : "border-gray-100 bg-gray-50"
                 }`}
                 onClick={() => router.push(`/productdetail/${item.productId}`)}
               >
@@ -1057,8 +1075,7 @@ const displayTotals = useMemo(() => {
                 )}
                 {availableStock < 10 && (
                   <span className="inline-block mt-1.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400">
-                    {t("onlyLeft", "Only")} {availableStock}{" "}
-                    {t("left", "left")}
+                    {t("onlyLeft", "Only")} {availableStock} {t("left", "left")}
                   </span>
                 )}
               </div>
@@ -1085,7 +1102,9 @@ const displayTotals = useMemo(() => {
               <div className="flex items-center justify-center">
                 <div
                   className={`inline-flex items-center rounded-lg border ${
-                    isDark ? "border-gray-700 bg-gray-800/40" : "border-gray-200 bg-gray-50"
+                    isDark
+                      ? "border-gray-700 bg-gray-800/40"
+                      : "border-gray-200 bg-gray-50"
                   }`}
                 >
                   <button
@@ -1186,7 +1205,9 @@ const displayTotals = useMemo(() => {
 
                 <div
                   className={`relative w-24 h-24 flex-shrink-0 rounded-xl overflow-hidden cursor-pointer border ${
-                    isDark ? "border-gray-800 bg-gray-800" : "border-gray-100 bg-gray-50"
+                    isDark
+                      ? "border-gray-800 bg-gray-800"
+                      : "border-gray-100 bg-gray-50"
                   }`}
                   onClick={() =>
                     router.push(`/productdetail/${item.productId}`)
@@ -1266,7 +1287,9 @@ const displayTotals = useMemo(() => {
                   <div className="flex items-center justify-between mt-3">
                     <div
                       className={`inline-flex items-center rounded-lg border ${
-                        isDark ? "border-gray-700 bg-gray-800/40" : "border-gray-200 bg-gray-50"
+                        isDark
+                          ? "border-gray-700 bg-gray-800/40"
+                          : "border-gray-200 bg-gray-50"
                       }`}
                     >
                       <button
@@ -1414,7 +1437,7 @@ const displayTotals = useMemo(() => {
                 : "bg-white hover:bg-gray-100 text-gray-700 border-gray-200"
             }`}
           >
-            <ArrowLeft className="w-4 h-4" />           
+            <ArrowLeft className="w-4 h-4" />
           </button>
         </div>
 
@@ -1522,7 +1545,9 @@ const displayTotals = useMemo(() => {
                 </h1>
                 <span
                   className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold mb-1.5 ${
-                    isDark ? "bg-gray-800 text-gray-300" : "bg-gray-100 text-gray-600"
+                    isDark
+                      ? "bg-gray-800 text-gray-300"
+                      : "bg-gray-100 text-gray-600"
                   }`}
                 >
                   {cartCount} {t("itemsCount", "items")}
@@ -1694,7 +1719,8 @@ const displayTotals = useMemo(() => {
                               isDark ? "text-gray-500" : "text-gray-400"
                             }`}
                           >
-                            {selectedIds.length} {t("items", "items")} • {t("total", "Total")}
+                            {selectedIds.length} {t("items", "items")} •{" "}
+                            {t("total", "Total")}
                           </span>
                           <div className="flex items-baseline gap-2 mt-1 flex-wrap">
                             {couponDiscount > 0 && (
@@ -1707,15 +1733,24 @@ const displayTotals = useMemo(() => {
                                 {displayTotals.currency}
                               </span>
                             )}
-                            <span
-                              className={`text-2xl font-bold ${
-                                hasAnyDiscount
-                                  ? "text-emerald-500"
-                                  : "text-orange-500"
-                              }`}
-                            >
-                              {finalTotal.toFixed(2)} {displayTotals.currency}
-                            </span>
+                            {isTotalsLoading && cartTotals === null ? (
+                              <span
+                                className={`inline-block h-7 w-28 rounded animate-pulse ${
+                                  isDark ? "bg-gray-800" : "bg-gray-200"
+                                }`}
+                                aria-label={t("loading", "Loading...")}
+                              />
+                            ) : (
+                              <span
+                                className={`text-2xl font-bold ${
+                                  hasAnyDiscount
+                                    ? "text-emerald-500"
+                                    : "text-orange-500"
+                                }`}
+                              >
+                                {finalTotal.toFixed(2)} {displayTotals.currency}
+                              </span>
+                            )}
                           </div>
                         </div>
                         {renderCompactCouponButton()}

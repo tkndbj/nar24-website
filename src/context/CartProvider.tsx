@@ -113,11 +113,13 @@ export interface CartTotals {
 }
 
 export interface CartItemTotal {
-  productId: string;
+  productId?: string; // present for non-bundle entries
+  productIds?: string[]; // present for bundle entries
   quantity: number;
   unitPrice: number;
   total: number;
   isBundleItem?: boolean;
+  bundleId?: string;
 }
 
 interface FirestoreCartData {
@@ -210,8 +212,7 @@ interface CartActionsContextType {
 }
 
 interface CartContextType
-  extends CartStateContextType,
-    CartActionsContextType {}
+  extends CartStateContextType, CartActionsContextType {}
 
 const CartStateContext = createContext<CartStateContextType | undefined>(
   undefined,
@@ -307,7 +308,10 @@ async function retryWithBackoff<T>(
 
       // Don't retry rate-limit errors — retrying makes it worse
       const errorCode = (e as { code?: string })?.code;
-      if (errorCode === "resource-exhausted" || errorCode === "functions/resource-exhausted") {
+      if (
+        errorCode === "resource-exhausted" ||
+        errorCode === "functions/resource-exhausted"
+      ) {
         console.warn(`⚠️ ${operationName} rate limited — not retrying`);
         throw e;
       }
@@ -941,11 +945,11 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       if (!user || !functions) {
         return { total: 0, items: [], currency: "TL" };
       }
-  
+
       // Dedup key — for in-flight request sharing only, no result caching
       const excludedSorted = [...(excludedProductIds ?? [])].sort();
       const dedupKey = `totals_all_minus_${excludedSorted.join(",")}`;
-  
+
       if (pendingFetchesRef.current.has(dedupKey)) {
         console.log("⏳ Joining in-flight totals calculation...");
         try {
@@ -955,7 +959,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           // Fall through and retry our own call
         }
       }
-  
+
       const totalsPromise = (async () => {
         try {
           const totals = await retryWithBackoff(
@@ -964,20 +968,20 @@ export const CartProvider: React.FC<CartProviderProps> = ({
                 functions,
                 "calculateCartTotals",
               );
-  
+
               const allIds = Array.from(cartProductIdsRef.current);
               const selectedIds =
                 excludedProductIds == null || excludedProductIds.length === 0
                   ? allIds
                   : allIds.filter((id) => !excludedProductIds.includes(id));
-  
+
               const result = await calculateCartTotalsFunction({
                 selectedProductIds: selectedIds,
               });
-  
+
               const rawData = result.data;
               const totalsData = deepConvertMap(rawData);
-  
+
               const totals: CartTotals = {
                 total: (totalsData.total as number) ?? 0,
                 currency: (totalsData.currency as string) ?? "TL",
@@ -986,30 +990,48 @@ export const CartProvider: React.FC<CartProviderProps> = ({
                   : []
                 ).map((item): CartItemTotal => {
                   const itemData = item as Record<string, unknown>;
-                  return {
-                    productId: (itemData.productId as string) ?? "",
+                  const result: CartItemTotal = {
                     unitPrice: (itemData.unitPrice as number) ?? 0,
                     total: (itemData.total as number) ?? 0,
                     quantity: (itemData.quantity as number) ?? 1,
                     isBundleItem: (itemData.isBundleItem as boolean) ?? false,
                   };
+                  // Preserve singular productId for non-bundle entries
+                  if (
+                    typeof itemData.productId === "string" &&
+                    itemData.productId
+                  ) {
+                    result.productId = itemData.productId;
+                  }
+                  // Preserve plural productIds[] for bundle entries
+                  if (Array.isArray(itemData.productIds)) {
+                    result.productIds = (itemData.productIds as unknown[]).map(
+                      (id) => String(id),
+                    );
+                  }
+                  if (typeof itemData.bundleId === "string") {
+                    result.bundleId = itemData.bundleId;
+                  }
+                  return result;
                 }),
               };
-  
+
               return totals;
             },
             "Calculate Totals",
             3,
           );
-  
-          console.log(`✅ Total calculated: ${totals.total} ${totals.currency}`);
+
+          console.log(
+            `✅ Total calculated: ${totals.total} ${totals.currency}`,
+          );
           return totals;
         } catch (error) {
           console.error("❌ Cloud Function failed after retries:", error);
           throw error;
         }
       })();
-  
+
       pendingFetchesRef.current.set(dedupKey, totalsPromise);
       try {
         return await totalsPromise;
@@ -1028,7 +1050,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     async (excludedProductIds: string[]): Promise<void> => {
       const allIds = cartProductIdsRef.current;
 
-      // If everything is excluded, show zero
       if (allIds.size > 0 && excludedProductIds.length >= allIds.size) {
         setCartTotals({ total: 0, items: [], currency: "TL" });
         currentTotalsProductIdsRef.current = new Set();
@@ -1041,17 +1062,34 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
       currentTotalsProductIdsRef.current = new Set(selectedIds);
 
-      // Step 1: Immediate optimistic update
-      if (selectedIds.length > 0) {
-        const optimistic = calculateOptimisticTotals(selectedIds);
-        setCartTotals(optimistic);
-      } else {
+      if (selectedIds.length === 0) {
         setCartTotals({ total: 0, items: [], currency: "TL" });
+        return;
       }
 
-      if (selectedIds.length === 0) return;
+      // Detect if any selected item participates in a bundle.
+      // Optimistic per-item math cannot reproduce bundle pricing,
+      // so showing it would cause flicker when the server total returns.
+      const selectedItems = cartItemsRef.current.filter((item) =>
+        selectedIds.includes(item.productId),
+      );
+      const hasBundleEligibleItems = selectedItems.some((item) => {
+        const bundleIds = item.product?.bundleIds;
+        const bundleData = item.product?.bundleData;
+        return (
+          (Array.isArray(bundleIds) && bundleIds.length > 0) ||
+          (Array.isArray(bundleData) && bundleData.length > 0)
+        );
+      });
 
-      // Step 2: Server verification (debounced via outer caller, but we run it here too)
+      // Step 1: Optimistic update — only when safe (no bundles involved).
+      // When bundles are present, keep existing totals (or null) and rely on
+      // the loading skeleton until the server responds.
+      if (!hasBundleEligibleItems) {
+        const optimistic = calculateOptimisticTotals(selectedIds);
+        setCartTotals(optimistic);
+      }
+
       setIsTotalsLoading(true);
 
       try {
@@ -1242,8 +1280,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     // skip subcollection read entirely (matches Flutter behavior, saves reads)
     const cachedIds = getProfileField<string[]>("cartItemIds");
     const hasLocalItems =
-      cartProductIdsRef.current.size > 0 ||
-      optimisticCacheRef.current.size > 0;
+      cartProductIdsRef.current.size > 0 || optimisticCacheRef.current.size > 0;
 
     if (
       !isInitialized &&
@@ -1296,7 +1333,11 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           const optimisticProduct =
             buildProductFromCartData(enrichedProductData);
           const optimisticItem: CartItem = {
-            ...createCartItem(productId, enrichedProductData, optimisticProduct),
+            ...createCartItem(
+              productId,
+              enrichedProductData,
+              optimisticProduct,
+            ),
             isOptimistic: true,
           };
           return [optimisticItem, ...existingItems];
@@ -1320,11 +1361,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
       optimisticTimeoutsRef.current.set(productId, timeout);
     },
-    [
-      clearOptimisticUpdate,
-      buildProductFromCartData,
-      createCartItem,
-    ],
+    [clearOptimisticUpdate, buildProductFromCartData, createCartItem],
   );
 
   const rollbackOptimisticUpdate = useCallback((productId: string) => {
@@ -1578,8 +1615,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         }
 
         const analyticsShopId =
-          (cartData?.shopId as string | undefined) ??
-          (shopId ?? undefined);
+          (cartData?.shopId as string | undefined) ?? shopId ?? undefined;
 
         const batch = writeBatch(db);
         batch.delete(doc(db, "users", user.uid, "cart", productId));
@@ -1739,17 +1775,14 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         let resultMessage = "Quantity updated";
         try {
           while (pendingQuantityWritesRef.current.has(productId)) {
-            const qtyToWrite =
-              pendingQuantityWritesRef.current.get(productId)!;
+            const qtyToWrite = pendingQuantityWritesRef.current.get(productId)!;
             pendingQuantityWritesRef.current.delete(productId);
 
             await updateDoc(doc(db, "users", user.uid, "cart", productId), {
               quantity: qtyToWrite,
               updatedAt: serverTimestamp(),
             });
-            console.log(
-              `✅ Updated quantity: ${productId} = ${qtyToWrite}`,
-            );
+            console.log(`✅ Updated quantity: ${productId} = ${qtyToWrite}`);
           }
           debouncedTotalsVerification();
         } catch (error) {
@@ -2179,37 +2212,35 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   // EFFECTS
   // ========================================================================
 
- // Handle user changes — clear data on user switch / logout. 
- // Cross-device ID sync is handled by the dedicated cartItemIds listener below.
- useEffect(() => {
-  if (!user) {
-    if (currentUserIdRef.current !== null) {
-      currentUserIdRef.current = null;
-      clearAllData();
+  // Handle user changes — clear data on user switch / logout.
+  // Cross-device ID sync is handled by the dedicated cartItemIds listener below.
+  useEffect(() => {
+    if (!user) {
+      if (currentUserIdRef.current !== null) {
+        currentUserIdRef.current = null;
+        clearAllData();
+      }
+      return;
     }
-    return;
-  }
 
-  // Same user re-emitting — let the cartItemIds listener handle ID sync.
-  if (currentUserIdRef.current === user.uid) {
-    return;
-  }
+    // Same user re-emitting — let the cartItemIds listener handle ID sync.
+    if (currentUserIdRef.current === user.uid) {
+      return;
+    }
 
-  // Different user — full clear. The cartItemIds listener will re-seed
-  // once profileData is populated.
-  currentUserIdRef.current = user.uid;
-  clearAllData();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [user]);
+    // Different user — full clear. The cartItemIds listener will re-seed
+    // once profileData is populated.
+    currentUserIdRef.current = user.uid;
+    clearAllData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
-// Listen to user doc cart IDs changes (cross-device sync)
+  // Listen to user doc cart IDs changes (cross-device sync)
   // Matches Flutter's _onUserDocCartIdsChanged — always syncs IDs/count,
   // but preserves any in-flight optimistic adds/removes.
   useEffect(() => {
     if (!user || !profileData) return;
-    const ids = new Set<string>(
-      getProfileField<string[]>("cartItemIds") ?? [],
-    );
+    const ids = new Set<string>(getProfileField<string[]>("cartItemIds") ?? []);
 
     // Apply optimistic overlay (matches updateCartIds behavior)
     optimisticCacheRef.current.forEach((value, key) => {
