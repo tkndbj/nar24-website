@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Package } from "lucide-react";
 import { useRouter } from "next/navigation";
 import SmartImage from "@/app/components/SmartImage";
 import { useTranslations } from "next-intl";
+import { fetchCollectionByProductClient } from "@/lib/product-detail-client";
 
 interface Product {
   id: string;
@@ -88,39 +89,6 @@ const CollectionProductCard: React.FC<CollectionProductCardProps> = ({
     </div>
   );
 };
-
-const LoadingSkeleton: React.FC = () => (
-  <div
-    className="rounded-2xl md:rounded-2xl rounded-none -mx-3 px-3 py-4 sm:mx-0 sm:p-6 border-0 sm:border shadow-none sm:shadow-sm bg-white border-gray-200 dark:bg-surface-2 dark:border-gray-700"
-  >
-    <div className="space-y-6 md:space-y-6 space-y-4">
-      {/* Header skeleton */}
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-3 md:gap-3 gap-2">
-          <div
-            className="w-10 h-10 md:w-10 md:h-10 w-8 h-8 rounded-xl animate-pulse bg-gray-200 dark:bg-gray-700"
-          />
-          <div
-            className="w-40 md:w-40 w-32 h-6 md:h-6 h-5 rounded animate-pulse bg-gray-200 dark:bg-gray-700"
-          />
-        </div>
-        <div
-          className="w-16 md:w-16 w-12 h-4 rounded animate-pulse bg-gray-200 dark:bg-gray-700"
-        />
-      </div>
-
-      {/* Products list skeleton */}
-      <div className="flex gap-4 md:gap-4 gap-3 overflow-hidden">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div
-            key={i}
-            className="min-w-72 w-72 h-28 rounded-2xl md:rounded-2xl rounded-lg animate-pulse bg-gray-200 dark:bg-gray-700"
-          />
-        ))}
-      </div>
-    </div>
-  </div>
-);
 
 const ProductCollectionWidget: React.FC<ProductCollectionWidgetProps> = ({
   productId,
@@ -210,35 +178,17 @@ const ProductCollectionWidget: React.FC<ProductCollectionWidgetProps> = ({
       return;
     }
 
-    // ✅ PRIORITY 2: Fetch from API (fallback)
+    // ✅ PRIORITY 2: Direct Firestore client read.
     const fetchProductCollection = async () => {
       if (!shopId) {
         setLoading(false);
         return;
       }
-
       try {
         setLoading(true);
         setError(null);
-
-        const response = await fetch(`/api/collections/by-product`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ productId, shopId }),
-        });
-
-        if (response.status === 404) {
-          setCollectionData(null);
-          setLoading(false);
-          return;
-        }
-
-        if (!response.ok) {
-          throw new Error(t("failedToFetchCollection"));
-        }
-
-        const data = await response.json();
-        setCollectionData(data);
+        const data = await fetchCollectionByProductClient(productId, shopId);
+        setCollectionData(data); // null if no collection — widget self-hides
       } catch (err) {
         console.error("Error fetching product collection:", err);
         setError(
@@ -267,8 +217,10 @@ const ProductCollectionWidget: React.FC<ProductCollectionWidgetProps> = ({
     }
   }, [collectionData, shopId, router]);
 
+  // Silent load: render nothing while fetching. Most products don't have
+  // collections, so flashing a skeleton and then collapsing is bad UX.
   if (isLoading || loading) {
-    return <LoadingSkeleton />;
+    return null;
   }
 
   if (error || !collectionData || collectionData.products.length === 0) {

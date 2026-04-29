@@ -101,12 +101,20 @@ export default function ProductImageGallery({
                 alt={product.productName}
                 fill
                 className="object-contain cursor-pointer hover:scale-105 transition-transform duration-300"
-                style={{
-                  animation:
-                    slideDirection === "right"
-                      ? "slideInFromRight 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards"
-                      : "slideInFromLeft 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards",
-                }}
+                // Only slide-animate when an actual image change happened.
+                // On first mount (or when this is the only image), don't
+                // animate — otherwise it competes with the loading.tsx
+                // hero hand-off and looks like the image renders twice.
+                style={
+                  previousImageIndex !== currentImageIndex
+                    ? {
+                        animation:
+                          slideDirection === "right"
+                            ? "slideInFromRight 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards"
+                            : "slideInFromLeft 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards",
+                      }
+                    : undefined
+                }
                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                 onClick={() => setShowFullScreenViewer(true)}
                 onFallbackError={() => handleImageError(currentImageIndex)}

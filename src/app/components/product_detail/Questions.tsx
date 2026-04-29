@@ -19,6 +19,10 @@ import translationService, {
 } from "@/services/translation_service";
 import { useUser } from "@/context/UserProvider";
 import { maskName } from "@/utils/maskName";
+import {
+  fetchQuestionsClient,
+  fetchSellerForQuestionsClient,
+} from "@/lib/product-detail-client";
 
 interface Question {
   id: string;
@@ -329,39 +333,6 @@ const QuestionAnswerCard: React.FC<QuestionAnswerCardProps> = ({
   );
 };
 
-const LoadingSkeleton: React.FC = () => (
-  <div
-    className="rounded-2xl sm:rounded-2xl rounded-none p-4 sm:p-6 border shadow-sm bg-white border-gray-200 dark:bg-surface-2 dark:border-gray-700"
-  >
-    <div className="space-y-4 sm:space-y-6">
-      {/* Header skeleton */}
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-2 sm:gap-3">
-          <div
-            className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl animate-pulse bg-gray-200 dark:bg-gray-700"
-          />
-          <div
-            className="w-32 h-5 sm:w-40 sm:h-6 rounded animate-pulse bg-gray-200 dark:bg-gray-700"
-          />
-        </div>
-        <div
-          className="w-20 h-7 sm:w-24 sm:h-8 rounded-xl animate-pulse bg-gray-200 dark:bg-gray-700"
-        />
-      </div>
-
-      {/* Questions skeleton */}
-      <div className="flex gap-4 overflow-hidden">
-        {Array.from({ length: 2 }).map((_, i) => (
-          <div
-            key={i}
-            className="min-w-80 w-80 h-48 sm:h-56 rounded-2xl sm:rounded-2xl rounded-none animate-pulse bg-gray-200 dark:bg-gray-700"
-          />
-        ))}
-      </div>
-    </div>
-  </div>
-);
-
 const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
   productId,
   sellerId,
@@ -468,31 +439,23 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
       return;
     }
 
-    // ✅ PRIORITY 2: Fetch from API (fallback)
+    // ✅ PRIORITY 2: Direct Firestore client reads — parallel for the
+    // questions subcollection and the seller/shop docs.
     const fetchData = async () => {
       if (!productId || !sellerId) return;
-
       try {
         setLoading(true);
-
-        const [questionsResponse, sellerResponse] = await Promise.all([
-          fetch(`/api/questions/${productId}?isShop=${isShop}&limit=5`),
-          fetch(
-            `/api/seller/${sellerId}${
-              isShop && shopId ? `?shopId=${shopId}` : ""
-            }`
-          ),
+        const [questionsResult, sellerResult] = await Promise.all([
+          fetchQuestionsClient(productId, { isShop, limit: 5 }),
+          fetchSellerForQuestionsClient(sellerId, isShop ? shopId ?? null : null),
         ]);
-
-        if (questionsResponse.ok) {
-          const questionsData = await questionsResponse.json();
-          setQuestions(questionsData.questions || []);
-          setTotalQuestions(questionsData.totalCount || 0);
-        }
-
-        if (sellerResponse.ok) {
-          const sellerData = await sellerResponse.json();
-          setSellerInfo(sellerData);
+        setQuestions(questionsResult.questions);
+        setTotalQuestions(questionsResult.totalCount);
+        if (sellerResult) {
+          setSellerInfo({
+            profileImageUrl: sellerResult.profileImageUrl,
+            profileImage: sellerResult.profileImage,
+          });
         }
       } catch (error) {
         console.error("Error fetching questions or seller info:", error);
@@ -516,8 +479,11 @@ const ProductQuestionsWidget: React.FC<ProductQuestionsWidgetProps> = ({
     handleViewAllQuestions();
   }, [handleViewAllQuestions]);
 
+  // Silent load: render nothing while fetching. No count hint exists for
+  // questions, so flashing a skeleton on products without any questions
+  // creates the "shimmer that collapses" UX.
   if (isLoading || loading) {
-    return <LoadingSkeleton />;
+    return null;
   }
 
   if (totalQuestions === 0) {

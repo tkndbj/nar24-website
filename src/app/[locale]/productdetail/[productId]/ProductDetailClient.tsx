@@ -106,26 +106,33 @@ export default function ProductDetailClient({
   // Scroll detection
   const { showHeaderButtons, actionButtonsRef } = useScrollDetection();
 
-  // Decide whether to mount a section. With nullable props we fall back to
-  // simple hints derived from the product itself when the server didn't
-  // pre-resolve the totals. The widgets themselves self-hide when their
-  // own fetch returns nothing.
-  const hasCollection =
-    collection !== null
-      ? collection.products.length > 0
-      : !!product.shopId; // collections are shop-scoped
-  const hasBundles =
-    bundles !== null ? bundles.length > 0 : !!product.shopId;
-  // Reviews / questions / related: always mount and let the widget decide.
-  // The `prefetchedData={null}` path triggers the widget's internal fetch,
-  // and an empty result hides the section.
-  const hasReviews = reviewsTotal === null ? true : reviewsTotal > 0;
-  const hasQuestions = questionsTotal === null ? true : questionsTotal > 0;
+  // Decide whether to mount each bottom section. We prefer denormalized
+  // hints on the product itself over speculative rendering — that avoids
+  // the bad UX where a section flashes a skeleton and then collapses to
+  // nothing when its fetch returns empty.
+  //
+  // Reviews: gated on the denormalized `reviewCount` field. If the product
+  // has no reviews we never mount the section, so no skeleton flash.
+  const hasReviews =
+    reviewsTotal !== null
+      ? reviewsTotal > 0
+      : (product.reviewCount ?? 0) > 0;
+  // Related: gated on `relatedProductIds`. If empty we never mount.
   const hasRelatedProducts =
     relatedProducts !== null
       ? relatedProducts.length > 0
-      : (product.relatedProductIds?.length ?? 0) > 0 ||
-        !!product.subcategory; // category-based fallback
+      : (product.relatedProductIds?.length ?? 0) > 0;
+  // Collection / Bundles: shop-scoped, no count hint available. We mount
+  // the widget so it can self-fetch — the widget itself renders nothing
+  // while loading and nothing if empty (silent), so there's no flash.
+  const hasCollection =
+    collection !== null
+      ? collection.products.length > 0
+      : !!product.shopId;
+  const hasBundles =
+    bundles !== null ? bundles.length > 0 : !!product.shopId;
+  // Questions: no hint. Same silent-load contract as collection / bundles.
+  const hasQuestions = questionsTotal === null ? true : questionsTotal > 0;
 
 
   // Translation helper
@@ -388,11 +395,7 @@ export default function ProductDetailClient({
         {/* Bottom Sections — only rendered when server prefetch found data */}
         <div className="mt-4 sm:mt-6 space-y-3 sm:space-y-4">
           {hasCollection && (
-            <Suspense
-              fallback={
-                <div className="h-40 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700" />
-              }
-            >
+            <Suspense fallback={null}>
               <ProductCollectionWidget
                 key={`collection-${product.id}`}
                 productId={product.id}
@@ -404,11 +407,7 @@ export default function ProductDetailClient({
           )}
 
           {hasBundles && (
-            <Suspense
-              fallback={
-                <div className="h-40 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700" />
-              }
-            >
+            <Suspense fallback={null}>
               <BundleComponent
                 key={`bundle-${product.id}`}
                 productId={product.id}
@@ -441,11 +440,7 @@ export default function ProductDetailClient({
           )}
 
           {hasQuestions && (
-            <Suspense
-              fallback={
-                <div className="h-40 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700" />
-              }
-            >
+            <Suspense fallback={null}>
               <ProductQuestionsWidget
                 key={`questions-${product.id}`}
                 productId={product.id}

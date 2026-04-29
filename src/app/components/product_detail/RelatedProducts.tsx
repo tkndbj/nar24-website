@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Shuffle } from "lucide-react";
 import ProductCard from "../../components/ProductCard";
 import { Product } from "@/app/models/Product";
 import { useTranslations } from "next-intl";
+import { fetchProductsBatchClient } from "@/lib/product-detail-client";
 
 interface ProductDetailRelatedProductsProps {
   productId?: string;
@@ -210,29 +211,16 @@ const ProductDetailRelatedProducts: React.FC<
     if (prefetchedProducts && prefetchedProducts.length > 0) return;
     if (loadingInitiated) return;
     if (!preloadedIds?.length) return; // No IDs = nothing to show, no fallback
-  
+
     setLoadingInitiated(true);
     setLoading(true);
-  
+
     try {
       setError(null);
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
-  
-      const url = `/api/products/batch?ids=${preloadedIds.slice(0, 15).join(",")}`;
-  
-      const response = await fetch(url, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-        signal: controller.signal,
-      });
-  
-      clearTimeout(timeoutId);
-  
-      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-  
-      const data = await response.json();
-      setRelatedProducts(data.products || []);
+      // Direct Firestore client batch read — preserves the 15-cap and the
+      // input-order semantics of /api/products/batch.
+      const products = await fetchProductsBatchClient(preloadedIds);
+      setRelatedProducts(products);
     } catch (err) {
       console.error("Error fetching related products:", err);
       setError(err instanceof Error ? err.message : t("failedToLoadRelated"));

@@ -4,8 +4,12 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import SmartImage from "@/app/components/SmartImage";
 import { Sparkles, Package } from "lucide-react";
-import { Product, ProductUtils } from "@/app/models/Product";
+import { Product } from "@/app/models/Product";
 import { useTranslations } from "next-intl";
+import {
+  fetchActiveBundlesForShopClient,
+  fetchProductByIdClient,
+} from "@/lib/product-detail-client";
 
 // ✅ NEW: Match Flutter's Bundle structure
 interface BundleProduct {
@@ -184,73 +188,54 @@ const BundleComponent: React.FC<BundleComponentProps> = ({
     [localization]
   );
 
-  // ✅ NEW: Match Flutter's _fetchProductBundles logic exactly
+  // ✅ NEW: Direct Firestore client reads — mirrors Flutter's
+  // _fetchProductBundles. Step 1 fetches active bundles for the shop.
+  // Step 2 fans out per-product reads in parallel for the OTHER products
+  // in each bundle the current product participates in.
   const fetchProductBundles = useCallback(async (): Promise<BundleDisplayData[]> => {
     try {
-      // Only proceed if we have a shopId (bundles are shop-only feature)
       if (!shopId || shopId.trim() === "") {
         return [];
       }
 
-      const bundleDisplayList: BundleDisplayData[] = [];
+      const allBundles = (await fetchActiveBundlesForShopClient(
+        shopId
+      )) as unknown as Bundle[];
 
-      // Find all active bundles in this shop
-      const response = await fetch(
-        `/api/bundles?shopId=${encodeURIComponent(shopId)}&isActive=true`
-      );
-
-      if (!response.ok) {
-        console.error("Failed to fetch bundles:", response.status);
-        return [];
-      }
-
-      const allBundles: Bundle[] = await response.json();
-
+      // Pair each "other product" with the bundle it came from so we can
+      // build the BundleDisplayData after the parallel fetch resolves.
+      type Pending = { bundle: Bundle; otherProductId: string };
+      const pending: Pending[] = [];
       for (const bundle of allBundles) {
-        // ✅ Check if current product is in this bundle's products array
-        const productInBundle = bundle.products?.some(
-          (bp) => bp.productId === productId
-        );
-
-        if (!productInBundle) continue;
-
-        // ✅ Get all OTHER products in this bundle (not the current one)
-        const otherProducts = bundle.products.filter(
-          (bp) => bp.productId !== productId
-        );
-
-        // Fetch the actual Product objects for other products
-        for (const bundleProduct of otherProducts) {
-          try {
-            const productResponse = await fetch(
-              `/api/products/${bundleProduct.productId}`
-            );
-
-            if (productResponse.ok) {
-              const productData = await productResponse.json();
-              const product = ProductUtils.fromJson(productData);
-
-              // Only show if product is active (not paused)
-              if (product.paused !== true) {
-                bundleDisplayList.push({
-                  bundleId: bundle.id,
-                  product: product,
-                  totalBundlePrice: bundle.totalBundlePrice,
-                  totalOriginalPrice: bundle.totalOriginalPrice,
-                  discountPercentage: bundle.discountPercentage,
-                  currency: bundle.currency,
-                  totalProductCount: bundle.products.length,
-                });
-              }
-            }
-          } catch (err) {
-            console.error(
-              `Error fetching bundled product ${bundleProduct.productId}:`,
-              err
-            );
+        const inBundle = bundle.products?.some((bp) => bp.productId === productId);
+        if (!inBundle) continue;
+        for (const bp of bundle.products) {
+          if (bp.productId !== productId) {
+            pending.push({ bundle, otherProductId: bp.productId });
           }
         }
       }
+
+      if (pending.length === 0) return [];
+
+      const products = await Promise.all(
+        pending.map((p) => fetchProductByIdClient(p.otherProductId))
+      );
+
+      const bundleDisplayList: BundleDisplayData[] = [];
+      products.forEach((product, i) => {
+        if (!product || product.paused === true) return;
+        const { bundle } = pending[i];
+        bundleDisplayList.push({
+          bundleId: bundle.id,
+          product,
+          totalBundlePrice: bundle.totalBundlePrice,
+          totalOriginalPrice: bundle.totalOriginalPrice,
+          discountPercentage: bundle.discountPercentage,
+          currency: bundle.currency,
+          totalProductCount: bundle.products.length,
+        });
+      });
 
       return bundleDisplayList;
     } catch (err) {
@@ -305,16 +290,11 @@ const BundleComponent: React.FC<BundleComponentProps> = ({
     return null;
   }
 
+  // Silent load: render nothing while fetching when we don't yet know
+  // whether this product has bundles. Prevents the "skeleton flash that
+  // collapses to nothing" UX on products without bundles.
   if (isLoading) {
-    return (
-      <div
-        className="rounded-2xl sm:rounded-xl p-4 sm:p-6 border shadow-sm bg-white border-gray-200 dark:bg-surface-2 dark:border-gray-700"
-      >
-        <div className="flex items-center justify-center h-32">
-          <div className="w-8 h-8 border-2 border-orange-600 border-t-transparent rounded-full animate-spin" />
-        </div>
-      </div>
-    );
+    return null;
   }
 
   if (error || bundles.length === 0) {

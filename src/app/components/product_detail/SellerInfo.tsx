@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { fetchSellerInfoClient } from "@/lib/product-detail-client";
 
 interface SellerInfo {
   sellerName: string;
@@ -110,7 +111,7 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
       return;
     }
 
-    // ✅ PRIORITY 2: Fetch from API (fallback)
+    // ✅ PRIORITY 2: Direct Firestore client read.
     const fetchSellerInfo = async () => {
       if (!sellerId) {
         setLoading(false);
@@ -120,16 +121,8 @@ const ProductDetailSellerInfo: React.FC<ProductDetailSellerInfoProps> = ({
       try {
         setLoading(true);
         setError(null);
-
-        const response = await fetch(
-          `/api/seller/${sellerId}${shopId ? `?shopId=${shopId}` : ""}`,
-        );
-
-        if (!response.ok) {
-          throw new Error(t("failedToFetchSellerInfo"));
-        }
-
-        const data = await response.json();
+        const data = await fetchSellerInfoClient(sellerId, shopId);
+        if (!data) throw new Error(t("failedToFetchSellerInfo"));
         setSellerInfo(data);
       } catch (err) {
         console.error("Error fetching seller info:", err);

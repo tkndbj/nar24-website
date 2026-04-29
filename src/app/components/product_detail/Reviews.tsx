@@ -16,6 +16,7 @@ import {
 import SmartImage from "@/app/components/SmartImage";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
+import { fetchReviewsClient } from "@/lib/product-detail-client";
 import translationService, {
   RateLimitException,
   TranslationException,
@@ -522,20 +523,16 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
       return;
     }
 
-    // ✅ PRIORITY 2: Fetch from API (fallback)
+    // ✅ PRIORITY 2: Direct Firestore client read (no API round-trip).
+    // Matches the shape of /api/reviews/[productId] but skips the Lambda
+    // cold start + edge round-trip — typically 200–500ms faster.
     const fetchReviews = async () => {
       if (!productId) return;
-
       try {
         setLoading(true);
-        const response = await fetch(`/api/reviews/${productId}${isShop !== undefined ? `?isShop=${isShop}` : ""}`);
-        if (!response.ok) {
-          throw new Error(t("failedToFetchReviews"));
-        }
-
-        const data = await response.json();
-        setReviews(data.reviews || []);
-        setTotalReviewCount(data.totalCount || 0);
+        const result = await fetchReviewsClient(productId, { isShop });
+        setReviews(result.reviews);
+        setTotalReviewCount(result.totalCount);
       } catch (error) {
         console.error("Error fetching reviews:", error);
         setReviews([]);
@@ -546,7 +543,7 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
     };
 
     fetchReviews();
-  }, [productId, t, prefetchedData]);
+  }, [productId, isShop, prefetchedData]);
 
   const handleLike = useCallback(
     async (reviewId: string) => {
@@ -583,7 +580,7 @@ const ProductDetailReviewsTab: React.FC<ProductDetailReviewsTabProps> = ({
 
   const handleSeeAllReviews = useCallback(() => {
     router.push(`/all-reviews?productId=${productId}${isShop !== undefined ? `&isShop=${isShop}` : ""}`);
-  }, [productId, router]);
+  }, [productId, isShop, router]);
 
   if (isLoading || loading) {
     return <LoadingSkeleton />;
