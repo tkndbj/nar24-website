@@ -56,8 +56,6 @@ const createAppLocalizations = (
 
 // Buyer (gender) categories: when URL `category=women|men`, the API expects
 // `buyerCategory=Women|Men` instead of `category` so it filters by gender.
-const BUYER_CATEGORY_KEYS = new Set(["women", "men"]);
-
 function toBuyerCategory(slug: string): "Women" | "Men" | null {
   if (slug === "women") return "Women";
   if (slug === "men") return "Men";
