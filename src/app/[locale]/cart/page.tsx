@@ -378,11 +378,17 @@ function CartPageContent() {
     });
   }, [cartItems]);
 
-  // Update totals whenever selection changes (delegates to provider)
-  useEffect(() => {
-    const excludedIds = Array.from(deselectedProducts);
+ // Update totals whenever selection changes (delegates to provider)
+useEffect(() => {
+  const excludedIds = Array.from(deselectedProducts);
+  
+  // Debounce — selection toggles fire rapidly, batch into one call
+  const timer = setTimeout(() => {
     updateTotalsForExcluded(excludedIds);
-  }, [deselectedProducts, cartItems, updateTotalsForExcluded]);
+  }, 400);
+
+  return () => clearTimeout(timer);
+}, [deselectedProducts, cartItems, updateTotalsForExcluded]);
 
 
   // ========================================================================

@@ -304,6 +304,14 @@ async function retryWithBackoff<T>(
       return await operation();
     } catch (e) {
       attempt++;
+
+      // Don't retry rate-limit errors — retrying makes it worse
+      const errorCode = (e as { code?: string })?.code;
+      if (errorCode === "resource-exhausted" || errorCode === "functions/resource-exhausted") {
+        console.warn(`⚠️ ${operationName} rate limited — not retrying`);
+        throw e;
+      }
+
       if (attempt >= maxRetries) {
         console.error(
           `❌ ${operationName} failed after ${maxRetries} attempts:`,

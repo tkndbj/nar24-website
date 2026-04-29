@@ -375,7 +375,7 @@ export default function FavoriteProductsPage() {
             </div>
 
             {/* Basket Widget + Search Row */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-8">
+            <div className={`flex flex-col sm:flex-row sm:items-center gap-3 ${showBottomSheet && selectedProductId ? "mb-3" : "mb-8"}`}>
               <div className="flex-1 min-w-0">
                 <FavoriteBasketWidget
                   isDarkMode={isDark}
@@ -395,6 +395,70 @@ export default function FavoriteProductsPage() {
                 </div>
               )}
             </div>
+
+            {/* Inline Action Bar — appears under basket dropdown when a product is selected */}
+            {showBottomSheet && selectedProductId && (
+              <div
+                className={`mb-8 rounded-2xl border px-3 py-3 sm:px-4 ${
+                  isDark
+                    ? "bg-gray-900 border-orange-500/30"
+                    : "bg-white border-orange-200 shadow-sm"
+                }`}
+              >
+                <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+                  {/* Selection Indicator */}
+                  <div className="flex items-center justify-between gap-3 lg:flex-1 lg:min-w-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`flex items-center justify-center w-6 h-6 rounded-full ${isDark ? "bg-orange-500/20" : "bg-orange-100"}`}>
+                        <CheckCircle size={14} className="text-orange-500" />
+                      </span>
+                      <span className={`text-sm font-semibold truncate ${isDark ? "text-white" : "text-gray-900"}`}>
+                        {t("itemSelected") || "1 item selected"}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => handleProductSelect(selectedProductId)}
+                      className={`flex-shrink-0 p-1.5 rounded-lg transition-colors ${isDark ? "hover:bg-gray-800 text-gray-400" : "hover:bg-gray-100 text-gray-500"}`}
+                      aria-label="Clear selection"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex items-stretch gap-2 sm:gap-2.5">
+                    <button
+                      onClick={removeSelectedFromFavorites}
+                      className={`flex-1 lg:flex-initial flex items-center justify-center gap-1.5 py-2.5 px-3 sm:px-4 rounded-xl text-[13px] font-semibold transition-colors ${isDark ? "bg-red-900/40 text-red-300 hover:bg-red-900/60" : "bg-red-50 text-red-600 hover:bg-red-100"}`}
+                    >
+                      <Trash2 size={14} />
+                      <span>{t("remove") || "Remove"}</span>
+                    </button>
+
+                    <button
+                      onClick={showTransferBasketDialog}
+                      className={`flex-1 lg:flex-initial flex items-center justify-center gap-1.5 py-2.5 px-3 sm:px-4 rounded-xl text-[13px] font-semibold transition-colors ${isDark ? "bg-teal-900/40 text-teal-300 hover:bg-teal-900/60" : "bg-teal-50 text-teal-600 hover:bg-teal-100"}`}
+                    >
+                      <ArrowRight size={14} />
+                      <span>{t("transfer") || "Transfer"}</span>
+                    </button>
+
+                    <button
+                      onClick={addSelectedToCart}
+                      disabled={isAddingToCart}
+                      className="flex-1 lg:flex-initial flex items-center justify-center gap-1.5 py-2.5 px-3 sm:px-4 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-[13px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
+                    >
+                      {isAddingToCart ? (
+                        <div className="w-3.5 h-3.5 border-[2px] border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <ShoppingCart size={14} />
+                      )}
+                      <span>{t("addToCart") || "Add to Cart"}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Content Area */}
             <div ref={scrollContainerRef} className="w-full">
@@ -534,53 +598,9 @@ export default function FavoriteProductsPage() {
                       <div className="w-6 h-6 border-[2.5px] border-orange-200 border-t-orange-500 rounded-full animate-spin" />
                     </div>
                   )}
-
-                  {/* Bottom Padding for bottom sheet */}
-                  {showBottomSheet && <div className="h-24" />}
                 </>
               )}
             </div>
-
-            {/* ================================================================
-                BOTTOM ACTION BAR - Fixed at bottom when product selected
-                ================================================================ */}
-            {showBottomSheet && selectedProductId && (
-              <div className={`fixed bottom-0 left-0 right-0 z-40 border-t backdrop-blur-md px-4 py-4 sm:px-6 ${isDark ? "bg-gray-900/95 border-gray-800" : "bg-white/95 border-gray-200"} shadow-[0_-4px_20px_rgba(0,0,0,0.06)]`}>
-                <div className="max-w-7xl mx-auto flex flex-col sm:flex-row gap-2.5 sm:gap-3">
-                  {/* Remove Button */}
-                  <button
-                    onClick={removeSelectedFromFavorites}
-                    className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-semibold transition-colors ${isDark ? "bg-red-900/40 text-red-300 hover:bg-red-900/60" : "bg-red-50 text-red-600 hover:bg-red-100"}`}
-                  >
-                    <Trash2 size={16} />
-                    <span>{t("remove") || "Remove"}</span>
-                  </button>
-
-                  {/* Transfer Button */}
-                  <button
-                    onClick={showTransferBasketDialog}
-                    className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-semibold transition-colors ${isDark ? "bg-teal-900/40 text-teal-300 hover:bg-teal-900/60" : "bg-teal-50 text-teal-600 hover:bg-teal-100"}`}
-                  >
-                    <ArrowRight size={16} />
-                    <span>{t("transfer") || "Transfer"}</span>
-                  </button>
-
-                  {/* Add to Cart Button */}
-                  <button
-                    onClick={addSelectedToCart}
-                    disabled={isAddingToCart}
-                    className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
-                  >
-                    {isAddingToCart ? (
-                      <div className="w-4 h-4 border-[2px] border-white/30 border-t-white rounded-full animate-spin" />
-                    ) : (
-                      <ShoppingCart size={16} />
-                    )}
-                    <span>{t("addToCart") || "Add to Cart"}</span>
-                  </button>
-                </div>
-              </div>
-            )}
           </>
         )}
       </div>

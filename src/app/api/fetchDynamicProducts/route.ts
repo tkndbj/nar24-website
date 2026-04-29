@@ -174,23 +174,13 @@ function parseProducts(snapshot: QuerySnapshot): Product[] {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function decideBackend(p: QueryParams): "firestore" | "typesense" {
-  if (p.sortOption !== "date") return "typesense";
-  if (
-    p.brands.length > 0 ||
-    p.colors.length > 0 ||
-    p.filterSubcategories.length > 0 ||
-    Object.keys(p.specFilters).length > 0 ||
-    p.minPrice !== null ||
-    p.maxPrice !== null ||
-    p.minRating !== null
-  )
-    return "typesense";
-  // Gender (buyerCategory) queries require a Firestore composite index on
-  // gender + promotionScore + __name__ that isn't deployed; route them to
-  // Typesense, which already indexes the gender facet.
-  if (p.buyerCategory === "Women" || p.buyerCategory === "Men")
-    return "typesense";
-  return "firestore";
+  // Typesense is the source of truth: it indexes every facet this route can
+  // filter on (category, gender, brand, color, spec attributes, price, rating)
+  // and the sort options. The Firestore "fast path" required composite indexes
+  // (category/gender + promotionScore + __name__) that aren't deployed in this
+  // environment and were 500ing on the no-filter case. Always use Typesense.
+  void p;
+  return "typesense";
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
