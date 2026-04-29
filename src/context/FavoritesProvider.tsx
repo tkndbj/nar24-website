@@ -569,17 +569,17 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
                   const shopId = (productDoc.data() as Record<string, unknown>)
                     .shopId as string | undefined;
 
-                  const update: Record<string, unknown> = {
-                    sourceCollection: resolvedCollection,
-                  };
-                  if (shopId) update.shopId = shopId;
-
-                  updateDoc(favRef, update).catch((e) =>
-                    console.warn(
-                      "⚠️ Favorite backfill failed (non-critical):",
-                      e
-                    )
-                  );
+                    const update: { sourceCollection: "products" | "shop_products"; shopId?: string } = {
+                      sourceCollection: resolvedCollection,
+                    };
+                    if (shopId) update.shopId = shopId;
+                    
+                    updateDoc(favRef, update).catch((e) =>
+                      console.warn(
+                        "⚠️ Favorite backfill failed (non-critical):",
+                        e
+                      )
+                    );
                 }
               }
               addResultsFromSnapshot(snap);
