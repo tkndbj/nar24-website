@@ -323,7 +323,7 @@ export default function MarketReceiptDetailPage({
       "receiptOrderNumber",
     )} #${shortOrderId(receipt.orderId)}\n${t(
       "orderTotalLabel",
-    )}: ${Math.round(receipt.totalPrice)} ${receipt.currency}\n${formatDate(
+    )}: ${receipt.totalPrice.toFixed(2)} ${receipt.currency}\n${formatDate(
       receipt.timestamp,
     )}`;
     if (navigator.share)
@@ -755,7 +755,7 @@ export default function MarketReceiptDetailPage({
                           isDarkMode ? "text-orange-400" : "text-orange-600"
                         }`}
                       >
-                        {Math.round(lineTotal(item))} {receipt.currency}
+                        {lineTotal(item).toFixed(2)} {receipt.currency}
                       </span>
                       {item.quantity > 1 && (
                         <p
@@ -764,7 +764,7 @@ export default function MarketReceiptDetailPage({
                           }`}
                         >
                           {t("receiptPerUnit", {
-                            price: `${Math.round(item.price)} ${receipt.currency}`,
+                            price: `${item.price.toFixed(2)} ${receipt.currency}`,
                           })}
                         </p>
                       )}
@@ -815,14 +815,14 @@ export default function MarketReceiptDetailPage({
           <div className="space-y-0">
             <InfoRow
               label={t("orderSubtotalLabel")}
-              value={`${Math.round(receipt.subtotal)} ${receipt.currency}`}
+              value={`${receipt.subtotal.toFixed(2)} ${receipt.currency}`}
             />
             <InfoRow
               label={t("orderDeliveryLabel")}
               value={
                 deliveryIsFree
                   ? t("orderDeliveryFree")
-                  : `${Math.round(receipt.deliveryFee)} ${receipt.currency}`
+                  : `${receipt.deliveryFee.toFixed(2)} ${receipt.currency}`
               }
               valueClass={
                 deliveryIsFree
@@ -850,7 +850,7 @@ export default function MarketReceiptDetailPage({
                 {t("orderTotalLabel")}
               </span>
               <span className="text-lg font-bold text-orange-600 dark:text-orange-400">
-                {Math.round(receipt.totalPrice)} {receipt.currency}
+                {receipt.totalPrice.toFixed(2)} {receipt.currency}
               </span>
             </div>
           </div>

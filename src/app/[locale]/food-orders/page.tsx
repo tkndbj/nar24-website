@@ -494,7 +494,7 @@ export default function FoodOrdersPage() {
                         <span
                           className={`text-xs font-bold ${isDarkMode ? "text-orange-400" : "text-orange-600"}`}
                         >
-                          {order.totalPrice.toFixed(0)} {order.currency}
+                          {order.totalPrice.toFixed(2)} {order.currency}
                         </span>
                         <span
                           className={`flex items-center gap-0.5 text-[11px] ${isPickup ? (isDarkMode ? "text-blue-400" : "text-blue-600") : isDarkMode ? "text-green-400" : "text-green-600"}`}

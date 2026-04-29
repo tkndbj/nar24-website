@@ -236,7 +236,10 @@ export default function FoodOrderDetailPage() {
 
   // ── Helpers ────────────────────────────────────────────────────────
   const formatCurrency = (amount: number, currency?: string) =>
-    new Intl.NumberFormat("tr-TR").format(amount) +
+    new Intl.NumberFormat("tr-TR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount) +
     " " +
     (currency === "TRY" ? "₺" : currency || "TL");
 

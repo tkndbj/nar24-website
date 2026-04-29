@@ -1,5 +1,21 @@
-// context/FavoritesProvider.tsx - REFACTORED v3.0 (Production Grade + Simplified)
-// Matches Flutter favorite_product_provider.dart exactly
+// context/FavoritesProvider.tsx - REFACTORED v4.0 (Full Flutter Parity)
+// Mirrors lib/providers/favorite_product_provider.dart exactly.
+//
+// Parity changes vs v3.0:
+//   1. `sourceCollection` + `shopId` are now persisted ON the favorite doc
+//      itself, mirroring Flutter. Reads (hydration, add-to-cart, remove)
+//      use the stored value to do a single targeted Firestore read instead
+//      of a parallel dual-collection fetch.
+//   2. Legacy favorites missing these fields are self-healed (backfilled)
+//      on read — same pattern as Flutter.
+//   3. Add/remove now commit the favorite doc + user doc array update in
+//      a single atomic WriteBatch.
+//   4. Per the agreed convergence: single-item remove also runs the
+//      `existsElsewhere` smart check before touching `favoriteItemIds`,
+//      preventing the heart icon from incorrectly toggling off when a
+//      product is removed from one basket but still in another.
+//   5. `getProductMetadata` now accepts an optional `sourceCollection`
+//      hint so it can do a targeted single read.
 
 "use client";
 
@@ -44,6 +60,7 @@ import { userActivityService } from "@/services/userActivity";
 import LimitReachedModal from "@/app/components/LimitReachedModal";
 
 const MAX_FAVORITE_ITEMS = 500;
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -58,6 +75,9 @@ interface FavoriteAttributes {
   quantity?: number;
   selectedColor?: string;
   selectedColorImage?: string;
+  // Persisted on the favorite doc for single-collection lookups.
+  sourceCollection?: "products" | "shop_products";
+  shopId?: string;
   [key: string]: unknown;
 }
 
@@ -88,7 +108,6 @@ interface PaginatedFavorite {
 // SPLIT CONTEXT TYPES - For granular subscriptions
 // ============================================================================
 
-// State-only context type (changes frequently)
 interface FavoritesStateContextType {
   favoriteIds: Set<string>;
   favoriteCount: number;
@@ -101,9 +120,7 @@ interface FavoritesStateContextType {
   favoriteBaskets: FavoriteBasket[];
 }
 
-// Actions-only context type (stable references, never causes re-renders)
 interface FavoritesActionsContextType {
-  // Methods
   addToFavorites: (
     productId: string,
     attributes?: FavoriteAttributes
@@ -111,7 +128,6 @@ interface FavoritesActionsContextType {
   removeMultipleFromFavorites: (productIds: string[]) => Promise<string>;
   removeGloballyFromFavorites: (productId: string) => Promise<string>;
 
-  // Basket management
   createFavoriteBasket: (name: string) => Promise<string>;
   deleteFavoriteBasket: (basketId: string) => Promise<string>;
   setSelectedBasket: (basketId: string | null) => void;
@@ -120,7 +136,6 @@ interface FavoritesActionsContextType {
     targetBasketId: string | null
   ) => Promise<string>;
 
-  // Pagination
   loadNextPage: (limit?: number) => Promise<{
     docs: DocumentSnapshot[];
     hasMore: boolean;
@@ -131,31 +146,28 @@ interface FavoritesActionsContextType {
   resetPagination: () => void;
   shouldReloadFavorites: (basketId: string | null) => boolean;
 
-  // Baskets (on-demand fetch, no listener)
   fetchBaskets: () => Promise<void>;
 
-  // Utilities
   isFavorite: (productId: string) => boolean;
   isGloballyFavorited: (productId: string) => boolean;
   isFavoritedInBasket: (productId: string) => Promise<boolean>;
   getBasketNameForProduct: (productId: string) => Promise<string | null>;
 }
 
-// Combined context type (for backward compatibility)
-interface FavoritesContextType extends FavoritesStateContextType, FavoritesActionsContextType {}
+interface FavoritesContextType
+  extends FavoritesStateContextType,
+    FavoritesActionsContextType {}
 
-// Create separate contexts
-const FavoritesStateContext = createContext<FavoritesStateContextType | undefined>(undefined);
-const FavoritesActionsContext = createContext<FavoritesActionsContextType | undefined>(undefined);
-
-// Combined context for backward compatibility
+const FavoritesStateContext = createContext<
+  FavoritesStateContextType | undefined
+>(undefined);
+const FavoritesActionsContext = createContext<
+  FavoritesActionsContextType | undefined
+>(undefined);
 const FavoritesContext = createContext<FavoritesContextType | undefined>(
   undefined
 );
 
-/**
- * Hook to access only favorites state (will re-render on state changes)
- */
 export const useFavoritesState = (): FavoritesStateContextType => {
   const context = useContext(FavoritesStateContext);
   if (!context) {
@@ -164,21 +176,16 @@ export const useFavoritesState = (): FavoritesStateContextType => {
   return context;
 };
 
-/**
- * Hook to access only favorites actions (stable, never re-renders)
- */
 export const useFavoritesActions = (): FavoritesActionsContextType => {
   const context = useContext(FavoritesActionsContext);
   if (!context) {
-    throw new Error("useFavoritesActions must be used within FavoritesProvider");
+    throw new Error(
+      "useFavoritesActions must be used within FavoritesProvider"
+    );
   }
   return context;
 };
 
-/**
- * Combined hook for backward compatibility - returns both state and actions
- * PREFER useFavoritesState() or useFavoritesActions() for better performance
- */
 export const useFavorites = (): FavoritesContextType => {
   const context = useContext(FavoritesContext);
   if (!context) {
@@ -188,7 +195,7 @@ export const useFavorites = (): FavoritesContextType => {
 };
 
 // ============================================================================
-// RATE LIMITER (Prevents spam)
+// RATE LIMITER
 // ============================================================================
 
 class RateLimiter {
@@ -218,7 +225,7 @@ class RateLimiter {
 }
 
 // ============================================================================
-// CIRCUIT BREAKER (Fault tolerance)
+// CIRCUIT BREAKER
 // ============================================================================
 
 class CircuitBreaker {
@@ -272,20 +279,18 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   children,
   db: dbProp,
 }) => {
-  const { user, getProfileField, updateLocalProfileField, profileData } = useUser();
+  const { user, getProfileField, updateLocalProfileField, profileData } =
+    useUser();
 
-  // Stable ref so callbacks always access the latest db without needing it in deps
   const dbRef = useRef<Firestore | null>(dbProp);
   dbRef.current = dbProp;
 
-  // Rate limiters
   const addFavoriteLimiter = useRef(new RateLimiter(300));
   const removeFavoriteLimiter = useRef(new RateLimiter(200));
 
-  // Circuit breaker
   const circuitBreaker = useRef(new CircuitBreaker());
 
-  // Reactive state (like ValueNotifiers)
+  // Reactive state
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [favoriteCount, setFavoriteCount] = useState(0);
   const [paginatedFavorites, setPaginatedFavorites] = useState<
@@ -302,7 +307,6 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   const [favoriteBaskets, setFavoriteBaskets] = useState<FavoriteBasket[]>([]);
   const [showFavoritesLimitModal, setShowFavoritesLimitModal] = useState(false);
 
-  // Internal state
   const lastDocument = useRef<DocumentSnapshot | null>(null);
   const paginatedFavoritesMap = useRef<Map<string, PaginatedFavorite>>(
     new Map()
@@ -310,7 +314,6 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   const currentBasketId = useRef<string | null>(null);
   const selectedBasketIdRef = useRef<string | null>(null);
 
-  // Per-basket cache for fast switching
   interface BasketCache {
     favorites: PaginatedFavorite[];
     lastDoc: DocumentSnapshot | null;
@@ -318,24 +321,25 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
     timestamp: number;
   }
   const basketCacheMap = useRef<Map<string, BasketCache>>(new Map());
-  const BASKET_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+  const BASKET_CACHE_TTL = 5 * 60 * 1000;
 
-
-  // Timers
   const removeFavoriteTimer = useRef<NodeJS.Timeout | null>(null);
   const cleanupTimer = useRef<NodeJS.Timeout | null>(null);
 
-  // Concurrency control
   const favoriteLocks = useRef<Map<string, Promise<string>>>(new Map());
   const pendingFetches = useRef<Map<string, Promise<void>>>(new Map());
-  const deferredFavInitRef = useRef<number | ReturnType<typeof setTimeout> | null>(null);
-  const isLoadingMoreRef = useRef(false); // Ref-based guard (sync, no race conditions)
-  const paginationGenRef = useRef(0); // Generation counter: stale fetches discard results
+  const deferredFavInitRef = useRef<
+    number | ReturnType<typeof setTimeout> | null
+  >(null);
+  const isLoadingMoreRef = useRef(false);
+  const paginationGenRef = useRef(0);
 
   // ========================================================================
   // UTILITY FUNCTIONS
   // ========================================================================
 
+  // System fields are managed by the provider — callers cannot override them.
+  // Mirrors Flutter's check in addToFavorites' additionalAttributes loop.
   const isSystemField = useCallback((key: string): boolean => {
     return [
       "addedAt",
@@ -343,9 +347,85 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
       "quantity",
       "selectedColor",
       "selectedColorImage",
+      "sourceCollection",
+      "shopId",
     ].includes(key);
   }, []);
 
+  /// Fetches product metadata for tracking/metrics.
+  ///
+  /// When `sourceCollection` is known (from a stored favorite doc), a single
+  /// targeted read is issued. Otherwise we fall back to a parallel dual-fetch —
+  /// needed only for first-time adds or legacy favorites without the field.
+  const getProductMetadata = useCallback(
+    async (
+      productId: string,
+      sourceCollection?: "products" | "shop_products"
+    ): Promise<{
+      sourceCollection?: "products" | "shop_products";
+      shopId?: string;
+      productName?: string;
+      category?: string;
+      subcategory?: string;
+      subsubcategory?: string;
+      brand?: string;
+      gender?: string;
+    }> => {
+      try {
+        let data: Record<string, unknown> | undefined;
+        let resolvedCollection: "products" | "shop_products" | undefined;
+
+        if (
+          sourceCollection === "products" ||
+          sourceCollection === "shop_products"
+        ) {
+          const snap = await getDoc(
+            doc(dbRef.current!, sourceCollection, productId)
+          );
+          if (snap.exists()) {
+            data = snap.data();
+            resolvedCollection = sourceCollection;
+          }
+        } else {
+          const [productsSnap, shopProductsSnap] = await Promise.all([
+            getDoc(doc(dbRef.current!, "products", productId)),
+            getDoc(doc(dbRef.current!, "shop_products", productId)),
+          ]);
+
+          if (productsSnap.exists()) {
+            data = productsSnap.data();
+            resolvedCollection = "products";
+          } else if (shopProductsSnap.exists()) {
+            data = shopProductsSnap.data();
+            resolvedCollection = "shop_products";
+          }
+        }
+
+        if (!data) return {};
+
+        return {
+          sourceCollection: resolvedCollection,
+          shopId: data.shopId as string | undefined,
+          productName: data.productName as string | undefined,
+          category: data.category as string | undefined,
+          subcategory: data.subcategory as string | undefined,
+          subsubcategory: data.subsubcategory as string | undefined,
+          brand: data.brandModel as string | undefined,
+          gender: data.gender as string | undefined,
+        };
+      } catch (error) {
+        console.warn("⚠️ Failed to get product metadata:", error);
+        return {};
+      }
+    },
+    []
+  );
+
+  /// Hydrates favorite docs to full product data using bucketed fetches.
+  ///
+  /// Favorites with a stored `sourceCollection` go to a single targeted query.
+  /// Legacy favorites without the field fall back to a parallel dual-fetch and
+  /// are self-healed (backfilled) so the next read is single-collection.
   const fetchProductDetailsForIds = useCallback(
     async (
       productIds: string[],
@@ -354,79 +434,159 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
       if (productIds.length === 0) return [];
 
       const results: PaginatedFavorite[] = [];
-      const favoriteDetailsByProductId: Record<string, FavoriteAttributes> = {};
+      const favoriteDetailsByProductId: Record<string, FavoriteAttributes> =
+        {};
+      const favoriteRefByProductId: Record<
+        string,
+        DocumentSnapshot["ref"]
+      > = {};
 
-      // Build attributes map
-      favoriteDocs.forEach((doc) => {
-        const data = doc.data();
-        if (data && data.productId) {
-          const attrs = { ...data };
-          delete attrs.productId;
-          delete attrs.addedAt;
-          favoriteDetailsByProductId[data.productId as string] = attrs;
+      // Bucket product IDs by the sourceCollection persisted on the favorite doc.
+      const productsBucket: string[] = [];
+      const shopProductsBucket: string[] = [];
+      const unknownBucket: string[] = [];
+
+      favoriteDocs.forEach((d) => {
+        const data = d.data();
+        if (!data || !data.productId) return;
+        const productId = data.productId as string;
+
+        const attrs = { ...data } as FavoriteAttributes;
+        delete (attrs as Record<string, unknown>).productId;
+        delete (attrs as Record<string, unknown>).addedAt;
+        favoriteDetailsByProductId[productId] = attrs;
+        favoriteRefByProductId[productId] = d.ref;
+
+        const src = data.sourceCollection as string | undefined;
+        if (src === "products") {
+          productsBucket.push(productId);
+        } else if (src === "shop_products") {
+          shopProductsBucket.push(productId);
+        } else {
+          unknownBucket.push(productId);
         }
       });
 
-      // Chunk IDs for Firestore 'in' queries (max 10)
-      const FIRESTORE_IN_LIMIT = 10;
-      for (let i = 0; i < productIds.length; i += FIRESTORE_IN_LIMIT) {
-        const chunk = productIds.slice(i, i + FIRESTORE_IN_LIMIT);
+      const chunks = function* (ids: string[]) {
+        for (let i = 0; i < ids.length; i += FIRESTORE_IN_LIMIT) {
+          yield ids.slice(i, i + FIRESTORE_IN_LIMIT);
+        }
+      };
 
+      const addResultsFromSnapshot = (
+        snap: Awaited<ReturnType<typeof getDocs>>
+      ) => {
+        snap.docs.forEach((doc) => {
+          try {
+            const product: ProductData = {
+              id: doc.id,
+              ...(doc.data() as Record<string, unknown>),
+            };
+            const attributes = favoriteDetailsByProductId[doc.id] || {};
+            results.push({
+              product,
+              attributes,
+              productId: doc.id,
+            });
+          } catch (error) {
+            console.error("Error parsing product", doc.id, error);
+          }
+        });
+      };
+
+      // Targeted single-collection queries for known buckets
+      const futures: Promise<Awaited<ReturnType<typeof getDocs>>>[] = [];
+      for (const chunk of chunks(productsBucket)) {
+        futures.push(
+          getDocs(
+            query(
+              collection(dbRef.current!, "products"),
+              where("__name__", "in", chunk)
+            )
+          )
+        );
+      }
+      for (const chunk of chunks(shopProductsBucket)) {
+        futures.push(
+          getDocs(
+            query(
+              collection(dbRef.current!, "shop_products"),
+              where("__name__", "in", chunk)
+            )
+          )
+        );
+      }
+      if (futures.length > 0) {
         try {
-          // ✅ Query BOTH collections in parallel (like Flutter)
-          const [productsSnap, shopProductsSnap] = await Promise.all([
-            getDocs(
-              query(collection(dbRef.current!, "products"), where("__name__", "in", chunk))
-            ),
-            getDocs(
-              query(
-                collection(dbRef.current!, "shop_products"),
-                where("__name__", "in", chunk)
-              )
-            ),
-          ]);
-
-          // Process products collection
-          productsSnap.docs.forEach((doc) => {
-            try {
-              const data = doc.data();
-              const product: ProductData = {
-                id: doc.id,
-                ...data,
-              };
-
-              const attributes = favoriteDetailsByProductId[doc.id] || {};
-              results.push({
-                product,
-                attributes,
-                productId: doc.id,
-              });
-            } catch (error) {
-              console.error("Error parsing product", doc.id, error);
-            }
-          });
-
-          // Process shop_products collection
-          shopProductsSnap.docs.forEach((doc) => {
-            try {
-              const data = doc.data();
-              const product: ProductData = {
-                id: doc.id,
-                ...data,
-              };
-
-              const attributes = favoriteDetailsByProductId[doc.id] || {};
-              results.push({
-                product,
-                attributes,
-                productId: doc.id,
-              });
-            } catch (error) {
-              console.error("Error parsing product", doc.id, error);
-            }
-          });
+          const snapshots = await Promise.all(futures);
+          let totalReads = 0;
+          for (const snap of snapshots) {
+            totalReads += snap.docs.length;
+            addResultsFromSnapshot(snap);
+          }
+          trackReads(
+            `Favorites:hydrate (targeted: products=${productsBucket.length}, shop_products=${shopProductsBucket.length})`,
+            totalReads
+          );
         } catch (error) {
-          console.error("Error fetching product chunk:", error);
+          console.error("Error fetching targeted product chunks:", error);
+        }
+      }
+
+      // Legacy fallback + self-heal: dual-fetch for favorites without sourceCollection.
+      if (unknownBucket.length > 0) {
+        for (const chunk of chunks(unknownBucket)) {
+          try {
+            const [productsSnap, shopProductsSnap] = await Promise.all([
+              getDocs(
+                query(
+                  collection(dbRef.current!, "products"),
+                  where("__name__", "in", chunk)
+                )
+              ),
+              getDocs(
+                query(
+                  collection(dbRef.current!, "shop_products"),
+                  where("__name__", "in", chunk)
+                )
+              ),
+            ]);
+
+            trackReads(
+              `Favorites:hydrate legacy (${chunk.length})`,
+              productsSnap.docs.length + shopProductsSnap.docs.length
+            );
+
+            for (const snap of [productsSnap, shopProductsSnap]) {
+              for (const productDoc of snap.docs) {
+                // Self-heal: backfill sourceCollection (+ shopId) so the
+                // next read is single-collection.
+                const favRef = favoriteRefByProductId[productDoc.id];
+                if (favRef) {
+                  const resolvedCollection = productDoc.ref.parent.id as
+                    | "products"
+                    | "shop_products";
+                  const shopId = (productDoc.data() as Record<string, unknown>)
+                    .shopId as string | undefined;
+
+                  const update: Record<string, unknown> = {
+                    sourceCollection: resolvedCollection,
+                  };
+                  if (shopId) update.shopId = shopId;
+
+                  updateDoc(favRef, update).catch((e) =>
+                    console.warn(
+                      "⚠️ Favorite backfill failed (non-critical):",
+                      e
+                    )
+                  );
+                }
+              }
+              addResultsFromSnapshot(snap);
+            }
+          } catch (error) {
+            console.error("Error fetching legacy product chunk:", error);
+          }
         }
       }
 
@@ -464,92 +624,6 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
     // TODO: Implement toast notification
   }, []);
 
-  const getProductShopId = useCallback(
-    async (productId: string): Promise<string | null> => {
-      try {
-        // Try products collection first
-        const productDoc = await getDoc(doc(dbRef.current!, "products", productId));
-
-        if (productDoc.exists()) {
-          const data = productDoc.data();
-          return (data?.shopId as string) || null;
-        }
-
-        // Try shop_products collection
-        const shopProductDoc = await getDoc(
-          doc(dbRef.current!, "shop_products", productId)
-        );
-
-        if (shopProductDoc.exists()) {
-          const data = shopProductDoc.data();
-          return (data?.shopId as string) || null;
-        }
-
-        return null;
-      } catch (error) {
-        console.warn("⚠️ Failed to get product shopId:", error);
-        return null;
-      }
-    },
-    []
-  );
-
-  const getProductMetadata = useCallback(
-    async (
-      productId: string
-    ): Promise<{
-      shopId?: string;
-      productName?: string;
-      category?: string;
-      subcategory?: string;
-      subsubcategory?: string;
-      brand?: string;
-      gender?: string;
-    }> => {
-      try {
-        // ✅ Fetch BOTH collections in parallel
-        const [productDoc, shopProductDoc] = await Promise.all([
-          getDoc(doc(dbRef.current!, "products", productId)),
-          getDoc(doc(dbRef.current!, "shop_products", productId)),
-        ]);
-
-        // Prefer products collection if it exists
-        if (productDoc.exists()) {
-          const data = productDoc.data();
-          return {
-            shopId: data?.shopId as string | undefined,
-            productName: data?.productName as string | undefined,
-            category: data?.category as string | undefined,
-            subcategory: data?.subcategory as string | undefined,
-            subsubcategory: data?.subsubcategory as string | undefined,
-            brand: data?.brandModel as string | undefined,
-            gender: data?.gender as string | undefined,
-          };
-        }
-
-        // Fall back to shop_products
-        if (shopProductDoc.exists()) {
-          const data = shopProductDoc.data();
-          return {
-            shopId: data?.shopId as string | undefined,
-            productName: data?.productName as string | undefined,
-            category: data?.category as string | undefined,
-            subcategory: data?.subcategory as string | undefined,
-            subsubcategory: data?.subsubcategory as string | undefined,
-            brand: data?.brandModel as string | undefined,
-            gender: data?.gender as string | undefined,
-          };
-        }
-
-        return {};
-      } catch (error) {
-        console.warn("⚠️ Failed to get product metadata:", error);
-        return {};
-      }
-    },
-    []
-  );
-
   const showErrorToast = useCallback((message: string) => {
     console.error("❌", message);
     // TODO: Implement toast notification
@@ -565,17 +639,12 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   }, [showSuccessToast]);
 
   // ========================================================================
-  // INITIALIZATION & DATA LOADING
+  // INITIALIZATION
   // ========================================================================
-
-  // Favorite IDs are seeded from user doc `favoriteItemIds` array (Tier 1).
-  // No listener needed — local state is the source of truth for the session.
-  // Full item data is fetched on-demand via getDocsFromServer (favorites page).
 
   const initializeIfNeeded = useCallback(async () => {
     if (!user) return;
 
-    // Request coalescing
     if (pendingFetches.current.has("init")) {
       console.log("⏳ Already initializing, waiting...");
       await pendingFetches.current.get("init");
@@ -584,8 +653,6 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
     const promise = (async () => {
       try {
-        // IDs are already seeded from user doc in the effect below.
-        // Mark as initialized so the favorites page can start loading full data.
         setIsInitialLoadComplete(true);
       } catch (error) {
         console.error("❌ Init error:", error);
@@ -598,6 +665,58 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   }, [user]);
 
   // ========================================================================
+  // EXISTS-ELSEWHERE CHECK
+  //
+  // Mirrors Flutter's smart-check pattern (used in deleteFavoriteBasket and
+  // now in single-item remove too). Returns true if `productId` still lives
+  // in default favorites or any basket OTHER than `excludeBasketId`. Used to
+  // decide whether to remove the id from the user doc's `favoriteItemIds`
+  // array — that array is the GLOBAL set across all containers, so we only
+  // strip it when the product is gone from every container.
+  // ========================================================================
+
+  const existsElsewhere = useCallback(
+    async (
+      productId: string,
+      excludeBasketId: string | null
+    ): Promise<boolean> => {
+      if (!user) return false;
+
+      // Always check default favorites unless that's where we're removing from
+      if (excludeBasketId !== null) {
+        const defaultSnap = await getDocs(
+          query(
+            collection(dbRef.current!, `users/${user.uid}/favorites`),
+            where("productId", "==", productId),
+            firestoreLimit(1)
+          )
+        );
+        if (!defaultSnap.empty) return true;
+      }
+
+      // Check all baskets except the excluded one
+      const basketsSnap = await getDocs(
+        collection(dbRef.current!, `users/${user.uid}/favorite_baskets`)
+      );
+
+      for (const bDoc of basketsSnap.docs) {
+        if (bDoc.id === excludeBasketId) continue;
+        const favSnap = await getDocs(
+          query(
+            collection(bDoc.ref, "favorites"),
+            where("productId", "==", productId),
+            firestoreLimit(1)
+          )
+        );
+        if (!favSnap.empty) return true;
+      }
+
+      return false;
+    },
+    [user]
+  );
+
+  // ========================================================================
   // ADD/REMOVE FAVORITES
   // ========================================================================
 
@@ -608,13 +727,14 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
     ): Promise<string> => {
       if (!user) return "Please log in";
 
-      // Ensure initialization if deferred init hasn't fired yet
       if (!isInitialLoadComplete) {
         if (deferredFavInitRef.current !== null) {
           if (typeof cancelIdleCallback !== "undefined") {
             cancelIdleCallback(deferredFavInitRef.current as number);
           } else {
-            clearTimeout(deferredFavInitRef.current as ReturnType<typeof setTimeout>);
+            clearTimeout(
+              deferredFavInitRef.current as ReturnType<typeof setTimeout>
+            );
           }
           deferredFavInitRef.current = null;
         }
@@ -647,12 +767,11 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
           ? `users/${user.uid}/favorite_baskets/${basketId}/favorites`
           : `users/${user.uid}/favorites`;
 
-        // Store previous state for rollback
         const wasFavorited = favoriteIds.has(productId);
         let isRemoving = false;
 
         try {
-          // Check if already exists
+          // Check if already exists in this container
           const existingSnap = await getDocs(
             query(
               collection(dbRef.current!, collectionPath),
@@ -663,90 +782,94 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
           isRemoving = existingSnap.docs.length > 0;
 
           if (isRemoving) {
-            // STEP 1: Delete from Firestore first
-            await deleteDoc(existingSnap.docs[0].ref);
-
-            // STEP 2: Check if product exists in any other location before
-            // removing from the global favoriteItemIds array
-            let existsElsewhere = false;
-
-            if (basketId) {
-              // Removed from a basket — check default favorites
-              const defaultSnap = await getDocs(
-                query(
-                  collection(dbRef.current!, `users/${user.uid}/favorites`),
-                  where("productId", "==", productId),
-                  firestoreLimit(1)
-                )
-              );
-              if (!defaultSnap.empty) {
-                existsElsewhere = true;
-              } else {
-                // Check other baskets
-                const basketsSnap = await getDocs(
-                  collection(dbRef.current!, `users/${user.uid}/favorite_baskets`)
-                );
-                for (const bDoc of basketsSnap.docs) {
-                  if (bDoc.id === basketId) continue; // skip current basket
-                  const favSnap = await getDocs(
-                    query(
-                      collection(bDoc.ref, "favorites"),
-                      where("productId", "==", productId),
-                      firestoreLimit(1)
-                    )
-                  );
-                  if (!favSnap.empty) {
-                    existsElsewhere = true;
-                    break;
-                  }
-                }
-              }
-            }
-            // If from default collection (no basketId), always safe to remove
-
-            // STEP 3: Only remove from user doc array if not in any other location
-            if (!existsElsewhere) {
+            const existingDoc = existingSnap.docs[0];
+            const existingData = existingDoc.data();
+            const storedCollection = existingData.sourceCollection as
+              | "products"
+              | "shop_products"
+              | undefined;
+            const storedShopId = existingData.shopId as string | undefined;
+            const productName = existingData.productName as string | undefined;
+          
+            // Smart check: only strip from user doc array if the product is
+            // gone from every container.
+            const stillElsewhere = await existsElsewhere(productId, basketId);
+          
+            // OPTIMISTIC UI: remove from current view BEFORE the batch commits.
+            // Snapshot the prior cache entry so we can roll back if the batch fails.
+            const previousCacheEntry = paginatedFavoritesMap.current.get(productId);
+            paginatedFavoritesMap.current.delete(productId);
+            setPaginatedFavorites(
+              Array.from(paginatedFavoritesMap.current.values())
+            );
+          
+            // Optimistic local state sync (also before the batch — matches Flutter)
+            let prevFavoriteIdsForRollback: Set<string> | null = null;
+            if (!stillElsewhere) {
+              prevFavoriteIdsForRollback = new Set(favoriteIds);
               const newIds = new Set(favoriteIds);
               newIds.delete(productId);
               setFavoriteIds(newIds);
               setFavoriteCount(newIds.size);
               updateLocalProfileField("favoriteItemIds", [...newIds]);
-
-              if (user) {
-                updateDoc(doc(dbRef.current!, "users", user.uid), {
-                  favoriteItemIds: arrayRemove(productId),
-                }).catch((err) => console.warn("favoriteItemIds arrayRemove failed:", err));
-              }
             }
-
-            // Remove from pagination cache (always — it's removed from current view)
-            paginatedFavoritesMap.current.delete(productId);
-            setPaginatedFavorites(
-              Array.from(paginatedFavoritesMap.current.values())
-            );
-
-            const metadata = await getProductMetadata(productId);
+          
+            try {
+              // Atomic batch: delete the favorite doc + (conditionally) update
+              // the user doc array in a single commit.
+              const removeBatch = writeBatch(dbRef.current!);
+              removeBatch.delete(existingDoc.ref);
+              if (!stillElsewhere) {
+                removeBatch.update(doc(dbRef.current!, "users", user.uid), {
+                  favoriteItemIds: arrayRemove(productId),
+                });
+              }
+              await removeBatch.commit();
+            } catch (commitError) {
+              // Roll back the optimistic UI changes
+              if (previousCacheEntry) {
+                paginatedFavoritesMap.current.set(productId, previousCacheEntry);
+                setPaginatedFavorites(
+                  Array.from(paginatedFavoritesMap.current.values())
+                );
+              }
+              if (prevFavoriteIdsForRollback) {
+                setFavoriteIds(prevFavoriteIdsForRollback);
+                setFavoriteCount(prevFavoriteIdsForRollback.size);
+                updateLocalProfileField("favoriteItemIds", [
+                  ...prevFavoriteIdsForRollback,
+                ]);
+              }
+              throw commitError; // let the outer catch handle circuit breaker + toast
+            }
+          
+            // Prefer values stored on the favorite doc (cheap, no extra reads).
+            // Fall back to a metadata lookup only for legacy docs missing them.
+            const needsMetadataLookup = !storedCollection;
+            const metadata = needsMetadataLookup
+              ? await getProductMetadata(productId)
+              : {};
+          
+            const shopId = storedShopId || metadata.shopId;
+          
             userActivityService.trackUnfavorite({
               productId,
-              shopId: metadata.shopId || undefined,
-              productName: metadata.productName || undefined,
+              shopId: shopId || undefined,
+              productName: productName || metadata.productName || undefined,
               category: metadata.category || undefined,
               brand: metadata.brand || undefined,
               gender: metadata.gender || undefined,
             });
-
-            // ✅ STEP 3: Get shopId and log metrics
-            const shopId = await getProductShopId(productId);
             metricsEventService.logFavoriteRemoved({
               productId,
-              shopId,
+              shopId: shopId || null,
             });
-
+          
             circuitBreaker.current.recordSuccess();
             showDebouncedRemoveToast();
             return "Removed from favorites";
           } else {
-            // Favorites item limit check
+            // Cap check
             if (favoriteIds.size >= MAX_FAVORITE_ITEMS) {
               setShowFavoritesLimitModal(true);
               return "Favorites limit reached";
@@ -759,12 +882,26 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
             setFavoriteCount(newIds.size);
             updateLocalProfileField("favoriteItemIds", [...newIds]);
 
-            // STEP 2: Add to Firestore
+            // STEP 2: Fetch product metadata once. We persist sourceCollection
+            // + shopId on the favorite doc so future reads (hydration, transfer,
+            // remove, add-to-cart) only hit a single collection.
+            const metadata = await getProductMetadata(productId);
+            const resolvedCollection = metadata.sourceCollection;
+            const resolvedShopId = metadata.shopId;
+
+            // STEP 3: Build favorite doc
             const favoriteData: Record<string, unknown> = {
               productId,
               addedAt: serverTimestamp(),
               quantity: attributes.quantity || 1,
             };
+
+            if (resolvedCollection) {
+              favoriteData.sourceCollection = resolvedCollection;
+            }
+            if (resolvedShopId) {
+              favoriteData.shopId = resolvedShopId;
+            }
 
             if (attributes.selectedColor) {
               favoriteData.selectedColor = attributes.selectedColor;
@@ -773,95 +910,104 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
               }
             }
 
-            // Add additional attributes
+            // Caller-supplied additional attributes — system fields filtered out
             Object.entries(attributes).forEach(([k, v]) => {
               if (!isSystemField(k) && v !== undefined && v !== null) {
                 favoriteData[k] = v;
               }
             });
 
-            await addDoc(collection(dbRef.current!, collectionPath), favoriteData);
+            // STEP 4: Atomic batch: add favorite doc + update user doc array
+            const newFavRef = doc(collection(dbRef.current!, collectionPath));
+            const addBatch = writeBatch(dbRef.current!);
+            addBatch.set(newFavRef, favoriteData);
+            addBatch.update(doc(dbRef.current!, "users", user.uid), {
+              favoriteItemIds: arrayUnion(productId),
+            });
+            await addBatch.commit();
 
-            // Update user doc array (only for default collection)
-            // Update user doc array (tracks all favorites across all baskets)
-            if (user) {
-              updateDoc(doc(dbRef.current!, "users", user.uid), {
-                favoriteItemIds: arrayUnion(productId),
-              }).catch((err) => console.warn("favoriteItemIds arrayUnion failed:", err));
-            }
-
-            const metadata = await getProductMetadata(productId);
+            // STEP 5: Track + add to paginated cache (using metadata we already have)
             userActivityService.trackFavorite({
               productId,
-              shopId: metadata.shopId || undefined,
+              shopId: resolvedShopId || undefined,
               productName: metadata.productName || undefined,
               category: metadata.category || undefined,
               subcategory: metadata.subcategory || undefined,
               subsubcategory: metadata.subsubcategory || undefined,
               brand: metadata.brand || undefined,
               gender: metadata.gender || undefined,
-              price: undefined, // We don't have price here
+              price: undefined,
             });
-            // ✅ STEP 2.5: FETCH AND ADD PRODUCT TO PAGINATED LIST (NEW!)
-            try {
-              // Fetch product details from BOTH collections
-              const [productDoc, shopProductDoc] = await Promise.all([
-                getDoc(doc(dbRef.current!, "products", productId)),
-                getDoc(doc(dbRef.current!, "shop_products", productId)),
-              ]);
 
+            metricsEventService.logFavoriteAdded({
+              productId,
+              shopId: resolvedShopId || null,
+            });
+
+            // Add to paginated cache. We need full product data; if we already
+            // resolved the collection, do a single targeted read.
+            try {
               let productData: ProductData | null = null;
 
-              if (productDoc.exists()) {
-                const data = productDoc.data();
-                productData = {
-                  id: productDoc.id,
-                  ...data,
-                };
-              } else if (shopProductDoc.exists()) {
-                const data = shopProductDoc.data();
-                productData = {
-                  id: shopProductDoc.id,
-                  ...data,
-                };
+              if (resolvedCollection) {
+                const snap = await getDoc(
+                  doc(dbRef.current!, resolvedCollection, productId)
+                );
+                if (snap.exists()) {
+                  productData = {
+                    id: snap.id,
+                    ...(snap.data() as Record<string, unknown>),
+                  };
+                }
+              } else {
+                const [productsSnap, shopProductsSnap] = await Promise.all([
+                  getDoc(doc(dbRef.current!, "products", productId)),
+                  getDoc(doc(dbRef.current!, "shop_products", productId)),
+                ]);
+                if (productsSnap.exists()) {
+                  productData = {
+                    id: productsSnap.id,
+                    ...(productsSnap.data() as Record<string, unknown>),
+                  };
+                } else if (shopProductsSnap.exists()) {
+                  productData = {
+                    id: shopProductsSnap.id,
+                    ...(shopProductsSnap.data() as Record<string, unknown>),
+                  };
+                }
               }
 
-              // Add to paginated cache immediately
               if (productData) {
+                const cleanAttrs: FavoriteAttributes = {
+                  quantity: attributes.quantity || 1,
+                  selectedColor: attributes.selectedColor,
+                  selectedColorImage: attributes.selectedColorImage,
+                  ...(resolvedCollection
+                    ? { sourceCollection: resolvedCollection }
+                    : {}),
+                  ...(resolvedShopId ? { shopId: resolvedShopId } : {}),
+                };
+                Object.entries(attributes).forEach(([k, v]) => {
+                  if (!isSystemField(k) && v !== undefined && v !== null) {
+                    cleanAttrs[k] = v;
+                  }
+                });
+
                 const newItem: PaginatedFavorite = {
                   product: productData,
-                  attributes: {
-                    quantity: attributes.quantity || 1,
-                    selectedColor: attributes.selectedColor,
-                    selectedColorImage: attributes.selectedColorImage,
-                    ...Object.fromEntries(
-                      Object.entries(attributes).filter(
-                        ([k]) => !isSystemField(k)
-                      )
-                    ),
-                  },
+                  attributes: cleanAttrs,
                   productId,
                 };
 
-                // Add to beginning of paginated list (most recent first)
                 paginatedFavoritesMap.current.set(productId, newItem);
                 setPaginatedFavorites(
                   Array.from(paginatedFavoritesMap.current.values())
                 );
-
-                console.log("✅ Added product to paginated list immediately");
               }
             } catch (error) {
               console.error("⚠️ Failed to fetch product details:", error);
-              // Non-critical error - the product will appear on next reload
+              // Non-critical — product will appear on next reload
             }
-
-            // STEP 3: Get shopId and log metrics
-            const shopId = await getProductShopId(productId);
-            metricsEventService.logFavoriteAdded({
-              productId,
-              shopId,
-            });
 
             circuitBreaker.current.recordSuccess();
             showSuccessToast("Added to favorites");
@@ -903,170 +1049,201 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
       favoriteIds,
       isInitialLoadComplete,
       initializeIfNeeded,
-      getProductShopId, // ✅ CORRECT
+      existsElsewhere,
+      getProductMetadata,
       isSystemField,
       showSuccessToast,
       showErrorToast,
       showDebouncedRemoveToast,
+      updateLocalProfileField,
     ]
   );
 
-  const removeMultipleFromFavorites = useCallback(
-    async (productIds: string[]): Promise<string> => {
-      if (!user) return "Please log in";
-      if (productIds.length === 0) return "No products selected";
+  /// Deletes the given favorite docs in chunks. Returns:
+///   - shopIds: extracted from the deleted docs (for metrics, no extra reads)
+///   - removedFromUserDoc: the ids that were actually stripped from the user
+///     doc's favoriteItemIds array (mirrors Flutter's _BatchRemoveResult).
+const removeMultipleBatch = useCallback(
+  async (
+    productIds: string[],
+    collectionPath: string
+  ): Promise<{
+    shopIds: Record<string, string | null>;
+    removedFromUserDoc: string[];
+  }> => {
+    if (!user) return { shopIds: {}, removedFromUserDoc: [] };
 
-      // Rate limiting
-      if (!removeFavoriteLimiter.current.canProceed("batch_remove")) {
-        return "Please wait";
-      }
+    const extractedShopIds: Record<string, string | null> = {};
+    const batch = writeBatch(dbRef.current!);
 
-      const previousIds = new Set(favoriteIds);
+    // Process in chunks of 10 (Firestore whereIn limit)
+    for (let i = 0; i < productIds.length; i += FIRESTORE_IN_LIMIT) {
+      const chunk = productIds.slice(i, i + FIRESTORE_IN_LIMIT);
+      const snap = await getDocs(
+        query(
+          collection(dbRef.current!, collectionPath),
+          where("productId", "in", chunk)
+        )
+      );
 
-      try {
-        // ✅ STEP 1: Get all shopIds BEFORE removal (NEW)
-        const shopIds: Record<string, string | null> = {};
-        for (const productId of productIds) {
-          shopIds[productId] = await getProductShopId(productId);
+      snap.docs.forEach((d) => {
+        const data = d.data();
+        const pid = data.productId as string | undefined;
+        if (pid) {
+          extractedShopIds[pid] = (data.shopId as string | undefined) ?? null;
         }
+        batch.delete(d.ref);
+      });
+    }
 
-        // STEP 2: Optimistic removal from current view (pagination cache)
-        productIds.forEach((id) => paginatedFavoritesMap.current.delete(id));
-        setPaginatedFavorites(
-          Array.from(paginatedFavoritesMap.current.values())
-        );
+    // Smart-check: only remove ids from user doc array that are gone everywhere
+    const basketId = selectedBasketIdRef.current;
+    let idsToRemoveFromUserDoc = productIds;
 
-        // STEP 3: Batch delete from Firestore (also handles favoriteItemIds safely)
-        const basketId = selectedBasketIdRef.current;
-        const collectionPath = basketId
-          ? `users/${user.uid}/favorite_baskets/${basketId}/favorites`
-          : `users/${user.uid}/favorites`;
+    if (basketId) {
+      const idsStillElsewhere = new Set<string>();
 
-        const batchSize = 50;
-        for (let i = 0; i < productIds.length; i += batchSize) {
-          const chunk = productIds.slice(i, i + batchSize);
-          await removeMultipleBatch(chunk, collectionPath);
-        }
-
-        // STEP 4: Sync local favoriteIds from what actually got removed from user doc
-        // Re-read the user doc's favoriteItemIds to get the accurate state
-        const updatedCachedIds = getProfileField<string[]>("favoriteItemIds");
-        if (Array.isArray(updatedCachedIds)) {
-          const updatedIds = new Set(updatedCachedIds);
-          // Also remove the ones we just processed (in case profile hasn't synced yet)
-          // but only if not in a basket context
-          if (!basketId) {
-            productIds.forEach((id) => updatedIds.delete(id));
-          }
-          setFavoriteIds(updatedIds);
-          setFavoriteCount(updatedIds.size);
-          updateLocalProfileField("favoriteItemIds", [...updatedIds]);
-        }
-
-        // STEP 5: Log batch metrics
-        metricsEventService.logBatchFavoriteRemovals({
-          productIds,
-          shopIds,
-        });
-
-        return "Products removed from favorites";
-      } catch (error) {
-        console.error("❌ Batch remove error:", error);
-
-        // Rollback pagination
-        setFavoriteIds(previousIds);
-        setFavoriteCount(previousIds.size);
-
-        return "Error removing favorites";
-      }
-    },
-    [user, favoriteIds, getProductShopId]
-  );
-
-  const removeMultipleBatch = useCallback(
-    async (productIds: string[], collectionPath: string) => {
-      if (!user) return;
-
-      const batch = writeBatch(dbRef.current!);
-
-      // Process in chunks of 10 (Firestore whereIn limit)
       for (let i = 0; i < productIds.length; i += FIRESTORE_IN_LIMIT) {
         const chunk = productIds.slice(i, i + FIRESTORE_IN_LIMIT);
-        const snap = await getDocs(
-          query(collection(dbRef.current!, collectionPath), where("productId", "in", chunk))
+        const defaultSnap = await getDocs(
+          query(
+            collection(dbRef.current!, `users/${user.uid}/favorites`),
+            where("productId", "in", chunk)
+          )
         );
-
-        snap.docs.forEach((doc) => {
-          batch.delete(doc.ref);
+        defaultSnap.docs.forEach((d) => {
+          const pid = d.data().productId as string;
+          if (pid) idsStillElsewhere.add(pid);
         });
       }
 
-      // Only remove from user doc array the IDs that don't exist elsewhere
-      const basketId = selectedBasketIdRef.current;
-      let idsToRemoveFromUserDoc = productIds;
-
-      if (basketId) {
-        // Removing from a basket — check which products still exist in other locations
-        const idsStillElsewhere = new Set<string>();
-
-        // Check default favorites
+      const basketsSnap = await getDocs(
+        collection(dbRef.current!, `users/${user.uid}/favorite_baskets`)
+      );
+      for (const bDoc of basketsSnap.docs) {
+        if (bDoc.id === basketId) continue;
         for (let i = 0; i < productIds.length; i += FIRESTORE_IN_LIMIT) {
           const chunk = productIds.slice(i, i + FIRESTORE_IN_LIMIT);
-          const defaultSnap = await getDocs(
+          const favSnap = await getDocs(
             query(
-              collection(dbRef.current!, `users/${user.uid}/favorites`),
+              collection(bDoc.ref, "favorites"),
               where("productId", "in", chunk)
             )
           );
-          defaultSnap.docs.forEach((d) => {
+          favSnap.docs.forEach((d) => {
             const pid = d.data().productId as string;
             if (pid) idsStillElsewhere.add(pid);
           });
         }
-
-        // Check other baskets
-        const basketsSnap = await getDocs(
-          collection(dbRef.current!, `users/${user.uid}/favorite_baskets`)
-        );
-        for (const bDoc of basketsSnap.docs) {
-          if (bDoc.id === basketId) continue;
-          for (let i = 0; i < productIds.length; i += FIRESTORE_IN_LIMIT) {
-            const chunk = productIds.slice(i, i + FIRESTORE_IN_LIMIT);
-            const favSnap = await getDocs(
-              query(
-                collection(bDoc.ref, "favorites"),
-                where("productId", "in", chunk)
-              )
-            );
-            favSnap.docs.forEach((d) => {
-              const pid = d.data().productId as string;
-              if (pid) idsStillElsewhere.add(pid);
-            });
-          }
-        }
-
-        idsToRemoveFromUserDoc = productIds.filter(
-          (id) => !idsStillElsewhere.has(id)
-        );
       }
 
-      if (idsToRemoveFromUserDoc.length > 0) {
-        batch.update(doc(dbRef.current!, "users", user.uid), {
-          favoriteItemIds: arrayRemove(...idsToRemoveFromUserDoc),
-        });
+      idsToRemoveFromUserDoc = productIds.filter(
+        (id) => !idsStillElsewhere.has(id)
+      );
+    }
+
+    if (idsToRemoveFromUserDoc.length > 0) {
+      batch.update(doc(dbRef.current!, "users", user.uid), {
+        favoriteItemIds: arrayRemove(...idsToRemoveFromUserDoc),
+      });
+    }
+
+    await batch.commit();
+    return {
+      shopIds: extractedShopIds,
+      removedFromUserDoc: idsToRemoveFromUserDoc,
+    };
+  },
+  [user]
+);
+
+const removeMultipleFromFavorites = useCallback(
+  async (productIds: string[]): Promise<string> => {
+    if (!user) return "Please log in";
+    if (productIds.length === 0) return "No products selected";
+
+    if (!removeFavoriteLimiter.current.canProceed("batch_remove")) {
+      return "Please wait";
+    }
+
+    // Snapshot for rollback (only the paginated cache state — notifier
+    // updates happen AFTER the batch reports what it actually removed)
+    const previousPaginated = new Map(paginatedFavoritesMap.current);
+
+    try {
+      // Optimistic: remove from current view only
+      productIds.forEach((id) => paginatedFavoritesMap.current.delete(id));
+      setPaginatedFavorites(
+        Array.from(paginatedFavoritesMap.current.values())
+      );
+
+      const basketId = selectedBasketIdRef.current;
+      const collectionPath = basketId
+        ? `users/${user.uid}/favorite_baskets/${basketId}/favorites`
+        : `users/${user.uid}/favorites`;
+
+      // Batch delete. Each chunk reports the shopIds AND which ids were
+      // actually stripped from favoriteItemIds (smart-check result).
+      const shopIds: Record<string, string | null> = {};
+      const actuallyRemoved = new Set<string>();
+      const batchSize = 50;
+      for (let i = 0; i < productIds.length; i += batchSize) {
+        const chunk = productIds.slice(i, i + batchSize);
+        const result = await removeMultipleBatch(chunk, collectionPath);
+        Object.assign(shopIds, result.shopIds);
+        result.removedFromUserDoc.forEach((id) => actuallyRemoved.add(id));
       }
 
-      await batch.commit();
-    },
-    [user]
-  );
+      // Sync notifiers based on what the server actually has now
+      if (actuallyRemoved.size > 0) {
+        const newIds = new Set(favoriteIds);
+        actuallyRemoved.forEach((id) => newIds.delete(id));
+        setFavoriteIds(newIds);
+        setFavoriteCount(newIds.size);
+        updateLocalProfileField("favoriteItemIds", [...newIds]);
+      }
 
+      metricsEventService.logBatchFavoriteRemovals({
+        productIds,
+        shopIds,
+      });
+
+      return "Products removed from favorites";
+    } catch (error) {
+      console.error("❌ Batch remove error:", error);
+
+      // Rollback paginated cache
+      paginatedFavoritesMap.current.clear();
+      previousPaginated.forEach((v, k) =>
+        paginatedFavoritesMap.current.set(k, v)
+      );
+      setPaginatedFavorites(
+        Array.from(paginatedFavoritesMap.current.values())
+      );
+
+      return "Error removing favorites";
+    }
+  },
+  [
+    user,
+    favoriteIds,
+    removeMultipleBatch,
+    updateLocalProfileField,
+  ]
+);
+
+  /// Removes a product from default favorites and every basket it lives in,
+  /// atomically, in a single batched commit.
+  ///
+  /// All read queries run in parallel. shopId for metrics is pulled from the
+  /// favorite docs themselves (no extra product-collection reads needed).
   const removeGloballyFromFavorites = useCallback(
     async (productId: string): Promise<string> => {
       if (!user) return "Please log in";
 
-      // Optimistic removal
       const previousIds = new Set(favoriteIds);
+
+      // Optimistic removal
       const newIds = new Set(favoriteIds);
       newIds.delete(productId);
       setFavoriteIds(newIds);
@@ -1077,66 +1254,79 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
       setPaginatedFavorites(Array.from(paginatedFavoritesMap.current.values()));
 
       try {
-        const shopId = await getProductShopId(productId);
+        const userRef = doc(dbRef.current!, "users", user.uid);
 
-        const batch = writeBatch(dbRef.current!);
+        // STEP 1: Parallel reads — default-favorites match + all baskets list
+        const [defaultFavsSnap, basketsSnapshot] = await Promise.all([
+          getDocs(
+            query(
+              collection(dbRef.current!, `users/${user.uid}/favorites`),
+              where("productId", "==", productId)
+            )
+          ),
+          getDocs(
+            collection(dbRef.current!, `users/${user.uid}/favorite_baskets`)
+          ),
+        ]);
 
-        // STEP 2: Remove from default favorites
-        const defaultFavsSnap = await getDocs(
-          query(
-            collection(dbRef.current!, `users/${user.uid}/favorites`),
-            where("productId", "==", productId)
+        // STEP 2: Parallel per-basket lookup
+        const basketMatches = await Promise.all(
+          basketsSnapshot.docs.map((basketDoc) =>
+            getDocs(
+              query(
+                collection(basketDoc.ref, "favorites"),
+                where("productId", "==", productId)
+              )
+            )
           )
         );
 
-        defaultFavsSnap.docs.forEach((doc) => {
-          batch.delete(doc.ref);
+        // STEP 3: Collect refs + extract shopId from any match
+        const docsToDelete: DocumentSnapshot["ref"][] = [];
+        let shopId: string | null = null;
+
+        defaultFavsSnap.docs.forEach((d) => {
+          docsToDelete.push(d.ref);
+          shopId ??= (d.data().shopId as string | undefined) ?? null;
+        });
+        basketMatches.forEach((snap) => {
+          snap.docs.forEach((d) => {
+            docsToDelete.push(d.ref);
+            shopId ??= (d.data().shopId as string | undefined) ?? null;
+          });
         });
 
-        // STEP 3: Remove from all baskets
-        const basketsSnapshot = await getDocs(
-          collection(dbRef.current!, `users/${user.uid}/favorite_baskets`)
-        );
-
-        for (const basketDoc of basketsSnapshot.docs) {
-          const favoriteSnapshot = await getDocs(
-            query(
-              collection(basketDoc.ref, "favorites"),
-              where("productId", "==", productId)
-            )
-          );
-
-          favoriteSnapshot.docs.forEach((favDoc) => {
-            batch.delete(favDoc.ref);
-          });
-        }
-
-        // Also remove from user doc array
-        batch.update(doc(dbRef.current!, "users", user.uid), {
+        // STEP 4: Single atomic batch (bounded: 1 default + 10 baskets + 1 user doc = 12 ops max)
+        const batch = writeBatch(dbRef.current!);
+        docsToDelete.forEach((ref) => batch.delete(ref));
+        batch.update(userRef, {
           favoriteItemIds: arrayRemove(productId),
         });
-
         await batch.commit();
 
-        // ✅ STEP 4: Log metrics (NEW)
         metricsEventService.logFavoriteRemoved({
           productId,
           shopId,
         });
 
-        console.log("✅ Removed", productId, "from all favorites");
+        console.log(
+          "✅ Removed",
+          productId,
+          "from",
+          docsToDelete.length,
+          "favorite doc(s)"
+        );
         return "Removed from all favorites";
       } catch (error) {
         console.error("❌ Error removing from favorites:", error);
 
-        // Rollback
         setFavoriteIds(previousIds);
         setFavoriteCount(previousIds.size);
 
         return "Error removing from favorites";
       }
     },
-    [user, favoriteIds, getProductShopId] // ✅ ADD getProductShopId
+    [user, favoriteIds, updateLocalProfileField]
   );
 
   // ========================================================================
@@ -1146,16 +1336,17 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   const setSelectedBasket = useCallback((basketId: string | null) => {
     const previousBasketId = currentBasketId.current;
 
-    // Save current basket's data to cache before switching
-    if (previousBasketId !== basketId && paginatedFavoritesMap.current.size > 0) {
+    if (
+      previousBasketId !== basketId &&
+      paginatedFavoritesMap.current.size > 0
+    ) {
       const cacheKey = previousBasketId ?? "__default__";
       basketCacheMap.current.set(cacheKey, {
         favorites: Array.from(paginatedFavoritesMap.current.values()),
         lastDoc: lastDocument.current,
-        hasMore: hasMoreData,
+        hasMore: hasMoreDataRef.current,
         timestamp: Date.now(),
       });
-      console.log("💾 Saved cache for basket:", cacheKey, "items:", paginatedFavoritesMap.current.size);
     }
 
     setSelectedBasketIdState(basketId);
@@ -1164,13 +1355,10 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
     if (previousBasketId !== basketId) {
       currentBasketId.current = basketId;
 
-      // Check for cached data for the new basket
       const newCacheKey = basketId ?? "__default__";
       const cached = basketCacheMap.current.get(newCacheKey);
 
       if (cached && Date.now() - cached.timestamp < BASKET_CACHE_TTL) {
-        // Restore from cache
-        console.log("✅ Restored cache for basket:", newCacheKey, "items:", cached.favorites.length);
         paginatedFavoritesMap.current.clear();
         cached.favorites.forEach((item) => {
           paginatedFavoritesMap.current.set(item.productId, item);
@@ -1181,8 +1369,6 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         setHasMoreData(cached.hasMore);
         setIsInitialLoadComplete(true);
       } else {
-        // No cache or expired, inline reset pagination logic
-        console.log("🔄 No cache for basket:", newCacheKey, "- loading fresh");
         lastDocument.current = null;
         hasMoreDataRef.current = true;
         setHasMoreData(true);
@@ -1205,7 +1391,6 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
       try {
         const currentBasket = selectedBasketIdRef.current;
 
-        // Get current favorite item data
         const currentCollectionPath = currentBasket
           ? `users/${user.uid}/favorite_baskets/${currentBasket}/favorites`
           : `users/${user.uid}/favorites`;
@@ -1224,23 +1409,24 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
         const itemData = itemSnapshot.docs[0].data();
 
-        // Add to target location
+        // Atomic transfer: add to target + delete from source in one batch
         const targetCollectionPath = targetBasketId
           ? `users/${user.uid}/favorite_baskets/${targetBasketId}/favorites`
           : `users/${user.uid}/favorites`;
 
-        await addDoc(collection(dbRef.current!, targetCollectionPath), {
+        const targetRef = doc(
+          collection(dbRef.current!, targetCollectionPath)
+        );
+        const batch = writeBatch(dbRef.current!);
+        batch.set(targetRef, {
           ...itemData,
           addedAt: serverTimestamp(),
         });
+        batch.delete(itemSnapshot.docs[0].ref);
+        await batch.commit();
 
-        // Remove from current location
-        await deleteDoc(itemSnapshot.docs[0].ref);
-
-        // No user doc array update needed — product stays favorited,
-        // just moves between containers. favoriteItemIds tracks all favorites.
-
-        // Update local cache
+        // Local cache: remove from current view (the favorite doc moved containers,
+        // and the user doc array tracks it globally so heart icon stays on).
         paginatedFavoritesMap.current.delete(productId);
         setPaginatedFavorites(
           Array.from(paginatedFavoritesMap.current.values())
@@ -1274,12 +1460,14 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
           return "Maximum basket limit reached";
         }
 
-        const newDoc = await addDoc(collection(dbRef.current!, `users/${user.uid}/favorite_baskets`), {
-          name,
-          createdAt: serverTimestamp(),
-        });
+        const newDoc = await addDoc(
+          collection(dbRef.current!, `users/${user.uid}/favorite_baskets`),
+          {
+            name,
+            createdAt: serverTimestamp(),
+          }
+        );
 
-        // Update local state (no listener to do this)
         setFavoriteBaskets((prev) => [
           { id: newDoc.id, name, createdAt: Timestamp.now() },
           ...prev,
@@ -1303,7 +1491,6 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         const db = dbRef.current!;
         const basketFavCollPath = `users/${user.uid}/favorite_baskets/${basketId}/favorites`;
 
-        // STEP 1: Get all favorites in the basket's subcollection
         const basketFavSnap = await getDocs(
           collection(db, basketFavCollPath)
         );
@@ -1311,12 +1498,10 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
           .map((d) => d.data().productId as string)
           .filter(Boolean);
 
-        // STEP 2: Determine which product IDs are exclusive to this basket
         let idsToRemoveFromUserDoc: string[] = [];
         if (basketProductIds.length > 0) {
           const idsStillElsewhere = new Set<string>();
 
-          // Check default favorites
           for (let i = 0; i < basketProductIds.length; i += FIRESTORE_IN_LIMIT) {
             const chunk = basketProductIds.slice(i, i + FIRESTORE_IN_LIMIT);
             const defaultSnap = await getDocs(
@@ -1331,13 +1516,16 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
             });
           }
 
-          // Check other baskets
           const basketsSnap = await getDocs(
             collection(db, `users/${user.uid}/favorite_baskets`)
           );
           for (const bDoc of basketsSnap.docs) {
             if (bDoc.id === basketId) continue;
-            for (let i = 0; i < basketProductIds.length; i += FIRESTORE_IN_LIMIT) {
+            for (
+              let i = 0;
+              i < basketProductIds.length;
+              i += FIRESTORE_IN_LIMIT
+            ) {
               const chunk = basketProductIds.slice(i, i + FIRESTORE_IN_LIMIT);
               const favSnap = await getDocs(
                 query(
@@ -1357,10 +1545,8 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
           );
         }
 
-        // STEP 3: Atomic batch — delete subcollection docs, update user doc, delete basket
-        // Firestore batch limit is 500; chunk if needed
         const allDeletes = basketFavSnap.docs;
-        const BATCH_LIMIT = 499; // leave room for the basket doc delete + user doc update
+        const BATCH_LIMIT = 499;
         for (let i = 0; i < allDeletes.length; i += BATCH_LIMIT) {
           const chunk = allDeletes.slice(i, i + BATCH_LIMIT);
           const isLastChunk = i + BATCH_LIMIT >= allDeletes.length;
@@ -1369,11 +1555,9 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
           chunk.forEach((d) => batch.delete(d.ref));
 
           if (isLastChunk) {
-            // Delete the basket document itself
             batch.delete(
               doc(db, `users/${user.uid}/favorite_baskets/${basketId}`)
             );
-            // Remove exclusive IDs from favoriteItemIds
             if (idsToRemoveFromUserDoc.length > 0) {
               batch.update(doc(db, "users", user.uid), {
                 favoriteItemIds: arrayRemove(...idsToRemoveFromUserDoc),
@@ -1384,14 +1568,12 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
           await batch.commit();
         }
 
-        // If basket had no favorites, still need to delete the basket doc
         if (allDeletes.length === 0) {
           await deleteDoc(
             doc(db, `users/${user.uid}/favorite_baskets/${basketId}`)
           );
         }
 
-        // STEP 4: Sync local state
         setFavoriteBaskets((prev) => prev.filter((b) => b.id !== basketId));
         basketCacheMap.current.delete(basketId);
 
@@ -1435,13 +1617,6 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         ? `users/${user.uid}/favorite_baskets/${basketId}/favorites`
         : `users/${user.uid}/favorites`;
 
-      console.log(
-        "🟡 fetchPaginatedFavorites: limit=",
-        limit,
-        "collection=",
-        collectionPath
-      );
-
       let q = query(
         collection(dbRef.current!, collectionPath),
         orderBy("addedAt", "desc"),
@@ -1464,18 +1639,6 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         }
       });
 
-      console.log(
-        "🟡 fetchPaginatedFavorites RESULT: fetched=",
-        snapshot.docs.length,
-        "limit=",
-        limit,
-        "hasMore=",
-        hasMore,
-        "returning",
-        docs.length,
-        "docs"
-      );
-
       return {
         docs,
         hasMore,
@@ -1487,7 +1650,6 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
   const loadNextPage = useCallback(
     async (limit: number = 50) => {
-      // Ref-based guards: synchronous, no stale closure issues
       if (isLoadingMoreRef.current || !hasMoreDataRef.current) {
         return { docs: [], hasMore: false, error: null };
       }
@@ -1502,7 +1664,6 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
           limit
         );
 
-        // Discard if a fresh load (basket switch) started while we were fetching
         if (gen !== paginationGenRef.current) {
           isLoadingMoreRef.current = false;
           setIsLoadingMore(false);
@@ -1541,14 +1702,14 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
         hasMoreDataRef.current = false;
         setHasMoreData(false);
 
-        return { docs: [], hasMore: false, error: (error as Error).toString() };
+        return {
+          docs: [],
+          hasMore: false,
+          error: (error as Error).toString(),
+        };
       }
     },
-    [
-      fetchPaginatedFavorites,
-      fetchProductDetailsForIds,
-      addPaginatedItems,
-    ]
+    [fetchPaginatedFavorites, fetchProductDetailsForIds, addPaginatedItems]
   );
 
   const resetPagination = useCallback(() => {
@@ -1564,10 +1725,8 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
   const loadFreshPage = useCallback(
     async (limit: number = 50) => {
-      // Invalidate any in-flight loadNextPage calls
       paginationGenRef.current++;
 
-      // Atomic reset + load: no stale closure gap
       lastDocument.current = null;
       isLoadingMoreRef.current = false;
       hasMoreDataRef.current = true;
@@ -1577,7 +1736,6 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
       setPaginatedFavorites([]);
       setIsInitialLoadComplete(false);
 
-      // Now load first page
       isLoadingMoreRef.current = true;
       setIsLoadingMore(true);
 
@@ -1621,21 +1779,17 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
 
   const shouldReloadFavorites = useCallback(
     (basketId: string | null): boolean => {
-      // Check if we have current data
       if (paginatedFavorites.length > 0 && isInitialLoadComplete) {
         return false;
       }
 
-      // Check cache for the target basket
       const cacheKey = basketId ?? "__default__";
       const cached = basketCacheMap.current.get(cacheKey);
 
       if (cached && Date.now() - cached.timestamp < BASKET_CACHE_TTL) {
-        // Valid cache exists
         return false;
       }
 
-      // No cache or expired, need to reload
       return true;
     },
     [paginatedFavorites.length, isInitialLoadComplete]
@@ -1652,9 +1806,10 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
     [favoriteIds]
   );
 
+  /// `favoriteItemIds` on the user doc IS the global set across all containers.
+  /// Mirrors Flutter's globalFavoriteIdsNotifier.contains() check.
   const isGloballyFavorited = useCallback(
     (productId: string): boolean => {
-      // favoriteItemIds on user doc is already the global set across all baskets
       return favoriteIds.has(productId);
     },
     [favoriteIds]
@@ -1736,7 +1891,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
     selectedBasketIdRef.current = null;
     currentBasketId.current = null;
     paginatedFavoritesMap.current.clear();
-    basketCacheMap.current.clear(); // Clear per-basket cache
+    basketCacheMap.current.clear();
     setIsInitialLoadComplete(false);
     setFavoriteBaskets([]);
     lastDocument.current = null;
@@ -1783,13 +1938,12 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   // EFFECTS
   // ========================================================================
 
-  // Seed favorite IDs from user doc (Tier 1) — zero extra Firestore reads
+  // Seed favorite IDs from user doc — zero extra Firestore reads
   const prevUserUid = useRef<string | null>(null);
   useEffect(() => {
     if (user && dbProp) {
       if (!profileData) return;
 
-      // Only clear everything on actual user change, not on profileData re-renders
       if (prevUserUid.current !== user.uid) {
         prevUserUid.current = user.uid;
         clearUserData();
@@ -1803,25 +1957,16 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
       prevUserUid.current = null;
       clearUserData();
     }
-  }, [
-    user,
-    dbProp,
-    profileData,
-    getProfileField,
-    clearUserData,
-  ]);
+  }, [user, dbProp, profileData, getProfileField, clearUserData]);
 
-  // Cleanup timer
   useEffect(() => {
     cleanupTimer.current = setInterval(() => {
-      // Cleanup old locks
       favoriteLocks.current.forEach((promise, key) => {
         promise.then(() => {
           favoriteLocks.current.delete(key);
         });
       });
 
-      // Cleanup pagination cache if too large
       if (paginatedFavoritesMap.current.size > MAX_PAGINATED_CACHE) {
         const entries = Array.from(paginatedFavoritesMap.current.entries());
         const toRemove = entries.slice(0, 50);
@@ -1836,15 +1981,15 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
     };
   }, []);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      // Cancel deferred init if still pending
       if (deferredFavInitRef.current !== null) {
         if (typeof cancelIdleCallback !== "undefined") {
           cancelIdleCallback(deferredFavInitRef.current as number);
         } else {
-          clearTimeout(deferredFavInitRef.current as ReturnType<typeof setTimeout>);
+          clearTimeout(
+            deferredFavInitRef.current as ReturnType<typeof setTimeout>
+          );
         }
         deferredFavInitRef.current = null;
       }
@@ -1855,10 +2000,9 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
   }, []);
 
   // ========================================================================
-  // CONTEXT VALUES - Split for granular subscriptions
+  // CONTEXT VALUES
   // ========================================================================
 
-  // State context - changes trigger re-renders
   const stateValue = useMemo<FavoritesStateContextType>(
     () => ({
       favoriteIds,
@@ -1884,7 +2028,6 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
     ]
   );
 
-  // Actions context - stable references, no re-renders
   const actionsValue = useMemo<FavoritesActionsContextType>(
     () => ({
       addToFavorites,
@@ -1924,7 +2067,6 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
     ]
   );
 
-  // Combined context for backward compatibility
   const combinedValue = useMemo<FavoritesContextType>(
     () => ({
       ...stateValue,

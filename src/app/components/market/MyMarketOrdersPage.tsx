@@ -214,7 +214,7 @@ function formatDate(ts: Timestamp): string {
 }
 
 function formatMoney(amount: number): string {
-  return Math.round(amount).toString();
+  return amount.toFixed(2);
 }
 
 function itemsPreviewText(order: MarketOrder, fallback: string): string {

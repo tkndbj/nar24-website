@@ -255,7 +255,8 @@ function formatMoney(amount: number, locale: string): string {
   // Match Flutter's NumberFormat('#,##0') — integer grouping, no decimals.
   // Using toLocaleString with maximumFractionDigits=0 for the same behavior.
   return amount.toLocaleString(locale === "tr" ? "tr-TR" : "en-US", {
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   });
 }
 

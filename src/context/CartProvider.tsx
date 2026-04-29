@@ -43,7 +43,7 @@ import LimitReachedModal from "@/app/components/LimitReachedModal";
 const MAX_CART_ITEMS = 300;
 
 // ============================================================================
-// TYPES - Matching Flutter implementation
+// TYPES — Matching Flutter implementation
 // ============================================================================
 
 interface CartUser {
@@ -90,16 +90,16 @@ interface CartItem {
   isShop: boolean;
   isOptimistic?: boolean;
 
-  // ✅ MATCH FLUTTER NAMING
-  salePreferenceInfo?: SalePreferences | null; // New - matches Flutter
-  selectedAttributes?: Record<string, unknown>; // New - matches Flutter
+  // Match Flutter naming
+  salePreferenceInfo?: SalePreferences | null;
+  selectedAttributes?: Record<string, unknown>;
 
-  // Deprecated (keep for backward compatibility)
+  // Kept for backward compatibility (Flutter still reads this)
   salePreferences?: SalePreferences | null;
 
   selectedColorImage?: string;
   showSellerHeader?: boolean;
-  selectedColor?: string; // Flattened for display
+  selectedColor?: string;
   [key: string]: unknown;
 }
 
@@ -121,19 +121,16 @@ export interface CartItemTotal {
   isBundleItem?: boolean;
 }
 
-// Type for cart data from Firestore
 interface FirestoreCartData {
   [key: string]: unknown;
 }
 
-// Type for optimistic cache entries
 interface OptimisticCacheEntry {
   _deleted?: boolean;
   _optimistic?: boolean;
   [key: string]: unknown;
 }
 
-// Type for validated items from payment validation
 interface ValidatedCartItem {
   productId: string;
   unitPrice?: number;
@@ -145,23 +142,20 @@ interface ValidatedCartItem {
   [key: string]: unknown;
 }
 
-// Type for validation errors/warnings
 interface ValidationMessage {
   key: string;
   params: Record<string, unknown>;
 }
 
-// Type for bundle data items
 interface BundleDataItem {
   bundlePrice?: number;
   [key: string]: unknown;
 }
 
 // ============================================================================
-// SPLIT CONTEXT TYPES - For granular subscriptions
+// SPLIT CONTEXT TYPES
 // ============================================================================
 
-// State-only context type (changes frequently)
 interface CartStateContextType {
   cartCount: number;
   cartProductIds: Set<string>;
@@ -170,9 +164,11 @@ interface CartStateContextType {
   isLoadingMore: boolean;
   hasMore: boolean;
   isInitialized: boolean;
+  // NEW: totals state lives in provider (matching Flutter's cartTotalsNotifier)
+  cartTotals: CartTotals | null;
+  isTotalsLoading: boolean;
 }
 
-// Actions-only context type (stable references, never causes re-renders)
 interface CartActionsContextType {
   addProductToCart: (
     product: Product,
@@ -190,8 +186,12 @@ interface CartActionsContextType {
   updateQuantity: (productId: string, newQuantity: number) => Promise<string>;
   removeMultipleFromCart: (productIds: string[]) => Promise<string>;
   initializeCartIfNeeded: () => Promise<void>;
+  // NEW: callable on every cart screen visit (matches Flutter loadCart())
+  loadCart: () => Promise<void>;
   loadMoreItems: () => Promise<void>;
   calculateCartTotals: (excludedProductIds?: string[]) => Promise<CartTotals>;
+  // NEW: optimistic-then-server totals update (matches Flutter)
+  updateTotalsForExcluded: (excludedProductIds: string[]) => Promise<void>;
   validateForPayment: (
     selectedProductIds: string[],
     reserveStock?: boolean,
@@ -205,26 +205,23 @@ interface CartActionsContextType {
     validatedItems: ValidatedCartItem[],
   ) => Promise<boolean>;
   refresh: () => Promise<void>;
+  clearLocalCache: () => void;
+  // NEW: get items for payment with selectedAttributes built (matches Flutter's _prepareItemsForPayment)
+  fetchAllSelectedItems: (selectedProductIds: string[]) => CartItem[];
 }
 
-// Combined context type (for backward compatibility)
 interface CartContextType
-  extends CartStateContextType, CartActionsContextType {}
+  extends CartStateContextType,
+    CartActionsContextType {}
 
-// Create separate contexts
 const CartStateContext = createContext<CartStateContextType | undefined>(
   undefined,
 );
 const CartActionsContext = createContext<CartActionsContextType | undefined>(
   undefined,
 );
-
-// Combined context for backward compatibility
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
-/**
- * Hook to access only cart state (will re-render on state changes)
- */
 export const useCartState = (): CartStateContextType => {
   const context = useContext(CartStateContext);
   if (context === undefined) {
@@ -233,9 +230,6 @@ export const useCartState = (): CartStateContextType => {
   return context;
 };
 
-/**
- * Hook to access only cart actions (stable, never re-renders)
- */
 export const useCartActions = (): CartActionsContextType => {
   const context = useContext(CartActionsContext);
   if (context === undefined) {
@@ -244,10 +238,6 @@ export const useCartActions = (): CartActionsContextType => {
   return context;
 };
 
-/**
- * Combined hook for backward compatibility - returns both state and actions
- * PREFER useCartState() or useCartActions() for better performance
- */
 export const useCart = (): CartContextType => {
   const context = useContext(CartContext);
   if (context === undefined) {
@@ -257,7 +247,7 @@ export const useCart = (): CartContextType => {
 };
 
 // ============================================================================
-// RATE LIMITER - Matching Flutter implementation
+// RATE LIMITER — Matching Flutter
 // ============================================================================
 
 class RateLimiter {
@@ -288,13 +278,88 @@ class RateLimiter {
 }
 
 // ============================================================================
-// CONSTANTS - Matching Flutter implementation
+// CONSTANTS — Matching Flutter
 // ============================================================================
 
 const ITEMS_PER_PAGE = 20;
-const OPTIMISTIC_TIMEOUT = 3000; // 3 seconds like Flutter
-const ADD_TO_CART_COOLDOWN = 300; // 300ms like Flutter
-const QUANTITY_UPDATE_COOLDOWN = 200; // 200ms like Flutter
+const OPTIMISTIC_TIMEOUT = 3000;
+const ADD_TO_CART_COOLDOWN = 300;
+const QUANTITY_UPDATE_COOLDOWN = 200;
+const TOTALS_VERIFICATION_DEBOUNCE = 500;
+
+// ============================================================================
+// RETRY WITH BACKOFF — Matching Flutter's _retryWithBackoff
+// ============================================================================
+
+async function retryWithBackoff<T>(
+  operation: () => Promise<T>,
+  operationName: string,
+  maxRetries: number = 3,
+  initialDelayMs: number = 500,
+): Promise<T> {
+  let attempt = 0;
+  let delay = initialDelayMs;
+
+  while (attempt < maxRetries) {
+    try {
+      return await operation();
+    } catch (e) {
+      attempt++;
+      if (attempt >= maxRetries) {
+        console.error(
+          `❌ ${operationName} failed after ${maxRetries} attempts:`,
+          e,
+        );
+        throw e;
+      }
+      console.warn(
+        `⚠️ ${operationName} failed (attempt ${attempt}/${maxRetries}). Retrying in ${delay}ms...`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      delay = delay * 2;
+    }
+  }
+
+  throw new Error(`${operationName} failed after ${maxRetries} attempts`);
+}
+
+// ============================================================================
+// HELPERS — Pure functions
+// ============================================================================
+
+const setsEqual = (a: Set<string>, b: Set<string>): boolean => {
+  if (a.size !== b.size) return false;
+  for (const item of a) if (!b.has(item)) return false;
+  return true;
+};
+
+const deepConvertMap = (map: unknown): Record<string, unknown> => {
+  if (!map || typeof map !== "object" || Array.isArray(map)) {
+    return {};
+  }
+  const result: Record<string, unknown> = {};
+  Object.entries(map as Record<string, unknown>).forEach(([key, value]) => {
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      result[key] = deepConvertMap(value);
+    } else if (Array.isArray(value)) {
+      result[key] = deepConvertList(value);
+    } else {
+      result[key] = value;
+    }
+  });
+  return result;
+};
+
+const deepConvertList = (list: unknown[]): unknown[] => {
+  return list.map((item) => {
+    if (item && typeof item === "object" && !Array.isArray(item)) {
+      return deepConvertMap(item);
+    } else if (Array.isArray(item)) {
+      return deepConvertList(item);
+    }
+    return item;
+  });
+};
 
 interface CartProviderProps {
   children: ReactNode;
@@ -354,24 +419,9 @@ export const buildProductDataForCart = (
     videoUrl: product.videoUrl ?? null,
   };
 
-  // ✅ Cached discount fields
-  if (product.discountPercentage !== undefined) {
-    data.cachedDiscountPercentage = product.discountPercentage;
-  } else {
-    data.cachedDiscountPercentage = null;
-  }
-
-  if (product.discountThreshold !== undefined) {
-    data.cachedDiscountThreshold = product.discountThreshold;
-  } else {
-    data.cachedDiscountThreshold = null;
-  }
-
-  if (product.bulkDiscountPercentage !== undefined) {
-    data.cachedBulkDiscountPercentage = product.bulkDiscountPercentage;
-  } else {
-    data.cachedBulkDiscountPercentage = null;
-  }
+  data.cachedDiscountPercentage = product.discountPercentage ?? null;
+  data.cachedDiscountThreshold = product.discountThreshold ?? null;
+  data.cachedBulkDiscountPercentage = product.bulkDiscountPercentage ?? null;
 
   if (product.colorImages && Object.keys(product.colorImages).length > 0) {
     data.colorImages = product.colorImages;
@@ -409,26 +459,20 @@ export const buildProductDataForCart = (
     data.shopId = product.shopId;
   }
 
-  // ✅ Add selectedColor at ROOT level (matching Flutter)
   if (selectedColor) {
     data.selectedColor = selectedColor;
   }
 
-  // ✅ Build attributes WITHOUT selectedColor
   if (attributes && Object.keys(attributes).length > 0) {
     const attributesMap = { ...attributes };
-
-    // Add selectedColorImage to attributes if color exists
     if (selectedColor && product.colorImages?.[selectedColor]) {
       const colorImages = product.colorImages[selectedColor];
       if (colorImages && colorImages.length > 0) {
         attributesMap.selectedColorImage = colorImages[0];
       }
     }
-
     data.attributes = attributesMap;
   } else if (selectedColor && product.colorImages?.[selectedColor]) {
-    // If no attributes but has color, only add selectedColorImage
     const colorImages = product.colorImages[selectedColor];
     if (colorImages && colorImages.length > 0) {
       data.attributes = {
@@ -446,11 +490,10 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   db,
   functions,
 }) => {
-  // Access UserProvider for profile-based cart ID seeding
   const { getProfileField, updateLocalProfileField, profileData } = useUser();
 
   // ========================================================================
-  // STATE - Matching Flutter ValueNotifiers
+  // STATE — Matching Flutter ValueNotifiers
   // ========================================================================
 
   const [cartProductIds, setCartProductIds] = useState<Set<string>>(new Set());
@@ -462,34 +505,50 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   const [hasMore, setHasMore] = useState(true);
   const [showCartLimitModal, setShowCartLimitModal] = useState(false);
 
+  // NEW: totals state in provider (Flutter's cartTotalsNotifier / isTotalsLoadingNotifier)
+  const [cartTotals, setCartTotals] = useState<CartTotals | null>(null);
+  const [isTotalsLoading, setIsTotalsLoading] = useState(false);
+
   // ========================================================================
-  // REFS - Internal state management
+  // REFS
   // ========================================================================
 
   const lastDocumentRef = useRef<DocumentSnapshot | null>(null);
-
-  // Keep a ref to current cart items to avoid stale closures in listeners
   const cartItemsRef = useRef<CartItem[]>([]);
+  const cartProductIdsRef = useRef<Set<string>>(new Set());
 
-  // Rate limiters
+  // Track which selection the current totals were calculated for
+  const currentTotalsProductIdsRef = useRef<Set<string>>(new Set());
+
+  // Track current user uid to distinguish same-user re-emit vs different-user
+  const currentUserIdRef = useRef<string | null>(null);
+
   const addToCartLimiterRef = useRef(new RateLimiter(ADD_TO_CART_COOLDOWN));
   const quantityLimiterRef = useRef(new RateLimiter(QUANTITY_UPDATE_COOLDOWN));
 
-  // Optimistic updates tracking
   const optimisticCacheRef = useRef<Map<string, OptimisticCacheEntry>>(
     new Map(),
   );
   const optimisticTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
-  // Concurrency control
+  // Concurrency control for quantity updates
   const quantityUpdateLocksRef = useRef<Map<string, Promise<string>>>(
     new Map(),
   );
+  // Coalesces rapid taps into final value (matches Flutter's _pendingQuantityWrites)
+  const pendingQuantityWritesRef = useRef<Map<string, number>>(new Map());
+
   const pendingFetchesRef = useRef<Map<string, Promise<unknown>>>(new Map());
-  const deferredCartInitRef = useRef<
-    number | ReturnType<typeof setTimeout> | null
-  >(null);
-  const backgroundTotalsTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const totalsVerificationTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    cartItemsRef.current = cartItems;
+  }, [cartItems]);
+
+  useEffect(() => {
+    cartProductIdsRef.current = cartProductIds;
+  }, [cartProductIds]);
 
   // ========================================================================
   // HELPER FUNCTIONS
@@ -497,27 +556,20 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
   const getProductShopId = useCallback(
     async (productId: string): Promise<string | null> => {
-      if (!db) return null; // Guard for lazy loading
-
+      if (!db) return null;
       try {
-        // Try shop_products collection first
         const shopProductDoc = await getDoc(
           doc(db, "shop_products", productId),
         );
-
         if (shopProductDoc.exists()) {
           const data = shopProductDoc.data();
           return (data?.shopId as string) || null;
         }
-
-        // Try products collection
         const productDoc = await getDoc(doc(db, "products", productId));
-
         if (productDoc.exists()) {
           const data = productDoc.data();
           return (data?.shopId as string) || null;
         }
-
         return null;
       } catch (error) {
         console.warn("⚠️ Failed to get product shopId:", error);
@@ -546,8 +598,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         "sellerName",
         "sellerId",
       ];
-
-      // ✅ FIX: Check for null/undefined, not falsy (0 is valid!)
       for (const field of required) {
         const value = cartData[field];
         if (value === null || value === undefined) {
@@ -555,19 +605,16 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           return false;
         }
       }
-
       const productName = cartData.productName;
       if (!productName || productName === "Unknown Product") {
         console.warn(`  ❌ Invalid productName: "${productName}"`);
         return false;
       }
-
       const sellerName = cartData.sellerName;
       if (!sellerName || sellerName === "Unknown") {
         console.warn(`  ❌ Invalid sellerName: "${sellerName}"`);
         return false;
       }
-
       return true;
     },
     [],
@@ -575,7 +622,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
   const buildProductFromCartData = useCallback(
     (cartData: FirestoreCartData): Product => {
-      // Safe getters matching Flutter implementation
       const safeGet = <T,>(key: string, defaultValue: T): T => {
         const value = cartData[key];
         if (value === null || value === undefined) return defaultValue;
@@ -588,13 +634,11 @@ export const CartProvider: React.FC<CartProviderProps> = ({
             return (isNaN(parsed) ? defaultValue : parsed) as T;
           }
         }
-
         if (typeof defaultValue === "string") return String(value) as T;
         if (typeof defaultValue === "boolean") {
           if (typeof value === "boolean") return value as T;
           return (String(value).toLowerCase() === "true") as T;
         }
-
         return value as T;
       };
 
@@ -609,7 +653,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       const safeColorImages = (key: string): Record<string, string[]> => {
         const value = cartData[key];
         if (!value || typeof value !== "object") return {};
-
         const result: Record<string, string[]> = {};
         Object.entries(value).forEach(([k, v]) => {
           if (Array.isArray(v)) {
@@ -624,7 +667,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       const safeColorQuantities = (key: string): Record<string, number> => {
         const value = cartData[key];
         if (!value || typeof value !== "object") return {};
-
         const result: Record<string, number> = {};
         Object.entries(value).forEach(([k, v]) => {
           if (typeof v === "number") {
@@ -639,7 +681,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       const safeBundleData = (key: string): BundleDataItem[] | undefined => {
         const value = cartData[key];
         if (!value || !Array.isArray(value)) return undefined;
-
         try {
           return value.map((item): BundleDataItem => {
             if (typeof item === "object" && item !== null) {
@@ -664,7 +705,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         return Timestamp.now();
       };
 
-      // Build Product object
       const imageUrls = safeStringList("allImages");
       return ProductUtils.fromJson({
         id: safeGet("productId", ""),
@@ -716,7 +756,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   const extractSalePreferences = useCallback(
     (data: FirestoreCartData): SalePreferences | null => {
       const salePrefs: SalePreferences = {};
-
       if (data.maxQuantity !== undefined && data.maxQuantity !== null) {
         salePrefs.maxQuantity = data.maxQuantity as number;
       }
@@ -733,7 +772,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         salePrefs.bulkDiscountPercentage =
           data.bulkDiscountPercentage as number;
       }
-
       return Object.keys(salePrefs).length === 0 ? null : salePrefs;
     },
     [],
@@ -744,7 +782,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       if (!selectedColor || !product.colorImages?.[selectedColor]) {
         return undefined;
       }
-
       const images = product.colorImages[selectedColor];
       return images?.[0];
     },
@@ -759,40 +796,41 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     ): CartItem => {
       const salePreferences = extractSalePreferences(cartData);
 
-      // ✅ BUILD selectedAttributes map (matching Flutter)
       const selectedAttributes: Record<string, unknown> = {};
 
-      // Add color if present
       if (
         cartData.selectedColor !== undefined &&
-        cartData.selectedColor !== null
+        cartData.selectedColor !== null &&
+        cartData.selectedColor !== "" &&
+        cartData.selectedColor !== "default"
       ) {
         selectedAttributes.selectedColor = cartData.selectedColor;
       }
 
-      // Flatten all attributes from cartData.attributes into selectedAttributes
       if (cartData.attributes && typeof cartData.attributes === "object") {
         const attributes = cartData.attributes as Record<string, unknown>;
         Object.entries(attributes).forEach(([key, value]) => {
-          selectedAttributes[key] = value;
+          if (
+            value !== null &&
+            value !== undefined &&
+            value !== "" &&
+            !(Array.isArray(value) && value.length === 0)
+          ) {
+            selectedAttributes[key] = value;
+          }
         });
       }
 
-      // ✅ CREATE ITEM MATCHING FLUTTER STRUCTURE
       const item: CartItem = {
         product,
         productId,
         quantity: (cartData.quantity as number) ?? 1,
-
-        // ✅ Store as selectedAttributes map (matching Flutter)
         selectedAttributes:
           Object.keys(selectedAttributes).length > 0
             ? selectedAttributes
             : undefined,
-
-        // ✅ Store salePreferenceInfo (matching Flutter naming)
         salePreferenceInfo: salePreferences,
-
+        salePreferences, // kept for backward compat (Flutter still reads this)
         selectedColorImage: resolveColorImage(
           product,
           cartData.selectedColor as string | undefined,
@@ -802,12 +840,8 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         isShop: (cartData.isShop as boolean) ?? false,
         cartData: cartData as CartData,
         isOptimistic: false,
-
-        // ✅ DEPRECATED: Keep for backward compatibility but don't use in orders
-        salePreferences, // Old field
       };
 
-      // ✅ ADD FLATTENED FIELDS TO ROOT (for display compatibility)
       if (selectedAttributes.selectedColor) {
         item.selectedColor = selectedAttributes.selectedColor as string;
       }
@@ -819,17 +853,16 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
   const sortCartItems = useCallback((items: CartItem[]) => {
     items.sort((a, b) => {
-      // Use shopId for shop items, sellerId for individual sellers
       const groupA = (a.cartData?.shopId as string) ?? a.sellerId ?? "";
       const groupB = (b.cartData?.shopId as string) ?? b.sellerId ?? "";
       if (groupA !== groupB) return groupA.localeCompare(groupB);
-  
+
       const dateA = a.cartData.addedAt as Timestamp;
       const dateB = b.cartData.addedAt as Timestamp;
       if (!dateA || !dateB) return 0;
       return dateB.toMillis() - dateA.toMillis();
     });
-  
+
     let lastGroupKey: string | null = null;
     items.forEach((item) => {
       const groupKey = (item.cartData?.shopId as string) ?? item.sellerId ?? "";
@@ -838,14 +871,8 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     });
   }, []);
 
-  // ========================================================================
-  // HELPER: Update cart IDs from doc snapshots
-  // ========================================================================
-
   const updateCartIds = useCallback((docs: QueryDocumentSnapshot[]) => {
     const ids = new Set(docs.map((doc) => doc.id));
-
-    // Apply optimistic updates
     const effectiveIds = new Set(ids);
     optimisticCacheRef.current.forEach((value, key) => {
       if (value._deleted === true) {
@@ -854,13 +881,273 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         effectiveIds.add(key);
       }
     });
-
     setCartProductIds(effectiveIds);
     setCartCount(effectiveIds.size);
   }, []);
 
   // ========================================================================
-  // INITIALIZATION
+  // OPTIMISTIC TOTALS — Matches Flutter's _calculateOptimisticTotals
+  // ========================================================================
+
+  const calculateOptimisticTotals = useCallback(
+    (selectedProductIds: string[]): CartTotals => {
+      const items = cartItemsRef.current.filter((item) =>
+        selectedProductIds.includes(item.productId),
+      );
+
+      if (items.length === 0) {
+        return { total: 0, items: [], currency: "TL" };
+      }
+
+      let total = 0;
+      let currency = "TL";
+      const itemTotals: CartItemTotal[] = [];
+
+      for (const item of items) {
+        const productId = item.productId;
+        const quantity = item.quantity ?? 1;
+        const cartData = item.cartData ?? {};
+
+        let unitPrice =
+          (cartData.unitPrice as number | undefined) ??
+          (cartData.cachedPrice as number | undefined) ??
+          item.product?.price ??
+          0;
+
+        const discountThreshold =
+          (cartData.discountThreshold as number | undefined) ??
+          (cartData.cachedDiscountThreshold as number | undefined);
+        const bulkDiscountPercentage =
+          (cartData.bulkDiscountPercentage as number | undefined) ??
+          (cartData.cachedBulkDiscountPercentage as number | undefined);
+
+        if (
+          discountThreshold !== undefined &&
+          bulkDiscountPercentage !== undefined &&
+          quantity >= discountThreshold
+        ) {
+          unitPrice = unitPrice * (1 - bulkDiscountPercentage / 100);
+        }
+
+        const itemTotal = unitPrice * quantity;
+        total += itemTotal;
+        currency = (cartData.currency as string | undefined) ?? "TL";
+
+        itemTotals.push({
+          productId,
+          unitPrice,
+          total: itemTotal,
+          quantity,
+        });
+      }
+
+      return {
+        total: Math.round(total * 100) / 100,
+        items: itemTotals,
+        currency,
+      };
+    },
+    [],
+  );
+
+  // ========================================================================
+  // CART TOTALS CALCULATION (with caching & retry)
+  // ========================================================================
+
+  const calculateCartTotals = useCallback(
+    async (excludedProductIds?: string[]): Promise<CartTotals> => {
+      if (!user || !functions) {
+        return { total: 0, items: [], currency: "TL" };
+      }
+
+      const excludedSorted = [...(excludedProductIds ?? [])].sort();
+      const cacheKey = `all_minus_${excludedSorted.join(",")}`;
+
+      const cached = cartTotalsCache.get(user.uid, [cacheKey]);
+      if (cached) {
+        console.log("⚡ Cache hit - instant total");
+        return {
+          total: cached.total,
+          currency: cached.currency,
+          items: cached.items.map((i) => ({
+            productId: i.productId,
+            unitPrice: i.unitPrice,
+            total: i.total,
+            quantity: i.quantity,
+            isBundleItem: i.isBundleItem,
+          })),
+        };
+      }
+
+      if (pendingFetchesRef.current.has(`totals_${cacheKey}`)) {
+        console.log("⏳ Waiting for existing totals calculation...");
+        const result = await pendingFetchesRef.current.get(
+          `totals_${cacheKey}`,
+        );
+        return result as CartTotals;
+      }
+
+      const totalsPromise = (async () => {
+        try {
+          const totals = await retryWithBackoff(
+            async () => {
+              const calculateCartTotalsFunction = httpsCallable(
+                functions,
+                "calculateCartTotals",
+              );
+
+              const allIds = Array.from(cartProductIdsRef.current);
+              const selectedIds =
+                excludedProductIds == null || excludedProductIds.length === 0
+                  ? allIds
+                  : allIds.filter((id) => !excludedProductIds.includes(id));
+
+              const result = await calculateCartTotalsFunction({
+                selectedProductIds: selectedIds,
+              });
+
+              const rawData = result.data;
+              const totalsData = deepConvertMap(rawData);
+
+              const totals: CartTotals = {
+                total: (totalsData.total as number) ?? 0,
+                currency: (totalsData.currency as string) ?? "TL",
+                items: (Array.isArray(totalsData.items)
+                  ? totalsData.items
+                  : []
+                ).map((item): CartItemTotal => {
+                  const itemData = item as Record<string, unknown>;
+                  return {
+                    productId: (itemData.productId as string) ?? "",
+                    unitPrice: (itemData.unitPrice as number) ?? 0,
+                    total: (itemData.total as number) ?? 0,
+                    quantity: (itemData.quantity as number) ?? 1,
+                    isBundleItem: (itemData.isBundleItem as boolean) ?? false,
+                  };
+                }),
+              };
+
+              cartTotalsCache.set(user.uid, [cacheKey], {
+                total: totals.total,
+                currency: totals.currency,
+                items: totals.items.map((i) => ({
+                  productId: i.productId,
+                  unitPrice: i.unitPrice,
+                  total: i.total,
+                  quantity: i.quantity,
+                  isBundleItem: i.isBundleItem ?? false,
+                })),
+              });
+
+              return totals;
+            },
+            "Calculate Totals",
+            3,
+          );
+
+          console.log(
+            `✅ Total calculated: ${totals.total} ${totals.currency}`,
+          );
+          return totals;
+        } catch (error) {
+          console.error("❌ Cloud Function failed after retries:", error);
+          throw error;
+        }
+      })();
+
+      pendingFetchesRef.current.set(`totals_${cacheKey}`, totalsPromise);
+      try {
+        const result = await totalsPromise;
+        return result;
+      } finally {
+        pendingFetchesRef.current.delete(`totals_${cacheKey}`);
+      }
+    },
+    [user, functions],
+  );
+
+  // ========================================================================
+  // updateTotalsForExcluded — Matches Flutter (optimistic + server verify)
+  // ========================================================================
+
+  const updateTotalsForExcluded = useCallback(
+    async (excludedProductIds: string[]): Promise<void> => {
+      const allIds = cartProductIdsRef.current;
+
+      // If everything is excluded, show zero
+      if (allIds.size > 0 && excludedProductIds.length >= allIds.size) {
+        setCartTotals({ total: 0, items: [], currency: "TL" });
+        currentTotalsProductIdsRef.current = new Set();
+        return;
+      }
+
+      const selectedIds = Array.from(allIds).filter(
+        (id) => !excludedProductIds.includes(id),
+      );
+
+      currentTotalsProductIdsRef.current = new Set(selectedIds);
+
+      // Step 1: Immediate optimistic update
+      if (selectedIds.length > 0) {
+        const optimistic = calculateOptimisticTotals(selectedIds);
+        setCartTotals(optimistic);
+      } else {
+        setCartTotals({ total: 0, items: [], currency: "TL" });
+      }
+
+      if (selectedIds.length === 0) return;
+
+      // Step 2: Server verification (debounced via outer caller, but we run it here too)
+      setIsTotalsLoading(true);
+
+      try {
+        const serverTotals = await calculateCartTotals(
+          excludedProductIds.length > 0 ? excludedProductIds : undefined,
+        );
+        // Only apply if the selection hasn't changed in the meantime
+        const currentSet = currentTotalsProductIdsRef.current;
+        const stillSameSelection =
+          currentSet.size === selectedIds.length &&
+          selectedIds.every((id) => currentSet.has(id));
+        if (stillSameSelection) {
+          setCartTotals(serverTotals);
+        }
+      } catch (e) {
+        console.warn("⚠️ Server totals failed, using optimistic:", e);
+      } finally {
+        setIsTotalsLoading(false);
+      }
+    },
+    [calculateOptimisticTotals, calculateCartTotals],
+  );
+
+  // ========================================================================
+  // BACKGROUND TOTALS REFRESH — Matches Flutter's unawaited approach
+  // ========================================================================
+
+  const backgroundRefreshTotals = useCallback(() => {
+    if (!user || cartProductIdsRef.current.size === 0) return;
+    // Fire and forget — Flutter uses `unawaited(_backgroundRefreshTotals())`
+    (async () => {
+      try {
+        // Recompute against the most recent selection (or all if none tracked)
+        const currentSelection = currentTotalsProductIdsRef.current;
+        const allIds = cartProductIdsRef.current;
+        const excluded =
+          currentSelection.size === 0
+            ? []
+            : Array.from(allIds).filter((id) => !currentSelection.has(id));
+
+        await calculateCartTotals(excluded.length > 0 ? excluded : undefined);
+        console.log("⚡ Background totals cached");
+      } catch (e) {
+        console.warn("⚠️ Background total refresh failed:", e);
+      }
+    })();
+  }, [user, calculateCartTotals]);
+
+  // ========================================================================
+  // BUILD CART ITEMS FROM DOCS
   // ========================================================================
 
   const buildCartItemsFromDocs = useCallback(
@@ -892,48 +1179,64 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     ],
   );
 
-  const initializeCartIfNeeded = useCallback(async () => {
-    if (!user || !db || isInitialized) return; // Guard for lazy loading
+  // ========================================================================
+  // RECONCILIATION — Matches Flutter's _reconcileCartIds
+  // ========================================================================
+
+  const reconcileCartIds = useCallback(async () => {
+    if (!user || !db) return;
+
+    try {
+      const loadedIds = cartProductIdsRef.current;
+      const userDocIds = new Set<string>(
+        getProfileField<string[]>("cartItemIds") ?? [],
+      );
+
+      // If pages remain, only do safe count check
+      if (hasMore) {
+        if (loadedIds.size > userDocIds.size) {
+          console.log("🔧 Cart reconciliation: adding missing IDs to user doc");
+          await updateDoc(doc(db, "users", user.uid), {
+            cartItemIds: arrayUnion(...Array.from(loadedIds)),
+          });
+          updateLocalProfileField(
+            "cartItemIds",
+            Array.from(new Set([...userDocIds, ...loadedIds])),
+          );
+        }
+        return;
+      }
+
+      // All pages loaded — full reconciliation safe
+      if (!setsEqual(loadedIds, userDocIds)) {
+        console.log(
+          `🔧 Cart reconciliation: fixing drift (loaded: ${loadedIds.size}, userDoc: ${userDocIds.size})`,
+        );
+        await updateDoc(doc(db, "users", user.uid), {
+          cartItemIds: Array.from(loadedIds),
+        });
+        updateLocalProfileField("cartItemIds", Array.from(loadedIds));
+      }
+    } catch (e) {
+      console.warn("⚠️ Cart reconciliation failed (non-critical):", e);
+    }
+  }, [user, db, hasMore, getProfileField, updateLocalProfileField]);
+
+  // ========================================================================
+  // LOAD CART — Matches Flutter's loadCart() (callable on every screen visit)
+  // ========================================================================
+
+  const loadCart = useCallback(async () => {
+    if (!user || !db) return;
 
     if (pendingFetchesRef.current.has("init")) {
-      console.log("⏳ Already initializing, waiting...");
+      console.log("⏳ Already loading cart, waiting...");
       await pendingFetchesRef.current.get("init");
       return;
     }
 
-    const initPromise = (async () => {
+    const loadPromise = (async () => {
       setIsLoading(true);
-
-      // Early exit: if user doc says cart is empty AND we have no local optimistic items,
-      // skip subcollection read entirely
-      const cachedIds = getProfileField<string[]>("cartItemIds");
-      const hasLocalItems =
-        cartProductIds.size > 0 || optimisticCacheRef.current.size > 0;
-      if (
-        Array.isArray(cachedIds) &&
-        cachedIds.length === 0 &&
-        !hasLocalItems
-      ) {
-        console.log(
-          "✅ Cart: User doc says empty, skipping subcollection read",
-        );
-        setCartItems([]);
-        setCartProductIds(new Set());
-        setCartCount(0);
-        setHasMore(false);
-        setIsInitialized(true);
-        setIsLoading(false);
-        return;
-      }
-
-      // Only clear if there are existing items to avoid clearing optimistic updates
-      if (cartItems.length > 0) {
-        setCartItems([]);
-        setCartProductIds(new Set());
-        setCartCount(0);
-      }
-
-      // Reset pagination state
       lastDocumentRef.current = null;
       setHasMore(true);
 
@@ -945,159 +1248,68 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         );
 
         const snapshot = await getDocsFromServer(cartQuery);
-        trackReads("Cart:Init", snapshot.docs.length || 1);
+        trackReads("Cart:Load", snapshot.docs.length || 1);
 
         await buildCartItemsFromDocs(snapshot.docs);
 
         if (snapshot.docs.length > 0) {
           lastDocumentRef.current = snapshot.docs[snapshot.docs.length - 1];
           setHasMore(snapshot.docs.length >= ITEMS_PER_PAGE);
+        } else {
+          setHasMore(false);
         }
 
-        console.log("✅ Cart initialized with", snapshot.docs.length, "items");
-
-        // Set initialized FIRST
         setIsInitialized(true);
+
+        // Best-effort reconcile (non-blocking semantics)
+        reconcileCartIds();
       } catch (error) {
-        console.error("❌ Init error:", error);
+        console.error("❌ Cart load error:", error);
       } finally {
         setIsLoading(false);
       }
     })();
 
-    pendingFetchesRef.current.set("init", initPromise);
-    await initPromise;
-    pendingFetchesRef.current.delete("init");
-  }, [user, isInitialized, db, buildCartItemsFromDocs, cartItems.length]);
+    pendingFetchesRef.current.set("init", loadPromise);
+    try {
+      await loadPromise;
+    } finally {
+      pendingFetchesRef.current.delete("init");
+    }
+  }, [user, db, buildCartItemsFromDocs, reconcileCartIds]);
 
-  const calculateCartTotals = useCallback(
-    async (excludedProductIds?: string[]): Promise<CartTotals> => {
-      if (!user || !functions) {
-        return { total: 0, items: [], currency: "TL" };
-      }
+  const initializeCartIfNeeded = useCallback(async () => {
+    if (!user || !db) return;
 
-      // ✅ Build cache key from excluded IDs (empty = all items)
-      const excludedSorted = [...(excludedProductIds ?? [])].sort();
-      const cacheKey = `all_minus_${excludedSorted.join(",")}`;
+    // Early-exit optimization: if user doc says cart is empty AND we have nothing local,
+    // skip subcollection read entirely (matches Flutter behavior, saves reads)
+    const cachedIds = getProfileField<string[]>("cartItemIds");
+    const hasLocalItems =
+      cartProductIdsRef.current.size > 0 ||
+      optimisticCacheRef.current.size > 0;
 
-      // ✅ Check local cache first
-      const cached = cartTotalsCache.get(user.uid, [cacheKey]);
-      if (cached) {
-        console.log("⚡ Cache hit - instant total");
-        return {
-          total: cached.total,
-          currency: cached.currency,
-          items: cached.items.map((i) => ({
-            productId: i.productId,
-            unitPrice: i.unitPrice,
-            total: i.total,
-            quantity: i.quantity,
-            isBundleItem: i.isBundleItem,
-          })),
-        };
-      }
-
-      // Request deduplication
-      if (pendingFetchesRef.current.has(`totals_${cacheKey}`)) {
-        console.log("⏳ Waiting for existing totals calculation...");
-        const result = await pendingFetchesRef.current.get(
-          `totals_${cacheKey}`,
-        );
-        return result as CartTotals;
-      }
-
-      const totalsPromise = (async () => {
-        try {
-          const calculateCartTotalsFunction = httpsCallable(
-            functions,
-            "calculateCartTotals",
-          );
-          
-          // Convert excluded IDs to selected IDs for direct lookup
-          const allIds = Array.from(cartProductIds);
-          const selectedIds = excludedProductIds == null || excludedProductIds.length === 0
-            ? allIds
-            : allIds.filter((id) => !excludedProductIds.includes(id));
-          
-          const result = await calculateCartTotalsFunction({
-            selectedProductIds: selectedIds,
-          });
-
-          // Deep conversion of nested structures
-          const rawData = result.data;
-          const totalsData = deepConvertMap(rawData);
-
-          console.log("✅ Converted totals data:", Object.keys(totalsData));
-
-          const totals: CartTotals = {
-            total: (totalsData.total as number) ?? 0,
-            currency: (totalsData.currency as string) ?? "TL",
-            items: (Array.isArray(totalsData.items)
-              ? totalsData.items
-              : []
-            ).map((item): CartItemTotal => {
-              const itemData = item as Record<string, unknown>;
-              return {
-                productId: (itemData.productId as string) ?? "",
-                unitPrice: (itemData.unitPrice as number) ?? 0,
-                total: (itemData.total as number) ?? 0,
-                quantity: (itemData.quantity as number) ?? 1,
-                isBundleItem: (itemData.isBundleItem as boolean) ?? false,
-              };
-            }),
-          };
-
-          // ✅ Cache result locally (instead of Redis)
-          cartTotalsCache.set(user.uid, [cacheKey], {
-            total: totals.total,
-            currency: totals.currency,
-            items: totals.items.map((i) => ({
-              productId: i.productId,
-              unitPrice: i.unitPrice,
-              total: i.total,
-              quantity: i.quantity,
-              isBundleItem: i.isBundleItem ?? false,
-            })),
-          });
-
-          console.log(
-            `✅ Total calculated: ${totals.total} ${totals.currency}`,
-          );
-          return totals;
-        } catch (error) {
-          console.error("❌ Cloud Function error:", error);
-          // Return empty totals on error
-          return { total: 0, items: [], currency: "TL" };
-        }
-      })();
-
-      pendingFetchesRef.current.set(`totals_${cacheKey}`, totalsPromise);
-      const result = await totalsPromise;
-      pendingFetchesRef.current.delete(`totals_${cacheKey}`);
-
-      return result;
-    },
-    [user, cartItems, functions],
-  );
-
-  const backgroundRefreshTotals = useCallback(() => {
-    if (!user || cartProductIds.size === 0) return;
-
-    // Debounce: if user makes rapid changes, only fire once after 2s of quiet
-    if (backgroundTotalsTimerRef.current) {
-      clearTimeout(backgroundTotalsTimerRef.current);
+    if (
+      !isInitialized &&
+      Array.isArray(cachedIds) &&
+      cachedIds.length === 0 &&
+      !hasLocalItems
+    ) {
+      console.log("✅ Cart: User doc says empty, skipping subcollection read");
+      setCartItems([]);
+      setCartProductIds(new Set());
+      setCartCount(0);
+      setHasMore(false);
+      setIsInitialized(true);
+      return;
     }
 
-    backgroundTotalsTimerRef.current = setTimeout(async () => {
-      backgroundTotalsTimerRef.current = null;
-      try {
-        await calculateCartTotals();
-        console.log("⚡ Background totals cached");
-      } catch (error) {
-        console.log("⚠️ Background total refresh failed:", error);
-      }
-    }, 2000);
-  }, [user, cartProductIds, calculateCartTotals]);
+    if (isInitialized) return;
+    await loadCart();
+  }, [user, db, isInitialized, getProfileField, loadCart]);
+
+  // ========================================================================
+  // ADD TO CART
+  // ========================================================================
 
   const applyOptimisticAdd = useCallback(
     (
@@ -1107,29 +1319,29 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     ) => {
       clearOptimisticUpdate(productId);
 
-      // ✅ FIX: Use setState to get current items, not ref
+      // Enrich productData with quantity FIRST (matches Flutter's _applyOptimisticAdd fix)
+      const enrichedProductData = {
+        ...productData,
+        quantity,
+      };
+
+      optimisticCacheRef.current.set(productId, {
+        ...enrichedProductData,
+        _optimistic: true,
+      });
+
       setCartItems((currentItems) => {
-        // Remove any existing item with this ID
         const existingItems = currentItems.filter(
           (item) => item.productId !== productId,
         );
 
-        // Mark as optimistic
-        optimisticCacheRef.current.set(productId, {
-          ...productData,
-          quantity,
-          _optimistic: true,
-        });
-
-        // Create optimistic item
         try {
-          const optimisticProduct = buildProductFromCartData(productData);
+          const optimisticProduct =
+            buildProductFromCartData(enrichedProductData);
           const optimisticItem: CartItem = {
-            ...createCartItem(productId, productData, optimisticProduct),
+            ...createCartItem(productId, enrichedProductData, optimisticProduct),
             isOptimistic: true,
           };
-
-          // Add at top
           return [optimisticItem, ...existingItems];
         } catch (error) {
           console.error("Failed to create optimistic item:", error);
@@ -1137,18 +1349,15 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         }
       });
 
-      // Update IDs
-      const newIds = new Set(cartProductIds);
+      const newIds = new Set(cartProductIdsRef.current);
       newIds.add(productId);
       setCartProductIds(newIds);
       setCartCount(newIds.size);
-      // Sync to user doc local state
       updateLocalProfileField("cartItemIds", [...newIds]);
 
-      // Set timeout
       const timeout = setTimeout(() => {
         if (optimisticCacheRef.current.has(productId)) {
-          console.log("⚠️ Optimistic timeout:", productId);
+          console.warn("⚠️ Optimistic timeout:", productId);
           clearOptimisticUpdate(productId);
         }
       }, OPTIMISTIC_TIMEOUT);
@@ -1156,7 +1365,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       optimisticTimeoutsRef.current.set(productId, timeout);
     },
     [
-      cartProductIds,
       clearOptimisticUpdate,
       buildProductFromCartData,
       updateLocalProfileField,
@@ -1164,25 +1372,25 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     ],
   );
 
-  const rollbackOptimisticUpdate = useCallback(
-    (productId: string) => {
-      optimisticCacheRef.current.delete(productId);
-      const timer = optimisticTimeoutsRef.current.get(productId);
-      if (timer) {
-        clearTimeout(timer);
-        optimisticTimeoutsRef.current.delete(productId);
-      }
+  const rollbackOptimisticUpdate = useCallback((productId: string) => {
+    optimisticCacheRef.current.delete(productId);
+    const timer = optimisticTimeoutsRef.current.get(productId);
+    if (timer) {
+      clearTimeout(timer);
+      optimisticTimeoutsRef.current.delete(productId);
+    }
 
-      // Update IDs
-      const newIds = new Set(cartProductIds);
-      newIds.delete(productId);
-      setCartProductIds(newIds);
-      setCartCount(newIds.size);
+    const newIds = new Set(cartProductIdsRef.current);
+    newIds.delete(productId);
+    setCartProductIds(newIds);
+    setCartCount(newIds.size);
 
-      console.log("🔄 Rolled back optimistic update:", productId);
-    },
-    [cartProductIds],
-  );
+    setCartItems((items) =>
+      items.filter((item) => item.productId !== productId),
+    );
+
+    console.log("🔄 Rolled back optimistic update:", productId);
+  }, []);
 
   const addProductToCart = useCallback(
     async (
@@ -1192,18 +1400,19 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       attributes?: CartAttributes,
     ): Promise<string> => {
       if (!user) return "Please log in first";
-      if (!db) return "Loading..."; // Guard for lazy loading
+      if (!db) return "Loading...";
       if (!isInitialized) {
         await initializeCartIfNeeded();
       }
 
-      // Rate limiting
       if (!addToCartLimiterRef.current.canProceed(`add_${product.id}`)) {
         return "Please wait before adding again";
       }
 
-      // Cart item limit check (only for new items)
-      if (!cartProductIds.has(product.id) && cartProductIds.size >= MAX_CART_ITEMS) {
+      if (
+        !cartProductIdsRef.current.has(product.id) &&
+        cartProductIdsRef.current.size >= MAX_CART_ITEMS
+      ) {
         setShowCartLimitModal(true);
         return "Cart limit reached";
       }
@@ -1215,7 +1424,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           attributes,
         );
 
-        // ✅ Validate before writing
         const requiredFields = [
           "productId",
           "productName",
@@ -1234,11 +1442,16 @@ export const CartProvider: React.FC<CartProviderProps> = ({
             return `Product data incomplete, cannot add to cart`;
           }
         }
+        if (
+          productData.sellerName === "Unknown" ||
+          productData.sellerName === ""
+        ) {
+          console.error("❌ Cannot add to cart: invalid sellerName");
+          return "Product data incomplete, cannot add to cart";
+        }
 
-        // ✅ STEP 2: Apply optimistic update for instant feedback
         applyOptimisticAdd(product.id, productData, quantity);
 
-        // Atomic batch: write cart doc + update user doc array
         const batch = writeBatch(db);
         batch.set(doc(db, "users", user.uid, "cart", product.id), {
           ...productData,
@@ -1250,6 +1463,8 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           cartItemIds: arrayUnion(product.id),
         });
         await batch.commit();
+
+        clearOptimisticUpdate(product.id);
 
         userActivityService.trackAddToCart({
           productId: product.id,
@@ -1264,7 +1479,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           quantity,
         });
 
-        // Metrics logging
         const shopId = await getProductShopId(product.id);
         metricsEventService.logCartAdded({
           productId: product.id,
@@ -1273,10 +1487,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
         console.log("✅ Added to cart:", product.id);
 
-        // Invalidate totals cache
         cartTotalsCache.invalidateForUser(user.uid);
-
-        // Background refresh totals
         backgroundRefreshTotals();
 
         return "Added to cart";
@@ -1290,11 +1501,12 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       user,
       db,
       isInitialized,
-      buildProductDataForCart,
+      initializeCartIfNeeded,
       applyOptimisticAdd,
       rollbackOptimisticUpdate,
       backgroundRefreshTotals,
       getProductShopId,
+      clearOptimisticUpdate,
     ],
   );
 
@@ -1306,11 +1518,10 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       attributes?: CartAttributes,
     ): Promise<string> => {
       if (!user) return "Please log in first";
-      if (!db) return "Loading..."; // Guard for lazy loading
+      if (!db) return "Loading...";
 
       try {
         const productDoc = await getDoc(doc(db, "shop_products", productId));
-
         if (!productDoc.exists()) {
           return "Product not found";
         }
@@ -1338,33 +1549,25 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   // REMOVE FROM CART
   // ========================================================================
 
-  const applyOptimisticRemove = useCallback(
-    (productId: string) => {
-      optimisticCacheRef.current.set(productId, { _deleted: true });
+  const applyOptimisticRemove = useCallback((productId: string) => {
+    optimisticCacheRef.current.set(productId, { _deleted: true });
 
-      // Update IDs immediately
-      const newIds = new Set(cartProductIds);
-      newIds.delete(productId);
-      setCartProductIds(newIds);
-      setCartCount(newIds.size);
-      // Sync to user doc local state
-      updateLocalProfileField("cartItemIds", [...newIds]);
+    const newIds = new Set(cartProductIdsRef.current);
+    newIds.delete(productId);
+    setCartProductIds(newIds);
+    setCartCount(newIds.size);
 
-      // Remove from items list
-      setCartItems((items) =>
-        items.filter((item) => item.productId !== productId),
-      );
+    setCartItems((items) =>
+      items.filter((item) => item.productId !== productId),
+    );
 
-      // Set timeout
-      const timeout = setTimeout(() => {
-        optimisticCacheRef.current.delete(productId);
-        optimisticTimeoutsRef.current.delete(productId);
-      }, 5000);
+    const timeout = setTimeout(() => {
+      optimisticCacheRef.current.delete(productId);
+      optimisticTimeoutsRef.current.delete(productId);
+    }, 5000);
 
-      optimisticTimeoutsRef.current.set(productId, timeout);
-    },
-    [cartProductIds],
-  );
+    optimisticTimeoutsRef.current.set(productId, timeout);
+  }, []);
 
   const rollbackOptimisticRemove = useCallback(
     async (productId: string) => {
@@ -1375,14 +1578,13 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         optimisticTimeoutsRef.current.delete(productId);
       }
 
-      // Force refresh from Firestore
       if (user && db) {
         try {
           const docSnap = await getDoc(
             doc(db, "users", user.uid, "cart", productId),
           );
           if (docSnap.exists()) {
-            const newIds = new Set(cartProductIds);
+            const newIds = new Set(cartProductIdsRef.current);
             newIds.add(productId);
             setCartProductIds(newIds);
             setCartCount(newIds.size);
@@ -1392,15 +1594,14 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         }
       }
     },
-    [user, db, cartProductIds],
+    [user, db],
   );
 
   const removeFromCart = useCallback(
     async (productId: string): Promise<string> => {
       if (!user) return "Please log in first";
-      if (!db) return "Loading..."; // Guard for lazy loading
+      if (!db) return "Loading...";
 
-      // Capture item BEFORE optimistic remove clears it (needed for rollback + shopId)
       const localItem = cartItemsRef.current.find(
         (item) => item.productId === productId,
       );
@@ -1409,13 +1610,20 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       try {
         applyOptimisticRemove(productId);
 
-        // Atomic batch: delete cart doc + update user doc array
         const batch = writeBatch(db);
         batch.delete(doc(db, "users", user.uid, "cart", productId));
         batch.update(doc(db, "users", user.uid), {
           cartItemIds: arrayRemove(productId),
         });
         await batch.commit();
+
+        // Sync local user doc
+        updateLocalProfileField(
+          "cartItemIds",
+          (getProfileField<string[]>("cartItemIds") ?? []).filter(
+            (id) => id !== productId,
+          ),
+        );
 
         userActivityService.trackRemoveFromCart({
           productId,
@@ -1428,15 +1636,12 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         });
 
         cartTotalsCache.invalidateForUser(user.uid);
-
-        // Background refresh totals
         backgroundRefreshTotals();
 
         return "Removed from cart";
       } catch (error) {
         console.error("❌ Remove error:", error);
         rollbackOptimisticRemove(productId);
-        // rollbackOptimisticRemove restores the ID but not the CartItem — restore it
         if (localItem) {
           setCartItems((items) => {
             if (items.some((i) => i.productId === productId)) return items;
@@ -1452,11 +1657,13 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       applyOptimisticRemove,
       rollbackOptimisticRemove,
       backgroundRefreshTotals,
+      getProfileField,
+      updateLocalProfileField,
     ],
   );
 
   // ========================================================================
-  // UPDATE QUANTITY
+  // UPDATE QUANTITY — With coalescing (matches Flutter)
   // ========================================================================
 
   const applyOptimisticQuantityChange = useCallback(
@@ -1465,7 +1672,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         const newItems = [...items];
         const indices: number[] = [];
 
-        // Find ALL occurrences
         for (let i = 0; i < newItems.length; i++) {
           if (newItems[i].productId === productId) {
             indices.push(i);
@@ -1474,13 +1680,11 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
         if (indices.length === 0) return items;
 
-        // Keep only the first occurrence, update its quantity
         newItems[indices[0]] = {
           ...newItems[indices[0]],
           quantity: newQuantity,
         };
 
-        // Remove duplicates
         for (let i = indices.length - 1; i > 0; i--) {
           newItems.splice(indices[i], 1);
         }
@@ -1491,62 +1695,111 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     [],
   );
 
+  const debouncedTotalsVerification = useCallback(() => {
+    if (totalsVerificationTimerRef.current) {
+      clearTimeout(totalsVerificationTimerRef.current);
+    }
+    totalsVerificationTimerRef.current = setTimeout(async () => {
+      const currentSelection = currentTotalsProductIdsRef.current;
+      if (currentSelection.size === 0) return;
+
+      try {
+        const allIds = cartProductIdsRef.current;
+        const excluded = Array.from(allIds).filter(
+          (id) => !currentSelection.has(id),
+        );
+        const serverTotals = await calculateCartTotals(
+          excluded.length > 0 ? excluded : undefined,
+        );
+        // Re-check selection didn't change
+        const stillSame = setsEqual(
+          currentTotalsProductIdsRef.current,
+          currentSelection,
+        );
+        if (stillSame) {
+          setCartTotals(serverTotals);
+        }
+        console.log(`✅ Server verified totals: ${serverTotals.total}`);
+      } catch (e) {
+        console.warn("⚠️ Server verification failed:", e);
+      }
+    }, TOTALS_VERIFICATION_DEBOUNCE);
+  }, [calculateCartTotals]);
+
   const updateQuantity = useCallback(
     async (productId: string, newQuantity: number): Promise<string> => {
       if (!user) return "Please log in first";
-      if (!db) return "Loading..."; // Guard for lazy loading
+      if (!db) return "Loading...";
 
       if (newQuantity < 1) {
         return removeFromCart(productId);
       }
 
-      // Rate limiting
       if (!quantityLimiterRef.current.canProceed(`qty_${productId}`)) {
         return "Please wait";
       }
 
-      // Concurrency control
-      if (quantityUpdateLocksRef.current.has(productId)) {
-        return quantityUpdateLocksRef.current.get(productId)!;
+      // Step 1: Optimistic UI update (every tap)
+      applyOptimisticQuantityChange(productId, newQuantity);
+
+      // Step 2: Optimistic totals (immediate)
+      const currentSelection = currentTotalsProductIdsRef.current;
+      if (currentSelection.size > 0) {
+        const optimistic = calculateOptimisticTotals(
+          Array.from(currentSelection),
+        );
+        setCartTotals(optimistic);
       }
 
-      const updatePromise = (async () => {
+      // Step 3: Record latest desired qty. If a write loop is running, it will pick this up.
+      pendingQuantityWritesRef.current.set(productId, newQuantity);
+
+      const inFlight = quantityUpdateLocksRef.current.get(productId);
+      if (inFlight) {
+        return inFlight;
+      }
+
+      // Step 4: Drain loop — guarantees final desired qty lands on server
+      const loopPromise = (async (): Promise<string> => {
+        let resultMessage = "Quantity updated";
         try {
-          // Optimistic update
-          applyOptimisticQuantityChange(productId, newQuantity);
+          while (pendingQuantityWritesRef.current.has(productId)) {
+            const qtyToWrite =
+              pendingQuantityWritesRef.current.get(productId)!;
+            pendingQuantityWritesRef.current.delete(productId);
 
-          // Update Firestore
-          await updateDoc(doc(db, "users", user.uid, "cart", productId), {
-            quantity: newQuantity,
-            updatedAt: serverTimestamp(),
-          });
+            await updateDoc(doc(db, "users", user.uid, "cart", productId), {
+              quantity: qtyToWrite,
+              updatedAt: serverTimestamp(),
+            });
+            console.log(
+              `✅ Updated quantity: ${productId} = ${qtyToWrite}`,
+            );
+          }
 
-          console.log("✅ Updated quantity:", productId, "=", newQuantity);
-
-          // Invalidate totals cache
           cartTotalsCache.invalidateForUser(user.uid);
-
-          // Background refresh totals
-          backgroundRefreshTotals();
-
-          return "Quantity updated";
+          debouncedTotalsVerification();
         } catch (error) {
           console.error("❌ Update quantity error:", error);
-          return "Failed to update quantity";
+          resultMessage = "Failed to update quantity";
+          // Drop pending writes on error to avoid infinite retry loop
+          pendingQuantityWritesRef.current.delete(productId);
         } finally {
           quantityUpdateLocksRef.current.delete(productId);
         }
+        return resultMessage;
       })();
 
-      quantityUpdateLocksRef.current.set(productId, updatePromise);
-      return updatePromise;
+      quantityUpdateLocksRef.current.set(productId, loopPromise);
+      return loopPromise;
     },
     [
       user,
       db,
       removeFromCart,
       applyOptimisticQuantityChange,
-      backgroundRefreshTotals,
+      calculateOptimisticTotals,
+      debouncedTotalsVerification,
     ],
   );
 
@@ -1557,11 +1810,10 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   const removeMultipleFromCart = useCallback(
     async (productIds: string[]): Promise<string> => {
       if (!user) return "Please log in first";
-      if (!db) return "Loading..."; // Guard for lazy loading
+      if (!db) return "Loading...";
       if (productIds.length === 0) return "No items selected";
 
       try {
-        // Get shopIds from local state BEFORE optimistic remove clears them
         const shopIds: Record<string, string | null> = {};
         for (const productId of productIds) {
           const localItem = cartItemsRef.current.find(
@@ -1570,10 +1822,8 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           shopIds[productId] = localItem?.isShop ? localItem.sellerId : null;
         }
 
-        // Optimistic removal
         productIds.forEach((productId) => applyOptimisticRemove(productId));
 
-        // STEP 3: Batch delete from Firestore + update user doc array
         const batch = writeBatch(db);
         productIds.forEach((productId) => {
           batch.delete(doc(db, "users", user.uid, "cart", productId));
@@ -1583,7 +1833,13 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         });
         await batch.commit();
 
-        // ✅ STEP 4: Log batch metrics (NEW)
+        updateLocalProfileField(
+          "cartItemIds",
+          (getProfileField<string[]>("cartItemIds") ?? []).filter(
+            (id) => !productIds.includes(id),
+          ),
+        );
+
         metricsEventService.logBatchCartRemovals({
           productIds,
           shopIds,
@@ -1591,8 +1847,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
         console.log(`✅ Removed ${productIds.length} items`);
         cartTotalsCache.invalidateForUser(user.uid);
-
-        // Background refresh totals
         backgroundRefreshTotals();
 
         return "Products removed from cart";
@@ -1601,17 +1855,23 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         return "Failed to remove products";
       }
     },
-    [user, db, applyOptimisticRemove, backgroundRefreshTotals],
+    [
+      user,
+      db,
+      applyOptimisticRemove,
+      backgroundRefreshTotals,
+      getProfileField,
+      updateLocalProfileField,
+    ],
   );
 
   // ========================================================================
-  // REFRESH
+  // REFRESH (force reload first page)
   // ========================================================================
 
   const refresh = useCallback(async () => {
-    if (!user || !db) return; // Guard for lazy loading
+    if (!user || !db) return;
 
-    // Reset pagination
     lastDocumentRef.current = null;
     setHasMore(true);
 
@@ -1625,7 +1885,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       const snapshot = await getDocsFromServer(cartQuery);
       trackReads("Cart:Refresh", snapshot.docs.length || 1);
 
-      // Preserve optimistic items that the server hasn't confirmed yet
+      // Preserve optimistic items the server hasn't confirmed yet
       const serverIds = new Set(snapshot.docs.map((d) => d.id));
       const pendingOptimistic = cartItemsRef.current.filter(
         (item) =>
@@ -1636,7 +1896,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
       await buildCartItemsFromDocs(snapshot.docs);
 
-      // Re-append pending optimistic items so they don't vanish
       if (pendingOptimistic.length > 0) {
         setCartItems((prev) => {
           const ids = new Set(prev.map((i) => i.productId));
@@ -1662,40 +1921,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   }, [user, db, buildCartItemsFromDocs]);
 
   // ========================================================================
-  // TOTALS CALCULATION
-  // ========================================================================
-
-  const deepConvertMap = (map: unknown): Record<string, unknown> => {
-    if (!map || typeof map !== "object" || Array.isArray(map)) {
-      return {};
-    }
-
-    const result: Record<string, unknown> = {};
-    Object.entries(map as Record<string, unknown>).forEach(([key, value]) => {
-      if (value && typeof value === "object" && !Array.isArray(value)) {
-        result[key] = deepConvertMap(value);
-      } else if (Array.isArray(value)) {
-        result[key] = deepConvertList(value);
-      } else {
-        result[key] = value;
-      }
-    });
-    return result;
-  };
-
-  const deepConvertList = (list: unknown[]): unknown[] => {
-    return list.map((item) => {
-      if (item && typeof item === "object" && !Array.isArray(item)) {
-        return deepConvertMap(item);
-      } else if (Array.isArray(item)) {
-        return deepConvertList(item);
-      }
-      return item;
-    });
-  };
-
-  // ========================================================================
-  // VALIDATION
+  // VALIDATION — With retry logic matching Flutter
   // ========================================================================
 
   const validateForPayment = useCallback(
@@ -1711,23 +1937,26 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       if (!functions) {
         return {
           isValid: false,
-          errors: { _system: { key: "firebase_not_ready", params: {} } },
+          errors: {
+            _system: { key: "validation_service_unavailable", params: {} },
+          },
           warnings: {},
           validatedItems: [],
         };
       }
 
       try {
-        const itemsToValidate = cartItems
+        const itemsToValidate = cartItemsRef.current
           .filter((item) => selectedProductIds.includes(item.productId))
           .map((item) => {
             const cartData = item.cartData;
-
             return {
               productId: item.productId,
               quantity: item.quantity ?? 1,
               selectedColor: cartData.selectedColor,
-              productSource: (cartData as Record<string, unknown>).productSource as string ?? "shop_products",
+              productSource:
+                ((cartData as Record<string, unknown>)
+                  .productSource as string) ?? "shop_products",
               cachedPrice: cartData.cachedPrice,
               cachedBundlePrice: cartData.cachedBundlePrice,
               cachedDiscountPercentage: cartData.cachedDiscountPercentage,
@@ -1738,36 +1967,56 @@ export const CartProvider: React.FC<CartProviderProps> = ({
             };
           });
 
-        const validateCartCheckoutFunction = httpsCallable(
-          functions,
-          "validateCartCheckout",
+        if (itemsToValidate.length === 0) {
+          return {
+            isValid: false,
+            errors: {
+              _system: { key: "no_items_selected", params: {} },
+            },
+            warnings: {},
+            validatedItems: [],
+          };
+        }
+
+        const result = await retryWithBackoff(
+          async () => {
+            const validateCartCheckoutFunction = httpsCallable(
+              functions,
+              "validateCartCheckout",
+            );
+            const r = await validateCartCheckoutFunction({
+              cartItems: itemsToValidate,
+              reserveStock,
+            });
+            const data = deepConvertMap(r.data);
+            return {
+              isValid: (data.isValid as boolean) ?? false,
+              errors: (data.errors as Record<string, ValidationMessage>) ?? {},
+              warnings:
+                (data.warnings as Record<string, ValidationMessage>) ?? {},
+              validatedItems:
+                (data.validatedItems as ValidatedCartItem[]) ?? [],
+            };
+          },
+          "Validate Cart",
+          2,
+          300,
         );
 
-        const result = await validateCartCheckoutFunction({
-          cartItems: itemsToValidate,
-          reserveStock,
-        });
-
-        const rawData = result.data;
-        const data = deepConvertMap(rawData);
-
-        return {
-          isValid: (data.isValid as boolean) ?? false,
-          errors: (data.errors as Record<string, ValidationMessage>) ?? {},
-          warnings: (data.warnings as Record<string, ValidationMessage>) ?? {},
-          validatedItems: (data.validatedItems as ValidatedCartItem[]) ?? [],
-        };
+        return result;
       } catch (error) {
-        console.error("❌ Validation error:", error);
+        console.error("❌ Validation failed after retries:", error);
         return {
           isValid: false,
-          errors: { _system: { key: "validation_failed", params: {} } },
+          errors: {
+            _system: { key: "validation_service_unavailable", params: {} },
+          },
           warnings: {},
           validatedItems: [],
         };
       }
     },
-    [cartItems, functions],
+    [functions],
   );
 
   const updateCartCacheFromValidation = useCallback(
@@ -1801,16 +2050,19 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           functions,
           "updateCartCache",
         );
-
         const result = await updateCartCacheFunction({
           productUpdates: updates,
         });
-
         const data = deepConvertMap(result.data);
 
         console.log(`✅ Cache updated: ${data.updated as number} items`);
 
         cartTotalsCache.invalidateForUser(user.uid);
+
+        // Refresh after cache update so UI reflects new prices (matches Flutter)
+        if ((data.success as boolean) === true) {
+          await refresh();
+        }
 
         return (data.success as boolean) === true;
       } catch (error) {
@@ -1818,15 +2070,28 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         return false;
       }
     },
-    [user, functions],
+    [user, functions, refresh],
   );
 
   // ========================================================================
-  // LOAD MORE (Pagination)
+  // FETCH ALL SELECTED ITEMS — Matches Flutter (used for payment screen)
+  // ========================================================================
+
+  const fetchAllSelectedItems = useCallback(
+    (selectedProductIds: string[]): CartItem[] => {
+      return cartItemsRef.current.filter((item) =>
+        selectedProductIds.includes(item.productId),
+      );
+    },
+    [],
+  );
+
+  // ========================================================================
+  // LOAD MORE
   // ========================================================================
 
   const loadMoreItems = useCallback(async () => {
-    if (!user || !db || !hasMore || isLoadingMore) return; // Guard for lazy loading
+    if (!user || !db || !hasMore || isLoadingMore) return;
 
     if (pendingFetchesRef.current.has("loadMore")) {
       console.log("⏳ Already loading more...");
@@ -1835,7 +2100,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
     const loadMorePromise = (async () => {
       setIsLoadingMore(true);
-
       try {
         let cartQuery = query(
           collection(db, "users", user.uid, "cart"),
@@ -1848,6 +2112,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         }
 
         const snapshot = await getDocsFromServer(cartQuery);
+        trackReads("Cart:LoadMore", snapshot.docs.length || 1);
 
         if (snapshot.docs.length === 0) {
           setHasMore(false);
@@ -1871,7 +2136,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           }
         }
 
-        // Deduplication using setState to avoid stale closure
         if (newItems.length > 0) {
           setCartItems((currentItems) => {
             const existingIds = new Set(
@@ -1882,7 +2146,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
             );
 
             if (uniqueNewItems.length === 0) {
-              console.log(`⚠️ All ${newItems.length} items already loaded`);
+              console.warn(`⚠️ All ${newItems.length} items already loaded`);
               return currentItems;
             }
 
@@ -1905,14 +2169,16 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     })();
 
     pendingFetchesRef.current.set("loadMore", loadMorePromise);
-    await loadMorePromise;
-    pendingFetchesRef.current.delete("loadMore");
+    try {
+      await loadMorePromise;
+    } finally {
+      pendingFetchesRef.current.delete("loadMore");
+    }
   }, [
     user,
     hasMore,
     isLoadingMore,
     db,
-    cartItems,
     hasRequiredFields,
     buildProductFromCartData,
     createCartItem,
@@ -1920,88 +2186,114 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   ]);
 
   // ========================================================================
+  // CLEAR LOCAL CACHE — Matches Flutter
+  // ========================================================================
+
+  const clearLocalCache = useCallback(() => {
+    console.log("🗑️ Clearing cart local cache");
+
+    setCartItems([]);
+    setCartProductIds(new Set());
+    setCartCount(0);
+    setCartTotals(null);
+    setIsTotalsLoading(false);
+    setIsInitialized(false);
+
+    optimisticCacheRef.current.clear();
+    optimisticTimeoutsRef.current.forEach((t) => clearTimeout(t));
+    optimisticTimeoutsRef.current.clear();
+    quantityUpdateLocksRef.current.clear();
+    pendingQuantityWritesRef.current.clear();
+    currentTotalsProductIdsRef.current = new Set();
+
+    if (totalsVerificationTimerRef.current) {
+      clearTimeout(totalsVerificationTimerRef.current);
+      totalsVerificationTimerRef.current = null;
+    }
+
+    lastDocumentRef.current = null;
+    setHasMore(true);
+
+    if (user) {
+      cartTotalsCache.invalidateForUser(user.uid);
+    }
+  }, [user]);
+
+  // ========================================================================
   // EFFECTS
   // ========================================================================
 
-  // Keep cartItemsRef in sync with cartItems state
-  useEffect(() => {
-    cartItemsRef.current = cartItems;
-  }, [cartItems]);
-
-  // Initialize cart IDs from user doc (Tier 1) or fallback to subcollection
+  // Handle user changes — distinguish same-user re-emit vs different user
   useEffect(() => {
     if (!user) {
-      // User logged out - clear everything
-      if (isInitialized) {
-        console.log("🔴 User logged out, clearing cart...");
-        setCartCount(0);
-        setCartProductIds(new Set());
-        setCartItems([]);
-        setIsInitialized(false);
-        setIsLoading(false);
-        optimisticCacheRef.current.clear();
-        optimisticTimeoutsRef.current.forEach((timer) => clearTimeout(timer));
-        optimisticTimeoutsRef.current.clear();
-        quantityUpdateLocksRef.current.clear();
-        cartTotalsCache.clearAll();
+      if (currentUserIdRef.current !== null) {
+        currentUserIdRef.current = null;
+        clearLocalCache();
       }
       return;
     }
 
-    if (!isInitialized) {
-      // Wait for profile data to load before checking cached IDs
-      if (!profileData) return;
-
-      const cachedIds = getProfileField<string[]>("cartItemIds");
-
-      // Seed from user doc array (0 extra Firestore reads)
-      const ids = new Set(Array.isArray(cachedIds) ? cachedIds : []);
-      console.log("🟢 Cart: Seeding from user doc array:", ids.size, "items");
+    // Same user re-emitting — just resync IDs from user doc, don't wipe items
+    if (currentUserIdRef.current === user.uid) {
+      const ids = new Set<string>(
+        getProfileField<string[]>("cartItemIds") ?? [],
+      );
       setCartProductIds(ids);
       setCartCount(ids.size);
-      setIsInitialized(true);
+      return;
+    }
+
+    // Different user — full clear and re-seed
+    currentUserIdRef.current = user.uid;
+    clearLocalCache();
+
+    // Wait for profile to load before seeding
+    if (!profileData) return;
+    const ids = new Set<string>(
+      getProfileField<string[]>("cartItemIds") ?? [],
+    );
+    setCartProductIds(ids);
+    setCartCount(ids.size);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, profileData]);
+
+  // Listen to user doc cart IDs changes (cross-device sync)
+  useEffect(() => {
+    if (!user || !profileData) return;
+    const ids = new Set<string>(
+      getProfileField<string[]>("cartItemIds") ?? [],
+    );
+    // Only update if we haven't initialized yet (otherwise our local state is authoritative
+    // until next loadCart). This matches Flutter's _onUserDocCartIdsChanged behavior:
+    // it only updates badge counts when no full cart is loaded.
+    if (!isInitialized) {
+      setCartProductIds(ids);
+      setCartCount(ids.size);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, isInitialized, profileData]);
+  }, [profileData?.cartItemIds, user, isInitialized]);
 
   // Initialize cache on mount
   useEffect(() => {
     cartTotalsCache.initialize();
-
-    return () => {
-      // Note: Don't dispose on unmount as it's a singleton
-      // Only dispose if truly shutting down the app
-    };
   }, []);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      // Cancel deferred init if still pending
-      if (deferredCartInitRef.current !== null) {
-        if (typeof cancelIdleCallback !== "undefined") {
-          cancelIdleCallback(deferredCartInitRef.current as number);
-        } else {
-          clearTimeout(
-            deferredCartInitRef.current as ReturnType<typeof setTimeout>,
-          );
-        }
-        deferredCartInitRef.current = null;
-      }
       optimisticTimeoutsRef.current.forEach((timer) => clearTimeout(timer));
       optimisticTimeoutsRef.current.clear();
-      if (backgroundTotalsTimerRef.current) {
-        clearTimeout(backgroundTotalsTimerRef.current);
-        backgroundTotalsTimerRef.current = null;
+      if (totalsVerificationTimerRef.current) {
+        clearTimeout(totalsVerificationTimerRef.current);
+        totalsVerificationTimerRef.current = null;
       }
     };
   }, []);
 
   // ========================================================================
-  // CONTEXT VALUES - Split for granular subscriptions
+  // CONTEXT VALUES
   // ========================================================================
 
-  // State context - changes trigger re-renders
   const stateValue = useMemo<CartStateContextType>(
     () => ({
       cartCount,
@@ -2011,6 +2303,8 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       isLoadingMore,
       hasMore,
       isInitialized,
+      cartTotals,
+      isTotalsLoading,
     }),
     [
       cartCount,
@@ -2020,10 +2314,11 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       isLoadingMore,
       hasMore,
       isInitialized,
+      cartTotals,
+      isTotalsLoading,
     ],
   );
 
-  // Actions context - stable references, no re-renders
   const actionsValue = useMemo<CartActionsContextType>(
     () => ({
       addProductToCart,
@@ -2032,11 +2327,15 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       updateQuantity,
       removeMultipleFromCart,
       initializeCartIfNeeded,
+      loadCart,
       loadMoreItems,
       calculateCartTotals,
+      updateTotalsForExcluded,
       validateForPayment,
       updateCartCacheFromValidation,
       refresh,
+      clearLocalCache,
+      fetchAllSelectedItems,
     }),
     [
       addProductToCart,
@@ -2045,15 +2344,18 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       updateQuantity,
       removeMultipleFromCart,
       initializeCartIfNeeded,
+      loadCart,
       loadMoreItems,
       calculateCartTotals,
+      updateTotalsForExcluded,
       validateForPayment,
       updateCartCacheFromValidation,
       refresh,
+      clearLocalCache,
+      fetchAllSelectedItems,
     ],
   );
 
-  // Combined context for backward compatibility
   const combinedValue = useMemo<CartContextType>(
     () => ({
       ...stateValue,

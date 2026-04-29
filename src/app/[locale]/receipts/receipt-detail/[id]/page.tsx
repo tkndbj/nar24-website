@@ -262,7 +262,7 @@ export default function ReceiptDetailPage() {
 
   const shareReceipt = () => {
     if (!receipt) return;
-    const text = `${l("ReceiptDetail.receipt")} - ${l("ReceiptDetail.orders")} #${receipt.orderId.substring(0, 8).toUpperCase()}\n${l("ReceiptDetail.total")}: ${receipt.totalPrice.toFixed(0)} ${receipt.currency}\n${formatDate(receipt.timestamp)}`;
+    const text = `${l("ReceiptDetail.receipt")} - ${l("ReceiptDetail.orders")} #${receipt.orderId.substring(0, 8).toUpperCase()}\n${l("ReceiptDetail.total")}: ${receipt.totalPrice.toFixed(2)} ${receipt.currency}\n${formatDate(receipt.timestamp)}`;
     if (navigator.share)
       navigator.share({ title: l("ReceiptDetail.receipt"), text });
     else {
@@ -680,7 +680,7 @@ export default function ReceiptDetailPage() {
                         <span
                           className={`text-xs font-bold flex-shrink-0 ${isDarkMode ? "text-orange-400" : "text-orange-600"}`}
                         >
-                          {item.price} {item.currency}
+                          {item.price.toFixed(2)} {item.currency}
                         </span>
                       </div>
                     ))}
@@ -699,7 +699,7 @@ export default function ReceiptDetailPage() {
           <div className="space-y-2">
             <InfoRow
               label={l("ReceiptDetail.subtotal") || "Subtotal"}
-              value={`${receipt.itemsSubtotal.toFixed(0)} ${receipt.currency}`}
+              value={`${receipt.itemsSubtotal.toFixed(2)} ${receipt.currency}`}
             />
 
             {receipt.couponDiscount > 0 && (
@@ -711,7 +711,7 @@ export default function ReceiptDetailPage() {
                     : l("ReceiptDetail.couponDiscount") || "Coupon"}
                 </span>
                 <span className="text-xs font-semibold text-green-500">
-                  -{receipt.couponDiscount.toFixed(0)} {receipt.currency}
+                  -{receipt.couponDiscount.toFixed(2)} {receipt.currency}
                 </span>
               </div>
             )}
@@ -731,7 +731,7 @@ export default function ReceiptDetailPage() {
                     <span
                       className={`text-[11px] line-through ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
                     >
-                      {receipt.originalDeliveryPrice.toFixed(0)}{" "}
+                      {receipt.originalDeliveryPrice.toFixed(2)}{" "}
                       {receipt.currency}
                     </span>
                   )}
@@ -740,7 +740,7 @@ export default function ReceiptDetailPage() {
                 >
                   {receipt.deliveryPrice === 0
                     ? l("ReceiptDetail.free") || "Free"
-                    : `${receipt.deliveryPrice.toFixed(0)} ${receipt.currency}`}
+                    : `${receipt.deliveryPrice.toFixed(2)} ${receipt.currency}`}
                 </span>
               </span>
             </div>
@@ -766,7 +766,7 @@ export default function ReceiptDetailPage() {
                     {l("ReceiptDetail.youSaved") || "You Saved"}
                   </span>
                   <span className="text-xs font-bold text-green-600">
-                    {totalSavings.toFixed(0)} {receipt.currency}
+                    {totalSavings.toFixed(2)} {receipt.currency}
                   </span>
                 </div>
               </div>
@@ -786,7 +786,7 @@ export default function ReceiptDetailPage() {
                   {l("ReceiptDetail.total") || "Total"}
                 </span>
                 <span className="text-lg font-bold text-orange-600 dark:text-orange-400">
-                  {receipt.totalPrice.toFixed(0)} {receipt.currency}
+                  {receipt.totalPrice.toFixed(2)} {receipt.currency}
                 </span>
               </div>
             </div>

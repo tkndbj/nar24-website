@@ -244,7 +244,10 @@ export default function SoldProductsPage() {
   // Format price
   const formatPrice = (price: number, currency: string) => {
     return (
-      new Intl.NumberFormat("tr-TR").format(price) +
+      new Intl.NumberFormat("tr-TR", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(price) +
       " " +
       (currency === "TRY" ? "₺" : currency)
     );

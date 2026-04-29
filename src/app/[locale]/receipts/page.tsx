@@ -727,7 +727,7 @@ export default function ReceiptsPage() {
                         <span
                           className={`text-xs font-bold ${isDarkMode ? "text-orange-400" : "text-orange-600"}`}
                         >
-                          {receipt.totalPrice.toFixed(0)} {receipt.currency}
+                          {receipt.totalPrice.toFixed(2)} {receipt.currency}
                         </span>
                         <ChevronRight
                           className={`w-4 h-4 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
@@ -863,7 +863,7 @@ export default function ReceiptsPage() {
                         <span
                           className={`text-xs font-bold ${isDarkMode ? "text-orange-400" : "text-orange-600"}`}
                         >
-                          {receipt.totalPrice.toFixed(0)} {receipt.currency}
+                          {receipt.totalPrice.toFixed(2)} {receipt.currency}
                         </span>
                         <ChevronRight
                           className={`w-4 h-4 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
@@ -1045,7 +1045,7 @@ export default function ReceiptsPage() {
                       <span
                         className={`text-xs font-bold ${isDarkMode ? "text-emerald-400" : "text-emerald-600"}`}
                       >
-                        {receipt.totalPrice.toFixed(0)} {receipt.currency}
+                        {receipt.totalPrice.toFixed(2)} {receipt.currency}
                       </span>
                       <ChevronRight
                         className={`w-4 h-4 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}

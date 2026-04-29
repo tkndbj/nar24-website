@@ -807,7 +807,7 @@ export default function OrdersPage() {
                         <span
                           className={`text-xs font-bold ${isDarkMode ? "text-orange-400" : "text-orange-600"}`}
                         >
-                          ₺{transaction.price.toLocaleString()}
+                          ₺{transaction.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                         {(transaction.averageRating ?? 0) > 0 && (
                           <div className="flex items-center gap-0.5">

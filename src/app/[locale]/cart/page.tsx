@@ -25,7 +25,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { CompactBundleWidget } from "@/app/components/CompactBundle";
-import { useCart, CartTotals, CartItemTotal } from "@/context/CartProvider";
+import { useCart, CartTotals } from "@/context/CartProvider";
 import cartTotalsCache from "@/services/cart_totals_cache";
 import { useUser } from "@/context/UserProvider";
 import { useRouter } from "@/navigation";
@@ -44,7 +44,7 @@ import { useCoupon } from "@/context/CouponProvider";
 import { CouponProviders } from "@/context/CouponProviders";
 import Footer from "@/app/components/Footer";
 
-// Lazy load CartValidationDialog - only shown when validation needed
+// Lazy load CartValidationDialog
 const CartValidationDialog = dynamic(
   () => import("@/app/components/CartValidationDialog"),
   { ssr: false },
@@ -66,7 +66,6 @@ interface ValidatedCartItem {
   [key: string]: unknown;
 }
 
-// Type definitions matching CartProvider
 interface SalePreferences {
   discountThreshold?: number;
   bulkDiscountPercentage?: number;
@@ -111,7 +110,6 @@ function CartPageContent() {
   const { user, isLoading: isAuthLoading } = useUser();
   const localization = useTranslations();
 
-  // Dynamic import for AttributeLocalizationUtils
   const [AttributeLocalizationUtils, setAttributeLocalizationUtils] = useState<
     typeof AttributeLocalizationUtilsType | null
   >(null);
@@ -120,6 +118,7 @@ function CartPageContent() {
       setAttributeLocalizationUtils(() => mod.AttributeLocalizationUtils),
     );
   }, []);
+
   const {
     cartItems,
     cartCount,
@@ -127,23 +126,25 @@ function CartPageContent() {
     isLoadingMore,
     hasMore,
     isInitialized,
+    cartTotals,
+    isTotalsLoading,
     updateQuantity,
-    removeFromCart,   
+    removeFromCart,
+    loadCart,
     loadMoreItems,
     calculateCartTotals,
+    updateTotalsForExcluded,
     validateForPayment,
     updateCartCacheFromValidation,
     refresh,
   } = useCart();
 
-  // ✅ Coupon Service - for available coupons/benefits
   const {
     activeCoupons,
     activeFreeShippingBenefits,
     isFreeShippingApplicable,
   } = useCoupon();
 
-  // ✅ Discount Selection Service - for selected discounts (matches Flutter's DiscountSelectionService)
   const {
     selectedCoupon,
     selectedBenefit,
@@ -156,30 +157,20 @@ function CartPageContent() {
     revalidateSelections,
   } = useDiscountSelection();
 
-  // ✅ Theme detection
   const [isDark, setIsDark] = useState(false);
-
-  // ✅ Coupon sheet state
   const [showCouponSheet, setShowCouponSheet] = useState(false);
 
   const [salesPaused, setSalesPaused] = useState(false);
   const [pauseReason, setPauseReason] = useState("");
   const [showSalesPausedDialog, setShowSalesPausedDialog] = useState(false);
-  const totalsVerificationTimer = useRef<NodeJS.Timeout | null>(null);
+
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
-  const isLoadingMoreRef = useRef(false); // Prevents race conditions
+  const isLoadingMoreRef = useRef(false);
+
   const [deselectedProducts, setDeselectedProducts] = useState<Set<string>>(
     new Set(),
   );
-
-  // Totals state
-  const [calculatedTotals, setCalculatedTotals] = useState<CartTotals>({
-    total: 0,
-    currency: "TL",
-    items: [],
-  });
-  const [isCalculatingTotals, setIsCalculatingTotals] = useState(false);
 
   const [isValidating, setIsValidating] = useState(false);
   const [showValidationDialog, setShowValidationDialog] = useState(false);
@@ -189,6 +180,13 @@ function CartPageContent() {
     warnings: Record<string, ValidationMessage>;
     validatedItems: ValidatedCartItem[];
   } | null>(null);
+
+  // Use provider totals (matches Flutter's cartTotalsNotifier subscription)
+  const totals: CartTotals = cartTotals ?? {
+    total: 0,
+    currency: "TL",
+    items: [],
+  };
 
   // ========================================================================
   // THEME DETECTION
@@ -224,18 +222,15 @@ function CartPageContent() {
   const t = useCallback(
     (key: string, fallback?: string) => {
       if (!localization) return fallback ?? key;
-
       try {
         const translation = localization(`CartDrawer.${key}`);
         if (translation && translation !== `CartDrawer.${key}`) {
           return translation;
         }
-
         const directTranslation = localization(key);
         if (directTranslation && directTranslation !== key) {
           return directTranslation;
         }
-
         return fallback ?? key;
       } catch (error) {
         console.warn(`Translation error for key: ${key}`, error);
@@ -246,69 +241,59 @@ function CartPageContent() {
   );
 
   // ========================================================================
-  // COMPUTED VALUES (matching Flutter)
+  // COMPUTED VALUES
   // ========================================================================
 
-  // Check if user has any coupons or benefits available
   const hasAnyCouponsOrBenefits = useMemo(() => {
     return activeCoupons.length > 0 || activeFreeShippingBenefits.length > 0;
   }, [activeCoupons, activeFreeShippingBenefits]);
 
-  // Get selected item count
   const selectedIds = useMemo(() => {
     return cartItems
       .filter((item) => !deselectedProducts.has(item.productId))
       .map((item) => item.productId);
   }, [cartItems, deselectedProducts]);
 
-  // Calculate coupon discount amount
   const couponDiscount = useMemo(() => {
-    return calculateCouponDiscount(calculatedTotals.total);
-  }, [calculateCouponDiscount, calculatedTotals.total]);
+    return calculateCouponDiscount(totals.total);
+  }, [calculateCouponDiscount, totals.total]);
 
-  // Calculate final total after discounts
   const finalTotal = useMemo(() => {
-    return calculateFinalTotal(calculatedTotals.total);
-  }, [calculateFinalTotal, calculatedTotals.total]);
+    return calculateFinalTotal(totals.total);
+  }, [calculateFinalTotal, totals.total]);
 
+  // Auto-clear coupon if no longer applicable
   useEffect(() => {
-    if (selectedCoupon && couponDiscount === 0 && calculatedTotals.total > 0) {
-      // Coupon selected but not applicable
+    if (selectedCoupon && couponDiscount === 0 && totals.total > 0) {
       selectCoupon(null);
     }
-  }, [selectedCoupon, couponDiscount, calculatedTotals.total, selectCoupon]);
+  }, [selectedCoupon, couponDiscount, totals.total, selectCoupon]);
 
   // Auto-clear free shipping if no longer applicable
   useEffect(() => {
     if (
       useFreeShipping &&
-      !isFreeShippingApplicable(calculatedTotals.total) &&
-      calculatedTotals.total > 0
+      !isFreeShippingApplicable(totals.total) &&
+      totals.total > 0
     ) {
       setFreeShipping(false);
     }
-  }, [
-    useFreeShipping,
-    calculatedTotals.total,
-    isFreeShippingApplicable,
-    setFreeShipping,
-  ]);
+  }, [useFreeShipping, totals.total, isFreeShippingApplicable, setFreeShipping]);
 
   // ========================================================================
   // EFFECTS
   // ========================================================================
 
-  // Revalidate selections on app resume/focus (matching Flutter's didChangeAppLifecycleState)
+  // Revalidate selections on focus (matches Flutter's didChangeAppLifecycleState)
   useEffect(() => {
     const handleFocus = () => {
       revalidateSelections();
     };
-
     window.addEventListener("focus", handleFocus);
     return () => window.removeEventListener("focus", handleFocus);
   }, [revalidateSelections]);
 
-  // Listen to sales config in real-time
+  // Sales config — kept as live listener per user preference (better UX than Flutter's on-demand)
   useEffect(() => {
     const unsubscribe = onSnapshot(
       doc(db, "settings", "salesConfig"),
@@ -327,34 +312,27 @@ function CartPageContent() {
         setSalesPaused(false);
       },
     );
-
     return () => unsubscribe();
   }, []);
 
+  // Call loadCart() on every page mount (matches Flutter's didChangeDependencies behavior).
+  // loadCart has its own dedup guard inside the provider, so this is safe.
+  useEffect(() => {
+    if (!user) return;
+    loadCart();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.uid]);
 
-const hasTriggeredRefresh = useRef(false);
-useEffect(() => {
-  if (!user || !isInitialized) return;
-  if (hasTriggeredRefresh.current) return;
-  hasTriggeredRefresh.current = true;
-  refresh();
-  // hasTriggeredRefresh is declared inside the component, so it resets
-  // to false on every page mount — refresh() runs once per cart page visit
-}, [user, isInitialized]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Sync selections with cart items (matching Flutter's _syncSelections)
+  // Sync selections with cart items (matches Flutter's _syncSelections)
   useEffect(() => {
     if (cartItems.length === 0) {
       setDeselectedProducts(new Set());
       return;
     }
-
     const currentProductIds = new Set(cartItems.map((item) => item.productId));
-
     setDeselectedProducts((prev) => {
       const newDeselected = new Set<string>();
       prev.forEach((id) => {
-        // Only keep deselection if item still exists in cart
         if (currentProductIds.has(id)) {
           newDeselected.add(id);
         }
@@ -363,47 +341,41 @@ useEffect(() => {
     });
   }, [cartItems]);
 
-  // Cleanup timer on unmount
+  // Update totals whenever selection changes (delegates to provider)
   useEffect(() => {
-    return () => {
-      if (totalsVerificationTimer.current) {
-        clearTimeout(totalsVerificationTimer.current);
-      }
-    };
-  }, []);
+    const excludedIds = Array.from(deselectedProducts);
+    updateTotalsForExcluded(excludedIds);
+  }, [deselectedProducts, cartItems, updateTotalsForExcluded]);
+
+  // Invalidate totals cache on mount so cross-device changes are picked up
+  useEffect(() => {
+    if (user) cartTotalsCache.invalidateForUser(user.uid);
+  }, [user]);
 
   // ========================================================================
-  // INFINITE SCROLL - IntersectionObserver for reliable pagination
+  // INFINITE SCROLL
   // ========================================================================
 
-  // Stable loadMore handler that prevents race conditions
   const handleLoadMore = useCallback(async () => {
-    // Guard against concurrent loads using ref (more reliable than state)
     if (isLoadingMoreRef.current || !hasMore || isLoadingMore) {
       return;
     }
-
     isLoadingMoreRef.current = true;
     try {
       await loadMoreItems();
     } finally {
-      // Small delay before allowing next load to prevent rapid-fire calls
       setTimeout(() => {
         isLoadingMoreRef.current = false;
       }, 100);
     }
   }, [hasMore, isLoadingMore, loadMoreItems]);
 
-  // IntersectionObserver for automatic infinite scroll
   useEffect(() => {
     if (!user || cartCount === 0 || !hasMore) {
       return;
     }
-
     const sentinel = loadMoreSentinelRef.current;
-    if (!sentinel) {
-      return;
-    }
+    if (!sentinel) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -420,31 +392,21 @@ useEffect(() => {
       },
       {
         root: scrollContainerRef.current,
-        rootMargin: "200px", // Trigger 200px before reaching the sentinel
+        rootMargin: "200px",
         threshold: 0,
       },
     );
 
     observer.observe(sentinel);
-
-    return () => {
-      observer.disconnect();
-    };
+    return () => observer.disconnect();
   }, [user, cartCount, hasMore, isLoadingMore, handleLoadMore]);
 
-  // Fallback scroll handler for browsers with IntersectionObserver issues
   const handleScroll = useCallback(
     (e: UIEvent<HTMLDivElement>) => {
-      if (!hasMore || isLoadingMore || isLoadingMoreRef.current) {
-        return;
-      }
-
+      if (!hasMore || isLoadingMore || isLoadingMoreRef.current) return;
       const target = e.target as HTMLDivElement;
       const { scrollTop, scrollHeight, clientHeight } = target;
-
-      // Trigger load when user is within 300px of the bottom
       const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
-
       if (distanceFromBottom < 300) {
         handleLoadMore();
       }
@@ -452,110 +414,14 @@ useEffect(() => {
     [hasMore, isLoadingMore, handleLoadMore],
   );
 
-  // Invalidate totals cache on mount so cross-device changes are picked up
-  useEffect(() => {
-    if (user) cartTotalsCache.invalidateForUser(user.uid);
-  }, [user]);
-
-  useEffect(() => {
-    // Step 1: Immediate optimistic update
-    const optimistic = calculateOptimisticTotals();
-    setCalculatedTotals(optimistic);
-
-    if (selectedIds.length === 0) {
-      return;
-    }
-
-    // Step 2: Debounced server verification
-    setIsCalculatingTotals(true);
-
-    // Clear previous timer
-    if (totalsVerificationTimer.current) {
-      clearTimeout(totalsVerificationTimer.current);
-    }
-
-    totalsVerificationTimer.current = setTimeout(async () => {
-      try {
-        // ✅ Pass excluded IDs to Cloud Function (matching Flutter)
-        const excludedIds = Array.from(deselectedProducts);
-        const serverTotals = await calculateCartTotals(
-          excludedIds.length > 0 ? excludedIds : undefined,
-        );
-        setCalculatedTotals(serverTotals);
-      } catch (error) {
-        console.error("Server totals failed, using optimistic:", error);
-      } finally {
-        setIsCalculatingTotals(false);
-      }
-    }, 500); // 500ms debounce (matches Flutter)
-
-    return () => {
-      if (totalsVerificationTimer.current) {
-        clearTimeout(totalsVerificationTimer.current);
-      }
-    };
-  }, [deselectedProducts, cartItems, calculateCartTotals, selectedIds.length]);
-
   // ========================================================================
   // HELPER FUNCTIONS
   // ========================================================================
 
-  const calculateOptimisticTotals = useCallback((): CartTotals => {
-    if (selectedIds.length === 0) {
-      return { total: 0, currency: "TL", items: [] };
-    }
-
-    const selectedItems = cartItems.filter((item) =>
-      selectedIds.includes(item.productId),
-    );
-
-    let total = 0;
-    const currency = selectedItems[0]?.product?.currency || "TL";
-    const items: CartItemTotal[] = [];
-
-    for (const item of selectedItems) {
-      const quantity = item.quantity || 1;
-      let unitPrice = item.product?.price || 0;
-
-      // Apply bulk discount if applicable
-      const salePrefs = item.salePreferences || item.salePreferenceInfo;
-      const discountThreshold = salePrefs?.discountThreshold;
-      const bulkDiscountPercentage = salePrefs?.bulkDiscountPercentage;
-
-      if (
-        discountThreshold &&
-        bulkDiscountPercentage &&
-        quantity >= discountThreshold
-      ) {
-        unitPrice = unitPrice * (1 - bulkDiscountPercentage / 100);
-      }
-
-      const itemTotal = unitPrice * quantity;
-      total += itemTotal;
-
-      items.push({
-        productId: item.productId,
-        unitPrice,
-        total: itemTotal,
-        quantity,
-        isBundleItem: false,
-      });
-    }
-
-    return {
-      total: Math.round(total * 100) / 100,
-      currency,
-      items,
-    };
-  }, [cartItems, selectedIds]);
-
-  // Get available stock for item (matching Flutter logic)
   const getAvailableStock = useCallback((item: CartItem): number => {
     const product = item.product;
     if (!product) return 0;
-
     const selectedColor = item.cartData?.selectedColor;
-
     if (
       selectedColor &&
       selectedColor !== "" &&
@@ -564,15 +430,12 @@ useEffect(() => {
     ) {
       return product.colorQuantities[selectedColor] || 0;
     }
-
     return product.quantity || 0;
   }, []);
 
-  // Format attributes for display
   const formatItemAttributes = useCallback(
     (item: CartItem) => {
       if (!localization) return "";
-
       const excludedKeys = [
         "productId",
         "cartData",
@@ -592,24 +455,20 @@ useEffect(() => {
         "addedAt",
         "updatedAt",
         "showSellerHeader",
+        "selectedAttributes",
       ];
-
       const displayValues: string[] = [];
 
-      // Handle selected color from cartData
       if (
         item.cartData?.selectedColor &&
         item.cartData.selectedColor !== "default"
       ) {
         displayValues.push(item.cartData.selectedColor);
       }
-
-      // Handle selected size from cartData
       if (item.cartData?.selectedSize) {
         displayValues.push(item.cartData.selectedSize);
       }
 
-      // Process other attributes - only include primitive values (string/number)
       Object.entries(item).forEach(([key, value]) => {
         if (
           !excludedKeys.includes(key) &&
@@ -637,10 +496,9 @@ useEffect(() => {
           }
         }
       });
-
       return displayValues.join(", ");
     },
-    [localization],
+    [localization, AttributeLocalizationUtils],
   );
 
   // ========================================================================
@@ -670,7 +528,7 @@ useEffect(() => {
   );
 
   // ========================================================================
-  // COUPON HANDLERS (matching Flutter)
+  // COUPON HANDLERS
   // ========================================================================
 
   const handleCouponSelected = useCallback(
@@ -682,7 +540,6 @@ useEffect(() => {
 
   const handleFreeShippingToggled = useCallback(
     (use: boolean, benefit?: UserBenefit | null) => {
-      // Find the first valid free shipping benefit if toggling on and no benefit provided
       const benefitToUse =
         use && !benefit && activeFreeShippingBenefits.length > 0
           ? activeFreeShippingBenefits[0]
@@ -697,30 +554,33 @@ useEffect(() => {
   }, []);
 
   // ========================================================================
-  // CHECKOUT (matching Flutter's _proceedToCheckout)
+  // CHECKOUT — Matches Flutter's _proceedToCheckout
   // ========================================================================
 
   const proceedToPayment = useCallback(
     async (freshTotals: CartTotals) => {
-        // ✅ FIX 2b: Final safety gate — never navigate with 0 total
-    if (freshTotals.total <= 0) {
-      alert(t("totalCalculationFailed", "Invalid total. Please refresh and try again."));
-      return;
-    }
-      // Build pricing map from Cloud Function totals
-      const pricingMap = new Map<string, CartItemTotal>();
+      // Final safety gate — never navigate with 0 total
+      if (freshTotals.total <= 0) {
+        alert(
+          t(
+            "totalCalculationFailed",
+            "Invalid total. Please refresh and try again.",
+          ),
+        );
+        return;
+      }
+
+      const pricingMap = new Map<string, unknown>();
       freshTotals.items.forEach((itemTotal) => {
         pricingMap.set(itemTotal.productId, itemTotal);
       });
 
-      // Filter cart items to only include those with calculated pricing
       const itemsWithPricing = cartItems.filter(
         (item) =>
           selectedIds.includes(item.productId) &&
           pricingMap.has(item.productId),
       );
 
-      // Check if we lost any items
       if (itemsWithPricing.length !== selectedIds.length) {
         const missingIds = selectedIds.filter((id) => !pricingMap.has(id));
         console.error("❌ Missing pricing for items:", missingIds);
@@ -733,7 +593,6 @@ useEffect(() => {
         return;
       }
 
-      // Store checkout data in sessionStorage
       if (typeof window !== "undefined") {
         sessionStorage.setItem(
           "checkoutSelectedIds",
@@ -742,8 +601,6 @@ useEffect(() => {
             timestamp: Date.now(),
           }),
         );
-
-        // ✅ Store discount selections (matching Flutter's passing to ProductPaymentScreen)
         sessionStorage.setItem(
           "checkoutDiscounts",
           JSON.stringify({
@@ -782,44 +639,42 @@ useEffect(() => {
     setIsValidating(true);
 
     try {
-      // STEP 1: Validate cart
       const validation = await validateForPayment(selectedIds, false);
 
-      if (validation.isValid && Object.keys(validation.warnings).length === 0) {
-        // STEP 2: Calculate FRESH totals with retry
+      // Check for system error (validation service failed)
+      const systemError = validation.errors._system;
+      if (systemError?.key === "validation_service_unavailable") {
+        setIsValidating(false);
+        alert(
+          t(
+            "serviceUnavailable",
+            "Service temporarily unavailable. Please try again.",
+          ),
+        );
+        return;
+      }
+
+      if (
+        validation.isValid &&
+        Object.keys(validation.warnings).length === 0
+      ) {
+        // Calculate fresh totals before payment
         console.log("💰 Calculating fresh totals before payment...");
 
-        let freshTotals: CartTotals | null = null;
-        let retries = 3;
-
         const excludedIds = Array.from(deselectedProducts);
+        const freshTotals = await calculateCartTotals(
+          excludedIds.length > 0 ? excludedIds : undefined,
+        );
 
-        while (retries > 0) {
-          try {
-            freshTotals = await calculateCartTotals(
-              excludedIds.length > 0 ? excludedIds : undefined,
-            );
-            break;
-          } catch (error) {
-            if (
-              error instanceof Error &&
-              error.message.includes("Too many requests") &&
-              retries > 1
-            ) {
-              console.log(
-                `⏳ Rate limited, waiting 2s... (${retries - 1} retries left)`,
-              );
-              await new Promise((resolve) => setTimeout(resolve, 2000));
-              retries--;
-            } else {
-              throw new Error("Failed to calculate fresh totals");
-            }
-          }
-        }
-
-        // STEP 3: Validate totals before proceeding
         if (!freshTotals || freshTotals.total <= 0) {
-          throw new Error("Invalid totals calculated");
+          setIsValidating(false);
+          alert(
+            t(
+              "totalCalculationFailed",
+              "Could not calculate total. Please try again.",
+            ),
+          );
+          return;
         }
 
         console.log("💰 Fresh totals:", freshTotals);
@@ -852,40 +707,43 @@ useEffect(() => {
 
   const handleValidationContinue = useCallback(async () => {
     if (!validationResult) return;
-  
+
     setIsValidating(true);
     setShowValidationDialog(false);
-  
+
     try {
+      // Update cache with fresh validated values (matches Flutter)
       if (validationResult.validatedItems.length > 0) {
         await updateCartCacheFromValidation(validationResult.validatedItems);
       }
-  
-      const errorIds = Object.keys(validationResult.errors);
+
+      // Remove error items from selection
+      const errorIds = Object.keys(validationResult.errors).filter(
+        (k) => k !== "_system",
+      );
       setDeselectedProducts((prev) => {
         const newSet = new Set(prev);
         errorIds.forEach((id) => newSet.add(id));
         return newSet;
       });
-  
+
+      // Use validatedItems (which have fresh prices) — matches Flutter
       const validIds = validationResult.validatedItems
         .map((item) => item.productId)
         .filter((id) => !errorIds.includes(id));
-  
+
       if (validIds.length === 0) {
         setIsValidating(false);
         alert(t("noValidItemsToCheckout", "No valid items to checkout"));
         return;
       }
-  
-      // ✅ FIX 1a: Refresh local cart state so it reflects updated Firestore docs
-      await refresh();
-  
-      // ✅ FIX 1b: Invalidate local totals cache — prevents stale cache hit
+
+      // Invalidate cache so we get fresh totals
       if (user) {
         cartTotalsCache.invalidateForUser(user.uid);
       }
-  
+
+      // Calculate totals from validated items (using their IDs as the selected set)
       const allProductIds = cartItems.map((item) => item.productId);
       const excludedForTotals = allProductIds.filter(
         (id) => !validIds.includes(id),
@@ -893,46 +751,56 @@ useEffect(() => {
       const freshTotals = await calculateCartTotals(
         excludedForTotals.length > 0 ? excludedForTotals : undefined,
       );
-  
-      // ✅ FIX 2a: Never proceed with 0 total
+
       if (!freshTotals || freshTotals.total <= 0) {
         setIsValidating(false);
-        alert(t("totalCalculationFailed", "Could not calculate total. Please try again."));
+        alert(
+          t(
+            "totalCalculationFailed",
+            "Could not calculate total. Please try again.",
+          ),
+        );
         return;
       }
-  
+
       setIsValidating(false);
       proceedToPayment(freshTotals);
     } catch (error) {
       setIsValidating(false);
       console.error("❌ Validation continue error:", error);
-      alert(t("validationFailed", "Checkout failed. Please wait a moment and try again."));
+      alert(
+        t(
+          "validationFailed",
+          "Checkout failed. Please wait a moment and try again.",
+        ),
+      );
     }
   }, [
     validationResult,
     updateCartCacheFromValidation,
     calculateCartTotals,
     proceedToPayment,
-    refresh,
     user,
     cartItems,
     t,
   ]);
 
   // ========================================================================
-  // PRICE BREAKDOWN COMPONENT (matching Flutter's _buildPriceBreakdown)
+  // PRICE BREAKDOWN
   // ========================================================================
 
   const renderPriceBreakdown = useCallback(() => {
     if (!hasAnyDiscount) return null;
-
-    const subtotal = calculatedTotals.total;
+    const subtotal = totals.total;
 
     return (
       <div
-        className={`p-3 rounded-xl mb-3 border ${isDark ? "bg-emerald-900/15 border-emerald-800/40" : "bg-emerald-50/50 border-emerald-200"}`}
+        className={`p-3 rounded-xl mb-3 border ${
+          isDark
+            ? "bg-emerald-900/15 border-emerald-800/40"
+            : "bg-emerald-50/50 border-emerald-200"
+        }`}
       >
-        {/* Subtotal row */}
         <div className="flex justify-between items-center">
           <span
             className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}
@@ -942,11 +810,10 @@ useEffect(() => {
           <span
             className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}
           >
-            {subtotal.toFixed(2)} {calculatedTotals.currency}
+            {subtotal.toFixed(2)} {totals.currency}
           </span>
         </div>
 
-        {/* Coupon discount row */}
         {couponDiscount > 0 && (
           <div className="flex justify-between items-center mt-1.5">
             <div className="flex items-center space-x-1">
@@ -956,12 +823,11 @@ useEffect(() => {
               </span>
             </div>
             <span className="text-xs font-semibold text-emerald-600">
-              -{couponDiscount.toFixed(2)} {calculatedTotals.currency}
+              -{couponDiscount.toFixed(2)} {totals.currency}
             </span>
           </div>
         )}
 
-        {/* Free shipping row */}
         {useFreeShipping && (
           <div className="flex justify-between items-center mt-1.5">
             <div className="flex items-center space-x-1">
@@ -977,24 +843,10 @@ useEffect(() => {
         )}
       </div>
     );
-  }, [
-    hasAnyDiscount,
-    calculatedTotals,
-    couponDiscount,
-    selectedCoupon,
-    useFreeShipping,
-    isDark,
-    t,
-  ]);
-
-  // ========================================================================
-  // COMPACT COUPON BUTTON (matching Flutter's _buildCompactCouponButton)
-  // ========================================================================
+  }, [hasAnyDiscount, totals, couponDiscount, selectedCoupon, useFreeShipping, isDark, t]);
 
   const renderCompactCouponButton = useCallback(() => {
     if (!hasAnyCouponsOrBenefits) return null;
-
-    // Count applied discounts (matching Flutter logic)
     const appliedCount = (selectedCoupon ? 1 : 0) + (useFreeShipping ? 1 : 0);
 
     return (
@@ -1048,7 +900,6 @@ useEffect(() => {
       );
       const attributesDisplay = formatItemAttributes(item);
 
-      // Calculate effective unit price and subtotal
       let effectivePrice = item.product?.price || 0;
       const hasBulkDiscount =
         salePrefs?.discountThreshold &&
@@ -1063,29 +914,42 @@ useEffect(() => {
 
       return (
         <div key={item.productId}>
-          {/* Seller Header - spans full width */}
           {item.showSellerHeader && (
-  <div className={`flex items-center space-x-1.5 px-2 py-1.5 mb-1 rounded-lg ${
-    isDark ? "bg-gray-800/60" : "bg-orange-500"
-  }`}>
-    {item.isShop ? (
-      <ShoppingBag size={11} className={isDark ? "text-orange-500" : "text-white"} />
-    ) : (
-      <User size={11} className={isDark ? "text-orange-500" : "text-white"} />
-    )}
-    <span className={`text-[11px] font-medium ${isDark ? "text-gray-300" : "text-white"}`}>
-      {item.sellerName}
-    </span>
-  </div>
-)}
+            <div
+              className={`flex items-center space-x-1.5 px-2 py-1.5 mb-1 rounded-lg ${
+                isDark ? "bg-gray-800/60" : "bg-orange-500"
+              }`}
+            >
+              {item.isShop ? (
+                <ShoppingBag
+                  size={11}
+                  className={isDark ? "text-orange-500" : "text-white"}
+                />
+              ) : (
+                <User
+                  size={11}
+                  className={isDark ? "text-orange-500" : "text-white"}
+                />
+              )}
+              <span
+                className={`text-[11px] font-medium ${
+                  isDark ? "text-gray-300" : "text-white"
+                }`}
+              >
+                {item.sellerName}
+              </span>
+            </div>
+          )}
 
-          {/* Item Row */}
           <div
-            className={`py-4 px-2 sm:px-0 ${index < cartItems.length - 1 ? `border-b ${isDark ? "border-gray-800/60" : "border-gray-100"}` : ""}`}
+            className={`py-4 px-2 sm:px-0 ${
+              index < cartItems.length - 1
+                ? `border-b ${isDark ? "border-gray-800/60" : "border-gray-100"}`
+                : ""
+            }`}
           >
             {/* Desktop layout */}
             <div className="hidden lg:grid lg:grid-cols-[auto_auto_1fr_100px_120px_100px_auto] lg:items-center lg:gap-4">
-              {/* Checkbox */}
               <div
                 onClick={(e) => {
                   e.stopPropagation();
@@ -1110,7 +974,6 @@ useEffect(() => {
                 />
               </div>
 
-              {/* Image */}
               <div
                 className={`relative w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden cursor-pointer border ${
                   isDark ? "border-gray-700" : "border-gray-200"
@@ -1131,58 +994,68 @@ useEffect(() => {
                 />
               </div>
 
-              {/* Product Info */}
               <div
                 className="min-w-0 cursor-pointer"
                 onClick={() => router.push(`/productdetail/${item.productId}`)}
               >
                 {item.product?.brandModel && (
                   <p
-                    className={`text-[10px] font-medium mb-0.5 ${isDark ? "text-blue-400" : "text-blue-600"}`}
+                    className={`text-[10px] font-medium mb-0.5 ${
+                      isDark ? "text-blue-400" : "text-blue-600"
+                    }`}
                   >
                     {item.product.brandModel}
                   </p>
                 )}
                 <h3
-                  className={`text-sm font-medium line-clamp-2 leading-snug ${isDark ? "text-white" : "text-gray-900"}`}
+                  className={`text-sm font-medium line-clamp-2 leading-snug ${
+                    isDark ? "text-white" : "text-gray-900"
+                  }`}
                 >
                   {item.product?.productName ||
                     t("loadingProduct", "Loading...")}
                 </h3>
                 {attributesDisplay && (
                   <p
-                    className={`text-[11px] mt-0.5 ${isDark ? "text-gray-500" : "text-gray-400"}`}
+                    className={`text-[11px] mt-0.5 ${
+                      isDark ? "text-gray-500" : "text-gray-400"
+                    }`}
                   >
                     {attributesDisplay}
                   </p>
                 )}
                 {availableStock < 10 && (
                   <p className="text-[10px] text-red-500 mt-0.5">
-                    {t("onlyLeft", "Only")} {availableStock} {t("left", "left")}
+                    {t("onlyLeft", "Only")} {availableStock}{" "}
+                    {t("left", "left")}
                   </p>
                 )}
               </div>
 
-              {/* Price */}
               <div className="text-right">
                 <span
-                  className={`text-sm font-semibold ${isDark ? "text-gray-200" : "text-gray-800"}`}
+                  className={`text-sm font-semibold ${
+                    isDark ? "text-gray-200" : "text-gray-800"
+                  }`}
                 >
                   {effectivePrice.toFixed(2)} {currency}
                 </span>
                 {hasBulkDiscount && (
                   <p
-                    className={`text-[10px] line-through ${isDark ? "text-gray-600" : "text-gray-400"}`}
+                    className={`text-[10px] line-through ${
+                      isDark ? "text-gray-600" : "text-gray-400"
+                    }`}
                   >
                     {item.product?.price.toFixed(2)} {currency}
                   </p>
                 )}
               </div>
 
-              {/* Quantity */}
               <div className="flex items-center justify-center">
                 <div
-                  className={`inline-flex items-center rounded-lg border ${isDark ? "border-gray-700" : "border-gray-200"}`}
+                  className={`inline-flex items-center rounded-lg border ${
+                    isDark ? "border-gray-700" : "border-gray-200"
+                  }`}
                 >
                   <button
                     onClick={(e) => {
@@ -1201,7 +1074,9 @@ useEffect(() => {
                     <Minus size={13} />
                   </button>
                   <span
-                    className={`min-w-[32px] text-center text-sm font-semibold ${isDark ? "text-white" : "text-gray-900"}`}
+                    className={`min-w-[32px] text-center text-sm font-semibold ${
+                      isDark ? "text-white" : "text-gray-900"
+                    }`}
                   >
                     {item.quantity}
                   </span>
@@ -1224,16 +1099,16 @@ useEffect(() => {
                 </div>
               </div>
 
-              {/* Subtotal */}
               <div className="text-right">
                 <span
-                  className={`text-sm font-bold ${isDark ? "text-white" : "text-gray-900"}`}
+                  className={`text-sm font-bold ${
+                    isDark ? "text-white" : "text-gray-900"
+                  }`}
                 >
                   {subtotal.toFixed(2)} {currency}
                 </span>
               </div>
 
-              {/* Remove */}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -1253,7 +1128,6 @@ useEffect(() => {
             {/* Mobile layout */}
             <div className="lg:hidden">
               <div className="flex items-start space-x-2 sm:space-x-3">
-                {/* Checkbox */}
                 <div
                   onClick={(e) => {
                     e.stopPropagation();
@@ -1278,7 +1152,6 @@ useEffect(() => {
                   />
                 </div>
 
-                {/* Image */}
                 <div
                   className={`relative w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden cursor-pointer border ${
                     isDark ? "border-gray-700" : "border-gray-200"
@@ -1301,7 +1174,6 @@ useEffect(() => {
                   />
                 </div>
 
-                {/* Details */}
                 <div className="flex-1 min-w-0">
                   <div
                     className="cursor-pointer"
@@ -1311,20 +1183,26 @@ useEffect(() => {
                   >
                     {item.product?.brandModel && (
                       <p
-                        className={`text-[10px] font-medium mb-0.5 ${isDark ? "text-blue-400" : "text-blue-600"}`}
+                        className={`text-[10px] font-medium mb-0.5 ${
+                          isDark ? "text-blue-400" : "text-blue-600"
+                        }`}
                       >
                         {item.product.brandModel}
                       </p>
                     )}
                     <h3
-                      className={`text-sm font-medium line-clamp-2 leading-snug ${isDark ? "text-white" : "text-gray-900"}`}
+                      className={`text-sm font-medium line-clamp-2 leading-snug ${
+                        isDark ? "text-white" : "text-gray-900"
+                      }`}
                     >
                       {item.product?.productName ||
                         t("loadingProduct", "Loading...")}
                     </h3>
                     {attributesDisplay && (
                       <p
-                        className={`text-[11px] mt-0.5 ${isDark ? "text-gray-500" : "text-gray-400"}`}
+                        className={`text-[11px] mt-0.5 ${
+                          isDark ? "text-gray-500" : "text-gray-400"
+                        }`}
                       >
                         {attributesDisplay}
                       </p>
@@ -1335,7 +1213,9 @@ useEffect(() => {
                     {subtotal.toFixed(2)} {currency}
                     {item.quantity > 1 && (
                       <span
-                        className={`text-[10px] font-normal ml-1.5 ${isDark ? "text-gray-500" : "text-gray-400"}`}
+                        className={`text-[10px] font-normal ml-1.5 ${
+                          isDark ? "text-gray-500" : "text-gray-400"
+                        }`}
                       >
                         ({effectivePrice.toFixed(2)} x {item.quantity})
                       </span>
@@ -1349,10 +1229,11 @@ useEffect(() => {
                     </p>
                   )}
 
-                  {/* Mobile: Quantity + Remove row */}
                   <div className="flex items-center justify-between mt-2">
                     <div
-                      className={`inline-flex items-center rounded-lg border ${isDark ? "border-gray-700" : "border-gray-200"}`}
+                      className={`inline-flex items-center rounded-lg border ${
+                        isDark ? "border-gray-700" : "border-gray-200"
+                      }`}
                     >
                       <button
                         onClick={(e) => {
@@ -1374,7 +1255,9 @@ useEffect(() => {
                         <Minus size={13} />
                       </button>
                       <span
-                        className={`min-w-[28px] text-center text-xs font-semibold ${isDark ? "text-white" : "text-gray-900"}`}
+                        className={`min-w-[28px] text-center text-xs font-semibold ${
+                          isDark ? "text-white" : "text-gray-900"
+                        }`}
                       >
                         {item.quantity}
                       </span>
@@ -1449,7 +1332,6 @@ useEffect(() => {
                 </div>
               )}
 
-            {/* Compact Bundle Widget */}
             {item.isShop && item.sellerId && (
               <div className="mt-2 lg:ml-[88px]">
                 <CompactBundleWidget
@@ -1483,10 +1365,11 @@ useEffect(() => {
 
   return (
     <div
-      className={`min-h-screen flex flex-col transition-colors duration-200 ${isDark ? "bg-gray-950" : "bg-gray-50"}`}
+      className={`min-h-screen flex flex-col transition-colors duration-200 ${
+        isDark ? "bg-gray-950" : "bg-gray-50"
+      }`}
     >
       <div className="max-w-6xl mx-auto px-0 sm:px-4 pt-4 pb-0 lg:px-8 lg:pt-8 lg:pb-8 flex-1 w-full">
-        {/* Back Button */}
         <div className="mb-4 lg:mb-6 px-2 sm:px-0">
           <button
             onClick={() => router.back()}
@@ -1500,18 +1383,22 @@ useEffect(() => {
           </button>
         </div>
 
-        {/* Auth Loading */}
         {isAuthLoading ? (
           <div className="flex flex-col items-center py-20">
             <div className="w-6 h-6 border-[2px] border-orange-200 border-t-orange-500 rounded-full animate-spin" />
           </div>
         ) : !user ? (
-          /* Not Authenticated */
           <div
-            className={`max-w-md mx-auto rounded-2xl border shadow-sm p-8 text-center ${isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"}`}
+            className={`max-w-md mx-auto rounded-2xl border shadow-sm p-8 text-center ${
+              isDark
+                ? "bg-gray-900 border-gray-800"
+                : "bg-white border-gray-100"
+            }`}
           >
             <div
-              className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4 ${isDark ? "bg-gray-800" : "bg-gray-100"}`}
+              className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4 ${
+                isDark ? "bg-gray-800" : "bg-gray-100"
+              }`}
             >
               <User
                 size={24}
@@ -1519,12 +1406,16 @@ useEffect(() => {
               />
             </div>
             <h3
-              className={`text-base font-bold mb-1.5 ${isDark ? "text-white" : "text-gray-900"}`}
+              className={`text-base font-bold mb-1.5 ${
+                isDark ? "text-white" : "text-gray-900"
+              }`}
             >
               {t("loginRequired", "Login Required")}
             </h3>
             <p
-              className={`text-sm mb-5 leading-relaxed ${isDark ? "text-gray-500" : "text-gray-500"}`}
+              className={`text-sm mb-5 leading-relaxed ${
+                isDark ? "text-gray-500" : "text-gray-500"
+              }`}
             >
               {t("loginToViewCart", "Please log in to view your cart")}
             </p>
@@ -1537,7 +1428,6 @@ useEffect(() => {
             </button>
           </div>
         ) : isLoading && !isInitialized ? (
-          /* Cart Loading */
           <div className="flex flex-col items-center py-20">
             <div className="w-6 h-6 border-[2px] border-orange-200 border-t-orange-500 rounded-full animate-spin mb-3" />
             <p
@@ -1547,7 +1437,6 @@ useEffect(() => {
             </p>
           </div>
         ) : cartCount === 0 ? (
-          /* Empty Cart */
           <div className="flex flex-col items-center py-16">
             <Image
               src="/images/empty-product2.png"
@@ -1557,12 +1446,16 @@ useEffect(() => {
               className="mb-6 opacity-90"
             />
             <h3
-              className={`text-lg font-bold mb-1.5 ${isDark ? "text-white" : "text-gray-900"}`}
+              className={`text-lg font-bold mb-1.5 ${
+                isDark ? "text-white" : "text-gray-900"
+              }`}
             >
               {t("emptyCart", "Your cart is empty")}
             </h3>
             <p
-              className={`text-sm mb-6 ${isDark ? "text-gray-500" : "text-gray-400"}`}
+              className={`text-sm mb-6 ${
+                isDark ? "text-gray-500" : "text-gray-400"
+              }`}
             >
               {t("emptyCartDescription", "Start shopping to add items")}
             </p>
@@ -1575,54 +1468,64 @@ useEffect(() => {
             </button>
           </div>
         ) : (
-          /* Cart with Items - Two Column Layout */
           <div className="flex flex-col lg:flex-row lg:gap-8">
             {/* Left: Cart Items */}
             <div className="flex-1 min-w-0">
-              {/* Title */}
               <div className="flex items-center space-x-3 mb-4 px-2 sm:px-0">
                 <h1
-                  className={`text-xl font-bold ${isDark ? "text-white" : "text-gray-900"}`}
+                  className={`text-xl font-bold ${
+                    isDark ? "text-white" : "text-gray-900"
+                  }`}
                 >
                   {t("title", "My Cart")}
                 </h1>
                 <span
-                  className={`text-sm ${isDark ? "text-gray-500" : "text-gray-400"}`}
+                  className={`text-sm ${
+                    isDark ? "text-gray-500" : "text-gray-400"
+                  }`}
                 >
                   ({cartCount} {t("itemsCount", "items")})
                 </span>
               </div>
 
-              {/* Column Headers - desktop only */}
               <div
-                className={`hidden lg:grid lg:grid-cols-[auto_auto_1fr_100px_120px_100px_auto] lg:gap-4 lg:items-center px-0 pb-3 mb-1 border-b ${isDark ? "border-gray-800" : "border-gray-200"}`}
+                className={`hidden lg:grid lg:grid-cols-[auto_auto_1fr_100px_120px_100px_auto] lg:gap-4 lg:items-center px-0 pb-3 mb-1 border-b ${
+                  isDark ? "border-gray-800" : "border-gray-200"
+                }`}
               >
                 <div className="w-4" />
                 <div className="w-16" />
                 <span
-                  className={`text-xs font-semibold uppercase tracking-wider ${isDark ? "text-gray-500" : "text-gray-400"}`}
+                  className={`text-xs font-semibold uppercase tracking-wider ${
+                    isDark ? "text-gray-500" : "text-gray-400"
+                  }`}
                 >
                   {t("product", "Product")}
                 </span>
                 <span
-                  className={`text-xs font-semibold uppercase tracking-wider text-right ${isDark ? "text-gray-500" : "text-gray-400"}`}
+                  className={`text-xs font-semibold uppercase tracking-wider text-right ${
+                    isDark ? "text-gray-500" : "text-gray-400"
+                  }`}
                 >
                   {t("price", "Price")}
                 </span>
                 <span
-                  className={`text-xs font-semibold uppercase tracking-wider text-center ${isDark ? "text-gray-500" : "text-gray-400"}`}
+                  className={`text-xs font-semibold uppercase tracking-wider text-center ${
+                    isDark ? "text-gray-500" : "text-gray-400"
+                  }`}
                 >
                   {t("quantity", "Quantity")}
                 </span>
                 <span
-                  className={`text-xs font-semibold uppercase tracking-wider text-right ${isDark ? "text-gray-500" : "text-gray-400"}`}
+                  className={`text-xs font-semibold uppercase tracking-wider text-right ${
+                    isDark ? "text-gray-500" : "text-gray-400"
+                  }`}
                 >
                   {t("subtotal", "Subtotal")}
                 </span>
                 <div className="w-[30px]" />
               </div>
 
-              {/* Items List */}
               <div
                 ref={scrollContainerRef}
                 onScroll={
@@ -1631,7 +1534,6 @@ useEffect(() => {
               >
                 {renderCartItems}
 
-                {/* Infinite Scroll Sentinel & Loading Indicator */}
                 {hasMore && (
                   <div
                     ref={loadMoreSentinelRef}
@@ -1642,7 +1544,9 @@ useEffect(() => {
                       <div className="flex items-center space-x-2">
                         <div className="w-4 h-4 border-[2px] border-orange-200 border-t-orange-500 rounded-full animate-spin" />
                         <span
-                          className={`text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}
+                          className={`text-xs ${
+                            isDark ? "text-gray-500" : "text-gray-400"
+                          }`}
                         >
                           {t("loadingMore", "Loading more...")}
                         </span>
@@ -1664,21 +1568,25 @@ useEffect(() => {
               </div>
             </div>
 
-            {/* Right: Order Summary — bottom of page on mobile, sidebar on desktop */}
+            {/* Right: Order Summary */}
             <div className="w-full lg:w-[380px] lg:flex-shrink-0 mt-4 lg:mt-0">
               <div className="lg:sticky lg:top-6">
                 <div
-                  className={`rounded-none lg:rounded-2xl border-t lg:border shadow-sm ${isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"}`}
+                  className={`rounded-none lg:rounded-2xl border-t lg:border shadow-sm ${
+                    isDark
+                      ? "bg-gray-900 border-gray-800"
+                      : "bg-white border-gray-100"
+                  }`}
                 >
                   <div className="px-4 py-3 sm:px-6 sm:py-5">
-                    {/* Order Summary Title */}
                     <h2
-                      className={`text-sm font-bold mb-4 ${isDark ? "text-white" : "text-gray-900"}`}
+                      className={`text-sm font-bold mb-4 ${
+                        isDark ? "text-white" : "text-gray-900"
+                      }`}
                     >
                       {t("orderSummary", "Order Summary")}
                     </h2>
 
-                    {/* Sales Paused Banner */}
                     {salesPaused && (
                       <div
                         className={`mb-3 p-3 rounded-xl border flex items-start space-x-2 ${
@@ -1701,7 +1609,9 @@ useEffect(() => {
                           />
                         </svg>
                         <p
-                          className={`text-xs font-medium ${isDark ? "text-orange-400" : "text-orange-700"}`}
+                          className={`text-xs font-medium ${
+                            isDark ? "text-orange-400" : "text-orange-700"
+                          }`}
                         >
                           {pauseReason ||
                             t(
@@ -1712,34 +1622,38 @@ useEffect(() => {
                       </div>
                     )}
 
-                    {/* Price Breakdown */}
                     {renderPriceBreakdown()}
 
-                    {/* Total Row + Coupon Button */}
                     <div className="flex items-end justify-between mb-4">
                       <div className="flex flex-col">
                         <span
-                          className={`text-[10px] ${isDark ? "text-gray-600" : "text-gray-400"}`}
+                          className={`text-[10px] ${
+                            isDark ? "text-gray-600" : "text-gray-400"
+                          }`}
                         >
                           {selectedIds.length} {t("items", "items")}
                         </span>
                         <div className="flex items-baseline space-x-2 mt-0.5">
                           {couponDiscount > 0 && (
                             <span
-                              className={`text-xs line-through ${isDark ? "text-gray-600" : "text-gray-400"}`}
+                              className={`text-xs line-through ${
+                                isDark ? "text-gray-600" : "text-gray-400"
+                              }`}
                             >
-                              {calculatedTotals.total.toFixed(2)}{" "}
-                              {calculatedTotals.currency}
+                              {totals.total.toFixed(2)} {totals.currency}
                             </span>
                           )}
-                          {isCalculatingTotals ? (
+                          {isTotalsLoading ? (
                             <div className="w-5 h-5 border-[2px] border-orange-200 border-t-orange-500 rounded-full animate-spin" />
                           ) : (
                             <span
-                              className={`text-xl font-bold ${hasAnyDiscount ? "text-emerald-500" : "text-orange-500"}`}
+                              className={`text-xl font-bold ${
+                                hasAnyDiscount
+                                  ? "text-emerald-500"
+                                  : "text-orange-500"
+                              }`}
                             >
-                              {finalTotal.toFixed(2)}{" "}
-                              {calculatedTotals.currency}
+                              {finalTotal.toFixed(2)} {totals.currency}
                             </span>
                           )}
                         </div>
@@ -1747,11 +1661,10 @@ useEffect(() => {
                       {renderCompactCouponButton()}
                     </div>
 
-                    {/* Checkout Button */}
                     <button
                       onClick={handleCheckout}
                       disabled={
-                        isCalculatingTotals ||
+                        isTotalsLoading ||
                         isValidating ||
                         salesPaused ||
                         selectedIds.length === 0
@@ -1784,7 +1697,9 @@ useEffect(() => {
                               d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"
                             />
                           </svg>
-                          <span>{t("checkoutPaused", "Checkout Paused")}</span>
+                          <span>
+                            {t("checkoutPaused", "Checkout Paused")}
+                          </span>
                         </>
                       ) : (
                         <>
@@ -1801,11 +1716,6 @@ useEffect(() => {
         )}
       </div>
 
-      {/* ================================================================
-          MODALS & OVERLAYS
-          ================================================================ */}
-
-      {/* Sales Paused Dialog */}
       {showSalesPausedDialog && (
         <div
           className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
@@ -1819,13 +1729,14 @@ useEffect(() => {
             }`}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header */}
             <div
               className={`px-5 py-4 ${isDark ? "bg-gray-800" : "bg-orange-50"}`}
             >
               <div className="flex items-center space-x-3">
                 <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center ${isDark ? "bg-orange-500/20" : "bg-orange-100"}`}
+                  className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                    isDark ? "bg-orange-500/20" : "bg-orange-100"
+                  }`}
                 >
                   <svg
                     className="w-5 h-5 text-orange-500"
@@ -1842,17 +1753,20 @@ useEffect(() => {
                   </svg>
                 </div>
                 <h3
-                  className={`text-base font-bold ${isDark ? "text-white" : "text-gray-900"}`}
+                  className={`text-base font-bold ${
+                    isDark ? "text-white" : "text-gray-900"
+                  }`}
                 >
                   {t("salesPausedTitle", "Sales Temporarily Paused")}
                 </h3>
               </div>
             </div>
 
-            {/* Content */}
             <div className="px-5 py-4">
               <p
-                className={`text-sm text-center ${isDark ? "text-gray-400" : "text-gray-500"}`}
+                className={`text-sm text-center ${
+                  isDark ? "text-gray-400" : "text-gray-500"
+                }`}
               >
                 {pauseReason ||
                   t(
@@ -1862,9 +1776,10 @@ useEffect(() => {
               </p>
             </div>
 
-            {/* Footer */}
             <div
-              className={`px-5 py-4 ${isDark ? "bg-gray-800/50" : "bg-gray-50"}`}
+              className={`px-5 py-4 ${
+                isDark ? "bg-gray-800/50" : "bg-gray-50"
+              }`}
             >
               <button
                 onClick={() => setShowSalesPausedDialog(false)}
@@ -1877,7 +1792,6 @@ useEffect(() => {
         </div>
       )}
 
-      {/* Validation Dialog */}
       {showValidationDialog && validationResult && (
         <CartValidationDialog
           open={showValidationDialog}
@@ -1894,11 +1808,10 @@ useEffect(() => {
         />
       )}
 
-      {/* Coupon Selection Sheet (matching Flutter's CouponSelectionSheet) */}
       <CouponSelectionSheet
         isOpen={showCouponSheet}
         onClose={() => setShowCouponSheet(false)}
-        cartTotal={calculatedTotals.total}
+        cartTotal={totals.total}
         selectedCoupon={selectedCoupon}
         useFreeShipping={useFreeShipping}
         onCouponSelected={handleCouponSelected}

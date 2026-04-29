@@ -221,7 +221,7 @@ export default function FoodReceiptDetailPage() {
 
   const shareReceipt = () => {
     if (!receipt) return;
-    const text = `${l("FoodReceiptDetail.foodReceipt") || "Food Receipt"} — ${receipt.restaurantName}\n${l("FoodReceiptDetail.order") || "Order"} #${receipt.orderId.substring(0, 8).toUpperCase()}\n${l("FoodReceiptDetail.total") || "Total"}: ${receipt.totalPrice.toFixed(0)} ${receipt.currency}\n${formatDate(receipt.timestamp)}`;
+    const text = `${l("FoodReceiptDetail.foodReceipt") || "Food Receipt"} — ${receipt.restaurantName}\n${l("FoodReceiptDetail.order") || "Order"} #${receipt.orderId.substring(0, 8).toUpperCase()}\n${l("FoodReceiptDetail.total") || "Total"}: ${receipt.totalPrice.toFixed(2)} ${receipt.currency}\n${formatDate(receipt.timestamp)}`;
     if (navigator.share)
       navigator.share({
         title: l("FoodReceiptDetail.foodReceipt") || "Food Receipt",
@@ -720,7 +720,7 @@ export default function FoodReceiptDetailPage() {
                                   ? t(FoodExtrasData.kExtrasTranslationKeys[ext.name])
                                   : ext.name}
                                 {ext.quantity > 1 ? ` ×${ext.quantity}` : ""}
-                                {ext.price > 0 ? ` +${ext.price}` : ""}
+                                {ext.price > 0 ? ` +${ext.price.toFixed(2)}` : ""}
                               </span>
                             ))}
                           </div>
@@ -748,7 +748,7 @@ export default function FoodReceiptDetailPage() {
                         >
                           {(
                             item.itemTotal || effectiveUnit * item.quantity
-                          ).toFixed(0)}{" "}
+                          ).toFixed(2)}{" "}
                           {receipt.currency}
                         </span>
                         {item.quantity > 1 && (
@@ -757,7 +757,7 @@ export default function FoodReceiptDetailPage() {
                               isDarkMode ? "text-gray-500" : "text-gray-400"
                             }`}
                           >
-                            {effectiveUnit.toFixed(0)}{" "}
+                            {effectiveUnit.toFixed(2)}{" "}
                             {l("FoodReceiptDetail.each") || "each"}
                           </p>
                         )}
@@ -813,7 +813,7 @@ export default function FoodReceiptDetailPage() {
           <div className="space-y-0">
             <InfoRow
               label={l("FoodReceiptDetail.subtotal") || "Subtotal"}
-              value={`${receipt.subtotal.toFixed(0)} ${receipt.currency}`}
+              value={`${receipt.subtotal.toFixed(2)} ${receipt.currency}`}
             />
 
             {receipt.deliveryType === "delivery" && (
@@ -822,7 +822,7 @@ export default function FoodReceiptDetailPage() {
                 value={
                   receipt.deliveryFee === 0
                     ? l("FoodReceiptDetail.free") || "Free"
-                    : `${receipt.deliveryFee.toFixed(0)} ${receipt.currency}`
+                    : `${receipt.deliveryFee.toFixed(2)} ${receipt.currency}`
                 }
                 valueClass={
                   receipt.deliveryFee === 0
@@ -852,7 +852,7 @@ export default function FoodReceiptDetailPage() {
                 {l("FoodReceiptDetail.total") || "Total"}
               </span>
               <span className="text-lg font-bold text-orange-600 dark:text-orange-400">
-                {receipt.totalPrice.toFixed(0)} {receipt.currency}
+                {receipt.totalPrice.toFixed(2)} {receipt.currency}
               </span>
             </div>
           </div>
