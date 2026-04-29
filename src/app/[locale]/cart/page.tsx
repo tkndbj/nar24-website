@@ -345,23 +345,37 @@ const displayTotals = useMemo(() => {
     });
   }, [cartItems]);
 
+  const hasInitializedTotalsRef = useRef(false);
+
   useEffect(() => {
     const excludedIds = Array.from(deselectedProducts);
     
-    // Initial calculation — no debounce, fire immediately so user doesn't see 0.00
-    if (cartTotals === null && cartItems.length > 0) {
+    // Initial calculation — no debounce, fire immediately
+    if (!hasInitializedTotalsRef.current && cartItems.length > 0) {
+      hasInitializedTotalsRef.current = true;
       updateTotalsForExcluded(excludedIds);
       return;
     }
     
-    // Subsequent updates — debounced for rapid selection toggling
+    // Subsequent updates — debounced
     const timer = setTimeout(() => {
       updateTotalsForExcluded(excludedIds);
     }, 400);
   
     return () => clearTimeout(timer);
-  }, [deselectedProducts, cartItems, updateTotalsForExcluded, cartTotals]);
+  }, [deselectedProducts, cartItems, updateTotalsForExcluded]);
 
+  useEffect(() => {
+    if (!user) {
+      hasInitializedTotalsRef.current = false;
+    }
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (!user || cartItems.length === 0) {
+      hasInitializedTotalsRef.current = false;
+    }
+  }, [user?.uid, cartItems.length]);
 
   // ========================================================================
   // INFINITE SCROLL
