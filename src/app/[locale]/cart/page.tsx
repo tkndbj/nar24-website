@@ -26,7 +26,6 @@ import {
 } from "lucide-react";
 import { CompactBundleWidget } from "@/app/components/CompactBundle";
 import { useCart, CartTotals } from "@/context/CartProvider";
-import cartTotalsCache from "@/services/cart_totals_cache";
 import { useUser } from "@/context/UserProvider";
 import { useRouter } from "@/navigation";
 import { useTranslations } from "next-intl";
@@ -385,10 +384,6 @@ function CartPageContent() {
     updateTotalsForExcluded(excludedIds);
   }, [deselectedProducts, cartItems, updateTotalsForExcluded]);
 
-  // Invalidate totals cache on mount so cross-device changes are picked up
-  useEffect(() => {
-    if (user) cartTotalsCache.invalidateForUser(user.uid);
-  }, [user]);
 
   // ========================================================================
   // INFINITE SCROLL
@@ -774,11 +769,6 @@ function CartPageContent() {
         setIsValidating(false);
         alert(t("noValidItemsToCheckout", "No valid items to checkout"));
         return;
-      }
-
-      // Invalidate cache so we get fresh totals
-      if (user) {
-        cartTotalsCache.invalidateForUser(user.uid);
       }
 
       // Calculate totals from validated items (using their IDs as the selected set)
@@ -1429,8 +1419,7 @@ function CartPageContent() {
                 : "bg-white hover:bg-gray-100 text-gray-700 border-gray-200"
             }`}
           >
-            <ArrowLeft className="w-4 h-4" />
-            <span>{t("back", "Back")}</span>
+            <ArrowLeft className="w-4 h-4" />           
           </button>
         </div>
 

@@ -33,7 +33,6 @@ import {
 import { User } from "firebase/auth";
 import { ProductUtils, Product } from "@/app/models/Product";
 import { httpsCallable, Functions } from "firebase/functions";
-import cartTotalsCache from "@/services/cart_totals_cache";
 import metricsEventService from "@/services/cartfavoritesmetricsEventService";
 import { userActivityService } from "@/services/userActivity";
 import { trackReads } from "@/lib/firestore-read-tracker";
@@ -934,34 +933,21 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       if (!user || !functions) {
         return { total: 0, items: [], currency: "TL" };
       }
-
+  
+      // Dedup key — for in-flight request sharing only, no result caching
       const excludedSorted = [...(excludedProductIds ?? [])].sort();
-      const cacheKey = `all_minus_${excludedSorted.join(",")}`;
-
-      const cached = cartTotalsCache.get(user.uid, [cacheKey]);
-      if (cached) {
-        console.log("⚡ Cache hit - instant total");
-        return {
-          total: cached.total,
-          currency: cached.currency,
-          items: cached.items.map((i) => ({
-            productId: i.productId,
-            unitPrice: i.unitPrice,
-            total: i.total,
-            quantity: i.quantity,
-            isBundleItem: i.isBundleItem,
-          })),
-        };
+      const dedupKey = `totals_all_minus_${excludedSorted.join(",")}`;
+  
+      if (pendingFetchesRef.current.has(dedupKey)) {
+        console.log("⏳ Joining in-flight totals calculation...");
+        try {
+          const result = await pendingFetchesRef.current.get(dedupKey);
+          return result as CartTotals;
+        } catch {
+          // Fall through and retry our own call
+        }
       }
-
-      if (pendingFetchesRef.current.has(`totals_${cacheKey}`)) {
-        console.log("⏳ Waiting for existing totals calculation...");
-        const result = await pendingFetchesRef.current.get(
-          `totals_${cacheKey}`,
-        );
-        return result as CartTotals;
-      }
-
+  
       const totalsPromise = (async () => {
         try {
           const totals = await retryWithBackoff(
@@ -970,20 +956,20 @@ export const CartProvider: React.FC<CartProviderProps> = ({
                 functions,
                 "calculateCartTotals",
               );
-
+  
               const allIds = Array.from(cartProductIdsRef.current);
               const selectedIds =
                 excludedProductIds == null || excludedProductIds.length === 0
                   ? allIds
                   : allIds.filter((id) => !excludedProductIds.includes(id));
-
+  
               const result = await calculateCartTotalsFunction({
                 selectedProductIds: selectedIds,
               });
-
+  
               const rawData = result.data;
               const totalsData = deepConvertMap(rawData);
-
+  
               const totals: CartTotals = {
                 total: (totalsData.total as number) ?? 0,
                 currency: (totalsData.currency as string) ?? "TL",
@@ -1001,41 +987,26 @@ export const CartProvider: React.FC<CartProviderProps> = ({
                   };
                 }),
               };
-
-              cartTotalsCache.set(user.uid, [cacheKey], {
-                total: totals.total,
-                currency: totals.currency,
-                items: totals.items.map((i) => ({
-                  productId: i.productId,
-                  unitPrice: i.unitPrice,
-                  total: i.total,
-                  quantity: i.quantity,
-                  isBundleItem: i.isBundleItem ?? false,
-                })),
-              });
-
+  
               return totals;
             },
             "Calculate Totals",
             3,
           );
-
-          console.log(
-            `✅ Total calculated: ${totals.total} ${totals.currency}`,
-          );
+  
+          console.log(`✅ Total calculated: ${totals.total} ${totals.currency}`);
           return totals;
         } catch (error) {
           console.error("❌ Cloud Function failed after retries:", error);
           throw error;
         }
       })();
-
-      pendingFetchesRef.current.set(`totals_${cacheKey}`, totalsPromise);
+  
+      pendingFetchesRef.current.set(dedupKey, totalsPromise);
       try {
-        const result = await totalsPromise;
-        return result;
+        return await totalsPromise;
       } finally {
-        pendingFetchesRef.current.delete(`totals_${cacheKey}`);
+        pendingFetchesRef.current.delete(dedupKey);
       }
     },
     [user, functions],
@@ -1465,8 +1436,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         });
 
         console.log("✅ Added to cart:", product.id);
-
-        cartTotalsCache.invalidateForUser(user.uid);
         backgroundRefreshTotals();
 
         return "Added to cart";
@@ -1640,8 +1609,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           productId,
           shopId: analyticsShopId ?? null,
         });
-
-        cartTotalsCache.invalidateForUser(user.uid);
         backgroundRefreshTotals();
 
         return "Removed from cart";
@@ -1776,8 +1743,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
               `✅ Updated quantity: ${productId} = ${qtyToWrite}`,
             );
           }
-
-          cartTotalsCache.invalidateForUser(user.uid);
           debouncedTotalsVerification();
         } catch (error) {
           console.error("❌ Update quantity error:", error);
@@ -1844,9 +1809,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           productIds,
           shopIds,
         });
-
-        console.log(`✅ Removed ${productIds.length} items`);
-        cartTotalsCache.invalidateForUser(user.uid);
         backgroundRefreshTotals();
 
         return "Products removed from cart";
@@ -2033,10 +1995,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         });
         const data = deepConvertMap(result.data);
 
-        console.log(`✅ Cache updated: ${data.updated as number} items`);
-
-        cartTotalsCache.invalidateForUser(user.uid);
-
         // Refresh after cache update so UI reflects new prices (matches Flutter)
         if ((data.success as boolean) === true) {
           await refresh();
@@ -2185,10 +2143,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
 
     lastDocumentRef.current = null;
     setHasMore(true);
-
-    if (user) {
-      cartTotalsCache.invalidateForUser(user.uid);
-    }
   }, [user]);
 
   const clearAllData = useCallback(() => {
@@ -2211,8 +2165,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     optimisticTimeoutsRef.current.clear();
     quantityUpdateLocksRef.current.clear();
     pendingQuantityWritesRef.current.clear();
-
-    cartTotalsCache.clearAll();
   }, []);
 
   // ========================================================================
@@ -2264,11 +2216,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     setCartCount(ids.size);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileData?.cartItemIds, user]);
-
-  // Initialize cache on mount
-  useEffect(() => {
-    cartTotalsCache.initialize();
-  }, []);
 
   // Cleanup on unmount
   useEffect(() => {
