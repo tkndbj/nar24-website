@@ -54,6 +54,16 @@ match /user_profiles/{userId} {
   }
 }
 
+ match /firestore_usage_sessions/{sessionId} {                                                                                                                                               
+    // Let any signed-in user create/update their own session docs.                                                                                                                           
+    // Tracker writes `userId` on every flush, so we pin it to request.auth.uid.
+    allow create: if request.auth != null;
+    allow update: if request.auth != null;
+
+    // Only admins can read (for your admin web app) or clean up.
+    allow read, delete: if isAdmin();
+  }
+
 match /shop_notifications/{notificationId} {
   // Read: authenticated shop members
   allow read: if request.auth != null 
@@ -968,7 +978,11 @@ match /product_edit_applications/{editApplicationId} {
   allow create: if false; // Cloud Functions only
   allow update, delete: if false;
 }
-    
+  
+  match /marketReceipts/{receiptId} {
+  allow read: if request.auth != null && request.auth.uid == userId;
+  allow create, update, delete: if false;
+}
     
     match /referral/{referralDocId} {  
   allow create, update: if request.auth != null && (    
@@ -1155,16 +1169,15 @@ match /coupons/{couponId} {
   // Users can read their own coupons
   allow read: if request.auth != null && request.auth.uid == userId;
 
-  // Users can update their own coupons in one of two shapes:
-  //  1. Mark-as-used: only isUsed/usedAt/orderId may change.
-  //  2. Mark-as-celebrated: only celebratedAt may change, and the previous
-  //     value must have been null (idempotent — can't re-stamp).
-  allow update: if request.auth != null
+  // Users can update their own coupons:
+  //  (a) mark-as-used during checkout, OR
+  //  (b) mark-as-celebrated when dismissing the celebration overlay.
+ allow update: if request.auth != null
     && request.auth.uid == userId
     && (
       (
         request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['isUsed', 'usedAt', 'orderId'])
+             .hasOnly(['isUsed', 'usedAt', 'orderId'])
         && request.resource.data.isUsed == true
         && request.resource.data.usedAt is timestamp
         && request.resource.data.orderId is string
@@ -1172,9 +1185,9 @@ match /coupons/{couponId} {
       ||
       (
         request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['celebratedAt'])
+             .hasOnly(['celebratedAt'])
         && request.resource.data.celebratedAt is timestamp
-        && resource.data.get('celebratedAt', null) == null
+        && resource.data.celebratedAt == null
       )
     );
 
@@ -1187,16 +1200,15 @@ match /benefits/{benefitId} {
   // Users can read their own benefits
   allow read: if request.auth != null && request.auth.uid == userId;
 
-  // Users can update their own benefits in one of two shapes:
-  //  1. Mark-as-used: only isUsed/usedAt/orderId may change.
-  //  2. Mark-as-celebrated: only celebratedAt may change, and the previous
-  //     value must have been null (idempotent — can't re-stamp).
+  // Users can update their own benefits:
+  //  (a) mark-as-used during checkout, OR
+  //  (b) mark-as-celebrated when dismissing the celebration overlay.
   allow update: if request.auth != null
     && request.auth.uid == userId
     && (
       (
         request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['isUsed', 'usedAt', 'orderId'])
+             .hasOnly(['isUsed', 'usedAt', 'orderId'])
         && request.resource.data.isUsed == true
         && request.resource.data.usedAt is timestamp
         && request.resource.data.orderId is string
@@ -1204,9 +1216,9 @@ match /benefits/{benefitId} {
       ||
       (
         request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['celebratedAt'])
+             .hasOnly(['celebratedAt'])
         && request.resource.data.celebratedAt is timestamp
-        && resource.data.get('celebratedAt', null) == null
+        && resource.data.celebratedAt == null
       )
     );
 
@@ -1283,6 +1295,31 @@ match /benefits/{benefitId} {
         // Allow authenticated users to delete their own food cart items
         allow delete: if request.auth != null && request.auth.uid == userId;
       }
+      
+      match /marketCart/{itemId} {
+  allow read: if request.auth != null && request.auth.uid == userId;
+
+  allow create: if request.auth != null
+                && request.auth.uid == userId
+                && request.resource.data.name is string
+                && request.resource.data.price is number
+                && request.resource.data.price >= 0
+                && request.resource.data.quantity is number
+                && request.resource.data.quantity >= 1
+                && request.resource.data.category is string
+                && request.resource.data.brand is string
+                && request.resource.data.type is string
+                && request.resource.data.addedAt == request.time;
+
+  allow update: if request.auth != null
+                && request.auth.uid == userId
+                && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['quantity'])
+                && request.resource.data.quantity is number
+                && request.resource.data.quantity >= 1
+                && request.resource.data.quantity <= 99;
+
+  allow delete: if request.auth != null && request.auth.uid == userId;
+}
       
       // Food cart meta — stores current restaurant info for the food cart
 match /foodCartMeta/{metaDoc} {
@@ -1424,10 +1461,8 @@ match /mail/{docId} {
                   // OR admin/semi-admin approving applications
                   || isAdmin()
                   || isSemiAdmin()
-                );
-                
-                  allow update: if request.auth != null
-    && resource.data.userId == request.auth.uid;
+                );               
+                  
                 
                 function isValidDiscount() {
   // Check *existing* doc final state:
@@ -1452,9 +1487,7 @@ match /mail/{docId} {
 
   return oldValid && newValid;
 }
-
-
-                
+              
                 // Function to check allowed fields for product owner updates
 function isOwnerUpdatingAllowedFields() {
   let allowedFields = [  	
@@ -1553,15 +1586,6 @@ function isOwnerUpdatingAllowedFields() {
 
 }
 
-                function isIncrementingFollowerCount() {
-  return request.auth != null
-      && request.writeFields.hasOnly(['followerCount'])
-      // only allow ±1
-      && (
-           request.resource.data.followerCount == resource.data.followerCount + 1
-        || request.resource.data.followerCount == resource.data.followerCount - 1
-         );
-}
 
     // *** Rules for 'shops' Collection ***
    match /shops/{shopId} {
@@ -1572,24 +1596,7 @@ function isOwnerUpdatingAllowedFields() {
       allow create: if request.auth != null
                     && request.resource.data.ownerId == request.auth.uid;
 
-      // Replace BOTH allow update rules with this single combined rule:
-allow update: if request.auth != null && (
-  // Existing conditions
-  resource.data.ownerId == request.auth.uid
-  || isAdmin()
-  || isIncrementingFollowerCount()
-  
-  // NEW: Allow any authenticated user to update metrics fields
-  || (
-    request.writeFields.hasAll(['metrics.totalCartAdditions', 'metrics.lastUpdated'])
-    && request.writeFields.size() == 2
-  )
-  || (
-    request.writeFields.hasAll(['metrics.totalFavoriteAdditions', 'metrics.lastUpdated']) 
-    && request.writeFields.size() == 2
-  )
-);
-      
+     
 
       
       allow update: if request.auth != null
@@ -1930,6 +1937,25 @@ match /foods/{foodId} {
   allow delete: if request.auth != null
     && isRestaurantMember(resource.data.restaurantId);
 }
+
+match /drinks/{drinkId} {
+  // Anyone can read (for customer-facing app)
+  allow read: if true;
+
+  // Create: must be a member of the restaurant
+  allow create: if request.auth != null
+    && request.resource.data.restaurantId is string
+    && isRestaurantMember(request.resource.data.restaurantId);
+
+  // Update: must be a member, cannot change restaurantId
+  allow update: if request.auth != null
+    && isRestaurantMember(resource.data.restaurantId)
+    && request.resource.data.restaurantId == resource.data.restaurantId;
+
+  // Delete: must be a member
+  allow delete: if request.auth != null
+    && isRestaurantMember(resource.data.restaurantId);
+}
   
 function isCargoCourier() {
   return request.auth != null && request.auth.token.foodcargoguy == true;
@@ -2035,10 +2061,6 @@ match /pendingFoodPayments/{paymentId} {
   allow write: if false;
 }
 
-match /food_courier_notifications/{id} {
-  allow read: if request.auth != null && request.auth.token.foodcargoguy == true;
-  allow write: if false; // Cloud Functions only (admin SDK bypasses rules)
-}
 
 match /courier_notification_reads/{courierId} {
   allow read, write: if request.auth != null 
@@ -2099,9 +2121,38 @@ match /food-accounting-monthly/{docId} {
   allow write: if false; // Cloud Functions only
 }
 
+match /market-accounting-daily/{docId} {
+  allow read: if request.auth != null && (
+    isAdmin() || isSemiAdmin()
+    || request.auth.token.masterCourier == true
+  );
+  allow write: if false; // Cloud Functions only
+}
+
+match /market-accounting-weekly/{docId} {
+  allow read: if request.auth != null && (
+    isAdmin() || isSemiAdmin()
+    || request.auth.token.masterCourier == true
+  );
+  allow write: if false; // Cloud Functions only
+}
+
+match /market-accounting-monthly/{docId} {
+  allow read: if request.auth != null && (
+    isAdmin() || isSemiAdmin()
+    || request.auth.token.masterCourier == true
+  );
+  allow write: if false; // Cloud Functions only
+}
+
 match /food_cache/{regionDoc} {
   allow read: if true;  // Public cache, no auth needed
   allow write: if false; // Only Cloud Functions write
+}
+
+match /market-items/{itemId} {
+  allow read: if true;
+  allow create, update, delete: if isAdmin() || isSemiAdmin();
 }
 
 match /business-reports/{businessId} {
@@ -2133,21 +2184,65 @@ match /{path=**}/food-reviews/{reviewId} {
   allow write: if false; // Cloud Functions only
 }
 
-match /courier_actions/{actionId} {
-  // Couriers can create their own actions
-  allow create: if request.auth != null
-    && request.auth.token.foodcargoguy == true
-    && request.resource.data.courierId == request.auth.uid
-    && request.resource.data.type in ['pickup', 'deliver']
-    && request.resource.data.orderId is string
-    && request.resource.data.status == 'pending';
+ match /courier_actions/{actionId} {                                                                                                                                                                             // Common field validation for all writers                                                                                                                                                                
+    allow create: if request.auth != null                                                                                                                                                                     
+      && request.resource.data.type in ['assign', 'unassign', 'pickup', 'deliver']
+      && request.resource.data.orderId is string
+      && request.resource.data.courierId is string
+      && request.resource.data.status == 'pending'
+      && (
+        !('collection' in request.resource.data.keys())
+        || request.resource.data.collection in ['orders-food', 'orders-market']
+      )
+      && (
+        // Self-service courier — must write their own uid as courierId
+        (
+          request.auth.token.foodcargoguy == true
+          && request.resource.data.courierId == request.auth.uid
+        )
+        ||
+        // Admin / semi-admin / master courier override — courierId is the
+        // target courier (any valid uid). Trigger still runs the same
+        // state-machine transaction, so race safety is preserved.
+        (
+          isAdmin() || isSemiAdmin() || request.auth.token.masterCourier == true
+        )
+      );
 
-  // Couriers can read their own actions (to listen for status updates)
-  allow read: if request.auth != null
-    && resource.data.courierId == request.auth.uid;
+    // Couriers read their own actions; admins/master-couriers read all
+    // (so they can listen for completed/failed results on docs they wrote).
+    allow read: if request.auth != null && (
+      resource.data.courierId == request.auth.uid
+      || isAdmin() || isSemiAdmin()
+      || request.auth.token.masterCourier == true
+    );
 
-  // Only Cloud Functions can update (to set completed/failed)
-  allow update, delete: if false;
+    // Only Cloud Functions can update (to set completed/failed)
+    allow update, delete: if false;
+  }
+
+ match /orders-market/{orderId} {                                                                                                                                                                                allow read: if request.auth != null && (
+      request.auth.uid == resource.data.buyerId                                                                                                                                                               
+      || isCargoCourier()
+      || request.auth.token.masterCourier == true
+      || isAdmin() || isSemiAdmin()
+    );
+    allow create, update, delete: if false; // Cloud Functions only
+  }
+
+match /pendingMarketPayments/{paymentId} {
+  allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+  allow write: if false;
+}
+
+match /nar24market/stats {
+  allow read: if true;
+  allow write: if false; // Cloud Functions only
+
+  match /reviews/{reviewId} {
+    allow read: if true;
+    allow write: if false; // Cloud Functions only
+  }
 }
 
 
