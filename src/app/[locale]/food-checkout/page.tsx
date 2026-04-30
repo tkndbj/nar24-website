@@ -488,7 +488,7 @@ function FoodCheckoutContent() {
 
           <div className="flex flex-col gap-2 mt-6">
             <Link
-              href="/orders?tab=food"
+              href="/food-orders"
               className="w-full py-2.5 px-4 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold transition-colors text-center"
             >
               {t("viewOrders")}
