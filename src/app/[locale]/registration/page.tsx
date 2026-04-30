@@ -293,6 +293,12 @@ function RegistrationContent() {
           case "functions/unauthenticated":
             message = t("RegistrationPage.authenticationError");
             break;
+          case "functions/resource-exhausted":
+            message = t("RegistrationPage.tooManyAttempts");
+            break;
+          case "functions/permission-denied":
+            message = t("RegistrationPage.permissionDenied");
+            break;
           default:
             message =
               authError.message || t("RegistrationPage.registrationError");

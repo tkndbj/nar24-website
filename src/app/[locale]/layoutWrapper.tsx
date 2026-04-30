@@ -6,6 +6,7 @@
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { NextIntlClientProvider } from "next-intl";
+import { Toaster } from "react-hot-toast";
 import { UserProvider, useUser } from "../../context/UserProvider";
 import ConditionalHeader from "../components/ConditionalHeader";
 import { AppInitializer } from "@/app/components/AppInitializer";
@@ -122,6 +123,13 @@ export default function LayoutWrapper({
       locale={locale}
       timeZone={timeZone}
     >
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          duration: 4000,
+          style: { borderRadius: "10px" },
+        }}
+      />
       {/* Step 1: Initialize memory manager (no user context needed) */}
       <AppInitializer>
         {/* Step 2: Provide user context (with lazy Firebase) */}

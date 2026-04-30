@@ -262,18 +262,13 @@ function EmailVerificationContent() {
     const verificationCode = codeToVerify || getEnteredCode();
 
     if (!verificationCode || verificationCode.length !== 6) {
-      toast.error(
-        t("LoginPage.invalidVerificationCode") ||
-          "Please enter a valid 6-digit code"
-      );
+      toast.error(t("LoginPage.invalidVerificationCode"));
       return;
     }
 
     // Validate email and password are available
     if (!email || !password) {
-      toast.error(
-        "Email and password are required. Please try logging in again."
-      );
+      toast.error(t("LoginPage.emailPasswordRequired"));
       console.error("Missing email or password:", {
         email: !!email,
         password: !!password,
@@ -340,9 +335,7 @@ function EmailVerificationContent() {
           }, 1500);
         } else {
           console.error("Email not verified after calling function");
-          toast.error(
-            "Verification succeeded but email not marked as verified. Please try again."
-          );
+          toast.error(t("LoginPage.verificationError"));
         }
       }
     } catch (error: unknown) {
@@ -353,30 +346,39 @@ function EmailVerificationContent() {
         const authError = error as AuthError;
         switch (authError.code) {
           case "functions/invalid-argument":
-            message =
-              t("LoginPage.invalidVerificationCode") ||
-              "Invalid verification code";
+            message = t("LoginPage.invalidVerificationCode");
             break;
           case "functions/deadline-exceeded":
-            message =
-              t("LoginPage.verificationCodeExpired") ||
-              "Verification code has expired";
+            message = t("LoginPage.verificationCodeExpired");
             break;
           case "functions/failed-precondition":
-            message =
-              t("LoginPage.verificationCodeUsed") ||
-              "Verification code has already been used";
+            message = t("LoginPage.verificationCodeUsed");
             break;
           case "functions/not-found":
-            message =
-              t("LoginPage.noVerificationCode") || "No verification code found";
+            message = t("LoginPage.noVerificationCode");
+            break;
+          case "functions/resource-exhausted":
+            message = t("LoginPage.tooManyRequests");
+            break;
+          case "functions/unauthenticated":
+            message = t("LoginPage.sessionExpired");
+            break;
+          case "auth/wrong-password":
+          case "auth/invalid-credential":
+            message = t("LoginPage.wrongPassword");
+            break;
+          case "auth/network-request-failed":
+            message = t("LoginPage.networkError");
             break;
           default:
-            message = authError.message || t("LoginPage.verificationError");
+            message = t("LoginPage.verificationError");
         }
       }
 
-      toast.error(message);
+      // Always show feedback — never let the toast be empty/missing
+      toast.error(message || t("LoginPage.verificationError"), {
+        style: { borderRadius: "10px", background: "#EF4444", color: "#fff" },
+      });
       clearCode();
     } finally {
       setIsVerifying(false);

@@ -2135,7 +2135,11 @@
     "googleSignInSuccess": "Google ile giriş başarılı!",
     "googleRegistrationError": "Google ile kayıt başarısız. Lütfen tekrar deneyin.",
     "accountExistsWithDifferentCredential": "Bu e-posta adresiyle farklı bir giriş yöntemi kullanılarak hesap mevcut.",
-    "invalidData": "Geçersiz veri. Lütfen bilgilerinizi kontrol edin."
+    "invalidData": "Geçersiz veri. Lütfen bilgilerinizi kontrol edin.",
+    "serverError": "Sunucu hatası. Lütfen birazdan tekrar deneyin.",
+    "authenticationError": "Kimlik doğrulama başarısız. Lütfen sayfayı yenileyip tekrar deneyin.",
+    "tooManyAttempts": "Bu ağdan çok fazla kayıt denemesi yapıldı. Lütfen daha sonra tekrar deneyin.",
+    "permissionDenied": "İstek engellendi. Lütfen sayfayı yenileyip tekrar deneyin."
   },
   "CompleteName": {
     "title": "Adınız nedir?",
@@ -2232,7 +2236,8 @@
     "resetEmailSent": "Şifre sıfırlama e-postası gönderildi! Lütfen gelen kutunuzu kontrol edin.",
     "resetEmailFailed": "Sıfırlama e-postası gönderilemedi. Lütfen tekrar deneyin.",
     "authTimeout": "Giriş çok uzun sürüyor. Lütfen bağlantınızı kontrol edip tekrar deneyin.",
-    "popupBlocked": "Açılır pencere engellendi. Lütfen bu site için açılır pencerelere izin verin ve tekrar deneyin."
+    "popupBlocked": "Açılır pencere engellendi. Lütfen bu site için açılır pencerelere izin verin ve tekrar deneyin.",
+    "sessionExpired": "Oturumunuzun süresi doldu. Lütfen tekrar giriş yapın."
   },
   "Collection": {
     "collection": "Koleksiyon",
