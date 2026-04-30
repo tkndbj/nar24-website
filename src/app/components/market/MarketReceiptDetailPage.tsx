@@ -304,7 +304,8 @@ export default function MarketReceiptDetailPage({
     try {
       let url = receipt.downloadUrl ?? "";
       if (!url && receipt.filePath) {
-        const storage = getStorage(getApp());
+        // Market receipts live in the private bucket.
+        const storage = getStorage(getApp(), "gs://emlak-mobile-app-private");
         url = await getDownloadURL(storageRef(storage, receipt.filePath));
       }
       if (url) {

@@ -197,10 +197,12 @@ export default function FoodReceiptDetailPage() {
     try {
       let url = receipt?.downloadUrl;
       if (!url && receipt?.filePath) {
-        // Fallback for receipts generated before the fix
+        // Fallback for receipts generated before the fix.
+        // Food receipts live in the private bucket, not the default public bucket.
         const { getStorage, ref, getDownloadURL } =
           await import("firebase/storage");
-        const storage = getStorage();
+        const { getApp } = await import("firebase/app");
+        const storage = getStorage(getApp(), "gs://emlak-mobile-app-private");
         url = await getDownloadURL(ref(storage, receipt.filePath));
       }
       if (url) {

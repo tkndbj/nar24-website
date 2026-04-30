@@ -275,9 +275,11 @@ export default function ReceiptDetailPage() {
     try {
       let url = receipt?.receiptUrl;
       if (!url && receipt?.filePath) {
+        // Receipts live in the private bucket, not the default public bucket.
         const { getStorage, ref, getDownloadURL } =
           await import("firebase/storage");
-        const storage = getStorage();
+        const { getApp } = await import("firebase/app");
+        const storage = getStorage(getApp(), "gs://emlak-mobile-app-private");
         url = await getDownloadURL(ref(storage, receipt.filePath));
       }
       if (url) {

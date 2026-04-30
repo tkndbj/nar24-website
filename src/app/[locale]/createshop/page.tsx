@@ -5,8 +5,12 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "../../../lib/firebase";
+
+// Sensitive shop-application docs live in a separate private bucket,
+// not the public marketplace bucket exported as `storage`.
+const privateStorage = getStorage(storage.app, "gs://emlak-mobile-app-private");
 import { useUser } from "@/context/UserProvider";
 import SecondHeader from "../../components/market_screen/SecondHeader";
 import type { AllInOneCategoryData as AllInOneCategoryDataType } from "../../../constants/productData";
@@ -243,7 +247,7 @@ export default function CreateShopPage() {
   const uploadFile = async (file: File, folder: string): Promise<string> => {
     if (!user) throw new Error("Not authenticated");
     const storageRef = ref(
-      storage,
+      privateStorage,
       `shop_applications/${user.uid}/${folder}_${Date.now()}.jpg`,
     );
     const snapshot = await uploadBytes(storageRef, file);
