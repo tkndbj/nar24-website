@@ -267,10 +267,14 @@ function RegistrationContent() {
           },
         });
 
-        // NEW: Redirect to email verification page instead of login
-        router.push(
-          `/email-verification?email=${encodeURIComponent(formData.email)}`
-        );
+        // Stash credentials for the email-verification page (mirrors login flow).
+        // Email-verification reads these from sessionStorage to re-sign-in
+        // before calling verifyEmailCode; without them the page bounces to /login.
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem("verification_email", formData.email.trim());
+          sessionStorage.setItem("verification_password", formData.password);
+        }
+        router.push(`/email-verification`);
       }
     } catch (error: unknown) {
       console.error("Registration error:", error);
