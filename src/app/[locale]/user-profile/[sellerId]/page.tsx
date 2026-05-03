@@ -137,8 +137,11 @@ export default function UserProfilePage() {
       lastDocRef.current = null;
 
       try {
-        // 1. Fetch user data
-        const userDocSnap = await getDoc(doc(db, "users", userId));
+        // 1. Fetch user data — cross-user read goes to /users_public.
+        // The mirror exposes only public-safe fields (displayName,
+        // profileImage, coverImage, verified, averageRating, reviewCount,
+        // totalProductsSold). PII stays on the locked-down /users doc.
+        const userDocSnap = await getDoc(doc(db, "users_public", userId));
         if (!isMounted) return;
 
         if (!userDocSnap.exists()) {

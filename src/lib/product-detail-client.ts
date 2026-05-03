@@ -91,7 +91,10 @@ export async function fetchSellerInfoClient(
 ): Promise<SellerInfo | null> {
   if (!sellerId || sellerId.trim() === "") return null;
 
-  const sellerRef = doc(db, "users", sellerId);
+  // Cross-user reads of /users are locked down. The mirror at
+  // /users_public exposes the public fields we need (displayName,
+  // averageRating, verified, totalProductsSold, reviewCount).
+  const sellerRef = doc(db, "users_public", sellerId);
   const shopRef = shopId ? doc(db, "shops", shopId) : null;
 
   const [sellerSnap, shopSnap] = await Promise.all([
@@ -162,8 +165,9 @@ export async function fetchSellerForQuestionsClient(
   shopId: string | null
 ): Promise<SellerInfoForQuestions | null> {
   if (!sellerId || sellerId.trim() === "") return null;
+  // Cross-user read → /users_public mirror.
   const [userSnap, shopSnap] = await Promise.all([
-    getDoc(doc(db, "users", sellerId)),
+    getDoc(doc(db, "users_public", sellerId)),
     shopId ? getDoc(doc(db, "shops", shopId)) : Promise.resolve(null),
   ]);
   if (!userSnap.exists()) return null;

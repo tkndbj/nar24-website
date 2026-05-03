@@ -85,7 +85,9 @@ export default function SellerInfoPage() {
     if (!sellerId) return;
 
     try {
-      const userDoc = await getDoc(doc(db, "users", sellerId));
+      // Cross-user read → /users_public mirror. /users is locked to the
+      // owner; only public-safe fields live in the mirror.
+      const userDoc = await getDoc(doc(db, "users_public", sellerId));
       if (userDoc.exists()) {
         setSellerData(userDoc.data() as SellerData);
       } else {

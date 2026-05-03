@@ -117,24 +117,6 @@ export interface PrefetchedBannerItem {
   linkedProductId?: string;
 }
 
-/** Serialized boosted product for server-side prefetch */
-export interface PrefetchedBoostedProduct {
-  id: string;
-  name: string;
-  price: number;
-  originalPrice?: number;
-  currency: string;
-  imageUrl: string;
-  shopId: string;
-  shopName?: string;
-  isBoosted: true;
-  boostExpiresAt?: number;
-  category?: string;
-  subcategory?: string;
-  rating?: number;
-  reviewCount?: number;
-}
-
 /** Serialized shop for server-side prefetch */
 export interface PrefetchedShop {
   id: string;
