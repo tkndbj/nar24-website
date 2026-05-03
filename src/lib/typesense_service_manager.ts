@@ -40,14 +40,32 @@ export type {
 } from "./typesense_market_service";
 
 // ── Configuration ─────────────────────────────────────────────────────────────
+//
+// Resolution order:
+//   1. Server-only `TYPESENSE_HOST` / `TYPESENSE_SEARCH_KEY` (what `.env.local`
+//      actually sets and what the `/api/typesense/[collection]` proxy uses).
+//   2. `NEXT_PUBLIC_*` fallback so the value is also available to client
+//      bundles. The client never sends the key (it routes through the proxy);
+//      only `host` is needed there, and even that is unused because
+//      `TypeSenseService.searchUrl` returns `/api/typesense/...` in the
+//      browser.
+//
+// No hardcoded fallback — we want missing config to fail loudly rather than
+// silently route to a stale instance.
 
 const TYPESENSE_HOST =
-  process.env.NEXT_PUBLIC_TYPESENSE_HOST ??
-  "j0xs6ry9275tu4cop.a2.typesense.net";
+  process.env.TYPESENSE_HOST ?? process.env.NEXT_PUBLIC_TYPESENSE_HOST ?? "";
 
 const TYPESENSE_SEARCH_KEY =
+  process.env.TYPESENSE_SEARCH_KEY ??
   process.env.NEXT_PUBLIC_TYPESENSE_SEARCH_KEY ??
-  "z8Ii7rZ3MUlpxLvbPLu3WOqmsZemMjBZ";
+  "";
+
+if (typeof window === "undefined" && (!TYPESENSE_HOST || !TYPESENSE_SEARCH_KEY)) {
+  console.error(
+    "[TypeSenseServiceManager] Missing TYPESENSE_HOST or TYPESENSE_SEARCH_KEY env var. Server-side Typesense calls will fail.",
+  );
+}
 
 // ── TypeSenseServiceManager ───────────────────────────────────────────────────
 
