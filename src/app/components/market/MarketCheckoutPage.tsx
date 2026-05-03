@@ -25,6 +25,7 @@
 
 import {
   useCallback,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -66,6 +67,7 @@ import {
   type MarketCategory,
 } from "@/constants/marketCategories";
 import { FoodAddress } from "@/app/models/FoodAddress";
+import FoodLocationPicker from "../restaurants/FoodLocationPicker";
 
 // ═════════════════════════════════════════════════════════════════════════════
 // TYPES + CONSTANTS
@@ -133,6 +135,7 @@ export default function MarketCheckoutPage() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderSuccessId, setOrderSuccessId] = useState<string | null>(null);
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
 
   // ── Derived: parsed FoodAddress (memoized so identity is stable) ─────────
   const foodAddress = useMemo<FoodAddress | null>(() => {
@@ -143,6 +146,14 @@ export default function MarketCheckoutPage() {
 
   const hasAddress = foodAddress !== null;
   const isFormValid = cart.items.length > 0 && hasAddress;
+
+  // Clear "address required" error once an address gets set.
+  const addressRequiredMsg = t("checkoutAddressRequired");
+  useEffect(() => {
+    if (hasAddress) {
+      setError((prev) => (prev === addressRequiredMsg ? null : prev));
+    }
+  }, [hasAddress, addressRequiredMsg]);
 
   // ── Submission ───────────────────────────────────────────────────────────
 
@@ -297,6 +308,7 @@ export default function MarketCheckoutPage() {
               <AddressCard
                 foodAddress={foodAddress}
                 isDarkMode={isDarkMode}
+                onEditAddress={() => setShowLocationPicker(true)}
               />
             </FormSection>
 
@@ -370,6 +382,12 @@ export default function MarketCheckoutPage() {
         paymentMethod={paymentMethod}
         error={error}
         onSubmit={submit}
+      />
+
+      <FoodLocationPicker
+        isOpen={showLocationPicker}
+        onClose={() => setShowLocationPicker(false)}
+        isDarkMode={isDarkMode}
       />
     </main>
   );
@@ -445,9 +463,11 @@ function FormSection({
 function AddressCard({
   foodAddress,
   isDarkMode,
+  onEditAddress,
 }: {
   foodAddress: FoodAddress | null;
   isDarkMode: boolean;
+  onEditAddress: () => void;
 }) {
   const t = useTranslations("market");
 
@@ -501,12 +521,13 @@ function AddressCard({
             </p>
           )}
         </div>
-        <Link
-          href="/food-address"
-          className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 hover:underline flex-shrink-0"
+        <button
+          type="button"
+          onClick={onEditAddress}
+          className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 hover:underline flex-shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 rounded"
         >
           {t("checkoutChangeAddress")}
-        </Link>
+        </button>
       </div>
     );
   }
@@ -533,12 +554,13 @@ function AddressCard({
       >
         {t("checkoutNoAddress")}
       </p>
-      <Link
-        href="/food-address"
-        className="inline-flex items-center px-3 py-1.5 rounded-lg bg-[#00A86B] text-white text-[11px] font-bold hover:bg-emerald-700 transition-colors"
+      <button
+        type="button"
+        onClick={onEditAddress}
+        className="inline-flex items-center px-3 py-1.5 rounded-lg bg-[#00A86B] text-white text-[11px] font-bold hover:bg-emerald-700 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
       >
         {t("checkoutAddAddress")}
-      </Link>
+      </button>
     </div>
   );
 }

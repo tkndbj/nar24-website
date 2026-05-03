@@ -46,7 +46,18 @@ import {
   type Query,
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
-import { Search, Star, X, AlertCircle, MessageSquare, User } from "lucide-react";
+import {
+  Search,
+  Star,
+  X,
+  AlertCircle,
+  MessageSquare,
+  User,
+  MapPin,
+  ChevronRight,
+  ChevronLeft,
+  ChevronDown,
+} from "lucide-react";
 
 import { db } from "@/lib/firebase";
 import { useTheme } from "@/hooks/useTheme";
@@ -55,6 +66,10 @@ import {
   type MarketCategory,
 } from "@/constants/marketCategories";
 import CloudinaryImage from "../CloudinaryImage";
+import { useUser } from "@/context/UserProvider";
+import { FoodAddress } from "@/app/models/FoodAddress";
+import FoodLocationPicker from "../restaurants/FoodLocationPicker";
+import LoginModal from "../LoginModal";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -122,9 +137,26 @@ export default function MarketCategoriesPage() {
   const t = useTranslations("market");
   const isDarkMode = useTheme();
   const router = useRouter();
+  const { user, profileData } = useUser();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [reviewsOpen, setReviewsOpen] = useState(false);
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
+
+  const foodAddress = useMemo<FoodAddress | null>(() => {
+    const raw = profileData?.foodAddress;
+    if (!raw) return null;
+    return FoodAddress.fromMap(raw as Record<string, unknown>);
+  }, [profileData?.foodAddress]);
+
+  const handleAddressClick = useCallback(() => {
+    if (!user) {
+      setShowLogin(true);
+      return;
+    }
+    setShowLocationPicker(true);
+  }, [user]);
 
   const handleSearchSubmit = useCallback(
     (e: React.FormEvent<HTMLFormElement>) => {
@@ -191,6 +223,14 @@ export default function MarketCategoriesPage() {
           </div>
         </header>
 
+        {/* Delivery address row */}
+        <DeliveryAddressRow
+          foodAddress={foodAddress}
+          isLoggedIn={!!user}
+          isDarkMode={isDarkMode}
+          onClick={handleAddressClick}
+        />
+
         {/* Grid */}
         <section aria-label={t("categoriesHeader")}>
           <ul className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 sm:gap-4">
@@ -209,7 +249,70 @@ export default function MarketCategoriesPage() {
         onClose={() => setReviewsOpen(false)}
         isDarkMode={isDarkMode}
       />
+
+      {/* Food location picker */}
+      <FoodLocationPicker
+        isOpen={showLocationPicker}
+        onClose={() => setShowLocationPicker(false)}
+        isDarkMode={isDarkMode}
+      />
+
+      {/* Login modal (for unauthenticated users) */}
+      <LoginModal
+        isOpen={showLogin}
+        onClose={() => setShowLogin(false)}
+      />
     </main>
+  );
+}
+
+// ─── Delivery address row ────────────────────────────────────────────────────
+
+function DeliveryAddressRow({
+  foodAddress,
+  isLoggedIn,
+  isDarkMode,
+  onClick,
+}: {
+  foodAddress: FoodAddress | null;
+  isLoggedIn: boolean;
+  isDarkMode: boolean;
+  onClick: () => void;
+}) {
+  const t = useTranslations("market");
+  const hasAddress = foodAddress !== null;
+  const label = hasAddress
+    ? foodAddress.displayLabel
+    : isLoggedIn
+      ? t("setAddressPrompt")
+      : t("setAddressLoginPrompt");
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`mb-6 w-full flex items-center gap-3 rounded-2xl px-4 py-3 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-orange-300 focus-visible:ring-offset-2 ${
+        isDarkMode
+          ? "bg-orange-600 hover:bg-orange-500 focus-visible:ring-offset-[#1C1A29]"
+          : "bg-orange-500 hover:bg-orange-600 focus-visible:ring-offset-white"
+      } shadow-sm`}
+      aria-label={label}
+    >
+      <MapPin className="w-5 h-5 text-white shrink-0" aria-hidden />
+      <div className="flex-1 min-w-0">
+        <p className="text-[10px] font-medium uppercase tracking-wider text-white/85">
+          {t("deliveryAddress")}
+        </p>
+        <p className="text-sm font-semibold text-white truncate">
+          {label}
+        </p>
+      </div>
+      {hasAddress ? (
+        <ChevronDown className="w-5 h-5 text-white shrink-0" aria-hidden />
+      ) : (
+        <ChevronRight className="w-5 h-5 text-white shrink-0" aria-hidden />
+      )}
+    </button>
   );
 }
 
@@ -574,6 +677,7 @@ function ReviewCard({
 }) {
   const t = useTranslations("market");
   const locale = useLocale();
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
   const displayName = useMemo(
     () => (review.buyerName ? maskName(review.buyerName) : t("anonymous")),
@@ -657,20 +761,144 @@ function ReviewCard({
         <ul className="mt-3 flex gap-2 overflow-x-auto scrollbar-none">
           {review.imageUrls.map((url, i) => (
             <li key={`${review.id}-img-${i}`} className="shrink-0">
-              <CloudinaryImage.Banner
-                source={url}
-                cdnWidth={160}
-                width={64}
-                height={64}
-                fit="cover"
-                borderRadius={8}
-                alt=""
-              />
+              <button
+                type="button"
+                onClick={() => setViewerIndex(i)}
+                className="block rounded-lg overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 transition-transform hover:scale-[1.03]"
+                aria-label={t("imageViewerNext")}
+              >
+                <CloudinaryImage.Banner
+                  source={url}
+                  cdnWidth={160}
+                  width={64}
+                  height={64}
+                  fit="cover"
+                  borderRadius={8}
+                  alt=""
+                />
+              </button>
             </li>
           ))}
         </ul>
       )}
+
+      {viewerIndex !== null && (
+        <ReviewImageViewer
+          imageUrls={review.imageUrls}
+          initialIndex={viewerIndex}
+          onClose={() => setViewerIndex(null)}
+        />
+      )}
     </article>
+  );
+}
+
+// ─── Fullscreen review image viewer ──────────────────────────────────────────
+
+function ReviewImageViewer({
+  imageUrls,
+  initialIndex,
+  onClose,
+}: {
+  imageUrls: string[];
+  initialIndex: number;
+  onClose: () => void;
+}) {
+  const t = useTranslations("market");
+  const [index, setIndex] = useState(initialIndex);
+  const total = imageUrls.length;
+
+  const goPrev = useCallback(() => {
+    setIndex((i) => (i - 1 + total) % total);
+  }, [total]);
+
+  const goNext = useCallback(() => {
+    setIndex((i) => (i + 1) % total);
+  }, [total]);
+
+  // Body scroll lock + keyboard handling.
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      else if (e.key === "ArrowLeft" && total > 1) goPrev();
+      else if (e.key === "ArrowRight" && total > 1) goNext();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [onClose, goPrev, goNext, total]);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={t("imageViewerClose")}
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/95"
+    >
+      {/* Click backdrop to close */}
+      <button
+        type="button"
+        aria-label={t("imageViewerClose")}
+        onClick={onClose}
+        className="absolute inset-0 cursor-default"
+      />
+
+      {/* Top bar */}
+      <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 py-3 z-10">
+        {total > 1 ? (
+          <span className="text-white text-sm font-medium select-none">
+            {index + 1} / {total}
+          </span>
+        ) : (
+          <span />
+        )}
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={t("imageViewerClose")}
+          className="p-2 rounded-full text-white/90 hover:bg-white/10 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+        >
+          <X className="w-6 h-6" />
+        </button>
+      </div>
+
+      {/* Image */}
+      <div className="relative max-w-[100vw] max-h-[100vh] px-4 py-16 flex items-center justify-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={imageUrls[index]}
+          alt=""
+          className="max-w-full max-h-[80vh] object-contain select-none"
+          draggable={false}
+        />
+      </div>
+
+      {/* Prev / Next */}
+      {total > 1 && (
+        <>
+          <button
+            type="button"
+            onClick={goPrev}
+            aria-label={t("imageViewerPrev")}
+            className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-black/40 text-white hover:bg-black/60 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+          >
+            <ChevronLeft className="w-6 h-6" />
+          </button>
+          <button
+            type="button"
+            onClick={goNext}
+            aria-label={t("imageViewerNext")}
+            className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-black/40 text-white hover:bg-black/60 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+          >
+            <ChevronRight className="w-6 h-6" />
+          </button>
+        </>
+      )}
+    </div>
   );
 }
 
