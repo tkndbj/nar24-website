@@ -119,7 +119,13 @@ function hasFilters(p: SearchParams): boolean {
 }
 
 function needsFilteredPath(p: SearchParams): boolean {
-  return hasFilters(p) || p.sortOption !== "date";
+  // Mirror Flutter: only the default ("None"/"relevance") sort uses the
+  // both-indexes merge path. Any explicit sort or active filter falls back
+  // to shop_products-only Typesense. The page sends sort="relevance" for
+  // the default option (see search-results/page.tsx → toSortCode), so that
+  // is the gate — not "date", which is the user's "Newest" choice and
+  // should follow the filtered path like every other explicit sort.
+  return hasFilters(p) || p.sortOption !== "relevance";
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

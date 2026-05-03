@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useRef, useCallback } from 'react';
+import React, { createContext, useContext, useState, useRef, useCallback, useEffect } from 'react';
 import {
   collection,
   query,
@@ -158,6 +158,22 @@ export const SearchHistoryProvider: React.FC<SearchHistoryProviderProps> = ({ ch
     fetchInFlightRef.current = promise;
     await promise;
   }, [userProp?.uid, updateCombinedEntries]);
+
+  // Eagerly load history when the user becomes available (matches Flutter:
+  // history is loaded on login, not first search-bar open). This avoids the
+  // race where the user clicks the search bar before auth has resolved —
+  // SearchBar's "first open" guard would latch true with userId still null
+  // and never re-fire.
+  useEffect(() => {
+    if (userProp?.uid) {
+      fetchHistory();
+    } else {
+      // Clear history when user logs out so a different user doesn't see stale data.
+      allEntries.current = [];
+      optimisticallyDeleted.current.clear();
+      setSearchEntries([]);
+    }
+  }, [userProp?.uid, fetchHistory]);
 
   // ========================================================================
   // LOCAL INSERT

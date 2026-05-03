@@ -93,7 +93,7 @@ interface Review {
   userId: string;
 }
 
-// Submitted food review (stored under restaurants/{id}/reviews)
+// Submitted food review (stored under restaurants/{id}/food-reviews)
 interface FoodReview {
   id: string;
   orderId: string;
@@ -101,6 +101,10 @@ interface FoodReview {
   buyerName?: string;
   restaurantId: string;
   restaurantName?: string;
+  // Denormalized at review-write time by submitRestaurantReview. Older
+  // reviews submitted before that field was added won't have it; render a
+  // fallback icon in that case.
+  restaurantProfileImage?: string;
   rating: number;
   comment: string;
   imageUrls?: string[];
@@ -2143,9 +2147,24 @@ export default function ReviewsPage() {
                         className={`px-4 py-3 ${cardBorderClass} flex items-center gap-3`}
                       >
                         <div
-                          className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isDarkMode ? "bg-orange-950/30" : "bg-orange-50"}`}
+                          className={`w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 relative ${thumbBg}`}
                         >
-                          <UtensilsCrossed className="w-4 h-4 text-orange-500" />
+                          {review.restaurantProfileImage ? (
+                            <SmartImage
+                              source={review.restaurantProfileImage}
+                              size="thumbnail"
+                              alt={review.restaurantName || "Restaurant"}
+                              fill
+                              className="object-cover"
+                              sizes="40px"
+                            />
+                          ) : (
+                            <div
+                              className={`w-full h-full flex items-center justify-center ${isDarkMode ? "bg-orange-950/30" : "bg-orange-50"}`}
+                            >
+                              <UtensilsCrossed className="w-4 h-4 text-orange-500" />
+                            </div>
+                          )}
                         </div>
                         <div className="flex-1 min-w-0">
                           <h3
