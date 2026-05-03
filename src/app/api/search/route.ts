@@ -224,7 +224,10 @@ async function fetchShopsFromTypesense(query: string): Promise<ShopResult[]> {
 
 async function fetchSearchData(p: SearchParams): Promise<SearchResponse> {
   const t0 = Date.now();
-  const svc = TypeSenseServiceManager.instance.shopService;
+  // Mirror Flutter exactly: each index gets its dedicated service instance.
+  // mainService → "products", shopService → "shop_products".
+  const mainService = TypeSenseServiceManager.instance.mainService;
+  const shopService = TypeSenseServiceManager.instance.shopService;
 
   const filtered = needsFilteredPath(p);
 
@@ -233,7 +236,7 @@ async function fetchSearchData(p: SearchParams): Promise<SearchResponse> {
     const facetFilters = buildFacetFilters(p);
     const numericFilters = buildNumericFilters(p);
 
-    const res = await svc.searchIdsWithFacets({
+    const res = await shopService.searchIdsWithFacets({
       indexName: "shop_products",
       query: p.query,
       page: p.page,
@@ -249,18 +252,24 @@ async function fetchSearchData(p: SearchParams): Promise<SearchResponse> {
 
     let specFacets: Record<string, FacetCount[]> | undefined;
     if (p.page === 0) {
-      specFacets = await svc
+      specFacets = await shopService
         .fetchSpecFacets({
           indexName: "shop_products",
           query: p.query,
           facetFilters,
         })
-        .catch(() => ({}));
+        .catch((err) => {
+          console.error("[search] fetchSpecFacets failed:", err);
+          return {};
+        });
     }
 
     const shops =
       p.page === 0
-        ? await fetchShopsFromTypesense(p.query).catch(() => [])
+        ? await fetchShopsFromTypesense(p.query).catch((err) => {
+            console.error("[search] fetchShopsFromTypesense failed:", err);
+            return [];
+          })
         : undefined;
 
     return {
@@ -276,7 +285,7 @@ async function fetchSearchData(p: SearchParams): Promise<SearchResponse> {
 
   // ── Unfiltered path — search BOTH indexes, merge & deduplicate ────────────
   const [prodRes, shopRes] = await Promise.allSettled([
-    svc.searchIdsWithFacets({
+    mainService.searchIdsWithFacets({
       indexName: "products",
       query: p.query,
       page: p.page,
@@ -285,7 +294,7 @@ async function fetchSearchData(p: SearchParams): Promise<SearchResponse> {
       numericFilters: [],
       sortOption: p.sortOption,
     }),
-    svc.searchIdsWithFacets({
+    shopService.searchIdsWithFacets({
       indexName: "shop_products",
       query: p.query,
       page: p.page,
@@ -295,6 +304,13 @@ async function fetchSearchData(p: SearchParams): Promise<SearchResponse> {
       sortOption: p.sortOption,
     }),
   ]);
+
+  // Surface failures — Promise.allSettled silently dropped these before, which
+  // is exactly the failure mode that hid the products-index issue.
+  if (prodRes.status === "rejected")
+    console.error("[search] products index failed:", prodRes.reason);
+  if (shopRes.status === "rejected")
+    console.error("[search] shop_products index failed:", shopRes.reason);
 
   const seen = new Set<string>();
   const merged: ReturnType<typeof ProductUtils.fromTypeSense>[] = [];
@@ -322,14 +338,20 @@ async function fetchSearchData(p: SearchParams): Promise<SearchResponse> {
   let shops: ShopResult[] | undefined;
   if (p.page === 0) {
     [specFacets, shops] = await Promise.all([
-      svc
+      shopService
         .fetchSpecFacets({
           indexName: "shop_products",
           query: p.query,
           facetFilters: [],
         })
-        .catch(() => ({})),
-      fetchShopsFromTypesense(p.query).catch(() => []),
+        .catch((err) => {
+          console.error("[search] fetchSpecFacets failed:", err);
+          return {};
+        }),
+      fetchShopsFromTypesense(p.query).catch((err) => {
+        console.error("[search] fetchShopsFromTypesense failed:", err);
+        return [];
+      }),
     ]);
   }
 

@@ -1,26 +1,17 @@
 // src/app/api/fetchDynamicTerasProducts/route.ts
 //
-// Dynamic Teras Products API with unstable_cache for server-side caching.
-// - Initial load (no filters, default sort) → Firestore `products` collection
-// - Filtering / sorting → Typesense `products` index via mainService
-// - Spec facets fetched from Typesense on page 0
+// Dynamic Teras Products API. Mirrors the Flutter teras_product_list_provider:
+// - Default (no filter / no category / sort=date) → Firestore `products`
+//   collection ordered by `promotionScore desc, __name__ asc`. We fetch
+//   MAX_FETCH_LIMIT once and slice in-memory for pagination — keeps Firestore
+//   reads flat across page requests within the cache TTL.
+// - Any filter / category / sort change → Typesense `products` index.
+// - Spec facets fetched from Typesense on page 0.
 
 import { NextRequest, NextResponse } from "next/server";
 import { unstable_cache, revalidateTag } from "next/cache";
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  limit,
-  getDocs,
-  Query,
-  DocumentData,
-  QueryConstraint,
-  CollectionReference,
-  QuerySnapshot,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { getFirestoreAdmin } from "@/lib/firebase-admin";
+import { FieldPath } from "firebase-admin/firestore";
 import { Product, ProductUtils } from "@/app/models/Product";
 import TypeSenseServiceManager from "@/lib/typesense_service_manager";
 import type { FacetCount } from "@/app/components/FilterSideBar";
@@ -31,7 +22,9 @@ import type { FacetCount } from "@/app/components/FilterSideBar";
 
 const CONFIG = {
   DEFAULT_LIMIT: 20,
-  MAX_ARRAY_FILTER_SIZE: 10,
+  // Mirrors Flutter's _maxPages * _pageSize cap (10 * 20 = 200). One Firestore
+  // fetch covers every page within the cache TTL — pagination is in-memory.
+  MAX_FETCH_LIMIT: 200,
   CACHE_REVALIDATE_SECONDS: 120, // 2 minutes
   FACET_CACHE_REVALIDATE_SECONDS: 300, // 5 minutes
   REQUEST_TIMEOUT: 12_000,
@@ -96,35 +89,6 @@ const URL_TO_FIRESTORE_CATEGORY: Record<string, string> = {
   "pet-supplies": "Pet Supplies",
   automotive: "Automotive",
   "health-wellness": "Health & Wellness",
-};
-
-const BUYER_TO_PRODUCT_CATEGORY: Record<string, Record<string, string>> = {
-  Women: {
-    Fashion: "Clothing & Fashion",
-    Shoes: "Footwear",
-    Accessories: "Accessories",
-    Bags: "Bags & Luggage",
-    "Self Care": "Beauty & Personal Care",
-  },
-  Men: {
-    Fashion: "Clothing & Fashion",
-    Shoes: "Footwear",
-    Accessories: "Accessories",
-    Bags: "Bags & Luggage",
-    "Self Care": "Beauty & Personal Care",
-  },
-};
-
-const DIRECT_CATEGORY_MAP: Record<string, string> = {
-  "Mother & Child": "Mother & Child",
-  "Home & Furniture": "Home & Furniture",
-  Electronics: "Electronics",
-  "Books, Stationery & Hobby": "Books, Stationery & Hobby",
-  "Sports & Outdoor": "Sports & Outdoor",
-  "Tools & Hardware": "Tools & Hardware",
-  "Pet Supplies": "Pet Supplies",
-  Automotive: "Automotive",
-  "Health & Wellness": "Health & Wellness",
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -222,95 +186,26 @@ function convertToFirestoreCategory(urlCategory: string | null): string | null {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Effective filters
-// ─────────────────────────────────────────────────────────────────────────────
-
-interface EffectiveFilters {
-  category: string | null;
-  gender: string | null;
-  subcategory: string | null;
-  subsubcategory: string | null;
-}
-
-function calculateEffectiveFilters(
-  params: QueryParams,
-  firestoreCategory: string | null,
-): EffectiveFilters {
-  let effectiveCategory = firestoreCategory;
-  let effectiveGender: string | null = null;
-  let effectiveSubcategory = params.subcategory;
-  let effectiveSubSubcategory = params.subsubcategory;
-
-  if (params.filterBuyerCategory) {
-    if (
-      params.filterBuyerCategory === "Women" ||
-      params.filterBuyerCategory === "Men"
-    ) {
-      effectiveGender = params.filterBuyerCategory;
-    }
-
-    if (params.filterBuyerSubcategory) {
-      const mappedCategory =
-        BUYER_TO_PRODUCT_CATEGORY[params.filterBuyerCategory]?.[
-          params.filterBuyerSubcategory
-        ];
-      if (mappedCategory && !firestoreCategory) {
-        effectiveCategory = mappedCategory;
-      }
-    } else if (
-      params.filterBuyerCategory !== "Women" &&
-      params.filterBuyerCategory !== "Men"
-    ) {
-      const mappedCategory = DIRECT_CATEGORY_MAP[params.filterBuyerCategory];
-      if (mappedCategory && !firestoreCategory) {
-        effectiveCategory = mappedCategory;
-      }
-    }
-  }
-
-  if (params.buyerCategory === "Women" || params.buyerCategory === "Men") {
-    effectiveGender = params.buyerCategory;
-  }
-
-  if (
-    params.filterBuyerCategory &&
-    (params.filterBuyerCategory === "Women" ||
-      params.filterBuyerCategory === "Men") &&
-    params.filterBuyerSubcategory &&
-    params.filterBuyerSubSubcategory &&
-    !params.subcategory
-  ) {
-    effectiveSubcategory = params.filterBuyerSubSubcategory;
-  }
-
-  if (
-    !effectiveSubSubcategory &&
-    params.filterBuyerSubSubcategory &&
-    !(
-      params.filterBuyerCategory &&
-      (params.filterBuyerCategory === "Women" ||
-        params.filterBuyerCategory === "Men") &&
-      params.filterBuyerSubcategory
-    )
-  ) {
-    effectiveSubSubcategory = params.filterBuyerSubSubcategory;
-  }
-
-  return {
-    category: effectiveCategory,
-    gender: effectiveGender,
-    subcategory: effectiveSubcategory,
-    subsubcategory: effectiveSubSubcategory,
-  };
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Backend decision
+//
+// Use Firestore only for the simple, unfiltered Flutter-teras feed (no
+// category context, no quick filter, no dynamic filter, default sort). Any
+// other shape → Typesense, which handles arbitrary filter/sort combos without
+// extra composite indexes.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function decideBackend(p: QueryParams): "firestore" | "typesense" {
   if (p.sortOption !== "date") return "typesense";
   if (
+    p.category ||
+    p.subcategory ||
+    p.subsubcategory ||
+    p.buyerCategory ||
+    p.buyerSubcategory ||
+    p.filterBuyerCategory ||
+    p.filterBuyerSubcategory ||
+    p.filterBuyerSubSubcategory ||
+    p.quickFilter ||
     p.brands.length > 0 ||
     p.colors.length > 0 ||
     p.filterSubcategories.length > 0 ||
@@ -318,16 +213,29 @@ function decideBackend(p: QueryParams): "firestore" | "typesense" {
     p.minPrice !== null ||
     p.maxPrice !== null ||
     p.minRating !== null
-  )
+  ) {
     return "typesense";
+  }
   return "firestore";
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Firestore query (initial load only — no dynamic filters)
+// Firestore feed (mirrors Flutter teras_product_list_provider)
+//
+// Single admin-SDK fetch of the top MAX_FETCH_LIMIT products by
+// `promotionScore desc, __name__ asc`. Cached via unstable_cache so all page
+// requests within the TTL share one Firestore read.
 // ─────────────────────────────────────────────────────────────────────────────
 
-function parseProducts(snapshot: QuerySnapshot<DocumentData>): Product[] {
+async function fetchTerasFeedFromFirestore(): Promise<Product[]> {
+  const adminDb = getFirestoreAdmin();
+  const snapshot = await adminDb
+    .collection("products")
+    .orderBy("promotionScore", "desc")
+    .orderBy(FieldPath.documentId(), "asc")
+    .limit(CONFIG.MAX_FETCH_LIMIT)
+    .get();
+
   const out: Product[] = [];
   const errIds: string[] = [];
   for (const doc of snapshot.docs) {
@@ -342,57 +250,11 @@ function parseProducts(snapshot: QuerySnapshot<DocumentData>): Product[] {
   return out;
 }
 
-function buildFirestoreQuery(
-  params: QueryParams,
-  effectiveFilters: EffectiveFilters,
-): Query<DocumentData, DocumentData> {
-  const collectionRef: CollectionReference<DocumentData, DocumentData> =
-    collection(db, "products");
-  const constraints: QueryConstraint[] = [];
-
-  if (effectiveFilters.category) {
-    constraints.push(where("category", "==", effectiveFilters.category));
-  }
-  if (effectiveFilters.gender) {
-    constraints.push(
-      where("gender", "in", [effectiveFilters.gender, "Unisex"]),
-    );
-  }
-  if (effectiveFilters.subcategory) {
-    constraints.push(where("subcategory", "==", effectiveFilters.subcategory));
-  }
-  if (effectiveFilters.subsubcategory) {
-    constraints.push(
-      where("subsubcategory", "==", effectiveFilters.subsubcategory),
-    );
-  }
-
-  if (params.quickFilter) {
-    switch (params.quickFilter) {
-      case "deals":
-        constraints.push(where("discountPercentage", ">", 0));
-        break;
-      case "boosted":
-        constraints.push(where("isBoosted", "==", true));
-        break;
-      case "trending":
-        constraints.push(where("isTrending", "==", true));
-        break;
-      case "fiveStar":
-        constraints.push(where("averageRating", "==", 5));
-        break;
-    }
-  }
-
-  if (params.quickFilter === "bestSellers") {
-    constraints.push(orderBy("purchaseCount", "desc"));
-  } else {
-    constraints.push(orderBy("createdAt", "desc"));
-  }
-
-  constraints.push(limit(CONFIG.DEFAULT_LIMIT));
-  return query(collectionRef, ...constraints);
-}
+const cachedTerasFeed = unstable_cache(
+  fetchTerasFeedFromFirestore,
+  ["teras-feed"],
+  { revalidate: CONFIG.CACHE_REVALIDATE_SECONDS, tags: ["teras-products"] },
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Typesense fetch (filtering + sorting)
@@ -520,28 +382,29 @@ async function fetchTerasProductsData(
   const t0 = Date.now();
 
   const firestoreCategory = convertToFirestoreCategory(params.category);
-  const effectiveFilters = calculateEffectiveFilters(params, firestoreCategory);
   const backend = decideBackend(params);
 
-  log(`Backend: ${backend}`, effectiveFilters);
+  log(`Backend: ${backend}`);
 
-  const [{ products, hasMore }, specFacets] = await Promise.all([
-    backend === "typesense"
-      ? fetchFromTypesense(params, firestoreCategory)
-      : withRetry(async () => {
-          const q = buildFirestoreQuery(params, effectiveFilters);
-          const snapshot = await getDocs(q);
-          const products = parseProducts(snapshot);
-          return {
-            products,
-            hasMore: products.length >= CONFIG.DEFAULT_LIMIT,
-          };
-        }),
+  let products: Product[];
+  let hasMore: boolean;
 
+  if (backend === "firestore") {
+    // Flutter parity: one cached fetch of the top 200, slice per page.
+    const feed = await withRetry(() => cachedTerasFeed());
+    const start = params.page * CONFIG.DEFAULT_LIMIT;
+    products = feed.slice(start, start + CONFIG.DEFAULT_LIMIT);
+    hasMore = start + CONFIG.DEFAULT_LIMIT < feed.length;
+  } else {
+    const res = await fetchFromTypesense(params, firestoreCategory);
+    products = res.products;
+    hasMore = res.hasMore;
+  }
+
+  const specFacets =
     params.page === 0
-      ? fetchSpecFacetsForParams(params, firestoreCategory)
-      : Promise.resolve({} as Record<string, FacetCount[]>),
-  ]);
+      ? await fetchSpecFacetsForParams(params, firestoreCategory)
+      : ({} as Record<string, FacetCount[]>);
 
   return {
     products,
@@ -553,16 +416,6 @@ async function fetchTerasProductsData(
     timing: Date.now() - t0,
   };
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Server-side cache
-// ─────────────────────────────────────────────────────────────────────────────
-
-const cachedFetchTerasProducts = unstable_cache(
-  fetchTerasProductsData,
-  ["teras-products"],
-  { revalidate: CONFIG.CACHE_REVALIDATE_SECONDS, tags: ["teras-products"] },
-);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main handler
@@ -588,7 +441,7 @@ export async function GET(request: NextRequest) {
 
     try {
       const result = await withTimeout(
-        cachedFetchTerasProducts(params),
+        fetchTerasProductsData(params),
         CONFIG.REQUEST_TIMEOUT,
       );
       return NextResponse.json(result, {
