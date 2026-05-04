@@ -80,9 +80,19 @@ const SORT_CYCLE: MarketSortOption[] = [
 
 interface Props {
   categorySlug: string;
+  /**
+   * Optional first page of items, pre-fetched on the server. When provided,
+   * we paint immediately and skip the initial client-side Firestore fetch.
+   * Pagination then continues using a `createdAt` cursor (since the query
+   * orders by `createdAt desc`).
+   */
+  initialItems?: MarketItem[] | null;
 }
 
-export default function MarketCategoryDetailPage({ categorySlug }: Props) {
+export default function MarketCategoryDetailPage({
+  categorySlug,
+  initialItems,
+}: Props) {
   const t = useTranslations("market");
   const locale = useLocale();
   const isDarkMode = useTheme();
@@ -98,9 +108,21 @@ export default function MarketCategoryDetailPage({ categorySlug }: Props) {
         ? category.labelTr
         : category.label;
 
+  // ── Seed flag (frozen at first render) ───────────────────────────────────
+  // We need a stable reference to "did we receive SSR data?" — taken once at
+  // mount so prop identity changes from the parent can't flip the path.
+  const seededRef = useRef<boolean>(
+    Array.isArray(initialItems) && initialItems.length > 0,
+  );
+  const seededItemsRef = useRef<MarketItem[]>(
+    Array.isArray(initialItems) ? initialItems : [],
+  );
+
   // ── Local state ──────────────────────────────────────────────────────────
 
-  const [items, setItems] = useState<MarketItem[]>([]);
+  const [items, setItems] = useState<MarketItem[]>(
+    () => seededItemsRef.current,
+  );
   const [facets, setFacets] = useState<MarketFacets>(() => {
     // Stale-while-revalidate: seed chips from cache for instant paint.
     return (
@@ -114,16 +136,28 @@ export default function MarketCategoryDetailPage({ categorySlug }: Props) {
   const [sortOption, setSortOption] = useState<MarketSortOption>("newest");
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  // When seeded, skip the initial full-page skeleton — we already have items.
+  const [isLoading, setIsLoading] = useState(() => !seededRef.current);
   const [isSearching, setIsSearching] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
+  const [hasMore, setHasMore] = useState(
+    () => seededItemsRef.current.length >= PAGE_SIZE,
+  );
   const [showLogin, setShowLogin] = useState(false);
 
   // ── Refs for cursor + fetch lifecycle ────────────────────────────────────
 
   const tsPageRef = useRef(0);
   const lastFsDocRef = useRef<QueryDocumentSnapshot<DocumentData> | null>(null);
+  // Fallback cursor for the first paginated fetch after an SSR seed: we don't
+  // have a DocumentSnapshot from the server, so we cursor by the last item's
+  // `createdAt` (the orderBy field). Once a real client-side page returns,
+  // `lastFsDocRef` takes over and this is ignored.
+  const lastFsCreatedAtRef = useRef<number | null>(
+    seededItemsRef.current.length > 0
+      ? seededItemsRef.current[seededItemsRef.current.length - 1].createdAt
+      : null,
+  );
   const fetchTokenRef = useRef(0); // invalidates stale in-flight fetches
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -166,8 +200,13 @@ export default function MarketCategoryDetailPage({ categorySlug }: Props) {
           orderBy("createdAt", "desc"),
           limit(PAGE_SIZE),
         );
-        if (!reset && lastFsDocRef.current) {
-          q = query(q, startAfter(lastFsDocRef.current));
+        if (!reset) {
+          if (lastFsDocRef.current) {
+            q = query(q, startAfter(lastFsDocRef.current));
+          } else if (lastFsCreatedAtRef.current != null) {
+            // First paginated fetch after an SSR seed — cursor by createdAt.
+            q = query(q, startAfter(lastFsCreatedAtRef.current));
+          }
         }
 
         const snap = await getDocs(q);
@@ -178,6 +217,7 @@ export default function MarketCategoryDetailPage({ categorySlug }: Props) {
         );
         if (snap.docs.length > 0) {
           lastFsDocRef.current = snap.docs[snap.docs.length - 1];
+          lastFsCreatedAtRef.current = fetched[fetched.length - 1].createdAt;
         }
         setItems((prev) => (reset ? fetched : [...prev, ...fetched]));
         setHasMore(snap.docs.length >= PAGE_SIZE);
@@ -248,8 +288,17 @@ export default function MarketCategoryDetailPage({ categorySlug }: Props) {
     fetchTokenRef.current += 1;
     const token = fetchTokenRef.current;
 
+    // Fast path: first run with SSR-seeded items and no active filters.
+    // Keep painted items, just refresh facets in the background.
+    if (seededRef.current && !hasActiveFilters) {
+      seededRef.current = false; // one-shot — subsequent runs do real fetches
+      void fetchFacets();
+      return;
+    }
+
     tsPageRef.current = 0;
     lastFsDocRef.current = null;
+    lastFsCreatedAtRef.current = null;
     setHasMore(false);
     setIsSearching(hasActiveFilters); // show skeletons over existing grid
     if (!hasActiveFilters) setIsLoading(true); // first entry shows full skeleton

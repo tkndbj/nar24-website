@@ -341,70 +341,154 @@ const prefetchDynamicListConfigs = unstable_cache(
   async (): Promise<PrefetchedDynamicListConfig[]> => {
     const db = getFirestoreAdmin();
 
-    // 1. Fetch list configs
+    // Reads the denormalized `home_lists` collection produced by the
+    // `home-list-manifest` Cloud Functions. Each manifest doc already has
+    // its product summaries embedded inline, so this is one Firestore
+    // query total — no per-list product fetches.
     const snapshot = await db
-      .collection("dynamic_product_lists")
+      .collection("home_lists")
       .where("isActive", "==", true)
       .orderBy("order")
       .get();
 
     const configs: PrefetchedDynamicListConfig[] = [];
 
-    // 2. For each config, fetch its products in parallel
-    const configPromises = snapshot.docs.map(async (doc) => {
+    for (const doc of snapshot.docs) {
       const d = doc.data();
-      const config: PrefetchedDynamicListConfig = {
+      const rawProducts = Array.isArray(d.products) ? d.products : [];
+
+      // Decode embedded summaries into the PrefetchedProduct shape that
+      // the client component already understands. Same end shape as the
+      // pre-manifest path; the data just lives inline now.
+      const prefetchedProducts: PrefetchedProduct[] = [];
+      for (const entry of rawProducts) {
+        if (!entry || typeof entry !== "object") continue;
+        const p = entry as Record<string, unknown>;
+        const id = typeof p.id === "string" ? p.id : "";
+        if (!id) continue;
+        const product = mapManifestEntryToPrefetchedProduct(id, p);
+        if (product) prefetchedProducts.push(product);
+        if (prefetchedProducts.length >= 20) break;
+      }
+
+      configs.push({
         id: doc.id,
         title: (d.title || "Product List") as string,
         isActive: true,
         order: Number(d.order) || 0,
         gradientStart: d.gradientStart as string | undefined,
         gradientEnd: d.gradientEnd as string | undefined,
-        selectedProductIds: d.selectedProductIds as string[] | undefined,
+        selectedProductIds: undefined, // not needed; products are embedded
         selectedShopId: d.selectedShopId as string | undefined,
-        limit: d.limit ? Number(d.limit) : undefined,
+        limit: undefined,
         showViewAllButton: d.showViewAllButton as boolean | undefined,
-      };
-
-      // Fetch products for this list
-      try {
-        if (config.selectedProductIds && config.selectedProductIds.length > 0) {
-          config.prefetchedProducts = await fetchProductDocsByIds(
-            db,
-            config.selectedProductIds,
-            20,
-          );
-        } else if (config.selectedShopId) {
-          const shopLimit = Math.min(Math.max(config.limit ?? 10, 1), 20);
-          const shopSnapshot = await db
-            .collection("shop_products")
-            .where("shopId", "==", config.selectedShopId)
-            .limit(shopLimit)
-            .get();
-          const products: PrefetchedProduct[] = [];
-          for (const productDoc of shopSnapshot.docs) {
-            const parsed = parseProductDoc(productDoc);
-            if (parsed) products.push(parsed);
-          }
-          config.prefetchedProducts = products;
-        }
-      } catch (e) {
-        console.error(`[Prefetch] Error fetching products for list ${doc.id}:`, e);
-      }
-
-      return config;
-    });
-
-    const results = await Promise.allSettled(configPromises);
-    for (const result of results) {
-      if (result.status === "fulfilled") configs.push(result.value);
+        prefetchedProducts,
+      });
     }
 
     return configs.sort((a, b) => a.order - b.order);
   },
-  ["prefetch-dynamic-list-configs-with-products"],
+  ["prefetch-home-lists-manifests"],
   { revalidate: 120 },
 );
+
+/**
+ * Convert one entry from the home_lists manifest's embedded `products` array
+ * into a `PrefetchedProduct`. Mirrors `parseProductDoc`'s logic but operates
+ * on a plain object (the manifest entry) rather than a Firestore snapshot.
+ */
+function mapManifestEntryToPrefetchedProduct(
+  id: string,
+  d: Record<string, unknown>,
+): PrefetchedProduct | null {
+  const productName = (d.productName as string) || (d.title as string) || "";
+  const price = Number(d.price);
+  if (!productName || !Number.isFinite(price)) return null;
+
+  let colorImages: Record<string, string[]> | undefined;
+  if (d.colorImages && typeof d.colorImages === "object") {
+    colorImages = {};
+    for (const [k, v] of Object.entries(d.colorImages as Record<string, unknown>)) {
+      if (Array.isArray(v)) colorImages[k] = v as string[];
+    }
+  }
+
+  let colorImageStoragePaths: Record<string, string> | undefined;
+  if (
+    d.colorImageStoragePaths &&
+    typeof d.colorImageStoragePaths === "object" &&
+    !Array.isArray(d.colorImageStoragePaths)
+  ) {
+    colorImageStoragePaths = {};
+    for (const [k, v] of Object.entries(
+      d.colorImageStoragePaths as Record<string, unknown>,
+    )) {
+      if (v != null) colorImageStoragePaths[k] = String(v);
+    }
+  }
+
+  let colorQuantities: Record<string, number> | undefined;
+  if (d.colorQuantities && typeof d.colorQuantities === "object") {
+    colorQuantities = {};
+    for (const [k, v] of Object.entries(
+      d.colorQuantities as Record<string, unknown>,
+    )) {
+      colorQuantities[k] = Number(v) || 0;
+    }
+  }
+
+  let attributes: Record<string, unknown> | undefined;
+  if (d.attributes && typeof d.attributes === "object" && !Array.isArray(d.attributes)) {
+    const raw = { ...(d.attributes as Record<string, unknown>) };
+    const specKeys = [
+      "clothingSizes", "clothingFit", "clothingTypes", "pantSizes",
+      "pantFabricTypes", "footwearSizes", "jewelryMaterials",
+      "consoleBrand", "curtainMaxWidth", "curtainMaxHeight",
+      "productType", "gender",
+    ];
+    for (const k of specKeys) delete raw[k];
+    if (Object.keys(raw).length > 0) attributes = raw;
+  }
+
+  return {
+    id,
+    productName,
+    imageUrls: Array.isArray(d.imageUrls) ? (d.imageUrls as string[]) : [],
+    imageStoragePaths: Array.isArray(d.imageStoragePaths)
+      ? (d.imageStoragePaths as string[])
+      : undefined,
+    colorImageStoragePaths,
+    price,
+    currency: (d.currency as string) || "TL",
+    condition: d.condition as string | undefined,
+    brandModel: (d.brandModel || d.brand) as string | undefined,
+    quantity: d.quantity != null ? Number(d.quantity) : undefined,
+    colorQuantities,
+    colorImages,
+    averageRating: d.averageRating != null ? Number(d.averageRating) : undefined,
+    discountPercentage:
+      d.discountPercentage != null ? Number(d.discountPercentage) : undefined,
+    deliveryOption: d.deliveryOption as string | undefined,
+    campaignName: d.campaignName as string | undefined,
+    isBoosted: d.isBoosted === true ? true : undefined,
+    category: d.category as string | undefined,
+    subcategory: d.subcategory as string | undefined,
+    subsubcategory: d.subsubcategory as string | undefined,
+    gender: d.gender as string | undefined,
+    shopId: d.shopId as string | undefined,
+    clothingSizes: Array.isArray(d.clothingSizes)
+      ? (d.clothingSizes as string[])
+      : undefined,
+    pantSizes: Array.isArray(d.pantSizes) ? (d.pantSizes as string[]) : undefined,
+    footwearSizes: Array.isArray(d.footwearSizes)
+      ? (d.footwearSizes as string[])
+      : undefined,
+    jewelryMaterials: Array.isArray(d.jewelryMaterials)
+      ? (d.jewelryMaterials as string[])
+      : undefined,
+    attributes,
+  };
+}
 
 const prefetchShops = unstable_cache(
   async (): Promise<PrefetchedShop[]> => {

@@ -27,10 +27,13 @@ interface DynamicListData {
   order: number;
   gradientStart?: string;
   gradientEnd?: string;
-  selectedProductIds?: string[];
   selectedShopId?: string;
-  limit?: number;
   showViewAllButton?: boolean;
+  // Inlined by the `home-list-manifest` Cloud Functions. Same shape the
+  // SSR path puts into `prefetchedProducts`; consumed by
+  // `hydrateProductsFromManifest`.
+  products?: Record<string, unknown>[];
+  // Server-prefetched (already-decoded) products — set on the SSR path.
   prefetchedProducts?: PrefetchedProduct[];
 }
 
@@ -40,8 +43,6 @@ interface DynamicListData {
 
 const MAX_CACHED_LISTS = 10;
 const MAX_PRODUCTS_PER_LIST = 20;
-const BATCH_SIZE = 10;
-const FETCH_TIMEOUT_MS = 10000;
 
 const PORTRAIT_IMAGE_HEIGHT = 380;
 const INFO_AREA_HEIGHT = 80;
@@ -144,79 +145,34 @@ class LRUProductCache {
 const productCache = new LRUProductCache();
 
 // ============================================================================
-// PRODUCT FETCHER — lazy Firebase
+// PRODUCT DECODER
 // ============================================================================
+//
+// The home_lists manifest doc embeds product summaries inline. There's no
+// separate per-product Firestore fetch on the client anymore — the products
+// arrived with the list config in a single read. This function just decodes
+// the embedded array into the Product shape the card expects.
 
-async function fetchProductsForList(
+function hydrateProductsFromManifest(
   listData: DynamicListData,
-): Promise<Product[]> {
+): Product[] {
+  const raw = (listData as unknown as { products?: unknown }).products;
+  if (!Array.isArray(raw)) return [];
+
   const products: Product[] = [];
-
-  try {
-    const [db, { collection, query, where, getDocs, documentId, limit: firestoreLimit }] =
-      await Promise.all([getFirebaseDb(), import("firebase/firestore")]);
-
-    // Mode 1: Fetch by specific product IDs
-    if (listData.selectedProductIds && listData.selectedProductIds.length > 0) {
-      const productIds = listData.selectedProductIds;
-      let fetchedCount = 0;
-
-      for (
-        let i = 0;
-        i < productIds.length && fetchedCount < MAX_PRODUCTS_PER_LIST;
-        i += BATCH_SIZE
-      ) {
-        const batch = productIds.slice(
-          i,
-          Math.min(i + BATCH_SIZE, productIds.length),
-        );
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(
-          () => controller.abort(),
-          FETCH_TIMEOUT_MS,
-        );
-
-        try {
-          const batchQuery = query(
-            collection(db, "shop_products"),
-            where(documentId(), "in", batch),
-          );
-          const batchDocs = await getDocs(batchQuery);
-
-          clearTimeout(timeoutId);
-
-          for (const doc of batchDocs.docs) {
-            if (fetchedCount >= MAX_PRODUCTS_PER_LIST) break;
-            products.push({ id: doc.id, ...doc.data() } as Product);
-            fetchedCount++;
-          }
-        } catch (e) {
-          clearTimeout(timeoutId);
-          console.error(`Error fetching batch for ${listData.id}:`, e);
-        }
-      }
-    }
-    // Mode 2: Fetch by shop ID
-    else if (listData.selectedShopId && listData.selectedShopId.length > 0) {
-      const shopLimit = Math.min(
-        Math.max(listData.limit ?? 10, 1),
-        MAX_PRODUCTS_PER_LIST,
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object") continue;
+    try {
+      products.push(
+        ProductUtils.fromJson(entry as Record<string, unknown>),
       );
-
-      const shopQuery = query(
-        collection(db, "shop_products"),
-        where("shopId", "==", listData.selectedShopId),
-        firestoreLimit(shopLimit),
+    } catch (e) {
+      console.warn(
+        `[DynamicHorizontalList] skipping malformed product in ${listData.id}:`,
+        e,
       );
-
-      const snapshot = await getDocs(shopQuery);
-      for (const doc of snapshot.docs) {
-        products.push({ id: doc.id, ...doc.data() } as Product);
-      }
     }
-  } catch (e) {
-    console.error(`Error fetching products for ${listData.id}:`, e);
+    if (products.length >= MAX_PRODUCTS_PER_LIST) break;
   }
 
   return products;
@@ -247,79 +203,45 @@ const DynamicListSection = React.memo(
         .filter((p): p is Product => p !== null);
     }, [listData.prefetchedProducts]);
 
-    const [products, setProducts] = useState<Product[] | null>(
-      () => {
-        // Priority: server data > LRU cache > null
-        if (hydratedFromServer && hydratedFromServer.length > 0) return hydratedFromServer;
-        return productCache.get(listData.id) ?? null;
-      },
+    // Products are inlined in the manifest doc, so the section has its
+    // products from the moment the list config arrives — whether that's
+    // SSR-prefetched or fetched client-side in the parent component.
+    const productsFromManifest = useMemo(
+      () => hydrateProductsFromManifest(listData),
+      [listData],
     );
-    const hasServerData = hydratedFromServer !== null && hydratedFromServer.length > 0;
-    const [loading, setLoading] = useState(false);
-    const [isVisible, setIsVisible] = useState(false);
+
+    const initialProducts =
+      hydratedFromServer && hydratedFromServer.length > 0
+        ? hydratedFromServer
+        : productsFromManifest.length > 0
+          ? productsFromManifest
+          : (productCache.get(listData.id) ?? null);
+
+    const [products, setProducts] = useState<Product[] | null>(initialProducts);
     const [canScrollLeft, setCanScrollLeft] = useState(false);
     const [canScrollRight, setCanScrollRight] = useState(false);
 
     const scrollRef = useRef<HTMLDivElement>(null);
     const sectionRef = useRef<HTMLDivElement>(null);
-    const hasFetchedRef = useRef(products !== null);
 
-    // Populate LRU cache from server data (once)
+    // Populate LRU cache (server data takes priority, then manifest data).
     useEffect(() => {
-      if (hydratedFromServer && hydratedFromServer.length > 0 && !productCache.has(listData.id)) {
-        productCache.set(listData.id, hydratedFromServer);
+      const source =
+        hydratedFromServer && hydratedFromServer.length > 0
+          ? hydratedFromServer
+          : productsFromManifest;
+      if (source.length > 0 && !productCache.has(listData.id)) {
+        productCache.set(listData.id, source);
       }
-    }, [hydratedFromServer, listData.id]);
+    }, [hydratedFromServer, productsFromManifest, listData.id]);
 
-    // Progressive loading: start fetching 200px before section enters viewport
-    // (skipped entirely when server data is available)
+    // If listData updates with new products (parent re-fetch), reflect it.
     useEffect(() => {
-      if (hasServerData) return; // No need to observe — already have data
-
-      const el = sectionRef.current;
-      if (!el) return;
-
-      const observer = new IntersectionObserver(
-        ([entry]) => {
-          if (entry.isIntersecting) {
-            setIsVisible(true);
-            observer.disconnect();
-          }
-        },
-        { rootMargin: "200px" },
-      );
-
-      observer.observe(el);
-      return () => observer.disconnect();
-    }, [hasServerData]);
-
-    // Load products when visible (one-time fetch, fallback only)
-    useEffect(() => {
-      if (hasServerData) return; // Server data available, skip client fetch
-      if (!isVisible || hasFetchedRef.current) return;
-
-      const cached = productCache.get(listData.id);
-      if (cached) {
-        setProducts(cached);
-        hasFetchedRef.current = true;
-        return;
+      if (productsFromManifest.length > 0) {
+        setProducts(productsFromManifest);
       }
-
-      let cancelled = false;
-      hasFetchedRef.current = true;
-      setLoading(true);
-
-      fetchProductsForList(listData).then((fetched) => {
-        if (cancelled) return;
-        productCache.set(listData.id, fetched);
-        setProducts(fetched);
-        setLoading(false);
-      });
-
-      return () => {
-        cancelled = true;
-      };
-    }, [isVisible, listData, hasServerData]);
+    }, [productsFromManifest]);
 
     // Scroll position check
     const checkScrollPosition = useCallback(() => {
@@ -354,8 +276,8 @@ const DynamicListSection = React.memo(
     const gradientStart = parseColor(listData.gradientStart, "#FF6B35");
     const gradientEnd = parseColor(listData.gradientEnd, "#FF8A65");
 
-    const showShimmer = !products || loading;
-    const isEmpty = products !== null && !loading && products.length === 0;
+    const showShimmer = products === null;
+    const isEmpty = products !== null && products.length === 0;
 
     // Don't render empty lists
     if (isEmpty) return null;
@@ -486,9 +408,12 @@ export default function DynamicHorizontalList({
   const [isLoading, setIsLoading] = useState(ssrLists.length === 0);
   const isDarkMode = useTheme();
 
-  // One-time fetch for dynamic lists config (skipped if SSR data available)
+  // One-time fetch for the home-screen list manifests (skipped if SSR data
+  // is available). Reads `home_lists` — the denormalized collection
+  // maintained server-side by the `home-list-manifest` Cloud Functions.
+  // Each manifest doc embeds its product summaries inline, so this single
+  // query also delivers the products: 1 read per list, regardless of size.
   useEffect(() => {
-    // Skip if we have server-prefetched configs
     if (lists.length > 0) {
       setIsLoading(false);
       return;
@@ -496,13 +421,13 @@ export default function DynamicHorizontalList({
 
     let cancelled = false;
 
-    async function fetchDynamicLists() {
+    async function fetchManifestLists() {
       try {
         const [db, { collection, query, where, orderBy, getDocs }] =
           await Promise.all([getFirebaseDb(), import("firebase/firestore")]);
 
         const listsQuery = query(
-          collection(db, "dynamic_product_lists"),
+          collection(db, "home_lists"),
           where("isActive", "==", true),
           orderBy("order"),
         );
@@ -518,12 +443,12 @@ export default function DynamicHorizontalList({
         setLists(fetchedLists);
         setIsLoading(false);
       } catch (e) {
-        console.error("Error fetching dynamic lists:", e);
+        console.error("Error fetching home list manifests:", e);
         if (!cancelled) setIsLoading(false);
       }
     }
 
-    fetchDynamicLists();
+    fetchManifestLists();
     return () => {
       cancelled = true;
     };

@@ -53,10 +53,12 @@ export default function RootLayout({
         {/* Preconnect to critical third-party domains for faster loading */}
         <link rel="preconnect" href="https://res.cloudinary.com" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://firebasestorage.googleapis.com" />
+        <link rel="preconnect" href="https://firestore.googleapis.com" />
         <link rel="preconnect" href="https://www.googleapis.com" />
         <link rel="preconnect" href="https://identitytoolkit.googleapis.com" />
         <link rel="dns-prefetch" href="https://res.cloudinary.com" />
         <link rel="dns-prefetch" href="https://firebasestorage.googleapis.com" />
+        <link rel="dns-prefetch" href="https://firestore.googleapis.com" />
         <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
         {/* Algolia search */}
         <link rel="preconnect" href="https://algolia.net" crossOrigin="anonymous" />
