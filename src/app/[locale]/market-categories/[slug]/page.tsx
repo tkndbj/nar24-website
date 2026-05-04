@@ -8,10 +8,39 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { unstable_cache } from "next/cache";
 import { getLocale, getTranslations } from "next-intl/server";
-import { MARKET_CATEGORY_MAP } from "@/constants/marketCategories";
+import {
+  MARKET_CATEGORIES,
+  MARKET_CATEGORY_MAP,
+} from "@/constants/marketCategories";
 import { getFirestoreAdmin } from "@/lib/firebase-admin";
 import type { MarketItem } from "@/lib/typesense_market_service";
 import MarketCategoryDetailPage from "../../../components/market/MarketCategoriesDetailPage";
+
+// Pre-render every (locale × slug) combination at build time. The slug list
+// is finite (~22 categories defined in constants) and locale list is small
+// (en/tr), so the full matrix is tiny — ~44 pages — and serves from CDN edge
+// after build instead of running a serverless function per request.
+//
+// `dynamicParams = true` (the default) means an unknown slug still falls
+// back to runtime SSR + notFound() — no regression for any link we missed.
+const SUPPORTED_LOCALES = ["en", "tr"] as const;
+
+export async function generateStaticParams(): Promise<
+  Array<{ locale: string; slug: string }>
+> {
+  const out: Array<{ locale: string; slug: string }> = [];
+  for (const locale of SUPPORTED_LOCALES) {
+    for (const cat of MARKET_CATEGORIES) {
+      out.push({ locale, slug: cat.slug });
+    }
+  }
+  return out;
+}
+
+// Stale-while-revalidate at the page level too — matches the unstable_cache
+// window on the underlying fetcher so the data and the rendered HTML don't
+// drift apart in age.
+export const revalidate = 60;
 
 interface RouteParams {
   params: Promise<{ slug: string }>;

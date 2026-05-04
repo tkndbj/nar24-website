@@ -131,6 +131,18 @@ export default function MarketCategoryDetailPage({
       ) ?? MARKET_FACETS_EMPTY
     );
   });
+  // Tracks whether the first Typesense facets fetch has completed.
+  // - Initially true if we already have cached facets (no need to show skeleton).
+  // - Flips to true after the first fetchFacets() resolves (success OR error)
+  //   so subsequent filter changes update chips in place without flashing the
+  //   skeleton again.
+  const [hasLoadedFacets, setHasLoadedFacets] = useState(() => {
+    const cached =
+      TypeSenseServiceManager.instance.marketService.cachedUnfilteredFacets(
+        categorySlug,
+      );
+    return cached != null;
+  });
   const [selectedBrands, setSelectedBrands] = useState<Set<string>>(new Set());
   const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set());
   const [sortOption, setSortOption] = useState<MarketSortOption>("newest");
@@ -279,6 +291,10 @@ export default function MarketCategoryDetailPage({
       setFacets(next);
     } catch (err) {
       console.warn("[MarketDetail] Facets error:", err);
+    } finally {
+      // Always exit the skeleton state, even on error — otherwise a Typesense
+      // outage would leave the chip rows showing skeletons indefinitely.
+      setHasLoadedFacets(true);
     }
   }, [categorySlug, debouncedQuery, selectedBrands, selectedTypes]);
 
@@ -486,24 +502,35 @@ export default function MarketCategoryDetailPage({
           </button>
         </div>
 
-        {/* Facet chips */}
-        {facets.types.length > 0 && (
-          <FacetChipRow
-            label={t("facetType")}
-            facets={facets.types}
-            selected={selectedTypes}
-            isDarkMode={isDarkMode}
-            onToggle={toggleType}
-          />
-        )}
-        {facets.brands.length > 0 && (
-          <FacetChipRow
-            label={t("facetBrand")}
-            facets={facets.brands}
-            selected={selectedBrands}
-            isDarkMode={isDarkMode}
-            onToggle={toggleBrand}
-          />
+        {/* Facet chips — skeleton on first load to prevent CLS, real chips
+            after the first Typesense fetch resolves. Subsequent filter changes
+            update chips in place without re-flashing the skeleton. */}
+        {!hasLoadedFacets ? (
+          <>
+            <FacetChipRowSkeleton isDarkMode={isDarkMode} />
+            <FacetChipRowSkeleton isDarkMode={isDarkMode} />
+          </>
+        ) : (
+          <>
+            {facets.types.length > 0 && (
+              <FacetChipRow
+                label={t("facetType")}
+                facets={facets.types}
+                selected={selectedTypes}
+                isDarkMode={isDarkMode}
+                onToggle={toggleType}
+              />
+            )}
+            {facets.brands.length > 0 && (
+              <FacetChipRow
+                label={t("facetBrand")}
+                facets={facets.brands}
+                selected={selectedBrands}
+                isDarkMode={isDarkMode}
+                onToggle={toggleBrand}
+              />
+            )}
+          </>
         )}
 
         {/* Clear button */}
@@ -603,6 +630,42 @@ function ProductGrid({ children }: { children: React.ReactNode }) {
       style={{ gridAutoRows: "min-content" }}
     >
       {children}
+    </div>
+  );
+}
+
+/**
+ * Skeleton placeholder for one facet row (label + horizontally scrolling chips).
+ * Renders the same vertical footprint as the real `FacetChipRow` so the chip
+ * area doesn't shift when real chips land. Pure CSS — no JS, no animations
+ * beyond Tailwind's `animate-pulse`.
+ */
+function FacetChipRowSkeleton({ isDarkMode }: { isDarkMode: boolean }) {
+  // Mixed widths to look like real chips of varying length.
+  const chipWidths = [56, 80, 64, 96, 72, 60, 88];
+  return (
+    <div className="mt-4" aria-hidden>
+      {/* Label placeholder — matches the [11px font + uppercase] real label */}
+      <div
+        className={`px-1 mb-1.5 h-3 w-16 rounded ${
+          isDarkMode ? "bg-gray-800" : "bg-gray-200"
+        } animate-pulse`}
+      />
+      {/* Chip placeholders — same height (28px) as the real chips */}
+      <div
+        className="flex gap-2 overflow-hidden pb-1"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+      >
+        {chipWidths.map((w, i) => (
+          <div
+            key={i}
+            className={`h-7 rounded-full shrink-0 ${
+              isDarkMode ? "bg-gray-800" : "bg-gray-100"
+            } animate-pulse`}
+            style={{ width: w }}
+          />
+        ))}
+      </div>
     </div>
   );
 }
