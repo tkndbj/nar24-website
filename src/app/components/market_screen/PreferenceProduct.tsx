@@ -172,17 +172,34 @@ export const PreferenceProduct = React.memo(
       setError(null);
 
       try {
-        // Client-side fallback: fetch trending IDs then product details
-        const productIds = await personalizedFeedService.getProductIds();
+        // ── Manifest fast path: 1 read (user_profile doc) instead of 1 + 30
+        // (whereIn on shop_products). Returns null when the user_profile
+        // doc predates the embed rollout or the CF skipped embedding due
+        // to size.
+        const embedded = await personalizedFeedService.getTopProducts();
+        let fetchedProducts: Product[];
 
-        if (productIds.length === 0) {
-          setProducts([]);
-          setIsLoading(false);
-          return;
+        if (embedded && embedded.length > 0) {
+          fetchedProducts = embedded.slice(0, 30);
+          console.log(
+            `✅ Loaded ${fetchedProducts.length} preference products from manifest (1 read)`
+          );
+        } else {
+          // ── Backward-compat fallback: ID list + whereIn lookup.
+          const productIds = await personalizedFeedService.getProductIds();
+
+          if (productIds.length === 0) {
+            setProducts([]);
+            setIsLoading(false);
+            return;
+          }
+
+          const topProductIds = productIds.slice(0, 30);
+          fetchedProducts = await fetchProductDetails(topProductIds);
+          console.log(
+            `✅ Loaded ${fetchedProducts.length} preference products via whereIn fallback`
+          );
         }
-
-        const topProductIds = productIds.slice(0, 30);
-        const fetchedProducts = await fetchProductDetails(topProductIds);
 
         // ✅ CACHE THE PRODUCTS
         cachedProducts = fetchedProducts;

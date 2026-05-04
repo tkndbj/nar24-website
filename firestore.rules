@@ -19,6 +19,11 @@ match /pendingPayments/{orderNumber} {
   allow write: if false;
 }
 
+match /pendingBoostPayments/{orderNumber} {
+  allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+  allow write: if false;
+}
+
 match /trending_products/{trendingId} {
   allow read: if true; // Anyone can read (including unauthenticated)
 }
@@ -973,10 +978,22 @@ match /product_edit_applications/{editApplicationId} {
 }
       
 
+     // *** Rules for 'users_public' Collection ***
+     // Public mirror of a small subset of /users fields. Read-open by design;
+     // writes happen exclusively through the `mirrorUserToPublic` Cloud
+     // Function (see functions/58-users-public-mirror/index.js).
+     match /users_public/{userId} {
+       allow get, list: if true;
+       allow write: if false;
+     }
+
      // *** Rules for 'users' Collection ***
+     // Parent doc holds PII (email, phone, IBAN in sellerInfo, fcmTokens,
+     // addresses, etc.). Only the owner can read it. Cross-user reads must
+     // go through /users_public above.
     match /users/{userId} {
-      allow read: if true;
-      allow get, list: if true;
+      allow get: if request.auth != null && request.auth.uid == userId;
+      allow list: if false;
       allow create: if request.auth != null && request.auth.uid == userId;
       
     match /preferences/{preferenceId} {

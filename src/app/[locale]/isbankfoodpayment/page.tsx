@@ -12,19 +12,40 @@ import {
   X,
   UtensilsCrossed,
 } from "lucide-react";
-import { httpsCallable } from "firebase/functions";
+import {
+  doc,
+  getDoc,
+  onSnapshot,
+  type DocumentData,
+} from "firebase/firestore";
 import { useUser } from "@/context/UserProvider";
-import { db, functions } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
 import {
   FoodCartProvider,
   useFoodCartActions,
 } from "@/context/FoodCartProvider";
 
-interface PaymentStatusResponse {
-  status: string;
-  orderId?: string;
-  errorMessage?: string;
-}
+// ════════════════════════════════════════════════════════════════════════════
+// Constants
+// ════════════════════════════════════════════════════════════════════════════
+
+/** Firestore status values written by the Cloud Functions payment pipeline. */
+const STATUS = {
+  COMPLETED: "completed",
+  PAYMENT_FAILED: "payment_failed",
+  HASH_FAILED: "hash_verification_failed",
+  PAYMENT_OK_ORDER_FAILED: "payment_succeeded_order_failed",
+} as const;
+
+/** Fallback poll schedule — only fires if the Firestore listener is silent. */
+const FALLBACK_FAST_POLL_COUNT = 10;
+const FALLBACK_FAST_MS = 5_000;
+const FALLBACK_SLOW_MS = 10_000;
+const FALLBACK_MAX_POLLS = 30; // ~4.5 minutes total cap
+
+const SUCCESS_REDIRECT_DELAY_MS = 2_000;
+
+type PaymentStatus = "pending" | "completed" | "failed" | "timeout";
 
 export default function FoodPaymentPage() {
   const { user } = useUser();
@@ -44,19 +65,111 @@ function FoodPaymentContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [paymentStatus, setPaymentStatus] = useState<string>("pending");
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("pending");
   const [successOrderId, setSuccessOrderId] = useState<string>("");
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const statusCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const hasSubmittedRef = useRef(false);
 
   // URL params from checkout page
   const gatewayUrl = searchParams.get("gatewayUrl");
   const orderNumber = searchParams.get("orderNumber");
   const paymentParamsStr = searchParams.get("paymentParams");
 
-  // ── Dark mode observer ─────────────────────────────────────────────
+  // ── Refs (so effects don't cascade on handler identity) ─────────────────
+  const resultHandledRef = useRef(false);
+  const formSubmittedRef = useRef(false);
+  const firestoreUnsubRef = useRef<(() => void) | null>(null);
+  const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fallbackCountRef = useRef(0);
+
+  // ── Cleanup helper ──────────────────────────────────────────────────────
+  const teardownListeners = useCallback(() => {
+    firestoreUnsubRef.current?.();
+    firestoreUnsubRef.current = null;
+    if (fallbackTimerRef.current) {
+      clearTimeout(fallbackTimerRef.current);
+      fallbackTimerRef.current = null;
+    }
+  }, []);
+
+  // ── Result handlers (idempotent) ────────────────────────────────────────
+
+  const handleSuccess = useCallback(
+    async (orderId: string) => {
+      if (resultHandledRef.current) return;
+      resultHandledRef.current = true;
+      teardownListeners();
+
+      setPaymentStatus("completed");
+      setSuccessOrderId(orderId);
+
+      // Non-critical: cart resyncs from Firestore on next page anyway.
+      try {
+        await clearCart();
+      } catch (e) {
+        console.warn("[FoodPayment] Cart clear failed (non-critical):", e);
+      }
+
+      setTimeout(() => {
+        router.push(
+          `/food-orders?success=true&orderId=${encodeURIComponent(orderId)}`,
+        );
+      }, SUCCESS_REDIRECT_DELAY_MS);
+    },
+    [clearCart, router, teardownListeners],
+  );
+
+  const handleFailure = useCallback(
+    (message: string) => {
+      if (resultHandledRef.current) return;
+      resultHandledRef.current = true;
+      teardownListeners();
+
+      setPaymentStatus("failed");
+      setError(message.trim() || t("paymentFailed"));
+    },
+    [t, teardownListeners],
+  );
+
+  const handleTimeout = useCallback(() => {
+    if (resultHandledRef.current) return;
+    resultHandledRef.current = true;
+    teardownListeners();
+
+    setPaymentStatus("timeout");
+    setError(t("paymentTimeout"));
+  }, [t, teardownListeners]);
+
+  const handleStatusDoc = useCallback(
+    (data: DocumentData) => {
+      if (resultHandledRef.current) return;
+      const s = typeof data.status === "string" ? data.status : undefined;
+      switch (s) {
+        case STATUS.COMPLETED:
+          void handleSuccess(
+            typeof data.orderId === "string" ? data.orderId : "",
+          );
+          break;
+        case STATUS.PAYMENT_FAILED:
+        case STATUS.HASH_FAILED:
+          handleFailure(
+            typeof data.errorMessage === "string" ? data.errorMessage : "",
+          );
+          break;
+        case STATUS.PAYMENT_OK_ORDER_FAILED:
+          handleFailure(t("paymentFailed"));
+          break;
+        default:
+          // pending / processing — keep waiting
+          break;
+      }
+    },
+    [handleSuccess, handleFailure, t],
+  );
+  const handleStatusDocRef = useRef(handleStatusDoc);
+  handleStatusDocRef.current = handleStatusDoc;
+
+  // ── Dark mode observer ──────────────────────────────────────────────────
   useEffect(() => {
     const check = () =>
       setIsDarkMode(document.documentElement.classList.contains("dark"));
@@ -66,97 +179,96 @@ function FoodPaymentContent() {
     return () => observer.disconnect();
   }, []);
 
-  // ── Cleanup on unmount ─────────────────────────────────────────────
+  // ── Firestore real-time listener (primary signal) ───────────────────────
   useEffect(() => {
-    return () => {
-      if (statusCheckIntervalRef.current) {
-        clearInterval(statusCheckIntervalRef.current);
-      }
-    };
-  }, []);
-
-  // ── Check payment status (single call) ─────────────────────────────
-  const checkPaymentStatus = useCallback(async () => {
     if (!orderNumber) return;
 
-    try {
-      const checkStatus = httpsCallable(functions, "checkFoodPaymentStatus");
-      const result = await checkStatus({ orderNumber });
-      const data = result.data as PaymentStatusResponse;
-      const status = data?.status;
+    const ref = doc(db, "pendingFoodPayments", orderNumber);
+    const unsubscribe = onSnapshot(
+      ref,
+      (snap) => {
+        if (!snap.exists() || resultHandledRef.current) return;
+        const data = snap.data();
+        if (data) handleStatusDocRef.current(data);
+      },
+      (err) => {
+        console.warn("[FoodPayment] Firestore listener error:", err);
+      },
+    );
+    firestoreUnsubRef.current = unsubscribe;
 
-      if (status === "completed") {
-        if (statusCheckIntervalRef.current) {
-          clearInterval(statusCheckIntervalRef.current);
-          statusCheckIntervalRef.current = null;
+    return () => {
+      unsubscribe();
+      if (firestoreUnsubRef.current === unsubscribe) {
+        firestoreUnsubRef.current = null;
+      }
+    };
+  }, [orderNumber]);
+
+  // ── Slow fallback poll ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (!orderNumber) return;
+    fallbackCountRef.current = 0;
+
+    const scheduleNext = () => {
+      if (resultHandledRef.current) return;
+
+      const delay =
+        fallbackCountRef.current < FALLBACK_FAST_POLL_COUNT
+          ? FALLBACK_FAST_MS
+          : FALLBACK_SLOW_MS;
+
+      fallbackTimerRef.current = setTimeout(async () => {
+        if (resultHandledRef.current) return;
+        fallbackCountRef.current += 1;
+
+        if (fallbackCountRef.current > FALLBACK_MAX_POLLS) {
+          handleTimeout();
+          return;
         }
-        setPaymentStatus("completed");
-        setSuccessOrderId(data.orderId || "");
 
-        // Clear the food cart
         try {
-          await clearCart();
-        } catch (e) {
-          console.warn("[FoodPayment] Cart clear failed (non-critical):", e);
-        }
-
-        // Navigate after brief success display
-        setTimeout(() => {
-          router.push(
-            `/food-orders?success=true&orderId=${data.orderId || ""}`,
+          const snap = await getDoc(
+            doc(db, "pendingFoodPayments", orderNumber),
           );
-        }, 2000);
-      } else if (
-        status === "payment_failed" ||
-        status === "hash_verification_failed" ||
-        status === "payment_succeeded_order_failed"
-      ) {
-        if (statusCheckIntervalRef.current) {
-          clearInterval(statusCheckIntervalRef.current);
-          statusCheckIntervalRef.current = null;
+          if (snap.exists() && !resultHandledRef.current) {
+            const data = snap.data();
+            if (data) handleStatusDocRef.current(data);
+          }
+        } catch (err) {
+          console.warn("[FoodPayment] Fallback poll error:", err);
         }
-        setPaymentStatus("failed");
-        setError(data.errorMessage || t("paymentFailed"));
+
+        if (!resultHandledRef.current) scheduleNext();
+      }, delay);
+    };
+
+    scheduleNext();
+
+    return () => {
+      if (fallbackTimerRef.current) {
+        clearTimeout(fallbackTimerRef.current);
+        fallbackTimerRef.current = null;
       }
-    } catch (err) {
-      // Don't stop polling on transient errors
-      console.error("[FoodPayment] Status check error:", err);
+    };
+  }, [orderNumber, handleTimeout]);
+
+  // ── Form POST to iframe ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (!gatewayUrl || !orderNumber || !paymentParamsStr) {
+      setError(t("missingPaymentInfo"));
+      setIsLoading(false);
+      return;
     }
-  }, [orderNumber, clearCart, router, t]);
+    if (formSubmittedRef.current) return;
+    formSubmittedRef.current = true;
 
-  // ── Start polling ──────────────────────────────────────────────────
-  const startStatusPolling = useCallback(() => {
-    if (!orderNumber || statusCheckIntervalRef.current) return;
-
-    let pollCount = 0;
-    const maxPolls = 300; // 5 minutes
-
-    statusCheckIntervalRef.current = setInterval(() => {
-      pollCount++;
-
-      if (pollCount > maxPolls) {
-        if (statusCheckIntervalRef.current) {
-          clearInterval(statusCheckIntervalRef.current);
-          statusCheckIntervalRef.current = null;
-        }
-        setPaymentStatus("timeout");
-        setError(t("paymentTimeout"));
-        return;
-      }
-
-      checkPaymentStatus();
-    }, 1000);
-  }, [orderNumber, checkPaymentStatus, t]);
-
-  // ── Submit form to iframe ──────────────────────────────────────────
-  const submitPaymentForm = useCallback(() => {
-    if (!gatewayUrl || !paymentParamsStr || hasSubmittedRef.current) return;
-    hasSubmittedRef.current = true;
+    let form: HTMLFormElement | null = null;
 
     try {
       const paymentParams = JSON.parse(paymentParamsStr);
 
-      const form = document.createElement("form");
+      form = document.createElement("form");
       form.method = "POST";
       form.action = gatewayUrl;
       form.target = "food-payment-iframe";
@@ -167,55 +279,50 @@ function FoodPaymentContent() {
         input.type = "hidden";
         input.name = key;
         input.value = String(value);
-        form.appendChild(input);
+        form!.appendChild(input);
       });
 
       document.body.appendChild(form);
-
-      // Small delay for iframe to be ready
-      setTimeout(() => {
-        form.submit();
-        setIsLoading(false);
-        setTimeout(() => form.remove(), 1000);
-      }, 1200);
     } catch (err) {
-      console.error("[FoodPayment] Form submit error:", err);
+      console.error("[FoodPayment] Form build error:", err);
       setError(t("paymentError"));
-      setIsLoading(false);
-    }
-  }, [gatewayUrl, paymentParamsStr, t]);
-
-  // ── Init: submit form + start polling ──────────────────────────────
-  useEffect(() => {
-    if (!gatewayUrl || !orderNumber || !paymentParamsStr) {
-      setError(t("missingPaymentInfo"));
       setIsLoading(false);
       return;
     }
 
-    startStatusPolling();
-    submitPaymentForm();
-  }, [
-    gatewayUrl,
-    orderNumber,
-    paymentParamsStr,
-    startStatusPolling,
-    submitPaymentForm,
-    t,
-  ]);
+    const submitTimer = setTimeout(() => {
+      try {
+        form!.submit();
+      } catch (err) {
+        console.error("[FoodPayment] Form submit error:", err);
+        setError(t("paymentError"));
+      }
+      setIsLoading(false);
+    }, 1200);
 
-  // ── Cancel handler ─────────────────────────────────────────────────
+    const removeTimer = setTimeout(() => {
+      if (form?.parentNode) form.parentNode.removeChild(form);
+    }, 2200);
+
+    return () => {
+      clearTimeout(submitTimer);
+      clearTimeout(removeTimer);
+      if (form?.parentNode) form.parentNode.removeChild(form);
+    };
+  }, [gatewayUrl, orderNumber, paymentParamsStr, t]);
+
+  // ── Final unmount safety net ────────────────────────────────────────────
+  useEffect(() => {
+    return () => {
+      teardownListeners();
+    };
+  }, [teardownListeners]);
+
+  // ── Cancel handler ──────────────────────────────────────────────────────
   const handleCancel = () => {
-    if (statusCheckIntervalRef.current) {
-      clearInterval(statusCheckIntervalRef.current);
-      statusCheckIntervalRef.current = null;
-    }
-
     if (confirm(t("cancelPaymentConfirm"))) {
+      teardownListeners();
       router.back();
-    } else {
-      // Resume polling if user didn't confirm cancel
-      startStatusPolling();
     }
   };
 

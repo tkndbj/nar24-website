@@ -5,7 +5,6 @@
 // Uses unstable_cache for server-side caching + batch Firestore reads for shops.
 
 import { NextRequest, NextResponse } from "next/server";
-import { unstable_cache, revalidateTag } from "next/cache";
 import TypeSenseServiceManager from "@/lib/typesense_service_manager";
 import { ProductUtils } from "@/app/models/Product";
 import type { FacetCount } from "@/app/components/FilterSideBar";
@@ -13,11 +12,16 @@ import type { FacetCount } from "@/app/components/FilterSideBar";
 // ─────────────────────────────────────────────────────────────────────────────
 // Config
 // ─────────────────────────────────────────────────────────────────────────────
+//
+// Caching strategy: free-text queries are unbounded, so server-side
+// `unstable_cache` would store one entry per unique query/filter combo and
+// almost never hit. The `Cache-Control` headers below let Vercel's edge CDN
+// cache repeats by URL — same effect for popular queries, zero cost for the
+// long tail. Typesense itself caches popular searches as well.
 
 const CONFIG = {
   DEFAULT_HITS: 20,
   MAX_HITS: 50,
-  CACHE_REVALIDATE_SECONDS: 60, // 1 minute
   TIMEOUT_MS: 8_000,
 } as const;
 
@@ -373,16 +377,6 @@ async function fetchSearchData(p: SearchParams): Promise<SearchResponse> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Server-side cache
-// ─────────────────────────────────────────────────────────────────────────────
-
-const cachedSearchData = unstable_cache(
-  fetchSearchData,
-  ["search-results"],
-  { revalidate: CONFIG.CACHE_REVALIDATE_SECONDS, tags: ["search"] },
-);
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Timeout wrapper
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -425,7 +419,7 @@ export async function GET(request: NextRequest) {
 
     try {
       const result = await withTimeout(
-        cachedSearchData(params),
+        fetchSearchData(params),
         CONFIG.TIMEOUT_MS,
       );
       return NextResponse.json(result, {
@@ -459,14 +453,3 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Cache management (admin-only)
-export async function DELETE(request: NextRequest) {
-  const { verifyAuth, verifyAdmin } = await import("@/lib/auth-middleware");
-  const auth = await verifyAuth(request);
-  if (auth.error) return auth.error;
-  const adminCheck = await verifyAdmin(auth.isAdmin ?? false);
-  if (adminCheck.error) return adminCheck.error;
-
-  revalidateTag("search");
-  return NextResponse.json({ cleared: true });
-}

@@ -29,6 +29,7 @@ import {
   getDoc,
   onSnapshot,
   Timestamp,
+  type DocumentData,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useTranslations } from "next-intl";
@@ -83,7 +84,19 @@ const DEFAULT_CONFIG: BoostPricesConfig = {
   serviceEnabled: true,
 };
 
-const STATUS_CHECK_INTERVAL = 2000;
+// Firestore status values written by the boost-payment Cloud Functions.
+const STATUS = {
+  COMPLETED: "completed",
+  PAYMENT_FAILED: "payment_failed",
+  HASH_FAILED: "hash_verification_failed",
+  PAYMENT_OK_BOOST_FAILED: "payment_succeeded_boost_failed",
+} as const;
+
+// Fallback poll schedule — only runs if the Firestore listener is silent.
+const FALLBACK_FAST_POLL_COUNT = 10; // first 10 polls at FAST_MS
+const FALLBACK_FAST_MS = 5_000;
+const FALLBACK_SLOW_MS = 10_000;
+const FALLBACK_MAX_POLLS = 30; // ~4.5 minutes total cap
 
 const generateDurationOptions = (
   minDuration: number,
@@ -138,9 +151,22 @@ export default function BoostPage() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentData, setPaymentData] = useState<PaymentData | null>(null);
   const [paymentError, setPaymentError] = useState<string | null>(null);
-  const [statusCheckInterval, setStatusCheckInterval] =
-    useState<NodeJS.Timeout | null>(null);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
+
+  // ── Refs for the payment-status listener (no setState churn) ─────────────
+  const resultHandledRef = useRef(false);
+  const firestoreUnsubRef = useRef<(() => void) | null>(null);
+  const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fallbackCountRef = useRef(0);
+
+  const teardownListeners = useCallback(() => {
+    firestoreUnsubRef.current?.();
+    firestoreUnsubRef.current = null;
+    if (fallbackTimerRef.current) {
+      clearTimeout(fallbackTimerRef.current);
+      fallbackTimerRef.current = null;
+    }
+  }, []);
 
   // Check dark mode
   useEffect(() => {
@@ -237,13 +263,12 @@ export default function BoostPage() {
     boostConfig.pricePerProductPerMinute,
   ]);
 
+  // Final unmount safety net for the payment-status listener.
   useEffect(() => {
     return () => {
-      if (statusCheckInterval) {
-        clearInterval(statusCheckInterval);
-      }
+      teardownListeners();
     };
-  }, [statusCheckInterval]);
+  }, [teardownListeners]);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -361,69 +386,154 @@ export default function BoostPage() {
     return `${minutes} ${t("minutes") || "minutes"}`;
   };
 
-  const checkPaymentStatus = useCallback(
-    async (orderNumber: string) => {
-      try {
-        const functions = getFunctions(undefined, "europe-west3");
-        const checkStatus = httpsCallable<
-          { orderNumber: string },
-          PaymentStatus
-        >(functions, "checkBoostPaymentStatus");
-        const result = await checkStatus({ orderNumber });
-        const status = result.data;
+  // ── Idempotent result handlers ────────────────────────────────────────
+  const handleSuccess = useCallback(
+    (boostResult: PaymentStatus["boostResult"]) => {
+      if (resultHandledRef.current) return;
+      resultHandledRef.current = true;
+      teardownListeners();
 
-        if (status.status === "completed") {
-          if (statusCheckInterval) {
-            clearInterval(statusCheckInterval);
-            setStatusCheckInterval(null);
-          }
-          setShowPaymentModal(false);
-          setPaymentData(null);
-          setTimeout(() => {
-            alert(
-              `${t("paymentSuccessful") || "Payment Successful!"}\n${
-                t("yourProductsAreNowBoosted") ||
-                "Your products are now boosted!"
-              }\n\nBoosted ${status.boostResult?.boostedItemsCount || 0} items for ${
-                status.boostResult?.boostDuration || 0
-              } minutes.`,
-            );
-            router.push("/myproducts");
-          }, 300);
-        } else if (
-          status.status === "payment_failed" ||
-          status.status === "hash_verification_failed" ||
-          status.status === "payment_succeeded_boost_failed"
-        ) {
-          if (statusCheckInterval) {
-            clearInterval(statusCheckInterval);
-            setStatusCheckInterval(null);
-          }
-          setPaymentError(
-            status.errorMessage ||
-              status.boostError ||
-              "Payment failed. Please try again.",
+      setShowPaymentModal(false);
+      setPaymentData(null);
+
+      setTimeout(() => {
+        alert(
+          `${t("paymentSuccessful") || "Payment Successful!"}\n${
+            t("yourProductsAreNowBoosted") || "Your products are now boosted!"
+          }\n\nBoosted ${boostResult?.boostedItemsCount || 0} items for ${
+            boostResult?.boostDuration || 0
+          } minutes.`,
+        );
+        router.push("/myproducts");
+      }, 300);
+    },
+    [router, t, teardownListeners],
+  );
+
+  const handleFailure = useCallback(
+    (message: string) => {
+      if (resultHandledRef.current) return;
+      resultHandledRef.current = true;
+      teardownListeners();
+
+      setPaymentError(
+        message.trim() || t("paymentError") || "Payment failed. Please try again.",
+      );
+    },
+    [t, teardownListeners],
+  );
+
+  // Stash status-handler in a ref so the Firestore subscription doesn't need
+  // to re-subscribe whenever a callback identity changes.
+  const handleStatusDoc = useCallback(
+    (data: DocumentData) => {
+      if (resultHandledRef.current) return;
+      const s = typeof data.status === "string" ? data.status : undefined;
+      switch (s) {
+        case STATUS.COMPLETED:
+          handleSuccess(
+            (data.boostResult as PaymentStatus["boostResult"]) || undefined,
           );
+          break;
+        case STATUS.PAYMENT_FAILED:
+        case STATUS.HASH_FAILED:
+        case STATUS.PAYMENT_OK_BOOST_FAILED: {
+          const msg =
+            (typeof data.errorMessage === "string" && data.errorMessage) ||
+            (typeof data.boostError === "string" && data.boostError) ||
+            "";
+          handleFailure(msg);
+          break;
         }
-      } catch (error) {
-        console.error("Error checking payment status:", error);
+        default:
+          // pending / processing — keep waiting
+          break;
       }
     },
-    [statusCheckInterval, router, t],
+    [handleSuccess, handleFailure],
   );
+  const handleStatusDocRef = useRef(handleStatusDoc);
+  handleStatusDocRef.current = handleStatusDoc;
 
-  const startStatusPolling = useCallback(
-    (orderNumber: string) => {
-      if (statusCheckInterval) {
-        clearInterval(statusCheckInterval);
+  // ── Firestore real-time listener (primary signal) ─────────────────────
+  useEffect(() => {
+    const orderNumber = paymentData?.orderNumber;
+    if (!orderNumber || !showPaymentModal) return;
+
+    // Reset for a fresh checkout (e.g. retry after failure).
+    resultHandledRef.current = false;
+
+    const ref = doc(db, "pendingBoostPayments", orderNumber);
+    const unsubscribe = onSnapshot(
+      ref,
+      (snap) => {
+        if (!snap.exists() || resultHandledRef.current) return;
+        const data = snap.data();
+        if (data) handleStatusDocRef.current(data);
+      },
+      (err) => {
+        // Don't bubble — fallback poll will pick up the result.
+        console.warn("[Boost] Firestore listener error:", err);
+      },
+    );
+    firestoreUnsubRef.current = unsubscribe;
+
+    return () => {
+      unsubscribe();
+      if (firestoreUnsubRef.current === unsubscribe) {
+        firestoreUnsubRef.current = null;
       }
-      const interval = setInterval(() => {
-        checkPaymentStatus(orderNumber);
-      }, STATUS_CHECK_INTERVAL);
-      setStatusCheckInterval(interval);
-    },
-    [statusCheckInterval, checkPaymentStatus],
-  );
+    };
+  }, [paymentData?.orderNumber, showPaymentModal]);
+
+  // ── Slow fallback poll (covers stale-tab / dropped-listener cases) ────
+  useEffect(() => {
+    const orderNumber = paymentData?.orderNumber;
+    if (!orderNumber || !showPaymentModal) return;
+    fallbackCountRef.current = 0;
+
+    const scheduleNext = () => {
+      if (resultHandledRef.current) return;
+
+      const delay =
+        fallbackCountRef.current < FALLBACK_FAST_POLL_COUNT
+          ? FALLBACK_FAST_MS
+          : FALLBACK_SLOW_MS;
+
+      fallbackTimerRef.current = setTimeout(async () => {
+        if (resultHandledRef.current) return;
+        fallbackCountRef.current += 1;
+
+        if (fallbackCountRef.current > FALLBACK_MAX_POLLS) {
+          handleFailure(t("paymentTimeout") || "Payment timeout");
+          return;
+        }
+
+        try {
+          const snap = await getDoc(
+            doc(db, "pendingBoostPayments", orderNumber),
+          );
+          if (snap.exists() && !resultHandledRef.current) {
+            const data = snap.data();
+            if (data) handleStatusDocRef.current(data);
+          }
+        } catch (err) {
+          console.warn("[Boost] Fallback poll error:", err);
+        }
+
+        if (!resultHandledRef.current) scheduleNext();
+      }, delay);
+    };
+
+    scheduleNext();
+
+    return () => {
+      if (fallbackTimerRef.current) {
+        clearTimeout(fallbackTimerRef.current);
+        fallbackTimerRef.current = null;
+      }
+    };
+  }, [paymentData?.orderNumber, showPaymentModal, handleFailure, t]);
 
   const proceedToPayment = async () => {
     if (!user) {
@@ -502,7 +612,7 @@ export default function BoostPage() {
           itemCount: data.itemCount,
         });
         setShowPaymentModal(true);
-        startStatusPolling(data.orderNumber);
+        // Listener attaches via useEffect when paymentData + showPaymentModal are set.
       }
     } catch (error: unknown) {
       const errorMessage =
@@ -521,10 +631,7 @@ export default function BoostPage() {
           "Are you sure you want to cancel the payment?",
       )
     ) {
-      if (statusCheckInterval) {
-        clearInterval(statusCheckInterval);
-        setStatusCheckInterval(null);
-      }
+      teardownListeners();
       setShowPaymentModal(false);
       setPaymentData(null);
       setPaymentError(null);

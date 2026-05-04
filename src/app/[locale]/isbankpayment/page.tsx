@@ -1,17 +1,39 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Lock, Loader2, AlertCircle, CheckCircle2, X } from "lucide-react";
-import { httpsCallable } from "firebase/functions";
-import { functions } from "@/lib/firebase";
+import {
+  doc,
+  getDoc,
+  onSnapshot,
+  type DocumentData,
+} from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
-interface PaymentStatusResponse {
-  status: string;
-  orderId?: string;
-  errorMessage?: string;
-}
+// ════════════════════════════════════════════════════════════════════════════
+// Constants
+// ════════════════════════════════════════════════════════════════════════════
+
+/** Firestore status values written by the Cloud Functions payment pipeline. */
+const STATUS = {
+  COMPLETED: "completed",
+  PAYMENT_FAILED: "payment_failed",
+  HASH_FAILED: "hash_verification_failed",
+  PAYMENT_OK_ORDER_FAILED: "payment_succeeded_order_failed",
+} as const;
+
+/** Fallback poll schedule — only fires if the Firestore listener is silent. */
+const FALLBACK_FAST_POLL_COUNT = 10; // first 10 polls at FAST_MS
+const FALLBACK_FAST_MS = 5_000;
+const FALLBACK_SLOW_MS = 10_000;
+const FALLBACK_MAX_POLLS = 30; // ~4.5 minutes total cap
+
+const SUCCESS_REDIRECT_DELAY_MS = 1_500;
+const FAILURE_REDIRECT_DELAY_MS = 3_000;
+
+type PaymentStatus = "pending" | "completed" | "failed" | "timeout";
 
 export default function IsbankPaymentPage() {
   const router = useRouter();
@@ -21,10 +43,9 @@ export default function IsbankPaymentPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [paymentStatus, setPaymentStatus] = useState<string>("pending");
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("pending");
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const statusCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Get params from URL
   const orderNumber = searchParams.get("orderNumber");
@@ -33,6 +54,109 @@ export default function IsbankPaymentPage() {
     paymentParams: Record<string, string | number>;
   } | null>(null);
 
+  // ── Refs (so effects don't cascade on handler identity) ─────────────────
+  const resultHandledRef = useRef(false);
+  const formSubmittedRef = useRef(false);
+  const firestoreUnsubRef = useRef<(() => void) | null>(null);
+  const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fallbackCountRef = useRef(0);
+
+  // ── Cleanup helper ──────────────────────────────────────────────────────
+  const teardownListeners = useCallback(() => {
+    firestoreUnsubRef.current?.();
+    firestoreUnsubRef.current = null;
+    if (fallbackTimerRef.current) {
+      clearTimeout(fallbackTimerRef.current);
+      fallbackTimerRef.current = null;
+    }
+  }, []);
+
+  // ── Result handlers (idempotent) ────────────────────────────────────────
+
+  const handleSuccess = useCallback(
+    (orderId: string) => {
+      if (resultHandledRef.current) return;
+      resultHandledRef.current = true;
+      teardownListeners();
+
+      // Clear cart hints (real cart is server-side; these are local mirrors).
+      try {
+        localStorage.removeItem("cartItems");
+        localStorage.removeItem("cartTotal");
+      } catch {
+        /* ignore storage errors */
+      }
+
+      setPaymentStatus("completed");
+
+      setTimeout(() => {
+        router.replace(
+          `/orders?success=true&orderId=${encodeURIComponent(orderId)}`,
+        );
+      }, SUCCESS_REDIRECT_DELAY_MS);
+    },
+    [router, teardownListeners],
+  );
+
+  const handleFailure = useCallback(
+    (message: string) => {
+      if (resultHandledRef.current) return;
+      resultHandledRef.current = true;
+      teardownListeners();
+
+      setPaymentStatus("failed");
+      setError(message.trim() || t("paymentFailed"));
+
+      setTimeout(() => {
+        router.back();
+      }, FAILURE_REDIRECT_DELAY_MS);
+    },
+    [router, t, teardownListeners],
+  );
+
+  const handleTimeout = useCallback(() => {
+    if (resultHandledRef.current) return;
+    resultHandledRef.current = true;
+    teardownListeners();
+
+    setPaymentStatus("timeout");
+    setError(t("paymentTimeout"));
+
+    setTimeout(() => {
+      router.back();
+    }, FAILURE_REDIRECT_DELAY_MS);
+  }, [router, t, teardownListeners]);
+
+  // Stash status-handler in a ref so the Firestore subscription doesn't need
+  // to re-subscribe whenever a callback identity changes.
+  const handleStatusDoc = useCallback(
+    (data: DocumentData) => {
+      if (resultHandledRef.current) return;
+      const s = typeof data.status === "string" ? data.status : undefined;
+      switch (s) {
+        case STATUS.COMPLETED:
+          handleSuccess(typeof data.orderId === "string" ? data.orderId : "");
+          break;
+        case STATUS.PAYMENT_FAILED:
+        case STATUS.HASH_FAILED:
+          handleFailure(
+            typeof data.errorMessage === "string" ? data.errorMessage : "",
+          );
+          break;
+        case STATUS.PAYMENT_OK_ORDER_FAILED:
+          handleFailure(t("paymentFailed"));
+          break;
+        default:
+          // pending / processing — keep waiting
+          break;
+      }
+    },
+    [handleSuccess, handleFailure, t],
+  );
+  const handleStatusDocRef = useRef(handleStatusDoc);
+  handleStatusDocRef.current = handleStatusDoc;
+
+  // ── Dark mode observer ──────────────────────────────────────────────────
   useEffect(() => {
     const checkDarkMode = () => {
       setIsDarkMode(document.documentElement.classList.contains("dark"));
@@ -43,6 +167,7 @@ export default function IsbankPaymentPage() {
     return () => observer.disconnect();
   }, []);
 
+  // ── Read paymentData from sessionStorage (one-shot) ─────────────────────
   useEffect(() => {
     try {
       const raw = sessionStorage.getItem("isbankPaymentData");
@@ -69,142 +194,134 @@ export default function IsbankPaymentPage() {
     }
   }, [t]);
 
+  // ── Firestore real-time listener (primary signal) ───────────────────────
   useEffect(() => {
-    if (!paymentData || !orderNumber) return; // ✅ silently wait, don't show error
+    if (!orderNumber) return;
 
-    startStatusPolling();
-    submitPaymentForm();
+    const ref = doc(db, "pendingPayments", orderNumber);
+    const unsubscribe = onSnapshot(
+      ref,
+      (snap) => {
+        if (!snap.exists() || resultHandledRef.current) return;
+        const data = snap.data();
+        if (data) handleStatusDocRef.current(data);
+      },
+      (err) => {
+        // Don't bubble — fallback poll will pick up the result.
+        console.warn("[IsbankPayment] Firestore listener error:", err);
+      },
+    );
+    firestoreUnsubRef.current = unsubscribe;
 
     return () => {
-      if (statusCheckIntervalRef.current) {
-        clearInterval(statusCheckIntervalRef.current);
+      unsubscribe();
+      if (firestoreUnsubRef.current === unsubscribe) {
+        firestoreUnsubRef.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paymentData, orderNumber]);
+  }, [orderNumber]);
 
-  const submitPaymentForm = () => {
-    try {
-      const paymentParams = paymentData!.paymentParams;
+  // ── Slow fallback poll (covers stale-tab / dropped-listener cases) ──────
+  useEffect(() => {
+    if (!orderNumber) return;
+    fallbackCountRef.current = 0;
 
-      // Create form dynamically
-      const form = document.createElement("form");
-      form.method = "POST";
-      form.action = paymentData!.gatewayUrl;
-      form.target = "payment-iframe";
-      form.style.display = "none";
+    const scheduleNext = () => {
+      if (resultHandledRef.current) return;
 
-      // Add all payment parameters as hidden inputs
-      Object.entries(paymentParams).forEach(([key, value]) => {
-        const input = document.createElement("input");
-        input.type = "hidden";
-        input.name = key;
-        input.value = String(value);
-        form.appendChild(input);
-      });
+      const delay =
+        fallbackCountRef.current < FALLBACK_FAST_POLL_COUNT
+          ? FALLBACK_FAST_MS
+          : FALLBACK_SLOW_MS;
 
-      // Append form to body and submit
-      document.body.appendChild(form);
+      fallbackTimerRef.current = setTimeout(async () => {
+        if (resultHandledRef.current) return;
+        fallbackCountRef.current += 1;
 
-      setTimeout(() => {
+        if (fallbackCountRef.current > FALLBACK_MAX_POLLS) {
+          handleTimeout();
+          return;
+        }
+
+        try {
+          const snap = await getDoc(doc(db, "pendingPayments", orderNumber));
+          if (snap.exists() && !resultHandledRef.current) {
+            const data = snap.data();
+            if (data) handleStatusDocRef.current(data);
+          }
+        } catch (err) {
+          console.warn("[IsbankPayment] Fallback poll error:", err);
+        }
+
+        if (!resultHandledRef.current) scheduleNext();
+      }, delay);
+    };
+
+    scheduleNext();
+
+    return () => {
+      if (fallbackTimerRef.current) {
+        clearTimeout(fallbackTimerRef.current);
+        fallbackTimerRef.current = null;
+      }
+    };
+  }, [orderNumber, handleTimeout]);
+
+  // ── Form POST to iframe ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (!paymentData || !orderNumber) return;
+    if (formSubmittedRef.current) return;
+    formSubmittedRef.current = true;
+
+    const paymentParams = paymentData.paymentParams;
+
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = paymentData.gatewayUrl;
+    form.target = "payment-iframe";
+    form.style.display = "none";
+
+    Object.entries(paymentParams).forEach(([key, value]) => {
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = key;
+      input.value = String(value);
+      form.appendChild(input);
+    });
+
+    document.body.appendChild(form);
+
+    // Short delay so the iframe element is definitely in the DOM.
+    const submitTimer = setTimeout(() => {
+      try {
         form.submit();
-        setIsLoading(false);
-        // Clean up form after submission
-        setTimeout(() => form.remove(), 1000);
-      }, 1500);
-    } catch (err) {
-      console.error("Error submitting payment form:", err);
-      setError(t("paymentError"));
+      } catch (err) {
+        console.error("[IsbankPayment] Form submit error:", err);
+        setError(t("paymentError"));
+      }
       setIsLoading(false);
-    }
-  };
-
-  const startStatusPolling = () => {
-    if (!orderNumber) return;
-
-    let pollCount = 0;
-    const maxPolls = 300; // 5 minutes max (300 seconds)
-
-    statusCheckIntervalRef.current = setInterval(async () => {
-      pollCount++;
-
-      if (pollCount > maxPolls) {
-        if (statusCheckIntervalRef.current) {
-          clearInterval(statusCheckIntervalRef.current);
-        }
-        handlePaymentTimeout();
-        return;
-      }
-
-      await checkPaymentStatus();
-    }, 1000); // Check every second
-  };
-
-  const checkPaymentStatus = async () => {
-    if (!orderNumber) return;
-
-    try {
-      const checkStatus = httpsCallable(functions, "checkIsbankPaymentStatus");
-      const result = await checkStatus({ orderNumber });
-
-      const data = result.data as PaymentStatusResponse;
-      const status = data?.status;
-
-      console.log("🔍 Payment status:", status);
-
-      if (status === "completed") {
-        if (statusCheckIntervalRef.current) {
-          clearInterval(statusCheckIntervalRef.current);
-        }
-        setPaymentStatus("completed");
-        handlePaymentSuccess(data.orderId || "");
-      } else if (
-        status === "payment_failed" ||
-        status === "hash_verification_failed" ||
-        status === "payment_succeeded_order_failed"
-      ) {
-        if (statusCheckIntervalRef.current) {
-          clearInterval(statusCheckIntervalRef.current);
-        }
-        setPaymentStatus("failed");
-        handlePaymentFailed(data.errorMessage || t("paymentFailed"));
-      }
-    } catch (error) {
-      console.error("Error checking payment status:", error);
-    }
-  };
-
-  const handlePaymentSuccess = (orderId: string) => {
-    // Clear cart
-    localStorage.removeItem("cartItems");
-    localStorage.removeItem("cartTotal");
-
-    // Show success message
-    setTimeout(() => {
-      router.replace(`/orders?success=true&orderId=${orderId}`);
     }, 1500);
-  };
 
-  const handlePaymentFailed = (errorMessage: string) => {
-    setError(errorMessage);
-    setTimeout(() => {
-      router.back();
-    }, 3000);
-  };
+    const removeTimer = setTimeout(() => form.remove(), 2500);
 
-  const handlePaymentTimeout = () => {
-    setError(t("paymentTimeout"));
-    setTimeout(() => {
-      router.back();
-    }, 3000);
-  };
+    return () => {
+      clearTimeout(submitTimer);
+      clearTimeout(removeTimer);
+      // Form may already be detached — guard.
+      if (form.parentNode) form.parentNode.removeChild(form);
+    };
+  }, [paymentData, orderNumber, t]);
+
+  // ── Final unmount safety net ────────────────────────────────────────────
+  useEffect(() => {
+    return () => {
+      teardownListeners();
+    };
+  }, [teardownListeners]);
 
   const handleCancel = () => {
-    if (statusCheckIntervalRef.current) {
-      clearInterval(statusCheckIntervalRef.current);
-    }
-
     if (confirm(t("cancelPaymentConfirm"))) {
+      teardownListeners();
       router.back();
     }
   };
@@ -277,8 +394,8 @@ export default function IsbankPaymentPage() {
     );
   }
 
-  // Payment failed
-  if (paymentStatus === "failed" || error) {
+  // Payment failed / timed out
+  if (paymentStatus === "failed" || paymentStatus === "timeout" || error) {
     return (
       <div
         className={`min-h-screen flex items-center justify-center ${
@@ -294,7 +411,9 @@ export default function IsbankPaymentPage() {
               isDarkMode ? "text-white" : "text-gray-900"
             }`}
           >
-            {t("paymentFailed")}
+            {paymentStatus === "timeout"
+              ? t("paymentTimeout")
+              : t("paymentFailed")}
           </h2>
           <p
             className={`mb-6 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}

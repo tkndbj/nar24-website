@@ -99,32 +99,43 @@ export default function SpecialForYouPage() {
     []
   );
 
-  // Load next batch of products
+  // Load next batch of products. Skips IDs already in `loadedProducts` —
+  // that handles the manifest fast path where the first 30-ish products
+  // come from embedded summaries, so pagination should pick up at the
+  // first un-embedded ID.
   const loadNextBatch = useCallback(async () => {
     if (isLoadingMore || !hasMore || allProductIds.length === 0) return;
 
     setIsLoadingMore(true);
 
     try {
-      const remainingIds = allProductIds.length - currentIndex;
+      const loadedIdsSet = new Set(loadedProducts.map((p) => p.id));
 
-      if (remainingIds <= 0) {
-        setHasMore(false);
+      // Walk forward through allProductIds, collecting up to BATCH_SIZE
+      // that aren't already loaded. `idx` advances past every checked ID
+      // whether we fetch it or skip it.
+      const nextBatch: string[] = [];
+      let idx = currentIndex;
+      while (idx < allProductIds.length && nextBatch.length < BATCH_SIZE) {
+        const id = allProductIds[idx];
+        idx++;
+        if (!loadedIdsSet.has(id)) {
+          nextBatch.push(id);
+        }
+      }
+
+      if (nextBatch.length === 0) {
+        setCurrentIndex(idx);
+        setHasMore(idx < allProductIds.length);
         setIsLoadingMore(false);
         return;
       }
 
-      const batchSize = Math.min(remainingIds, BATCH_SIZE);
-      const nextBatch = allProductIds.slice(
-        currentIndex,
-        currentIndex + batchSize
-      );
-
       const products = await fetchProductDetails(nextBatch);
 
       setLoadedProducts((prev) => [...prev, ...products]);
-      setCurrentIndex((prev) => prev + batchSize);
-      setHasMore(currentIndex + batchSize < allProductIds.length);
+      setCurrentIndex(idx);
+      setHasMore(idx < allProductIds.length);
 
       console.log(
         `✅ Loaded batch: ${products.length} products (${
@@ -143,11 +154,17 @@ export default function SpecialForYouPage() {
     hasMore,
     isLoadingMore,
     fetchProductDetails,
-    loadedProducts.length,
+    loadedProducts,
     t,
   ]);
 
-  // Initialize - Get all 200 IDs and load first batch
+  // Initialize - get all 150 IDs and the first batch.
+  //
+  // Uses the embedded-products manifest path when available — the top-N
+  // product summaries come back inside the user_profile doc itself, so the
+  // first page renders without a separate `whereIn` query against
+  // `shop_products`. Pages 2+ continue to use the existing `whereIn` flow,
+  // skipping any IDs already covered by the manifest.
   const initialize = useCallback(async () => {
     setIsInitialLoading(true);
     setError(null);
@@ -156,7 +173,7 @@ export default function SpecialForYouPage() {
       // Initialize service if needed
       await personalizedFeedService.initialize();
 
-      // Get all product IDs from service
+      // Get all product IDs from service (1 read shared with getTopProducts)
       const productIds = await personalizedFeedService.getProductIds();
 
       if (productIds.length === 0) {
@@ -168,17 +185,35 @@ export default function SpecialForYouPage() {
 
       setAllProductIds(productIds);
 
-      // Load first batch
-      const firstBatch = productIds.slice(0, BATCH_SIZE);
-      const products = await fetchProductDetails(firstBatch);
+      // ── Manifest fast path: pre-populate the first page from embedded
+      // summaries (0 extra reads — already paid for by getProductIds when
+      // it hit the user_profile doc). Falls back gracefully when the
+      // user_profile doc has no `products` field.
+      const embedded = await personalizedFeedService.getTopProducts();
+      if (embedded && embedded.length > 0) {
+        setLoadedProducts(embedded);
+        // currentIndex advances past every position covered by the
+        // embedded list. loadNextBatch's skip-loaded logic handles any
+        // gaps (e.g. if the CF byte-budget guard trimmed the embed).
+        setCurrentIndex(0);
+        setHasMore(embedded.length < productIds.length);
 
-      setLoadedProducts(products);
-      setCurrentIndex(BATCH_SIZE);
-      setHasMore(BATCH_SIZE < productIds.length);
+        console.log(
+          `✅ Pre-populated ${embedded.length} products from manifest (0 extra reads)`
+        );
+      } else {
+        // Backward-compat: load first batch the old way.
+        const firstBatch = productIds.slice(0, BATCH_SIZE);
+        const products = await fetchProductDetails(firstBatch);
 
-      console.log(
-        `✅ Initialized with ${productIds.length} product IDs, loaded first ${products.length}`
-      );
+        setLoadedProducts(products);
+        setCurrentIndex(BATCH_SIZE);
+        setHasMore(BATCH_SIZE < productIds.length);
+
+        console.log(
+          `✅ Initialized with ${productIds.length} product IDs, loaded first ${products.length} via whereIn`
+        );
+      }
     } catch (e) {
       console.error("Error initializing:", e);
       setError(t("SpecialForYou.errorInitializing"));

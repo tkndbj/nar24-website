@@ -131,29 +131,66 @@ export async function verifyAdmin(isAdmin: boolean): Promise<{ error?: NextRespo
 }
 
 /**
- * Rate limiting helper (simple in-memory implementation)
- * For production, use Redis or a proper rate limiting service
+ * Rate limiting.
+ *
+ * Production: backed by Upstash Redis (sliding window) so limits are shared
+ * across all serverless instances. Auto-detects via env vars
+ * `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` (set in Vercel).
+ *
+ * Local dev / missing env vars: falls back to a per-process in-memory map so
+ * `npm run dev` works without an Upstash account. Same API either way.
  */
+
+const upstashEnabled =
+  !!process.env.UPSTASH_REDIS_REST_URL &&
+  !!process.env.UPSTASH_REDIS_REST_TOKEN;
+
+// Lazily-initialised Upstash Redis client (singleton across requests).
+let _redis: import('@upstash/redis').Redis | null = null;
+async function getRedis() {
+  if (_redis) return _redis;
+  const { Redis } = await import('@upstash/redis');
+  _redis = Redis.fromEnv();
+  return _redis;
+}
+
+// One Ratelimit instance per (max, window) combo — cheap to cache, expensive
+// to recreate per-request.
+const _limiters = new Map<string, import('@upstash/ratelimit').Ratelimit>();
+async function getLimiter(maxRequests: number, windowMs: number) {
+  const key = `${maxRequests}:${windowMs}`;
+  const cached = _limiters.get(key);
+  if (cached) return cached;
+
+  const { Ratelimit } = await import('@upstash/ratelimit');
+  const redis = await getRedis();
+  const limiter = new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(maxRequests, `${windowMs} ms`),
+    analytics: false,
+    prefix: 'rl:nar24',
+  });
+  _limiters.set(key, limiter);
+  return limiter;
+}
+
+// In-memory fallback (local dev only).
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
 
-export async function checkRateLimit(
-  identifier: string, // userId or IP
-  maxRequests: number = 100,
-  windowMs: number = 60000 // 1 minute
-): Promise<{ error?: NextResponse }> {
+function checkInMemory(
+  identifier: string,
+  maxRequests: number,
+  windowMs: number
+): { error?: NextResponse } {
   const now = Date.now();
-  const userLimit = rateLimitMap.get(identifier);
+  const entry = rateLimitMap.get(identifier);
 
-  if (!userLimit || now > userLimit.resetTime) {
-    // Reset or initialize
-    rateLimitMap.set(identifier, {
-      count: 1,
-      resetTime: now + windowMs,
-    });
+  if (!entry || now > entry.resetTime) {
+    rateLimitMap.set(identifier, { count: 1, resetTime: now + windowMs });
     return {};
   }
 
-  if (userLimit.count >= maxRequests) {
+  if (entry.count >= maxRequests) {
     return {
       error: NextResponse.json(
         { error: 'Too Many Requests', message: 'Rate limit exceeded' },
@@ -162,20 +199,45 @@ export async function checkRateLimit(
     };
   }
 
-  // Increment count
-  userLimit.count++;
+  entry.count++;
   return {};
 }
 
-// Cleanup old rate limit entries every 5 minutes
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, value] of rateLimitMap.entries()) {
-    if (now > value.resetTime) {
-      rateLimitMap.delete(key);
-    }
+export async function checkRateLimit(
+  identifier: string, // userId or IP
+  maxRequests: number = 100,
+  windowMs: number = 60000 // 1 minute
+): Promise<{ error?: NextResponse }> {
+  if (!upstashEnabled) {
+    return checkInMemory(identifier, maxRequests, windowMs);
   }
-}, 5 * 60 * 1000);
+
+  try {
+    const limiter = await getLimiter(maxRequests, windowMs);
+    const { success, limit, remaining, reset } = await limiter.limit(identifier);
+
+    if (success) return {};
+
+    return {
+      error: NextResponse.json(
+        { error: 'Too Many Requests', message: 'Rate limit exceeded' },
+        {
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': String(limit),
+            'X-RateLimit-Remaining': String(remaining),
+            'X-RateLimit-Reset': String(reset),
+            'Retry-After': String(Math.max(1, Math.ceil((reset - Date.now()) / 1000))),
+          },
+        }
+      ),
+    };
+  } catch (err) {
+    // Never let a Redis outage break the API — fail open and log.
+    console.error('[rateLimit] Upstash error, allowing request:', err);
+    return {};
+  }
+}
 
 /**
  * Extract client IP from request headers (works behind proxies/CDNs)

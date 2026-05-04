@@ -375,8 +375,30 @@ async function fetchDynamicProductsData(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Server-side cache
+// Server-side cache (hot path only)
+//
+// Cache only the high-traffic combinations: category browse with no
+// user-supplied filters, default sort, first few pages. These are bounded
+// by the taxonomy (a few hundred keys total) and dominate real traffic.
+// Filtered/sorted variants skip the cache and rely on Vercel's edge CDN
+// (`Cache-Control` header below) for URL-keyed caching.
 // ─────────────────────────────────────────────────────────────────────────────
+
+const HOT_PATH_MAX_PAGE = 3;
+
+function isHotPath(p: QueryParams): boolean {
+  return (
+    p.page <= HOT_PATH_MAX_PAGE &&
+    p.sortOption === "date" &&
+    p.brands.length === 0 &&
+    p.colors.length === 0 &&
+    p.filterSubcategories.length === 0 &&
+    Object.keys(p.specFilters).length === 0 &&
+    p.minPrice === null &&
+    p.maxPrice === null &&
+    p.minRating === null
+  );
+}
 
 const cachedFetchDynamicProducts = unstable_cache(
   fetchDynamicProductsData,
@@ -408,7 +430,9 @@ export async function GET(request: NextRequest) {
 
     try {
       const result = await withTimeout(
-        cachedFetchDynamicProducts(params),
+        isHotPath(params)
+          ? cachedFetchDynamicProducts(params)
+          : fetchDynamicProductsData(params),
         CONFIG.REQUEST_TIMEOUT,
       );
       return NextResponse.json(result, {
