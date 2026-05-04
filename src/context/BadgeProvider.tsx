@@ -83,24 +83,23 @@ export function BadgeProvider({ children, user: userProp }: BadgeProviderProps) 
     const newUnsubscribes: Unsubscribe[] = [];
 
     try {
-      // Listen to notifications subcollection
-      // Exclude notifications of type 'message' from badge count
-      // Cap at 11 docs: enough to know "10+" without reading the entire collection
-      const BADGE_CAP = 10;
+      // Listen for ANY unread notification (presence only). limit(1) caps the
+      // billing to 1 read on attach + 1 per change, no matter how many unread
+      // docs exist — UI just renders a dot on the bell icon.
       const notificationsQuery = query(
         collection(db, "users", userId, "notifications"),
         where("isRead", "==", false),
         where("type", "!=", "message"),
         orderBy("type"), // Required when using != operator
-        limit(BADGE_CAP + 1)
+        limit(1)
       );
 
       const notificationsUnsubscribe = onSnapshot(
         notificationsQuery,
         (querySnapshot) => {
-          const count = Math.min(querySnapshot.docs.length, BADGE_CAP + 1);
-          console.log("🔔 BadgeProvider: Unread notifications count:", count);
-          trackReads("Badge:Notifications", querySnapshot.docs.length);
+          const count = querySnapshot.docs.length;
+          console.log("🔔 BadgeProvider: Has unread notifications:", count > 0);
+          trackReads("Badge:Notifications", count);
           setUnreadNotificationsCount(count);
         },
         (error) => {

@@ -128,11 +128,7 @@ export default function MarketSectionHeader({
   const NotificationBadge = useMemo(() => {
     if (!user || unreadNotificationsCount === 0) return null;
     return (
-      <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] bg-emerald-500 rounded-full flex items-center justify-center ring-[1.5px] ring-white dark:ring-gray-900">
-        <span className="text-white text-[8px] font-bold leading-none px-[3px]">
-          {unreadNotificationsCount > 10 ? "10+" : unreadNotificationsCount}
-        </span>
-      </span>
+      <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-[1.5px] ring-white dark:ring-gray-900" />
     );
   }, [user, unreadNotificationsCount]);
 
