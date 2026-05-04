@@ -3,7 +3,12 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useUser } from "@/context/UserProvider";
 import { updateDoc, doc } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import {
+  ref,
+  uploadBytes,
+  getDownloadURL,
+  deleteObject,
+} from "firebase/storage";
 import { httpsCallable } from "firebase/functions";
 import { db, storage, functions } from "@/lib/firebase";
 import { smartCompress, shouldCompress } from "@/app/utils/imageCompression";
@@ -40,8 +45,6 @@ import SmartImage from "@/app/components/SmartImage";
 import { useTranslations } from "next-intl";
 import Footer from "@/app/components/Footer";
 
-
-
 interface NavItem {
   icon: React.ElementType;
   label: string;
@@ -73,7 +76,7 @@ export default function ProfilePage() {
     if (typeof document !== "undefined") {
       const savedTheme = localStorage.getItem("theme");
       const systemPrefersDark = window.matchMedia(
-        "(prefers-color-scheme: dark)"
+        "(prefers-color-scheme: dark)",
       ).matches;
 
       if (savedTheme === "dark" || (!savedTheme && systemPrefersDark)) {
@@ -168,7 +171,7 @@ export default function ProfilePage() {
   const handleNavigation = (
     path?: string,
     action?: () => void,
-    isExternal?: boolean
+    isExternal?: boolean,
   ) => {
     if (action) {
       action();
@@ -203,7 +206,9 @@ export default function ProfilePage() {
   // Loading
   if (isLoading) {
     return (
-      <div className={`min-h-screen flex items-center justify-center ${isDarkMode ? "bg-gray-950" : "bg-gray-50"}`}>
+      <div
+        className={`min-h-screen flex items-center justify-center ${isDarkMode ? "bg-gray-950" : "bg-gray-50"}`}
+      >
         <div className="h-6 w-6 border-2 border-orange-200 dark:border-orange-900 border-t-orange-500 rounded-full animate-spin" />
       </div>
     );
@@ -212,47 +217,146 @@ export default function ProfilePage() {
   // --- Sections data ---
 
   const shortcutItems: NavItem[] = [
-    { icon: Box, label: t("ProfilePage.myProducts"), path: "/myproducts", color: "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40" },
-    { icon: MapPin, label: t("ProfilePage.myAddresses"), path: "/saved-addresses", color: "text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/40" },
-    { icon: Info, label: t("ProfilePage.sellerInfo"), path: "/seller-info", color: "text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/40" },
-    { icon: Ticket, label: t("ProfilePage.coupons"), path: "/coupon-and-benefits", color: "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40" },
+    {
+      icon: Box,
+      label: t("ProfilePage.myProducts"),
+      path: "/myproducts",
+      color: "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40",
+    },
+    {
+      icon: MapPin,
+      label: t("ProfilePage.myAddresses"),
+      path: "/saved-addresses",
+      color:
+        "text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/40",
+    },
+    {
+      icon: Info,
+      label: t("ProfilePage.sellerInfo"),
+      path: "/seller-info",
+      color: "text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/40",
+    },
+    {
+      icon: Ticket,
+      label: t("ProfilePage.coupons"),
+      path: "/coupon-and-benefits",
+      color:
+        "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40",
+    },
   ];
 
   const activityItems: NavItem[] = [
     ...(userOwnsShop
-      ? [{
-          icon: ShoppingCart,
-          label: t("ProfilePage.sellerPanel"),
-          path: "/seller-panel",
-          description: t("ProfilePage.manageYourStore"),
-          featured: true,
-          color: "text-purple-600 dark:text-purple-400",
-        }]
+      ? [
+          {
+            icon: ShoppingCart,
+            label: t("ProfilePage.sellerPanel"),
+            path: "/seller-panel",
+            description: t("ProfilePage.manageYourStore"),
+            featured: true,
+            color: "text-purple-600 dark:text-purple-400",
+          },
+        ]
       : []),
-    { icon: Package, label: t("ProfilePage.myProductOrders"), path: "/orders", description: t("ProfilePage.productOrdersDescription"), color: "text-orange-500 dark:text-orange-400" },
-    { icon: UtensilsCrossed, label: t("ProfilePage.myFoodOrders"), path: "/food-orders", description: t("ProfilePage.foodOrdersDescription"), color: "text-rose-500 dark:text-rose-400" },
-    { icon: ShoppingBasket, label: t("ProfilePage.myMarketOrders"), path: "/market-orders", description: t("ProfilePage.marketOrdersDescription"), color: "text-green-500 dark:text-green-400" },
-    { icon: Upload, label: t("ProfilePage.sellOnVitrin"), path: "/listproduct", description: t("ProfilePage.startSellingProducts"), color: "text-emerald-500 dark:text-emerald-400" },
-    { icon: Star, label: t("ProfilePage.myReviews"), path: "/reviews", description: t("ProfilePage.yourWrittenReviews"), color: "text-amber-500 dark:text-amber-400" },
-    { icon: Zap, label: t("ProfilePage.boosts"), path: "/boosts", description: t("ProfilePage.promoteYourListings"), color: "text-blue-500 dark:text-blue-400" },
-    { icon: HelpCircle, label: t("ProfilePage.myQuestions"), path: "/productquestions", description: t("ProfilePage.productQuestionsAnswers"), color: "text-rose-500 dark:text-rose-400" },
+    {
+      icon: Package,
+      label: t("ProfilePage.myProductOrders"),
+      path: "/orders",
+      description: t("ProfilePage.productOrdersDescription"),
+      color: "text-orange-500 dark:text-orange-400",
+    },
+    {
+      icon: UtensilsCrossed,
+      label: t("ProfilePage.myFoodOrders"),
+      path: "/food-orders",
+      description: t("ProfilePage.foodOrdersDescription"),
+      color: "text-rose-500 dark:text-rose-400",
+    },
+    {
+      icon: ShoppingBasket,
+      label: t("ProfilePage.myMarketOrders"),
+      path: "/market-orders",
+      description: t("ProfilePage.marketOrdersDescription"),
+      color: "text-green-500 dark:text-green-400",
+    },
+    {
+      icon: Upload,
+      label: t("ProfilePage.sellOnVitrin"),
+      path: "/listproduct",
+      description: t("ProfilePage.startSellingProducts"),
+      color: "text-emerald-500 dark:text-emerald-400",
+    },
+    {
+      icon: Star,
+      label: t("ProfilePage.myReviews"),
+      path: "/reviews",
+      description: t("ProfilePage.yourWrittenReviews"),
+      color: "text-amber-500 dark:text-amber-400",
+    },
+    {
+      icon: Zap,
+      label: t("ProfilePage.boosts"),
+      path: "/boost",
+      description: t("ProfilePage.promoteYourListings"),
+      color: "text-blue-500 dark:text-blue-400",
+    },
+    {
+      icon: HelpCircle,
+      label: t("ProfilePage.myQuestions"),
+      path: "/productquestions",
+      description: t("ProfilePage.productQuestionsAnswers"),
+      color: "text-rose-500 dark:text-rose-400",
+    },
   ];
 
   const accountItems: NavItem[] = [
-    { icon: Receipt, label: t("ProfilePage.myReceipts"), path: "/receipts", color: "text-emerald-500 dark:text-emerald-400" },
-    { icon: Folder, label: t("ProfilePage.refundForm"), path: "/refundform", color: "text-orange-500 dark:text-orange-400" },
-    { icon: Store, label: t("ProfilePage.becomeASeller"), path: "/createshop", color: "text-violet-500 dark:text-violet-400" },
-    { icon: Settings, label: t("ProfilePage.accountSettings"), path: "/account-settings", color: "text-gray-500 dark:text-gray-400" },
-    { icon: Info, label: t("ProfilePage.supportAndFaq"), path: "/support-and-faq", color: "text-blue-500 dark:text-blue-400" },
+    {
+      icon: Receipt,
+      label: t("ProfilePage.myReceipts"),
+      path: "/receipts",
+      color: "text-emerald-500 dark:text-emerald-400",
+    },
+    {
+      icon: Folder,
+      label: t("ProfilePage.refundForm"),
+      path: "/refundform",
+      color: "text-orange-500 dark:text-orange-400",
+    },
+    {
+      icon: Store,
+      label: t("ProfilePage.becomeASeller"),
+      path: "/createshop",
+      color: "text-violet-500 dark:text-violet-400",
+    },
+    {
+      icon: Settings,
+      label: t("ProfilePage.accountSettings"),
+      path: "/account-settings",
+      color: "text-gray-500 dark:text-gray-400",
+    },
+    {
+      icon: Info,
+      label: t("ProfilePage.supportAndFaq"),
+      path: "/support-and-faq",
+      color: "text-blue-500 dark:text-blue-400",
+    },
   ];
 
   // Row component for nav lists
-  const NavRow = ({ item, showBorder = true }: { item: NavItem; showBorder?: boolean }) => (
+  const NavRow = ({
+    item,
+    showBorder = true,
+  }: {
+    item: NavItem;
+    showBorder?: boolean;
+  }) => (
     <button
       onClick={() => handleNavigation(item.path, item.action, item.isExternal)}
       className={`w-full flex items-center gap-3 px-4 py-3 md:py-3.5 text-left transition-colors group ${
         showBorder
-          ? isDarkMode ? "border-b border-gray-800/70" : "border-b border-gray-100"
+          ? isDarkMode
+            ? "border-b border-gray-800/70"
+            : "border-b border-gray-100"
           : ""
       } ${isDarkMode ? "hover:bg-gray-800/40" : "hover:bg-gray-50"}`}
     >
@@ -261,11 +365,15 @@ export default function ProfilePage() {
         strokeWidth={1.8}
       />
       <div className="flex-1 min-w-0">
-        <span className={`text-[13px] md:text-sm block font-medium ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+        <span
+          className={`text-[13px] md:text-sm block font-medium ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}
+        >
           {item.label}
         </span>
         {item.description && (
-          <span className={`text-[11px] md:text-xs block mt-0.5 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+          <span
+            className={`text-[11px] md:text-xs block mt-0.5 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
+          >
             {item.description}
           </span>
         )}
@@ -300,13 +408,22 @@ export default function ProfilePage() {
           </div>
 
           <div className="pt-12 pb-10 text-center">
-            <div className={`w-20 h-20 rounded-full mx-auto mb-6 flex items-center justify-center ${isDarkMode ? "bg-gray-800" : "bg-gray-200"}`}>
-              <User className={`w-9 h-9 ${isDarkMode ? "text-gray-600" : "text-gray-400"}`} strokeWidth={1.5} />
+            <div
+              className={`w-20 h-20 rounded-full mx-auto mb-6 flex items-center justify-center ${isDarkMode ? "bg-gray-800" : "bg-gray-200"}`}
+            >
+              <User
+                className={`w-9 h-9 ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}
+                strokeWidth={1.5}
+              />
             </div>
-            <h1 className={`text-lg font-semibold mb-1.5 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+            <h1
+              className={`text-lg font-semibold mb-1.5 ${isDarkMode ? "text-white" : "text-gray-900"}`}
+            >
               {t("ProfilePage.loginToAccess")}
             </h1>
-            <p className={`text-sm mb-8 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+            <p
+              className={`text-sm mb-8 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+            >
               {t("ProfilePage.loginDescription")}
             </p>
             <button
@@ -317,7 +434,9 @@ export default function ProfilePage() {
             </button>
           </div>
 
-          <div className={`rounded-xl overflow-hidden ${isDarkMode ? "bg-gray-900 border border-gray-800" : "bg-white border border-gray-200"}`}>
+          <div
+            className={`rounded-xl overflow-hidden ${isDarkMode ? "bg-gray-900 border border-gray-800" : "bg-white border border-gray-200"}`}
+          >
             {activityItems
               .filter((b) => !b.featured)
               .slice(0, 3)
@@ -354,11 +473,15 @@ export default function ProfilePage() {
         </div>
 
         {/* ===== Profile Card ===== */}
-        <div className={`rounded-xl p-5 mb-5 ${isDarkMode ? "bg-gray-900 border border-gray-800" : "bg-white border border-gray-200"}`}>
+        <div
+          className={`rounded-xl p-5 mb-5 ${isDarkMode ? "bg-gray-900 border border-gray-800" : "bg-white border border-gray-200"}`}
+        >
           <div className="flex items-center gap-4">
             {/* Avatar */}
             <div className="relative flex-shrink-0">
-              <div className={`w-16 h-16 md:w-[72px] md:h-[72px] rounded-full overflow-hidden ring-2 ${isDarkMode ? "ring-gray-700 bg-gray-800" : "ring-gray-200 bg-gray-100"}`}>
+              <div
+                className={`w-16 h-16 md:w-[72px] md:h-[72px] rounded-full overflow-hidden ring-2 ${isDarkMode ? "ring-gray-700 bg-gray-800" : "ring-gray-200 bg-gray-100"}`}
+              >
                 {profileData?.profileImage ? (
                   <SmartImage
                     source={profileData.profileImage}
@@ -369,7 +492,10 @@ export default function ProfilePage() {
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
-                    <User className={`w-7 h-7 ${isDarkMode ? "text-gray-600" : "text-gray-400"}`} strokeWidth={1.5} />
+                    <User
+                      className={`w-7 h-7 ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}
+                      strokeWidth={1.5}
+                    />
                   </div>
                 )}
               </div>
@@ -396,21 +522,37 @@ export default function ProfilePage() {
             {/* User info */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
-                <h1 className={`text-base md:text-lg font-semibold truncate ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                <h1
+                  className={`text-base md:text-lg font-semibold truncate ${isDarkMode ? "text-white" : "text-gray-900"}`}
+                >
                   {profileData?.displayName || t("ProfilePage.noName")}
                 </h1>
                 {profileData?.isVerified && (
-                  <CheckCircle className="w-4 h-4 text-blue-500 flex-shrink-0" strokeWidth={2.5} />
+                  <CheckCircle
+                    className="w-4 h-4 text-blue-500 flex-shrink-0"
+                    strokeWidth={2.5}
+                  />
                 )}
               </div>
-              <div className={`flex items-center gap-1.5 mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+              <div
+                className={`flex items-center gap-1.5 mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+              >
                 <Mail className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={1.5} />
-                <span className="text-xs md:text-[13px] truncate">{profileData?.email || user.email}</span>
+                <span className="text-xs md:text-[13px] truncate">
+                  {profileData?.email || user.email}
+                </span>
               </div>
               {profileData?.location && (
-                <div className={`flex items-center gap-1.5 mt-0.5 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
-                  <MapPin className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={1.5} />
-                  <span className="text-xs truncate">{profileData.location}</span>
+                <div
+                  className={`flex items-center gap-1.5 mt-0.5 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
+                >
+                  <MapPin
+                    className="w-3.5 h-3.5 flex-shrink-0"
+                    strokeWidth={1.5}
+                  />
+                  <span className="text-xs truncate">
+                    {profileData.location}
+                  </span>
                 </div>
               )}
             </div>
@@ -429,10 +571,14 @@ export default function ProfilePage() {
                   : "bg-white border border-gray-200 hover:bg-gray-50"
               }`}
             >
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${item.color}`}>
+              <div
+                className={`w-10 h-10 rounded-lg flex items-center justify-center ${item.color}`}
+              >
                 <item.icon className="w-[18px] h-[18px]" strokeWidth={1.8} />
               </div>
-              <span className={`text-[11px] font-medium text-center leading-tight ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+              <span
+                className={`text-[11px] font-medium text-center leading-tight ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}
+              >
                 {item.label}
               </span>
             </button>
@@ -449,15 +595,24 @@ export default function ProfilePage() {
               <ShoppingCart className="w-5 h-5 text-white" strokeWidth={1.8} />
             </div>
             <div className="flex-1 min-w-0">
-              <span className="text-sm font-semibold text-white block">{t("ProfilePage.sellerPanel")}</span>
-              <span className="text-xs text-white/70 block mt-0.5">{t("ProfilePage.manageYourStore")}</span>
+              <span className="text-sm font-semibold text-white block">
+                {t("ProfilePage.sellerPanel")}
+              </span>
+              <span className="text-xs text-white/70 block mt-0.5">
+                {t("ProfilePage.manageYourStore")}
+              </span>
             </div>
-            <ChevronRight className="w-4 h-4 text-white/50 group-hover:translate-x-0.5 transition-transform flex-shrink-0" strokeWidth={1.5} />
+            <ChevronRight
+              className="w-4 h-4 text-white/50 group-hover:translate-x-0.5 transition-transform flex-shrink-0"
+              strokeWidth={1.5}
+            />
           </button>
         )}
 
         {/* ===== Activity ===== */}
-        <div className={`rounded-xl overflow-hidden mb-5 ${isDarkMode ? "bg-gray-900 border border-gray-800" : "bg-white border border-gray-200"}`}>
+        <div
+          className={`rounded-xl overflow-hidden mb-5 ${isDarkMode ? "bg-gray-900 border border-gray-800" : "bg-white border border-gray-200"}`}
+        >
           {activityItems
             .filter((b) => !b.featured)
             .map((item, i, arr) => (
@@ -467,12 +622,20 @@ export default function ProfilePage() {
 
         {/* ===== Account & Settings ===== */}
         <div className="mb-5">
-          <p className={`text-[11px] font-semibold uppercase tracking-wider mb-2 px-1 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+          <p
+            className={`text-[11px] font-semibold uppercase tracking-wider mb-2 px-1 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
+          >
             {t("ProfilePage.accountSettings")}
           </p>
-          <div className={`rounded-xl overflow-hidden ${isDarkMode ? "bg-gray-900 border border-gray-800" : "bg-white border border-gray-200"}`}>
+          <div
+            className={`rounded-xl overflow-hidden ${isDarkMode ? "bg-gray-900 border border-gray-800" : "bg-white border border-gray-200"}`}
+          >
             {accountItems.map((item, i) => (
-              <NavRow key={i} item={item} showBorder={i < accountItems.length - 1} />
+              <NavRow
+                key={i}
+                item={item}
+                showBorder={i < accountItems.length - 1}
+              />
             ))}
           </div>
         </div>
@@ -487,9 +650,14 @@ export default function ProfilePage() {
               : "bg-white border border-gray-200 text-red-500 hover:bg-red-50 hover:border-red-200"
           }`}
         >
-          <LogOut className={`w-4 h-4 ${isLoggingOut ? "animate-spin" : ""}`} strokeWidth={1.8} />
+          <LogOut
+            className={`w-4 h-4 ${isLoggingOut ? "animate-spin" : ""}`}
+            strokeWidth={1.8}
+          />
           <span className="font-medium">
-            {isLoggingOut ? t("ProfilePage.loggingOut") : t("ProfilePage.logout")}
+            {isLoggingOut
+              ? t("ProfilePage.loggingOut")
+              : t("ProfilePage.logout")}
           </span>
         </button>
       </div>
