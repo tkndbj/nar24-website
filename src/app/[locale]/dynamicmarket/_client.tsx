@@ -134,8 +134,13 @@ export default function DynamicMarketPage({
   // Progressively reveal products to spread out image requests; mounting 20+
   // <ProductCard>s at once causes the browser/CDN to drop or stall some image
   // fetches (no onLoad/onError fires, placeholder gets stuck).
+  // Exception: when seeded by SSR, reveal the first batch instantly — those
+  // products are in the initial HTML payload and the user is staring at them.
   const [streamedProducts, setStreamedProducts] = useState<Product[]>([]);
   const streamIndexRef = useRef(0);
+  // One-shot flag: true after the SSR-seeded batch is revealed instantly,
+  // so subsequent product changes (pagination, filter results) still drip-feed.
+  const seedRevealedRef = useRef(false);
 
   const [isInitialLoading, setIsInitialLoading] = useState(() => !seededRef.current);
   const [isProductsLoading, setIsProductsLoading] = useState(false);
@@ -193,6 +198,15 @@ export default function DynamicMarketPage({
     if (products.length === 0) {
       setStreamedProducts([]);
       streamIndexRef.current = 0;
+      return;
+    }
+    // Fast path: SSR-seeded first batch — reveal all at once. The seed is
+    // already in the initial HTML; staggering it just adds artificial delay.
+    // One-shot — pagination/filter batches still drip-feed below.
+    if (!seedRevealedRef.current && seedRef.current) {
+      seedRevealedRef.current = true;
+      streamIndexRef.current = products.length;
+      setStreamedProducts(products);
       return;
     }
     if (streamIndexRef.current > products.length) {

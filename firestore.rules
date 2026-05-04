@@ -250,9 +250,19 @@ match /market_screen_filters/{document} {
 match /dynamic_product_lists/{document} {
   // Allow everyone (even unauthenticated users) to read dynamic product lists
   allow read: if true;
-  
+
   // Allow only admins to create, update, or delete lists
   allow create, update, delete: if isAdmin();
+}
+
+// Denormalized snapshots of `dynamic_product_lists` with embedded product
+// summaries. Maintained server-side by the `home-list-manifest` Cloud
+// Functions (onWrite + scheduled refresh). Reads are public so the home
+// screen can render for anyone; writes are denied to all clients —
+// admin SDK from CFs bypasses these rules.
+match /home_lists/{document} {
+  allow read: if true;
+  allow write: if false;
 }
 
 match /campaigns/{campaignId} {

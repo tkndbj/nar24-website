@@ -111,6 +111,9 @@ const DynamicTerasPage: React.FC<DynamicTerasPageProps> = ({
 
   const [streamedProducts, setStreamedProducts] = useState<Product[]>([]);
   const streamIndexRef = useRef(0);
+  // One-shot flag: true after the SSR-seeded batch is revealed instantly,
+  // so subsequent product changes (pagination, filter results) still drip-feed.
+  const seedRevealedRef = useRef(false);
 
   const [isInitialLoading, setIsInitialLoading] = useState(() => !seededRef.current);
   const [isProductsLoading, setIsProductsLoading] = useState(false);
@@ -151,6 +154,15 @@ const DynamicTerasPage: React.FC<DynamicTerasPageProps> = ({
     if (products.length === 0) {
       setStreamedProducts([]);
       streamIndexRef.current = 0;
+      return;
+    }
+    // Fast path: SSR-seeded first batch — reveal all at once. The seed is
+    // already in the initial HTML; staggering it just adds artificial delay.
+    // One-shot — pagination/filter batches still drip-feed below.
+    if (!seedRevealedRef.current && seedRef.current) {
+      seedRevealedRef.current = true;
+      streamIndexRef.current = products.length;
+      setStreamedProducts(products);
       return;
     }
     if (streamIndexRef.current > products.length) {
