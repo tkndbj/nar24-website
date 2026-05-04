@@ -7,6 +7,7 @@ import Image from "next/image";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "../../../lib/firebase";
+import { smartCompress, shouldCompress } from "../../utils/imageCompression";
 
 // Sensitive shop-application docs live in a separate private bucket,
 // not the public marketplace bucket exported as `storage`.
@@ -216,7 +217,7 @@ export default function CreateShopPage() {
   };
 
   const validateFile = (file: File): boolean => {
-    if (file.size > 30 * 1024 * 1024) {
+    if (file.size > 10 * 1024 * 1024) {
       alert(t("fileTooLarge"));
       return false;
     }
@@ -250,7 +251,10 @@ export default function CreateShopPage() {
       privateStorage,
       `shop_applications/${user.uid}/${folder}_${Date.now()}.jpg`,
     );
-    const snapshot = await uploadBytes(storageRef, file);
+    const fileToUpload = shouldCompress(file, 200)
+      ? (await smartCompress(file, "gallery")).compressedFile
+      : file;
+    const snapshot = await uploadBytes(storageRef, fileToUpload);
     return getDownloadURL(snapshot.ref);
   };
 

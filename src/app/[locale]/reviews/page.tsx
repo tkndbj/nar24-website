@@ -198,7 +198,7 @@ interface SubmitMarketReviewData {
 // CONSTANTS
 // ============================================================================
 
-const FOOD_MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
+const FOOD_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 const PAGE_SIZE = 20;
 const FOOD_PAGE_SIZE = 20;
 const MARKET_PAGE_SIZE = 20;
