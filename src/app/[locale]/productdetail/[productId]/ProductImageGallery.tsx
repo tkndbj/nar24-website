@@ -11,11 +11,19 @@ const FullScreenImageViewer = lazy(
 
 interface ProductImageGalleryProps {
   product: Product;
+  /**
+   * When set, the gallery shows the images for that color from
+   * `product.colorImages[selectedColor]` instead of the default list.
+   * `null` falls back to the product's default `imageStoragePaths` /
+   * `imageUrls`.
+   */
+  selectedColor?: string | null;
   t: (key: string) => string;
 }
 
 export default function ProductImageGallery({
   product,
+  selectedColor = null,
   t,
 }: ProductImageGalleryProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -34,15 +42,36 @@ export default function ProductImageGallery({
     () => new Set([0]),
   );
 
-  // Prefer storage paths (post-migration); legacy `imageUrls` are
-  // accepted by SmartImage too — it extracts the storage path from
-  // Firebase download URLs and still routes the request through the CDN.
+  // Source priority:
+  //   1. Per-color images when a color swatch is selected (parity with
+  //      Flutter's ProductDetailColorOptions → provider.toggleColorSelection).
+  //   2. Storage paths (post-migration; SmartImage routes them via CDN).
+  //   3. Legacy `imageUrls`.
   const sources = React.useMemo<string[]>(() => {
+    if (selectedColor) {
+      const list = product.colorImages?.[selectedColor];
+      if (Array.isArray(list) && list.length > 0) return list;
+    }
     if (product.imageStoragePaths && product.imageStoragePaths.length > 0) {
       return product.imageStoragePaths;
     }
     return product.imageUrls || [];
-  }, [product.imageStoragePaths, product.imageUrls]);
+  }, [
+    selectedColor,
+    product.colorImages,
+    product.imageStoragePaths,
+    product.imageUrls,
+  ]);
+
+  // When the color changes, snap back to the first image of the new set
+  // and refresh the loaded-tracker so the spinner overlay logic is sound
+  // (index 0 of the new list is what's about to render with priority).
+  React.useEffect(() => {
+    setCurrentImageIndex(0);
+    setPreviousImageIndex(0);
+    setImageErrors(new Set());
+    setImagesLoaded(new Set([0]));
+  }, [selectedColor]);
 
   const handleImageError = useCallback((index: number) => {
     setImageErrors((prev) => new Set(prev).add(index));

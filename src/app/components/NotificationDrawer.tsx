@@ -43,6 +43,7 @@ import {
 } from "firebase/firestore";
 import { httpsCallable, getFunctions } from "firebase/functions";
 import { db } from "@/lib/firebase";
+import { trackReads, trackWrites } from "@/lib/firestore-read-tracker";
 
 interface NotificationData {
   id: string;
@@ -245,6 +246,17 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
       );
 
       const unsubscribe = onSnapshot(q, async (snapshot) => {
+        // Mirror Flutter NotificationScreen: count billable doc changes per
+        // event, skip cache replays.
+        if (!snapshot.metadata.fromCache) {
+          const billable = snapshot.docChanges().length || snapshot.docs.length;
+          if (billable > 0) {
+            trackReads(
+              `notification_drawer:notifications (page, limit: ${LIMIT})`,
+              billable,
+            );
+          }
+        }
         if (snapshot.empty) {
           setHasMore(false);
           setIsLoadingMore(false);
@@ -619,6 +631,15 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
         }
 
         const unsubscribe = onSnapshot(q, async (snapshot) => {
+          if (!snapshot.metadata.fromCache) {
+            const billable = snapshot.docChanges().length || snapshot.docs.length;
+            if (billable > 0) {
+              trackReads(
+                `notification_drawer:notifications (initial, limit: ${LIMIT})`,
+                billable,
+              );
+            }
+          }
           if (snapshot.empty) {
             setHasMore(false);
             setIsLoading(false);
@@ -724,6 +745,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
         batch.update(doc.ref, { isRead: true });
       });
       await batch.commit();
+      trackWrites("notification_drawer:mark notifications read", docs.length);
     } catch (error) {
       console.error("Error marking notifications as read:", error);
     }
@@ -739,6 +761,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
       await deleteDoc(
         doc(db, "users", user.uid, "notifications", notificationId),
       );
+      trackWrites("notification_drawer:delete notification", 1);
       setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
     } catch (error) {
       console.error("Error deleting notification:", error);

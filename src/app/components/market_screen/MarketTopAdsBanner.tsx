@@ -8,6 +8,7 @@ import React, {
   useMemo,
 } from "react";
 import { getFirebaseDb } from "@/lib/firebase-lazy";
+import { trackReads } from "@/lib/firestore-read-tracker";
 import { useRouter } from "next/navigation";
 import { CloudinaryUrl } from "@/utils/cloudinaryUrl";
 import CloudinaryImage from "../CloudinaryImage";
@@ -166,6 +167,7 @@ export const AdsBanner: React.FC<AdsBannerProps> = ({
         );
 
         const snapshot = await getDocs(q);
+        trackReads("market_top_ads_banner_provider:market_top_ads_banners", snapshot.docs.length || 1);
 
         if (cancelled) return;
 

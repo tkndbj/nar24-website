@@ -3583,6 +3583,9 @@
     "readAll": "Read All",
     "outOfStock": "Out of Stock",
     "translate": "Translate",
+    "color": "Color",
+    "differentColorsCount": "{count} Different Colors",
+    "popular": "Popular",
     "ProductDetailPage": {
       "buyNow": "Buy Now"
     }

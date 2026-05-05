@@ -277,7 +277,9 @@ const BundleComponent: React.FC<BundleComponentProps> = ({
           console.error("Cannot navigate to product with empty ID");
           return;
         }
-        router.push(`/product/${product.id}`);
+        // Canonical product detail route — every other entry point uses this
+        // path; the previous `/product/${id}` form was a 404.
+        router.push(`/productdetail/${product.id}`);
       } catch (err) {
         console.error("Error navigating to bundled product:", err);
       }

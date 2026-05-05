@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback, memo, useMemo } from "
 import SmartImage from "@/app/components/SmartImage";
 import { useRouter } from "next/navigation";
 import { getFirebaseDb } from "@/lib/firebase-lazy";
+import { trackReads } from "@/lib/firestore-read-tracker";
 import type { PrefetchedBannerItem } from "@/types/MarketLayout";
 
 /**
@@ -117,6 +118,7 @@ const MarketThinBanner = memo(
           );
 
           const snapshot = await getDocs(bannersQuery);
+          trackReads("market_thin_banner_provider:market_thin_banners", snapshot.docs.length || 1);
 
           if (!isMountedRef.current) return;
 

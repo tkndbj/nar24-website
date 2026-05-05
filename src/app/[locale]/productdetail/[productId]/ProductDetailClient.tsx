@@ -19,6 +19,7 @@ import LoginModal from "@/app/components/LoginModal";
 import ProductDetailActionsRow from "../../../components/product_detail/ProductDetailActionsRow";
 import DynamicAttributesWidget from "../../../components/product_detail/DynamicAttributesWidget";
 import ProductDetailSellerInfo from "../../../components/product_detail/SellerInfo";
+import ProductColorOptions from "../../../components/product_detail/ProductColorOptions";
 import ProductImageGallery from "./ProductImageGallery";
 import ProductActionButtons from "./ProductActionButtons";
 import ProductDescription from "./ProductDescription";
@@ -102,6 +103,10 @@ export default function ProductDetailClient({
   // Sales config from server (no client-side Firestore listener needed)
   const { salesPaused, pauseReason } = salesConfig;
   const [showSalesPausedDialog, setShowSalesPausedDialog] = useState(false);
+
+  // Selected colour for the per-color image preview. `null` = no override,
+  // gallery uses the product's default `imageUrls` / `imageStoragePaths`.
+  const [selectedColor, setSelectedColor] = useState<string | null>(null);
 
   // Scroll detection
   const { showHeaderButtons, actionButtonsRef } = useScrollDetection();
@@ -315,7 +320,11 @@ export default function ProductDetailClient({
       <div className="w-full sm:max-w-6xl sm:mx-auto p-2 sm:p-3 lg:p-4 overflow-x-hidden">
         <div className="grid lg:grid-cols-2 gap-3 sm:gap-6 lg:gap-8">
           {/* Left Column - Images */}
-          <ProductImageGallery product={product} t={t} />
+          <ProductImageGallery
+            product={product}
+            selectedColor={selectedColor}
+            t={t}
+          />
 
           {/* Right Column - Product Info */}
           <div className="space-y-3 sm:space-y-4">
@@ -362,6 +371,14 @@ export default function ProductDetailClient({
               />
             </div>
 
+            {/* Color Options — renders nothing when product has no colorImages */}
+            <ProductColorOptions
+              product={product}
+              selectedColor={selectedColor}
+              onSelectColor={setSelectedColor}
+              localization={localization}
+            />
+
             {/* Seller Info */}
             <ProductDetailSellerInfo
               sellerId={product.userId}
@@ -392,8 +409,21 @@ export default function ProductDetailClient({
           </div>
         </div>
 
-        {/* Bottom Sections — only rendered when server prefetch found data */}
+        {/* Bottom Sections — order mirrors Flutter's product_detail_screen.dart:
+            bundle → collection → questions → reviews → related. */}
         <div className="mt-4 sm:mt-6 space-y-3 sm:space-y-4">
+          {hasBundles && (
+            <Suspense fallback={null}>
+              <BundleComponent
+                key={`bundle-${product.id}`}
+                productId={product.id}
+                shopId={product.shopId}
+                localization={localization}
+                prefetchedData={bundles as unknown as BundleDisplayData[] | null}
+              />
+            </Suspense>
+          )}
+
           {hasCollection && (
             <Suspense fallback={null}>
               <ProductCollectionWidget
@@ -406,14 +436,21 @@ export default function ProductDetailClient({
             </Suspense>
           )}
 
-          {hasBundles && (
+          {hasQuestions && (
             <Suspense fallback={null}>
-              <BundleComponent
-                key={`bundle-${product.id}`}
+              <ProductQuestionsWidget
+                key={`questions-${product.id}`}
                 productId={product.id}
+                sellerId={product.userId}
                 shopId={product.shopId}
+                isShop={!!product.shopId}
                 localization={localization}
-                prefetchedData={bundles as unknown as BundleDisplayData[] | null}
+                locale={locale}
+                prefetchedData={
+                  questionsTotal === null
+                    ? null
+                    : { questions, totalCount: questionsTotal }
+                }
               />
             </Suspense>
           )}
@@ -434,25 +471,6 @@ export default function ProductDetailClient({
                   reviewsTotal === null
                     ? null
                     : { reviews, totalCount: reviewsTotal }
-                }
-              />
-            </Suspense>
-          )}
-
-          {hasQuestions && (
-            <Suspense fallback={null}>
-              <ProductQuestionsWidget
-                key={`questions-${product.id}`}
-                productId={product.id}
-                sellerId={product.userId}
-                shopId={product.shopId}
-                isShop={!!product.shopId}
-                localization={localization}
-                locale={locale}
-                prefetchedData={
-                  questionsTotal === null
-                    ? null
-                    : { questions, totalCount: questionsTotal }
                 }
               />
             </Suspense>

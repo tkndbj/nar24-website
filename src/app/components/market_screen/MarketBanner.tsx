@@ -17,6 +17,7 @@ import {
   QueryDocumentSnapshot,
   DocumentData,
 } from "firebase/firestore";
+import { trackReads } from "@/lib/firestore-read-tracker";
 
 // Market Banner Item interface
 interface MarketBannerItem {
@@ -140,6 +141,7 @@ const useMarketBanners = (initialItems?: PrefetchedBannerItem[] | null) => {
       }
 
       const snapshot = await getDocs(q);
+      trackReads("market_banner_provider:banners page", snapshot.docs.length || 1);
 
       // Process documents exactly like Flutter
       const processedBanners: MarketBannerItem[] = snapshot.docs

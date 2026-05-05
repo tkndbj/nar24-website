@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { personalizedFeedService } from "@/services/personalizedFeedService";
 import { getFirebaseDb, getFirebaseAuth } from "@/lib/firebase-lazy";
+import { trackReads } from "@/lib/firestore-read-tracker";
 import { useTheme } from "@/hooks/useTheme";
 import { ProductUtils } from "@/app/models/Product";
 import type { Product } from "@/app/models/Product";
@@ -130,6 +131,7 @@ export const PreferenceProduct = React.memo(
           // Firestore whereIn limit is 30
           const q = query(productsRef, where("__name__", "in", productIds));
           const snapshot = await getDocs(q);
+          trackReads("preference_product:shop_products whereIn fallback", snapshot.docs.length || 1);
 
           const products: Product[] = [];
           snapshot.docs.forEach((doc) => {

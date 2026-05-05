@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { ProductCard } from "../ProductCard";
 import { ChevronRight, ChevronLeft } from "lucide-react";
 import { getFirebaseDb } from "@/lib/firebase-lazy";
+import { trackReads } from "@/lib/firestore-read-tracker";
 import { useTheme } from "@/hooks/useTheme";
 import { ProductUtils } from "@/app/models/Product";
 import type { Product } from "@/app/models/Product";
@@ -433,6 +434,7 @@ export default function DynamicHorizontalList({
         );
 
         const snapshot = await getDocs(listsQuery);
+        trackReads("market_dynamic_filter_provider:home_lists (active)", snapshot.docs.length || 1);
         if (cancelled) return;
 
         const fetchedLists: DynamicListData[] = snapshot.docs.map((doc) => ({

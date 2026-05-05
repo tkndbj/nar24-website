@@ -26,6 +26,7 @@ import React, {
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import SmartImage from "@/app/components/SmartImage";
+import { trackReads } from "@/lib/firestore-read-tracker";
 import {
   doc,
   getDoc,
@@ -529,6 +530,7 @@ export default function ShopDetailPage({
       setIsLoading(true);
       setError(null);
       const shopDoc = await getDoc(doc(db, "shops", shopId));
+      trackReads("shop_provider:shop doc", 1);
       if (!shopDoc.exists()) {
         setError(t("shopNotFound"));
         return;
@@ -557,6 +559,7 @@ export default function ShopDetailPage({
         orderBy("createdAt", "desc"),
       );
       const snapshot = await getDocs(q);
+      trackReads("shop_provider:shop collections", snapshot.docs.length || 1);
       setShopCollections(
         snapshot.docs.map((d) => ({
           id: d.id,
@@ -577,6 +580,7 @@ export default function ShopDetailPage({
         limit(20),
       );
       const snapshot = await getDocs(q);
+      trackReads("shop_provider:shop reviews", snapshot.docs.length || 1);
       setReviews(
         snapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as Review[],
       );
@@ -778,6 +782,7 @@ export default function ShopDetailPage({
           : query(baseQuery, limit(PRODUCTS_LIMIT));
 
       const snapshot = await getDocs(finalQuery);
+      trackReads("shop_provider:shop_products page", snapshot.docs.length || 1);
 
       // Discard results if this request was superseded
       if (signal.aborted) return;

@@ -3611,6 +3611,9 @@
     "readAll": "Tümünü Oku",
     "outOfStock": "Stokta Yok",
     "translate": "Çevir",
+    "color": "Renk",
+    "differentColorsCount": "{count} Farklı Renk",
+    "popular": "Popüler",
     "ProductDetailPage": {
       "buyNow": "Şimdi Satın Al"
     }
