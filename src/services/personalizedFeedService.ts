@@ -37,6 +37,12 @@ const STALE_DAYS = 3; // Feed older than this falls back to trending
 //   * trending fallback path was taken
 let cachedTopProducts: Product[] | null = null;
 
+// In-memory cache for the embedded top-N trending summaries from
+// `trending_products/global.productSummaries`. Same lifecycle rules as
+// `cachedTopProducts`. Used by `getTrendingTopProducts()` to render the
+// home preference widget for unauthenticated users with 1 read.
+let cachedTopTrendingProducts: Product[] | null = null;
+
 // ── Cache helpers ───────────────────────────────────────────────────────────
 
 function readCache(dataKey: string, expiryKey: string): string[] | null {
@@ -101,13 +107,60 @@ async function fetchTrending(): Promise<string[]> {
   ]);
 
   const snap = await getDoc(doc(db, "trending_products", "global"));
-  if (!snap.exists()) return [];
+  if (!snap.exists()) {
+    cachedTopTrendingProducts = null;
+    return [];
+  }
 
-  const ids = (snap.data().products || []) as string[];
-  if (ids.length === 0) return [];
+  const data = snap.data();
+  const ids = (data.products || []) as string[];
+  if (ids.length === 0) {
+    cachedTopTrendingProducts = null;
+    return [];
+  }
+
+  // Manifest fast path: parse embedded summaries when the CF wrote them.
+  // Side-effect populates `cachedTopTrendingProducts` so subsequent
+  // `getTrendingTopProducts()` calls within this session hit the memory
+  // cache. Falls back to null when the doc predates the embed rollout.
+  cachedTopTrendingProducts = parseEmbeddedProducts(data.productSummaries);
 
   writeCache(CACHE_KEYS.trendingProducts, CACHE_KEYS.trendingExpiry, ids, TTL.trending);
   return ids;
+}
+
+/**
+ * Direct doc read for embedded trending summaries. Used when
+ * `cachedTopTrendingProducts` is empty but `getProductIds` already returned a
+ * localStorage hit (so `fetchTrending` didn't run this session).
+ */
+async function fetchEmbeddedTrendingProducts(): Promise<Product[] | null> {
+  const [db, { doc, getDoc }] = await Promise.all([
+    getFirebaseDb(),
+    import("firebase/firestore"),
+  ]);
+
+  const snap = await getDoc(doc(db, "trending_products", "global"));
+  if (!snap.exists()) {
+    cachedTopTrendingProducts = null;
+    return null;
+  }
+
+  const data = snap.data();
+
+  // Refresh the IDs cache while we have the doc open — costs nothing extra.
+  const ids = (data.products || []) as string[];
+  if (ids.length > 0) {
+    writeCache(
+      CACHE_KEYS.trendingProducts,
+      CACHE_KEYS.trendingExpiry,
+      ids,
+      TTL.trending,
+    );
+  }
+
+  cachedTopTrendingProducts = parseEmbeddedProducts(data.productSummaries);
+  return cachedTopTrendingProducts;
 }
 
 async function fetchPersonalized(userId: string): Promise<string[]> {
@@ -244,15 +297,41 @@ export const personalizedFeedService = {
     }
   },
 
+  /**
+   * Get the top-N trending products as embedded summaries — 1 Firestore read
+   * (the `trending_products/global` doc) instead of 1 + 30 (whereIn). Used
+   * by the home preference widget for unauthenticated users.
+   *
+   * Returns null when:
+   *   * the trending doc predates the embedded-products rollout
+   *   * any error occurs
+   *
+   * Callers should fall back to `getProductIds()` + a `whereIn` query when
+   * this returns null.
+   */
+  async getTrendingTopProducts(): Promise<Product[] | null> {
+    try {
+      // Memory cache hit — no Firestore read.
+      if (cachedTopTrendingProducts !== null) return cachedTopTrendingProducts;
+
+      return await fetchEmbeddedTrendingProducts();
+    } catch (e) {
+      console.warn("getTrendingTopProducts error:", e);
+      return null;
+    }
+  },
+
   /** Clear caches and re-fetch on next getProductIds call. */
   async forceRefresh(): Promise<void> {
     cachedTopProducts = null;
+    cachedTopTrendingProducts = null;
     clearAllCaches();
   },
 
   /** Clear all localStorage caches (call on logout). */
   async clearCache(): Promise<void> {
     cachedTopProducts = null;
+    cachedTopTrendingProducts = null;
     clearAllCaches();
   },
 };

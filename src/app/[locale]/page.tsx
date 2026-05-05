@@ -315,22 +315,37 @@ const prefetchPreferenceProducts = unstable_cache(
   async (): Promise<PrefetchedProduct[]> => {
     const db = getFirestoreAdmin();
 
-    // 1. Fetch trending product IDs
+    // Manifest fast path: the trending CF (12-trending-products) embeds the
+    // top-30 product summaries inline in `productSummaries`. One read
+    // serves the entire prefetch — no per-product fetch. Mirrors the
+    // pattern used by `prefetchDynamicListConfigs` for `home_lists`.
     const trendingDoc = await db.collection("trending_products").doc("global").get();
     if (!trendingDoc.exists) return [];
-    const allIds = (trendingDoc.data()?.products || []) as string[];
-    if (allIds.length === 0) return [];
+    const data = trendingDoc.data() || {};
 
-    // 2. Sample up to 30 random IDs
-    const sampleSize = Math.min(30, allIds.length);
-    const sampled: string[] = [];
-    const indices = new Set<number>();
-    while (indices.size < sampleSize) {
-      indices.add(Math.floor(Math.random() * allIds.length));
+    const rawSummaries = Array.isArray(data.productSummaries)
+      ? (data.productSummaries as Array<Record<string, unknown>>)
+      : null;
+
+    if (rawSummaries && rawSummaries.length > 0) {
+      const prefetched: PrefetchedProduct[] = [];
+      for (const entry of rawSummaries) {
+        if (!entry || typeof entry !== "object") continue;
+        const id = typeof entry.id === "string" ? entry.id : "";
+        if (!id) continue;
+        const product = mapManifestEntryToPrefetchedProduct(id, entry);
+        if (product) prefetched.push(product);
+        if (prefetched.length >= 30) break;
+      }
+      if (prefetched.length > 0) return prefetched;
     }
-    for (const i of indices) sampled.push(allIds[i]);
 
-    // 3. Fetch full product documents
+    // ── Fallback: trending doc predates the embed rollout. Fetch full
+    // product docs by ID. Triggers 1 + ceil(N/30) reads — same cost shape
+    // as before the manifest landed.
+    const allIds = (data.products || []) as string[];
+    if (allIds.length === 0) return [];
+    const sampled = allIds.slice(0, 30);
     return fetchProductDocsByIds(db, sampled, 30);
   },
   ["prefetch-preference-products"],

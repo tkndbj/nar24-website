@@ -2909,6 +2909,7 @@
   },
   "MarketScreen": {
     "specialProductsForYou": "Senin İçin Özel Ürünler",
+    "trendingItems": "Trend Ürünler",
     "viewAll": "Tümünü Görüntüle",
     "failedToLoadRecommendations": "Öneriler yüklenemedi",
     "tryAgain": "Tekrar Dene",

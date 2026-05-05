@@ -7,7 +7,7 @@ import { ChevronRight, ChevronLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { personalizedFeedService } from "@/services/personalizedFeedService";
-import { getFirebaseDb } from "@/lib/firebase-lazy";
+import { getFirebaseDb, getFirebaseAuth } from "@/lib/firebase-lazy";
 import { useTheme } from "@/hooks/useTheme";
 import { ProductUtils } from "@/app/models/Product";
 import type { Product } from "@/app/models/Product";
@@ -96,6 +96,10 @@ export const PreferenceProduct = React.memo(
     const [error, setError] = useState<string | null>(null);
     const [canScrollLeft, setCanScrollLeft] = useState(false);
     const [canScrollRight, setCanScrollRight] = useState(false);
+    // Tracks whether the current `products` list came from the trending
+    // manifest (unauth users) vs the personalized feed. Drives the header
+    // title so the user sees an honest label.
+    const [isTrending, setIsTrending] = useState(false);
     const isDarkMode = useTheme();
 
     const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -172,33 +176,64 @@ export const PreferenceProduct = React.memo(
       setError(null);
 
       try {
-        // ── Manifest fast path: 1 read (user_profile doc) instead of 1 + 30
-        // (whereIn on shop_products). Returns null when the user_profile
-        // doc predates the embed rollout or the CF skipped embedding due
-        // to size.
-        const embedded = await personalizedFeedService.getTopProducts();
+        const auth = await getFirebaseAuth();
+        const isAuthenticated = auth.currentUser != null;
         let fetchedProducts: Product[];
+        let trending: boolean;
 
-        if (embedded && embedded.length > 0) {
-          fetchedProducts = embedded.slice(0, 30);
-          console.log(
-            `✅ Loaded ${fetchedProducts.length} preference products from manifest (1 read)`
-          );
-        } else {
-          // ── Backward-compat fallback: ID list + whereIn lookup.
-          const productIds = await personalizedFeedService.getProductIds();
-
-          if (productIds.length === 0) {
-            setProducts([]);
-            setIsLoading(false);
-            return;
+        if (!isAuthenticated) {
+          // ── Unauthenticated: trending manifest only. 1 read (the
+          // `trending_products/global` doc) instead of 1 + 30 whereIn.
+          // Falls back to the legacy IDs + whereIn path if the manifest doc
+          // predates the embed rollout.
+          const embedded = await personalizedFeedService.getTrendingTopProducts();
+          if (embedded && embedded.length > 0) {
+            fetchedProducts = embedded.slice(0, 30);
+            console.log(
+              `✅ Loaded ${fetchedProducts.length} trending products from manifest (1 read)`
+            );
+          } else {
+            const productIds = await personalizedFeedService.getProductIds();
+            if (productIds.length === 0) {
+              setProducts([]);
+              setIsTrending(true);
+              setIsLoading(false);
+              return;
+            }
+            const topProductIds = productIds.slice(0, 30);
+            fetchedProducts = await fetchProductDetails(topProductIds);
+            console.log(
+              `✅ Loaded ${fetchedProducts.length} trending products via whereIn fallback`
+            );
           }
+          trending = true;
+        } else {
+          // ── Authenticated: personalized feed. Manifest fast path: 1 read
+          // (user_profile doc) instead of 1 + 30 (whereIn on shop_products).
+          // Returns null when the user_profile doc predates the embed
+          // rollout or the CF skipped embedding due to size.
+          const embedded = await personalizedFeedService.getTopProducts();
 
-          const topProductIds = productIds.slice(0, 30);
-          fetchedProducts = await fetchProductDetails(topProductIds);
-          console.log(
-            `✅ Loaded ${fetchedProducts.length} preference products via whereIn fallback`
-          );
+          if (embedded && embedded.length > 0) {
+            fetchedProducts = embedded.slice(0, 30);
+            console.log(
+              `✅ Loaded ${fetchedProducts.length} preference products from manifest (1 read)`
+            );
+          } else {
+            const productIds = await personalizedFeedService.getProductIds();
+            if (productIds.length === 0) {
+              setProducts([]);
+              setIsTrending(false);
+              setIsLoading(false);
+              return;
+            }
+            const topProductIds = productIds.slice(0, 30);
+            fetchedProducts = await fetchProductDetails(topProductIds);
+            console.log(
+              `✅ Loaded ${fetchedProducts.length} preference products via whereIn fallback`
+            );
+          }
+          trending = false;
         }
 
         // ✅ CACHE THE PRODUCTS
@@ -209,6 +244,7 @@ export const PreferenceProduct = React.memo(
         );
 
         setProducts(fetchedProducts);
+        setIsTrending(trending);
         setIsLoading(false);
       } catch (e) {
         console.error("Error loading personalized feed:", e);
@@ -319,7 +355,7 @@ useEffect(() => {
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-2">
                   <h2 className="text-lg font-bold text-white">
-                    {t("specialProductsForYou")}
+                    {isTrending ? t("trendingItems") : t("specialProductsForYou")}
                   </h2>
                   {/* Loading indicator when refreshing */}
                   {isLoading && products.length > 0 && (

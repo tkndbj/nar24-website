@@ -2842,6 +2842,7 @@
   },
   "MarketScreen": {
     "specialProductsForYou": "Special Products For You",
+    "trendingItems": "Trending Items",
     "viewAll": "View All",
     "failedToLoadRecommendations": "Failed to load recommendations",
     "tryAgain": "Try Again",
