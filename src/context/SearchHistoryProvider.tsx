@@ -80,6 +80,11 @@ export const SearchHistoryProvider: React.FC<SearchHistoryProviderProps> = ({ ch
   // Prevent duplicate concurrent fetches
   const fetchInFlightRef = useRef<Promise<void> | null>(null);
 
+  // Tracks the userId we have already loaded history for. Lets repeat calls to
+  // fetchHistory() (e.g. every time the search bar opens) be a no-op without
+  // a Firestore round-trip. Cleared whenever the userId changes.
+  const lastFetchedForUidRef = useRef<string | null>(null);
+
   // ========================================================================
   // HELPERS
   // ========================================================================
@@ -113,7 +118,12 @@ export const SearchHistoryProvider: React.FC<SearchHistoryProviderProps> = ({ ch
 
   const fetchHistory = useCallback(async () => {
     const userId = userProp?.uid;
+    // No user yet — caller (SearchBar) will retry once auth resolves because
+    // fetchHistory's identity changes when userProp?.uid changes.
     if (!userId) return;
+
+    // Already loaded for this user; nothing to fetch.
+    if (lastFetchedForUidRef.current === userId) return;
 
     // Deduplicate concurrent calls
     if (fetchInFlightRef.current) {
@@ -147,6 +157,7 @@ export const SearchHistoryProvider: React.FC<SearchHistoryProviderProps> = ({ ch
         toRemove.forEach(id => optimisticallyDeleted.current.delete(id));
 
         updateCombinedEntries();
+        lastFetchedForUidRef.current = userId;
       } catch (error) {
         console.error('Error fetching search history:', error);
       } finally {
@@ -159,21 +170,25 @@ export const SearchHistoryProvider: React.FC<SearchHistoryProviderProps> = ({ ch
     await promise;
   }, [userProp?.uid, updateCombinedEntries]);
 
-  // Eagerly load history when the user becomes available (matches Flutter:
-  // history is loaded on login, not first search-bar open). This avoids the
-  // race where the user clicks the search bar before auth has resolved —
-  // SearchBar's "first open" guard would latch true with userId still null
-  // and never re-fire.
+  // History fetching is now strictly on-demand (called by SearchBar when the
+  // user opens the search bar). Reset cached state on logout/user change so a
+  // different user doesn't see stale data and the next search-bar open
+  // re-fetches.
   useEffect(() => {
-    if (userProp?.uid) {
-      fetchHistory();
-    } else {
-      // Clear history when user logs out so a different user doesn't see stale data.
+    if (!userProp?.uid) {
+      lastFetchedForUidRef.current = null;
+      allEntries.current = [];
+      optimisticallyDeleted.current.clear();
+      setSearchEntries([]);
+    } else if (lastFetchedForUidRef.current !== userProp.uid) {
+      // Different user signed in — clear cached entries; next on-demand fetch
+      // will repopulate.
+      lastFetchedForUidRef.current = null;
       allEntries.current = [];
       optimisticallyDeleted.current.clear();
       setSearchEntries([]);
     }
-  }, [userProp?.uid, fetchHistory]);
+  }, [userProp?.uid]);
 
   // ========================================================================
   // LOCAL INSERT

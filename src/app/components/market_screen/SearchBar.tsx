@@ -150,11 +150,14 @@ export default function SearchBar({
     fetchHistory,
   } = useSearchHistory();
 
-  // Fetch search history on demand when search bar opens
-  const historyFetchedRef = useRef(false);
+  // Fetch search history on demand when search bar opens. Provider-side
+  // dedup (lastFetchedForUidRef) makes this idempotent — repeated opens by
+  // the same signed-in user cost zero Firestore reads. fetchHistory's
+  // identity also changes when the user's uid changes, so this useEffect
+  // automatically re-fires after a sign-in race (drawer opened anonymously,
+  // then user logs in via modal) without needing a separate latch.
   useEffect(() => {
-    if (isSearching && !historyFetchedRef.current) {
-      historyFetchedRef.current = true;
+    if (isSearching) {
       fetchHistory();
     }
   }, [isSearching, fetchHistory]);
