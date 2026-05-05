@@ -99,7 +99,7 @@ export function BadgeProvider({ children, user: userProp }: BadgeProviderProps) 
         (querySnapshot) => {
           const count = querySnapshot.docs.length;
           console.log("🔔 BadgeProvider: Has unread notifications:", count > 0);
-          trackReads("Badge:Notifications", count);
+          trackReads("badge_provider:notifications (any unread)", count);
           setUnreadNotificationsCount(count);
         },
         (error) => {

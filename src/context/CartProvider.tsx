@@ -1242,7 +1242,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         );
 
         const snapshot = await getDocsFromServer(cartQuery);
-        trackReads("Cart:Load", snapshot.docs.length || 1);
+        trackReads("cart_provider:cart page load", snapshot.docs.length || 1);
 
         await buildCartItemsFromDocs(snapshot.docs);
 
@@ -1610,7 +1610,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           const cartDocSnap = await getDoc(
             doc(db, "users", user.uid, "cart", productId),
           );
-          trackReads("Cart:RemovePreFetch", 1);
+          trackReads("cart_provider:cart doc pre-remove (analytics)", 1);
           cartData = cartDocSnap.data();
         } catch {
           // Non-fatal — fall back to local item
@@ -1883,7 +1883,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
       );
 
       const snapshot = await getDocsFromServer(cartQuery);
-      trackReads("Cart:Refresh", snapshot.docs.length || 1);
+      trackReads("cart_provider:cart refresh", snapshot.docs.length || 1);
 
       await buildCartItemsFromDocs(snapshot.docs);
 
@@ -2087,7 +2087,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         }
 
         const snapshot = await getDocsFromServer(cartQuery);
-        trackReads("Cart:LoadMore", snapshot.docs.length || 1);
+        trackReads("cart_provider:cart load more", snapshot.docs.length || 1);
 
         if (snapshot.docs.length === 0) {
           setHasMore(false);

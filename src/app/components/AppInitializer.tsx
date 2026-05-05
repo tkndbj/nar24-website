@@ -16,10 +16,15 @@ export function AppInitializer({ children }: { children: ReactNode }) {
         : (cb: () => void) => setTimeout(cb, 1);
 
     const id = schedule(async () => {
-      const [{ userActivityService }] = await Promise.all([
-        import("@/services/userActivity"),
-      ]);
+      const [{ userActivityService }, { firestoreReadTracker }] =
+        await Promise.all([
+          import("@/services/userActivity"),
+          import("@/lib/firestore-read-tracker"),
+        ]);
       userActivityService.initialize();
+      // Synchronous; sets up the 60s flush timer and lifecycle handlers.
+      // First flush lazily resolves Firebase via firebase-lazy.
+      firestoreReadTracker.initialize();
     });
 
     return () => {
@@ -29,6 +34,9 @@ export function AppInitializer({ children }: { children: ReactNode }) {
       // Lazy cleanup — only dispose if modules were loaded
       import("@/services/userActivity").then((m) =>
         m.userActivityService.dispose()
+      );
+      import("@/lib/firestore-read-tracker").then((m) =>
+        m.firestoreReadTracker.dispose()
       );
     };
   }, []);

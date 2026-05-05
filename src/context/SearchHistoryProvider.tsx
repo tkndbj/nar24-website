@@ -133,7 +133,7 @@ export const SearchHistoryProvider: React.FC<SearchHistoryProviderProps> = ({ ch
         );
 
         const snapshot = await getDocs(q);
-        trackReads("SearchHistory", snapshot.docs.length || 1);
+        trackReads("search_history_provider:search history load", snapshot.docs.length || 1);
 
         const entries = snapshot.docs.map(searchEntryFromFirestore);
         allEntries.current = entries;
@@ -215,7 +215,7 @@ export const SearchHistoryProvider: React.FC<SearchHistoryProviderProps> = ({ ch
         searchTerm: searchTerm.trim(),
         timestamp: serverTimestamp(),
       });
-      trackWrites("SearchHistory", 1);
+      trackWrites("search_history_provider:save search term", 1);
     } catch (error) {
       console.error('Error saving search term:', error);
       // Rollback placeholder
@@ -248,7 +248,7 @@ export const SearchHistoryProvider: React.FC<SearchHistoryProviderProps> = ({ ch
     while (retryCount < maxRetries) {
       try {
         await deleteDoc(doc(db, 'searches', docId));
-        trackWrites("SearchHistory", 1);
+        trackWrites("search_history_provider:delete search entry", 1);
         return;
       } catch (error) {
         retryCount++;
@@ -316,7 +316,7 @@ export const SearchHistoryProvider: React.FC<SearchHistoryProviderProps> = ({ ch
       );
 
       const snapshot = await getDocs(q);
-      trackReads("SearchHistory:DeleteAll", snapshot.docs.length || 1);
+      trackReads("search_history_provider:delete all (pre-fetch)", snapshot.docs.length || 1);
 
       const batchSize = 500;
       for (let i = 0; i < snapshot.docs.length; i += batchSize) {
@@ -324,7 +324,7 @@ export const SearchHistoryProvider: React.FC<SearchHistoryProviderProps> = ({ ch
         snapshot.docs.slice(i, i + batchSize).forEach(d => batch.delete(d.ref));
         await batch.commit();
       }
-      trackWrites("SearchHistory:DeleteAll", snapshot.docs.length);
+      trackWrites("search_history_provider:delete all", snapshot.docs.length);
     } catch (error) {
       console.error('Error deleting all search history:', error);
       throw error;

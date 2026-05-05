@@ -525,7 +525,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
             addResultsFromSnapshot(snap);
           }
           trackReads(
-            `Favorites:hydrate (targeted: products=${productsBucket.length}, shop_products=${shopProductsBucket.length})`,
+            `favorite_product_provider:hydrate (targeted: products=${productsBucket.length}, shop_products=${shopProductsBucket.length})`,
             totalReads
           );
         } catch (error) {
@@ -553,7 +553,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
             ]);
 
             trackReads(
-              `Favorites:hydrate legacy (${chunk.length})`,
+              `favorite_product_provider:hydrate legacy (${chunk.length})`,
               productsSnap.docs.length + shopProductsSnap.docs.length
             );
 
@@ -1924,7 +1924,7 @@ const removeMultipleFromFavorites = useCallback(
       const basketsSnap = await getDocsFromServer(
         query(collection(dbRef.current!, `users/${user.uid}/favorite_baskets`))
       );
-      trackReads("Favorites:Baskets", basketsSnap.docs.length || 1);
+      trackReads("favorite_product_provider:favorite_baskets", basketsSnap.docs.length || 1);
 
       const baskets: FavoriteBasket[] = [];
       basketsSnap.docs.forEach((d) => {

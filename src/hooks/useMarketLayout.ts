@@ -196,7 +196,7 @@ export function useMarketLayout(
       try {
         const webDocRef = doc(db, FIRESTORE_COLLECTION, FIRESTORE_DOC_WEB);
         const webSnap = await getDoc(webDocRef);
-        trackReads("MarketLayout:Web", 1);
+        trackReads("market_layout_provider:layout (web-specific)", 1);
 
         if (webSnap.exists()) {
           const data = webSnap.data();
@@ -231,7 +231,7 @@ export function useMarketLayout(
           FIRESTORE_DOC_SHARED
         );
         const sharedSnap = await getDoc(sharedDocRef);
-        trackReads("MarketLayout:Shared", 1);
+        trackReads("market_layout_provider:layout (shared fallback)", 1);
 
         if (sharedSnap.exists()) {
           const data = sharedSnap.data();

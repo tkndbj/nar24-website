@@ -40,7 +40,7 @@ async function startListener() {
     _unsubscribe = onSnapshot(
       configRef,
       (snapshot) => {
-        trackReads("SearchConfig", 1);
+        trackReads("search_config_service:config/search", 1);
         if (snapshot.exists()) {
           const data = snapshot.data();
           _config = {

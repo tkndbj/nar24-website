@@ -220,7 +220,7 @@ export const CouponProvider: React.FC<CouponProviderProps> = ({
   // ========================================================================
 
   const handleCouponsUpdate = useCallback((snapshot: QuerySnapshot) => {
-    trackReads("Coupons", snapshot.docs.length || 1);
+    trackReads("coupon_provider:coupons", snapshot.docs.length || 1);
     const newCoupons = snapshot.docs
       .map((doc) => Coupon.fromFirestore(doc.id, doc.data()))
       .filter((c) => c.isValid); // Filter out expired ones
@@ -232,7 +232,7 @@ export const CouponProvider: React.FC<CouponProviderProps> = ({
   }, []);
 
   const handleBenefitsUpdate = useCallback((snapshot: QuerySnapshot) => {
-    trackReads("Benefits", snapshot.docs.length || 1);
+    trackReads("coupon_provider:benefits", snapshot.docs.length || 1);
     const newBenefits = snapshot.docs
       .map((doc) => UserBenefit.fromFirestore(doc.id, doc.data()))
       .filter((b) => b.isValid); // Filter out expired ones

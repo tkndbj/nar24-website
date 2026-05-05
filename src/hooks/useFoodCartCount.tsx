@@ -32,7 +32,7 @@ export function useFoodCartCount(uid: string | null | undefined): number {
           q,
           { includeMetadataChanges: false },
           (snapshot) => {
-            trackReads("FoodCart", snapshot.docs.length || 1);
+            trackReads("food_cart_provider:food cart count", snapshot.docs.length || 1);
             // Sum quantities for accurate badge count
             let total = 0;
             snapshot.docs.forEach((doc) => {
