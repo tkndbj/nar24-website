@@ -13,6 +13,7 @@ import {
   limit,
   QueryDocumentSnapshot,
   addDoc,
+  updateDoc,
   serverTimestamp
 } from 'firebase/firestore';
 import type { User } from 'firebase/auth';
@@ -146,7 +147,44 @@ export const SearchHistoryProvider: React.FC<SearchHistoryProviderProps> = ({ ch
         trackReads("search_history_provider:search history load", snapshot.docs.length || 1);
 
         const entries = snapshot.docs.map(searchEntryFromFirestore);
-        allEntries.current = entries;
+
+        // One-shot dedup cleanup: docs returned sorted by timestamp desc, so
+        // the first occurrence of each searchTerm is the newest — keep that
+        // one and batch-delete the older copies. After this runs once per
+        // user, future fetches return only unique terms (since
+        // saveSearchTerm now upserts instead of inserting).
+        const dedupedSeen = new Map<string, SearchEntry>();
+        const dupeIdsToDelete: string[] = [];
+        for (const entry of entries) {
+          const key = entry.searchTerm.trim().toLowerCase();
+          if (!key) continue;
+          if (dedupedSeen.has(key)) {
+            dupeIdsToDelete.push(entry.id);
+          } else {
+            dedupedSeen.set(key, entry);
+          }
+        }
+
+        if (dupeIdsToDelete.length > 0) {
+          // Fire-and-forget; tracker swallows failures.
+          void (async () => {
+            try {
+              const batch = writeBatch(db);
+              dupeIdsToDelete.forEach(id =>
+                batch.delete(doc(db, 'searches', id))
+              );
+              await batch.commit();
+              trackWrites(
+                "search_history_provider:dedupe cleanup",
+                dupeIdsToDelete.length
+              );
+            } catch (err) {
+              console.warn('Search history dedupe cleanup failed:', err);
+            }
+          })();
+        }
+
+        allEntries.current = Array.from(dedupedSeen.values());
 
         // Clean up confirmed deletes
         const existingDocIds = new Set(snapshot.docs.map(d => d.id));
@@ -208,16 +246,50 @@ export const SearchHistoryProvider: React.FC<SearchHistoryProviderProps> = ({ ch
 
   const saveSearchTerm = useCallback(async (searchTerm: string): Promise<void> => {
     const currentUser = auth.currentUser;
-    if (!currentUser || !searchTerm.trim()) return;
+    const trimmed = searchTerm.trim();
+    if (!currentUser || !trimmed) return;
 
     const userId = currentUser.uid;
     const now = new Date();
+
+    // Match Flutter: dedup at write time using the in-memory entry list.
+    // If the same term was searched before, just bump its timestamp instead
+    // of creating a new doc. Keeps the `searches` collection from growing
+    // duplicate copies and keeps fetch-time read counts == displayed count.
+    const lowered = trimmed.toLowerCase();
+    const existing = allEntries.current.find(
+      e => e.searchTerm.trim().toLowerCase() === lowered &&
+           !e.id.startsWith('temp_')
+    );
+
+    if (existing) {
+      // Move the existing entry to the top of the local list with a fresh
+      // timestamp; UI updates instantly.
+      allEntries.current = [
+        { ...existing, timestamp: now },
+        ...allEntries.current.filter(e => e.id !== existing.id),
+      ];
+      updateCombinedEntries();
+
+      try {
+        await updateDoc(doc(db, 'searches', existing.id), {
+          timestamp: serverTimestamp(),
+        });
+        trackWrites("search_history_provider:bump search term timestamp", 1);
+      } catch (error) {
+        console.error('Error bumping search term timestamp:', error);
+        // Non-fatal: local timestamp still reflects the click, list shows it
+        // at the top until the next fetch. No rollback needed.
+      }
+      return;
+    }
+
     const placeholderId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     // Optimistic local insert
     const localEntry: SearchEntry = {
       id: placeholderId,
-      searchTerm: searchTerm.trim(),
+      searchTerm: trimmed,
       timestamp: now,
       userId: userId,
     };
@@ -225,12 +297,23 @@ export const SearchHistoryProvider: React.FC<SearchHistoryProviderProps> = ({ ch
     insertLocalEntry(localEntry);
 
     try {
-      await addDoc(collection(db, 'searches'), {
+      const newDocRef = await addDoc(collection(db, 'searches'), {
         userId: userId,
-        searchTerm: searchTerm.trim(),
+        searchTerm: trimmed,
         timestamp: serverTimestamp(),
       });
       trackWrites("search_history_provider:save search term", 1);
+
+      // Swap the placeholder ID for the real Firestore ID so a subsequent
+      // re-search of the same term hits the upsert path above instead of
+      // being treated as a temp-only entry.
+      const idx = allEntries.current.findIndex(e => e.id === placeholderId);
+      if (idx !== -1) {
+        allEntries.current[idx] = {
+          ...allEntries.current[idx],
+          id: newDocRef.id,
+        };
+      }
     } catch (error) {
       console.error('Error saving search term:', error);
       // Rollback placeholder

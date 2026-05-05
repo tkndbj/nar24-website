@@ -20,6 +20,7 @@ import React, {
   useState,
   useRef,
   useEffect,
+  useLayoutEffect,
   useCallback,
   useMemo,
 } from "react";
@@ -153,10 +154,15 @@ export default function SearchBar({
   // Fetch search history on demand when search bar opens. Provider-side
   // dedup (lastFetchedForUidRef) makes this idempotent — repeated opens by
   // the same signed-in user cost zero Firestore reads. fetchHistory's
-  // identity also changes when the user's uid changes, so this useEffect
+  // identity also changes when the user's uid changes, so this effect
   // automatically re-fires after a sign-in race (drawer opened anonymously,
   // then user logs in via modal) without needing a separate latch.
-  useEffect(() => {
+  //
+  // useLayoutEffect (not useEffect) so the synchronous setIsLoadingHistory
+  // inside fetchHistory flushes before the browser paints the dropdown —
+  // otherwise the user sees a one-frame flash of the empty-state placeholder
+  // before the shimmer appears.
+  useLayoutEffect(() => {
     if (isSearching) {
       fetchHistory();
     }
@@ -389,7 +395,10 @@ export default function SearchBar({
     ],
   );
 
-  const showHistory = !trimmedTerm && searchEntries.length > 0;
+  // Include the loading state so the dropdown shows a shimmer (instead of
+  // the empty-state placeholder) while the first fetch is in flight.
+  const showHistory =
+    !trimmedTerm && (searchEntries.length > 0 || isLoadingHistory);
 
   const paginatedHistory = useMemo(
     () => searchEntries.slice(0, (historyPage + 1) * HISTORY_ITEMS_PER_PAGE),
@@ -860,20 +869,38 @@ export default function SearchBar({
                     >
                       {t("header.recentSearches")}
                     </span>
-                    <span
-                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${isDark ? "bg-white/5 text-gray-400" : "bg-gray-100 text-gray-500"}`}
-                    >
-                      {searchEntries.length}
-                    </span>
+                    {!isLoadingHistory && (
+                      <span
+                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${isDark ? "bg-white/5 text-gray-400" : "bg-gray-100 text-gray-500"}`}
+                      >
+                        {searchEntries.length}
+                      </span>
+                    )}
                   </div>
                 </div>
 
                 {isLoadingHistory ? (
-                  <div className="flex justify-center py-8">
-                    <Loader2
-                      size={18}
-                      className={`animate-spin ${mutedText}`}
-                    />
+                  /* Shimmer rows that match the height/shape of real history
+                     items so the dropdown doesn't reflow when data lands. */
+                  <div className="px-2 pb-2 space-y-0">
+                    {[0, 1, 2, 3].map((i) => {
+                      const shimmerBase = `${isDark ? "bg-white/5" : "bg-gray-100"} shimmer-effect ${isDark ? "shimmer-effect-dark" : "shimmer-effect-light"}`;
+                      const widths = ["62%", "48%", "70%", "40%"];
+                      return (
+                        <div
+                          key={i}
+                          className="flex items-center gap-3 px-2.5 py-2 rounded-xl"
+                        >
+                          <div
+                            className={`w-8 h-8 rounded-lg flex-shrink-0 ${shimmerBase}`}
+                          />
+                          <div
+                            className={`h-3.5 rounded ${shimmerBase}`}
+                            style={{ width: widths[i] }}
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
                   <div
