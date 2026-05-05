@@ -22,6 +22,56 @@ import {
 import { smartCompress, shouldCompress } from "../../../utils/imageCompression";
 import { CloudinaryUrl } from "@/utils/cloudinaryUrl";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Filename sanitizer — must mirror nar24-seller-panel/src/utils/UploadStorage.ts
+// and lib/services/product_upload_service.dart in the Flutter app. Storage
+// paths flow through Cloudinary's auto-upload, which 400s on reserved chars
+// (`&`, `?`, `#`, `+`, spaces, …) even when the inbound URL is properly
+// encoded — its source fetcher doesn't fully encode the GCS request.
+// Normalizing filenames at upload time guarantees only safe characters ever
+// land in Storage.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const TURKISH_TRANSLITERATION: Record<string, string> = {
+  ş: "s", Ş: "S",
+  ı: "i", İ: "I",
+  ğ: "g", Ğ: "G",
+  ü: "u", Ü: "U",
+  ö: "o", Ö: "O",
+  ç: "c", Ç: "C",
+};
+
+const MAX_STEM_LENGTH = 80;
+
+function transliterate(input: string): string {
+  let out = "";
+  for (const ch of input) {
+    out += TURKISH_TRANSLITERATION[ch] ?? ch;
+  }
+  return out.normalize("NFD").replace(/[̀-ͯ]/g, "");
+}
+
+function sanitizeUploadFilename(name: string): string {
+  if (!name) return "file";
+
+  const lastDot = name.lastIndexOf(".");
+  const stem = lastDot > 0 ? name.slice(0, lastDot) : name;
+  const ext = lastDot > 0 ? name.slice(lastDot + 1) : "";
+
+  let cleanStem = transliterate(stem)
+    .replace(/[^a-zA-Z0-9_-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  if (cleanStem.length > MAX_STEM_LENGTH) {
+    cleanStem = cleanStem.slice(0, MAX_STEM_LENGTH);
+  }
+
+  const cleanExt = transliterate(ext).replace(/[^a-zA-Z0-9]+/g, "");
+  const result = cleanExt ? `${cleanStem}.${cleanExt}` : cleanStem;
+  return result || "file";
+}
+
 // ─── Internal types ───────────────────────────────────────────────────────────
 
 interface UploadJob {
@@ -118,7 +168,7 @@ export default function ListProductPreview() {
       let attempt = 0;
       while (true) {
         try {
-          const fileName = `${Date.now()}_${file.name}`;
+          const fileName = `${Date.now()}_${sanitizeUploadFilename(file.name)}`;
           const path = `products/${userId}/${folder}/${fileName}`;
           const ref = storageRef(storage, path);
           const task = uploadBytesResumable(ref, file);
@@ -252,7 +302,11 @@ export default function ListProductPreview() {
         }
         jobs.push({
           file: fileToUpload,
-          folder: `colors/${colorKey}`,
+          // Color name is sanitized for the path segment so chars like `&`,
+          // spaces, or non-ASCII don't break Cloudinary auto-upload. The
+          // `colorKey` field below stays in its original form so Firestore
+          // lookups still work.
+          folder: `colors/${sanitizeUploadFilename(colorKey)}`,
           colorKey,
         });
       }
