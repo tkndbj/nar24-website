@@ -55,6 +55,56 @@ const CONFIG_COLLECTION = "app_config";      // ADD
 const CONFIG_DOC = "featured_shops"; 
 
 // ============================================================================
+// HELPERS
+// ============================================================================
+
+function mapShopData(id: string, data: Record<string, unknown>): Shop {
+  const coverImageUrlsRaw = data.coverImageUrls;
+  const coverImageUrls =
+    Array.isArray(coverImageUrlsRaw) && coverImageUrlsRaw.length > 0
+      ? (coverImageUrlsRaw as string[])
+      : undefined;
+
+  return {
+    id,
+    name: data.name as string,
+    description: data.description as string | undefined,
+    logoUrl: (data.logoUrl || data.profileImageUrl) as string | undefined,
+    profileImageUrl: data.profileImageUrl as string | undefined,
+    coverImageUrl: data.coverImageUrl as string | undefined,
+    coverImageUrls,
+    averageRating: Number(data.averageRating) || 0,
+    reviewCount: Number(data.reviewCount) || 0,
+    productCount: Number(data.productCount) || 0,
+    category: data.category as string | undefined,
+    isVerified: Boolean(data.isVerified),
+    ownerId: (data.ownerId as string) || "",
+  };
+}
+
+/**
+ * Parse the `shopSummaries` array embedded on `app_config/featured_shops`.
+ * Mirrors the Flutter ShopWidgetProvider manifest path. Skips inactive
+ * shops and malformed entries. Returns an empty array when the field is
+ * missing or empty so callers can fall through to the legacy `shopIds`
+ * path.
+ */
+function parseEmbeddedShops(raw: unknown): Shop[] {
+  if (!Array.isArray(raw) || raw.length === 0) return [];
+  const out: Shop[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object") continue;
+    const map = entry as Record<string, unknown>;
+    const id = map.id;
+    if (typeof id !== "string" || !id) continue;
+    if (map.isActive === false) continue;
+    if (!map.name) continue;
+    out.push(mapShopData(id, map));
+  }
+  return out;
+}
+
+// ============================================================================
 // HOOK
 // ============================================================================
 
@@ -96,10 +146,24 @@ export function useShops(initialShops?: PrefetchedShop[] | null): UseShopsReturn
 
         if (configSnap.exists()) {
           const config = configSnap.data();
+
+          // ── Manifest fast path: embedded summaries written by the admin
+          // panel at save time. 1 read total (this config doc) regardless
+          // of how many shops are in the carousel. Falls back gracefully
+          // when the field is absent (older config docs before the embed
+          // rollout).
+          const embedded = parseEmbeddedShops(config.shopSummaries);
+          if (embedded.length > 0) {
+            console.log(`[useShops] Loaded ${embedded.length} featured shops from manifest`);
+            safeSetState({ shops: embedded, isLoading: false, error: null });
+            return;
+          }
+
+          // ── Legacy fallback: fetch each shop by ID. Used until the admin
+          // saves the config once with the new manifest writer.
           const shopIds = config.shopIds as string[] | undefined;
-  
+
           if (shopIds && shopIds.length > 0) {
-            // Fetch each shop in order
             for (const id of shopIds) {
               try {
                 const shopRef = doc(db, COLLECTION_NAME, id);
@@ -108,40 +172,17 @@ export function useShops(initialShops?: PrefetchedShop[] | null): UseShopsReturn
 
                 if (shopSnap.exists()) {
                   const data = shopSnap.data();
-                  
-                  // Skip inactive shops
                   if (data.isActive === false) continue;
                   if (!data.name) continue;
-  
-                  // Parse coverImageUrls - matches Flutter logic
-                  let coverImageUrls: string[] | undefined;
-                  if (Array.isArray(data.coverImageUrls) && data.coverImageUrls.length > 0) {
-                    coverImageUrls = data.coverImageUrls;
-                  }
-  
-                  shops.push({
-                    id: shopSnap.id,
-                    name: data.name,
-                    description: data.description,
-                    logoUrl: data.logoUrl || data.profileImageUrl,
-                    profileImageUrl: data.profileImageUrl,
-                    coverImageUrl: data.coverImageUrl,
-                    coverImageUrls: coverImageUrls,
-                    averageRating: Number(data.averageRating) || 0,
-                    reviewCount: Number(data.reviewCount) || 0,
-                    productCount: Number(data.productCount) || 0,
-                    category: data.category,
-                    isVerified: Boolean(data.isVerified),
-                    ownerId: data.ownerId || "",
-                  });
+                  shops.push(mapShopData(shopSnap.id, data));
                 }
               } catch (e) {
                 console.error(`[useShops] Error fetching shop ${id}:`, e);
               }
             }
-  
+
             if (shops.length > 0) {
-              console.log(`[useShops] Loaded ${shops.length} configured featured shops`);
+              console.log(`[useShops] Loaded ${shops.length} configured featured shops (legacy path)`);
               safeSetState({ shops, isLoading: false, error: null });
               return;
             }
@@ -150,50 +191,30 @@ export function useShops(initialShops?: PrefetchedShop[] | null): UseShopsReturn
       } catch (configError) {
         console.error("[useShops] Error reading config:", configError);
       }
-  
+
       // ========================================
-      // 2. Fallback: fetch top-rated shops
+      // 2. Fallback: fetch newest active shops (matches Flutter)
       // ========================================
       console.log("[useShops] No featured config, using fallback query");
-      
+
       const shopsQuery = query(
         collection(db, COLLECTION_NAME),
         where("isActive", "==", true),
-        orderBy("averageRating", "desc"),
+        orderBy("createdAt", "desc"),
         limit(SHOPS_LIMIT)
       );
-  
+
       const snapshot = await getDocs(shopsQuery);
       trackReads("Shops:Fallback", snapshot.docs.length || 1);
 
       snapshot.docs.forEach((doc) => {
         const data = doc.data();
         if (!data.name) return;
-  
-        let coverImageUrls: string[] | undefined;
-        if (Array.isArray(data.coverImageUrls) && data.coverImageUrls.length > 0) {
-          coverImageUrls = data.coverImageUrls;
-        }
-  
-        shops.push({
-          id: doc.id,
-          name: data.name,
-          description: data.description,
-          logoUrl: data.logoUrl || data.profileImageUrl,
-          profileImageUrl: data.profileImageUrl,
-          coverImageUrl: data.coverImageUrl,
-          coverImageUrls: coverImageUrls,
-          averageRating: Number(data.averageRating) || 0,
-          reviewCount: Number(data.reviewCount) || 0,
-          productCount: Number(data.productCount) || 0,
-          category: data.category,
-          isVerified: Boolean(data.isVerified),
-          ownerId: data.ownerId || "",
-        });
+        shops.push(mapShopData(doc.id, data));
       });
-  
+
       safeSetState({ shops, isLoading: false, error: null });
-  
+
     } catch (error) {
       console.error("[useShops] Setup error:", error);
       safeSetState({

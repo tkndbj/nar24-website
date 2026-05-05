@@ -505,6 +505,30 @@ function mapManifestEntryToPrefetchedProduct(
   };
 }
 
+function mapShopDataToPrefetched(
+  id: string,
+  d: Record<string, unknown>,
+): PrefetchedShop | null {
+  if (!d.name) return null;
+  return {
+    id,
+    name: d.name as string,
+    description: d.description as string | undefined,
+    logoUrl: (d.logoUrl || d.profileImageUrl) as string | undefined,
+    coverImageUrl: d.coverImageUrl as string | undefined,
+    coverImageUrls: Array.isArray(d.coverImageUrls)
+      ? (d.coverImageUrls as string[])
+      : undefined,
+    profileImageUrl: d.profileImageUrl as string | undefined,
+    averageRating: Number(d.averageRating) || 0,
+    reviewCount: Number(d.reviewCount) || 0,
+    productCount: Number(d.productCount) || 0,
+    category: d.category as string | undefined,
+    isVerified: Boolean(d.isVerified),
+    ownerId: (d.ownerId || "") as string,
+  };
+}
+
 const prefetchShops = unstable_cache(
   async (): Promise<PrefetchedShop[]> => {
     const db = getFirestoreAdmin();
@@ -517,29 +541,37 @@ const prefetchShops = unstable_cache(
         .doc("featured_shops")
         .get();
       if (configDoc.exists) {
-        const shopIds = configDoc.data()?.shopIds as string[] | undefined;
+        const data = configDoc.data() ?? {};
+
+        // ── Manifest fast path: embedded summaries written by the admin
+        // panel at save time. 1 read total regardless of carousel size.
+        // Mirrors Flutter's ShopWidgetProvider._parseEmbeddedShops.
+        const rawSummaries = Array.isArray(data.shopSummaries)
+          ? (data.shopSummaries as Array<Record<string, unknown>>)
+          : null;
+        if (rawSummaries && rawSummaries.length > 0) {
+          for (const entry of rawSummaries) {
+            if (!entry || typeof entry !== "object") continue;
+            const id = typeof entry.id === "string" ? entry.id : "";
+            if (!id) continue;
+            if (entry.isActive === false) continue;
+            const shop = mapShopDataToPrefetched(id, entry);
+            if (shop) shops.push(shop);
+          }
+          if (shops.length > 0) return shops;
+        }
+
+        // ── Legacy fallback: fetch each shop by ID.
+        const shopIds = data.shopIds as string[] | undefined;
         if (shopIds && shopIds.length > 0) {
           for (const id of shopIds) {
             try {
               const shopDoc = await db.collection("shops").doc(id).get();
               if (!shopDoc.exists) continue;
               const d = shopDoc.data()!;
-              if (d.isActive === false || !d.name) continue;
-              shops.push({
-                id: shopDoc.id,
-                name: d.name as string,
-                description: d.description as string | undefined,
-                logoUrl: (d.logoUrl || d.profileImageUrl) as string | undefined,
-                coverImageUrl: d.coverImageUrl as string | undefined,
-                coverImageUrls: Array.isArray(d.coverImageUrls) ? d.coverImageUrls as string[] : undefined,
-                profileImageUrl: d.profileImageUrl as string | undefined,
-                averageRating: Number(d.averageRating) || 0,
-                reviewCount: Number(d.reviewCount) || 0,
-                productCount: Number(d.productCount) || 0,
-                category: d.category as string | undefined,
-                isVerified: Boolean(d.isVerified),
-                ownerId: (d.ownerId || "") as string,
-              });
+              if (d.isActive === false) continue;
+              const shop = mapShopDataToPrefetched(shopDoc.id, d);
+              if (shop) shops.push(shop);
             } catch { /* skip individual shop errors */ }
           }
           if (shops.length > 0) return shops;
@@ -547,31 +579,16 @@ const prefetchShops = unstable_cache(
       }
     } catch { /* fall through to fallback */ }
 
-    // 2. Fallback: top-rated active shops
+    // 2. Fallback: newest active shops (matches Flutter)
     const snapshot = await db
       .collection("shops")
       .where("isActive", "==", true)
-      .orderBy("averageRating", "desc")
+      .orderBy("createdAt", "desc")
       .limit(10)
       .get();
     snapshot.docs.forEach((doc) => {
-      const d = doc.data();
-      if (!d.name) return;
-      shops.push({
-        id: doc.id,
-        name: d.name as string,
-        description: d.description as string | undefined,
-        logoUrl: (d.logoUrl || d.profileImageUrl) as string | undefined,
-        coverImageUrl: d.coverImageUrl as string | undefined,
-        coverImageUrls: Array.isArray(d.coverImageUrls) ? d.coverImageUrls as string[] : undefined,
-        profileImageUrl: d.profileImageUrl as string | undefined,
-        averageRating: Number(d.averageRating) || 0,
-        reviewCount: Number(d.reviewCount) || 0,
-        productCount: Number(d.productCount) || 0,
-        category: d.category as string | undefined,
-        isVerified: Boolean(d.isVerified),
-        ownerId: (d.ownerId || "") as string,
-      });
+      const shop = mapShopDataToPrefetched(doc.id, doc.data());
+      if (shop) shops.push(shop);
     });
     return shops;
   },
