@@ -64,12 +64,14 @@ function sanitizeUploadFilename(name: string): string {
     .replace(/^-+|-+$/g, "");
 
   if (cleanStem.length > MAX_STEM_LENGTH) {
-    cleanStem = cleanStem.slice(0, MAX_STEM_LENGTH);
+    // Re-trim after truncation — see UploadStorage.ts for why.
+    cleanStem = cleanStem.slice(0, MAX_STEM_LENGTH).replace(/-+$/, "");
   }
 
+  if (!cleanStem) cleanStem = "file";
+
   const cleanExt = transliterate(ext).replace(/[^a-zA-Z0-9]+/g, "");
-  const result = cleanExt ? `${cleanStem}.${cleanExt}` : cleanStem;
-  return result || "file";
+  return cleanExt ? `${cleanStem}.${cleanExt}` : cleanStem;
 }
 
 // ─── Internal types ───────────────────────────────────────────────────────────
