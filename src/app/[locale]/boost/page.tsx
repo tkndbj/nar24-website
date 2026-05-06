@@ -123,12 +123,16 @@ function StepIndicator({
               <div
                 className="w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all"
                 style={{
-                  borderColor: done || active ? JADE : isDark ? "#4B5563" : "#D1D5DB",
+                  borderColor:
+                    done || active ? JADE : isDark ? "#4B5563" : "#D1D5DB",
                   backgroundColor: done || active ? `${JADE}1A` : "transparent",
                 }}
               >
                 {done ? (
-                  <CheckCircle className="w-3.5 h-3.5" style={{ color: JADE }} />
+                  <CheckCircle
+                    className="w-3.5 h-3.5"
+                    style={{ color: JADE }}
+                  />
                 ) : (
                   <div
                     className="w-2 h-2 rounded-full"
@@ -146,8 +150,7 @@ function StepIndicator({
                 className="text-[10px] mt-1 text-center leading-tight"
                 style={{
                   fontWeight: active ? 700 : 500,
-                  color:
-                    done || active ? JADE : isDark ? "#6B7280" : "#9CA3AF",
+                  color: done || active ? JADE : isDark ? "#6B7280" : "#9CA3AF",
                   maxWidth: 60,
                 }}
               >
@@ -195,9 +198,7 @@ function DurationChip({
   onTap: () => void;
 }) {
   const label =
-    days === 1
-      ? `1 ${t("day") || "day"}`
-      : `${days} ${t("days") || "days"}`;
+    days === 1 ? `1 ${t("day") || "day"}` : `${days} ${t("days") || "days"}`;
 
   return (
     <button
@@ -303,8 +304,7 @@ const PaymentIframe = React.memo(function PaymentIframe({
 </body>
 </html>`;
 
-    const iframeDoc =
-      iframe.contentDocument || iframe.contentWindow?.document;
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
     if (iframeDoc) {
       iframeDoc.open();
       iframeDoc.write(formHtml);
@@ -358,7 +358,10 @@ export default function BoostPage() {
   // Config (one-time fetch)
   const [config, setConfig] = useState<BoostConfig>(DEFAULT_CONFIG);
   const [dayOptions, setDayOptions] = useState<number[]>(
-    generateDayOptions(DEFAULT_CONFIG.minDurationDays, DEFAULT_CONFIG.maxDurationDays),
+    generateDayOptions(
+      DEFAULT_CONFIG.minDurationDays,
+      DEFAULT_CONFIG.maxDurationDays,
+    ),
   );
 
   // Products
@@ -381,6 +384,9 @@ export default function BoostPage() {
   const firestoreUnsubRef = useRef<(() => void) | null>(null);
   const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fallbackCountRef = useRef(0);
+  // Stash orderNumber synchronously when paymentData is set so handleSuccess
+  // can read it without depending on state (which may have been cleared).
+  const orderNumberRef = useRef<string>("");
 
   const teardownListeners = useCallback(() => {
     firestoreUnsubRef.current?.();
@@ -414,7 +420,10 @@ export default function BoostPage() {
           };
           setConfig(newConfig);
           setDayOptions(
-            generateDayOptions(newConfig.minDurationDays, newConfig.maxDurationDays),
+            generateDayOptions(
+              newConfig.minDurationDays,
+              newConfig.maxDurationDays,
+            ),
           );
         }
       })
@@ -474,22 +483,19 @@ export default function BoostPage() {
       ? selectedIds.length * selectedDays * config.pricePerProductPerDay
       : 0;
 
-  const unboostedCount = allProducts.filter((p) => !p.isBoosted).length;
-
   // ── Result handlers ───────────────────────────────────────────────────────
-  const handleSuccess = useCallback(
-    (orderNumber: string) => {
-      if (resultHandledRef.current) return;
-      resultHandledRef.current = true;
-      teardownListeners();
-      setShowPaymentModal(false);
-      setPaymentData(null);
-      setTimeout(() => {
-        router.push(`/myproducts?pendingBoostOrderNumber=${orderNumber}`);
-      }, 300);
-    },
-    [router, teardownListeners],
-  );
+  const handleSuccess = useCallback(() => {
+    if (resultHandledRef.current) return;
+    resultHandledRef.current = true;
+    teardownListeners();
+    setShowPaymentModal(false);
+    setPaymentData(null);
+    setTimeout(() => {
+      router.push(
+        `/myproducts?pendingBoostOrderNumber=${orderNumberRef.current}`,
+      );
+    }, 300);
+  }, [router, teardownListeners]);
 
   const handleFailure = useCallback(
     (message: string) => {
@@ -508,11 +514,9 @@ export default function BoostPage() {
   const handleStatusDoc = useCallback(
     (data: DocumentData) => {
       if (resultHandledRef.current) return;
-      const orderNumber =
-        typeof data.orderNumber === "string" ? data.orderNumber : "";
       switch (data.status) {
         case STATUS.COMPLETED:
-          handleSuccess(orderNumber);
+          handleSuccess();
           break;
         case STATUS.PAYMENT_FAILED:
         case STATUS.HASH_FAILED:
@@ -659,6 +663,7 @@ export default function BoostPage() {
 
       const data = result.data;
       if (data.success) {
+        orderNumberRef.current = data.orderNumber;
         setPaymentData({
           gatewayUrl: data.gatewayUrl,
           paymentParams: data.paymentParams,
@@ -703,7 +708,9 @@ export default function BoostPage() {
   // ── Render guards ─────────────────────────────────────────────────────────
   if (authLoading || loadingProducts) {
     return (
-      <div className={`min-h-screen ${isDark ? "bg-gray-900" : "bg-[#F4F4F4]"}`}>
+      <div
+        className={`min-h-screen ${isDark ? "bg-gray-900" : "bg-[#F4F4F4]"}`}
+      >
         <div className="max-w-2xl mx-auto px-4 py-6 space-y-3">
           {[...Array(4)].map((_, i) => (
             <div
@@ -819,9 +826,7 @@ export default function BoostPage() {
                 <div
                   className="rounded-2xl border p-4"
                   style={{
-                    background: isDark
-                      ? `${JADE}0D`
-                      : `${JADE}0A`,
+                    background: isDark ? `${JADE}0D` : `${JADE}0A`,
                     borderColor: `${JADE}33`,
                   }}
                 >
@@ -866,10 +871,7 @@ export default function BoostPage() {
                   {atLimit ? (
                     <AlertCircle className="w-4 h-4 text-orange-500" />
                   ) : (
-                    <CheckCircle
-                      className="w-4 h-4"
-                      style={{ color: JADE }}
-                    />
+                    <CheckCircle className="w-4 h-4" style={{ color: JADE }} />
                   )}
                   <span
                     className="text-sm font-semibold"
@@ -916,7 +918,11 @@ export default function BoostPage() {
                           key={product.id}
                           onClick={() => toggleProduct(product.id, isBoosted)}
                           className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all ${
-                            isBoosted ? "opacity-50 cursor-default" : canSelect || isSelected ? "cursor-pointer" : "opacity-40 cursor-default"
+                            isBoosted
+                              ? "opacity-50 cursor-default"
+                              : canSelect || isSelected
+                                ? "cursor-pointer"
+                                : "opacity-40 cursor-default"
                           }`}
                           style={{
                             backgroundColor: isSelected
@@ -927,8 +933,12 @@ export default function BoostPage() {
                             borderColor: isSelected
                               ? `${JADE}59`
                               : isBoosted
-                                ? isDark ? "#4B556333" : "#9CA3AF33"
-                                : isDark ? "#374151" : "#E5E7EB",
+                                ? isDark
+                                  ? "#4B556333"
+                                  : "#9CA3AF33"
+                                : isDark
+                                  ? "#374151"
+                                  : "#E5E7EB",
                             borderWidth: isSelected ? 1.5 : 1,
                           }}
                         >
@@ -949,7 +959,9 @@ export default function BoostPage() {
                               className="w-[22px] h-[22px] rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors"
                               style={{
                                 borderColor: isSelected ? JADE : "#9CA3AF",
-                                backgroundColor: isSelected ? JADE : "transparent",
+                                backgroundColor: isSelected
+                                  ? JADE
+                                  : "transparent",
                               }}
                             >
                               {isSelected && (
@@ -1019,7 +1031,9 @@ export default function BoostPage() {
                     >
                       {t("selectBoostDuration") || "Select Boost Duration"}
                     </p>
-                    <p className={`text-xs ${isDark ? "text-gray-500" : "text-gray-500"}`}>
+                    <p
+                      className={`text-xs ${isDark ? "text-gray-500" : "text-gray-500"}`}
+                    >
                       {selectedIds.length}{" "}
                       {t("products")?.toLowerCase() || "products"}
                     </p>
@@ -1066,8 +1080,7 @@ export default function BoostPage() {
                     <p
                       className="text-3xl font-extrabold mb-1"
                       style={{
-                        background:
-                          "linear-gradient(135deg,#f97316,#ec4899)",
+                        background: "linear-gradient(135deg,#f97316,#ec4899)",
                         WebkitBackgroundClip: "text",
                         WebkitTextFillColor: "transparent",
                       }}
@@ -1077,7 +1090,8 @@ export default function BoostPage() {
                     <p
                       className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}
                     >
-                      {config.pricePerProductPerDay.toFixed(0)} TL × {selectedIds.length} × {selectedDays}
+                      {config.pricePerProductPerDay.toFixed(0)} TL ×{" "}
+                      {selectedIds.length} × {selectedDays}
                     </p>
                   </div>
                 )}
@@ -1118,8 +1132,18 @@ export default function BoostPage() {
                         : t("completePayment") || "Complete Payment"}
                     </span>
                     {currentStep === 0 ? (
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2.5}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M9 5l7 7-7 7"
+                        />
                       </svg>
                     ) : (
                       <CreditCard className="w-4 h-4" />
