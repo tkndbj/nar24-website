@@ -809,17 +809,18 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
 
     // Navigation types — close drawer, then push.
     switch (type) {
-      case "boosted":
-      case "boost_expired": {
-        // Flutter: BoostScreen with productId for personal products,
-        // seller-panel route for shop products. Web is consumer-only,
-        // so we route to /boost?productId=... regardless and let the
-        // boost page show "not yours" if the product is shop-owned.
+      case "boosted": {
         const productId = notification.productId;
         if (productId) {
           onClose();
           router.push(`/boost?productId=${productId}`);
         }
+        break;
+      }
+
+      case "boost_expired": {
+        onClose();
+        router.push("/boostanalysis?tab=past");
         break;
       }
 

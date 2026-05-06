@@ -16,7 +16,7 @@ import {
   Zap,
   LucideIcon,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useUser } from "@/context/UserProvider";
 import {
@@ -91,12 +91,17 @@ const colors = {
 
 export default function BoostAnalysisPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const t = useTranslations("BoostAnalysis");
   const { user, isLoading: authLoading } = useUser();
 
   // State
   const [activeTab, setActiveTab] = useState<"analysis" | "ongoing" | "past">(
-    "analysis"
+    () => {
+      const tab = searchParams.get("tab");
+      if (tab === "past" || tab === "ongoing" || tab === "analysis") return tab;
+      return "analysis";
+    }
   );
   const [searchQuery, setSearchQuery] = useState("");
   const [isDarkMode, setIsDarkMode] = useState(false);
