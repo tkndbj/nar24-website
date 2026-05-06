@@ -1785,7 +1785,18 @@
     "noProductsToBoostTitle": "No Products to Boost",
     "noProductsToBoostDescription": "You don't have any products available for boosting. Add products first to get started.",
     "addProductFirst": "Add Product",
-    "selectedProduct": "Selected Product"
+    "selectedProduct": "Selected Product",
+    "boosted": "Boosted",
+    "boostSelectProductsStep": "Select Products",
+    "boostSelectDurationStep": "Select Duration",
+    "boostPaymentStep": "Payment",
+    "boostServiceTemporarilyOff": "Boost Service Temporarily Unavailable",
+    "boostServiceDisabledMessage": "The boost service is currently disabled. Please check back later.",
+    "continueButton": "Continue",
+    "day": "day",
+    "days": "days",
+    "paymentTimeout": "Payment timed out. Please try again.",
+    "products": "products"
   },
   "RestaurantHeader": {
     "restaurants": "Restaurants",

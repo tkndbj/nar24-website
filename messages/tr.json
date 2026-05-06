@@ -1785,7 +1785,18 @@
     "noProductsToBoostTitle": "Yükseltilecek Ürün Yok",
     "noProductsToBoostDescription": "Yükseltme için uygun ürününüz bulunmuyor. Başlamak için önce ürün ekleyin.",
     "addProductFirst": "Ürün Ekle",
-    "selectedProduct": "Seçili Ürün"
+    "selectedProduct": "Seçili Ürün",
+    "boosted": "Yükseltildi",
+    "boostSelectProductsStep": "Ürün Seç",
+    "boostSelectDurationStep": "Süre Seç",
+    "boostPaymentStep": "Ödeme",
+    "boostServiceTemporarilyOff": "Yükseltme Hizmeti Geçici Olarak Kullanılamıyor",
+    "boostServiceDisabledMessage": "Yükseltme hizmeti şu anda devre dışı. Lütfen daha sonra tekrar kontrol edin.",
+    "continueButton": "Devam Et",
+    "day": "gün",
+    "days": "gün",
+    "paymentTimeout": "Ödeme zaman aşımına uğradı. Lütfen tekrar deneyin.",
+    "products": "ürün"
   },
   "market": {
     "categoryTitle": "Market Kategorileri",
