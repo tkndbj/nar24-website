@@ -1991,6 +1991,7 @@
     "receiptPdfNotReady": "Makbuz PDF'i henüz hazır değil. Lütfen daha sonra tekrar deneyin.",
     "receiptOnlinePaymentReceived": "Online ödeme alındı",
     "receiptPayDuringDelivery": "Teslimatta ödenecek",
+    "receiptVatIncludedInTotal": "KDV toplam fiyata dahildir",
     "receiptLoadError": "Makbuz yüklenemedi",
     "receiptNotFound": "Makbuz bulunamadı",
     "receiptNotFoundSubtitle": "Bu makbuz mevcut değil veya kaldırılmış olabilir.",
@@ -3503,6 +3504,7 @@
     "paidOnline": "Online Ödendi",
     "paidOnlineNote": "✓ Online ödeme alındı",
     "payAtDoorNote": "⚠ Teslimat sırasında ödenecek",
+    "vatIncludedInTotal": "KDV toplam fiyata dahildir",
     "receiptPdfNotAvailable": "PDF makbuz henüz hazır değil.",
     "statusPending": "Beklemede",
     "statusConfirmed": "Onaylandı",
@@ -3672,7 +3674,11 @@
     "brand": "Marka",
     "delivery": "Teslimat",
     "generic": "Genel",
-    "standard": "Standart"
+    "standard": "Standart",
+    "vitrinBadge": "Bu bir Vitrin ürünüdür",
+    "vitrinSheetTitle": "Vitrin Ürünleri Hakkında",
+    "vitrinSheetBody": "Bu ürün, doğrulanmış bir mağaza veya işletme tarafından değil, bireysel bir kullanıcı tarafından listelenmiştir. Nar24, Vitrin ürünlerinin durumunu veya kalitesini doğrulamaz ve bunlar için herhangi bir sorumluluk kabul etmez. Bununla birlikte Nar24, tüm Vitrin siparişlerinin teslimat süreçlerini eksiksiz yönetir ve siparişinizin güvenle elinize ulaşmasını sağlar. Vitrin ürünleri iade ve geri ödeme kapsamında kabul edilmemektedir.",
+    "gotIt": "Anladım"
   },
   "ProductQuestionsWidget": {
     "title": "Ürün Soru & Cevap",

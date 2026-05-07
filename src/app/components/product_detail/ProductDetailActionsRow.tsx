@@ -1,7 +1,7 @@
 // src/components/productdetail/ProductDetailActionsRow.tsx
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Heart, Star, StarHalf, Shield, Truck, Award} from "lucide-react";
+import { Heart, Star, StarHalf, Shield, Truck, Award, Info, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Product } from "@/app/models/Product";
@@ -185,6 +185,17 @@ const ProductDetailActionsRow: React.FC<ProductDetailActionsRowProps> = ({
   isLoading = false,
   localization,
 }) => {
+  const [showVitrinModal, setShowVitrinModal] = useState(false);
+
+  // Close on Escape key
+  useEffect(() => {
+    if (!showVitrinModal) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowVitrinModal(false);
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [showVitrinModal]);
 
   // ✅ FIXED: Proper nested translation function that uses JSON files
   const t = useCallback((key: string) => {
@@ -253,8 +264,70 @@ const ProductDetailActionsRow: React.FC<ProductDetailActionsRowProps> = ({
             value={product.deliveryOption || t("standard")}
           />
         </div>
+
+        {/* Vitrin badge — only for user-listed products, zero extra reads */}
+        {product.sourceCollection === "products" && (
+          <button
+            onClick={() => setShowVitrinModal(true)}
+            className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500 hover:text-gray-500 dark:hover:text-gray-400 transition-colors"
+          >
+            <Info className="w-3.5 h-3.5 flex-shrink-0" />
+            <span>{t("vitrinBadge")}</span>
+          </button>
+        )}
       </div>
 
+      {/* Vitrin info modal */}
+      {showVitrinModal && (
+        <div className="fixed inset-0 z-[1200] flex items-end sm:items-center justify-center">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowVitrinModal(false)}
+          />
+          {/* Sheet */}
+          <div className="relative z-10 w-full sm:max-w-md mx-0 sm:mx-4 rounded-t-2xl sm:rounded-2xl bg-white dark:bg-gray-900 shadow-2xl">
+            {/* Handle (mobile only) */}
+            <div className="flex justify-center pt-3 pb-1 sm:hidden">
+              <div className="w-9 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
+            </div>
+
+            <div className="px-5 pt-4 pb-6 sm:pt-5">
+              {/* Header */}
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-orange-100 dark:bg-orange-900/30 flex-shrink-0">
+                    <Info className="w-4 h-4 text-orange-500" />
+                  </div>
+                  <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                    {t("vitrinSheetTitle")}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setShowVitrinModal(false)}
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex-shrink-0"
+                  aria-label="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <p className="text-sm leading-relaxed text-gray-600 dark:text-gray-300 mb-6">
+                {t("vitrinSheetBody")}
+              </p>
+
+              {/* Dismiss button */}
+              <button
+                onClick={() => setShowVitrinModal(false)}
+                className="w-full py-3 px-4 rounded-xl font-semibold text-sm bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors"
+              >
+                {t("gotIt")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

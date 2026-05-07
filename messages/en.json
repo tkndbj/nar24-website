@@ -1999,6 +1999,7 @@
     "receiptPdfNotReady": "Receipt PDF isn't ready yet. Please try again later.",
     "receiptOnlinePaymentReceived": "Online payment received",
     "receiptPayDuringDelivery": "Will be paid at delivery",
+    "receiptVatIncludedInTotal": "VAT is included in the total price",
     "receiptLoadError": "Couldn't load receipt",
     "receiptNotFound": "Receipt not found",
     "receiptNotFoundSubtitle": "This receipt doesn't exist or may have been removed.",
@@ -3475,6 +3476,7 @@
     "paidOnline": "Paid Online",
     "paidOnlineNote": "✓ Payment received online",
     "payAtDoorNote": "⚠ Payment due at delivery",
+    "vatIncludedInTotal": "VAT is included in the total price",
     "receiptPdfNotAvailable": "PDF receipt is not available yet.",
     "statusPending": "Pending",
     "statusConfirmed": "Confirmed",
@@ -3644,7 +3646,11 @@
     "brand": "Brand",
     "delivery": "Delivery",
     "generic": "Generic",
-    "standard": "Standard"
+    "standard": "Standard",
+    "vitrinBadge": "This is a Vitrin product",
+    "vitrinSheetTitle": "About Vitrin Products",
+    "vitrinSheetBody": "This product has been listed by an individual user, not by a verified shop or business. Nar24 does not verify the condition or quality of Vitrin products and assumes no responsibility for them. However, Nar24 fully manages the delivery logistics for every Vitrin order, ensuring your purchase arrives safely. Please note that Vitrin products are not eligible for returns or refunds.",
+    "gotIt": "Got It"
   },
   "ProductQuestionsWidget": {
     "title": "Product Q&A",

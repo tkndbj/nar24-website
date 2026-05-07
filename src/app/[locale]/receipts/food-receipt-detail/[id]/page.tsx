@@ -877,6 +877,14 @@ export default function FoodReceiptDetailPage() {
               : l("FoodReceiptDetail.payAtDoorNote") ||
                 "⚠ Payment due at delivery"}
           </p>
+          <p
+            className={`text-[10px] mt-1 text-center ${
+              isDarkMode ? "text-gray-500" : "text-gray-400"
+            }`}
+          >
+            {l("FoodReceiptDetail.vatIncludedInTotal") ||
+              "VAT is included in the total price"}
+          </p>
         </SectionCard>
       </div>
     </div>

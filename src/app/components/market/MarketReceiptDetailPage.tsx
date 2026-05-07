@@ -871,6 +871,13 @@ export default function MarketReceiptDetailPage({
               ? `✓ ${t("receiptOnlinePaymentReceived")}`
               : `⚠ ${t("receiptPayDuringDelivery")}`}
           </p>
+          <p
+            className={`text-[10px] mt-1 text-center ${
+              isDarkMode ? "text-gray-500" : "text-gray-400"
+            }`}
+          >
+            {t("receiptVatIncludedInTotal")}
+          </p>
         </SectionCard>
       </div>
     </div>
