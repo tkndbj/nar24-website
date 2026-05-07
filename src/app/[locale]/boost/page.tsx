@@ -185,6 +185,8 @@ function StepIndicator({
 function DurationChip({
   days,
   price,
+  kdvRate,
+  kdvAmount,
   isSelected,
   isDark,
   t,
@@ -192,6 +194,8 @@ function DurationChip({
 }: {
   days: number;
   price: number;
+  kdvRate: number;
+  kdvAmount: number;
   isSelected: boolean;
   isDark: boolean;
   t: (key: string) => string;
@@ -242,6 +246,14 @@ function DurationChip({
       >
         {price.toFixed(2)} TL
       </span>
+      {kdvRate > 0 && kdvAmount > 0 && (
+        <span
+          className="block text-[10px] font-medium mt-0.5"
+          style={{ color: isSelected ? `${JADE}B3` : "#F97316" }}
+        >
+          KDV dahil
+        </span>
+      )}
     </button>
   );
 }
@@ -372,6 +384,9 @@ export default function BoostPage() {
   // Duration
   const [selectedDays, setSelectedDays] = useState(-1);
 
+  // KDV
+  const [kdvRate, setKdvRate] = useState(0);
+
   // Payment
   const [submitting, setSubmitting] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -402,12 +417,15 @@ export default function BoostPage() {
     if (!authLoading && !user) router.push("/login");
   }, [user, authLoading, router]);
 
-  // ── Config fetch (one-time) ──────────────────────────────────────────────
+  // ── Config + KDV fetch (one-time, parallel) ──────────────────────────────
   useEffect(() => {
-    getDoc(doc(db, "app_config", "boost_prices"))
-      .then((snap) => {
-        if (snap.exists()) {
-          const d = snap.data();
+    Promise.all([
+      getDoc(doc(db, "app_config", "boost_prices")),
+      getDoc(doc(db, "app_config", "KDV")),
+    ])
+      .then(([boostSnap, kdvSnap]) => {
+        if (boostSnap.exists()) {
+          const d = boostSnap.data();
           const newConfig: BoostConfig = {
             pricePerProductPerDay:
               d.pricePerProductPerDay ?? DEFAULT_CONFIG.pricePerProductPerDay,
@@ -425,6 +443,10 @@ export default function BoostPage() {
               newConfig.maxDurationDays,
             ),
           );
+        }
+        if (kdvSnap.exists()) {
+          const rate = (kdvSnap.data()?.boost as number) ?? 0;
+          setKdvRate(rate >= 0 ? rate : 0);
         }
       })
       .catch((err) => console.error("Error fetching boost config:", err));
@@ -478,10 +500,15 @@ export default function BoostPage() {
   }, []);
 
   // ── Computed ─────────────────────────────────────────────────────────────
-  const totalPrice =
+  const basePrice =
     selectedDays > 0
       ? selectedIds.length * selectedDays * config.pricePerProductPerDay
       : 0;
+  const kdvAmount =
+    kdvRate > 0 && basePrice > 0
+      ? Math.round(basePrice * kdvRate / 100 * 100) / 100
+      : 0;
+  const totalPrice = basePrice + kdvAmount;
 
   // ── Result handlers ───────────────────────────────────────────────────────
   const handleSuccess = useCallback(() => {
@@ -1043,13 +1070,17 @@ export default function BoostPage() {
                 {/* Day chips */}
                 <div className="flex flex-wrap gap-2.5 mb-6">
                   {dayOptions.map((days) => {
-                    const chipPrice =
+                    const chipBase =
                       selectedIds.length * days * config.pricePerProductPerDay;
+                    const chipKdv =
+                      kdvRate > 0 ? Math.round(chipBase * kdvRate / 100 * 100) / 100 : 0;
                     return (
                       <DurationChip
                         key={days}
                         days={days}
-                        price={chipPrice}
+                        price={chipBase + chipKdv}
+                        kdvRate={kdvRate}
+                        kdvAmount={chipKdv}
                         isSelected={selectedDays === days}
                         isDark={isDark}
                         t={t}
@@ -1093,6 +1124,11 @@ export default function BoostPage() {
                       {config.pricePerProductPerDay.toFixed(0)} TL ×{" "}
                       {selectedIds.length} × {selectedDays}
                     </p>
+                    {kdvRate > 0 && kdvAmount > 0 && (
+                      <p className="text-xs font-medium mt-1" style={{ color: "#F97316" }}>
+                        KDV (%{Number.isInteger(kdvRate) ? kdvRate : kdvRate}): +{kdvAmount.toFixed(2)} TL
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
