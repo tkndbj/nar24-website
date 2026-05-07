@@ -57,6 +57,8 @@ interface Receipt {
   couponCode?: string;
   couponDiscount: number;
   freeShippingApplied: boolean;
+  kdvRate: number;
+  kdvAmount: number;
 }
 
 interface OrderData {
@@ -158,6 +160,8 @@ export default function ReceiptDetailPage() {
           couponCode: rd.couponCode,
           couponDiscount: rd.couponDiscount || 0,
           freeShippingApplied: rd.freeShippingApplied || false,
+          kdvRate: rd.kdvRate || 0,
+          kdvAmount: rd.kdvAmount || 0,
         };
         setReceipt(receiptObj);
         const orderDoc = await getDoc(doc(db, "orders", receiptObj.orderId));
@@ -771,6 +775,18 @@ export default function ReceiptDetailPage() {
                     {totalSavings.toFixed(2)} {receipt.currency}
                   </span>
                 </div>
+              </div>
+            )}
+
+            {receipt.kdvRate > 0 && receipt.kdvAmount > 0 && (
+              <div className="flex items-center justify-between py-2">
+                <span className={`flex items-center gap-1 text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                  <FileText className="w-3 h-3 text-orange-500" />
+                  {`KDV (%${Number.isInteger(receipt.kdvRate) ? receipt.kdvRate : receipt.kdvRate})`}
+                </span>
+                <span className={`text-xs font-semibold ${isDarkMode ? "text-orange-400" : "text-orange-600"}`}>
+                  +{receipt.kdvAmount.toFixed(2)} {receipt.currency}
+                </span>
               </div>
             )}
 

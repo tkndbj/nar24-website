@@ -561,6 +561,7 @@ function ProductPaymentPageContent() {
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [freeShippingBenefit, setFreeShippingBenefit] =
     useState<UserBenefit | null>(null);
+  const [kdvRate, setKdvRate] = useState(0);
 
   // Delivery settings from Firestore
   const [deliverySettings, setDeliverySettings] = useState<{
@@ -721,7 +722,9 @@ function ProductPaymentPageContent() {
   }, [useFreeShipping, freeShippingBenefit, getDeliveryPrice]);
 
   // ✅ Calculate final total (matching Flutter's finalTotal getter)
-  const finalTotal = totalPrice - couponDiscount + getEffectiveDeliveryPrice();
+  const preKdvTotal = totalPrice - couponDiscount + getEffectiveDeliveryPrice();
+  const kdvAmount = kdvRate > 0 ? Math.round(preKdvTotal * kdvRate / 100 * 100) / 100 : 0;
+  const finalTotal = preKdvTotal + kdvAmount;
 
   // ✅ Check if express is available (matching Flutter's isExpressAvailable)
   const isExpressAvailable = !useFreeShipping;
@@ -760,6 +763,23 @@ function ProductPaymentPageContent() {
     };
 
     fetchDeliverySettings();
+  }, []);
+
+  // Fetch KDV config
+  useEffect(() => {
+    const fetchKdvConfig = async () => {
+      try {
+        const { doc, getDoc } = await import("firebase/firestore");
+        const snap = await getDoc(doc(db, "app_config", "KDV"));
+        if (snap.exists()) {
+          const rate = (snap.data()?.product as number) ?? 0;
+          setKdvRate(rate >= 0 ? rate : 0);
+        }
+      } catch (e) {
+        console.error("Failed to fetch KDV config:", e);
+      }
+    };
+    fetchKdvConfig();
   }, []);
 
   // Dark mode detection
@@ -2265,6 +2285,22 @@ function ProductPaymentPageContent() {
                       : `${getEffectiveDeliveryPrice().toFixed(2)} ${currency}`}
                   </span>
                 </div>
+
+                {/* KDV Row */}
+                {kdvRate > 0 && kdvAmount > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span
+                      className={`text-xs ${
+                        isDarkMode ? "text-gray-400" : "text-gray-600"
+                      }`}
+                    >
+                      {`KDV (%${Number.isInteger(kdvRate) ? kdvRate : kdvRate})`}
+                    </span>
+                    <span className={`text-xs font-medium ${isDarkMode ? "text-orange-400" : "text-orange-600"}`}>
+                      +{kdvAmount.toFixed(2)} {currency}
+                    </span>
+                  </div>
+                )}
 
                 {/* Total */}
                 <div
