@@ -6210,6 +6210,18 @@
       "title": "İade Reddedildi",
       "body": "İade talebiniz reddedildi."
     },
+    "payment_completed_after_retry": {
+      "title": "Siparişiniz Onaylandı ✅",
+      "body": "Siparişiniz başarıyla oluşturuldu."
+    },
+    "payment_refunded_order_failed": {
+      "title": "Ödemeniz İade Edildi 💳",
+      "body": "Siparişiniz oluşturulamadığı için ödemeniz iade edildi. Lütfen tekrar deneyiniz."
+    },
+    "payment_under_review": {
+      "title": "Ödemeniz İncelemede",
+      "body": "Ödeme işleminiz incelenmektedir, en kısa sürede sonuçlandırılacaktır."
+    },
     "product_question_answered": {
       "title": "Sorunuz Yanıtlandı 💬",
       "body": "Bir ürüne sorduğunuz soru yanıtlandı."

@@ -6198,6 +6198,18 @@
       "title": "Refund Rejected",
       "body": "Your refund request has been rejected."
     },
+    "payment_completed_after_retry": {
+      "title": "Order Confirmed ✅",
+      "body": "Your order has been successfully created."
+    },
+    "payment_refunded_order_failed": {
+      "title": "Payment Refunded 💳",
+      "body": "Your order could not be created and your payment has been refunded. Please try again."
+    },
+    "payment_under_review": {
+      "title": "Payment Under Review",
+      "body": "Your payment is being reviewed. We will resolve this shortly."
+    },
     "product_question_answered": {
       "title": "Question Answered 💬",
       "body": "Your question on a product has been answered."

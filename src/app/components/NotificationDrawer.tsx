@@ -24,6 +24,8 @@ import {
   UtensilsCrossed,
   ShieldCheck,
   ShieldAlert,
+  Banknote,
+  Hourglass,
 } from "lucide-react";
 import { useUser } from "@/context/UserProvider";
 import { useRouter } from "next/navigation";
@@ -406,6 +408,12 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
         return { icon: CheckCircle2, color: "text-green-500" };
       case "product_edit_rejected":
         return { icon: XCircle, color: "text-red-500" };
+      case "payment_completed_after_retry":
+        return { icon: CheckCircle2, color: "text-green-500" };
+      case "payment_refunded_order_failed":
+        return { icon: Banknote, color: "text-amber-500" };
+      case "payment_under_review":
+        return { icon: Hourglass, color: "text-amber-500" };
       default:
         return { icon: Bell, color: "text-orange-500" };
     }
@@ -455,6 +463,9 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
       refund_request_approved: "refund_request_approved.title",
       refund_request_rejected: "refund_request_rejected.title",
       ad_approved: "ad_approved.title",
+      payment_completed_after_retry: "payment_completed_after_retry.title",
+      payment_refunded_order_failed: "payment_refunded_order_failed.title",
+      payment_under_review: "payment_under_review.title",
     };
 
     const key = titleKeys[type];
@@ -571,6 +582,17 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
 
       case "campaign":
         return notification.campaignDescription || notification.message || "";
+
+      // Payment notifications written by the order-retry pipeline. The CF
+      // only stores `type` + `payload` (no message_{en,tr,ru} fields), so
+      // we render entirely from local i18n. See product-payment CF
+      // notifyBuyer().
+      case "payment_completed_after_retry":
+        return t("payment_completed_after_retry.body");
+      case "payment_refunded_order_failed":
+        return t("payment_refunded_order_failed.body");
+      case "payment_under_review":
+        return t("payment_under_review.body");
 
       default: {
         if (locale === "tr") {
@@ -916,6 +938,20 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
         // Flutter: /my_orders?tab=1. Web has /orders.
         onClose();
         router.push("/orders?tab=1");
+        break;
+
+      case "payment_completed_after_retry":
+      case "payment_refunded_order_failed":
+        // Flutter routes both to /my_orders (success → see new order; refund
+        // → confirm no charge and re-checkout from cart).
+        onClose();
+        router.push("/orders");
+        break;
+
+      case "payment_under_review":
+        // Informational only — ops is already on it. Mirrors Flutter's
+        // no-op tap handler.
+        onClose();
         break;
 
       case "product_question": {
