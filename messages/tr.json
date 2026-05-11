@@ -6234,6 +6234,30 @@
       "title": "Boost Ödemeniz İncelemede",
       "body": "Boost ödemeniz incelenmektedir, en kısa sürede sonuçlandırılacaktır."
     },
+    "ad_completed_after_retry": {
+      "title": "Reklam Aktif Edildi ✅",
+      "body": "Reklamınız başarıyla aktif edildi."
+    },
+    "ad_refunded_failed": {
+      "title": "Reklam Ödemesi İade Edildi 💳",
+      "body": "Reklamınız aktif edilemediği için ödemeniz iade edildi. Lütfen tekrar deneyiniz."
+    },
+    "ad_under_review": {
+      "title": "Reklam Ödemeniz İncelemede",
+      "body": "Reklam ödemeniz incelenmektedir, en kısa sürede sonuçlandırılacaktır."
+    },
+    "food_completed_after_retry": {
+      "title": "Siparişiniz Onaylandı ✅",
+      "body": "Yemek siparişiniz başarıyla oluşturuldu."
+    },
+    "food_refunded_failed": {
+      "title": "Yemek Ödemesi İade Edildi 💳",
+      "body": "Yemek siparişiniz oluşturulamadığı için ödemeniz iade edildi. Lütfen tekrar deneyiniz."
+    },
+    "food_under_review": {
+      "title": "Yemek Ödemeniz İncelemede",
+      "body": "Yemek siparişi ödemeniz incelenmektedir, en kısa sürede sonuçlandırılacaktır."
+    },
     "product_question_answered": {
       "title": "Sorunuz Yanıtlandı 💬",
       "body": "Bir ürüne sorduğunuz soru yanıtlandı."

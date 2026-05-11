@@ -6222,6 +6222,30 @@
       "title": "Boost Payment Under Review",
       "body": "Your boost payment is being reviewed. We will resolve this shortly."
     },
+    "ad_completed_after_retry": {
+      "title": "Ad Activated ✅",
+      "body": "Your ad has been activated successfully."
+    },
+    "ad_refunded_failed": {
+      "title": "Ad Payment Refunded 💳",
+      "body": "Your ad could not be activated and your payment has been refunded. Please try again."
+    },
+    "ad_under_review": {
+      "title": "Ad Payment Under Review",
+      "body": "Your ad payment is being reviewed. We will resolve this shortly."
+    },
+    "food_completed_after_retry": {
+      "title": "Order Confirmed ✅",
+      "body": "Your food order has been successfully created."
+    },
+    "food_refunded_failed": {
+      "title": "Food Payment Refunded 💳",
+      "body": "Your food order could not be created and your payment has been refunded. Please try again."
+    },
+    "food_under_review": {
+      "title": "Food Payment Under Review",
+      "body": "Your food order payment is being reviewed. We will resolve this shortly."
+    },
     "product_question_answered": {
       "title": "Question Answered 💬",
       "body": "Your question on a product has been answered."

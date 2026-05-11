@@ -420,6 +420,18 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
         return { icon: Banknote, color: "text-amber-500" };
       case "boost_under_review":
         return { icon: Hourglass, color: "text-amber-500" };
+      case "ad_completed_after_retry":
+        return { icon: Megaphone, color: "text-green-500" };
+      case "ad_refunded_failed":
+        return { icon: Banknote, color: "text-amber-500" };
+      case "ad_under_review":
+        return { icon: Hourglass, color: "text-amber-500" };
+      case "food_completed_after_retry":
+        return { icon: UtensilsCrossed, color: "text-green-500" };
+      case "food_refunded_failed":
+        return { icon: Banknote, color: "text-amber-500" };
+      case "food_under_review":
+        return { icon: Hourglass, color: "text-amber-500" };
       default:
         return { icon: Bell, color: "text-orange-500" };
     }
@@ -475,6 +487,12 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
       boost_completed_after_retry: "boost_completed_after_retry.title",
       boost_refunded_failed: "boost_refunded_failed.title",
       boost_under_review: "boost_under_review.title",
+      ad_completed_after_retry: "ad_completed_after_retry.title",
+      ad_refunded_failed: "ad_refunded_failed.title",
+      ad_under_review: "ad_under_review.title",
+      food_completed_after_retry: "food_completed_after_retry.title",
+      food_refunded_failed: "food_refunded_failed.title",
+      food_under_review: "food_under_review.title",
     };
 
     const key = titleKeys[type];
@@ -609,6 +627,20 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
         return t("boost_refunded_failed.body");
       case "boost_under_review":
         return t("boost_under_review.body");
+
+      case "ad_completed_after_retry":
+        return t("ad_completed_after_retry.body");
+      case "ad_refunded_failed":
+        return t("ad_refunded_failed.body");
+      case "ad_under_review":
+        return t("ad_under_review.body");
+
+      case "food_completed_after_retry":
+        return t("food_completed_after_retry.body");
+      case "food_refunded_failed":
+        return t("food_refunded_failed.body");
+      case "food_under_review":
+        return t("food_under_review.body");
 
       default: {
         if (locale === "tr") {
@@ -979,6 +1011,27 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
         break;
 
       case "boost_under_review":
+        // Informational only — ops handling. No nav.
+        onClose();
+        break;
+
+      case "ad_completed_after_retry":
+      case "ad_refunded_failed":
+      case "ad_under_review":
+        // Ad notifications — no navigation. The seller-side ads view
+        // requires shop context that isn't carried in the notification.
+        // Just close the drawer.
+        onClose();
+        break;
+
+      case "food_completed_after_retry":
+      case "food_refunded_failed":
+        // Both route to the buyer's food order list.
+        onClose();
+        router.push("/food-orders");
+        break;
+
+      case "food_under_review":
         // Informational only — ops handling. No nav.
         onClose();
         break;
