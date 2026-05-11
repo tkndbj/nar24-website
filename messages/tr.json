@@ -6222,6 +6222,18 @@
       "title": "Ödemeniz İncelemede",
       "body": "Ödeme işleminiz incelenmektedir, en kısa sürede sonuçlandırılacaktır."
     },
+    "boost_completed_after_retry": {
+      "title": "Boost Aktif Edildi ✅",
+      "body": "Boost işleminiz başarıyla aktif edildi."
+    },
+    "boost_refunded_failed": {
+      "title": "Boost Ödemesi İade Edildi 💳",
+      "body": "Boost aktif edilemediği için ödemeniz iade edildi. Lütfen tekrar deneyiniz."
+    },
+    "boost_under_review": {
+      "title": "Boost Ödemeniz İncelemede",
+      "body": "Boost ödemeniz incelenmektedir, en kısa sürede sonuçlandırılacaktır."
+    },
     "product_question_answered": {
       "title": "Sorunuz Yanıtlandı 💬",
       "body": "Bir ürüne sorduğunuz soru yanıtlandı."

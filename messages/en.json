@@ -6210,6 +6210,18 @@
       "title": "Payment Under Review",
       "body": "Your payment is being reviewed. We will resolve this shortly."
     },
+    "boost_completed_after_retry": {
+      "title": "Boost Activated ✅",
+      "body": "Your boost has been activated successfully."
+    },
+    "boost_refunded_failed": {
+      "title": "Boost Payment Refunded 💳",
+      "body": "Your boost could not be activated and your payment has been refunded. Please try again."
+    },
+    "boost_under_review": {
+      "title": "Boost Payment Under Review",
+      "body": "Your boost payment is being reviewed. We will resolve this shortly."
+    },
     "product_question_answered": {
       "title": "Question Answered 💬",
       "body": "Your question on a product has been answered."

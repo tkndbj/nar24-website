@@ -414,6 +414,12 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
         return { icon: Banknote, color: "text-amber-500" };
       case "payment_under_review":
         return { icon: Hourglass, color: "text-amber-500" };
+      case "boost_completed_after_retry":
+        return { icon: TrendingUp, color: "text-green-500" };
+      case "boost_refunded_failed":
+        return { icon: Banknote, color: "text-amber-500" };
+      case "boost_under_review":
+        return { icon: Hourglass, color: "text-amber-500" };
       default:
         return { icon: Bell, color: "text-orange-500" };
     }
@@ -466,6 +472,9 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
       payment_completed_after_retry: "payment_completed_after_retry.title",
       payment_refunded_order_failed: "payment_refunded_order_failed.title",
       payment_under_review: "payment_under_review.title",
+      boost_completed_after_retry: "boost_completed_after_retry.title",
+      boost_refunded_failed: "boost_refunded_failed.title",
+      boost_under_review: "boost_under_review.title",
     };
 
     const key = titleKeys[type];
@@ -593,6 +602,13 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
         return t("payment_refunded_order_failed.body");
       case "payment_under_review":
         return t("payment_under_review.body");
+
+      case "boost_completed_after_retry":
+        return t("boost_completed_after_retry.body");
+      case "boost_refunded_failed":
+        return t("boost_refunded_failed.body");
+      case "boost_under_review":
+        return t("boost_under_review.body");
 
       default: {
         if (locale === "tr") {
@@ -951,6 +967,19 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
       case "payment_under_review":
         // Informational only — ops is already on it. Mirrors Flutter's
         // no-op tap handler.
+        onClose();
+        break;
+
+      case "boost_completed_after_retry":
+      case "boost_refunded_failed":
+        // Both route to the boost analysis page. Success → user sees the
+        // newly-active boost; refund → user can re-attempt the boost.
+        onClose();
+        router.push("/boostanalysis");
+        break;
+
+      case "boost_under_review":
+        // Informational only — ops handling. No nav.
         onClose();
         break;
 
