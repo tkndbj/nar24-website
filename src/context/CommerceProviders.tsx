@@ -14,6 +14,7 @@ import { CartProvider } from "./CartProvider";
 import { FavoritesProvider } from "./FavoritesProvider";
 import { MarketCartProvider } from "./MarketCartProvider";
 import { CouponProvider } from "./CouponProvider";
+import { CategoryCacheProvider } from "./CategoryCacheProvider";
 
 interface CommerceProvidersProps {
   children: ReactNode;
@@ -50,15 +51,17 @@ export const CommerceProviders: React.FC<CommerceProvidersProps> = ({
   functions,
 }) => {
   return (
-    <ProductCacheProvider>
-      <CartProvider user={user} db={db} functions={functions}>
-        <FavoritesProvider db={db}>
-          <CouponProvider user={user} db={db}>
-            <MarketCartProvider>{children}</MarketCartProvider>
-          </CouponProvider>
-        </FavoritesProvider>
-      </CartProvider>
-    </ProductCacheProvider>
+    <CategoryCacheProvider db={db}>
+      <ProductCacheProvider>
+        <CartProvider user={user} db={db} functions={functions}>
+          <FavoritesProvider db={db}>
+            <CouponProvider user={user} db={db}>
+              <MarketCartProvider>{children}</MarketCartProvider>
+            </CouponProvider>
+          </FavoritesProvider>
+        </CartProvider>
+      </ProductCacheProvider>
+    </CategoryCacheProvider>
   );
 };
 

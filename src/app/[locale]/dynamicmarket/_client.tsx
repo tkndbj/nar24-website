@@ -8,10 +8,11 @@ import React, {
   useRef,
 } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { AlertCircle, Filter } from "lucide-react";
 import SecondHeader from "../../components/market_screen/SecondHeader";
 import ProductCard from "../../components/ProductCard";
+import { useCategoryStructure } from "@/context/CategoryCacheProvider";
 import FilterSidebar, {
   FilterState,
   SpecFacets,
@@ -20,7 +21,6 @@ import FilterSidebar, {
 } from "@/app/components/FilterSideBar";
 import { Product } from "@/app/models/Product";
 import { impressionBatcher } from "@/app/utils/impressionBatcher";
-import type { AllInOneCategoryData as AllInOneCategoryDataType } from "../../../constants/productData";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -33,26 +33,6 @@ interface ProductsResponse {
   total: number;
   specFacets?: SpecFacets;
 }
-
-interface AppLocalizations {
-  [key: string]: string;
-}
-
-const createAppLocalizations = (
-  t: (key: string) => string,
-): AppLocalizations =>
-  new Proxy(
-    {},
-    {
-      get: (_target, prop: string) => {
-        try {
-          return t(prop);
-        } catch {
-          return prop;
-        }
-      },
-    },
-  ) as AppLocalizations;
 
 // Buyer (gender) categories: when URL `category=women|men`, the API expects
 // `buyerCategory=Women|Men` instead of `category` so it filters by gender.
@@ -89,7 +69,9 @@ export default function DynamicMarketPage({
   initialData,
 }: DynamicMarketPageProps = {}) {
   const t = useTranslations();
-  const l10n = useMemo(() => createAppLocalizations(t), [t]);
+  const langCode = useLocale();
+  // Dynamic category structure (Firestore-backed, cached in localStorage).
+  const structure = useCategoryStructure();
 
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -110,15 +92,6 @@ export default function DynamicMarketPage({
   const seedRef = useRef<DynamicMarketInitialData | null>(
     seededRef.current ? initialData ?? null : null,
   );
-
-  // Lazy import for category localization helpers
-  const [AllInOneCategoryData, setAllInOneCategoryData] =
-    useState<typeof AllInOneCategoryDataType | null>(null);
-  useEffect(() => {
-    import("../../../constants/productData").then((mod) =>
-      setAllInOneCategoryData(() => mod.AllInOneCategoryData),
-    );
-  }, []);
 
   // ── UI state ───────────────────────────────────────────────────────────────
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -282,42 +255,23 @@ export default function DynamicMarketPage({
     const formattedCategory = formatPathSegment(category);
     let localizedCategory = formattedCategory;
 
-    try {
-      const buyerCategories = AllInOneCategoryData?.kBuyerCategories;
-      if (
-        buyerCategories &&
-        Array.isArray(buyerCategories) &&
-        AllInOneCategoryData
-      ) {
-        const isBuyerCategory = buyerCategories.some(
-          (cat) => cat.key === formattedCategory,
-        );
-        if (isBuyerCategory) {
-          localizedCategory = AllInOneCategoryData.localizeBuyerCategoryKey(
-            formattedCategory,
-            l10n,
-          );
-        }
-      }
-    } catch {
-      /* fall through */
+    if (structure?.findBuyerCategory(formattedCategory)) {
+      localizedCategory = structure.localizeBuyerCategory(
+        formattedCategory,
+        langCode,
+      );
     }
 
     let title = localizedCategory;
 
     if (subcategory) {
       const formattedSubcategory = formatPathSegment(subcategory);
-      let localizedSubcategory = formattedSubcategory;
-      try {
-        localizedSubcategory =
-          AllInOneCategoryData?.localizeBuyerSubcategoryKey(
-            formattedCategory,
-            formattedSubcategory,
-            l10n,
-          ) ?? formattedSubcategory;
-      } catch {
-        /* keep raw */
-      }
+      const localizedSubcategory =
+        structure?.localizeBuyerSubcategory(
+          formattedCategory,
+          formattedSubcategory,
+          langCode,
+        ) ?? formattedSubcategory;
       title = `${localizedCategory} - ${localizedSubcategory}`;
     }
 
@@ -328,23 +282,19 @@ export default function DynamicMarketPage({
         subcategory &&
         (formattedCategory === "Women" || formattedCategory === "Men")
       ) {
-        try {
-          localizedSubSubcategory =
-            AllInOneCategoryData?.localizeBuyerSubSubcategoryKey(
-              formattedCategory,
-              formatPathSegment(subcategory),
-              formattedSubSubcategory,
-              l10n,
-            ) ?? formattedSubSubcategory;
-        } catch {
-          /* keep raw */
-        }
+        localizedSubSubcategory =
+          structure?.localizeBuyerSubSubcategory(
+            formattedCategory,
+            formatPathSegment(subcategory),
+            formattedSubSubcategory,
+            langCode,
+          ) ?? formattedSubSubcategory;
       }
       title = `${title} - ${localizedSubSubcategory}`;
     }
 
     setCategoryTitle(title);
-  }, [category, subcategory, subsubcategory, AllInOneCategoryData, l10n]);
+  }, [category, subcategory, subsubcategory, structure, langCode]);
 
   // ── Data fetching ──────────────────────────────────────────────────────────
 

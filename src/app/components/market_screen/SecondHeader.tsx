@@ -23,9 +23,9 @@ import {
   Flower2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import type { AllInOneCategoryData as AllInOneCategoryDataType } from "@/constants/productData";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { useTheme } from "@/hooks/useTheme";
+import { useCategoryStructure } from "@/context/CategoryCacheProvider";
 
 interface SecondHeaderProps {
   className?: string;
@@ -44,28 +44,6 @@ interface BuyerCategory {
   icon: React.ComponentType<{ size?: number; className?: string }>;
   subcategories: string[];
 }
-
-// Create a wrapper to convert useTranslations to AppLocalizations format
-interface AppLocalizations {
-  [key: string]: string;
-}
-
-const createAppLocalizations = (
-  t: (key: string) => string
-): AppLocalizations => {
-  return new Proxy(
-    {},
-    {
-      get: (target, prop: string) => {
-        try {
-          return t(prop);
-        } catch {
-          return prop; // fallback to the key itself if translation doesn't exist
-        }
-      },
-    }
-  ) as AppLocalizations;
-};
 
 // Icon mapping for buyer categories
 const categoryIconMap: Record<
@@ -128,12 +106,10 @@ const chunkArray = <T,>(array: T[], size: number): T[][] => {
 
 export default function SecondHeader({ className = "" }: SecondHeaderProps) {
   const isDark = useTheme();
-  const [CategoryData, setCategoryData] = useState<typeof AllInOneCategoryDataType | null>(null);
-
-  // Lazy-load productData (202KB) — avoids blocking initial paint
-  useEffect(() => {
-    import("@/constants/productData").then((mod) => setCategoryData(() => mod.AllInOneCategoryData));
-  }, []);
+  // Dynamic category structure (Firestore-backed, cached in localStorage).
+  // Replaces the previous lazy import of the ~200KB productData.ts constant.
+  const structure = useCategoryStructure();
+  const langCode = useLocale();
 
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [showCategoriesMenu, setShowCategoriesMenu] = useState(false);
@@ -162,7 +138,6 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
   } | null>(null);
   const router = useRouter();
   const t = useTranslations();
-  const l10n = useMemo(() => createAppLocalizations(t), [t]);
 
   // Check if screen is mobile
   useEffect(() => {
@@ -214,15 +189,14 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
     };
   }, [showMobileDrawer, isMobile, drawerState]);
 
-  // Get buyer categories from AllInOneCategoryData
+  // Get buyer categories from the dynamic structure
   const getBuyerCategories = (): BuyerCategory[] => {
-    if (!CategoryData) return [];
-    return CategoryData.kBuyerCategories.map((category) => ({
+    if (!structure) return [];
+    return structure.buyerCategories.map((category) => ({
       key: category.key,
-      name: CategoryData.localizeBuyerCategoryKey(category.key, l10n),
+      name: category.getLabel(langCode),
       icon: categoryIconMap[category.key] || Grid3x3,
-      subcategories:
-        CategoryData.kBuyerSubcategories[category.key] || [],
+      subcategories: category.subcategories.map((s) => s.key),
     }));
   };
 
@@ -253,34 +227,49 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
     return [categoriesButton, ...categoryItems];
   };
 
-  const buyerCategories = useMemo(() => getBuyerCategories(), [CategoryData, l10n]);
-  const categories = useMemo(() => getCategories(), [CategoryData, l10n, t]);
+  const buyerCategories = useMemo(
+    () => getBuyerCategories(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [structure, langCode],
+  );
+  const categories = useMemo(
+    () => getCategories(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [structure, langCode, t],
+  );
 
   // Helper function to get localized subcategory name
-  const getLocalizedSubcategory = useCallback((
-    buyerCategory: string,
-    subcategory: string
-  ): string => {
-    return CategoryData?.localizeBuyerSubcategoryKey(
-      buyerCategory,
-      subcategory,
-      l10n
-    ) ?? subcategory;
-  }, [CategoryData, l10n]);
+  const getLocalizedSubcategory = useCallback(
+    (buyerCategory: string, subcategory: string): string => {
+      return (
+        structure?.localizeBuyerSubcategory(
+          buyerCategory,
+          subcategory,
+          langCode,
+        ) ?? subcategory
+      );
+    },
+    [structure, langCode],
+  );
 
   // Helper function to get localized sub-subcategory name
-  const getLocalizedSubSubcategory = useCallback((
-    buyerCategory: string,
-    subcategory: string,
-    subSubcategory: string
-  ): string => {
-    return CategoryData?.localizeBuyerSubSubcategoryKey(
-      buyerCategory,
-      subcategory,
-      subSubcategory,
-      l10n
-    ) ?? subSubcategory;
-  }, [CategoryData, l10n]);
+  const getLocalizedSubSubcategory = useCallback(
+    (
+      buyerCategory: string,
+      subcategory: string,
+      subSubcategory: string,
+    ): string => {
+      return (
+        structure?.localizeBuyerSubSubcategory(
+          buyerCategory,
+          subcategory,
+          subSubcategory,
+          langCode,
+        ) ?? subSubcategory
+      );
+    },
+    [structure, langCode],
+  );
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -480,7 +469,7 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
       ) {
         // ✅ FIX: Use the same logic as Flutter for Women/Men categories
         // Map buyer subcategory to actual product category
-        const mapping = CategoryData?.getBuyerToProductMapping(
+        const mapping = structure?.getBuyerToProductMapping(
           selectedMainCategory.key,
           selectedSubcategory,
           subSubcategory
@@ -820,9 +809,14 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
 
                                   {/* Sub-subcategories */}
                                   <div className="space-y-1">
-                                    {CategoryData?.kBuyerSubSubcategories[
-                                      category.key
-                                    ]?.[subcategory].map((subSubcategory) => (
+                                    {structure
+                                      ?.getSubSubcategories(
+                                        category.key,
+                                        subcategory,
+                                      )
+                                      .map((subSubNode) => {
+                                        const subSubcategory = subSubNode.key;
+                                        return (
                                       <button
                                         key={subSubcategory}
                                         onClick={() => {
@@ -834,7 +828,7 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
                                           ) {
                                             // ✅ FIX: Use the same logic as handleSubSubcategoryClick
                                             const productCategoryMapping =
-                                              CategoryData?.getBuyerToProductMapping(
+                                              structure?.getBuyerToProductMapping(
                                                 category.key,
                                                 subcategory,
                                                 subSubcategory
@@ -926,7 +920,8 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
                                           subSubcategory
                                         )}
                                       </button>
-                                    ))}
+                                        );
+                                      })}
                                   </div>
                                 </div>
                               ))}
@@ -1171,33 +1166,39 @@ export default function SecondHeader({ className = "" }: SecondHeaderProps) {
                       </span>
                     </button>
 
-                    {CategoryData?.kBuyerSubSubcategories[
-                      selectedMainCategory.key
-                    ]?.[selectedSubcategory]?.map((subSubcategory) => (
-                      <button
-                        key={subSubcategory}
-                        onClick={() =>
-                          handleSubSubcategoryClick(subSubcategory)
-                        }
-                        className={`
-                        w-full flex items-center space-x-3 p-3 rounded-lg
-                        transition-all duration-200 text-left
-                        ${
-                          isDark
-                            ? "hover:bg-gray-800 text-gray-300 hover:text-white"
-                            : "hover:bg-gray-50 text-gray-700 hover:text-gray-900"
-                        }
-                      `}
-                      >
-                        <span className="text-sm font-medium flex-1">
-                          {getLocalizedSubSubcategory(
-                            selectedMainCategory.key,
-                            selectedSubcategory,
-                            subSubcategory
-                          )}
-                        </span>
-                      </button>
-                    ))}
+                    {structure
+                      ?.getSubSubcategories(
+                        selectedMainCategory.key,
+                        selectedSubcategory,
+                      )
+                      .map((subSubNode) => {
+                        const subSubcategory = subSubNode.key;
+                        return (
+                          <button
+                            key={subSubcategory}
+                            onClick={() =>
+                              handleSubSubcategoryClick(subSubcategory)
+                            }
+                            className={`
+                              w-full flex items-center space-x-3 p-3 rounded-lg
+                              transition-all duration-200 text-left
+                              ${
+                                isDark
+                                  ? "hover:bg-gray-800 text-gray-300 hover:text-white"
+                                  : "hover:bg-gray-50 text-gray-700 hover:text-gray-900"
+                              }
+                            `}
+                          >
+                            <span className="text-sm font-medium flex-1">
+                              {getLocalizedSubSubcategory(
+                                selectedMainCategory.key,
+                                selectedSubcategory,
+                                subSubcategory
+                              )}
+                            </span>
+                          </button>
+                        );
+                      })}
                   </div>
                 )}
             </div>

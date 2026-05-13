@@ -34,7 +34,7 @@ import {
   FunnelIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
-import type { AllInOneCategoryData as AllInOneCategoryDataType } from "@/constants/productData";
+import { useCategoryStructure } from "@/context/CategoryCacheProvider";
 
 interface Shop {
   id: string;
@@ -107,12 +107,9 @@ const getCategoryTranslationKey = (category: string): string => {
 };
 
 export default function ShopsPage() {
-  // Dynamic import for AllInOneCategoryData
-  const [CategoryData, setCategoryData] = useState<typeof AllInOneCategoryDataType | null>(null);
-  useEffect(() => {
-    import("@/constants/productData").then((mod) => setCategoryData(() => mod.AllInOneCategoryData));
-  }, []);
-  const CATEGORIES = CategoryData?.kCategories.map((cat) => cat.key) ?? [];
+  // Dynamic category structure (Firestore-backed, cached in localStorage).
+  const structure = useCategoryStructure();
+  const CATEGORIES = structure?.productCategories.map((cat) => cat.key) ?? [];
 
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [shops, setShops] = useState<Shop[]>([]);

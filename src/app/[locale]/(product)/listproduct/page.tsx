@@ -70,16 +70,13 @@ interface ProductListingFlow {
   completionRate: number;
 }
 
-import type { AllInOneCategoryData as AllInOneCategoryDataType } from "@/constants/productData";
+import { useCategoryStructure } from "@/context/CategoryCacheProvider";
 
 export default function ListProductForm() {
   const t = useTranslations("listProduct");
 
-  // Dynamic import for AllInOneCategoryData
-  const [AllInOneCategoryData, setAllInOneCategoryData] = useState<typeof AllInOneCategoryDataType | null>(null);
-  useEffect(() => {
-    import("@/constants/productData").then((mod) => setAllInOneCategoryData(() => mod.AllInOneCategoryData));
-  }, []);
+  // Dynamic category structure (Firestore-backed, cached in localStorage).
+  const structure = useCategoryStructure();
   const tGender = useTranslations("genderStep");
   const tFootwear = useTranslations("footwearSizeStep");
   const tClothing = useTranslations("clothingStep");
@@ -977,30 +974,44 @@ export default function ListProductForm() {
     return selectedFlow.flow;
   };
 
+  // Prefer the dynamic structure's labels (admin-managed in TR/EN/RU); fall
+  // back to the i18n .json keys for any category that pre-dates the dynamic
+  // structure, and finally to the raw key.
   const getLocalizedCategoryName = (categoryKey: string): string => {
-    // Convert "Clothing & Fashion" to "categoryClothingFashion"
-    const key = `category${categoryKey.replace(/[^a-zA-Z0-9]/g, "")}`;
-    const localized = tRoot(key);
-    return localized !== key ? localized : categoryKey;
+    const fromStructure = structure?.findProductCategory(categoryKey);
+    if (fromStructure) return fromStructure.getLabel(locale);
+    const i18nKey = `category${categoryKey.replace(/[^a-zA-Z0-9]/g, "")}`;
+    const localized = tRoot(i18nKey);
+    return localized !== i18nKey ? localized : categoryKey;
   };
 
   const getLocalizedSubcategoryName = (subcategoryKey: string): string => {
-    // Convert "Tops & Shirts" to "subcategoryTopsShirts"
-    const key = `subcategory${subcategoryKey.replace(/[^a-zA-Z0-9]/g, "")}`;
-    const localized = tRoot(key);
-    return localized !== key ? localized : subcategoryKey;
+    const fromStructure =
+      category && structure?.findProductSubcategory(category, subcategoryKey);
+    if (fromStructure) return fromStructure.getLabel(locale);
+    const i18nKey = `subcategory${subcategoryKey.replace(/[^a-zA-Z0-9]/g, "")}`;
+    const localized = tRoot(i18nKey);
+    return localized !== i18nKey ? localized : subcategoryKey;
   };
 
   const getLocalizedSubSubcategoryName = (
     subSubcategoryKey: string
   ): string => {
-    // Convert "Casual Dresses" to "subSubcategoryCasualDresses"
-    const key = `subSubcategory${subSubcategoryKey.replace(
+    const fromStructure =
+      category && subcategory
+        ? structure?.findProductSubSubcategory(
+            category,
+            subcategory,
+            subSubcategoryKey,
+          )
+        : undefined;
+    if (fromStructure) return fromStructure.getLabel(locale);
+    const i18nKey = `subSubcategory${subSubcategoryKey.replace(
       /[^a-zA-Z0-9]/g,
       ""
     )}`;
-    const localized = tRoot(key);
-    return localized !== key ? localized : subSubcategoryKey;
+    const localized = tRoot(i18nKey);
+    return localized !== i18nKey ? localized : subSubcategoryKey;
   };
 
   const restartFlow = async () => {
@@ -1995,7 +2006,7 @@ export default function ListProductForm() {
                   className={selectClass}
                 >
                   <option value="">{t("form.selectCategory")}</option>
-                  {(AllInOneCategoryData?.kCategories ?? []).map((cat) => (
+                  {(structure?.productCategories ?? []).map((cat) => (
                     <option key={cat.key} value={cat.key}>
                       {getLocalizedCategoryName(cat.key)}
                     </option>
@@ -2022,10 +2033,10 @@ export default function ListProductForm() {
                     className={selectClass}
                   >
                     <option value="">{t("form.selectSubcategory")}</option>
-                    {(AllInOneCategoryData?.kSubcategories[category] ?? []).map(
+                    {(structure?.getProductSubcategories(category) ?? []).map(
                       (sub) => (
-                        <option key={sub} value={sub}>
-                          {getLocalizedSubcategoryName(sub)}
+                        <option key={sub.key} value={sub.key}>
+                          {getLocalizedSubcategoryName(sub.key)}
                         </option>
                       )
                     )}
@@ -2052,12 +2063,13 @@ export default function ListProductForm() {
                   >
                     <option value="">{t("form.selectSubsubcategory")}</option>
                     {(
-                      AllInOneCategoryData?.kSubSubcategories[category]?.[
-                        subcategory
-                      ] ?? []
+                      structure?.getProductSubSubcategories(
+                        category,
+                        subcategory,
+                      ) ?? []
                     ).map((ss) => (
-                      <option key={ss} value={ss}>
-                        {getLocalizedSubSubcategoryName(ss)}
+                      <option key={ss.key} value={ss.key}>
+                        {getLocalizedSubSubcategoryName(ss.key)}
                       </option>
                     ))}
                   </select>

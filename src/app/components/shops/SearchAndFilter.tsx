@@ -5,7 +5,7 @@ import {
   FunnelIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
-import type { AllInOneCategoryData as AllInOneCategoryDataType } from "@/constants/productData";
+import { useCategoryStructure } from "@/context/CategoryCacheProvider";
 
 interface SearchAndFilterProps {
   onSearch: (term: string) => void;
@@ -83,12 +83,10 @@ export default function SearchAndFilter({
   const t = useTranslations("shops");
   const tRoot = useTranslations(); // For root-level category translations
 
-  // Dynamic import for AllInOneCategoryData
-  const [CategoryData, setCategoryData] = useState<typeof AllInOneCategoryDataType | null>(null);
-  useEffect(() => {
-    import("@/constants/productData").then((mod) => setCategoryData(() => mod.AllInOneCategoryData));
-  }, []);
-  const CATEGORIES = CategoryData?.kCategories.map((cat) => cat.key) ?? [];
+  // Pull product category keys from the dynamic structure (Firestore-backed,
+  // cached in localStorage via CategoryCacheProvider).
+  const structure = useCategoryStructure();
+  const CATEGORIES = structure?.productCategories.map((cat) => cat.key) ?? [];
 
   // Debounced search
   useEffect(() => {

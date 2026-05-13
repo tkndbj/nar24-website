@@ -2,10 +2,11 @@
 
 import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { X, Minus, Plus, ShoppingCart, StickyNote } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { FoodExtrasData } from "@/constants/foodExtras";
 import { SelectedExtra } from "@/context/FoodCartProvider";
 import type { FoodExtra } from "@/types/Food";
+import { pickLocalizedExtra } from "@/utils/foodLocalized";
 
 interface FoodExtrasSheetProps {
   open: boolean;
@@ -40,6 +41,7 @@ export default function FoodExtrasSheet({
 }: FoodExtrasSheetProps) {
   const t = useTranslations("restaurantDetail");
   const tRoot = useTranslations();
+  const locale = useLocale();
   const [selectedExtras, setSelectedExtras] = useState<Map<string, SelectedExtra>>(new Map());
   const [notes, setNotes] = useState(initialNotes);
   const [quantity, setQuantity] = useState(initialQuantity);
@@ -50,19 +52,32 @@ export default function FoodExtrasSheet({
     return allowedExtras ?? [];
   }, [allowedExtras]);
 
-  // Translate extra name
-  const getExtraName = useCallback(
-    (key: string): string => {
-      const tKey = FoodExtrasData.kExtrasTranslationKeys[key];
-      if (!tKey) return key;
+  // Resolve the display label for an extra. Order of precedence:
+  //   1. Per-doc translation (nameEn / nameRu populated by the
+  //      `translateFoodOnWrite` CF for custom extras).
+  //   2. Static .json translation key (handles the predefined English-key
+  //      extras like "Extra Cheese" — CF intentionally skips translating
+  //      those to avoid wasting OpenAI calls).
+  //   3. Raw key as last-resort fallback.
+  const getExtraLabel = useCallback(
+    (extra: FoodExtra): string => {
+      const perDoc = pickLocalizedExtra(
+        locale,
+        extra.nameTr,
+        extra.nameEn,
+        extra.nameRu,
+      );
+      if (perDoc) return perDoc;
+      const tKey = FoodExtrasData.kExtrasTranslationKeys[extra.name];
+      if (!tKey) return extra.name;
       try {
         const translated = tRoot(tKey);
-        return translated !== tKey ? translated : key;
+        return translated !== tKey ? translated : extra.name;
       } catch {
-        return key;
+        return extra.name;
       }
     },
-    [tRoot],
+    [locale, tRoot],
   );
 
   // Reset state when sheet opens
@@ -242,7 +257,7 @@ export default function FoodExtrasSheet({
                           <span className="mr-1">
                             {isSelected ? "✓" : "+"}
                           </span>
-                          {getExtraName(extra.name)}
+                          {getExtraLabel(extra)}
                         </span>
                         {extra.price > 0 && (
                           <span className={`text-[10px] font-semibold flex-shrink-0 ${

@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import Image from "next/image";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -14,7 +14,8 @@ import { smartCompress, shouldCompress } from "../../utils/imageCompression";
 const privateStorage = getStorage(storage.app, "gs://emlak-mobile-app-private");
 import { useUser } from "@/context/UserProvider";
 import SecondHeader from "../../components/market_screen/SecondHeader";
-import type { AllInOneCategoryData as AllInOneCategoryDataType } from "../../../constants/productData";
+import { useCategoryStructure } from "@/context/CategoryCacheProvider";
+import type { CategoryStructure } from "@/models/CategoryStructure";
 import { sanitizeShopApplication } from "@/lib/sanitize";
 import {
   XMarkIcon,
@@ -27,9 +28,6 @@ import {
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
-interface AppLocalizations {
-  [key: string]: string;
-}
 interface Category {
   code: string;
   name: string;
@@ -41,23 +39,14 @@ declare global {
   }
 }
 
-const getLocalizedCategories = (t: (key: string) => string, categoryData: typeof AllInOneCategoryDataType | null): Category[] => {
-  if (!categoryData) return [];
-  const appLocalizations = new Proxy({} as AppLocalizations, {
-    get: (_, prop: string) => {
-      try {
-        return t(prop);
-      } catch {
-        return prop;
-      }
-    },
-  });
-  return categoryData.kCategories.map((category) => ({
+const getLocalizedCategories = (
+  structure: CategoryStructure | null,
+  langCode: string,
+): Category[] => {
+  if (!structure) return [];
+  return structure.productCategories.map((category) => ({
     code: category.key.toLowerCase().replace(/\s+/g, "-").replace(/&/g, ""),
-    name: categoryData.localizeCategoryKey(
-      category.key,
-      appLocalizations,
-    ),
+    name: category.getLabel(langCode),
   }));
 };
 
@@ -65,12 +54,10 @@ export default function CreateShopPage() {
   const router = useRouter();
   const { user } = useUser();
   const t = useTranslations("createShop");
+  const langCode = useLocale();
 
-  // Dynamic import for AllInOneCategoryData
-  const [AllInOneCategoryData, setAllInOneCategoryData] = useState<typeof AllInOneCategoryDataType | null>(null);
-  useEffect(() => {
-    import("../../../constants/productData").then((mod) => setAllInOneCategoryData(() => mod.AllInOneCategoryData));
-  }, []);
+  // Dynamic category structure (Firestore-backed, cached in localStorage).
+  const structure = useCategoryStructure();
 
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -113,7 +100,7 @@ export default function CreateShopPage() {
   const taxInputRef = useRef<HTMLInputElement>(null);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
 
-  const CATEGORIES = getLocalizedCategories(t, AllInOneCategoryData);
+  const CATEGORIES = getLocalizedCategories(structure, langCode);
 
   // Google Maps
   React.useEffect(() => {

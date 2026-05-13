@@ -5,10 +5,11 @@ import { createPortal } from "react-dom";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useTheme } from "@/hooks/useTheme";
 import { Restaurant } from "@/types/Restaurant";
 import { Food } from "@/types/Food";
+import { pickLocalized } from "@/utils/foodLocalized";
 import { isRestaurantOpen, doesRestaurantDeliver } from "@/utils/restaurant";
 import { FoodAddress } from "@/app/models/FoodAddress";
 import { FoodCategoryData } from "@/constants/foodData";
@@ -271,6 +272,11 @@ interface DrinkItem {
   name: string;
   price: number;
   isAvailable: boolean;
+  /** Auto-translations written by `translateDrinkOnWrite`. May be missing
+   *  until the CF has run for this doc. */
+  nameTr?: string;
+  nameEn?: string;
+  nameRu?: string;
 }
 
 function FoodCard({
@@ -303,10 +309,31 @@ function FoodCard({
   hasFoodAddress: boolean;
 }) {
   const t = useTranslations("restaurantDetail");
+  const locale = useLocale();
   const { addItem } = useFoodCartActions();
 
   const [extrasOpen, setExtrasOpen] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+
+  // Localized variants picked from CF-written name_tr / name_en / name_ru
+  // (and the description_* counterparts). Falls back to the raw user-typed
+  // source when the active locale's translation isn't there yet.
+  const displayName = pickLocalized(
+    locale,
+    food.name,
+    food.nameTr,
+    food.nameEn,
+    food.nameRu,
+  );
+  const displayDescription = food.description
+    ? pickLocalized(
+        locale,
+        food.description,
+        food.descriptionTr,
+        food.descriptionEn,
+        food.descriptionRu,
+      )
+    : undefined;
 
   // Try to get localized food type name
   const translationKey =
@@ -408,7 +435,7 @@ function FoodCard({
               source={food.imageStoragePath || food.imageUrl!}
               cdnWidth={400}
               fit="cover"
-              alt={food.name}
+              alt={displayName}
             />
             {isDiscountActive && food.discount && (
               <div className="absolute top-1.5 left-1.5 z-10 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md shadow-sm">
@@ -426,7 +453,7 @@ function FoodCard({
                 isDarkMode ? "text-white" : "text-gray-900"
               }`}
             >
-              {food.name}
+              {displayName}
             </h3>
 
             <p
@@ -437,13 +464,13 @@ function FoodCard({
               {displayType}
             </p>
 
-            {food.description && (
+            {displayDescription && (
               <p
                 className={`text-sm mt-1.5 line-clamp-2 ${
                   isDarkMode ? "text-gray-400" : "text-gray-500"
                 }`}
               >
-                {food.description}
+                {displayDescription}
               </p>
             )}
           </div>
@@ -547,7 +574,7 @@ function FoodCard({
         open={extrasOpen}
         onClose={() => setExtrasOpen(false)}
         onConfirm={handleExtrasConfirm}
-        foodName={food.name}
+        foodName={displayName}
         foodPrice={food.price}
         foodCategory={food.foodCategory}
         allowedExtras={food.extras}
@@ -557,7 +584,7 @@ function FoodCard({
       {lightboxOpen && food.imageUrl && (
         <FoodImageLightbox
           src={food.imageStoragePath || food.imageUrl}
-          alt={food.name}
+          alt={displayName}
           onClose={() => setLightboxOpen(false)}
         />
       )}
@@ -583,6 +610,14 @@ function DrinkCard({
   onRemove: () => void;
 }) {
   const t = useTranslations("restaurantDetail");
+  const locale = useLocale();
+  const displayName = pickLocalized(
+    locale,
+    drink.name,
+    drink.nameTr,
+    drink.nameEn,
+    drink.nameRu,
+  );
 
   return (
     <div
@@ -610,7 +645,7 @@ function DrinkCard({
             isDarkMode ? "text-white" : "text-gray-900"
           }`}
         >
-          {drink.name}
+          {displayName}
         </h3>
         <span
           className={`text-base font-bold mt-0.5 block ${

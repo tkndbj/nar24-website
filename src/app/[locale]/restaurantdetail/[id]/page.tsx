@@ -25,6 +25,11 @@ interface DrinkItem {
   name: string;
   price: number;
   isAvailable: boolean;
+  /** Auto-translations written by `translateDrinkOnWrite`. May be missing
+   *  until the CF has run for this doc. */
+  nameTr?: string;
+  nameEn?: string;
+  nameRu?: string;
 }
 
 export default function RestaurantDetailPage() {
@@ -142,6 +147,14 @@ export default function RestaurantDetailPage() {
           }
         }
 
+        // Per-extra translations written by the `translateFoodOnWrite` CF.
+        // Splice each extra's en/ru into the FoodExtra so card components
+        // don't need to look the parent doc up again.
+        const extraTranslations =
+          d.extra_translations && typeof d.extra_translations === "object"
+            ? (d.extra_translations as Record<string, Record<string, unknown>>)
+            : {};
+
         foodList.push({
           id: docSnap.id,
           name: d.name as string,
@@ -154,24 +167,43 @@ export default function RestaurantDetailPage() {
             d.preparationTime != null ? Number(d.preparationTime) : undefined,
           price: Number(d.price) || 0,
           extras: Array.isArray(d.extras)
-            ? d.extras.map((e: Record<string, unknown>) => ({
-                name: String(e.name ?? ""),
-                price: Number(e.price ?? 0),
-              }))
+            ? d.extras.map((e: Record<string, unknown>) => {
+                const exName = String(e.name ?? "");
+                const trans = extraTranslations[exName];
+                return {
+                  name: exName,
+                  price: Number(e.price ?? 0),
+                  nameTr: trans?.tr as string | undefined,
+                  nameEn: trans?.en as string | undefined,
+                  nameRu: trans?.ru as string | undefined,
+                };
+              })
             : [],
           restaurantId: id,
           discount,
+          nameTr: d.name_tr as string | undefined,
+          nameEn: d.name_en as string | undefined,
+          nameRu: d.name_ru as string | undefined,
+          descriptionTr: d.description_tr as string | undefined,
+          descriptionEn: d.description_en as string | undefined,
+          descriptionRu: d.description_ru as string | undefined,
         });
       }
 
       setDrinks(
-        drinksSnap.docs.map((docSnap) => ({
-          id: docSnap.id,
-          restaurantId: id,
-          name: (docSnap.data().name as string) || "",
-          price: Number(docSnap.data().price) || 0,
-          isAvailable: true,
-        })),
+        drinksSnap.docs.map((docSnap) => {
+          const dd = docSnap.data();
+          return {
+            id: docSnap.id,
+            restaurantId: id,
+            name: (dd.name as string) || "",
+            price: Number(dd.price) || 0,
+            isAvailable: true,
+            nameTr: dd.name_tr as string | undefined,
+            nameEn: dd.name_en as string | undefined,
+            nameRu: dd.name_ru as string | undefined,
+          };
+        }),
       );
 
       setFoods(foodList);
