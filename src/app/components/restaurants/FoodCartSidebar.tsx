@@ -23,7 +23,6 @@ import {
 import { useRouter } from "@/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { pickLocalized, pickLocalizedExtra } from "@/utils/foodLocalized";
-import type { SelectedExtra } from "@/context/FoodCartProvider";
 import FoodExtrasSheet from "./FoodExtrasSheet";
 import MinOrderAlertDialog from "./MinOrderAlertDialog";
 import RestaurantClosedAlertDialog from "./RestaurantClosedAlertDialog";

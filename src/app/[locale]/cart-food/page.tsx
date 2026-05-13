@@ -25,7 +25,6 @@ import { useUser } from "@/context/UserProvider";
 import { useRouter } from "@/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { pickLocalized, pickLocalizedExtra } from "@/utils/foodLocalized";
-import type { SelectedExtra } from "@/context/FoodCartProvider";
 import FoodExtrasSheet from "@/app/components/restaurants/FoodExtrasSheet";
 import MinOrderAlertDialog from "@/app/components/restaurants/MinOrderAlertDialog";
 import { FoodExtrasData } from "@/constants/foodExtras";
