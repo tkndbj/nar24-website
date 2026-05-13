@@ -25,8 +25,9 @@ import {
   Banknote,
   StickyNote,
 } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { FoodExtrasData } from "@/constants/foodExtras";
+import { pickLocalized, pickLocalizedExtra } from "@/utils/foodLocalized";
 
 // ============================================================================
 // INTERFACES
@@ -62,9 +63,22 @@ interface FoodOrderItem {
   name: string;
   price: number;
   quantity: number;
-  extras: { name: string; price: number; quantity: number }[];
+  extras: {
+    name: string;
+    price: number;
+    quantity: number;
+    // Per-extra translations snapshotted into the order by module 27. May
+    // be null/undefined on legacy orders predating that change.
+    name_tr?: string | null;
+    name_en?: string | null;
+    name_ru?: string | null;
+  }[];
   specialNotes?: string;
   itemTotal: number;
+  // Auto-translations snapshotted into the order doc by module 27.
+  name_tr?: string | null;
+  name_en?: string | null;
+  name_ru?: string | null;
 }
 
 interface FoodOrderDetails {
@@ -91,6 +105,7 @@ export default function FoodReceiptDetailPage() {
   const { user, isLoading: authLoading } = useUser();
   const router = useRouter();
   const t = useTranslations();
+  const locale = useLocale();
   const l = (key: string) => t(key) || key.split(".").pop() || key;
 
   // ── Theme detection ──────────────────────────────────────────────
@@ -702,29 +717,57 @@ export default function FoodReceiptDetailPage() {
                               isDarkMode ? "text-white" : "text-gray-900"
                             }`}
                           >
-                            {item.name}
+                            {pickLocalized(
+                              locale,
+                              item.name,
+                              item.name_tr ?? undefined,
+                              item.name_en ?? undefined,
+                              item.name_ru ?? undefined,
+                            )}
                           </h4>
                         </div>
 
                         {/* Extras */}
                         {item.extras.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-1.5 ml-7">
-                            {item.extras.map((ext) => (
-                              <span
-                                key={ext.name}
-                                className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                                  isDarkMode
-                                    ? "bg-gray-600 text-gray-300"
-                                    : "bg-gray-200 text-gray-600"
-                                }`}
-                              >
-                                {FoodExtrasData.kExtrasTranslationKeys[ext.name]
-                                  ? t(FoodExtrasData.kExtrasTranslationKeys[ext.name])
-                                  : ext.name}
-                                {ext.quantity > 1 ? ` ×${ext.quantity}` : ""}
-                                {ext.price > 0 ? ` +${ext.price.toFixed(2)}` : ""}
-                              </span>
-                            ))}
+                            {item.extras.map((ext) => {
+                              // Precedence:
+                              //   1. Per-doc translation snapshotted onto
+                              //      the order (custom extras).
+                              //   2. Static .json dictionary (predefined
+                              //      English-key extras like "Extra Cheese").
+                              //   3. Raw extra name as last-resort fallback.
+                              const perDoc = pickLocalizedExtra(
+                                locale,
+                                ext.name_tr ?? undefined,
+                                ext.name_en ?? undefined,
+                                ext.name_ru ?? undefined,
+                              );
+                              let label: string;
+                              if (perDoc) {
+                                label = perDoc;
+                              } else {
+                                const tKey =
+                                  FoodExtrasData.kExtrasTranslationKeys[ext.name];
+                                label = tKey ? t(tKey) : ext.name;
+                              }
+                              return (
+                                <span
+                                  key={ext.name}
+                                  className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                                    isDarkMode
+                                      ? "bg-gray-600 text-gray-300"
+                                      : "bg-gray-200 text-gray-600"
+                                  }`}
+                                >
+                                  {label}
+                                  {ext.quantity > 1 ? ` ×${ext.quantity}` : ""}
+                                  {ext.price > 0
+                                    ? ` +${ext.price.toFixed(2)}`
+                                    : ""}
+                                </span>
+                              );
+                            })}
                           </div>
                         )}
 

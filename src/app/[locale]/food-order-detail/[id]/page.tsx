@@ -21,8 +21,9 @@ import { useUser } from "@/context/UserProvider";
 import { useRouter, useParams } from "next/navigation";
 import { doc, getDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { FoodExtrasData } from "@/constants/foodExtras";
+import { pickLocalized, pickLocalizedExtra } from "@/utils/foodLocalized";
 
 // ============================================================================
 // TYPES
@@ -43,6 +44,11 @@ interface FoodOrderExtra {
   name: string;
   price: number;
   quantity: number;
+  // Per-extra translations snapshotted into the order doc by module 27.
+  // May be null/undefined on legacy orders predating that change.
+  name_tr?: string | null;
+  name_en?: string | null;
+  name_ru?: string | null;
 }
 
 interface FoodOrderItem {
@@ -53,6 +59,10 @@ interface FoodOrderItem {
   extras: FoodOrderExtra[];
   specialNotes?: string;
   itemTotal?: number;
+  // Auto-translations snapshotted into the order doc by module 27.
+  name_tr?: string | null;
+  name_en?: string | null;
+  name_ru?: string | null;
 }
 
 interface DeliveryAddress {
@@ -172,6 +182,7 @@ export default function FoodOrderDetailPage() {
   const { user, isLoading: authLoading } = useUser();
   const t = useTranslations("FoodOrderDetail");
   const tRoot = useTranslations();
+  const locale = useLocale();
 
   const [order, setOrder] = useState<FoodOrder | null>(null);
   const [loading, setLoading] = useState(true);
@@ -564,7 +575,13 @@ export default function FoodOrderDetailPage() {
                           isDarkMode ? "text-white" : "text-gray-900"
                         }`}
                       >
-                        {item.name}
+                        {pickLocalized(
+                          locale,
+                          item.name,
+                          item.name_tr ?? undefined,
+                          item.name_en ?? undefined,
+                          item.name_ru ?? undefined,
+                        )}
                       </h4>
                       <div className="px-2 py-0.5 bg-orange-100 rounded text-[10px] font-semibold text-orange-600 inline-block mt-1">
                         {order.restaurantName}
@@ -605,29 +622,49 @@ export default function FoodOrderDetailPage() {
                         {t("extras") || "Extras"}
                       </div>
                       <div className="flex flex-wrap gap-1.5">
-                        {item.extras.map((ext) => (
-                          <span
-                            key={ext.name}
-                            className="inline-flex items-center px-2 py-1 rounded text-[10px] font-semibold"
-                            style={{
-                              backgroundColor: isDarkMode
-                                ? "#F9731620"
-                                : "#FFEDD5",
-                              color: "#F97316",
-                              border: "1px solid #F9731630",
-                            }}
-                          >
-                            {FoodExtrasData.kExtrasTranslationKeys[ext.name]
-                              ? tRoot(FoodExtrasData.kExtrasTranslationKeys[ext.name])
-                              : ext.name}
-                            {ext.quantity > 1 && ` ×${ext.quantity}`}
-                            {ext.price > 0 && (
-                              <span className="ml-1 opacity-75">
-                                +{formatCurrency(ext.price, order.currency)}
-                              </span>
-                            )}
-                          </span>
-                        ))}
+                        {item.extras.map((ext) => {
+                          // Precedence:
+                          //   1. Per-doc translation snapshotted onto the
+                          //      order (custom extras translated by the CF).
+                          //   2. Static .json dictionary (predefined English
+                          //      keys like "Extra Cheese" — CF skips those).
+                          //   3. Raw extra name as last-resort fallback.
+                          const perDoc = pickLocalizedExtra(
+                            locale,
+                            ext.name_tr ?? undefined,
+                            ext.name_en ?? undefined,
+                            ext.name_ru ?? undefined,
+                          );
+                          let label: string;
+                          if (perDoc) {
+                            label = perDoc;
+                          } else {
+                            const tKey =
+                              FoodExtrasData.kExtrasTranslationKeys[ext.name];
+                            label = tKey ? tRoot(tKey) : ext.name;
+                          }
+                          return (
+                            <span
+                              key={ext.name}
+                              className="inline-flex items-center px-2 py-1 rounded text-[10px] font-semibold"
+                              style={{
+                                backgroundColor: isDarkMode
+                                  ? "#F9731620"
+                                  : "#FFEDD5",
+                                color: "#F97316",
+                                border: "1px solid #F9731630",
+                              }}
+                            >
+                              {label}
+                              {ext.quantity > 1 && ` ×${ext.quantity}`}
+                              {ext.price > 0 && (
+                                <span className="ml-1 opacity-75">
+                                  +{formatCurrency(ext.price, order.currency)}
+                                </span>
+                              )}
+                            </span>
+                          );
+                        })}
                       </div>
                     </div>
                   )}

@@ -30,9 +30,10 @@ import {
   QueryDocumentSnapshot,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useTheme } from "@/hooks/useTheme";
 import SmartImage from "@/app/components/SmartImage";
+import { pickLocalized } from "@/utils/foodLocalized";
 
 type FoodOrderStatus =
   | "pending"
@@ -55,7 +56,20 @@ interface FoodOrder {
     name: string;
     quantity: number;
     price: number;
-    extras: { name: string; price: number; quantity: number }[];
+    extras: {
+      name: string;
+      price: number;
+      quantity: number;
+      name_tr?: string | null;
+      name_en?: string | null;
+      name_ru?: string | null;
+    }[];
+    // Auto-translations snapshotted into the order doc by module 27. May be
+    // null/undefined for orders placed before the denormalization landed —
+    // pickLocalized falls back to `name` gracefully.
+    name_tr?: string | null;
+    name_en?: string | null;
+    name_ru?: string | null;
   }[];
   totalPrice: number;
   currency: string;
@@ -74,6 +88,7 @@ export default function FoodOrdersPage() {
   const router = useRouter();
   const { user, isLoading: authLoading } = useUser();
   const t = useTranslations("FoodOrders");
+  const locale = useLocale();
   const isDarkMode = useTheme();
 
   const [orders, setOrders] = useState<FoodOrder[]>([]);
@@ -142,8 +157,15 @@ export default function FoodOrdersPage() {
           ? newOrders.filter(
               (o) =>
                 o.restaurantName.toLowerCase().includes(searchQuery) ||
-                o.items.some((i) =>
-                  i.name.toLowerCase().includes(searchQuery),
+                // Match against every locale variant so the user can find an
+                // order by whichever name they currently see, regardless of
+                // their locale.
+                o.items.some(
+                  (i) =>
+                    i.name.toLowerCase().includes(searchQuery) ||
+                    (i.name_tr ?? "").toLowerCase().includes(searchQuery) ||
+                    (i.name_en ?? "").toLowerCase().includes(searchQuery) ||
+                    (i.name_ru ?? "").toLowerCase().includes(searchQuery),
                 ),
             )
           : newOrders;
@@ -449,9 +471,16 @@ export default function FoodOrdersPage() {
               const itemsPreview =
                 order.items
                   .slice(0, 2)
-                  .map((i) =>
-                    i.quantity > 1 ? `${i.quantity}× ${i.name}` : i.name,
-                  )
+                  .map((i) => {
+                    const n = pickLocalized(
+                      locale,
+                      i.name,
+                      i.name_tr ?? undefined,
+                      i.name_en ?? undefined,
+                      i.name_ru ?? undefined,
+                    );
+                    return i.quantity > 1 ? `${i.quantity}× ${n}` : n;
+                  })
                   .join(", ") +
                 (order.items.length > 2 ? ` +${order.items.length - 2}` : "");
               return (
