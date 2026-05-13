@@ -438,7 +438,7 @@ function FoodCard({
               alt={displayName}
             />
             {isDiscountActive && food.discount && (
-              <div className="absolute top-1.5 left-1.5 z-10 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md shadow-sm">
+              <div className="absolute top-1.5 left-1.5 z-10 bg-[#00A86B] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md shadow-sm">
                 -{food.discount.percentage}%
               </div>
             )}
@@ -482,8 +482,8 @@ function FoodCard({
                   <span
                     className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[11px] font-bold ${
                       isDarkMode
-                        ? "bg-red-500/15 text-red-400"
-                        : "bg-red-50 text-red-600"
+                        ? "bg-[#00A86B]/15 text-[#34D399]"
+                        : "bg-[#00A86B]/10 text-[#00A86B]"
                     }`}
                   >
                     <Percent className="w-3 h-3" />
@@ -498,7 +498,7 @@ function FoodCard({
                   </span>
                   <span
                     className={`text-lg font-bold ${
-                      isDarkMode ? "text-orange-400" : "text-orange-600"
+                      isDarkMode ? "text-[#34D399]" : "text-[#00A86B]"
                     }`}
                   >
                     {food.price.toLocaleString()} TL
