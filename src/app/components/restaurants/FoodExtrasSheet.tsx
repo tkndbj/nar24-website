@@ -93,11 +93,13 @@ export default function FoodExtrasSheet({
     prevOpenRef.current = open;
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Build a price lookup from allowedExtras
-  const extraPriceMap = useMemo(() => {
-    const map = new Map<string, number>();
+  // Build a lookup from allowedExtras — price + per-extra auto-translations.
+  // Carrying the translations here means a toggled SelectedExtra flows them
+  // straight into the cart and on to the order doc without a re-lookup.
+  const extraInfoMap = useMemo(() => {
+    const map = new Map<string, FoodExtra>();
     for (const e of allowedExtras) {
-      map.set(e.name, e.price);
+      map.set(e.name, e);
     }
     return map;
   }, [allowedExtras]);
@@ -109,11 +111,19 @@ export default function FoodExtrasSheet({
       if (next.has(extraName)) {
         next.delete(extraName);
       } else {
-        next.set(extraName, { name: extraName, quantity: 1, price: extraPriceMap.get(extraName) ?? 0 });
+        const src = extraInfoMap.get(extraName);
+        next.set(extraName, {
+          name: extraName,
+          quantity: 1,
+          price: src?.price ?? 0,
+          name_tr: src?.nameTr ?? null,
+          name_en: src?.nameEn ?? null,
+          name_ru: src?.nameRu ?? null,
+        });
       }
       return next;
     });
-  }, [extraPriceMap]);
+  }, [extraInfoMap]);
 
   // Calculate total
   const totalPrice = useMemo(() => {

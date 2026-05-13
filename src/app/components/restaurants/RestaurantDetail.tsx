@@ -259,6 +259,12 @@ interface PendingConflict {
     foodCategory: string;
     foodType: string;
     preparationTime?: number | null;
+    nameTr?: string | null;
+    nameEn?: string | null;
+    nameRu?: string | null;
+    descriptionTr?: string | null;
+    descriptionEn?: string | null;
+    descriptionRu?: string | null;
   };
   restaurant: FoodCartRestaurant;
   quantity: number;
@@ -394,6 +400,15 @@ function FoodCard({
         foodCategory: food.foodCategory,
         foodType: food.foodType,
         preparationTime: food.preparationTime,
+        // Forward auto-translations from the source food doc so the cart,
+        // checkout, and order doc downstream all render localized text
+        // without re-fetching.
+        nameTr: food.nameTr,
+        nameEn: food.nameEn,
+        nameRu: food.nameRu,
+        descriptionTr: food.descriptionTr,
+        descriptionEn: food.descriptionEn,
+        descriptionRu: food.descriptionRu,
       };
 
       const result = await addItem({
@@ -868,14 +883,20 @@ export default function RestaurantDetail({
         profileImageUrl: restaurant!.profileImageUrl,
       };
 
+      const drinkPayload = {
+        id: drink.id,
+        name: drink.name,
+        price: drink.price,
+        foodCategory: "drink",
+        foodType: "drink",
+        // Forward drink auto-translations through the cart.
+        nameTr: drink.nameTr,
+        nameEn: drink.nameEn,
+        nameRu: drink.nameRu,
+      };
+
       const result = await addItem({
-        food: {
-          id: drink.id,
-          name: drink.name,
-          price: drink.price,
-          foodCategory: "drink",
-          foodType: "drink",
-        },
+        food: drinkPayload,
         restaurant: cartRest,
         quantity: 1,
         extras: [],
@@ -884,13 +905,7 @@ export default function RestaurantDetail({
 
       if (result === "restaurant_conflict") {
         handleConflict({
-          food: {
-            id: drink.id,
-            name: drink.name,
-            price: drink.price,
-            foodCategory: "drink",
-            foodType: "drink",
-          },
+          food: drinkPayload,
           restaurant: cartRest,
           quantity: 1,
           extras: [],

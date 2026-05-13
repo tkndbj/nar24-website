@@ -23,7 +23,9 @@ import {
 } from "@/context/FoodCartProvider";
 import { useUser } from "@/context/UserProvider";
 import { useRouter } from "@/navigation";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { pickLocalized, pickLocalizedExtra } from "@/utils/foodLocalized";
+import type { SelectedExtra } from "@/context/FoodCartProvider";
 import FoodExtrasSheet from "@/app/components/restaurants/FoodExtrasSheet";
 import MinOrderAlertDialog from "@/app/components/restaurants/MinOrderAlertDialog";
 import { FoodExtrasData } from "@/constants/foodExtras";
@@ -59,6 +61,7 @@ function FoodCartPageContent() {
   const router = useRouter();
   const { user, isLoading: isAuthLoading, profileData } = useUser();
   const localization = useTranslations();
+  const locale = useLocale();
 
   const {
     currentRestaurant,
@@ -547,7 +550,13 @@ function FoodCartPageContent() {
                                 isDark ? "text-gray-300" : "text-gray-600"
                               }`}
                             >
-                              {item.name}
+                              {pickLocalized(
+                                locale,
+                                item.name,
+                                item.name_tr ?? undefined,
+                                item.name_en ?? undefined,
+                                item.name_ru ?? undefined,
+                              )}
                             </span>
                           </div>
                           <span
@@ -754,25 +763,44 @@ function FoodCartItemCard({
   onRemove: () => void;
   onEditExtras: () => void;
 }) {
+  const locale = useLocale();
   const extrasTotal = item.extras.reduce(
     (sum, ext) => sum + ext.price * ext.quantity,
     0,
   );
   const lineTotal = (item.price + extrasTotal) * item.quantity;
 
-  // Translate extra names using imported FoodExtrasData
-  const getExtraName = useCallback(
-    (name: string) => {
-      const key = FoodExtrasData.kExtrasTranslationKeys[name];
-      if (!key) return name;
+  const displayName = pickLocalized(
+    locale,
+    item.name,
+    item.name_tr ?? undefined,
+    item.name_en ?? undefined,
+    item.name_ru ?? undefined,
+  );
+
+  // Resolve the display label for an extra:
+  //   1. Per-doc translation snapshotted onto the cart extra (custom extras).
+  //   2. Static .json dictionary (predefined English-key extras).
+  //   3. Raw name as last-resort fallback.
+  const getExtraLabel = useCallback(
+    (ext: SelectedExtra) => {
+      const perDoc = pickLocalizedExtra(
+        locale,
+        ext.name_tr ?? undefined,
+        ext.name_en ?? undefined,
+        ext.name_ru ?? undefined,
+      );
+      if (perDoc) return perDoc;
+      const key = FoodExtrasData.kExtrasTranslationKeys[ext.name];
+      if (!key) return ext.name;
       try {
         const translated = tRoot(key);
-        return translated !== key ? translated : name;
+        return translated !== key ? translated : ext.name;
       } catch {
-        return name;
+        return ext.name;
       }
     },
-    [tRoot],
+    [locale, tRoot],
   );
 
   return (
@@ -793,7 +821,7 @@ function FoodCartItemCard({
               <SmartImage
                 source={item.imageUrl}
                 size="thumbnail"
-                alt={item.name}
+                alt={displayName}
                 fill
                 className="object-cover"
                 sizes="80px"
@@ -831,7 +859,7 @@ function FoodCartItemCard({
                     isDark ? "text-white" : "text-gray-900"
                   }`}
                 >
-                  {item.name}
+                  {displayName}
                 </h3>
                 <p
                   className={`text-[11px] mt-0.5 ${
@@ -938,7 +966,7 @@ function FoodCartItemCard({
                 }`}
               >
                 <span className="text-orange-500">+</span>
-                {getExtraName(ext.name)}
+                {getExtraLabel(ext)}
                 {ext.quantity > 1 && (
                   <span className={isDark ? "text-gray-600" : "text-gray-300"}>
                     ×{ext.quantity}

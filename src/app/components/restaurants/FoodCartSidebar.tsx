@@ -21,7 +21,9 @@ import {
   type SelectedExtra,
 } from "@/context/FoodCartProvider";
 import { useRouter } from "@/navigation";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { pickLocalized, pickLocalizedExtra } from "@/utils/foodLocalized";
+import type { SelectedExtra } from "@/context/FoodCartProvider";
 import FoodExtrasSheet from "./FoodExtrasSheet";
 import MinOrderAlertDialog from "./MinOrderAlertDialog";
 import RestaurantClosedAlertDialog from "./RestaurantClosedAlertDialog";
@@ -51,19 +53,39 @@ function SidebarCartItem({
   onEditExtras: () => void;
 }) {
   const localization = useTranslations();
+  const locale = useLocale();
 
-  const getExtraName = useCallback(
-    (name: string) => {
-      const key = FoodExtrasData.kExtrasTranslationKeys[name];
-      if (!key) return name;
+  // Resolve the display label for an extra:
+  //   1. Per-doc translation snapshotted onto the cart extra (custom extras).
+  //   2. Static .json dictionary (predefined English-key extras).
+  //   3. Raw name as last-resort fallback.
+  const getExtraLabel = useCallback(
+    (ext: SelectedExtra) => {
+      const perDoc = pickLocalizedExtra(
+        locale,
+        ext.name_tr ?? undefined,
+        ext.name_en ?? undefined,
+        ext.name_ru ?? undefined,
+      );
+      if (perDoc) return perDoc;
+      const key = FoodExtrasData.kExtrasTranslationKeys[ext.name];
+      if (!key) return ext.name;
       try {
         const translated = localization(key);
-        return translated !== key ? translated : name;
+        return translated !== key ? translated : ext.name;
       } catch {
-        return name;
+        return ext.name;
       }
     },
-    [localization],
+    [locale, localization],
+  );
+
+  const displayName = pickLocalized(
+    locale,
+    item.name,
+    item.name_tr ?? undefined,
+    item.name_en ?? undefined,
+    item.name_ru ?? undefined,
   );
 
   const extrasTotal = item.extras.reduce(
@@ -91,7 +113,7 @@ function SidebarCartItem({
             <SmartImage
               source={item.imageUrl}
               size="thumbnail"
-              alt={item.name}
+              alt={displayName}
               fill
               className="object-cover"
               sizes="56px"
@@ -128,7 +150,7 @@ function SidebarCartItem({
                 isDarkMode ? "text-white" : "text-gray-900"
               }`}
             >
-              {item.name}
+              {displayName}
             </h4>
             <button
               onClick={onRemove}
@@ -212,7 +234,7 @@ function SidebarCartItem({
               }`}
             >
               <span className="text-orange-500">+</span>
-              {getExtraName(ext.name)}
+              {getExtraLabel(ext)}
               {ext.quantity > 1 && (
                 <span
                   className={isDarkMode ? "text-gray-500" : "text-gray-300"}
@@ -263,6 +285,7 @@ function CartContent({
 }) {
   const router = useRouter();
   const localization = useTranslations();
+  const locale = useLocale();
   const { items, totals, itemCount, currentRestaurant } = useFoodCartState();
   const { removeItem, updateQuantity, updateExtras, updateNotes, clearCart } =
     useFoodCartActions();
@@ -488,7 +511,13 @@ function CartContent({
                         isDarkMode ? "text-gray-300" : "text-gray-600"
                       }`}
                     >
-                      {item.name}
+                      {pickLocalized(
+                        locale,
+                        item.name,
+                        item.name_tr ?? undefined,
+                        item.name_en ?? undefined,
+                        item.name_ru ?? undefined,
+                      )}
                     </span>
                   </div>
                   <span

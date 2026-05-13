@@ -44,6 +44,14 @@ export interface SelectedExtra {
   name: string; // Extra key, e.g. "Extra Cheese"
   quantity: number; // How many of this extra (default: 1)
   price: number; // Price per unit of this extra (0 if free)
+  // Per-extra auto-translations snapshotted from the parent food's
+  // `extra_translations` map at add-to-cart time. Optional — predefined
+  // English-key extras don't have these and resolve via the static .json
+  // dictionary on the client. Legacy cart items predating this field stay
+  // valid (everything is null/undefined → pickLocalizedExtra falls back).
+  name_tr?: string | null;
+  name_en?: string | null;
+  name_ru?: string | null;
 }
 
 /** A single food item in the cart */
@@ -70,6 +78,16 @@ export interface FoodCartItem {
   // Metadata
   addedAt: Timestamp | null;
   isOptimistic?: boolean;
+
+  // Auto-translations snapshotted from the source food/drink doc at
+  // add-to-cart time. Optional — legacy cart items lack them and the
+  // render layer falls back to `name` / `description`.
+  name_tr?: string | null;
+  name_en?: string | null;
+  name_ru?: string | null;
+  description_tr?: string | null;
+  description_en?: string | null;
+  description_ru?: string | null;
 }
 
 /** Lightweight restaurant info stored in the food cart meta */
@@ -128,6 +146,15 @@ interface FoodCartActionsContextType {
       foodCategory: string;
       foodType: string;
       preparationTime?: number | null;
+      // Auto-translation snapshots from the source food doc. Optional so
+      // existing callers compile unchanged; missing variants fall back to
+      // `name`/`description` at render time via pickLocalized.
+      nameTr?: string | null;
+      nameEn?: string | null;
+      nameRu?: string | null;
+      descriptionTr?: string | null;
+      descriptionEn?: string | null;
+      descriptionRu?: string | null;
     };
     restaurant: FoodCartRestaurant;
     quantity?: number;
@@ -149,6 +176,12 @@ interface FoodCartActionsContextType {
       foodCategory: string;
       foodType: string;
       preparationTime?: number | null;
+      nameTr?: string | null;
+      nameEn?: string | null;
+      nameRu?: string | null;
+      descriptionTr?: string | null;
+      descriptionEn?: string | null;
+      descriptionRu?: string | null;
     };
     restaurant: FoodCartRestaurant;
     quantity?: number;
@@ -273,9 +306,12 @@ function buildFoodCartItem(
   foodId: string,
   data: Record<string, unknown>,
 ): FoodCartItem {
+  // Carry every translation field through as `string | null | undefined`.
+  // Legacy cart docs without these fields just resolve to `undefined`, which
+  // pickLocalized/pickLocalizedExtra treat as "fall back to raw `name`".
   return {
     foodId,
-    originalFoodId: (data.originalFoodId as string) ?? foodId, 
+    originalFoodId: (data.originalFoodId as string) ?? foodId,
     name: (data.name as string) ?? "",
     description: (data.description as string) ?? "",
     price: (data.price as number) ?? 0,
@@ -286,10 +322,13 @@ function buildFoodCartItem(
 
     quantity: (data.quantity as number) ?? 1,
     extras: Array.isArray(data.extras)
-      ? (data.extras as SelectedExtra[]).map((e) => ({
-          name: e.name ?? "",
-          quantity: e.quantity ?? 1,
-          price: e.price ?? 0,
+      ? (data.extras as Array<Record<string, unknown>>).map((e) => ({
+          name: (e.name as string) ?? "",
+          quantity: (e.quantity as number) ?? 1,
+          price: (e.price as number) ?? 0,
+          name_tr: (e.name_tr as string) ?? null,
+          name_en: (e.name_en as string) ?? null,
+          name_ru: (e.name_ru as string) ?? null,
         }))
       : [],
     specialNotes: (data.specialNotes as string) ?? "",
@@ -299,6 +338,13 @@ function buildFoodCartItem(
 
     addedAt: data.addedAt instanceof Timestamp ? data.addedAt : null,
     isOptimistic: false,
+
+    name_tr: (data.name_tr as string) ?? null,
+    name_en: (data.name_en as string) ?? null,
+    name_ru: (data.name_ru as string) ?? null,
+    description_tr: (data.description_tr as string) ?? null,
+    description_en: (data.description_en as string) ?? null,
+    description_ru: (data.description_ru as string) ?? null,
   };
 }
 
@@ -316,13 +362,22 @@ function buildFirestoreData(params: {
     foodCategory: string;
     foodType: string;
     preparationTime?: number | null;
+    nameTr?: string | null;
+    nameEn?: string | null;
+    nameRu?: string | null;
+    descriptionTr?: string | null;
+    descriptionEn?: string | null;
+    descriptionRu?: string | null;
   };
   restaurant: FoodCartRestaurant;
   quantity: number;
   extras: SelectedExtra[];
   specialNotes: string;
 }): Record<string, unknown> {
-  return {
+  // Spread-with-conditionals so we DON'T stamp `null` translation fields
+  // onto the doc when the caller doesn't supply them — keeps legacy carts
+  // looking exactly like before this change.
+  const out: Record<string, unknown> = {
     name: params.food.name,
     originalFoodId: params.food.id,
     description: params.food.description ?? "",
@@ -332,16 +387,29 @@ function buildFirestoreData(params: {
     foodType: params.food.foodType,
     preparationTime: params.food.preparationTime ?? null,
     quantity: params.quantity,
-    extras: params.extras.map((e) => ({
-      name: e.name,
-      quantity: e.quantity,
-      price: e.price,
-    })),
+    extras: params.extras.map((e) => {
+      const ext: Record<string, unknown> = {
+        name: e.name,
+        quantity: e.quantity,
+        price: e.price,
+      };
+      if (e.name_tr) ext.name_tr = e.name_tr;
+      if (e.name_en) ext.name_en = e.name_en;
+      if (e.name_ru) ext.name_ru = e.name_ru;
+      return ext;
+    }),
     specialNotes: params.specialNotes,
     restaurantId: params.restaurant.id,
     restaurantName: params.restaurant.name,
     addedAt: serverTimestamp(),
   };
+  if (params.food.nameTr) out.name_tr = params.food.nameTr;
+  if (params.food.nameEn) out.name_en = params.food.nameEn;
+  if (params.food.nameRu) out.name_ru = params.food.nameRu;
+  if (params.food.descriptionTr) out.description_tr = params.food.descriptionTr;
+  if (params.food.descriptionEn) out.description_en = params.food.descriptionEn;
+  if (params.food.descriptionRu) out.description_ru = params.food.descriptionRu;
+  return out;
 }
 
 // ============================================================================
@@ -672,6 +740,12 @@ export const FoodCartProvider: React.FC<FoodCartProviderProps> = ({
           restaurantName: restaurant.name,
           addedAt: Timestamp.now(),
           isOptimistic: false,
+          name_tr: food.nameTr ?? null,
+          name_en: food.nameEn ?? null,
+          name_ru: food.nameRu ?? null,
+          description_tr: food.descriptionTr ?? null,
+          description_en: food.descriptionEn ?? null,
+          description_ru: food.descriptionRu ?? null,
         };
 
         setItems((prev) => {
@@ -742,6 +816,12 @@ export const FoodCartProvider: React.FC<FoodCartProviderProps> = ({
             restaurantName: restaurant.name,
             addedAt: Timestamp.now(),
             isOptimistic: false,
+            name_tr: food.nameTr ?? null,
+            name_en: food.nameEn ?? null,
+            name_ru: food.nameRu ?? null,
+            description_tr: food.descriptionTr ?? null,
+            description_en: food.descriptionEn ?? null,
+            description_ru: food.descriptionRu ?? null,
           };
 
           setItems((prev) => {

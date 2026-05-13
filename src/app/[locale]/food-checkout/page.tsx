@@ -4,11 +4,14 @@ import React, { useState, useCallback, useMemo } from "react";
 import SmartImage from "@/app/components/SmartImage";
 import { Link } from "@/navigation";
 
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useTheme } from "@/hooks/useTheme";
 import { useUser } from "@/context/UserProvider";
 import { useRouter } from "@/navigation";
 import { FoodCartProvider } from "@/context/FoodCartProvider";
+import type { SelectedExtra } from "@/context/FoodCartProvider";
+import { FoodExtrasData } from "@/constants/foodExtras";
+import { pickLocalized, pickLocalizedExtra } from "@/utils/foodLocalized";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "@/lib/firebase";
 import {
@@ -52,12 +55,44 @@ function CartItemRow({
   isDarkMode: boolean;
 }) {
   const { updateQuantity, removeItem } = useFoodCartActions();
+  const locale = useLocale();
+  const tRoot = useTranslations();
 
   const extrasTotal = item.extras.reduce(
     (sum, ext) => sum + ext.price * ext.quantity,
     0,
   );
   const lineTotal = (item.price + extrasTotal) * item.quantity;
+
+  const displayName = pickLocalized(
+    locale,
+    item.name,
+    item.name_tr ?? undefined,
+    item.name_en ?? undefined,
+    item.name_ru ?? undefined,
+  );
+
+  // Resolve the display label for an extra:
+  //   1. Per-doc translation snapshotted onto the cart extra (custom extras).
+  //   2. Static .json dictionary (predefined English-key extras).
+  //   3. Raw name as last-resort fallback.
+  const labelForExtra = (ext: SelectedExtra): string => {
+    const perDoc = pickLocalizedExtra(
+      locale,
+      ext.name_tr ?? undefined,
+      ext.name_en ?? undefined,
+      ext.name_ru ?? undefined,
+    );
+    if (perDoc) return perDoc;
+    const key = FoodExtrasData.kExtrasTranslationKeys[ext.name];
+    if (!key) return ext.name;
+    try {
+      const translated = tRoot(key);
+      return translated !== key ? translated : ext.name;
+    } catch {
+      return ext.name;
+    }
+  };
 
   return (
     <div
@@ -70,7 +105,7 @@ function CartItemRow({
           <SmartImage
             source={item.imageUrl}
             size="thumbnail"
-            alt={item.name}
+            alt={displayName}
             fill
             className="object-cover"
             sizes="64px"
@@ -93,7 +128,7 @@ function CartItemRow({
               isDarkMode ? "text-white" : "text-gray-900"
             }`}
           >
-            {item.name}
+            {displayName}
           </h4>
           <button
             onClick={() => removeItem(item.foodId)}
@@ -127,7 +162,7 @@ function CartItemRow({
                     : "bg-orange-50 text-orange-600"
                 }`}
               >
-                {ext.name}
+                {labelForExtra(ext)}
               </span>
             ))}
           </div>
