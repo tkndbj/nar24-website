@@ -50,6 +50,10 @@ interface RestaurantDetailProps {
   foods: Food[];
   drinks: DrinkItem[];
   loading: boolean;
+  /** Pre-computed food category facets from `food_menu_cache`. When provided,
+   *  the body skips its own Typesense `fetchFoodFacets` call — same data,
+   *  one fewer external dependency, faster first paint. */
+  categoryFacets?: string[];
 }
 
 // ─── Restaurant Header ──────────────────────────────────────────────────────
@@ -785,6 +789,7 @@ export default function RestaurantDetail({
   foods,
   drinks,
   loading,
+  categoryFacets,
 }: RestaurantDetailProps) {
   const isDarkMode = useTheme();
   const t = useTranslations("restaurantDetail");
@@ -934,16 +939,28 @@ export default function RestaurantDetail({
     [items, removeItem],
   );
 
-  // Fetch this restaurant's food categories from Typesense facets
+  // Adopt facets from the menu cache when the parent passed them in. The
+  // cache parent doc carries `categoryFacets` computed at rebuild time, so
+  // the body can skip an extra Typesense round-trip on first paint.
+  useEffect(() => {
+    if (categoryFacets && categoryFacets.length > 0) {
+      setRestaurantFoodCategories(categoryFacets);
+    }
+  }, [categoryFacets]);
+
+  // Cache-miss fallback: when the parent couldn't supply facets (no cache
+  // doc yet, or it failed to read), hit Typesense the way the page did
+  // before the menu cache existed.
   useEffect(() => {
     if (!restaurant?.id) return;
+    if (categoryFacets !== undefined) return; // parent already supplied facets
     const svc = TypeSenseServiceManager.instance.restaurantService;
     svc.fetchFoodFacets({ restaurantId: restaurant.id }).then((facets) => {
       if (facets.foodCategory?.length) {
         setRestaurantFoodCategories(facets.foodCategory.map((f) => f.value));
       }
     });
-  }, [restaurant?.id]);
+  }, [restaurant?.id, categoryFacets]);
 
   // Typesense search results (only populated when user types a query)
   const [typesenseResults, setTypesenseResults] = useState<Food[] | null>(null);

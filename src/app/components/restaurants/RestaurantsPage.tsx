@@ -16,7 +16,7 @@ import FoodLocationPicker from "./FoodLocationPicker";
 import RestaurantBanner from "./RestaurantBanner";
 import { useUser } from "@/context/UserProvider";
 import { FoodAddress } from "@/app/models/FoodAddress";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, DocumentData } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 interface RestaurantsPageProps {
@@ -246,6 +246,74 @@ function RestaurantCard({
   );
 }
 
+// ─── Cache-aware slim-item parsing ──────────────────────────────────────────
+//
+// The CF `rebuildRegionCacheFromFirestore` writes slim restaurants into
+// `food_cache/region_{region}/pages/{idx}` with this exact shape:
+//   { id, name, profileImageUrl, profileImageStoragePath,
+//     cuisineTypes, foodType, averageRating, reviewCount,
+//     workingHoursJson, workingDays, minOrderPricesJson, isActive }
+//
+// `workingHours` and `minOrderPrices` are serialised as JSON strings to keep
+// the cached items compact and to avoid the cost of nested doc reads. We
+// parse them back into the `Restaurant` shape here.
+
+function parseSlimRestaurant(r: DocumentData): Restaurant | null {
+  const id = String(r.id ?? "");
+  if (!id) return null;
+
+  let workingHours: Restaurant["workingHours"];
+  if (typeof r.workingHoursJson === "string" && r.workingHoursJson) {
+    try {
+      const parsed = JSON.parse(r.workingHoursJson);
+      if (parsed?.open && parsed?.close) {
+        workingHours = { open: String(parsed.open), close: String(parsed.close) };
+      }
+    } catch {
+      /* keep undefined */
+    }
+  }
+
+  let minOrderPrices: Restaurant["minOrderPrices"];
+  if (typeof r.minOrderPricesJson === "string" && r.minOrderPricesJson) {
+    try {
+      const parsed = JSON.parse(r.minOrderPricesJson);
+      if (Array.isArray(parsed)) {
+        minOrderPrices = parsed
+          .filter((p) => p && typeof p === "object")
+          .map((p) => ({
+            mainRegion: String(p.mainRegion ?? ""),
+            subregion: String(p.subregion ?? ""),
+            minOrderPrice: Number(p.minOrderPrice ?? 0),
+          }));
+      }
+    } catch {
+      /* keep undefined */
+    }
+  }
+
+  return {
+    id,
+    name: String(r.name ?? ""),
+    profileImageUrl: r.profileImageUrl ? String(r.profileImageUrl) : undefined,
+    profileImageStoragePath: r.profileImageStoragePath
+      ? String(r.profileImageStoragePath)
+      : undefined,
+    cuisineTypes: Array.isArray(r.cuisineTypes)
+      ? (r.cuisineTypes as string[])
+      : undefined,
+    foodType: Array.isArray(r.foodType) ? (r.foodType as string[]) : undefined,
+    averageRating: r.averageRating != null ? Number(r.averageRating) : undefined,
+    reviewCount: r.reviewCount != null ? Number(r.reviewCount) : undefined,
+    isActive: r.isActive !== false,
+    workingDays: Array.isArray(r.workingDays)
+      ? (r.workingDays as string[])
+      : undefined,
+    workingHours,
+    minOrderPrices,
+  };
+}
+
 // ─── Main Page ──────────────────────────────────────────────────────────────
 
 const HITS_PER_PAGE = 30;
@@ -304,62 +372,116 @@ export default function RestaurantsPage({
 
   const pillsRef = useRef<HTMLDivElement>(null);
 
+  // ── Cache pagination state ───────────────────────────────────────────────
+  // When the default-view cache hit succeeds we walk `food_cache/region_X/
+  // pages/{idx}` on scroll until exhausted, then fall through to Typesense
+  // at an offset aligned to the cache page boundary (cachedPageCount *
+  // pageSize) — so the two sources never duplicate or skip items.
+  const cacheActiveRef = useRef(false);
+  const cacheRegionRef = useRef<string | null>(null);
+  const cachePageCountRef = useRef(0);
+  const cachePageSizeRef = useRef(0);
+  const highestCachePageRef = useRef(-1);
+  const totalRestaurantCountRef = useRef(0);
+  // IDs already rendered — used to dedupe across the cache→Typesense
+  // transition since cache shards are 100/page and Typesense queries are
+  // 30/page. When we hand off, Typesense's nearest aligned page will
+  // overlap the cache range; dedupe drops the duplicates.
+  const loadedIdsRef = useRef<Set<string>>(new Set());
+
+  const resetCacheState = useCallback(() => {
+    cacheActiveRef.current = false;
+    cacheRegionRef.current = null;
+    cachePageCountRef.current = 0;
+    cachePageSizeRef.current = 0;
+    highestCachePageRef.current = -1;
+    totalRestaurantCountRef.current = 0;
+    loadedIdsRef.current = new Set();
+  }, []);
+
+  // Filters items by ID against `loadedIdsRef`, mutating the set with the
+  // new entries. Safe to call before every state append.
+  const dedupeAndTrack = useCallback((items: Restaurant[]): Restaurant[] => {
+    const seen = loadedIdsRef.current;
+    const fresh: Restaurant[] = [];
+    for (const r of items) {
+      if (!r.id || seen.has(r.id)) continue;
+      seen.add(r.id);
+      fresh.push(r);
+    }
+    return fresh;
+  }, []);
+
+  // Reads `food_cache/region_{region}` parent + `pages/0` in parallel. On
+  // success, primes the cache-pagination refs and returns true. On any miss
+  // or error returns false so the caller can fall back to Typesense.
   const fetchFromCache = useCallback(async (): Promise<boolean> => {
     if (!deliveryFilterRegions?.length) return false;
 
     const region = deliveryFilterRegions[0];
+    const parentRef = doc(db, "food_cache", `region_${region}`);
+
     try {
-      const cacheDoc = await getDoc(doc(db, "food_cache", `region_${region}`));
-      if (!cacheDoc.exists()) return false;
+      const [parentSnap, page0Snap] = await Promise.all([
+        getDoc(parentRef),
+        getDoc(doc(parentRef, "pages", "0")),
+      ]);
 
-      const data = cacheDoc.data();
-      const rawList = (data.restaurants ?? []) as Record<string, unknown>[];
-      const totalInRegion = (data.restaurantCount as number) ?? rawList.length;
+      if (!parentSnap.exists()) {
+        resetCacheState();
+        return false;
+      }
 
-      // If cache is incomplete, fall back to Typesense
-      if (rawList.length < totalInRegion) return false;
+      const parent = parentSnap.data();
+      const pageCount = Number(parent.pageCount ?? 0);
+      const pageSize = Number(parent.pageSize ?? HITS_PER_PAGE);
+      const cachedCount = Number(parent.cachedCount ?? 0);
+      const totalCount = Number(parent.restaurantCount ?? cachedCount);
 
-      const restaurants: Restaurant[] = rawList.map((r) => ({
-        id: String(r.id ?? ""),
-        name: String(r.name ?? ""),
-        profileImageUrl: r.profileImageUrl ? String(r.profileImageUrl) : undefined,
-        cuisineTypes: Array.isArray(r.cuisineTypes) ? (r.cuisineTypes as string[]) : undefined,
-        foodType: Array.isArray(r.foodType) ? (r.foodType as string[]) : undefined,
-        averageRating: r.averageRating != null ? Number(r.averageRating) : undefined,
-        reviewCount: r.reviewCount != null ? Number(r.reviewCount) : undefined,
-        isActive: r.isActive === true,
-        workingDays: Array.isArray(r.workingDays) ? (r.workingDays as string[]) : undefined,
-        workingHours: (() => {
-          if (typeof r.workingHoursJson !== "string" || !r.workingHoursJson) return undefined;
-          try {
-            const parsed = JSON.parse(r.workingHoursJson);
-            if (parsed?.open && parsed?.close) return { open: parsed.open, close: parsed.close };
-          } catch { /* ignore */ }
-          return undefined;
-        })(),
-        minOrderPrices: (() => {
-          if (typeof r.minOrderPricesJson !== "string" || !r.minOrderPricesJson) return undefined;
-          try {
-            const parsed = JSON.parse(r.minOrderPricesJson);
-            if (Array.isArray(parsed)) return parsed;
-          } catch { /* ignore */ }
-          return undefined;
-        })(),
-      }));
+      const rawItems = page0Snap.exists()
+        ? Array.isArray(page0Snap.data()?.restaurants)
+          ? (page0Snap.data()!.restaurants as DocumentData[])
+          : []
+        : [];
 
-      const rawCuisines = (data.cuisineFacets ?? []) as Array<{ value: string; count: number }>;
+      const restaurants: Restaurant[] = [];
+      for (const item of rawItems) {
+        const parsed = parseSlimRestaurant(item);
+        if (parsed) restaurants.push(parsed);
+      }
+
+      const rawCuisines = (parent.cuisineFacets ?? []) as Array<{
+        value: string;
+        count: number;
+      }>;
       const cuisines = rawCuisines.filter((f) => f.value && f.count > 0);
 
-      setFilteredRestaurants(restaurants);
+      cacheActiveRef.current = true;
+      cacheRegionRef.current = region;
+      cachePageCountRef.current = pageCount;
+      cachePageSizeRef.current = pageSize;
+      highestCachePageRef.current = 0;
+      totalRestaurantCountRef.current = totalCount;
+      // Replace: reset the dedupe set, then seed it with the first page.
+      loadedIdsRef.current = new Set();
+      const seeded = dedupeAndTrack(restaurants);
+
+      setFilteredRestaurants(seeded);
       setCuisineFacets(cuisines);
-      setHasMore(false);
+      // More items remain if there are extra cache pages OR the cache was
+      // capped and the true total exceeds what we've loaded so far. In the
+      // latter case we'll transition to Typesense once cache pages run out.
+      setHasMore(
+        pageCount > 1 || totalCount > seeded.length || cachedCount < totalCount,
+      );
       initialLoadDone.current = true;
       return true;
     } catch (err) {
       console.warn("[RestaurantsPage] Cache read failed:", err);
+      resetCacheState();
       return false;
     }
-  }, [deliveryFilterRegions]);
+  }, [deliveryFilterRegions, resetCacheState, dedupeAndTrack]);
 
   // Show location picker on first visit if user is logged in but hasn't set foodAddress
   useEffect(() => {
@@ -408,7 +530,13 @@ export default function RestaurantsPage({
       sortOption === "default";
 
     const run = async () => {
-      // Try cache for default view
+      // Any filter/search invalidates the cache path — filtered views use
+      // Typesense end-to-end so results stay consistent with the index.
+      if (!isDefaultView) {
+        resetCacheState();
+      }
+
+      // Try cache for the default view (no filters, no sort, no search).
       if (isDefaultView) {
         const cacheHit = await fetchFromCache();
         if (!cancelled && cacheHit) {
@@ -437,7 +565,11 @@ export default function RestaurantsPage({
         });
 
         if (!cancelled) {
-          setFilteredRestaurants(result.items);
+          // Filtered/searched views start a fresh dedupe set — same as cache
+          // path, but seeded from Typesense.
+          loadedIdsRef.current = new Set();
+          const seeded = dedupeAndTrack(result.items);
+          setFilteredRestaurants(seeded);
           setHasMore(result.page < result.nbPages - 1);
           initialLoadDone.current = true;
         }
@@ -456,16 +588,91 @@ export default function RestaurantsPage({
     isUserLoading,
     deliveryFilterRegions,
     fetchFromCache,
+    resetCacheState,
+    dedupeAndTrack,
   ]);
 
 
-  // Load next page — called by IntersectionObserver
+  // Load next page — called by IntersectionObserver. While the cache path is
+  // active we walk `pages/{idx}` shards; once those are exhausted we hand
+  // off to Typesense at an offset aligned to the cache page boundary so we
+  // don't duplicate or skip items across the transition.
   const loadMore = useCallback(() => {
     if (isLoadingMore || !hasMore) return;
 
     const version = filterVersionRef.current;
-    const nextPage = currentPageRef.current + 1;
     setIsLoadingMore(true);
+
+    const finish = () => {
+      if (filterVersionRef.current === version) {
+        setIsLoadingMore(false);
+      }
+    };
+
+    // ── Cache-page path ────────────────────────────────────────────────
+    if (
+      cacheActiveRef.current &&
+      cacheRegionRef.current &&
+      highestCachePageRef.current + 1 < cachePageCountRef.current
+    ) {
+      const region = cacheRegionRef.current;
+      const nextIdx = highestCachePageRef.current + 1;
+      const parentRef = doc(db, "food_cache", `region_${region}`);
+
+      getDoc(doc(parentRef, "pages", String(nextIdx)))
+        .then((snap) => {
+          if (filterVersionRef.current !== version) return;
+          if (!snap.exists()) {
+            // Shard missing — give up on cache, switch to Typesense from
+            // the next offset boundary.
+            cacheActiveRef.current = false;
+            return;
+          }
+          const rawItems = Array.isArray(snap.data()?.restaurants)
+            ? (snap.data()!.restaurants as DocumentData[])
+            : [];
+          const restaurants: Restaurant[] = [];
+          for (const item of rawItems) {
+            const parsed = parseSlimRestaurant(item);
+            if (parsed) restaurants.push(parsed);
+          }
+          highestCachePageRef.current = nextIdx;
+          const fresh = dedupeAndTrack(restaurants);
+          setFilteredRestaurants((prev) => [...prev, ...fresh]);
+
+          const cachedLoadedSoFar =
+            (nextIdx + 1) * cachePageSizeRef.current;
+          // Still more cache pages, OR the cap was hit and Typesense should
+          // pick up beyond the cached range.
+          setHasMore(
+            nextIdx + 1 < cachePageCountRef.current ||
+              totalRestaurantCountRef.current > cachedLoadedSoFar,
+          );
+        })
+        .catch((err) => {
+          console.warn("[RestaurantsPage] Cache page read failed:", err);
+          cacheActiveRef.current = false;
+        })
+        .finally(finish);
+      return;
+    }
+
+    // ── Typesense path ─────────────────────────────────────────────────
+    // Transitioning out of cache: jump to the Typesense page that contains
+    // the first not-yet-loaded item, then let dedupeAndTrack drop any
+    // overlap with cached items. (Cache shard size is 100 and Typesense
+    // queries use HITS_PER_PAGE=30, so the boundary isn't clean — overlap
+    // is expected and handled.)
+    let nextPage: number;
+    if (cacheActiveRef.current) {
+      const cacheItemsLoaded =
+        cachePageCountRef.current * cachePageSizeRef.current;
+      nextPage = Math.floor(cacheItemsLoaded / HITS_PER_PAGE);
+      cacheActiveRef.current = false;
+      currentPageRef.current = nextPage;
+    } else {
+      nextPage = currentPageRef.current + 1;
+    }
 
     const svc = TypeSenseServiceManager.instance.restaurantService;
     svc
@@ -480,17 +687,13 @@ export default function RestaurantsPage({
         deliveryRegions: deliveryFilterRegions,
       })
       .then((result) => {
-        // Discard if filters changed while this was in flight
         if (filterVersionRef.current !== version) return;
         currentPageRef.current = nextPage;
-        setFilteredRestaurants((prev) => [...prev, ...result.items]);
+        const fresh = dedupeAndTrack(result.items);
+        setFilteredRestaurants((prev) => [...prev, ...fresh]);
         setHasMore(result.page < result.nbPages - 1);
       })
-      .finally(() => {
-        if (filterVersionRef.current === version) {
-          setIsLoadingMore(false);
-        }
-      });
+      .finally(finish);
   }, [
     isLoadingMore,
     hasMore,
@@ -499,6 +702,7 @@ export default function RestaurantsPage({
     selectedFoodType,
     sortOption,
     deliveryFilterRegions,
+    dedupeAndTrack,
   ]);
 
   // IntersectionObserver to trigger loadMore when sentinel is visible
